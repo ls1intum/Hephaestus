@@ -30,7 +30,6 @@ import {
 	accountLabel,
 	eventLabel,
 	eventSeverity,
-	humanizeDetails,
 	resultLabel,
 } from "./auditFormat";
 
@@ -39,6 +38,8 @@ export interface AdminAuditTableProps {
 	isLoading: boolean;
 	isError: boolean;
 	hasFilter: boolean;
+	/** Clears every filter — the only way out of an over-filtered empty state. */
+	onResetFilters?: () => void;
 	hasNextPage: boolean;
 	isFetchingNextPage: boolean;
 	onLoadMore: () => void;
@@ -67,6 +68,7 @@ export function AdminAuditTable({
 	isLoading,
 	isError,
 	hasFilter,
+	onResetFilters,
 	hasNextPage,
 	isFetchingNextPage,
 	onLoadMore,
@@ -85,7 +87,7 @@ export function AdminAuditTable({
 					<EmptyMedia variant="icon">
 						<ScrollText />
 					</EmptyMedia>
-					<EmptyTitle>Failed to load audit events.</EmptyTitle>
+					<EmptyTitle>Couldn&rsquo;t load the audit log</EmptyTitle>
 				</EmptyHeader>
 				{onRetry && (
 					<EmptyContent>
@@ -105,84 +107,73 @@ export function AdminAuditTable({
 					<EmptyMedia variant="icon">
 						<ScrollText />
 					</EmptyMedia>
-					<EmptyTitle>
-						{hasFilter ? "No events match the current filters." : "No audit events yet."}
-					</EmptyTitle>
+					<EmptyTitle>{hasFilter ? "No events match your filters" : "No events yet"}</EmptyTitle>
 					{!hasFilter && (
 						<EmptyDescription>
-							Sign-ins, impersonation, role changes and account deletions will appear here.
+							Sign-ins, impersonation, role changes, and account deletions will appear here.
 						</EmptyDescription>
 					)}
 				</EmptyHeader>
+				{hasFilter && onResetFilters && (
+					<EmptyContent>
+						<Button variant="outline" onClick={onResetFilters}>
+							Reset filters
+						</Button>
+					</EmptyContent>
+				)}
 			</Empty>
 		);
 	}
 
 	return (
 		<div className="space-y-4">
-			<div className="rounded-md border">
-				<Table>
-					<TableCaption className="sr-only">
-						Authentication and admin events, newest first
-					</TableCaption>
-					<TableHeader>
-						<TableRow>
-							<TableHead scope="col">Time</TableHead>
-							<TableHead scope="col">Event</TableHead>
-							<TableHead scope="col">Result</TableHead>
-							<TableHead scope="col">Account</TableHead>
-							<TableHead scope="col">Actor</TableHead>
-							<TableHead scope="col" className="hidden md:table-cell">
-								IP
-							</TableHead>
-							<TableHead scope="col" className="hidden lg:table-cell">
-								Summary
-							</TableHead>
-							<TableHead scope="col">
-								<span className="sr-only">Details</span>
-							</TableHead>
-						</TableRow>
-					</TableHeader>
-					{isLoading ? (
-						<TableRowsSkeleton
-							columns={["w-24", "w-28", "w-16", "w-24", "w-24", "w-20", "w-32", null]}
-							rows={8}
-						/>
-					) : (
-						<TableBody>
-							{events.map((e) => {
-								const severity = eventSeverity(e.eventType, e.result);
-								const account = accountLabel(e.account, e.accountId);
-								const actor = accountLabel(e.actor, e.actingAccountId);
-								const summary =
-									e.result === "FAILURE" && e.failureReason
-										? e.failureReason
-										: humanizeDetails(e.details);
-								return (
-									<TableRow key={e.id}>
-										<TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-											<RelativeTime value={e.occurredAt} />
-										</TableCell>
-										<TableCell>
-											<span className="flex items-center gap-2" title={e.eventType}>
-												<span
-													className={`size-1.5 shrink-0 rounded-full ${SEVERITY_DOT[severity]}`}
-													aria-hidden
-												/>
-												{severity === "warning" && (
-													// Hue alone is the only marker of a high-risk event on this row; a failure
-													// at least also carries the destructive Result badge.
-													<span className="sr-only">High-risk event: </span>
-												)}
-												<span className="text-sm">{eventLabel(e.eventType)}</span>
-											</span>
-										</TableCell>
-										<TableCell>
-											<Badge variant={e.result === "FAILURE" ? "destructive" : "outline"}>
-												{resultLabel(e.result)}
-											</Badge>
-										</TableCell>
-										<TableCell className="max-w-[12rem] truncate">
+			<Table containerClassName="rounded-md border">
+				<TableCaption className="sr-only">Sign-in and account events, newest first</TableCaption>
+				<TableHeader>
+					<TableRow>
+						<TableHead scope="col">Time</TableHead>
+						<TableHead scope="col">Event</TableHead>
+						<TableHead scope="col">Result</TableHead>
+						<TableHead scope="col">Account</TableHead>
+						<TableHead scope="col" className="w-0 text-right">
+							<span className="sr-only">Details</span>
+						</TableHead>
+					</TableRow>
+				</TableHeader>
+				{isLoading ? (
+					<TableRowsSkeleton columns={["w-24", "w-28", "w-16", "w-24", null]} rows={8} />
+				) : (
+					<TableBody>
+						{events.map((e) => {
+							const severity = eventSeverity(e.eventType, e.result);
+							const account = accountLabel(e.account, e.accountId);
+							const actor = accountLabel(e.actor, e.actingAccountId);
+							return (
+								<TableRow key={e.id}>
+									<TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+										<RelativeTime value={e.occurredAt} />
+									</TableCell>
+									<TableCell>
+										<span className="flex items-center gap-2" title={e.eventType}>
+											<span
+												className={`size-1.5 shrink-0 rounded-full ${SEVERITY_DOT[severity]}`}
+												aria-hidden
+											/>
+											{severity === "warning" && (
+												// Hue alone is the only marker of a high-risk event on this row; a failure
+												// at least also carries the destructive Result badge.
+												<span className="sr-only">High-risk event: </span>
+											)}
+											<span className="text-sm">{eventLabel(e.eventType)}</span>
+										</span>
+									</TableCell>
+									<TableCell>
+										<Badge variant={e.result === "FAILURE" ? "destructive" : "outline"}>
+											{resultLabel(e.result)}
+										</Badge>
+									</TableCell>
+									<TableCell className="max-w-[12rem]">
+										<span className="block truncate">
 											{account ? (
 												onFilterAccount && e.accountId != null ? (
 													<FilterLink
@@ -196,63 +187,42 @@ export function AdminAuditTable({
 											) : (
 												"—"
 											)}
-										</TableCell>
-										<TableCell className="max-w-[12rem] truncate">
-											{actor ? (
-												<span className="text-muted-foreground">
-													via{" "}
-													{onFilterActor && e.actingAccountId != null ? (
-														<FilterLink
-															label={actor}
-															title={e.actor?.email ?? `Filter by ${actor}`}
-															onSelect={() => onFilterActor(e.actingAccountId as number)}
-														/>
-													) : (
-														actor
-													)}
-												</span>
-											) : (
-												"—"
-											)}
-										</TableCell>
-										<TableCell className="font-mono text-xs text-muted-foreground">
-											{e.ipAddress ?? "—"}
-										</TableCell>
-										<TableCell className="max-w-xs">
-											{summary ? (
-												<span
-													className={`block truncate text-xs ${
-														e.result === "FAILURE" ? "text-destructive" : "text-muted-foreground"
-													}`}
-													title={summary}
-												>
-													{summary}
-												</span>
-											) : (
-												"—"
-											)}
-										</TableCell>
-										<TableCell className="text-right">
-											<Button
-												type="button"
-												variant="ghost"
-												size="sm"
-												aria-label={`View details of ${eventLabel(e.eventType)} event`}
-												onClick={() => {
-													setDetail(e);
-													setDetailOpen(true);
-												}}
-											>
-												Details
-											</Button>
-										</TableCell>
-									</TableRow>
-								);
-							})}
-						</TableBody>
-					)}
-				</Table>
-			</div>
+										</span>
+										{actor && (
+											<span className="block truncate text-xs text-muted-foreground">
+												impersonated by{" "}
+												{onFilterActor && e.actingAccountId != null ? (
+													<FilterLink
+														label={actor}
+														title={e.actor?.email ?? `Filter by ${actor}`}
+														onSelect={() => onFilterActor(e.actingAccountId as number)}
+													/>
+												) : (
+													actor
+												)}
+											</span>
+										)}
+									</TableCell>
+									<TableCell className="text-right">
+										<Button
+											type="button"
+											variant="ghost"
+											size="sm"
+											aria-label={`View details: ${eventLabel(e.eventType)}${account ? ` — ${account}` : ""}`}
+											onClick={() => {
+												setDetail(e);
+												setDetailOpen(true);
+											}}
+										>
+											Details
+										</Button>
+									</TableCell>
+								</TableRow>
+							);
+						})}
+					</TableBody>
+				)}
+			</Table>
 
 			{hasNextPage && (
 				<div className="flex justify-center">

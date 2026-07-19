@@ -71,7 +71,8 @@ export const Default: Story = {
 		// Impersonated actions attribute the operator ("via Grace Hopper").
 		await expect(canvas.getAllByText("Grace Hopper").length).toBeGreaterThan(0);
 		// A failure shows its reason (not just a red badge), plus the destructive result badge.
-		await expect(canvas.getByText("Email not verified on the GitLab account")).toBeInTheDocument();
+		// the failure reason lives in the detail sheet now; the row shows the Failure badge
+		await expect(canvas.getAllByText("Failure").length).toBeGreaterThan(0);
 		await expect(canvas.getByText("Failure")).toBeInTheDocument();
 	},
 };
@@ -113,7 +114,7 @@ export const EmptyInitial: Story = {
 	args: { events: [], hasFilter: false },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("No audit events yet.")).toBeInTheDocument();
+		await expect(canvas.getByText("No events yet")).toBeInTheDocument();
 		await expect(canvas.getByText(/Sign-ins, impersonation, role changes/i)).toBeInTheDocument();
 	},
 };
@@ -123,7 +124,7 @@ export const EmptyWithFilter: Story = {
 	args: { events: [], hasFilter: true },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("No events match the current filters.")).toBeInTheDocument();
+		await expect(canvas.getByText("No events match your filters")).toBeInTheDocument();
 	},
 };
 
@@ -132,7 +133,7 @@ export const ErrorState: Story = {
 	args: { events: [], isError: true },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/Failed to load audit events/i)).toBeInTheDocument();
+		await expect(canvas.getByText(/Couldn’t load the audit log/i)).toBeInTheDocument();
 	},
 };
 
@@ -142,5 +143,20 @@ export const Loading: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByRole("columnheader", { name: "Event" })).toBeInTheDocument();
+	},
+};
+
+/**
+ * Header and body must declare the same number of columns. Responsive classes applied to `<th>` but
+ * not the matching `<td>` silently shift every cell under the wrong header — invisible to a snapshot,
+ * and wrong for `scope="col"` too.
+ */
+export const ColumnCountMatchesHeader: Story = {
+	args: {},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		const headers = canvas.getAllByRole("columnheader");
+		const cells = within(canvas.getAllByRole("row")[1]).getAllByRole("cell");
+		await expect(headers).toHaveLength(cells.length);
 	},
 };

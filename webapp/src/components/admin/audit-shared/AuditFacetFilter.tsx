@@ -97,10 +97,10 @@ export function AuditFacetFilter({ title, options, selected, onChange }: AuditFa
 
 			<ComboboxContent align="start" className="min-w-56">
 				<ComboboxSearchInput
-					placeholder={`Search ${title.toLowerCase()}…`}
-					aria-label={`Search ${title.toLowerCase()}`}
+					placeholder="Search…"
+					aria-label={`Search ${title.toLowerCase()} options`}
 				/>
-				<ComboboxEmpty>No matches.</ComboboxEmpty>
+				<ComboboxEmpty>No matches</ComboboxEmpty>
 				<ComboboxList>
 					{(option: AuditFacetOption) => (
 						<ComboboxItem key={option.value} value={option} className="pr-1.5">
@@ -119,7 +119,7 @@ export function AuditFacetFilter({ title, options, selected, onChange }: AuditFa
 				    ComboboxClear unmounts itself when nothing is selected, so it needs no guard. */}
 				<ComboboxSeparator />
 				<ComboboxClear render={<Button variant="ghost" size="sm" className="h-8 font-normal" />}>
-					Clear {title.toLowerCase()}
+					Clear selection
 				</ComboboxClear>
 			</ComboboxContent>
 		</Combobox>

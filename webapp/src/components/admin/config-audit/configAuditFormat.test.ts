@@ -136,9 +136,9 @@ describe("formatLeaf", () => {
 });
 
 describe("changeSummary", () => {
-	it("names created/deleted without a diff arrow", () => {
-		expect(changeSummary(entry({ action: "CREATED", newValue: "{}" }))).toBe("Created");
-		expect(changeSummary(entry({ action: "DELETED", oldValue: "{}" }))).toBe("Deleted");
+	it("leaves the summary empty for created/deleted, where the Action badge already says it", () => {
+		expect(changeSummary(entry({ action: "CREATED", newValue: "{}" }))).toBe("");
+		expect(changeSummary(entry({ action: "DELETED", oldValue: "{}" }))).toBe("");
 	});
 	it("spells out one or two field changes inline", () => {
 		expect(
@@ -151,7 +151,7 @@ describe("changeSummary", () => {
 			),
 		).toBe("cooldownMinutes: 30 → 10");
 	});
-	it("collapses many field changes to a count + key list", () => {
+	it("collapses many field changes to a count, leaving the field names to the detail sheet", () => {
 		expect(
 			changeSummary(
 				entry({
@@ -160,7 +160,7 @@ describe("changeSummary", () => {
 					newValue: '{"a":2,"b":2,"c":2}',
 				}),
 			),
-		).toBe("3 settings changed: a, b, c");
+		).toBe("3 fields changed");
 	});
 });
 
@@ -236,7 +236,7 @@ describe("degrading on unusable data", () => {
 		// still has to say what kind of change it was, not render empty.
 		const broken = entry({ action: "UPDATED", oldValue: "{not json", newValue: "{also not json" });
 		expect(fieldChanges(broken)).toEqual([]);
-		expect(changeSummary(broken)).toBe("No field changes");
+		expect(changeSummary(broken)).toBe("");
 	});
 
 	it("falls back to the raw enum for an entity type the client does not know yet", () => {

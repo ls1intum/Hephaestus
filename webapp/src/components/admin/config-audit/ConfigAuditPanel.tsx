@@ -192,6 +192,7 @@ function ConfigAuditView({
 				isLoading={listQuery.isLoading}
 				isError={listQuery.isError}
 				hasFilter={hasFilter}
+				onResetFilters={reset}
 				hasNextPage={listQuery.hasNextPage}
 				isFetchingNextPage={listQuery.isFetchingNextPage}
 				onLoadMore={() => listQuery.fetchNextPage()}

@@ -20,8 +20,10 @@ export function AuditRefFilterPill({ label, id, name, onClear }: AuditRefFilterP
 	const shown = name ?? `#${id}`;
 	return (
 		<ButtonGroup>
-			<ButtonGroupText className="h-8">
-				{label}: {shown}
+			<ButtonGroupText className="h-8 min-w-0 max-w-[60vw] sm:max-w-xs">
+				<span className="truncate" title={`${label}: ${shown}`}>
+					{label}: {shown}
+				</span>
 			</ButtonGroupText>
 			<Button
 				variant="outline"

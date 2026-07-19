@@ -33,9 +33,7 @@ function WorkspaceAuditPage() {
 					<h1 className="text-2xl font-semibold">Audit log</h1>
 				</div>
 				<p className="text-sm text-muted-foreground">
-					Who changed which setting in this workspace, and when. Append-only — entries can't be
-					edited or removed. Times are shown in your local timezone; open a row for the exact UTC
-					instant.
+					A permanent record of who changed which settings in this workspace.
 				</p>
 			</header>
 

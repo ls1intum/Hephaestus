@@ -39,9 +39,8 @@ function AdminAuditPage() {
 					<h1 className="text-2xl font-semibold">Audit log</h1>
 				</div>
 				<p className="text-sm text-muted-foreground">
-					Read-only record of who did what, and when, across the instance. Append-only — entries
-					can't be edited or removed. Times are shown in your local timezone; open a row for the
-					exact UTC instant.
+					A permanent record of sign-ins, permission changes, and settings changes across this
+					instance.
 				</p>
 			</header>
 
@@ -60,9 +59,9 @@ function AdminAuditPage() {
 					})
 				}
 			>
-				<TabsList>
-					<TabsTrigger value="signins">Sign-ins &amp; accounts</TabsTrigger>
-					<TabsTrigger value="settings">Settings changes</TabsTrigger>
+				<TabsList className="h-10 w-full p-1">
+					<TabsTrigger value="signins">Access</TabsTrigger>
+					<TabsTrigger value="settings">Settings</TabsTrigger>
 				</TabsList>
 
 				<TabsContent value="signins" className="pt-4">

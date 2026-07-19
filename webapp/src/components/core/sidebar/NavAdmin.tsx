@@ -282,7 +282,7 @@ export function NavAdmin({
 				    turned off, since the record of past changes still exists. */}
 				<SidebarMenuItem>
 					<SidebarMenuButton
-						tooltip="Setting change history"
+						tooltip="Settings changes in this workspace"
 						render={
 							<Link to="/w/$workspaceSlug/admin/audit" params={{ workspaceSlug }} search={{}} />
 						}

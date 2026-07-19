@@ -58,7 +58,7 @@ export function ConfigAuditDetailSheet({
 		<Sheet open={open} onOpenChange={onOpenChange}>
 			<SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
 				<SheetHeader>
-					<SheetTitle>{entry ? subject?.label : "Configuration change"}</SheetTitle>
+					<SheetTitle>{entry ? subject?.label : "Settings change"}</SheetTitle>
 					<SheetDescription>
 						{entry ? `${actionLabel(entry.action)} — ${entityTypeLabel(entry.entityType)}` : ""}
 					</SheetDescription>
@@ -117,7 +117,7 @@ export function ConfigAuditDetailSheet({
 						<div>
 							<h3 className="mb-2 text-sm font-medium">{valuesHeading}</h3>
 							{changes.length === 0 ? (
-								<p className="text-sm text-muted-foreground">No field-level changes recorded.</p>
+								<p className="text-sm text-muted-foreground">No field changes recorded</p>
 							) : (
 								<dl className="divide-y rounded-md border">
 									{changes.map((change) => (

@@ -19,7 +19,7 @@ export interface AuditToolbarProps {
  */
 export function AuditToolbar({ children, hasFilter, onReset, actions }: AuditToolbarProps) {
 	return (
-		<div className="flex flex-wrap items-center gap-2">
+		<div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
 			{children}
 			{hasFilter && (
 				<Button variant="ghost" size="sm" className="h-8 px-2 lg:px-3" onClick={onReset}>
@@ -27,7 +27,9 @@ export function AuditToolbar({ children, hasFilter, onReset, actions }: AuditToo
 					<XIcon aria-hidden />
 				</Button>
 			)}
-			{actions && <div className="ml-auto flex items-center gap-2">{actions}</div>}
+			{/* ml-auto only from sm up: on one wrapped mobile column it would strand the actions on a
+			    line of their own, flush right against nothing. */}
+			{actions && <div className="flex items-center gap-2 sm:ml-auto">{actions}</div>}
 		</div>
 	);
 }

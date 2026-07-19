@@ -143,7 +143,9 @@ export const OpenPopup: Story = {
 		await userEvent.click(canvas.getByRole("combobox", { name: /^Setting/i }));
 
 		await expect(await screen.findByRole("listbox")).toBeInTheDocument();
-		await expect(await screen.findByRole("button", { name: /clear setting/i })).toBeInTheDocument();
+		await expect(
+			await screen.findByRole("button", { name: /clear selection/i }),
+		).toBeInTheDocument();
 	},
 };
 
@@ -153,7 +155,7 @@ export const ClearsOneFacetOnly: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await userEvent.click(canvas.getByRole("combobox", { name: /^Setting/i }));
-		await userEvent.click(await screen.findByRole("button", { name: /clear setting/i }));
+		await userEvent.click(await screen.findByRole("button", { name: /clear selection/i }));
 		await userEvent.keyboard("{Escape}");
 
 		await expect(canvas.queryByText(ENTITY_TYPE_LABELS.WORKSPACE_FEATURES)).not.toBeInTheDocument();

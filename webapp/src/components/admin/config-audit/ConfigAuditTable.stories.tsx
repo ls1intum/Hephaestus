@@ -149,7 +149,7 @@ export const EmptyWithFilter: Story = {
 	args: { entries: [], hasFilter: true },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("No changes match the current filters.")).toBeInTheDocument();
+		await expect(canvas.getByText("No changes match your filters")).toBeInTheDocument();
 	},
 };
 
@@ -158,7 +158,7 @@ export const EmptyInitial: Story = {
 	args: { entries: [] },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("No settings changes yet.")).toBeInTheDocument();
+		await expect(canvas.getByText("No settings changes yet")).toBeInTheDocument();
 	},
 };
 
@@ -167,7 +167,7 @@ export const ErrorState: Story = {
 	args: { entries: [], isError: true },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/Failed to load configuration changes/i)).toBeInTheDocument();
+		await expect(canvas.getByText(/Couldn’t load the audit log/i)).toBeInTheDocument();
 		await expect(canvas.getByRole("button", { name: /Try again/i })).toBeInTheDocument();
 	},
 };
@@ -183,5 +183,20 @@ export const LoadMore: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByRole("button", { name: /Load more/i })).toBeDisabled();
+	},
+};
+
+/**
+ * Header and body must declare the same number of columns. Responsive classes applied to `<th>` but
+ * not the matching `<td>` silently shift every cell under the wrong header — invisible to a snapshot,
+ * and wrong for `scope="col"` too.
+ */
+export const ColumnCountMatchesHeader: Story = {
+	args: { showWorkspace: true },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		const headers = canvas.getAllByRole("columnheader");
+		const cells = within(canvas.getAllByRole("row")[1]).getAllByRole("cell");
+		await expect(headers).toHaveLength(cells.length);
 	},
 };

@@ -38,6 +38,8 @@ export interface ConfigAuditTableProps {
 	isLoading: boolean;
 	isError: boolean;
 	hasFilter: boolean;
+	/** Clears every filter — the only way out of an over-filtered empty state. */
+	onResetFilters?: () => void;
 	hasNextPage: boolean;
 	isFetchingNextPage: boolean;
 	onLoadMore: () => void;
@@ -59,6 +61,7 @@ export function ConfigAuditTable({
 	isLoading,
 	isError,
 	hasFilter,
+	onResetFilters,
 	hasNextPage,
 	isFetchingNextPage,
 	onLoadMore,
@@ -77,7 +80,7 @@ export function ConfigAuditTable({
 					<EmptyMedia variant="icon">
 						<History />
 					</EmptyMedia>
-					<EmptyTitle>Failed to load configuration changes.</EmptyTitle>
+					<EmptyTitle>Couldn&rsquo;t load the audit log</EmptyTitle>
 				</EmptyHeader>
 				{onRetry && (
 					<EmptyContent>
@@ -98,7 +101,7 @@ export function ConfigAuditTable({
 						<History />
 					</EmptyMedia>
 					<EmptyTitle>
-						{hasFilter ? "No changes match the current filters." : "No settings changes yet."}
+						{hasFilter ? "No changes match your filters" : "No settings changes yet"}
 					</EmptyTitle>
 					{!hasFilter && (
 						<EmptyDescription>
@@ -107,106 +110,99 @@ export function ConfigAuditTable({
 						</EmptyDescription>
 					)}
 				</EmptyHeader>
+				{hasFilter && onResetFilters && (
+					<EmptyContent>
+						<Button variant="outline" onClick={onResetFilters}>
+							Reset filters
+						</Button>
+					</EmptyContent>
+				)}
 			</Empty>
 		);
 	}
 
 	return (
 		<div className="space-y-4">
-			<div className="rounded-md border">
-				<Table>
-					<TableCaption className="sr-only">Settings changes, newest first</TableCaption>
-					<TableHeader>
-						<TableRow>
-							<TableHead scope="col">Time</TableHead>
-							<TableHead scope="col">Action</TableHead>
-							<TableHead scope="col">Subject</TableHead>
-							{showWorkspace && (
-								<TableHead scope="col" className="hidden md:table-cell">
-									Workspace
-								</TableHead>
-							)}
-							<TableHead scope="col">Actor</TableHead>
-							<TableHead scope="col" className="hidden lg:table-cell">
-								Changes
-							</TableHead>
-							<TableHead scope="col">
-								<span className="sr-only">Details</span>
-							</TableHead>
-						</TableRow>
-					</TableHeader>
-					{isLoading ? (
-						<TableRowsSkeleton
-							columns={
-								showWorkspace
-									? ["w-24", "w-16", "w-32", "w-24", "w-24", "w-28", null]
-									: ["w-24", "w-16", "w-32", "w-24", "w-28", null]
-							}
-							rows={8}
-						/>
-					) : (
-						<TableBody>
-							{entries.map((entry) => {
-								const actor = actorDisplay(entry);
-								const subject = subjectLabel(entry);
-								const summary = changeSummary(entry);
-								const workspaceName =
-									entry.workspaceId != null ? resolveWorkspaceName?.(entry.workspaceId) : undefined;
-								return (
-									<TableRow key={entry.id}>
-										<TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-											<RelativeTime value={entry.occurredAt} />
+			<Table containerClassName="rounded-md border">
+				<TableCaption className="sr-only">Settings changes, newest first</TableCaption>
+				<TableHeader>
+					<TableRow>
+						<TableHead scope="col">Time</TableHead>
+						<TableHead scope="col">Action</TableHead>
+						<TableHead scope="col">Setting</TableHead>
+						{showWorkspace && <TableHead scope="col">Workspace</TableHead>}
+						<TableHead scope="col">Actor</TableHead>
+						<TableHead scope="col" className="w-0 text-right">
+							<span className="sr-only">Details</span>
+						</TableHead>
+					</TableRow>
+				</TableHeader>
+				{isLoading ? (
+					<TableRowsSkeleton
+						columns={
+							showWorkspace
+								? ["w-24", "w-16", "w-32", "w-24", "w-24", null]
+								: ["w-24", "w-16", "w-32", "w-24", null]
+						}
+						rows={8}
+					/>
+				) : (
+					<TableBody>
+						{entries.map((entry) => {
+							const actor = actorDisplay(entry);
+							const subject = subjectLabel(entry);
+							const summary = changeSummary(entry);
+							const workspaceName =
+								entry.workspaceId != null ? resolveWorkspaceName?.(entry.workspaceId) : undefined;
+							return (
+								<TableRow key={entry.id}>
+									<TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+										<RelativeTime value={entry.occurredAt} />
+									</TableCell>
+									<TableCell>
+										<Badge variant={ACTION_BADGE[entry.action ?? "UPDATED"]}>
+											{actionLabel(entry.action)}
+										</Badge>
+									</TableCell>
+									<TableCell
+										className="max-w-[14rem] truncate"
+										title={subject.hint ?? subject.label}
+									>
+										{subject.label}
+									</TableCell>
+									{showWorkspace && (
+										<TableCell className="max-w-[10rem] truncate text-sm text-muted-foreground">
+											{entry.workspaceId != null ? (workspaceName ?? `#${entry.workspaceId}`) : "—"}
 										</TableCell>
-										<TableCell>
-											<Badge variant={ACTION_BADGE[entry.action ?? "UPDATED"]}>
-												{actionLabel(entry.action)}
-											</Badge>
-										</TableCell>
-										<TableCell
-											className="max-w-[14rem] truncate"
-											title={subject.hint ?? subject.label}
-										>
-											{subject.label}
-										</TableCell>
-										{showWorkspace && (
-											<TableCell className="max-w-[10rem] truncate text-sm text-muted-foreground">
-												{entry.workspaceId != null
-													? (workspaceName ?? `#${entry.workspaceId}`)
-													: "—"}
-											</TableCell>
-										)}
-										<TableCell className="max-w-[14rem] truncate">
+									)}
+									<TableCell className="max-w-[14rem]">
+										<span className="block truncate">
 											<ActorCell actor={actor} onFilterActor={onFilterActor} />
-										</TableCell>
-										<TableCell className="max-w-xs">
-											<span
-												className="block truncate text-xs text-muted-foreground"
-												title={summary}
-											>
-												{summary}
-											</span>
-										</TableCell>
-										<TableCell className="text-right">
-											<Button
-												type="button"
-												variant="ghost"
-												size="sm"
-												aria-label={`View details of ${subject.label} change`}
-												onClick={() => {
-													setDetail(entry);
-													setDetailOpen(true);
-												}}
-											>
-												Details
-											</Button>
-										</TableCell>
-									</TableRow>
-								);
-							})}
-						</TableBody>
-					)}
-				</Table>
-			</div>
+										</span>
+										<span className="block truncate text-xs text-muted-foreground" title={summary}>
+											{summary}
+										</span>
+									</TableCell>
+									<TableCell className="text-right">
+										<Button
+											type="button"
+											variant="ghost"
+											size="sm"
+											aria-label={`View details: ${actionLabel(entry.action)} ${subject.label}`}
+											onClick={() => {
+												setDetail(entry);
+												setDetailOpen(true);
+											}}
+										>
+											Details
+										</Button>
+									</TableCell>
+								</TableRow>
+							);
+						})}
+					</TableBody>
+				)}
+			</Table>
 
 			{hasNextPage && (
 				<div className="flex justify-center">

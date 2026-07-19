@@ -148,7 +148,7 @@ export function AuthAuditPanel({
 					onChange={(values) => onSearchChange({ eventType: nonEmpty(values) })}
 				/>
 				<AuditFacetFilter
-					title="Outcome"
+					title="Result"
 					options={OUTCOME_OPTIONS}
 					selected={search.outcome ?? []}
 					onChange={(values) => onSearchChange({ outcome: nonEmpty(values) })}
@@ -167,7 +167,7 @@ export function AuthAuditPanel({
 				)}
 				{search.actorId !== undefined && (
 					<AuditRefFilterPill
-						label="Actor"
+						label="Impersonated by"
 						id={search.actorId}
 						name={nameForRef(events, search.actorId)}
 						onClear={() => onSearchChange({ actorId: undefined })}
@@ -188,6 +188,7 @@ export function AuthAuditPanel({
 				isLoading={listQuery.isLoading}
 				isError={listQuery.isError}
 				hasFilter={hasFilter}
+				onResetFilters={reset}
 				hasNextPage={Boolean(listQuery.hasNextPage)}
 				isFetchingNextPage={listQuery.isFetchingNextPage}
 				onLoadMore={() => listQuery.fetchNextPage()}

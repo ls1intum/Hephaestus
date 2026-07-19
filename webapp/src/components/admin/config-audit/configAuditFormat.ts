@@ -69,7 +69,7 @@ export function actorDisplay(entry: ConfigAuditEntryView): ActorDisplay {
 	if (kind === "IMPERSONATED") {
 		return {
 			kind,
-			primary: refLabel(entry.actingActor, entry.actingAccountId) ?? "Unknown operator",
+			primary: refLabel(entry.actingActor, entry.actingAccountId) ?? "Unknown",
 			primaryEmail: entry.actingActor?.email,
 			actingAs: refLabel(entry.actor, entry.actorAccountId) ?? undefined,
 			filterId: entry.actingAccountId,
@@ -133,14 +133,15 @@ export function subjectLabel(entry: ConfigAuditEntryView): { label: string; hint
 
 /** A one-line summary of the change for the table row. */
 export function changeSummary(entry: ConfigAuditEntryView): string {
-	if (entry.action === "CREATED") return "Created";
-	if (entry.action === "DELETED") return "Deleted";
+	// The row's Action badge already says Created/Deleted; repeating it here would fill the widest
+	// piece of the cell with nothing.
+	if (entry.action === "CREATED" || entry.action === "DELETED") return "";
 	const changes = fieldChanges(entry);
-	if (changes.length === 0) return "No field changes";
+	if (changes.length === 0) return "";
 	if (changes.length <= 2) {
 		return changes.map((c) => `${c.path}: ${c.before ?? "—"} → ${c.after ?? "—"}`).join(" · ");
 	}
-	return `${changes.length} settings changed: ${changes.map((c) => c.path).join(", ")}`;
+	return `${changes.length} fields changed`;
 }
 
 /** Slugs render as-is (already human), numeric ids as `#42`. */

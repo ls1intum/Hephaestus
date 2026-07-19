@@ -28,7 +28,7 @@ const ADMIN_SECTIONS = [
 		to: "/admin/audit",
 		label: "Audit log",
 		icon: ScrollText,
-		tooltip: "Sign-ins and settings changes",
+		tooltip: "Who did what, and when",
 	},
 ] as const;
 

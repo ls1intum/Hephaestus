@@ -8,7 +8,13 @@ import {
 	SheetTitle,
 } from "@/components/ui/sheet";
 import { DetailRow } from "../audit-shared/DetailRow";
-import { accountLabel, eventLabel, formatTimestamp, prettyDetails } from "./auditFormat";
+import {
+	accountLabel,
+	eventLabel,
+	formatTimestamp,
+	prettyDetails,
+	resultLabel,
+} from "./auditFormat";
 
 interface AuditEventDetailSheetProps {
 	event: AuthEventView | null;
@@ -60,7 +66,7 @@ export function AuditEventDetailSheet({
 						</DetailRow>
 						<DetailRow label="Result">
 							<Badge variant={event.result === "FAILURE" ? "destructive" : "outline"}>
-								{event.result}
+								{resultLabel(event.result)}
 							</Badge>
 						</DetailRow>
 						{event.failureReason && (
@@ -82,7 +88,7 @@ export function AuditEventDetailSheet({
 								"—"
 							)}
 						</DetailRow>
-						<DetailRow label="Actor">
+						<DetailRow label="Impersonated by">
 							{actor ? (
 								<span>
 									{actor}
@@ -107,7 +113,7 @@ export function AuditEventDetailSheet({
 						<DetailRow label="User agent">
 							<span className="text-xs">{event.userAgent ?? "—"}</span>
 						</DetailRow>
-						<DetailRow label="Details">
+						<DetailRow label="Raw data">
 							{pretty ? (
 								<pre className="max-h-48 overflow-auto rounded bg-muted p-2 text-xs">{pretty}</pre>
 							) : (
