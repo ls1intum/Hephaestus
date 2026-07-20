@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -11,4 +12,7 @@ public interface LlmModelWorkspaceGrantRepository
     List<LlmModelWorkspaceGrant> findByIdWorkspaceId(Long workspaceId);
 
     List<LlmModelWorkspaceGrant> findByIdModelId(Long modelId);
+
+    /** Batched grant lookup for the admin list view. */
+    List<LlmModelWorkspaceGrant> findByIdModelIdIn(Collection<Long> modelIds);
 }

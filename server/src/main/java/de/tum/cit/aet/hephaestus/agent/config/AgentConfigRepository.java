@@ -47,4 +47,7 @@ public interface AgentConfigRepository extends JpaRepository<AgentConfig, Long> 
 
     /** Deterministic default enabled config (oldest wins) — the mentor fallback when unbound. */
     Optional<AgentConfig> findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(Long workspaceId);
+
+    /** Whether any config still binds the given instance-catalog model (#1368) — guards model deletion. */
+    boolean existsByInstanceModelId(Long instanceModelId);
 }
