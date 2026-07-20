@@ -5,9 +5,7 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
-import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -17,7 +15,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 /**
  * CRUD, pricing, and sharing for instance-owned LLM catalog models (#1368). GLOBAL, {@code
@@ -205,37 +202,15 @@ public class LlmModelService {
     }
 
     private static void validatePriceRequest(UpdateLlmModelPriceRequest request) {
-        List<BigDecimal> rates = Arrays.asList(
+        LlmPriceValidation.validate(
+            request.pricingMode(),
             request.per1mInputUsd(),
             request.per1mOutputUsd(),
             request.per1mCacheReadUsd(),
             request.per1mCacheWriteUsd(),
-            request.per1mReasoningUsd()
+            request.per1mReasoningUsd(),
+            request.note()
         );
-        boolean anyRatePresent = rates.stream().anyMatch(rate -> rate != null);
-
-        if (request.pricingMode() == PricingMode.PRICED) {
-            if (request.per1mInputUsd() == null || request.per1mOutputUsd() == null) {
-                throw new IllegalArgumentException(
-                    "A price requires at least an input rate and an output rate (per 1M tokens)."
-                );
-            }
-            boolean anyNegative = rates.stream().anyMatch(rate -> rate != null && rate.signum() < 0);
-            if (anyNegative) {
-                throw new IllegalArgumentException("Rates must be zero or greater.");
-            }
-        } else {
-            if (anyRatePresent) {
-                throw new IllegalArgumentException(
-                    "Rates can only be set when the model has a price; clear them or set a price first."
-                );
-            }
-            if (request.pricingMode() == PricingMode.FREE && !StringUtils.hasText(request.note())) {
-                throw new IllegalArgumentException(
-                    "A note explaining why this model is free (e.g. self-hosted, no cost) is required."
-                );
-            }
-        }
     }
 
     /**

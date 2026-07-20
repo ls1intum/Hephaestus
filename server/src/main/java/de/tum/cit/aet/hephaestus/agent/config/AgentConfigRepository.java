@@ -50,4 +50,13 @@ public interface AgentConfigRepository extends JpaRepository<AgentConfig, Long> 
 
     /** Whether any config still binds the given instance-catalog model (#1368) — guards model deletion. */
     boolean existsByInstanceModelId(Long instanceModelId);
+
+    /**
+     * Whether any config in {@code workspaceId} still binds the given workspace (BYO) model (#1368) —
+     * guards {@code WorkspaceLlmModelService#delete}. Workspace-scoped (unlike
+     * {@link #existsByInstanceModelId}, which checks a global model across every tenant): a workspace's
+     * own model can only ever be bound within that same workspace, so the predicate is both a tenancy
+     * requirement and a correctness one.
+     */
+    boolean existsByWorkspaceModelIdAndWorkspaceId(Long workspaceModelId, Long workspaceId);
 }

@@ -8,4 +8,7 @@ public interface WorkspaceLlmConnectionRepository extends JpaRepository<Workspac
     List<WorkspaceLlmConnection> findByWorkspaceId(Long workspaceId);
 
     Optional<WorkspaceLlmConnection> findByWorkspaceIdAndSlug(Long workspaceId, String slug);
+
+    /** Tenancy-safe lookup for a client-supplied id (path variable) — never trust a bare {@code findById}. */
+    Optional<WorkspaceLlmConnection> findByIdAndWorkspaceId(Long id, Long workspaceId);
 }

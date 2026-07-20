@@ -19,6 +19,8 @@ public record AgentConfigDTO(
     @NonNull @Schema(description = "Maximum concurrent jobs") Integer maxConcurrentJobs,
     @NonNull @Schema(description = "Whether agent containers have internet access") Boolean allowInternet,
     @NonNull @Schema(description = "Authentication mode") CredentialMode credentialMode,
+    @Schema(description = "Bound shared (instance catalog) model id, if bound to one") Long instanceModelId,
+    @Schema(description = "Bound model id on your own provider, if bound to one") Long workspaceModelId,
     @NonNull @Schema(description = "Timestamp when the config was created") Instant createdAt,
     @Schema(description = "Timestamp when the config was last updated") Instant updatedAt
 ) {
@@ -35,6 +37,8 @@ public record AgentConfigDTO(
             config.getMaxConcurrentJobs(),
             config.isAllowInternet(),
             config.getCredentialMode(),
+            config.getInstanceModel() != null ? config.getInstanceModel().getId() : null,
+            config.getWorkspaceModel() != null ? config.getWorkspaceModel().getId() : null,
             config.getCreatedAt(),
             config.getUpdatedAt()
         );

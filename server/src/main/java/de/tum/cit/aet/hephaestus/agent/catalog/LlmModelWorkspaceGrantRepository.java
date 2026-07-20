@@ -15,4 +15,7 @@ public interface LlmModelWorkspaceGrantRepository
 
     /** Batched grant lookup for the admin list view. */
     List<LlmModelWorkspaceGrant> findByIdModelIdIn(Collection<Long> modelIds);
+
+    /** Bind-time visibility check: is a {@code GRANTED} model shared with this specific workspace? */
+    boolean existsByIdModelIdAndIdWorkspaceId(Long modelId, Long workspaceId);
 }

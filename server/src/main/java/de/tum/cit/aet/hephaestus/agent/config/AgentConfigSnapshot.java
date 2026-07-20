@@ -37,7 +37,9 @@ record AgentConfigSnapshot(
     boolean llmApiKeySet,
     int timeoutSeconds,
     int maxConcurrentJobs,
-    boolean allowInternet
+    boolean allowInternet,
+    @Nullable Long instanceModelId,
+    @Nullable Long workspaceModelId
 ) implements ConfigAuditSnapshot {
     static AgentConfigSnapshot of(AgentConfig c) {
         return new AgentConfigSnapshot(
@@ -51,7 +53,9 @@ record AgentConfigSnapshot(
             c.getLlmApiKey() != null && !c.getLlmApiKey().isBlank(),
             c.getTimeoutSeconds(),
             c.getMaxConcurrentJobs(),
-            c.isAllowInternet()
+            c.isAllowInternet(),
+            c.getInstanceModel() != null ? c.getInstanceModel().getId() : null,
+            c.getWorkspaceModel() != null ? c.getWorkspaceModel().getId() : null
         );
     }
 

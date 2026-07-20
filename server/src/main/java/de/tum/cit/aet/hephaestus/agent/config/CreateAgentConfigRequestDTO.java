@@ -41,5 +41,9 @@ public record CreateAgentConfigRequestDTO(
     Integer maxConcurrentJobs,
     @Schema(description = "Whether agent containers have internet access") Boolean allowInternet,
     @Schema(description = "Authentication mode: PROXY (internal proxy) or API_KEY (direct)", defaultValue = "PROXY")
-    CredentialMode credentialMode
+    CredentialMode credentialMode,
+    @Schema(description = "Bind to a shared (instance catalog) model. Mutually exclusive with workspaceModelId.")
+    Long instanceModelId,
+    @Schema(description = "Bind to a model on your own provider. Mutually exclusive with instanceModelId.")
+    Long workspaceModelId
 ) {}

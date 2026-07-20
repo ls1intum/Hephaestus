@@ -1,6 +1,12 @@
 package de.tum.cit.aet.hephaestus.agent.config;
 
 import de.tum.cit.aet.hephaestus.agent.CredentialMode;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelWorkspaceGrantRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.ModelVisibility;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModel;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
@@ -13,6 +19,7 @@ import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +32,9 @@ public class AgentConfigService {
     private final AgentJobRepository agentJobRepository;
     private final WorkspaceRepository workspaceRepository;
     private final ConfigAuditPort configAudit;
+    private final LlmModelRepository llmModelRepository;
+    private final WorkspaceLlmModelRepository workspaceLlmModelRepository;
+    private final LlmModelWorkspaceGrantRepository llmModelWorkspaceGrantRepository;
 
     @Transactional(readOnly = true)
     public List<AgentConfig> getConfigs(WorkspaceContext workspaceContext) {
@@ -84,6 +94,7 @@ public class AgentConfigService {
         if (request.credentialMode() != null) {
             config.setCredentialMode(request.credentialMode());
         }
+        applyModelBinding(config, workspaceContext, request.instanceModelId(), request.workspaceModelId(), null);
 
         validateCredentialMode(config);
 
@@ -157,6 +168,13 @@ public class AgentConfigService {
         if (request.credentialMode() != null) {
             config.setCredentialMode(request.credentialMode());
         }
+        applyModelBinding(
+            config,
+            workspaceContext,
+            request.instanceModelId(),
+            request.workspaceModelId(),
+            request.clearModelBinding()
+        );
 
         validateCredentialMode(config);
 
@@ -208,6 +226,63 @@ public class AgentConfigService {
         configAudit.record(
             ConfigAuditEntry.deleted(ConfigAuditEntityType.AGENT_CONFIG, config.getId(), workspaceContext.id(), before)
         );
+    }
+
+    /**
+     * Applies a model-binding write (#1368): exactly one of {@code instanceModelId} /
+     * {@code workspaceModelId} may be set (both non-null is a 400), and either clears the other side of
+     * the pair. {@code clearModelBinding=true} resets both to {@code null}, reverting to the legacy
+     * provider fields. Leaving both ids null (and no clear flag) is a no-op — it preserves the config's
+     * current binding, matching this DTO's partial-update convention elsewhere; the pre-existing
+     * {@code (NULL, NULL)} state of an unmigrated config is therefore never touched by an unrelated PATCH.
+     *
+     * <p>Bind-time validation only runs on the id actually supplied in this call, never on whatever the
+     * config already carries — re-validating an untouched binding on every unrelated field update would
+     * turn a later model/connection disable into a landmine for every config that happens to reference it.
+     */
+    private void applyModelBinding(
+        AgentConfig config,
+        WorkspaceContext workspaceContext,
+        @Nullable Long instanceModelId,
+        @Nullable Long workspaceModelId,
+        @Nullable Boolean clearModelBinding
+    ) {
+        if (Boolean.TRUE.equals(clearModelBinding)) {
+            config.setInstanceModel(null);
+            config.setWorkspaceModel(null);
+            return;
+        }
+        if (instanceModelId != null && workspaceModelId != null) {
+            throw new IllegalArgumentException(
+                "An agent config can bind to only one model at a time — a shared model or your own " +
+                    "provider's model, not both."
+            );
+        }
+        if (instanceModelId != null) {
+            LlmModel model = llmModelRepository
+                .findById(instanceModelId)
+                .orElseThrow(() -> new EntityNotFoundException("LlmModel", instanceModelId));
+            boolean visible =
+                model.getVisibility() == ModelVisibility.PUBLIC ||
+                llmModelWorkspaceGrantRepository.existsByIdModelIdAndIdWorkspaceId(
+                    model.getId(),
+                    workspaceContext.id()
+                );
+            if (!model.isEnabled() || !model.getConnection().isEnabled() || !visible) {
+                throw new IllegalArgumentException("This model isn't available to this workspace.");
+            }
+            config.setInstanceModel(model);
+            config.setWorkspaceModel(null);
+        } else if (workspaceModelId != null) {
+            WorkspaceLlmModel model = workspaceLlmModelRepository
+                .findByIdAndWorkspaceId(workspaceModelId, workspaceContext.id())
+                .orElseThrow(() -> new EntityNotFoundException("WorkspaceLlmModel", workspaceModelId));
+            if (!model.isEnabled() || !model.getConnection().isEnabled()) {
+                throw new IllegalArgumentException("This model isn't available to this workspace.");
+            }
+            config.setWorkspaceModel(model);
+            config.setInstanceModel(null);
+        }
     }
 
     /**

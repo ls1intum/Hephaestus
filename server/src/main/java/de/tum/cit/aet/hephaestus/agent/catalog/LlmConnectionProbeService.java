@@ -73,6 +73,20 @@ public class LlmConnectionProbeService {
         return probe(request.baseUrl(), headerName, prefix, request.apiKey());
     }
 
+    /**
+     * Low-level probe entry point for a caller that owns a different scope's connection (workspace BYO)
+     * and has already egress-validated {@code baseUrl} itself — reused rather than duplicated so both
+     * scopes share the exact same "test & fetch models" mechanics.
+     */
+    public LlmProbeResult probeCredential(
+        String baseUrl,
+        String authHeaderName,
+        String authValuePrefix,
+        String apiKey
+    ) {
+        return probe(baseUrl, authHeaderName, authValuePrefix, apiKey);
+    }
+
     private LlmProbeResult probe(String baseUrl, String authHeaderName, String authValuePrefix, String apiKey) {
         String url = stripTrailingSlash(baseUrl) + "/models";
         try {

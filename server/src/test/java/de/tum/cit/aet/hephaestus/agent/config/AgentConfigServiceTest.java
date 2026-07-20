@@ -10,6 +10,14 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelWorkspaceGrantRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.ModelVisibility;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmConnection;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModel;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
@@ -45,6 +53,15 @@ class AgentConfigServiceTest extends BaseUnitTest {
 
     @Mock
     private ConfigAuditPort configAudit;
+
+    @Mock
+    private LlmModelRepository llmModelRepository;
+
+    @Mock
+    private WorkspaceLlmModelRepository workspaceLlmModelRepository;
+
+    @Mock
+    private LlmModelWorkspaceGrantRepository llmModelWorkspaceGrantRepository;
 
     @InjectMocks
     private AgentConfigService agentConfigService;
@@ -543,6 +560,222 @@ class AgentConfigServiceTest extends BaseUnitTest {
             assertThat(entry.entityId()).isEqualTo("7");
             assertThat(String.valueOf(entry.before())).contains("old-model");
             assertThat(String.valueOf(entry.after())).contains("new-model");
+        }
+    }
+
+    @Nested
+    class ModelBinding {
+
+        private AgentConfig existingConfig() {
+            AgentConfig config = new AgentConfig();
+            config.setId(10L);
+            config.setWorkspace(workspace);
+            config.setLlmProvider(LlmProvider.ANTHROPIC);
+            return config;
+        }
+
+        private LlmModel instanceModel(
+            Long id,
+            ModelVisibility visibility,
+            boolean modelEnabled,
+            boolean connectionEnabled
+        ) {
+            LlmConnection connection = new LlmConnection();
+            connection.setId(100L);
+            connection.setEnabled(connectionEnabled);
+            LlmModel model = new LlmModel();
+            model.setId(id);
+            model.setConnection(connection);
+            model.setVisibility(visibility);
+            model.setEnabled(modelEnabled);
+            return model;
+        }
+
+        private WorkspaceLlmModel workspaceModel(Long id, boolean modelEnabled, boolean connectionEnabled) {
+            WorkspaceLlmConnection connection = new WorkspaceLlmConnection();
+            connection.setId(200L);
+            connection.setEnabled(connectionEnabled);
+            WorkspaceLlmModel model = new WorkspaceLlmModel();
+            model.setId(id);
+            model.setConnection(connection);
+            model.setEnabled(modelEnabled);
+            return model;
+        }
+
+        @Test
+        void settingBothInstanceAndWorkspaceModelIsRejected() {
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(
+                Optional.of(existingConfig())
+            );
+
+            var request = UpdateAgentConfigRequestDTO.builder().instanceModelId(5L).workspaceModelId(6L).build();
+
+            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("only one model");
+            verify(agentConfigRepository, never()).save(any());
+        }
+
+        @Test
+        void bindingAPublicEnabledInstanceModelSucceedsAndClearsAnyWorkspaceModel() {
+            AgentConfig existing = existingConfig();
+            existing.setWorkspaceModel(workspaceModel(6L, true, true));
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
+            when(llmModelRepository.findById(5L)).thenReturn(
+                Optional.of(instanceModel(5L, ModelVisibility.PUBLIC, true, true))
+            );
+            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            var request = UpdateAgentConfigRequestDTO.builder().instanceModelId(5L).build();
+            AgentConfig result = agentConfigService.updateConfig(workspaceContext, 10L, request);
+
+            assertThat(result.getInstanceModel()).isNotNull();
+            assertThat(result.getInstanceModel().getId()).isEqualTo(5L);
+            assertThat(result.getWorkspaceModel()).isNull();
+        }
+
+        @Test
+        void bindingAGrantedInstanceModelWithoutAGrantIsRejected() {
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(
+                Optional.of(existingConfig())
+            );
+            when(llmModelRepository.findById(5L)).thenReturn(
+                Optional.of(instanceModel(5L, ModelVisibility.GRANTED, true, true))
+            );
+            when(llmModelWorkspaceGrantRepository.existsByIdModelIdAndIdWorkspaceId(5L, 1L)).thenReturn(false);
+
+            var request = UpdateAgentConfigRequestDTO.builder().instanceModelId(5L).build();
+
+            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("isn't available");
+            verify(agentConfigRepository, never()).save(any());
+        }
+
+        @Test
+        void bindingAGrantedInstanceModelWithAGrantSucceeds() {
+            AgentConfig existing = existingConfig();
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
+            when(llmModelRepository.findById(5L)).thenReturn(
+                Optional.of(instanceModel(5L, ModelVisibility.GRANTED, true, true))
+            );
+            when(llmModelWorkspaceGrantRepository.existsByIdModelIdAndIdWorkspaceId(5L, 1L)).thenReturn(true);
+            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            var request = UpdateAgentConfigRequestDTO.builder().instanceModelId(5L).build();
+            AgentConfig result = agentConfigService.updateConfig(workspaceContext, 10L, request);
+
+            assertThat(result.getInstanceModel().getId()).isEqualTo(5L);
+        }
+
+        @Test
+        void bindingADisabledInstanceModelIsRejected() {
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(
+                Optional.of(existingConfig())
+            );
+            when(llmModelRepository.findById(5L)).thenReturn(
+                Optional.of(instanceModel(5L, ModelVisibility.PUBLIC, false, true))
+            );
+
+            var request = UpdateAgentConfigRequestDTO.builder().instanceModelId(5L).build();
+
+            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("isn't available");
+        }
+
+        @Test
+        void bindingAnInstanceModelWhoseConnectionIsDisabledIsRejected() {
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(
+                Optional.of(existingConfig())
+            );
+            when(llmModelRepository.findById(5L)).thenReturn(
+                Optional.of(instanceModel(5L, ModelVisibility.PUBLIC, true, false))
+            );
+
+            var request = UpdateAgentConfigRequestDTO.builder().instanceModelId(5L).build();
+
+            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("isn't available");
+        }
+
+        @Test
+        void bindingAnEnabledWorkspaceModelSucceedsAndClearsAnyInstanceModel() {
+            AgentConfig existing = existingConfig();
+            existing.setInstanceModel(instanceModel(5L, ModelVisibility.PUBLIC, true, true));
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
+            when(workspaceLlmModelRepository.findByIdAndWorkspaceId(6L, 1L)).thenReturn(
+                Optional.of(workspaceModel(6L, true, true))
+            );
+            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            var request = UpdateAgentConfigRequestDTO.builder().workspaceModelId(6L).build();
+            AgentConfig result = agentConfigService.updateConfig(workspaceContext, 10L, request);
+
+            assertThat(result.getWorkspaceModel().getId()).isEqualTo(6L);
+            assertThat(result.getInstanceModel()).isNull();
+        }
+
+        @Test
+        void bindingAWorkspaceModelFromAnotherWorkspaceIsRejected() {
+            // The tenancy-scoped lookup itself enforces this (composite FK also guards it server-side);
+            // this proves the service surfaces a clean 404, not a 500, for a foreign/nonexistent id.
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(
+                Optional.of(existingConfig())
+            );
+            when(workspaceLlmModelRepository.findByIdAndWorkspaceId(6L, 1L)).thenReturn(Optional.empty());
+
+            var request = UpdateAgentConfigRequestDTO.builder().workspaceModelId(6L).build();
+
+            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request)).isInstanceOf(
+                EntityNotFoundException.class
+            );
+        }
+
+        @Test
+        void bindingADisabledWorkspaceModelIsRejected() {
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(
+                Optional.of(existingConfig())
+            );
+            when(workspaceLlmModelRepository.findByIdAndWorkspaceId(6L, 1L)).thenReturn(
+                Optional.of(workspaceModel(6L, false, true))
+            );
+
+            var request = UpdateAgentConfigRequestDTO.builder().workspaceModelId(6L).build();
+
+            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("isn't available");
+        }
+
+        @Test
+        void clearModelBindingResetsBothSides() {
+            AgentConfig existing = existingConfig();
+            existing.setInstanceModel(instanceModel(5L, ModelVisibility.PUBLIC, true, true));
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
+            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            var request = UpdateAgentConfigRequestDTO.builder().clearModelBinding(true).build();
+            AgentConfig result = agentConfigService.updateConfig(workspaceContext, 10L, request);
+
+            assertThat(result.getInstanceModel()).isNull();
+            assertThat(result.getWorkspaceModel()).isNull();
+        }
+
+        @Test
+        void leavingBothIdsAbsentPreservesTheExistingBinding() {
+            AgentConfig existing = existingConfig();
+            existing.setInstanceModel(instanceModel(5L, ModelVisibility.PUBLIC, true, true));
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
+            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            var request = UpdateAgentConfigRequestDTO.builder().modelName("unrelated-change").build();
+            AgentConfig result = agentConfigService.updateConfig(workspaceContext, 10L, request);
+
+            assertThat(result.getInstanceModel()).isNotNull();
+            assertThat(result.getInstanceModel().getId()).isEqualTo(5L);
+            verify(llmModelRepository, never()).findById(any());
         }
     }
 }

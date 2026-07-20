@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 @WorkspaceAgnostic("Instance LLM model catalog is global (app_admin-owned), not tenant-scoped.")
 public interface LlmModelRepository extends JpaRepository<LlmModel, Long> {
@@ -17,4 +18,20 @@ public interface LlmModelRepository extends JpaRepository<LlmModel, Long> {
     /** Eager-fetches {@code connection} so the admin list view avoids one lazy load per row. */
     @Query("SELECT m FROM LlmModel m JOIN FETCH m.connection ORDER BY m.id")
     List<LlmModel> findAllWithConnection();
+
+    /**
+     * Available-models projection: instance models usable by a given workspace — active, on an active
+     * connection, and either shared with every workspace ({@code PUBLIC}) or explicitly granted to this
+     * one. Both {@code llm_model} and {@code llm_model_workspace_grant} are global tables, so the
+     * {@code :workspaceId} parameter is a plain filter, not a tenancy predicate.
+     */
+    @Query(
+        "SELECT m FROM LlmModel m JOIN FETCH m.connection c " +
+            "WHERE m.enabled = true AND c.enabled = true " +
+            "AND (m.visibility = de.tum.cit.aet.hephaestus.agent.catalog.ModelVisibility.PUBLIC " +
+            "OR EXISTS (SELECT 1 FROM LlmModelWorkspaceGrant g " +
+            "WHERE g.id.modelId = m.id AND g.id.workspaceId = :workspaceId)) " +
+            "ORDER BY m.id"
+    )
+    List<LlmModel> findVisibleEnabledModels(@Param("workspaceId") Long workspaceId);
 }
