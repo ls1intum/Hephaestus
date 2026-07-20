@@ -63,10 +63,14 @@ function SetBudgetDialogContent({ workspace, isPending, onSubmit }: SetBudgetDia
 
 	const parsed = Number.parseFloat(value);
 	const isEmpty = value.trim() === "";
-	const isValid = !isEmpty && Number.isFinite(parsed) && parsed >= 0;
+	// At most two decimals: a cap is an amount of money, and the server column is NUMERIC(10,2).
+	const hasCentPrecision = /^\d*(\.\d{0,2})?$/.test(value.trim());
+	const isValid = !isEmpty && Number.isFinite(parsed) && parsed >= 0 && hasCentPrecision;
 	const errorMessage = isEmpty
 		? "Enter a budget amount, or remove the cap entirely."
-		: "Enter an amount of $0 or more.";
+		: !Number.isFinite(parsed) || parsed < 0
+			? "Enter an amount of $0 or more."
+			: "Use at most two decimal places.";
 	const isInvalid = showError && !isValid;
 
 	const handleSubmit = (event: FormEvent) => {
@@ -76,13 +80,15 @@ function SetBudgetDialogContent({ workspace, isPending, onSubmit }: SetBudgetDia
 			setShowError(true);
 			return;
 		}
-		// Sub-cent values are already rejected by the input's native `step={0.01}` validation.
 		onSubmit(parsed);
 	};
 
 	return (
 		<DialogContent>
-			<form onSubmit={handleSubmit} className="contents">
+			{/* noValidate: this form validates itself so every rejection surfaces through `FieldError`.
+			    Left to the browser, `min`/`step` would silently block submit with a native bubble and the
+			    field's own explanation would never render. */}
+			<form onSubmit={handleSubmit} className="contents" noValidate>
 				<DialogHeader>
 					<DialogTitle>Set monthly AI budget</DialogTitle>
 					<DialogDescription>

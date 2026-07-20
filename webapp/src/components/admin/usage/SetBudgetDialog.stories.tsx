@@ -66,6 +66,20 @@ export const InvalidEmptyValue: Story = {
 	},
 };
 
+/** Sub-cent precision is rejected in the field rather than by a native browser bubble. */
+export const InvalidSubCentValue: Story = {
+	play: async ({ args }) => {
+		const dialog = within(await screen.findByRole("dialog"));
+		const input = dialog.getByLabelText(/monthly budget/i);
+		await userEvent.clear(input);
+		await userEvent.type(input, "25.005");
+		await userEvent.click(dialog.getByRole("button", { name: /save cap/i }));
+
+		await expect(dialog.getByRole("alert")).toHaveTextContent(/two decimal places/i);
+		await expect(args.onSubmit).not.toHaveBeenCalled();
+	},
+};
+
 /** A negative amount is rejected with its own reason, and nothing is submitted. */
 export const InvalidNegativeValue: Story = {
 	play: async ({ args }) => {
