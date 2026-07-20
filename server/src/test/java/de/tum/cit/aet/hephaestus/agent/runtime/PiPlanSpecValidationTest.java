@@ -4,8 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeRunnerProfile;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
@@ -21,12 +19,13 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
 
     private static PiPlanSpec specWith(Map<String, byte[]> extraInputs) {
         return new PiPlanSpec(
-            LlmProvider.OPENAI,
-            CredentialMode.API_KEY,
-            "sk",
+            "openai-completions",
+            "gpt-5.4-mini",
             null,
             null,
+            false,
             null,
+            "job-token",
             true,
             600,
             PROFILE,
@@ -56,13 +55,16 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
     }
 
     @Test
-    void proxyRequiresToken() {
+    void jobTokenIsAlwaysRequired() {
+        // #1368 slice 5: ONE credential path — every sandbox talks to the LLM proxy, so a blank/null
+        // jobToken is always rejected, not just in some "mode".
         assertThatThrownBy(() ->
             new PiPlanSpec(
-                LlmProvider.OPENAI,
-                CredentialMode.PROXY,
+                "openai-completions",
+                "gpt-5.4-mini",
                 null,
                 null,
+                false,
                 null,
                 null,
                 false,
@@ -77,15 +79,16 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
     }
 
     @Test
-    void apiKeyRequiresCredential() {
+    void blankJobTokenRejected() {
         assertThatThrownBy(() ->
             new PiPlanSpec(
-                LlmProvider.OPENAI,
-                CredentialMode.API_KEY,
+                "openai-completions",
+                "gpt-5.4-mini",
                 null,
                 null,
+                false,
                 null,
-                null,
+                "  ",
                 false,
                 600,
                 PROFILE,
@@ -94,19 +97,51 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
             )
         )
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("credential");
+            .hasMessageContaining("jobToken");
+    }
+
+    @Test
+    void blankApiProtocolRejected() {
+        assertThatThrownBy(() ->
+            new PiPlanSpec("", "gpt-5.4-mini", null, null, false, null, "job-token", false, 600, PROFILE, Map.of(), "")
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("apiProtocol");
+    }
+
+    @Test
+    void blankUpstreamModelIdRejected() {
+        assertThatThrownBy(() ->
+            new PiPlanSpec(
+                "openai-completions",
+                "  ",
+                null,
+                null,
+                false,
+                null,
+                "job-token",
+                false,
+                600,
+                PROFILE,
+                Map.of(),
+                ""
+            )
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("upstreamModelId");
     }
 
     @Test
     void timeoutMustExceedBuffer() {
         assertThatThrownBy(() ->
             new PiPlanSpec(
-                LlmProvider.OPENAI,
-                CredentialMode.API_KEY,
-                "sk",
+                "openai-completions",
+                "gpt-5.4-mini",
                 null,
                 null,
+                false,
                 null,
+                "job-token",
                 true,
                 PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS,
                 PROFILE,
@@ -140,12 +175,13 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
     void blankRunnerScriptRejected() {
         assertThatThrownBy(() ->
             new PiPlanSpec(
-                LlmProvider.OPENAI,
-                CredentialMode.API_KEY,
-                "sk",
+                "openai-completions",
+                "gpt-5.4-mini",
                 null,
                 null,
+                false,
                 null,
+                "job-token",
                 true,
                 600,
                 BLANK_SCRIPT_PROFILE,
@@ -160,12 +196,13 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
     @Test
     void nullPrecomputeStepNormalizesToEmptyString() {
         PiPlanSpec spec = new PiPlanSpec(
-            LlmProvider.OPENAI,
-            CredentialMode.API_KEY,
-            "sk",
+            "openai-completions",
+            "gpt-5.4-mini",
             null,
             null,
+            false,
             null,
+            "job-token",
             true,
             600,
             PROFILE,
@@ -178,13 +215,14 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
     }
 
     @Test
-    void proxyWithAzureOpenAiAndTokenConstructs() {
+    void azureProtocolWithTokenConstructs() {
         assertThatNoException().isThrownBy(() ->
             new PiPlanSpec(
-                LlmProvider.AZURE_OPENAI,
-                CredentialMode.PROXY,
+                "azure-openai-responses",
+                "gpt-5.4-mini",
                 null,
                 null,
+                false,
                 null,
                 "job-token",
                 false,
@@ -194,30 +232,6 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
                 ""
             )
         );
-    }
-
-    @Test
-    void proxyNormalizesBaseUrlToNull() {
-        // PROXY + baseUrl is a SUPPORTED, default topology: PROXY is the default credentialMode and llmBaseUrl
-        // is independently settable, so a valid persisted config legitimately reaches here as PROXY + non-null
-        // baseUrl (both the practice path via AgentJobExecutor and the mentor path via MentorPiAdapter). The
-        // baseUrl is genuinely shadowed by the sandbox-injected $LLM_PROXY_URL, so the compact constructor
-        // normalises it to null rather than throwing on every job.
-        PiPlanSpec spec = new PiPlanSpec(
-            LlmProvider.OPENAI,
-            CredentialMode.PROXY,
-            null,
-            null,
-            "https://example.test/v1",
-            "job-token",
-            false,
-            600,
-            PROFILE,
-            Map.of(),
-            ""
-        );
-
-        assertThat(spec.baseUrl()).isNull();
     }
 
     @Test

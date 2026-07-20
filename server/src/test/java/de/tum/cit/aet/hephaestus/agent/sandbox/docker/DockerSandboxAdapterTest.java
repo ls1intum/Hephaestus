@@ -120,7 +120,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             "alpine:latest",
             List.of("echo", "hello"),
             Map.of("FOO", "bar"),
-            new NetworkPolicy(allowInternet, null, "test-token", "anthropic"),
+            new NetworkPolicy(allowInternet, null, "test-token"),
             ResourceLimits.DEFAULT,
             SecurityProfile.DEFAULT,
             Map.of(".prompt", "test prompt".getBytes()),
@@ -186,7 +186,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 "alpine:latest",
                 List.of("echo"),
                 Map.of(),
-                new NetworkPolicy(false, null, "token-123", "anthropic"),
+                new NetworkPolicy(false, null, "token-123"),
                 ResourceLimits.DEFAULT,
                 SecurityProfile.DEFAULT,
                 Map.of(".prompt", "test".getBytes()),
@@ -202,7 +202,9 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             verify(containerManager).createContainer(captor.capture());
 
             Map<String, String> env = captor.getValue().environment();
-            assertThat(env).containsEntry("LLM_PROXY_URL", "http://172.18.0.2:8080/internal/llm/anthropic");
+            // #1368 slice 5: no per-provider path segment — the connection is identified from the
+            // authenticated token, not the URL.
+            assertThat(env).containsEntry("LLM_PROXY_URL", "http://172.18.0.2:8080/internal/llm");
             assertThat(env).containsEntry("LLM_PROXY_TOKEN", "token-123");
         }
 
@@ -238,7 +240,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 "alpine:latest",
                 List.of("echo"),
                 Map.of(),
-                new NetworkPolicy(false, null, "token-123", "anthropic"),
+                new NetworkPolicy(false, null, "token-123"),
                 ResourceLimits.DEFAULT,
                 SecurityProfile.DEFAULT,
                 Map.of(".prompt", "test".getBytes()),
@@ -255,7 +257,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
 
             assertThat(captor.getValue().environment()).containsEntry(
                 "LLM_PROXY_URL",
-                "http://172.18.0.2:8090/internal/llm/anthropic"
+                "http://172.18.0.2:8090/internal/llm"
             );
         }
 
@@ -268,7 +270,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 "alpine:latest",
                 List.of("echo"),
                 Map.of(),
-                new NetworkPolicy(false, "http://{appServerIp}:9090/v1", "tok", null),
+                new NetworkPolicy(false, "http://{appServerIp}:9090/v1", "tok"),
                 ResourceLimits.DEFAULT,
                 SecurityProfile.DEFAULT,
                 Map.of(".prompt", "test".getBytes()),
@@ -295,7 +297,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 "alpine:latest",
                 List.of("echo"),
                 Map.of(),
-                new NetworkPolicy(false, "https://my-proxy.example.com/api", null, null),
+                new NetworkPolicy(false, "https://my-proxy.example.com/api", null),
                 ResourceLimits.DEFAULT,
                 SecurityProfile.DEFAULT,
                 Map.of(".prompt", "test".getBytes()),
@@ -353,7 +355,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                     "HOME",
                     "/home/agent"
                 ),
-                new NetworkPolicy(false, null, "tok", "anthropic"),
+                new NetworkPolicy(false, null, "tok"),
                 ResourceLimits.DEFAULT,
                 SecurityProfile.DEFAULT,
                 Map.of(".prompt", "test".getBytes()),
@@ -404,7 +406,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 "alpine:latest",
                 List.of("echo"),
                 Map.of(),
-                new NetworkPolicy(false, null, null, null),
+                new NetworkPolicy(false, null, null),
                 ResourceLimits.DEFAULT,
                 SecurityProfile.DEFAULT,
                 Map.of(),
@@ -466,7 +468,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 "alpine:latest",
                 List.of("echo"),
                 Map.of(),
-                new NetworkPolicy(false, null, null, null),
+                new NetworkPolicy(false, null, null),
                 ResourceLimits.DEFAULT,
                 SecurityProfile.DEFAULT,
                 Map.of(),
@@ -604,7 +606,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 "alpine:latest",
                 List.of("echo"),
                 Map.of(),
-                new NetworkPolicy(false, null, null, null),
+                new NetworkPolicy(false, null, null),
                 ResourceLimits.DEFAULT,
                 null,
                 Map.of(),

@@ -20,8 +20,7 @@ public record WorkerProperties(
     @DefaultValue Capacity capacity,
     @DefaultValue Drain drain,
     @DefaultValue Heartbeat heartbeat,
-    @DefaultValue Control control,
-    @DefaultValue Llm llm
+    @DefaultValue Control control
 ) {
     public static final String AUTO = "auto";
 
@@ -68,21 +67,8 @@ public record WorkerProperties(
             heartbeat +
             ", control=" +
             control +
-            ", llm=" +
-            (llm.isConfigured() ? "<configured>" : "<unset>") +
             "]"
         );
-    }
-
-    /**
-     * BYO LLM credentials. When both fields are set, {@code AgentJobExecutor} overrides the
-     * per-job credential mode to {@code API_KEY} so agent-pi reaches the operator's LLM
-     * directly (the app-pod's bundled proxy is not reachable from a separate host).
-     */
-    public record Llm(@Nullable String baseUrl, @Nullable String apiKey) {
-        public boolean isConfigured() {
-            return baseUrl != null && !baseUrl.isBlank() && apiKey != null && !apiKey.isBlank();
-        }
     }
 
     public record Capacity(@DefaultValue("auto") String reviewMax, @DefaultValue("auto") String mentorMax) {

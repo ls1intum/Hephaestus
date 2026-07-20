@@ -8,8 +8,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -85,11 +83,16 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
     /** Real entity (owned JPA types must not be mocked) for the absolute-timeout reaper tests. */
     private AgentJob runningJob(UUID id, Instant startedAt, int timeoutSeconds) {
         ConfigSnapshot snapshot = new ConfigSnapshot(
-            1,
+            ConfigSnapshot.SCHEMA_VERSION,
             1L,
             "cfg",
-            LlmProvider.ANTHROPIC,
-            CredentialMode.PROXY,
+            "anthropic-messages",
+            "https://api.anthropic.com",
+            "claude-sonnet-4",
+            null,
+            null,
+            null,
+            false,
             null,
             null,
             null,

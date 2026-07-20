@@ -24,6 +24,9 @@ public final class MentorRunnerProfile implements PiRunnerProfile {
 
     public static final String SCRIPT = "pi-mentor-runner.mjs";
 
+    /** Shared with the practice runner (#1368 slice 5) — stage it beside pi-mentor-runner.mjs. */
+    private static final List<String> SIDECARS = List.of("pi-provider.mjs");
+
     private static final List<String> FLAGS = List.of("--max-old-space-size=256", "--no-warnings", "--expose-gc");
 
     // Iteration order is load-bearing: renderNodeEnv emits `KEY=value` pairs in iteration order,
@@ -40,6 +43,11 @@ public final class MentorRunnerProfile implements PiRunnerProfile {
     @Override
     public String runnerScript() {
         return SCRIPT;
+    }
+
+    @Override
+    public List<String> sidecarScripts() {
+        return SIDECARS;
     }
 
     @Override

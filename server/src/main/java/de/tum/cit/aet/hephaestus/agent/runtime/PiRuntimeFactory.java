@@ -1,17 +1,13 @@
 package de.tum.cit.aet.hephaestus.agent.runtime;
 
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.NetworkPolicy;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -19,11 +15,18 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Shared Pi-agent kernel. Builds the sandbox-level scaffolding (settings, auth, env, workspace
- * inputs, base command, classpath resources, network policy) that every Pi-based agent reuses.
+ * Shared Pi-agent kernel. Builds the sandbox-level scaffolding (settings, provider spec, env,
+ * workspace inputs, base command, classpath resources, network policy) that every Pi-based agent
+ * reuses.
  *
- * <p>Stays domain-agnostic: callers supply a {@link PiPlanSpec} (provider, credentials, runner
- * filename, precompute step). Nothing here knows about practices or chat sessions.
+ * <p>Stays domain-agnostic: callers supply a {@link PiPlanSpec} (resolved LLM behaviour, job token,
+ * runner filename, precompute step). Nothing here knows about practices or chat sessions.
+ *
+ * <p><b>#1368 slice 5 — ONE credential path.</b> Every sandbox talks to the in-app LLM proxy over
+ * {@code $LLM_PROXY_URL}/{@code $LLM_PROXY_TOKEN} (injected by the sandbox adapter from
+ * {@link PiPlan#networkPolicy()}) and registers a single custom Pi provider named
+ * {@code hephaestus} from {@link SandboxLayout#PROVIDER_CONFIG_FILENAME}, which this factory writes
+ * from the resolved {@link PiPlanSpec}. The real provider API key never enters the container.
  */
 @Component
 public class PiRuntimeFactory {
@@ -54,26 +57,13 @@ public class PiRuntimeFactory {
     public PiPlan build(PiPlanSpec spec) {
         Map<String, String> env = new HashMap<>();
         Map<String, byte[]> inputFiles = new LinkedHashMap<>();
-        String authSetup = LlmProxyAuthShell.build(
-            spec.credentialMode(),
-            spec.provider(),
-            spec.credential(),
-            spec.baseUrl(),
-            spec.modelName(),
-            env
-        );
 
-        // Provider config is owned by the runner script: it constructs the ModelRegistry and
-        // calls registerProvider("hephaestus", {...}) BEFORE createAgentSession, sidestepping
-        // the Pi 0.74.x race where findInitialModel runs ahead of extension loading. Settings.json
-        // pins defaultProvider/defaultModel so the runner's registration is what Pi resolves to.
-        boolean useCustomProvider = useHephaestusProvider(spec);
-        inputFiles.put(
-            SandboxLayout.PI_AGENT_PREFIX + "settings.json",
-            buildPiSettingsJson(spec.provider(), spec.modelName(), useCustomProvider)
-        );
+        inputFiles.put(SandboxLayout.PI_AGENT_PREFIX + "settings.json", buildPiSettingsJson(spec.upstreamModelId()));
+        inputFiles.put(SandboxLayout.PROVIDER_CONFIG_FILENAME, buildProviderConfigJson(spec));
+
         // The scaffolding is the run's prompt template; its digest is the job's prompt version. settings.json
-        // is deliberately EXCLUDED — it varies by model, which the job's config snapshot already pins.
+        // and pi-provider.json are deliberately EXCLUDED — they vary by model, which the job's config
+        // snapshot already pins.
         Map<String, byte[]> promptScaffolding = new LinkedHashMap<>();
         promptScaffolding.put(SandboxLayout.ORCHESTRATOR_PATH, loadClasspathResource("pi-orchestrator.md"));
         promptScaffolding.put(
@@ -95,22 +85,12 @@ public class PiRuntimeFactory {
         env.put("TMPDIR", "/home/agent/.local/tmp");
         env.put("PI_CODING_AGENT_DIR", SandboxLayout.PI_AGENT_DIR);
 
-        // Azure's `azure-openai-responses` provider hard-defaults the model id to "gpt-5.2"; route
-        // both that and the configured model to the same Azure deployment.
-        if (spec.provider() == LlmProvider.AZURE_OPENAI) {
-            String deployment = (spec.modelName() != null && !spec.modelName().isBlank())
-                ? spec.modelName()
-                : "gpt-5.4-mini";
-            env.put("AZURE_OPENAI_DEPLOYMENT_NAME_MAP", deployment + "=" + deployment + ",gpt-5.2=" + deployment);
-        }
-
         String workspaceRoot = SandboxLayout.WORKSPACE_ROOT;
         PiRunnerProfile profile = spec.runnerProfile();
         String nodeFlagsFragment = renderNodeFlags(profile.nodeFlags());
         String nodeEnvFragment = renderNodeEnv(profile.additionalEnv());
 
         String command =
-            authSetup +
             "mkdir -p " +
             SandboxLayout.OUTPUT_PATH +
             " /home/agent/.config /home/agent/.local/tmp && " +
@@ -129,18 +109,13 @@ public class PiRuntimeFactory {
             "/" +
             SandboxLayout.RUNNER_SCRIPT_FILENAME;
 
-        NetworkPolicy networkPolicy = buildNetworkPolicy(
-            spec.credentialMode(),
-            spec.provider(),
-            spec.jobToken(),
-            spec.allowInternet()
-        );
+        NetworkPolicy networkPolicy = buildNetworkPolicy(spec.jobToken(), spec.allowInternet());
 
         log.debug(
-            "Built Pi plan: timeout={}s, provider={}, credentialMode={}, files={}",
+            "Built Pi plan: timeout={}s, apiProtocol={}, model={}, files={}",
             spec.timeoutSeconds(),
-            spec.provider(),
-            spec.credentialMode(),
+            spec.apiProtocol(),
+            spec.upstreamModelId(),
             inputFiles.size()
         );
         return new PiPlan(
@@ -171,34 +146,20 @@ public class PiRuntimeFactory {
         return b.toString();
     }
 
-    /** Map {@link LlmProvider} to its Pi provider token. */
-    static String providerToken(LlmProvider provider) {
-        return switch (provider) {
-            case AZURE_OPENAI -> "azure-openai-responses";
-            case OPENAI -> "openai";
-            case ANTHROPIC -> "anthropic";
-        };
-    }
-
     /**
-     * Build the settings JSON Pi loads at session start. When {@code useCustomProvider} is true,
-     * {@code defaultProvider} resolves to the {@code hephaestus} provider that the runner script
-     * (pi-runner.mjs / pi-mentor-runner.mjs) registers directly on the ModelRegistry before
-     * {@code createAgentSession}. {@code defaultModel} is the verbatim model id — gateway-routed
+     * Build the settings JSON Pi loads at session start. {@code defaultProvider} always resolves to
+     * the {@code hephaestus} provider that the runner script (pi-runner.mjs / pi-mentor-runner.mjs,
+     * via the shared {@code pi-provider.mjs} helper) registers directly on the ModelRegistry before
+     * {@code createAgentSession}, sidestepping the Pi 0.74.x race where findInitialModel runs ahead
+     * of extension loading. {@code defaultModel} is the verbatim upstream model id — gateway-routed
      * deployments (e.g. TUM GPU expects {@code openai/gpt-oss-120b} as the wire id) and Pi's
-     * exact-match lookup against {@code modelRegistry.find} see the same string. With
-     * {@code defaultProvider="hephaestus"} pinned explicitly, Pi does not reinterpret slashes
-     * as a provider prefix.
+     * exact-match lookup against {@code modelRegistry.find} see the same string.
      */
-    public byte[] buildPiSettingsJson(LlmProvider provider, @Nullable String modelName, boolean useCustomProvider) {
+    public byte[] buildPiSettingsJson(String upstreamModelId) {
         Map<String, Object> settings = new LinkedHashMap<>();
-        if (useCustomProvider) {
-            settings.put("defaultProvider", "hephaestus");
-        } else {
-            settings.put("defaultProvider", providerToken(provider));
-        }
-        if (modelName != null && !modelName.isBlank()) {
-            settings.put("defaultModel", modelName);
+        settings.put("defaultProvider", "hephaestus");
+        if (upstreamModelId != null && !upstreamModelId.isBlank()) {
+            settings.put("defaultModel", upstreamModelId);
         }
         settings.put("transport", "sse");
         Map<String, Object> compaction = new LinkedHashMap<>();
@@ -213,30 +174,39 @@ public class PiRuntimeFactory {
     }
 
     /**
-     * True when the spec routes the LLM through the {@code hephaestus} custom provider that the
-     * runner script registers directly on the ModelRegistry: OpenAI over the proxy (Pi's native
-     * {@code openai-completions} wire format), or a non-Azure provider in direct API_KEY mode with
-     * a gateway {@code baseUrl}. Azure always uses its own deployment-name routing; Anthropic over
-     * the proxy keeps its native Messages API.
+     * Build {@code pi-provider.json} — the single, non-secret provider spec both runners read to
+     * register the {@code hephaestus} Pi provider. {@code baseUrl} is intentionally NOT included here:
+     * it is the sandbox-local {@code $LLM_PROXY_URL} env var, resolved by the sandbox adapter at
+     * container-start time (after {@code {appServerIp}} template substitution) — baking it into this
+     * classpath-shaped JSON would freeze a value the adapter has not resolved yet.
      */
-    static boolean useHephaestusProvider(PiPlanSpec spec) {
-        if (spec.provider() == LlmProvider.AZURE_OPENAI) return false;
-        if (spec.credentialMode() == CredentialMode.PROXY) return spec.provider() == LlmProvider.OPENAI;
-        return spec.baseUrl() != null && !spec.baseUrl().isBlank();
+    byte[] buildProviderConfigJson(PiPlanSpec spec) {
+        Map<String, Object> provider = new LinkedHashMap<>();
+        provider.put("apiProtocol", spec.apiProtocol());
+        provider.put("modelId", spec.upstreamModelId());
+        provider.put("supportsReasoning", spec.supportsReasoning());
+        if (spec.contextWindow() != null) {
+            provider.put("contextWindow", spec.contextWindow());
+        }
+        if (spec.maxOutputTokens() != null) {
+            provider.put("maxOutputTokens", spec.maxOutputTokens());
+        }
+        if (spec.cacheControlFormat() != null && !spec.cacheControlFormat().isBlank()) {
+            provider.put("cacheControlFormat", spec.cacheControlFormat());
+        }
+        try {
+            return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(provider);
+        } catch (JacksonException e) {
+            throw new IllegalStateException("Failed to serialize pi-provider.json", e);
+        }
     }
 
-    /** Sandbox-layer fills in {@code llmProxyUrl} during PREPARE; this only emits the policy shape. */
-    static NetworkPolicy buildNetworkPolicy(
-        CredentialMode mode,
-        LlmProvider provider,
-        @Nullable String jobToken,
-        boolean allowInternet
-    ) {
-        if (mode == CredentialMode.PROXY) {
-            String providerPath = provider.name().toLowerCase(Locale.ROOT);
-            return new NetworkPolicy(allowInternet, null, jobToken, providerPath);
-        }
-        return new NetworkPolicy(true, null, null, null);
+    /**
+     * Sandbox-layer fills in {@code llmProxyUrl} during PREPARE; this only emits the policy shape.
+     * Proxy is now the ONLY mode (#1368 slice 5) — no per-config branching.
+     */
+    static NetworkPolicy buildNetworkPolicy(String jobToken, boolean allowInternet) {
+        return new NetworkPolicy(allowInternet, null, jobToken);
     }
 
     /** Read a classpath resource under {@link #AGENT_RESOURCE_PREFIX}. */

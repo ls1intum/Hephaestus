@@ -12,6 +12,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 
 import { dedupeKeyForFinding, normalizeFinding } from "./pi-finding-normalize.mjs";
+import { loadProviderConfig, registerHephaestusProvider } from "./pi-provider.mjs";
 
 const OUTPUT = "/workspace/out";
 const CWD = "/workspace";
@@ -51,6 +52,7 @@ const usageTotals = {
     model: null,
     inputTokens: 0,
     outputTokens: 0,
+    reasoningTokens: 0,
     cacheReadTokens: 0,
     cacheWriteTokens: 0,
     costUsd: 0,
@@ -268,6 +270,7 @@ function extractUsageFromSession(session) {
     let model = null,
         inputTokens = 0,
         outputTokens = 0,
+        reasoningTokens = 0,
         cacheReadTokens = 0,
         cacheWriteTokens = 0,
         costUsd = 0,
@@ -282,6 +285,10 @@ function extractUsageFromSession(session) {
         model = msg.model || model;
         inputTokens += Number(msg.usage.input || 0);
         outputTokens += Number(msg.usage.output || 0);
+        // Responses-path shape (output_tokens_details.reasoning_tokens) surfaced by the SDK as
+        // usage.reasoning when the upstream model reports it (e.g. o-series/gpt-5 reasoning models);
+        // absent for chat/completions-only models, so this stays 0 for those.
+        reasoningTokens += Number(msg.usage.reasoning || msg.usage.reasoningTokens || 0);
         cacheReadTokens += Number(msg.usage.cacheRead || 0);
         cacheWriteTokens += Number(msg.usage.cacheWrite || 0);
         costUsd += Number(msg.usage.cost?.total || 0);
@@ -293,6 +300,7 @@ function extractUsageFromSession(session) {
         model,
         inputTokens,
         outputTokens,
+        reasoningTokens,
         cacheReadTokens,
         cacheWriteTokens,
         costUsd,
@@ -306,6 +314,7 @@ function accumulateUsage(prev, curr) {
     usageTotals.model = curr.model || usageTotals.model;
     usageTotals.inputTokens += Math.max(0, curr.inputTokens - (prev?.inputTokens || 0));
     usageTotals.outputTokens += Math.max(0, curr.outputTokens - (prev?.outputTokens || 0));
+    usageTotals.reasoningTokens += Math.max(0, curr.reasoningTokens - (prev?.reasoningTokens || 0));
     usageTotals.cacheReadTokens += Math.max(0, curr.cacheReadTokens - (prev?.cacheReadTokens || 0));
     usageTotals.cacheWriteTokens += Math.max(0, curr.cacheWriteTokens - (prev?.cacheWriteTokens || 0));
     usageTotals.costUsd += Math.max(0, curr.costUsd - (prev?.costUsd || 0));
@@ -521,33 +530,17 @@ async function main() {
 
     // Pi 0.74.x bug: createAgentSession.findInitialModel runs before the extension runner drains
     // pending registrations into the model registry. Register the hephaestus provider directly
-    // here so the session resolves a real model on first prompt.
-    const hephaestusBaseUrl = process.env.PI_HEPHAESTUS_BASE_URL;
-    const hephaestusModel = process.env.PI_HEPHAESTUS_MODEL;
-    if (hephaestusBaseUrl && hephaestusModel) {
-        modelRegistry.registerProvider("hephaestus", {
-            name: "Hephaestus Gateway",
-            baseUrl: hephaestusBaseUrl,
-            apiKey: "PI_HEPHAESTUS_API_KEY",
-            authHeader: true,
-            api: "openai-completions",
-            models: [
-                {
-                    id: hephaestusModel,
-                    name: hephaestusModel,
-                    reasoning: false,
-                    input: ["text"],
-                    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-                    contextWindow: 131072,
-                    maxTokens: 4096,
-                    // Opt into Anthropic-style cache_control markers so the large stable prefix (system
-                    // prompt + the diff/context the agent reads once) is cached across the per-area turns.
-                    // A no-op if the gateway ignores the markers; verify via usage.cacheRead before relying on it.
-                    compat: { cacheControlFormat: "anthropic", supportsLongCacheRetention: true },
-                },
-            ],
-        });
-        console.error(`[pi-runner] registered hephaestus provider: baseUrl=${hephaestusBaseUrl} model=${hephaestusModel}`);
+    // here so the session resolves a real model on first prompt. Config (protocol/model/capability)
+    // comes from the server-written pi-provider.json; baseUrl/token come from the sandbox env
+    // (#1368 slice 5 — shared with pi-mentor-runner.mjs via pi-provider.mjs).
+    const providerConfig = loadProviderConfig(CWD);
+    const registered = registerHephaestusProvider(modelRegistry, providerConfig);
+    if (registered) {
+        console.error(
+            `[pi-runner] registered hephaestus provider: apiProtocol=${providerConfig.apiProtocol} model=${providerConfig.modelId}`,
+        );
+    } else {
+        console.error(`[pi-runner] hephaestus provider NOT registered — missing pi-provider.json or proxy env vars`);
     }
 
     const { session, extensionsResult } = await createAgentSession({

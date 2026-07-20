@@ -2,13 +2,17 @@ package de.tum.cit.aet.hephaestus.agent.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
+import de.tum.cit.aet.hephaestus.agent.catalog.ResolvedLlmModel;
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -21,6 +25,9 @@ class ConfigSnapshotTest extends BaseUnitTest {
         .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
         .build();
 
+    @Mock
+    private LlmModelResolver resolver;
+
     private AgentConfig createConfig() {
         Workspace ws = new Workspace();
         ws.setId(1L);
@@ -30,7 +37,6 @@ class ConfigSnapshotTest extends BaseUnitTest {
         config.setWorkspace(ws);
         config.setName("my-agent");
         config.setLlmProvider(LlmProvider.ANTHROPIC);
-        config.setCredentialMode(CredentialMode.PROXY);
         config.setModelName("claude-sonnet-4-20250514");
         config.setTimeoutSeconds(600);
         config.setAllowInternet(false);
@@ -39,36 +45,58 @@ class ConfigSnapshotTest extends BaseUnitTest {
         return config;
     }
 
+    private void stubResolver(AgentConfig config) {
+        when(resolver.resolve(config)).thenReturn(
+            new ResolvedLlmModel(
+                "https://api.anthropic.com",
+                "anthropic-messages",
+                "x-api-key",
+                "",
+                null,
+                "claude-sonnet-4-20250514",
+                200000,
+                8192,
+                false,
+                null,
+                FundingSource.INSTANCE
+            )
+        );
+        when(resolver.connectionRef(config)).thenReturn(new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 7L));
+    }
+
     @Nested
     class FromConfig {
 
         @Test
         void shouldCaptureAllIncludedFields() {
             AgentConfig config = createConfig();
-            ConfigSnapshot snapshot = ConfigSnapshot.from(config);
+            stubResolver(config);
+            ConfigSnapshot snapshot = ConfigSnapshot.from(config, resolver);
 
             assertThat(snapshot.schemaVersion()).isEqualTo(ConfigSnapshot.SCHEMA_VERSION);
             assertThat(snapshot.configId()).isEqualTo(42L);
             assertThat(snapshot.configName()).isEqualTo("my-agent");
-            assertThat(snapshot.llmProvider()).isEqualTo(LlmProvider.ANTHROPIC);
-            assertThat(snapshot.credentialMode()).isEqualTo(CredentialMode.PROXY);
-            assertThat(snapshot.modelName()).isEqualTo("claude-sonnet-4-20250514");
+            assertThat(snapshot.apiProtocol()).isEqualTo("anthropic-messages");
+            assertThat(snapshot.baseUrl()).isEqualTo("https://api.anthropic.com");
+            assertThat(snapshot.upstreamModelId()).isEqualTo("claude-sonnet-4-20250514");
+            assertThat(snapshot.contextWindow()).isEqualTo(200000);
+            assertThat(snapshot.maxOutputTokens()).isEqualTo(8192);
+            assertThat(snapshot.connectionScope()).isEqualTo(FundingSource.INSTANCE);
+            assertThat(snapshot.connectionId()).isEqualTo(7L);
             assertThat(snapshot.timeoutSeconds()).isEqualTo(600);
             assertThat(snapshot.allowInternet()).isFalse();
         }
 
         @Test
-        void shouldHandleNullModelName() {
-            AgentConfig config = createConfig();
-            config.setModelName(null);
-
-            ConfigSnapshot snapshot = ConfigSnapshot.from(config);
-            assertThat(snapshot.modelName()).isNull();
+        void shouldRejectNullConfig() {
+            assertThatThrownBy(() -> ConfigSnapshot.from(null, resolver)).isInstanceOf(NullPointerException.class);
         }
 
         @Test
-        void shouldRejectNullConfig() {
-            assertThatThrownBy(() -> ConfigSnapshot.from(null)).isInstanceOf(NullPointerException.class);
+        void shouldRejectNullResolver() {
+            assertThatThrownBy(() -> ConfigSnapshot.from(createConfig(), null)).isInstanceOf(
+                NullPointerException.class
+            );
         }
     }
 
@@ -78,7 +106,8 @@ class ConfigSnapshotTest extends BaseUnitTest {
         @Test
         void shouldSerializeAndDeserializeCorrectly() {
             AgentConfig config = createConfig();
-            ConfigSnapshot original = ConfigSnapshot.from(config);
+            stubResolver(config);
+            ConfigSnapshot original = ConfigSnapshot.from(config, resolver);
 
             JsonNode json = original.toJson(OBJECT_MAPPER);
             ConfigSnapshot deserialized = ConfigSnapshot.fromJson(json, OBJECT_MAPPER);
@@ -94,8 +123,9 @@ class ConfigSnapshotTest extends BaseUnitTest {
         void shouldNotContainLlmApiKeyInJson() {
             AgentConfig config = createConfig();
             config.setLlmApiKey("sk-super-secret");
+            stubResolver(config);
 
-            ConfigSnapshot snapshot = ConfigSnapshot.from(config);
+            ConfigSnapshot snapshot = ConfigSnapshot.from(config, resolver);
             JsonNode json = snapshot.toJson(OBJECT_MAPPER);
             String jsonString = json.toString();
 
@@ -105,11 +135,27 @@ class ConfigSnapshotTest extends BaseUnitTest {
         }
 
         @Test
+        void shouldNotContainAuthHeaderMaterialInJson() {
+            // Locked decision (#1368 slice 5): NEVER freeze the credential OR any header material —
+            // authHeaderName/authValuePrefix are re-resolved live from the connection, never from the
+            // snapshot.
+            AgentConfig config = createConfig();
+            stubResolver(config);
+
+            ConfigSnapshot snapshot = ConfigSnapshot.from(config, resolver);
+            String jsonString = snapshot.toJson(OBJECT_MAPPER).toString();
+
+            assertThat(jsonString).doesNotContain("authHeaderName");
+            assertThat(jsonString).doesNotContain("authValuePrefix");
+        }
+
+        @Test
         void shouldNotContainMaxConcurrentJobsInJson() {
             AgentConfig config = createConfig();
             config.setMaxConcurrentJobs(10);
+            stubResolver(config);
 
-            ConfigSnapshot snapshot = ConfigSnapshot.from(config);
+            ConfigSnapshot snapshot = ConfigSnapshot.from(config, resolver);
             JsonNode json = snapshot.toJson(OBJECT_MAPPER);
             String jsonString = json.toString();
 
@@ -119,7 +165,9 @@ class ConfigSnapshotTest extends BaseUnitTest {
 
         @Test
         void shouldIncludeSchemaVersionInJson() {
-            ConfigSnapshot snapshot = ConfigSnapshot.from(createConfig());
+            AgentConfig config = createConfig();
+            stubResolver(config);
+            ConfigSnapshot snapshot = ConfigSnapshot.from(config, resolver);
             JsonNode json = snapshot.toJson(OBJECT_MAPPER);
 
             assertThat(json.has("schemaVersion")).isTrue();
@@ -128,7 +176,9 @@ class ConfigSnapshotTest extends BaseUnitTest {
 
         @Test
         void shouldIncludeConfigIdAndName() {
-            ConfigSnapshot snapshot = ConfigSnapshot.from(createConfig());
+            AgentConfig config = createConfig();
+            stubResolver(config);
+            ConfigSnapshot snapshot = ConfigSnapshot.from(config, resolver);
             JsonNode json = snapshot.toJson(OBJECT_MAPPER);
 
             assertThat(json.has("configId")).isTrue();
@@ -139,7 +189,9 @@ class ConfigSnapshotTest extends BaseUnitTest {
 
         @Test
         void shouldRejectNewerSchemaVersion() {
-            ConfigSnapshot original = ConfigSnapshot.from(createConfig());
+            AgentConfig config = createConfig();
+            stubResolver(config);
+            ConfigSnapshot original = ConfigSnapshot.from(config, resolver);
             JsonNode json = original.toJson(OBJECT_MAPPER);
 
             // Mutate schemaVersion to a future version
@@ -152,7 +204,9 @@ class ConfigSnapshotTest extends BaseUnitTest {
 
         @Test
         void shouldTolerateUnknownFields() {
-            ConfigSnapshot original = ConfigSnapshot.from(createConfig());
+            AgentConfig config = createConfig();
+            stubResolver(config);
+            ConfigSnapshot original = ConfigSnapshot.from(config, resolver);
             JsonNode json = original.toJson(OBJECT_MAPPER);
 
             // Add an unknown field (simulates future schema addition)
@@ -163,42 +217,50 @@ class ConfigSnapshotTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldHandleNullModelNameInJson() {
-            AgentConfig config = createConfig();
-            config.setModelName(null);
-
-            ConfigSnapshot original = ConfigSnapshot.from(config);
-            JsonNode json = original.toJson(OBJECT_MAPPER);
-            ConfigSnapshot deserialized = ConfigSnapshot.fromJson(json, OBJECT_MAPPER);
-
-            assertThat(deserialized.modelName()).isNull();
-        }
-
-        @Test
-        void shouldDeserializeLegacyV2WithAgentType() throws Exception {
-            // Pre-consolidation snapshot shape: schemaVersion=2 + agentType=CLAUDE_CODE.
-            // After the Pi-only consolidation the agentType field is gone from the record;
-            // @JsonIgnoreProperties(ignoreUnknown=true) must let these legacy rows deserialise.
+        void shouldDeserializeLegacyV3Snapshot() {
+            // Pre-v4 snapshot shape: llmProvider/credentialMode/llmBaseUrl/modelName, no
+            // apiProtocol/connectionScope/connectionId. fromJson must translate it rather than
+            // default-null the new fields — an in-flight job dispatched before the v4 deploy still
+            // needs a usable apiProtocol/baseUrl/upstreamModelId.
             String legacy =
-                "{\"schemaVersion\":2,\"configId\":42,\"configName\":\"legacy\"," +
-                "\"agentType\":\"CLAUDE_CODE\",\"llmProvider\":\"ANTHROPIC\"," +
-                "\"credentialMode\":\"PROXY\",\"modelName\":\"claude-sonnet-4-20250514\"," +
-                "\"modelVersion\":null,\"timeoutSeconds\":600,\"allowInternet\":false}";
+                "{\"schemaVersion\":3,\"configId\":42,\"configName\":\"legacy\"," +
+                "\"llmProvider\":\"ANTHROPIC\",\"credentialMode\":\"PROXY\"," +
+                "\"modelName\":\"claude-sonnet-4-20250514\"," +
+                "\"modelVersion\":null,\"llmBaseUrl\":null,\"timeoutSeconds\":600,\"allowInternet\":false}";
             JsonNode node = OBJECT_MAPPER.readTree(legacy);
 
             ConfigSnapshot snapshot = ConfigSnapshot.fromJson(node, OBJECT_MAPPER);
 
             assertThat(snapshot.configId()).isEqualTo(42L);
             assertThat(snapshot.configName()).isEqualTo("legacy");
-            assertThat(snapshot.llmProvider()).isEqualTo(LlmProvider.ANTHROPIC);
-            assertThat(snapshot.modelName()).isEqualTo("claude-sonnet-4-20250514");
+            assertThat(snapshot.apiProtocol()).isEqualTo("anthropic-messages");
+            assertThat(snapshot.baseUrl()).isEqualTo("https://api.anthropic.com");
+            assertThat(snapshot.upstreamModelId()).isEqualTo("claude-sonnet-4-20250514");
             assertThat(snapshot.timeoutSeconds()).isEqualTo(600);
+            assertThat(snapshot.connectionScope()).isNull();
+            assertThat(snapshot.connectionId()).isNull();
         }
 
         @Test
-        void shouldDeserializeV1WithoutSchemaVersion() throws Exception {
+        void shouldDeserializeLegacyV3SnapshotWithExplicitBaseUrl() {
+            String legacy =
+                "{\"schemaVersion\":3,\"configId\":9,\"configName\":\"gateway\"," +
+                "\"llmProvider\":\"OPENAI\",\"credentialMode\":\"API_KEY\"," +
+                "\"modelName\":\"gpt-oss-120b\",\"llmBaseUrl\":\"https://gpu.example.com\"," +
+                "\"timeoutSeconds\":300,\"allowInternet\":true}";
+            JsonNode node = OBJECT_MAPPER.readTree(legacy);
+
+            ConfigSnapshot snapshot = ConfigSnapshot.fromJson(node, OBJECT_MAPPER);
+
+            assertThat(snapshot.apiProtocol()).isEqualTo("openai-completions");
+            assertThat(snapshot.baseUrl()).isEqualTo("https://gpu.example.com");
+            assertThat(snapshot.upstreamModelId()).isEqualTo("gpt-oss-120b");
+        }
+
+        @Test
+        void shouldDeserializeV1WithoutSchemaVersion() {
             // Earliest snapshot shape predates the schemaVersion guard. fromJson reads
-            // missing schemaVersion as 0 (≤ current), so v1 rows are accepted.
+            // missing schemaVersion as 0 (< v4), so v1 rows are translated via the legacy path.
             String v1 =
                 "{\"configId\":7,\"configName\":\"v1\",\"agentType\":\"OPENCODE\"," +
                 "\"llmProvider\":\"OPENAI\",\"credentialMode\":\"PROXY\"," +
@@ -207,9 +269,8 @@ class ConfigSnapshotTest extends BaseUnitTest {
 
             ConfigSnapshot snapshot = ConfigSnapshot.fromJson(node, OBJECT_MAPPER);
 
-            assertThat(snapshot.schemaVersion()).isEqualTo(0);
-            assertThat(snapshot.llmProvider()).isEqualTo(LlmProvider.OPENAI);
-            assertThat(snapshot.modelName()).isEqualTo("gpt-4o-mini");
+            assertThat(snapshot.apiProtocol()).isEqualTo("openai-completions");
+            assertThat(snapshot.upstreamModelId()).isEqualTo("gpt-4o-mini");
         }
     }
 
@@ -217,16 +278,48 @@ class ConfigSnapshotTest extends BaseUnitTest {
     class Validation {
 
         @Test
-        void shouldRejectNullLlmProvider() {
+        void shouldRejectNullApiProtocol() {
             assertThatThrownBy(() ->
-                new ConfigSnapshot(1, 1L, "name", null, CredentialMode.PROXY, null, null, null, 600, false)
+                new ConfigSnapshot(
+                    4,
+                    1L,
+                    "name",
+                    null,
+                    "https://api.openai.com",
+                    "gpt",
+                    null,
+                    null,
+                    null,
+                    false,
+                    null,
+                    null,
+                    null,
+                    600,
+                    false
+                )
             ).isInstanceOf(NullPointerException.class);
         }
 
         @Test
-        void shouldRejectNullCredentialMode() {
+        void shouldRejectNullBaseUrl() {
             assertThatThrownBy(() ->
-                new ConfigSnapshot(1, 1L, "name", LlmProvider.ANTHROPIC, null, null, null, null, 600, false)
+                new ConfigSnapshot(
+                    4,
+                    1L,
+                    "name",
+                    "openai-completions",
+                    null,
+                    "gpt",
+                    null,
+                    null,
+                    null,
+                    false,
+                    null,
+                    null,
+                    null,
+                    600,
+                    false
+                )
             ).isInstanceOf(NullPointerException.class);
         }
 
@@ -234,11 +327,16 @@ class ConfigSnapshotTest extends BaseUnitTest {
         void shouldRejectZeroTimeout() {
             assertThatThrownBy(() ->
                 new ConfigSnapshot(
-                    1,
+                    4,
                     1L,
                     "name",
-                    LlmProvider.ANTHROPIC,
-                    CredentialMode.PROXY,
+                    "openai-completions",
+                    "https://api.openai.com",
+                    "gpt",
+                    null,
+                    null,
+                    null,
+                    false,
                     null,
                     null,
                     null,
@@ -252,11 +350,16 @@ class ConfigSnapshotTest extends BaseUnitTest {
         void shouldRejectNegativeTimeout() {
             assertThatThrownBy(() ->
                 new ConfigSnapshot(
-                    1,
+                    4,
                     1L,
                     "name",
-                    LlmProvider.ANTHROPIC,
-                    CredentialMode.PROXY,
+                    "openai-completions",
+                    "https://api.openai.com",
+                    "gpt",
+                    null,
+                    null,
+                    null,
+                    false,
                     null,
                     null,
                     null,

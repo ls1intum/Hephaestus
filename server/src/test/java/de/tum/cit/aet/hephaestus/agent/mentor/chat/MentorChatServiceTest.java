@@ -9,8 +9,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
+import de.tum.cit.aet.hephaestus.agent.catalog.ResolvedLlmModel;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
@@ -27,6 +28,7 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxIdentity;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
@@ -124,6 +126,9 @@ class MentorChatServiceTest extends BaseUnitTest {
     @Mock
     de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService llmBudgetService;
 
+    @Mock
+    LlmModelResolver llmModelResolver;
+
     private MentorTurnLock turnLock;
     private PiEventToUiChunkTranslator translator;
     private ScheduledExecutorService scheduler;
@@ -169,8 +174,29 @@ class MentorChatServiceTest extends BaseUnitTest {
             turnExecutorBean,
             schedulerBean,
             new MentorChatMetrics(meterRegistry),
-            llmBudgetService
+            llmBudgetService,
+            llmModelResolver
         );
+
+        // Default resolver stub — MentorLlmConfig.fromAgentConfig routes every AgentConfig through
+        // this; individual tests override where the resolved shape matters. Class-level
+        // Strictness.LENIENT (see @MockitoSettings above) covers any test that never resolves a config.
+        when(llmModelResolver.resolve(any())).thenReturn(
+            new ResolvedLlmModel(
+                "https://api.openai.com",
+                "openai-completions",
+                "Authorization",
+                "Bearer ",
+                null,
+                "test-model",
+                null,
+                null,
+                false,
+                null,
+                FundingSource.INSTANCE
+            )
+        );
+        when(llmModelResolver.connectionRef(any())).thenReturn(new LlmModelResolver.ConnectionRef(null, null));
 
         // Default happy-path collaborator wiring; individual tests override as needed.
         User user = new User();
@@ -181,7 +207,6 @@ class MentorChatServiceTest extends BaseUnitTest {
         AgentConfig agentConfig = new AgentConfig();
         agentConfig.setEnabled(true);
         agentConfig.setLlmProvider(LlmProvider.OPENAI);
-        agentConfig.setCredentialMode(CredentialMode.API_KEY);
         agentConfig.setLlmApiKey("test-key");
         agentConfig.setModelName("test-model");
         agentConfig.setTimeoutSeconds(600);
@@ -380,7 +405,6 @@ class MentorChatServiceTest extends BaseUnitTest {
         AgentConfig boundConfig = new AgentConfig();
         boundConfig.setEnabled(true);
         boundConfig.setLlmProvider(LlmProvider.OPENAI);
-        boundConfig.setCredentialMode(CredentialMode.API_KEY);
         boundConfig.setLlmApiKey("bound-key");
         boundConfig.setModelName("bound-model");
         boundConfig.setTimeoutSeconds(600);

@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.agent.config;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -88,7 +87,6 @@ class AgentConfigSnapshotTest {
         AgentConfigSnapshot snapshot = AgentConfigSnapshot.of(configWithKey(SENTINEL));
         assertThat(snapshot.name()).isEqualTo("primary");
         assertThat(snapshot.modelName()).isEqualTo("gpt-oss-120b");
-        assertThat(snapshot.credentialMode()).isEqualTo(CredentialMode.API_KEY);
         assertThat(snapshot.enabled()).isTrue();
     }
 
@@ -98,7 +96,6 @@ class AgentConfigSnapshotTest {
         config.setEnabled(true);
         config.setLlmProvider(LlmProvider.OPENAI);
         config.setModelName("gpt-oss-120b");
-        config.setCredentialMode(CredentialMode.API_KEY);
         config.setLlmApiKey(key);
         return config;
     }

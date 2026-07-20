@@ -1,48 +1,32 @@
 package de.tum.cit.aet.hephaestus.agent.practice;
 
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Input for {@link PracticePiAdapter#buildSandboxSpec}. PROXY mode requires {@code jobToken};
- * API_KEY require {@code credential}. The task prompt is carried by the
+ * Input for {@link PracticePiAdapter#buildSandboxSpec}. Every sandbox talks to the LLM proxy over
+ * {@code jobToken} (#1368 slice 5 — ONE credential path); the task prompt is carried by the
  * {@code task.json} envelope written by the handler — not by this request.
- *
- * @param baseUrl optional OpenAI-compatible base URL override. {@code null} in production
- *                (the provider URL is intrinsic to the configured LLM provider). Live tests use
- *                it to point Pi at a non-default endpoint such as the TUM AET ASE gateway.
- *                Threaded through to {@link PiPlanSpec}; see {@link LlmProxyAuthShell} for the
- *                env-var semantics (only exported in API_KEY modes).
  */
 public record PracticeAgentRequest(
-    LlmProvider llmProvider,
-    CredentialMode credentialMode,
-    @Nullable String modelName,
-    @Nullable String credential,
-    @Nullable String baseUrl,
-    @Nullable String jobToken,
+    String apiProtocol,
+    String upstreamModelId,
+    @Nullable Integer contextWindow,
+    @Nullable Integer maxOutputTokens,
+    boolean supportsReasoning,
+    @Nullable String cacheControlFormat,
+    String jobToken,
     boolean allowInternet,
     int timeoutSeconds
 ) {
     public PracticeAgentRequest {
-        Objects.requireNonNull(llmProvider, "llmProvider must not be null");
-        Objects.requireNonNull(credentialMode, "credentialMode must not be null");
+        Objects.requireNonNull(apiProtocol, "apiProtocol must not be null");
+        Objects.requireNonNull(upstreamModelId, "upstreamModelId must not be null");
         if (timeoutSeconds <= 0) {
             throw new IllegalArgumentException("timeoutSeconds must be positive, got: " + timeoutSeconds);
         }
-        switch (credentialMode) {
-            case PROXY -> {
-                if (jobToken == null || jobToken.isBlank()) {
-                    throw new IllegalArgumentException("jobToken is required in PROXY mode");
-                }
-            }
-            case API_KEY -> {
-                if (credential == null || credential.isBlank()) {
-                    throw new IllegalArgumentException("credential is required in " + credentialMode + " mode");
-                }
-            }
+        if (jobToken == null || jobToken.isBlank()) {
+            throw new IllegalArgumentException("jobToken is required — every sandbox talks to the LLM proxy");
         }
     }
 }

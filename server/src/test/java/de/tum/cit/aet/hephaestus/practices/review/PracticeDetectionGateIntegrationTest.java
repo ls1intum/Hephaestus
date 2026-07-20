@@ -6,7 +6,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
@@ -105,7 +104,6 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
         config.setName("gate-config");
         config.setEnabled(true);
         config.setLlmProvider(LlmProvider.ANTHROPIC);
-        config.setCredentialMode(CredentialMode.PROXY);
         config.setTimeoutSeconds(300);
         agentConfigRepository.save(config);
 

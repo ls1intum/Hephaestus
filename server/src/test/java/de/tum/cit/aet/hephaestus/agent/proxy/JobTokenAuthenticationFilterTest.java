@@ -2,14 +2,13 @@ package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
@@ -28,6 +27,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import tools.jackson.databind.ObjectMapper;
 
 class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
@@ -37,7 +37,9 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
     @Mock
     private FilterChain filterChain;
 
+    private MentorProxyCredentialRegistry mentorRegistry;
     private JobTokenAuthenticationFilter filter;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     /** A valid Base64-URL token (43 chars, 256 bits). */
     private static final String VALID_TOKEN = "dGVzdC10b2tlbi0xMjM0NTY3ODkwMTIzNDU2Nzg5MDE";
@@ -45,7 +47,8 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        filter = new JobTokenAuthenticationFilter(agentJobRepository);
+        mentorRegistry = new MentorProxyCredentialRegistry();
+        filter = new JobTokenAuthenticationFilter(agentJobRepository, mentorRegistry, objectMapper);
         SecurityContextHolder.clearContext();
     }
 
@@ -195,7 +198,8 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
             verify(filterChain).doFilter(any(), any());
             assertThat(authCapture.get()).isInstanceOf(JobTokenAuthentication.class);
-            assertThat(((JobTokenAuthentication) authCapture.get()).getPrincipal()).isSameAs(job);
+            ProxyRouting routing = (ProxyRouting) ((JobTokenAuthentication) authCapture.get()).getPrincipal();
+            assertThat(routing.principalDescription()).isEqualTo("job:" + job.getId());
             assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
         }
 
@@ -224,7 +228,8 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
             verify(filterChain).doFilter(any(), any());
             assertThat(authCapture.get()).isInstanceOf(JobTokenAuthentication.class);
-            assertThat(((JobTokenAuthentication) authCapture.get()).getPrincipal()).isSameAs(job);
+            ProxyRouting routing = (ProxyRouting) ((JobTokenAuthentication) authCapture.get()).getPrincipal();
+            assertThat(routing.principalDescription()).isEqualTo("job:" + job.getId());
             assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
         }
 
@@ -254,6 +259,28 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             filter.doFilterInternal(request, response, filterChain);
 
             assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
+        }
+
+        @Test
+        @DisplayName(
+            "a job with no config snapshot (should be impossible in prod — column is NOT NULL) is refused, not NPE'd"
+        )
+        void shouldReturn401WhenJobHasNoConfigSnapshot() throws Exception {
+            var job = new AgentJob();
+            job.setJobToken(VALID_TOKEN);
+            when(
+                agentJobRepository.findByJobTokenHashAndStatus(eq(VALID_TOKEN_HASH), eq(AgentJobStatus.RUNNING))
+            ).thenReturn(Optional.of(job));
+
+            var request = new MockHttpServletRequest();
+            request.setRemoteAddr("10.0.0.2");
+            request.addHeader("x-api-key", VALID_TOKEN);
+            var response = new MockHttpServletResponse();
+
+            filter.doFilterInternal(request, response, filterChain);
+
+            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
+            verify(filterChain, never()).doFilter(any(), any());
         }
 
         @Test
@@ -374,9 +401,78 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
     }
 
+    @Nested
+    @DisplayName("Mentor session token fallback (#1368 slice 5 — the mentor sandbox is not an AgentJob row)")
+    class MentorTokenFallback {
+
+        @Test
+        void aMentorRegistryTokenAuthenticatesWhenNoJobMatches() throws Exception {
+            when(agentJobRepository.findByJobTokenHashAndStatus(any(), eq(AgentJobStatus.RUNNING))).thenReturn(
+                Optional.empty()
+            );
+            String mentorToken = mentorRegistry.mint("openai-completions", "https://api.openai.com", null, null, 5L);
+
+            var authCapture = new AtomicReference<Authentication>();
+            doAnswer(invocation -> {
+                authCapture.set(SecurityContextHolder.getContext().getAuthentication());
+                return null;
+            })
+                .when(filterChain)
+                .doFilter(any(), any());
+
+            var request = new MockHttpServletRequest();
+            request.setRemoteAddr("10.0.0.2");
+            request.addHeader("Authorization", "Bearer " + mentorToken);
+            var response = new MockHttpServletResponse();
+
+            filter.doFilterInternal(request, response, filterChain);
+
+            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
+            ProxyRouting routing = (ProxyRouting) ((JobTokenAuthentication) authCapture.get()).getPrincipal();
+            assertThat(routing.apiProtocol()).isEqualTo("openai-completions");
+            assertThat(routing.legacyConfigId()).isEqualTo(5L);
+        }
+
+        @Test
+        void aTokenMatchingNeitherJobNorMentorRegistryIsRefused() throws Exception {
+            when(agentJobRepository.findByJobTokenHashAndStatus(any(), eq(AgentJobStatus.RUNNING))).thenReturn(
+                Optional.empty()
+            );
+
+            var request = new MockHttpServletRequest();
+            request.setRemoteAddr("10.0.0.2");
+            request.addHeader("x-api-key", VALID_TOKEN); // never minted anywhere
+            var response = new MockHttpServletResponse();
+
+            filter.doFilterInternal(request, response, filterChain);
+
+            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
+            verify(filterChain, never()).doFilter(any(), any());
+        }
+    }
+
     private AgentJob createRunningJob() {
         var job = new AgentJob();
         job.setJobToken(VALID_TOKEN);
+        ConfigSnapshot snapshot = new ConfigSnapshot(
+            ConfigSnapshot.SCHEMA_VERSION,
+            42L,
+            "test-config",
+            "anthropic-messages",
+            "https://api.anthropic.com",
+            "claude-sonnet-4",
+            null,
+            null,
+            null,
+            false,
+            null,
+            null,
+            null,
+            600,
+            false
+        );
+        job.setConfigSnapshot(snapshot.toJson(objectMapper));
+        job.setId(java.util.UUID.randomUUID());
         return job;
     }
 }

@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.config;
 
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
@@ -18,7 +17,6 @@ public record AgentConfigDTO(
     @NonNull @Schema(description = "Job timeout in seconds") Integer timeoutSeconds,
     @NonNull @Schema(description = "Maximum concurrent jobs") Integer maxConcurrentJobs,
     @NonNull @Schema(description = "Whether agent containers have internet access") Boolean allowInternet,
-    @NonNull @Schema(description = "Authentication mode") CredentialMode credentialMode,
     @Schema(description = "Bound shared (instance catalog) model id, if bound to one") Long instanceModelId,
     @Schema(description = "Bound model id on your own provider, if bound to one") Long workspaceModelId,
     @NonNull @Schema(description = "Timestamp when the config was created") Instant createdAt,
@@ -36,7 +34,6 @@ public record AgentConfigDTO(
             config.getTimeoutSeconds(),
             config.getMaxConcurrentJobs(),
             config.isAllowInternet(),
-            config.getCredentialMode(),
             config.getInstanceModel() != null ? config.getInstanceModel().getId() : null,
             config.getWorkspaceModel() != null ? config.getWorkspaceModel().getId() : null,
             config.getCreatedAt(),

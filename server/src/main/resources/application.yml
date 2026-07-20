@@ -410,25 +410,11 @@ hephaestus:
         project-id: ${POSTHOG_PROJECT_ID:}
         personal-api-key: ${POSTHOG_PERSONAL_API_KEY:}
 
-    # LLM proxy upstream URLs. Override for Azure OpenAI, WireMock, or other API-compatible
-    # endpoints. Docker sandbox deployment requirements are documented on SandboxProperties.
-    llm-proxy:
-        anthropic-upstream-url: ${LLM_PROXY_ANTHROPIC_URL:https://api.anthropic.com}
-        openai-upstream-url: ${LLM_PROXY_OPENAI_URL:https://api.openai.com}
-        # For Azure OpenAI, set openai-auth-header=api-key and openai-use-bearer-prefix=false
-        openai-auth-header: ${LLM_PROXY_OPENAI_AUTH_HEADER:Authorization}
-        openai-use-bearer-prefix: ${LLM_PROXY_OPENAI_USE_BEARER:true}
-        # Dedicated Azure OpenAI route used by the sandboxed Pi agent
-        azure-openai-upstream-url: ${LLM_PROXY_AZURE_OPENAI_URL:}
-        azure-openai-auth-header: ${LLM_PROXY_AZURE_OPENAI_AUTH_HEADER:api-key}
-        azure-openai-use-bearer-prefix: ${LLM_PROXY_AZURE_OPENAI_USE_BEARER:false}
-
     sandbox:
-        # Capability flag (not a role): worker-internal LLM proxy controller. Stays on
-        # the coordinator by default (BYO trust model — see ADR 0006). Future managed-mode
-        # workers opt in by setting this on the worker pod and false on the server pod.
-        llm-proxy:
-            enabled: ${HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED:true}
+        # The LLM proxy controller/security chain (agent.proxy) is gated on the job-execution
+        # capability expression (hephaestus.agent.nats.enabled AND hephaestus.runtime.worker.enabled)
+        # — the same one AgentJobExecutor wires on — not a standalone flag (#1368 slice 5: it is the
+        # ONLY LLM credential path, so "jobs on, proxy off" must be unexpressible).
         docker-host: ${SANDBOX_DOCKER_HOST:unix:///var/run/docker.sock}
         tls-verify: ${SANDBOX_TLS_VERIFY:false}
         max-concurrent-containers: ${SANDBOX_MAX_CONCURRENT:5}

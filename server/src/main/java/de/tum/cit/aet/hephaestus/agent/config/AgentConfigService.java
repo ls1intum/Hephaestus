@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.config;
 
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelWorkspaceGrantRepository;
@@ -91,12 +90,7 @@ public class AgentConfigService {
         if (request.allowInternet() != null) {
             config.setAllowInternet(request.allowInternet());
         }
-        if (request.credentialMode() != null) {
-            config.setCredentialMode(request.credentialMode());
-        }
         applyModelBinding(config, workspaceContext, request.instanceModelId(), request.workspaceModelId(), null);
-
-        validateCredentialMode(config);
 
         AgentConfig saved;
         try {
@@ -165,9 +159,6 @@ public class AgentConfigService {
         if (request.allowInternet() != null) {
             config.setAllowInternet(request.allowInternet());
         }
-        if (request.credentialMode() != null) {
-            config.setCredentialMode(request.credentialMode());
-        }
         applyModelBinding(
             config,
             workspaceContext,
@@ -175,8 +166,6 @@ public class AgentConfigService {
             request.workspaceModelId(),
             request.clearModelBinding()
         );
-
-        validateCredentialMode(config);
 
         AgentConfig saved = agentConfigRepository.save(config);
         configAudit.record(
@@ -282,26 +271,6 @@ public class AgentConfigService {
             }
             config.setWorkspaceModel(model);
             config.setInstanceModel(null);
-        }
-    }
-
-    /**
-     * Validates the direct credential mode (API_KEY): it requires internet access AND a stored
-     * credential, since the container reaches the provider directly. Runs on both create and update;
-     * on update the merged config still carries the existing key, so a kept key passes.
-     */
-    private void validateCredentialMode(AgentConfig config) {
-        if (config.getCredentialMode() == CredentialMode.PROXY) {
-            return;
-        }
-        if (!config.isAllowInternet()) {
-            throw AgentConfigCredentialModeException.requiresInternet(config.getCredentialMode());
-        }
-        // Only an ENABLED runtime must carry a usable key — a disabled one never runs, so a keyless
-        // config can still be renamed or left parked (and, importantly, an already-keyless config can be
-        // disabled) without being forced to supply a key first.
-        if (config.isEnabled() && (config.getLlmApiKey() == null || config.getLlmApiKey().isBlank())) {
-            throw AgentConfigCredentialModeException.missingCredential(config.getCredentialMode());
         }
     }
 }

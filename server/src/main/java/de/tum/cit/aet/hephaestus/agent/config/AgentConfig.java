@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.config;
 
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModel;
@@ -95,9 +94,10 @@ public class AgentConfig {
     @Column(name = "llm_provider", nullable = false, length = 32)
     private LlmProvider llmProvider;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "credential_mode", nullable = false, length = 16)
-    private CredentialMode credentialMode = CredentialMode.PROXY;
+    // NOTE: the `credential_mode` DB column is deliberately no longer mapped (#1368 slice 5 — the LLM
+    // proxy is now the ONLY credential path; API_KEY-direct mode was deleted). The column itself is
+    // left in place — dropping it is a schema change out of scope for this slice (see
+    // docs/contributor/database-migration.mdx's deprecate-then-remove policy).
 
     @Column(name = "timeout_seconds", nullable = false)
     private int timeoutSeconds = 600;

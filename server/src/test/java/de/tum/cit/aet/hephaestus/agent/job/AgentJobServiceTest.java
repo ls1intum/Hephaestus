@@ -14,14 +14,16 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
+import de.tum.cit.aet.hephaestus.agent.catalog.ResolvedLlmModel;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -38,6 +40,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -79,6 +82,9 @@ class AgentJobServiceTest extends BaseUnitTest {
     @Mock
     private de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService llmBudgetService;
 
+    @Mock
+    private LlmModelResolver llmModelResolver;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private AgentJobService service;
@@ -99,7 +105,8 @@ class AgentJobServiceTest extends BaseUnitTest {
             eventPublisher,
             transactionTemplate,
             new PracticeReviewProperties(false, true, false, "", 15, false, false),
-            llmBudgetService
+            llmBudgetService,
+            llmModelResolver
         );
 
         workspace = new Workspace();
@@ -112,8 +119,31 @@ class AgentJobServiceTest extends BaseUnitTest {
         enabledConfig.setName("test-config");
         enabledConfig.setEnabled(true);
         enabledConfig.setLlmProvider(LlmProvider.ANTHROPIC);
-        enabledConfig.setCredentialMode(CredentialMode.PROXY);
         enabledConfig.setTimeoutSeconds(600);
+
+        // Default resolver stub — submitForConfig freezes ConfigSnapshot.from(config, resolver) for
+        // every enabled config in the fan-out; individual tests override where the resolved shape
+        // matters.
+        lenient()
+            .when(llmModelResolver.resolve(any()))
+            .thenReturn(
+                new ResolvedLlmModel(
+                    "https://api.anthropic.com",
+                    "anthropic-messages",
+                    "x-api-key",
+                    "",
+                    null,
+                    "claude-sonnet-4",
+                    null,
+                    null,
+                    false,
+                    null,
+                    FundingSource.INSTANCE
+                )
+            );
+        lenient()
+            .when(llmModelResolver.connectionRef(any()))
+            .thenReturn(new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 99L));
     }
 
     private JobSubmission createSubmission() {
@@ -311,10 +341,9 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldCopyLlmApiKeyForApiKeyMode() {
-            enabledConfig.setCredentialMode(CredentialMode.API_KEY);
+        @DisplayName("the credential is NEVER frozen onto the job (#1368 slice 5 — ONE credential path, resolved live)")
+        void neverCopiesTheCredentialOntoTheJob() {
             enabledConfig.setLlmApiKey("sk-test-key");
-            enabledConfig.setAllowInternet(true);
 
             when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(enabledConfig));
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
@@ -339,38 +368,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             );
 
             assertThat(result).isPresent();
-            assertThat(result.get().getLlmApiKey()).isEqualTo("sk-test-key");
-        }
-
-        @Test
-        void shouldCopyLlmApiKeyForProxyMode() {
-            enabledConfig.setCredentialMode(CredentialMode.PROXY);
-            enabledConfig.setLlmApiKey("sk-proxy-key");
-
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(enabledConfig));
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-
-            JobTypeHandler handler = mock(JobTypeHandler.class);
-            when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
-            when(handler.createSubmission(any())).thenReturn(createSubmission());
-
-            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any())).thenReturn(
-                Optional.empty()
-            );
-            when(agentJobRepository.saveAndFlush(any())).thenAnswer(inv -> {
-                AgentJob j = inv.getArgument(0);
-                j.prePersist();
-                return j;
-            });
-
-            Optional<AgentJob> result = service.submit(
-                1L,
-                AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class)
-            );
-
-            assertThat(result).isPresent();
-            assertThat(result.get().getLlmApiKey()).isEqualTo("sk-proxy-key");
+            assertThat(result.get().getLlmApiKey()).isNull();
         }
 
         @Test

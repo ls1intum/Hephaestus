@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.mentor;
 
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MentorContextKeys;
+import de.tum.cit.aet.hephaestus.agent.proxy.MentorProxyCredentialRegistry;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentImageProperties;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiPlanSpec;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiRuntimeFactory;
@@ -36,6 +37,7 @@ public class MentorPiAdapter {
     private final PiRuntimeFactory runtimeFactory;
     private final MentorAgentProperties mentorProperties;
     private final AgentImageProperties imageProperties;
+    private final MentorProxyCredentialRegistry proxyCredentialRegistry;
 
     /**
      * Build the interactive sandbox spec for a mentor chat session. Sandbox is keyed by
@@ -61,13 +63,19 @@ public class MentorPiAdapter {
             extraInputs.put(SESSIONS_DIR_PREFIX + sessionRestore.threadId() + ".jsonl", sessionRestore.bytes());
         }
 
-        // Honor the bound mentor config's base URL first (per-workspace LLM gateway, e.g. a TUM GPU
-        // endpoint that activates the hephaestus provider); fall back to the global mentor property.
-        String baseUrl;
-        if (llmConfig.llmBaseUrl() != null && !llmConfig.llmBaseUrl().isBlank()) {
-            baseUrl = llmConfig.llmBaseUrl();
-        } else {
-            baseUrl = mentorProperties.baseUrl().isBlank() ? null : mentorProperties.baseUrl();
+        // Legacy-only global override (#1368 slice 5 — flagged as a residual separate config source,
+        // see MentorAgentProperties javadoc): preserves the pre-catalog precedence — an explicit
+        // per-config llmBaseUrl wins, else the instance-wide hephaestus.mentor.agent.base-url property,
+        // else the resolver's hardcoded provider default. A catalog-bound config (connectionScope !=
+        // null) always uses its connection's own base URL and ignores both.
+        String baseUrl = llmConfig.baseUrl();
+        boolean legacyWithoutExplicitOverride =
+            llmConfig.connectionScope() == null &&
+            (llmConfig.rawLegacyBaseUrl() == null || llmConfig.rawLegacyBaseUrl().isBlank());
+        if (
+            legacyWithoutExplicitOverride && mentorProperties.baseUrl() != null && !mentorProperties.baseUrl().isBlank()
+        ) {
+            baseUrl = mentorProperties.baseUrl();
         }
 
         // The config API floor (@Min(30) on AgentConfig timeoutSeconds) sits below PiPlanSpec's runtime
@@ -76,14 +84,27 @@ public class MentorPiAdapter {
         // minimum buildable budget so any valid config always yields a mentor sandbox.
         int timeoutSeconds = Math.max(llmConfig.timeoutSeconds(), PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS + 1);
 
-        PiPlanSpec planSpec = new PiPlanSpec(
-            llmConfig.llmProvider(),
-            llmConfig.credentialMode(),
-            llmConfig.llmApiKey(),
-            llmConfig.modelName(),
+        // ONE credential path (#1368 slice 5): the mentor's interactive sandbox is not an AgentJob row,
+        // so it gets an equivalent proxy-scoped token from the in-memory mentor registry rather than a
+        // DB-backed job token. See MentorProxyCredentialRegistry's javadoc for the residual-risk note
+        // (TTL-only expiry, no explicit revoke-on-teardown hook yet).
+        String proxyToken = proxyCredentialRegistry.mint(
+            llmConfig.apiProtocol(),
             baseUrl,
-            null,
-            true,
+            llmConfig.connectionScope(),
+            llmConfig.connectionId(),
+            llmConfig.connectionScope() == null ? llmConfig.configId() : null
+        );
+
+        PiPlanSpec planSpec = new PiPlanSpec(
+            llmConfig.apiProtocol(),
+            llmConfig.upstreamModelId(),
+            llmConfig.contextWindow(),
+            llmConfig.maxOutputTokens(),
+            llmConfig.supportsReasoning(),
+            llmConfig.cacheControlFormat(),
+            proxyToken,
+            false,
             timeoutSeconds,
             PROFILE,
             extraInputs,

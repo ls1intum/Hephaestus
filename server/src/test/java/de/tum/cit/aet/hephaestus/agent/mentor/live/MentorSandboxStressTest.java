@@ -1,7 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.live;
 
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorRunnerProfile;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiPlanSpec;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiRuntimeFactory;
@@ -763,25 +761,31 @@ class MentorSandboxStressTest {
 
         PiRuntimeFactory factory = new PiRuntimeFactory(MAPPER);
         PiPlanSpec spec = new PiPlanSpec(
-            LlmProvider.OPENAI,
-            CredentialMode.API_KEY,
-            creds.apiKey(),
+            "openai-completions",
             creds.model(),
-            creds.baseUrl(),
             null,
+            null,
+            false,
+            null,
+            "live-test-token", // never actually checked — no real proxy sits in front of this test
             true,
             300,
             new MentorRunnerProfile(),
             Map.of(),
             ""
         );
-        byte[] settingsBytes = factory.buildPiSettingsJson(spec.provider(), spec.modelName(), true);
+        byte[] settingsBytes = factory.buildPiSettingsJson(spec.upstreamModelId());
 
         Path piHome = tmp.resolve(".pi-home");
         Files.createDirectories(piHome);
         Files.write(piHome.resolve("settings.json"), settingsBytes);
-        // No extension file — pi-mentor-runner.mjs registers the hephaestus provider directly
-        // on the ModelRegistry from the PI_HEPHAESTUS_* env vars set on the spawned process.
+
+        // pi-provider.json — written at the real tmp root; the runner-entry shim rewrites the
+        // runner's hardcoded "/workspace/..." reads to this real path (see buildRunnerShim).
+        byte[] providerConfigBytes = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(
+            Map.of("apiProtocol", spec.apiProtocol(), "modelId", spec.upstreamModelId(), "supportsReasoning", false)
+        );
+        Files.write(tmp.resolve("pi-provider.json"), providerConfigBytes);
         return tmp;
     }
 
@@ -789,9 +793,10 @@ class MentorSandboxStressTest {
         ProcessBuilder pb = new ProcessBuilder();
         Map<String, String> env = pb.environment();
         env.putAll(creds.asProcessEnv());
-        env.put("PI_HEPHAESTUS_BASE_URL", creds.baseUrl());
-        env.put("PI_HEPHAESTUS_API_KEY", creds.apiKey());
-        env.put("PI_HEPHAESTUS_MODEL", creds.model());
+        // #1368 slice 5: the runner reads LLM_PROXY_URL / LLM_PROXY_TOKEN (see MentorLiveLlmTest for
+        // the full rationale — no real proxy sits in front of this stress test either).
+        env.put("LLM_PROXY_URL", creds.baseUrl());
+        env.put("LLM_PROXY_TOKEN", creds.apiKey());
         env.put("PI_CODING_AGENT_DIR", workspace.resolve(".pi-home").toString());
         pb.directory(workspace.toFile());
 

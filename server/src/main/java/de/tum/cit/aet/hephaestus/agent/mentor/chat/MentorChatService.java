@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
@@ -85,6 +86,7 @@ public class MentorChatService implements MentorTurnRunner {
     private final MentorChatExecutorConfig.MentorRunnerTimeoutScheduler runnerTimeoutScheduler;
     private final MentorChatMetrics metrics;
     private final LlmBudgetService llmBudgetService;
+    private final LlmModelResolver llmModelResolver;
 
     /**
      * Submit a turn to the virtual-thread executor and return. {@code clientHolder} lets the
@@ -700,12 +702,12 @@ public class MentorChatService implements MentorTurnRunner {
         if (boundConfigId != null) {
             Optional<AgentConfig> bound = agentConfigRepository.findByIdAndWorkspaceId(boundConfigId, workspaceId);
             if (bound.isPresent() && bound.get().isEnabled()) {
-                return MentorLlmConfig.fromAgentConfig(bound.get());
+                return MentorLlmConfig.fromAgentConfig(bound.get(), llmModelResolver);
             }
         }
         return agentConfigRepository
             .findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(workspaceId)
-            .map(MentorLlmConfig::fromAgentConfig)
+            .map(config -> MentorLlmConfig.fromAgentConfig(config, llmModelResolver))
             .orElseThrow(() ->
                 new IllegalStateException(
                     "No enabled AgentConfig for workspace " + workspaceId + " — mentor cannot run a turn"

@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent;
 
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigBoundException;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigCredentialModeException;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigHasActiveJobsException;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigNameConflictException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStateConflictException;
@@ -35,11 +34,6 @@ public class AgentControllerAdvice {
     @ExceptionHandler(AgentConfigBoundException.class)
     ProblemDetail handleAgentConfigBound(AgentConfigBoundException exception) {
         return problem(HttpStatus.CONFLICT, "Agent config is bound", exception.getMessage());
-    }
-
-    @ExceptionHandler(AgentConfigCredentialModeException.class)
-    ProblemDetail handleAgentConfigCredentialMode(AgentConfigCredentialModeException exception) {
-        return problem(HttpStatus.BAD_REQUEST, "Invalid credential mode", exception.getMessage());
     }
 
     @ExceptionHandler(AgentJobStateConflictException.class)

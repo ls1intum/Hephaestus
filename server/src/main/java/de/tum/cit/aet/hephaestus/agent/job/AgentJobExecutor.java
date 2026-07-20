@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
@@ -513,24 +512,18 @@ public class AgentJobExecutor {
             return new PrepareResult(files, volumes);
         });
 
-        // BYO worker pod: when the operator configures hephaestus.worker.llm.{base-url,api-key},
-        // override the per-job credential mode + endpoint so agent-pi reaches the operator's LLM
-        // directly. The app-pod's bundled LLM proxy is not reachable from a worker host. ADR 0009.
-        // Worker-level override wins; otherwise the per-workspace AgentConfig.llmBaseUrl applies
-        // (needed when the workspace's LLM gateway doesn't speak the OpenAI Responses API and the
-        // Pi runtime must route via chat/completions through the hephaestus provider extension).
-        WorkerProperties.Llm workerLlm = workerProperties.map(WorkerProperties::llm).orElse(null);
-        boolean workerLlmActive = workerLlm != null && workerLlm.isConfigured();
-        CredentialMode credentialMode = workerLlmActive ? CredentialMode.API_KEY : snapshot.credentialMode();
-        String credential = workerLlmActive ? workerLlm.apiKey() : job.getLlmApiKey();
-        String baseUrl = workerLlmActive ? workerLlm.baseUrl() : snapshot.llmBaseUrl();
-
+        // ONE credential path (#1368 slice 5): every sandbox — app-server AND worker pod alike, both
+        // share the DB — talks to the in-app LLM proxy via the job's own token. There is no
+        // worker-side BYO-LLM override anymore; a worker host reaches the proxy the same way the
+        // app-server's own sandboxes do (both run the proxy controller whenever job execution is
+        // enabled — see LlmProxySecurityConfig).
         PracticeAgentRequest adapterRequest = new PracticeAgentRequest(
-            snapshot.llmProvider(),
-            credentialMode,
-            snapshot.modelName(),
-            credential,
-            baseUrl,
+            snapshot.apiProtocol(),
+            snapshot.upstreamModelId(),
+            snapshot.contextWindow(),
+            snapshot.maxOutputTokens(),
+            snapshot.supportsReasoning(),
+            snapshot.cacheControlFormat(),
             job.getJobToken(),
             snapshot.allowInternet(),
             snapshot.timeoutSeconds()
@@ -888,7 +881,7 @@ public class AgentJobExecutor {
                         }
                     }
                     if ((model == null || model.isBlank()) && snap != null) {
-                        model = snap.modelName();
+                        model = snap.upstreamModelId();
                     }
                     freshJob.setLlmModel(model);
                     if (snap != null) {

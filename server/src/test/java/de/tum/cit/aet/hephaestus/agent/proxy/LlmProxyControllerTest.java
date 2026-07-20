@@ -2,23 +2,26 @@ package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.agent.catalog.EgressPolicy;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -29,19 +32,21 @@ import org.springframework.web.reactive.function.client.WebClientRequestExceptio
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
 
+/**
+ * #1368 slice 5: the proxy no longer takes a {@code {provider}} path segment — the connection is
+ * identified from the authenticated {@link ProxyRouting} (a job token's frozen ConfigSnapshot, or a
+ * mentor session token), and the live credential is re-resolved via {@link LlmModelResolver} on
+ * every call.
+ */
 class LlmProxyControllerTest extends BaseUnitTest {
 
-    private static final LlmProxyProperties DEFAULT_PROPS = new LlmProxyProperties(
-        "https://api.anthropic.com",
-        "https://api.openai.com",
-        "Authorization",
-        true,
-        "",
-        "api-key",
-        false
-    );
-
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+    @Mock
+    private LlmModelResolver llmModelResolver;
+
+    @Mock
+    private EgressPolicy egressPolicy;
 
     private LlmProxyController controller;
     private SimpleMeterRegistry meterRegistry;
@@ -49,7 +54,13 @@ class LlmProxyControllerTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
-        controller = new LlmProxyController(WebClient.create(), DEFAULT_PROPS, OBJECT_MAPPER, meterRegistry);
+        controller = new LlmProxyController(
+            WebClient.create(),
+            llmModelResolver,
+            egressPolicy,
+            OBJECT_MAPPER,
+            meterRegistry
+        );
         SecurityContextHolder.clearContext();
     }
 
@@ -58,15 +69,33 @@ class LlmProxyControllerTest extends BaseUnitTest {
         SecurityContextHolder.clearContext();
     }
 
-    private void setUpAuthentication(AgentJob job) {
-        SecurityContextHolder.getContext().setAuthentication(new JobTokenAuthentication(job));
+    private void authenticate(ProxyRouting routing) {
+        SecurityContextHolder.getContext().setAuthentication(new JobTokenAuthentication(routing));
     }
 
-    private AgentJob createJobWithApiKey(String apiKey) {
-        var job = new AgentJob();
-        job.setId(UUID.randomUUID());
-        job.setLlmApiKey(apiKey);
-        return job;
+    private static ProxyRouting anthropicRouting() {
+        return new ProxyRouting(
+            "job:test",
+            "anthropic-messages",
+            "https://api.anthropic.com",
+            FundingSource.INSTANCE,
+            7L,
+            null
+        );
+    }
+
+    private void stubCredential(ProxyRouting routing, LlmModelResolver.ProxyCredential credential) {
+        when(
+            llmModelResolver.resolveProxyCredential(
+                eq(new LlmModelResolver.ConnectionRef(routing.connectionScope(), routing.connectionId())),
+                eq(routing.legacyConfigId()),
+                eq(routing.apiProtocol())
+            )
+        ).thenReturn(credential);
+    }
+
+    private void stubNoCredential(ProxyRouting routing) {
+        stubCredential(routing, null);
     }
 
     @Nested
@@ -74,12 +103,17 @@ class LlmProxyControllerTest extends BaseUnitTest {
 
         @Test
         void shouldStripXApiKey() {
-            var config = ProviderProxyConfig.forProvider(LlmProvider.ANTHROPIC, DEFAULT_PROPS);
+            LlmModelResolver.ProxyCredential credential = new LlmModelResolver.ProxyCredential(
+                "x-api-key",
+                "",
+                null,
+                "sk-real-key"
+            );
             HttpHeaders incoming = new HttpHeaders();
             incoming.set("x-api-key", "job-token-should-be-stripped");
             incoming.set("Content-Type", "application/json");
 
-            HttpHeaders out = controller.buildUpstreamHeaders(incoming, config, "sk-real-key");
+            HttpHeaders out = controller.buildUpstreamHeaders(incoming, credential);
 
             assertThat(out.getFirst("x-api-key")).isEqualTo("sk-real-key");
             assertThat(out.get("x-api-key")).hasSize(1);
@@ -88,12 +122,17 @@ class LlmProxyControllerTest extends BaseUnitTest {
 
         @Test
         void shouldStripAuthorization() {
-            var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, DEFAULT_PROPS);
+            LlmModelResolver.ProxyCredential credential = new LlmModelResolver.ProxyCredential(
+                "Authorization",
+                "Bearer ",
+                null,
+                "sk-real-key"
+            );
             HttpHeaders incoming = new HttpHeaders();
             incoming.set(HttpHeaders.AUTHORIZATION, "Bearer job-token-should-be-stripped");
             incoming.set("Content-Type", "application/json");
 
-            HttpHeaders out = controller.buildUpstreamHeaders(incoming, config, "sk-real-key");
+            HttpHeaders out = controller.buildUpstreamHeaders(incoming, credential);
 
             assertThat(out.getFirst(HttpHeaders.AUTHORIZATION)).isEqualTo("Bearer sk-real-key");
             assertThat(out.get(HttpHeaders.AUTHORIZATION)).hasSize(1);
@@ -101,38 +140,52 @@ class LlmProxyControllerTest extends BaseUnitTest {
 
         @Test
         void shouldStripAzureApiKey() {
-            var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, DEFAULT_PROPS);
+            LlmModelResolver.ProxyCredential credential = new LlmModelResolver.ProxyCredential(
+                "api-key",
+                "",
+                null,
+                "sk-real-key"
+            );
             HttpHeaders incoming = new HttpHeaders();
             incoming.set("api-key", "job-token-should-be-stripped");
 
-            HttpHeaders out = controller.buildUpstreamHeaders(incoming, config, "sk-real-key");
+            HttpHeaders out = controller.buildUpstreamHeaders(incoming, credential);
 
-            assertThat(out.get("api-key")).isNull();
+            assertThat(out.getFirst("api-key")).isEqualTo("sk-real-key");
         }
 
         @Test
         void shouldStripAllAuthHeaders() {
-            var config = ProviderProxyConfig.forProvider(LlmProvider.ANTHROPIC, DEFAULT_PROPS);
+            LlmModelResolver.ProxyCredential credential = new LlmModelResolver.ProxyCredential(
+                "x-api-key",
+                "",
+                null,
+                "sk-real-key"
+            );
             HttpHeaders incoming = new HttpHeaders();
             incoming.set("x-api-key", "token1");
             incoming.set(HttpHeaders.AUTHORIZATION, "Bearer token2");
             incoming.set("api-key", "token3");
 
-            HttpHeaders out = controller.buildUpstreamHeaders(incoming, config, "sk-real-key");
+            HttpHeaders out = controller.buildUpstreamHeaders(incoming, credential);
 
             assertThat(out.getFirst("x-api-key")).isEqualTo("sk-real-key");
             assertThat(out.get(HttpHeaders.AUTHORIZATION)).isNull();
-            assertThat(out.get("api-key")).isNull();
         }
 
         @Test
         void shouldRemoveHostAndSetAcceptEncodingIdentity() {
-            var config = ProviderProxyConfig.forProvider(LlmProvider.ANTHROPIC, DEFAULT_PROPS);
+            LlmModelResolver.ProxyCredential credential = new LlmModelResolver.ProxyCredential(
+                "x-api-key",
+                "",
+                null,
+                "sk-real-key"
+            );
             HttpHeaders incoming = new HttpHeaders();
             incoming.set(HttpHeaders.HOST, "app-server:8080");
             incoming.set(HttpHeaders.ACCEPT_ENCODING, "gzip, deflate");
 
-            HttpHeaders out = controller.buildUpstreamHeaders(incoming, config, "sk-real-key");
+            HttpHeaders out = controller.buildUpstreamHeaders(incoming, credential);
 
             assertThat(out.get(HttpHeaders.HOST)).isNull();
             assertThat(out.getFirst(HttpHeaders.ACCEPT_ENCODING)).isEqualTo("identity");
@@ -140,34 +193,78 @@ class LlmProxyControllerTest extends BaseUnitTest {
 
         @Test
         void shouldStripHopByHopHeaders() {
-            var config = ProviderProxyConfig.forProvider(LlmProvider.ANTHROPIC, DEFAULT_PROPS);
+            LlmModelResolver.ProxyCredential credential = new LlmModelResolver.ProxyCredential(
+                "x-api-key",
+                "",
+                null,
+                "sk-real-key"
+            );
             HttpHeaders incoming = new HttpHeaders();
             incoming.set(HttpHeaders.CONNECTION, "keep-alive");
             incoming.set(HttpHeaders.TRANSFER_ENCODING, "chunked");
             incoming.set("Keep-Alive", "timeout=5");
             incoming.set("Content-Type", "application/json");
 
-            HttpHeaders out = controller.buildUpstreamHeaders(incoming, config, "sk-real-key");
+            HttpHeaders out = controller.buildUpstreamHeaders(incoming, credential);
 
             assertThat(out.get(HttpHeaders.CONNECTION)).isNull();
             assertThat(out.get(HttpHeaders.TRANSFER_ENCODING)).isNull();
             assertThat(out.get("Keep-Alive")).isNull();
             assertThat(out.getFirst("Content-Type")).isEqualTo("application/json");
         }
+    }
+
+    @Nested
+    class ConnectionResolution {
 
         @Test
-        void shouldPreserveCustomHeaders() {
-            var config = ProviderProxyConfig.forProvider(LlmProvider.ANTHROPIC, DEFAULT_PROPS);
-            HttpHeaders incoming = new HttpHeaders();
-            incoming.set("Content-Type", "application/json");
-            incoming.set("anthropic-version", "2024-01-01");
-            incoming.set("X-Custom", "preserved");
+        @DisplayName(
+            "no authenticated principal on the security context throws (JobTokenAuthenticationFilter contract)"
+        )
+        void unauthenticatedRequestFails() {
+            var request = new MockHttpServletRequest("POST", "/internal/llm/v1/messages");
+            var response = new MockHttpServletResponse();
 
-            HttpHeaders out = controller.buildUpstreamHeaders(incoming, config, "sk-real-key");
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () ->
+                controller.proxy(request, response, new HttpHeaders(), "{}".getBytes())
+            );
+        }
 
-            assertThat(out.getFirst("Content-Type")).isEqualTo("application/json");
-            assertThat(out.getFirst("anthropic-version")).isEqualTo("2024-01-01");
-            assertThat(out.getFirst("X-Custom")).isEqualTo("preserved");
+        @Test
+        @DisplayName(
+            "a token whose routing resolves no live connection/credential is refused with 502, never forwarded"
+        )
+        void unresolvableConnectionIsRefused() {
+            ProxyRouting routing = anthropicRouting();
+            authenticate(routing);
+            stubNoCredential(routing); // connection disabled / deleted since the snapshot was frozen
+
+            var request = new MockHttpServletRequest("POST", "/internal/llm/v1/messages");
+            var response = new MockHttpServletResponse();
+
+            var result = controller.proxy(request, response, new HttpHeaders(), "{}".getBytes());
+
+            assertThat(result.getStatusCode().value()).isEqualTo(502);
+            assertThat(result.getBody()).isEqualTo("No credential configured for this connection");
+        }
+
+        @Test
+        @DisplayName("egress policy rejecting the frozen base URL refuses forwarding")
+        void egressPolicyRejectionIsRefused() {
+            ProxyRouting routing = anthropicRouting();
+            authenticate(routing);
+            stubCredential(routing, new LlmModelResolver.ProxyCredential("x-api-key", "", null, "sk-real-key"));
+            doThrow(new IllegalArgumentException("Provider host must be a public HTTPS URL"))
+                .when(egressPolicy)
+                .validate(routing.baseUrl());
+
+            var request = new MockHttpServletRequest("POST", "/internal/llm/v1/messages");
+            var response = new MockHttpServletResponse();
+
+            var result = controller.proxy(request, response, new HttpHeaders(), "{}".getBytes());
+
+            assertThat(result.getStatusCode().value()).isEqualTo(502);
+            assertThat(result.getBody()).isEqualTo("Upstream target not permitted");
         }
     }
 
@@ -177,125 +274,62 @@ class LlmProxyControllerTest extends BaseUnitTest {
         @Test
         @DisplayName("should reject .. in subpath")
         void shouldRejectPathTraversal() {
-            AgentJob job = createJobWithApiKey("sk-real-key");
-            setUpAuthentication(job);
+            authenticate(anthropicRouting());
 
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/../../../etc/passwd");
+            var request = new MockHttpServletRequest("POST", "/internal/llm/../../../etc/passwd");
             var response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("x-api-key", "token");
 
-            var result = controller.proxy("anthropic", request, response, headers, "{}".getBytes());
+            var result = controller.proxy(request, response, new HttpHeaders(), "{}".getBytes());
 
             assertThat(result.getStatusCode().value()).isEqualTo(400);
         }
 
         @Test
         void shouldRejectDoubleDotInDecodedPath() {
-            AgentJob job = createJobWithApiKey("sk-real-key");
-            setUpAuthentication(job);
+            authenticate(anthropicRouting());
 
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1/../../etc/passwd");
+            var request = new MockHttpServletRequest("POST", "/internal/llm/v1/../../etc/passwd");
             var response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("x-api-key", "token");
 
-            var result = controller.proxy("anthropic", request, response, headers, "{}".getBytes());
+            var result = controller.proxy(request, response, new HttpHeaders(), "{}".getBytes());
 
             assertThat(result.getStatusCode().value()).isEqualTo(400);
         }
 
         @Test
         void shouldRejectPercentEncodedDots() {
-            AgentJob job = createJobWithApiKey("sk-real-key");
-            setUpAuthentication(job);
+            authenticate(anthropicRouting());
 
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/%2e%2e/etc/passwd");
+            var request = new MockHttpServletRequest("POST", "/internal/llm/%2e%2e/etc/passwd");
             var response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("x-api-key", "token");
 
-            var result = controller.proxy("anthropic", request, response, headers, "{}".getBytes());
+            var result = controller.proxy(request, response, new HttpHeaders(), "{}".getBytes());
 
             assertThat(result.getStatusCode().value()).isEqualTo(400);
         }
 
         @Test
         void shouldRejectDoubleEncodedDots() {
-            AgentJob job = createJobWithApiKey("sk-real-key");
-            setUpAuthentication(job);
+            authenticate(anthropicRouting());
 
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/%252e%252e/etc/passwd");
+            var request = new MockHttpServletRequest("POST", "/internal/llm/%252e%252e/etc/passwd");
             var response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("x-api-key", "token");
 
-            var result = controller.proxy("anthropic", request, response, headers, "{}".getBytes());
+            var result = controller.proxy(request, response, new HttpHeaders(), "{}".getBytes());
 
             assertThat(result.getStatusCode().value()).isEqualTo(400);
         }
 
         @Test
         void shouldRejectBackslash() {
-            AgentJob job = createJobWithApiKey("sk-real-key");
-            setUpAuthentication(job);
+            authenticate(anthropicRouting());
 
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1\\..\\etc\\passwd");
+            var request = new MockHttpServletRequest("POST", "/internal/llm/v1\\..\\etc\\passwd");
             var response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("x-api-key", "token");
 
-            var result = controller.proxy("anthropic", request, response, headers, "{}".getBytes());
+            var result = controller.proxy(request, response, new HttpHeaders(), "{}".getBytes());
 
             assertThat(result.getStatusCode().value()).isEqualTo(400);
-        }
-    }
-
-    @Nested
-    class NullApiKey {
-
-        @Test
-        void shouldReturn502ForNullApiKey() {
-            AgentJob job = createJobWithApiKey(null);
-            setUpAuthentication(job);
-
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1/messages");
-            var response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
-
-            var result = controller.proxy("anthropic", request, response, headers, "{}".getBytes());
-
-            assertThat(result.getStatusCode().value()).isEqualTo(502);
-        }
-
-        @Test
-        void shouldReturn502ForBlankApiKey() {
-            AgentJob job = createJobWithApiKey("   ");
-            setUpAuthentication(job);
-
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1/messages");
-            var response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
-
-            var result = controller.proxy("anthropic", request, response, headers, "{}".getBytes());
-
-            assertThat(result.getStatusCode().value()).isEqualTo(502);
-        }
-
-        @Test
-        void shouldIncrementErrorCounterForNullApiKey() {
-            AgentJob job = createJobWithApiKey(null);
-            setUpAuthentication(job);
-
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1/messages");
-            var response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
-
-            controller.proxy("anthropic", request, response, headers, "{}".getBytes());
-
-            var errorCounter = meterRegistry.find("llm.proxy.errors").tag("provider", "ANTHROPIC").counter();
-            assertThat(errorCounter).isNotNull();
-            assertThat(errorCounter.count()).isEqualTo(1.0);
         }
     }
 
@@ -335,8 +369,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
 
         @Test
         void shouldNotMisinterpretAtInPathAsUserinfo() {
-            // An @ in the URL path (after the authority) is a harmless literal character,
-            // not a userinfo separator. Verify the constructed URI parses correctly.
             String url = LlmProxyController.buildUpstreamUrl(
                 "https://api.anthropic.com",
                 "/user@evil.com/v1/messages",
@@ -349,29 +381,18 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("SSRF defense detects userinfo in authority (defense-in-depth)")
-        void shouldDetectUserInfoInAuthority() {
-            // The controller's SSRF check rejects URIs with userinfo.
-            // This verifies the defense works at the URI level — in production,
-            // buildUpstreamUrl cannot produce userinfo since the base URL is from config.
-            var uri = java.net.URI.create("https://attacker:pass@evil.com/v1/messages");
-            assertThat(uri.getUserInfo()).as("URI with @ in authority has userinfo").isNotNull();
-            assertThat(uri.getHost()).isNotEqualTo("api.anthropic.com");
-        }
-
-        @Test
         void shouldRejectSsrfHostMismatchViaAtInjection() {
-            AgentJob job = createJobWithApiKey("sk-real-key");
-            setUpAuthentication(job);
+            ProxyRouting routing = anthropicRouting();
+            authenticate(routing);
+            stubCredential(routing, new LlmModelResolver.ProxyCredential("x-api-key", "", null, "sk-real-key"));
 
-            // Craft path where stripping "/internal/llm/anthropic" leaves "@evil.com/v1/messages".
+            // Craft path where stripping "/internal/llm" leaves "@evil.com/v1/messages".
             // buildUpstreamUrl produces: "https://api.anthropic.com@evil.com/v1/messages"
             // URI.create parses this as: userInfo=api.anthropic.com, host=evil.com
-            // The SSRF check catches both userInfo != null AND host != expected host.
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic@evil.com/v1/messages");
+            var request = new MockHttpServletRequest("POST", "/internal/llm@evil.com/v1/messages");
             var response = new MockHttpServletResponse();
 
-            var result = controller.proxy("anthropic", request, response, new HttpHeaders(), "{}".getBytes());
+            var result = controller.proxy(request, response, new HttpHeaders(), "{}".getBytes());
 
             assertThat(result).isNotNull();
             assertThat(result.getStatusCode().value()).isEqualTo(400);
@@ -380,17 +401,15 @@ class LlmProxyControllerTest extends BaseUnitTest {
 
         @Test
         void shouldHandleMalformedUri() {
-            AgentJob job = createJobWithApiKey("sk-real-key");
-            setUpAuthentication(job);
+            ProxyRouting routing = anthropicRouting();
+            authenticate(routing);
+            stubCredential(routing, new LlmModelResolver.ProxyCredential("x-api-key", "", null, "sk-real-key"));
 
-            // Path with characters invalid for URI
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1/messages with spaces");
+            var request = new MockHttpServletRequest("POST", "/internal/llm/v1/messages with spaces");
             var response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
 
-            var result = controller.proxy("anthropic", request, response, headers, "{}".getBytes());
+            var result = controller.proxy(request, response, new HttpHeaders(), "{}".getBytes());
 
-            // Should return 400, not 500 (IllegalArgumentException caught)
             assertThat(result).isNotNull();
             assertThat(result.getStatusCode().value()).isEqualTo(400);
         }
@@ -400,77 +419,40 @@ class LlmProxyControllerTest extends BaseUnitTest {
     class Metrics {
 
         @Test
-        void shouldRecordTimerWithProviderTag() {
-            AgentJob job = createJobWithApiKey(null);
-            setUpAuthentication(job);
+        void shouldRecordTimerWithApiProtocolTag() {
+            ProxyRouting routing = anthropicRouting();
+            authenticate(routing);
+            stubNoCredential(routing);
 
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1/messages");
+            var request = new MockHttpServletRequest("POST", "/internal/llm/v1/messages");
             var response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
 
-            controller.proxy("anthropic", request, response, headers, "{}".getBytes());
+            controller.proxy(request, response, new HttpHeaders(), "{}".getBytes());
 
-            var timer = meterRegistry.find("llm.proxy.duration").tag("provider", "ANTHROPIC").timer();
+            var timer = meterRegistry.find("llm.proxy.duration").tag("apiProtocol", "anthropic-messages").timer();
             assertThat(timer).isNotNull();
             assertThat(timer.count()).isEqualTo(1);
-        }
-
-        @Test
-        void shouldRecordTimerOnEarlyReturn() {
-            AgentJob job = createJobWithApiKey("   ");
-            setUpAuthentication(job);
-
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1/messages");
-            var response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
-
-            controller.proxy("anthropic", request, response, headers, "{}".getBytes());
-
-            var timer = meterRegistry.find("llm.proxy.duration").tag("provider", "ANTHROPIC").timer();
-            assertThat(timer).isNotNull();
-            assertThat(timer.count()).isEqualTo(1);
-            assertThat(timer.totalTime(TimeUnit.NANOSECONDS)).isGreaterThan(0);
         }
 
         @Test
         void shouldIncrementErrorCounterMultipleTimes() {
-            AgentJob job = createJobWithApiKey(null);
-            setUpAuthentication(job);
+            ProxyRouting routing = anthropicRouting();
+            authenticate(routing);
+            stubNoCredential(routing);
 
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1/messages");
+            var request = new MockHttpServletRequest("POST", "/internal/llm/v1/messages");
             var response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
 
-            controller.proxy("anthropic", request, response, headers, "{}".getBytes());
-            controller.proxy("anthropic", request, response, headers, "{}".getBytes());
-            controller.proxy("anthropic", request, response, headers, "{}".getBytes());
+            controller.proxy(request, response, new HttpHeaders(), "{}".getBytes());
+            controller.proxy(request, response, new HttpHeaders(), "{}".getBytes());
+            controller.proxy(request, response, new HttpHeaders(), "{}".getBytes());
 
-            var errorCounter = meterRegistry.find("llm.proxy.errors").tag("provider", "ANTHROPIC").counter();
+            var errorCounter = meterRegistry
+                .find("llm.proxy.errors")
+                .tag("apiProtocol", "anthropic-messages")
+                .counter();
             assertThat(errorCounter).isNotNull();
             assertThat(errorCounter.count()).isEqualTo(3.0);
-        }
-
-        @Test
-        void shouldTrackErrorsPerProvider() {
-            AgentJob job = createJobWithApiKey(null);
-            setUpAuthentication(job);
-
-            var anthropicReq = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1/messages");
-            var openaiReq = new MockHttpServletRequest("POST", "/internal/llm/openai/v1/chat/completions");
-            var response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
-
-            controller.proxy("anthropic", anthropicReq, response, headers, "{}".getBytes());
-            controller.proxy("openai", openaiReq, response, headers, "{}".getBytes());
-            controller.proxy("openai", openaiReq, response, headers, "{}".getBytes());
-
-            var anthropicErrors = meterRegistry.find("llm.proxy.errors").tag("provider", "ANTHROPIC").counter();
-            var openaiErrors = meterRegistry.find("llm.proxy.errors").tag("provider", "OPENAI").counter();
-
-            assertThat(anthropicErrors).isNotNull();
-            assertThat(anthropicErrors.count()).isEqualTo(1.0);
-            assertThat(openaiErrors).isNotNull();
-            assertThat(openaiErrors.count()).isEqualTo(2.0);
         }
     }
 
@@ -479,46 +461,31 @@ class LlmProxyControllerTest extends BaseUnitTest {
 
         @Test
         void shouldRejectOversizedBody() {
-            AgentJob job = createJobWithApiKey("sk-real-key");
-            setUpAuthentication(job);
+            // Body-size validation is a cheap syntactic check that runs BEFORE credential resolution
+            // — no stub needed here (a stub would be flagged as unnecessary).
+            authenticate(anthropicRouting());
 
             byte[] oversizedBody = new byte[4 * 1024 * 1024 + 1]; // 4MB + 1 byte
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1/messages");
+            var request = new MockHttpServletRequest("POST", "/internal/llm/v1/messages");
             var response = new MockHttpServletResponse();
 
-            var result = controller.proxy("anthropic", request, response, new HttpHeaders(), oversizedBody);
+            var result = controller.proxy(request, response, new HttpHeaders(), oversizedBody);
 
             assertThat(result).isNotNull();
             assertThat(result.getStatusCode().value()).isEqualTo(413);
         }
 
         @Test
-        void shouldAcceptBodyAtLimit() {
-            AgentJob job = createJobWithApiKey("sk-real-key");
-            setUpAuthentication(job);
-
-            byte[] maxBody = new byte[4 * 1024 * 1024]; // exactly 4MB
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1/messages");
-            var response = new MockHttpServletResponse();
-
-            var result = controller.proxy("anthropic", request, response, new HttpHeaders(), maxBody);
-
-            // Should pass body validation (may get 502 from WebClient, but not 413)
-            assertThat(result).isNotNull();
-            assertThat(result.getStatusCode().value()).isNotEqualTo(413);
-        }
-
-        @Test
         void shouldAcceptNullBody() {
-            AgentJob job = createJobWithApiKey("sk-real-key");
-            setUpAuthentication(job);
+            ProxyRouting routing = anthropicRouting();
+            authenticate(routing);
+            stubCredential(routing, new LlmModelResolver.ProxyCredential("x-api-key", "", null, "sk-real-key"));
 
-            var request = new MockHttpServletRequest("GET", "/internal/llm/anthropic/v1/models");
+            var request = new MockHttpServletRequest("GET", "/internal/llm/v1/models");
             var response = new MockHttpServletResponse();
 
-            var result = controller.proxy("anthropic", request, response, new HttpHeaders(), null);
+            var result = controller.proxy(request, response, new HttpHeaders(), null);
 
-            // Should not fail body validation
             assertThat(result).isNotNull();
             assertThat(result.getStatusCode().value()).isNotEqualTo(413);
         }
@@ -529,7 +496,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
 
         @Test
         void shouldReturn502OnWebClientRequestException() {
-            // Mock WebClient to throw WebClientRequestException (upstream unreachable)
             @SuppressWarnings("unchecked")
             WebClient.RequestBodyUriSpec bodyUriSpec = mock(WebClient.RequestBodyUriSpec.class);
             @SuppressWarnings("unchecked")
@@ -553,21 +519,31 @@ class LlmProxyControllerTest extends BaseUnitTest {
                 )
             );
 
-            var mockedController = new LlmProxyController(mockWebClient, DEFAULT_PROPS, OBJECT_MAPPER, meterRegistry);
+            var mockedController = new LlmProxyController(
+                mockWebClient,
+                llmModelResolver,
+                egressPolicy,
+                OBJECT_MAPPER,
+                meterRegistry
+            );
 
-            AgentJob job = createJobWithApiKey("sk-real-key");
-            setUpAuthentication(job);
+            ProxyRouting routing = anthropicRouting();
+            authenticate(routing);
+            stubCredential(routing, new LlmModelResolver.ProxyCredential("x-api-key", "", null, "sk-real-key"));
 
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1/messages");
+            var request = new MockHttpServletRequest("POST", "/internal/llm/v1/messages");
             var response = new MockHttpServletResponse();
 
-            var result = mockedController.proxy("anthropic", request, response, new HttpHeaders(), "{}".getBytes());
+            var result = mockedController.proxy(request, response, new HttpHeaders(), "{}".getBytes());
 
             assertThat(result).isNotNull();
             assertThat(result.getStatusCode().value()).isEqualTo(502);
             assertThat(result.getBody()).isEqualTo("Upstream provider unreachable");
 
-            var errorCounter = meterRegistry.find("llm.proxy.errors").tag("provider", "ANTHROPIC").counter();
+            var errorCounter = meterRegistry
+                .find("llm.proxy.errors")
+                .tag("apiProtocol", "anthropic-messages")
+                .counter();
             assertThat(errorCounter).isNotNull();
             assertThat(errorCounter.count()).isEqualTo(1.0);
         }
@@ -590,48 +566,38 @@ class LlmProxyControllerTest extends BaseUnitTest {
                 Mono.error(new RuntimeException("Unexpected upstream error"))
             );
 
-            var mockedController = new LlmProxyController(mockWebClient, DEFAULT_PROPS, OBJECT_MAPPER, meterRegistry);
+            var mockedController = new LlmProxyController(
+                mockWebClient,
+                llmModelResolver,
+                egressPolicy,
+                OBJECT_MAPPER,
+                meterRegistry
+            );
 
-            AgentJob job = createJobWithApiKey("sk-real-key");
-            setUpAuthentication(job);
+            ProxyRouting routing = anthropicRouting();
+            authenticate(routing);
+            stubCredential(routing, new LlmModelResolver.ProxyCredential("x-api-key", "", null, "sk-real-key"));
 
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1/messages");
+            var request = new MockHttpServletRequest("POST", "/internal/llm/v1/messages");
             var response = new MockHttpServletResponse();
 
-            var result = mockedController.proxy("anthropic", request, response, new HttpHeaders(), "{}".getBytes());
+            var result = mockedController.proxy(request, response, new HttpHeaders(), "{}".getBytes());
 
             assertThat(result).isNotNull();
             assertThat(result.getStatusCode().value()).isEqualTo(502);
             assertThat(result.getBody()).isEqualTo("Upstream request failed");
-
-            var errorCounter = meterRegistry.find("llm.proxy.errors").tag("provider", "ANTHROPIC").counter();
-            assertThat(errorCounter).isNotNull();
-            assertThat(errorCounter.count()).isEqualTo(1.0);
         }
     }
 
     @Nested
     class AzureBodySanitization {
 
-        private static final LlmProxyProperties AZURE_PROPS = new LlmProxyProperties(
-            "https://api.anthropic.com",
-            "https://my-resource.openai.azure.com/openai/deployments/gpt-4",
-            "api-key",
-            false,
-            "",
-            "api-key",
-            false
-        );
-
         @Test
-        void shouldStripReasoningSummaryForAzure() throws Exception {
-            var azureController = new LlmProxyController(WebClient.create(), AZURE_PROPS, OBJECT_MAPPER, meterRegistry);
-            var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, AZURE_PROPS);
-
+        void shouldStripReasoningSummaryForAzure() {
             byte[] body = "{\"model\":\"gpt-4\",\"reasoningSummary\":\"auto\",\"messages\":[]}".getBytes(
                 StandardCharsets.UTF_8
             );
-            byte[] sanitized = azureController.sanitizeBodyForAzure(LlmProvider.AZURE_OPENAI, config, body);
+            byte[] sanitized = controller.sanitizeBodyForAzure(body);
 
             var tree = OBJECT_MAPPER.readTree(sanitized);
             assertThat(tree.has("reasoningSummary")).isFalse();
@@ -640,49 +606,27 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldNotStripForStandardOpenAI() throws Exception {
-            var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, DEFAULT_PROPS);
-
-            byte[] body = "{\"model\":\"gpt-4\",\"reasoningSummary\":\"auto\",\"messages\":[]}".getBytes(
-                StandardCharsets.UTF_8
-            );
-            byte[] result = controller.sanitizeBodyForAzure(LlmProvider.OPENAI, config, body);
-
-            // Should return same reference (no modification)
-            assertThat(result).isSameAs(body);
-        }
-
-        @Test
         void shouldPassThroughNullBody() {
-            var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, AZURE_PROPS);
-            assertThat(controller.sanitizeBodyForAzure(LlmProvider.OPENAI, config, null)).isNull();
+            assertThat(controller.sanitizeBodyForAzure(null)).isNull();
         }
 
         @Test
         void shouldPassThroughEmptyBody() {
-            var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, AZURE_PROPS);
             byte[] empty = new byte[0];
-            assertThat(controller.sanitizeBodyForAzure(LlmProvider.OPENAI, config, empty)).isSameAs(empty);
+            assertThat(controller.sanitizeBodyForAzure(empty)).isSameAs(empty);
         }
 
         @Test
         void shouldPassThroughNonJsonBody() {
-            var azureController = new LlmProxyController(WebClient.create(), AZURE_PROPS, OBJECT_MAPPER, meterRegistry);
-            var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, AZURE_PROPS);
-
             byte[] body = "not-json".getBytes(StandardCharsets.UTF_8);
-            byte[] result = azureController.sanitizeBodyForAzure(LlmProvider.AZURE_OPENAI, config, body);
-
+            byte[] result = controller.sanitizeBodyForAzure(body);
             assertThat(result).isSameAs(body);
         }
 
         @Test
-        void shouldRenameMaxTokensForAzure() throws Exception {
-            var azureController = new LlmProxyController(WebClient.create(), AZURE_PROPS, OBJECT_MAPPER, meterRegistry);
-            var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, AZURE_PROPS);
-
+        void shouldRenameMaxTokensForAzure() {
             byte[] body = "{\"model\":\"gpt-4\",\"max_tokens\":1024,\"messages\":[]}".getBytes(StandardCharsets.UTF_8);
-            byte[] sanitized = azureController.sanitizeBodyForAzure(LlmProvider.AZURE_OPENAI, config, body);
+            byte[] sanitized = controller.sanitizeBodyForAzure(body);
 
             var tree = OBJECT_MAPPER.readTree(sanitized);
             assertThat(tree.has("max_tokens")).isFalse();
@@ -691,25 +635,48 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldNotRenameMaxTokensForStandardOpenAI() throws Exception {
-            var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, DEFAULT_PROPS);
+        void shouldNotModifyCleanBody() {
+            byte[] body = "{\"model\":\"gpt-4\",\"messages\":[]}".getBytes(StandardCharsets.UTF_8);
+            byte[] result = controller.sanitizeBodyForAzure(body);
+            assertThat(result).isSameAs(body);
+        }
+    }
 
-            byte[] body = "{\"model\":\"gpt-4\",\"max_tokens\":1024,\"messages\":[]}".getBytes(StandardCharsets.UTF_8);
-            byte[] result = controller.sanitizeBodyForAzure(LlmProvider.OPENAI, config, body);
+    @Nested
+    class StreamUsageInjection {
 
+        @Test
+        @DisplayName("openai-completions streaming requests get stream_options.include_usage=true")
+        void injectsIncludeUsageForStreamingOpenAiRequests() {
+            byte[] body = "{\"model\":\"gpt-4\",\"stream\":true,\"messages\":[]}".getBytes(StandardCharsets.UTF_8);
+            byte[] result = controller.injectStreamUsageOption(body);
+
+            var tree = OBJECT_MAPPER.readTree(result);
+            assertThat(tree.path("stream_options").path("include_usage").asBoolean()).isTrue();
+        }
+
+        @Test
+        void preservesExistingStreamOptions() {
+            byte[] body = "{\"stream\":true,\"stream_options\":{\"foo\":1}}".getBytes(StandardCharsets.UTF_8);
+            byte[] result = controller.injectStreamUsageOption(body);
+
+            var tree = OBJECT_MAPPER.readTree(result);
+            assertThat(tree.path("stream_options").path("foo").asInt()).isEqualTo(1);
+            assertThat(tree.path("stream_options").path("include_usage").asBoolean()).isTrue();
+        }
+
+        @Test
+        void doesNotTouchNonStreamingRequests() {
+            byte[] body = "{\"model\":\"gpt-4\",\"messages\":[]}".getBytes(StandardCharsets.UTF_8);
+            byte[] result = controller.injectStreamUsageOption(body);
             assertThat(result).isSameAs(body);
         }
 
         @Test
-        void shouldNotModifyCleanBody() throws Exception {
-            var azureController = new LlmProxyController(WebClient.create(), AZURE_PROPS, OBJECT_MAPPER, meterRegistry);
-            var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, AZURE_PROPS);
-
-            byte[] body = "{\"model\":\"gpt-4\",\"messages\":[]}".getBytes(StandardCharsets.UTF_8);
-            byte[] result = azureController.sanitizeBodyForAzure(LlmProvider.AZURE_OPENAI, config, body);
-
-            // Should return same reference (no modification needed)
-            assertThat(result).isSameAs(body);
+        void passesThroughNullOrEmptyBody() {
+            assertThat(controller.injectStreamUsageOption(null)).isNull();
+            byte[] empty = new byte[0];
+            assertThat(controller.injectStreamUsageOption(empty)).isSameAs(empty);
         }
     }
 
@@ -718,7 +685,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
 
         @Test
         void shouldUseAnthropicUpstream() {
-            // Verify buildUpstreamUrl produces correct Anthropic URL
             String url = LlmProxyController.buildUpstreamUrl("https://api.anthropic.com", "/v1/messages", null);
             assertThat(java.net.URI.create(url).getHost()).isEqualTo("api.anthropic.com");
         }
@@ -730,14 +696,26 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should inject x-api-key for Anthropic, Bearer for OpenAI")
-        void shouldInjectCorrectAuthPerProvider() {
-            var anthropicConfig = ProviderProxyConfig.forProvider(LlmProvider.ANTHROPIC, DEFAULT_PROPS);
-            var openaiConfig = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, DEFAULT_PROPS);
+        @DisplayName(
+            "auth header shape follows the LIVE connection's authHeaderName/authValuePrefix, not the api protocol"
+        )
+        void shouldInjectCorrectAuthPerConnection() {
+            LlmModelResolver.ProxyCredential anthropicCredential = new LlmModelResolver.ProxyCredential(
+                "x-api-key",
+                "",
+                null,
+                "sk-ant"
+            );
+            LlmModelResolver.ProxyCredential openaiCredential = new LlmModelResolver.ProxyCredential(
+                "Authorization",
+                "Bearer ",
+                null,
+                "sk-oai"
+            );
             HttpHeaders incoming = new HttpHeaders();
 
-            HttpHeaders anthropicOut = controller.buildUpstreamHeaders(incoming, anthropicConfig, "sk-ant");
-            HttpHeaders openaiOut = controller.buildUpstreamHeaders(incoming, openaiConfig, "sk-oai");
+            HttpHeaders anthropicOut = controller.buildUpstreamHeaders(incoming, anthropicCredential);
+            HttpHeaders openaiOut = controller.buildUpstreamHeaders(incoming, openaiCredential);
 
             assertThat(anthropicOut.getFirst("x-api-key")).isEqualTo("sk-ant");
             assertThat(anthropicOut.get(HttpHeaders.AUTHORIZATION)).isNull();

@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
@@ -56,6 +56,7 @@ public class AgentJobService {
     private final TransactionTemplate transactionTemplate;
     private final PracticeReviewProperties reviewProperties;
     private final LlmBudgetService llmBudgetService;
+    private final LlmModelResolver llmModelResolver;
 
     public AgentJobService(
         AgentJobRepository agentJobRepository,
@@ -68,7 +69,8 @@ public class AgentJobService {
         ApplicationEventPublisher eventPublisher,
         TransactionTemplate transactionTemplate,
         PracticeReviewProperties reviewProperties,
-        LlmBudgetService llmBudgetService
+        LlmBudgetService llmBudgetService,
+        LlmModelResolver llmModelResolver
     ) {
         this.agentJobRepository = agentJobRepository;
         this.agentConfigRepository = agentConfigRepository;
@@ -81,6 +83,7 @@ public class AgentJobService {
         this.transactionTemplate = transactionTemplate;
         this.reviewProperties = reviewProperties;
         this.llmBudgetService = llmBudgetService;
+        this.llmModelResolver = llmModelResolver;
     }
 
     // Read operations
@@ -301,7 +304,7 @@ public class AgentJobService {
             job.setSubjectClass(subjectClassFor(jobType));
             job.setMetadata(submission.metadata());
             job.setIdempotencyKey(configScopedKey);
-            job.setConfigSnapshot(ConfigSnapshot.from(config).toJson(objectMapper));
+            job.setConfigSnapshot(ConfigSnapshot.from(config, llmModelResolver).toJson(objectMapper));
             // The SCM kind drives delivery (which channel posts the comment/diff notes). Resolve it
             // from the workspace's active connection so EVERY path (events + dev-trigger) sets it —
             // a null integrationKind made the comment poster NPE and silently drop delivery. We log
@@ -319,12 +322,10 @@ public class AgentJobService {
                 );
             }
 
-            // Copy LLM API key — needed for all credential modes:
-            // PROXY mode: proxy controller reads it to forward to upstream provider
-            // API_KEY mode: adapter injects it as env var into the container
-            if (config.getLlmApiKey() != null) {
-                job.setLlmApiKey(config.getLlmApiKey());
-            }
+            // The credential is NEVER frozen onto the job (#1368 slice 5 — ONE credential path,
+            // resolved live by the proxy from the config snapshot's connection reference / configId on
+            // every call). AgentJob.llmApiKey is retained on the entity only for backward-compatible
+            // column shape; nothing writes or reads it anymore.
 
             try {
                 agentJobRepository.saveAndFlush(job);

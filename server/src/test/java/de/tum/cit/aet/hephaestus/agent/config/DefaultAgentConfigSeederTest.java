@@ -8,7 +8,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -69,7 +68,7 @@ class DefaultAgentConfigSeederTest extends BaseUnitTest {
     }
 
     @Test
-    void happyPath_createsOneEnabledProxyConfig() {
+    void happyPath_createsOneEnabledConfig() {
         when(workspaceRepository.findAll()).thenReturn(List.of(new Workspace()));
         when(agentConfigRepository.existsByWorkspaceIdAndName(any(), any())).thenReturn(false);
         when(agentConfigService.createConfig(any(), any())).thenReturn(new AgentConfig());
@@ -78,7 +77,6 @@ class DefaultAgentConfigSeederTest extends BaseUnitTest {
 
         var captor = ArgumentCaptor.forClass(CreateAgentConfigRequestDTO.class);
         verify(agentConfigService).createConfig(any(), captor.capture());
-        assertThat(captor.getValue().credentialMode()).isEqualTo(CredentialMode.PROXY);
         assertThat(captor.getValue().enabled()).isTrue();
         assertThat(captor.getValue().name()).isEqualTo("Default model");
     }

@@ -8,8 +8,6 @@ import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
 import com.github.dockerjava.core.DockerClientImpl;
 import com.github.dockerjava.httpclient5.ApacheDockerHttpClient;
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorRunnerProfile;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiPlanSpec;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiRuntimeFactory;
@@ -200,7 +198,7 @@ class DockerInteractiveSandboxLiveTest {
             NODE_IMAGE,
             List.of("node", "/workspace/.runner/pi-mentor-runner.mjs"),
             Map.of(),
-            new NetworkPolicy(true, null, null, null),
+            new NetworkPolicy(true, null, null),
             new ResourceLimits(512 * 1024 * 1024, 1.0, 256, Duration.ofMinutes(5)),
             sec,
             Map.of(".runner/pi-mentor-runner.mjs", runnerBytes),
@@ -483,7 +481,7 @@ class DockerInteractiveSandboxLiveTest {
                 AGENT_PI_IMAGE,
                 List.of("node", "/workspace/.runner/pi-mentor-runner.mjs"),
                 Map.of(),
-                new NetworkPolicy(true, null, null, null),
+                new NetworkPolicy(true, null, null),
                 new ResourceLimits(512 * 1024 * 1024, 1.0, 256, Duration.ofMinutes(5)),
                 sec,
                 Map.of(".runner/pi-mentor-runner.mjs", runnerBytes),
@@ -537,14 +535,14 @@ class DockerInteractiveSandboxLiveTest {
      */
     private InteractiveSandboxSpec buildMentorSpec(String userId, String workspaceId) {
         PiRuntimeFactory factory = new PiRuntimeFactory(MAPPER);
-        // API_KEY + baseUrl triggers the custom provider extension code path used in production.
         PiPlanSpec planSpec = new PiPlanSpec(
-            LlmProvider.OPENAI,
-            CredentialMode.API_KEY,
-            "stub-api-key",
+            "openai-completions",
             "stub-model",
-            "https://api.stub.example.com/v1",
             null,
+            null,
+            false,
+            null,
+            "stub-proxy-token",
             true,
             120,
             new MentorRunnerProfile(),

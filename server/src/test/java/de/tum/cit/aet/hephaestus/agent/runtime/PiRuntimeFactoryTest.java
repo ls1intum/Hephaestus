@@ -2,8 +2,6 @@ package de.tum.cit.aet.hephaestus.agent.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorRunnerProfile;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeRunnerProfile;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -13,9 +11,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.EnumSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -32,15 +27,16 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         factory = new PiRuntimeFactory(objectMapper);
     }
 
-    private PiPlanSpec proxySpec(LlmProvider provider, String modelName) {
+    private PiPlanSpec spec(String apiProtocol, String modelId, boolean allowInternet) {
         return new PiPlanSpec(
-            provider,
-            CredentialMode.PROXY,
-            null,
-            modelName,
+            apiProtocol,
+            modelId,
+            200000,
+            8192,
+            false,
             null,
             "job-token-123",
-            false,
+            allowInternet,
             600,
             PRACTICE,
             Map.of(),
@@ -48,17 +44,18 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         );
     }
 
-    private PiPlanSpec apiKeySpec(LlmProvider provider) {
+    private PiPlanSpec spec(PiRunnerProfile profile) {
         return new PiPlanSpec(
-            provider,
-            CredentialMode.API_KEY,
-            "sk-test",
+            "openai-completions",
+            "gpt-5.4-mini",
             null,
             null,
+            false,
             null,
-            true,
+            "job-token-123",
+            false,
             600,
-            PRACTICE,
+            profile,
             Map.of(),
             ""
         );
@@ -68,17 +65,17 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
     class NetworkPolicyContract {
 
         @Test
-        void proxyForwardsToken() {
-            var policy = factory.build(proxySpec(LlmProvider.AZURE_OPENAI, null)).networkPolicy();
+        void alwaysForwardsToken() {
+            var policy = factory.build(spec("azure-openai-responses", "gpt-5.4-mini", false)).networkPolicy();
             assertThat(policy.internetAccess()).isFalse();
             assertThat(policy.llmProxyToken()).isEqualTo("job-token-123");
         }
 
         @Test
-        void apiKeyAllowsInternet() {
-            var policy = factory.build(apiKeySpec(LlmProvider.OPENAI)).networkPolicy();
+        void allowInternetReflectsSpec() {
+            var policy = factory.build(spec("openai-completions", "gpt-x", true)).networkPolicy();
             assertThat(policy.internetAccess()).isTrue();
-            assertThat(policy.llmProxyToken()).isNull();
+            assertThat(policy.llmProxyToken()).isEqualTo("job-token-123");
         }
     }
 
@@ -87,7 +84,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
 
         @Test
         void loadsClasspathResources() {
-            var inputs = factory.build(proxySpec(LlmProvider.AZURE_OPENAI, null)).inputFiles();
+            var inputs = factory.build(spec("azure-openai-responses", "gpt-5.4-mini", false)).inputFiles();
             assertThat(inputs.get(SandboxLayout.ORCHESTRATOR_PATH)).isNotNull();
             assertThat(new String(inputs.get(SandboxLayout.ORCHESTRATOR_PATH), StandardCharsets.UTF_8)).contains(
                 "findings"
@@ -96,24 +93,27 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("stages the runner's relative-import sidecars beside the runner (pi-finding-normalize.mjs)")
+        @DisplayName(
+            "stages the runner's relative-import sidecars beside the runner (pi-finding-normalize.mjs, pi-provider.mjs)"
+        )
         void stagesRunnerSidecars() {
-            var inputs = factory.build(proxySpec(LlmProvider.OPENAI, "m")).inputFiles();
-            // pi-runner.mjs does `import ... from "./pi-finding-normalize.mjs"`; without staging it the
-            // sandbox exits 1 with ERR_MODULE_NOT_FOUND and no detection runs.
+            var inputs = factory.build(spec("openai-completions", "m", false)).inputFiles();
+            // pi-runner.mjs imports both sidecars relatively; without staging them the sandbox exits 1
+            // with ERR_MODULE_NOT_FOUND and no detection runs.
             for (String sidecar : PRACTICE.sidecarScripts()) {
                 assertThat(inputs).containsKey(sidecar);
                 assertThat(inputs.get(sidecar)).isNotEmpty();
             }
-            assertThat(PRACTICE.sidecarScripts()).contains("pi-finding-normalize.mjs");
+            assertThat(PRACTICE.sidecarScripts()).contains("pi-finding-normalize.mjs", "pi-provider.mjs");
         }
 
         @Test
         void promptDigest_isStableAcrossBuilds_andIndependentOfModel() {
             // The prompt-version provenance (issue #1363): same scaffolding → same digest, regardless of the
-            // model/workspace the run used — an evaluation groups runs by this value.
-            String first = factory.build(proxySpec(LlmProvider.OPENAI, "model-a")).promptDigest();
-            String second = factory.build(proxySpec(LlmProvider.OPENAI, "model-b")).promptDigest();
+            // model/workspace the run used — an evaluation groups runs by this value. settings.json and
+            // pi-provider.json are deliberately excluded from the digested scaffolding.
+            String first = factory.build(spec("openai-completions", "model-a", false)).promptDigest();
+            String second = factory.build(spec("openai-completions", "model-b", false)).promptDigest();
 
             assertThat(first).matches("[0-9a-f]{64}").isEqualTo(second);
         }
@@ -122,7 +122,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         void promptDigest_matchesScaffoldingBytes() {
             // The digest is exactly the root digest over orchestrator + runner + sidecars — recomputable
             // from the plan's own input files, so a replay can verify it.
-            var plan = factory.build(proxySpec(LlmProvider.OPENAI, "m"));
+            var plan = factory.build(spec("openai-completions", "m", false));
             var scaffolding = new java.util.LinkedHashMap<String, byte[]>();
             scaffolding.put(SandboxLayout.ORCHESTRATOR_PATH, plan.inputFiles().get(SandboxLayout.ORCHESTRATOR_PATH));
             scaffolding.put(
@@ -140,12 +140,13 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         void extraInputsMerge() {
             byte[] payload = "deadbeef".getBytes(StandardCharsets.UTF_8);
             PiPlanSpec spec = new PiPlanSpec(
-                LlmProvider.OPENAI,
-                CredentialMode.API_KEY,
-                "sk-test",
+                "openai-completions",
+                "gpt-x",
                 null,
                 null,
+                false,
                 null,
+                "job-token-123",
                 true,
                 600,
                 PRACTICE,
@@ -159,19 +160,18 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
     @Nested
     class SettingsJson {
 
-        @ParameterizedTest(name = "{0} → defaultProvider {1}")
-        @CsvSource({ "AZURE_OPENAI, azure-openai-responses", "OPENAI, openai", "ANTHROPIC, anthropic" })
-        void mapsProvider(LlmProvider provider, String expected) throws Exception {
-            byte[] json = factory.buildPiSettingsJson(provider, "some-model", false);
+        @Test
+        void alwaysUsesHephaestusProvider() throws Exception {
+            byte[] json = factory.buildPiSettingsJson("some-model");
             JsonNode root = objectMapper.readTree(new String(json, StandardCharsets.UTF_8));
-            assertThat(root.path("defaultProvider").asString()).isEqualTo(expected);
+            assertThat(root.path("defaultProvider").asString()).isEqualTo("hephaestus");
             assertThat(root.path("defaultModel").asString()).isEqualTo("some-model");
             assertThat(root.path("transport").asString()).isEqualTo("sse");
         }
 
         @Test
         void omitsModelAndIncludesCompaction() throws Exception {
-            byte[] json = factory.buildPiSettingsJson(LlmProvider.OPENAI, null, false);
+            byte[] json = factory.buildPiSettingsJson(null);
             JsonNode root = objectMapper.readTree(new String(json, StandardCharsets.UTF_8));
             assertThat(root.has("defaultModel")).isFalse();
             assertThat(root.path("compaction").path("enabled").asBoolean()).isTrue();
@@ -180,15 +180,62 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
     }
 
     @Nested
+    class ProviderConfigJson {
+
+        @Test
+        void capturesResolvedBehaviour() throws Exception {
+            PiPlanSpec spec = new PiPlanSpec(
+                "openai-completions",
+                "gpt-oss-120b",
+                131072,
+                4096,
+                true,
+                "anthropic",
+                "job-token-123",
+                false,
+                600,
+                PRACTICE,
+                Map.of(),
+                ""
+            );
+            byte[] json = factory.buildProviderConfigJson(spec);
+            JsonNode root = objectMapper.readTree(new String(json, StandardCharsets.UTF_8));
+
+            assertThat(root.path("apiProtocol").asString()).isEqualTo("openai-completions");
+            assertThat(root.path("modelId").asString()).isEqualTo("gpt-oss-120b");
+            assertThat(root.path("contextWindow").asInt()).isEqualTo(131072);
+            assertThat(root.path("maxOutputTokens").asInt()).isEqualTo(4096);
+            assertThat(root.path("supportsReasoning").asBoolean()).isTrue();
+            assertThat(root.path("cacheControlFormat").asString()).isEqualTo("anthropic");
+            // The credential NEVER lands here — only non-secret behaviour.
+            assertThat(new String(json, StandardCharsets.UTF_8)).doesNotContain("job-token-123");
+        }
+
+        @Test
+        void omitsNullCapabilityFields() throws Exception {
+            byte[] json = factory.buildProviderConfigJson(spec("anthropic-messages", "claude", false));
+            JsonNode root = objectMapper.readTree(new String(json, StandardCharsets.UTF_8));
+            assertThat(root.has("contextWindow")).isTrue(); // spec() helper sets 200000
+            assertThat(root.has("cacheControlFormat")).isFalse();
+        }
+
+        @Test
+        void writtenAtWorkspaceRootFilename() {
+            var inputs = factory.build(spec("openai-completions", "m", false)).inputFiles();
+            assertThat(inputs).containsKey(SandboxLayout.PROVIDER_CONFIG_FILENAME);
+        }
+    }
+
+    @Nested
     class Environment {
 
         @Test
         void budget_leavesGraceUnderSpecTimeout() {
-            var spec = proxySpec(LlmProvider.AZURE_OPENAI, null);
-            String budget = factory.build(spec).environment().get("AGENT_BUDGET_MS");
+            var pspec = spec("azure-openai-responses", "gpt-5.4-mini", false);
+            String budget = factory.build(pspec).environment().get("AGENT_BUDGET_MS");
             assertThat(budget).as("AGENT_BUDGET_MS must be present").isNotNull();
             long budgetMs = Long.parseLong(budget);
-            long hardTimeoutMs = (long) spec.timeoutSeconds() * 1_000L;
+            long hardTimeoutMs = (long) pspec.timeoutSeconds() * 1_000L;
             assertThat(budgetMs)
                 .as("Pi's self-watchdog must fire strictly before the SPI hard kill — leaves grace")
                 .isLessThan(hardTimeoutMs)
@@ -203,10 +250,11 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             // untested Math.max floor. The floor must stay positive AND strictly under the hard-kill deadline.
             int timeoutSeconds = PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS + 1;
             PiPlanSpec spec = new PiPlanSpec(
-                LlmProvider.OPENAI,
-                CredentialMode.PROXY,
+                "openai-completions",
+                "gpt-x",
                 null,
                 null,
+                false,
                 null,
                 "job-token-123",
                 false,
@@ -223,7 +271,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         @Test
         @DisplayName("HOME / TMPDIR on tmpfs; PI_CODING_AGENT_DIR points into the workspace")
         void writableMounts() {
-            var env = factory.build(proxySpec(LlmProvider.AZURE_OPENAI, null)).environment();
+            var env = factory.build(spec("azure-openai-responses", "gpt-5.4-mini", false)).environment();
             assertThat(env)
                 .containsEntry("HOME", "/home/agent")
                 .containsEntry("TMPDIR", "/home/agent/.local/tmp")
@@ -232,178 +280,26 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
 
         @Test
         void uvThreadpoolNotForced() {
-            var env = factory.build(proxySpec(LlmProvider.OPENAI, null)).environment();
+            var env = factory.build(spec("openai-completions", "gpt-x", false)).environment();
             assertThat(env).doesNotContainKey("UV_THREADPOOL_SIZE");
         }
 
         @Test
-        void azureDeploymentMap() {
-            var env = factory.build(proxySpec(LlmProvider.AZURE_OPENAI, "gpt-5.4-mini")).environment();
-            assertThat(env).containsEntry(
+        @DisplayName(
+            "No shell-side credential export — LLM_PROXY_URL/TOKEN come from NetworkPolicy, not AGENT_BUDGET_MS env"
+        )
+        void noLegacyProviderEnvVars() {
+            var env = factory.build(spec("openai-completions", "gpt-x", false)).environment();
+            assertThat(env).doesNotContainKeys(
+                "PI_HEPHAESTUS_BASE_URL",
+                "PI_HEPHAESTUS_API_KEY",
+                "PI_HEPHAESTUS_MODEL",
+                "AZURE_OPENAI_API_KEY",
+                "AZURE_OPENAI_BASE_URL",
                 "AZURE_OPENAI_DEPLOYMENT_NAME_MAP",
-                "gpt-5.4-mini=gpt-5.4-mini,gpt-5.2=gpt-5.4-mini"
+                "OPENAI_API_KEY",
+                "ANTHROPIC_API_KEY"
             );
-        }
-
-        @ParameterizedTest(name = "Azure deployment map is NOT set for {0}")
-        @EnumSource(value = LlmProvider.class, names = { "OPENAI", "ANTHROPIC" })
-        void azureDeploymentNotSetForOthers(LlmProvider provider) {
-            assertThat(factory.build(proxySpec(provider, null)).environment()).doesNotContainKey(
-                "AZURE_OPENAI_DEPLOYMENT_NAME_MAP"
-            );
-        }
-
-        @Test
-        void baseUrlExported() {
-            PiPlanSpec spec = new PiPlanSpec(
-                LlmProvider.OPENAI,
-                CredentialMode.API_KEY,
-                "sk-test",
-                "gpt-x",
-                "https://gpu.example.com/api",
-                null,
-                true,
-                600,
-                PRACTICE,
-                Map.of(),
-                ""
-            );
-            assertThat(factory.build(spec).environment())
-                .doesNotContainKey("OPENAI_API_KEY") // would auto-activate built-in OpenAI provider
-                .containsEntry("PI_HEPHAESTUS_BASE_URL", "https://gpu.example.com/api")
-                .containsEntry("PI_HEPHAESTUS_API_KEY", "sk-test")
-                .containsEntry("PI_HEPHAESTUS_MODEL", "gpt-x")
-                .doesNotContainKey("OPENAI_BASE_URL");
-        }
-    }
-
-    @Nested
-    class CustomProvider {
-
-        @Test
-        @DisplayName("no .pi/extensions/ files are written — runner-script owns provider registration")
-        void noExtensionFilesEmitted() {
-            PiPlanSpec spec = new PiPlanSpec(
-                LlmProvider.OPENAI,
-                CredentialMode.API_KEY,
-                "sk-test",
-                "gpt-x",
-                "https://gpu.example.com/api",
-                null,
-                true,
-                600,
-                PRACTICE,
-                Map.of(),
-                ""
-            );
-            assertThat(factory.build(spec).inputFiles().keySet())
-                .as(
-                    "provider extension files are no longer emitted; the runner script's " +
-                        "modelRegistry.registerProvider() call is the single source of truth"
-                )
-                .noneMatch(k -> k.startsWith(SandboxLayout.PI_AGENT_PREFIX + "extensions/"));
-        }
-
-        @Test
-        void baseUrlPinnedSpecSetsHephaestusDefault() throws Exception {
-            PiPlanSpec spec = new PiPlanSpec(
-                LlmProvider.OPENAI,
-                CredentialMode.API_KEY,
-                "sk-test",
-                "gpt-x",
-                "https://gpu.example.com/api",
-                null,
-                true,
-                600,
-                PRACTICE,
-                Map.of(),
-                ""
-            );
-            JsonNode settings = objectMapper.readTree(
-                new String(
-                    factory.build(spec).inputFiles().get(SandboxLayout.PI_AGENT_PREFIX + "settings.json"),
-                    StandardCharsets.UTF_8
-                )
-            );
-            assertThat(settings.path("defaultProvider").asString()).isEqualTo("hephaestus");
-            assertThat(settings.path("defaultModel").asString()).isEqualTo("gpt-x");
-        }
-
-        @Test
-        void modelIdPassedVerbatim() throws Exception {
-            PiPlanSpec spec = new PiPlanSpec(
-                LlmProvider.OPENAI,
-                CredentialMode.API_KEY,
-                "sk-test",
-                "openai/gpt-oss-120b",
-                "https://gpu.example.com/api",
-                null,
-                true,
-                600,
-                PRACTICE,
-                Map.of(),
-                ""
-            );
-            JsonNode settings = objectMapper.readTree(
-                new String(
-                    factory.build(spec).inputFiles().get(SandboxLayout.PI_AGENT_PREFIX + "settings.json"),
-                    StandardCharsets.UTF_8
-                )
-            );
-            // defaultProvider=hephaestus pins the provider explicitly, so Pi does not parse the
-            // slash in defaultModel as a provider/model reference; the full id is what the
-            // runner-script's registerProvider() call matches AND what the gateway expects on the wire.
-            assertThat(settings.path("defaultProvider").asString()).isEqualTo("hephaestus");
-            assertThat(settings.path("defaultModel").asString()).isEqualTo("openai/gpt-oss-120b");
-        }
-
-        @Test
-        void noBaseUrlUsesBuiltInProvider() throws Exception {
-            PiPlanSpec spec = new PiPlanSpec(
-                LlmProvider.OPENAI,
-                CredentialMode.API_KEY,
-                "sk-test",
-                "gpt-x",
-                null,
-                null,
-                true,
-                600,
-                PRACTICE,
-                Map.of(),
-                ""
-            );
-            JsonNode settings = objectMapper.readTree(
-                new String(
-                    factory.build(spec).inputFiles().get(SandboxLayout.PI_AGENT_PREFIX + "settings.json"),
-                    StandardCharsets.UTF_8
-                )
-            );
-            assertThat(settings.path("defaultProvider").asString()).isEqualTo("openai");
-        }
-
-        @Test
-        @DisplayName("AZURE_OPENAI with baseUrl uses azure-openai-responses (Azure has its own routing)")
-        void azureNeverUsesHephaestusProvider() throws Exception {
-            PiPlanSpec spec = new PiPlanSpec(
-                LlmProvider.AZURE_OPENAI,
-                CredentialMode.API_KEY,
-                "sk-test",
-                "gpt-x",
-                "https://gpu.example.com/api",
-                null,
-                true,
-                600,
-                PRACTICE,
-                Map.of(),
-                ""
-            );
-            JsonNode settings = objectMapper.readTree(
-                new String(
-                    factory.build(spec).inputFiles().get(SandboxLayout.PI_AGENT_PREFIX + "settings.json"),
-                    StandardCharsets.UTF_8
-                )
-            );
-            assertThat(settings.path("defaultProvider").asString()).isEqualTo("azure-openai-responses");
         }
     }
 
@@ -413,7 +309,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         @Test
         @DisplayName("Practice profile contributes --no-warnings and no per-process env")
         void nodeFlagsForPractice() {
-            String body = factory.build(apiKeySpec(LlmProvider.OPENAI)).command().get(2);
+            String body = factory.build(spec("openai-completions", "gpt-x", false)).command().get(2);
             int nodeIdx = body.indexOf("node ");
             int scriptIdx = body.indexOf(SandboxLayout.RUNNER_SCRIPT_FILENAME);
             String nodePrefix = body.substring(nodeIdx, scriptIdx);
@@ -430,20 +326,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
 
         @Test
         void mentorProfileContributesMentorFlagsAndEnv() {
-            PiPlanSpec spec = new PiPlanSpec(
-                LlmProvider.OPENAI,
-                CredentialMode.API_KEY,
-                "sk-test",
-                null,
-                null,
-                null,
-                true,
-                600,
-                MENTOR,
-                Map.of(),
-                ""
-            );
-            String body = factory.build(spec).command().get(2);
+            String body = factory.build(spec(MENTOR)).command().get(2);
             int nodeIdx = body.indexOf("node ");
             int scriptIdx = body.indexOf(SandboxLayout.RUNNER_SCRIPT_FILENAME);
             assertThat(body.substring(nodeIdx, scriptIdx))
@@ -458,34 +341,22 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
 
         @Test
         void profilesResolveToDistinctScripts() {
-            PiPlanSpec base = proxySpec(LlmProvider.AZURE_OPENAI, null);
+            PiPlanSpec base = spec("azure-openai-responses", "gpt-5.4-mini", false);
             byte[] practiceBytes = factory.build(base).inputFiles().get(SandboxLayout.RUNNER_SCRIPT_FILENAME);
-            PiPlanSpec mentorSpec = new PiPlanSpec(
-                LlmProvider.OPENAI,
-                CredentialMode.API_KEY,
-                "sk-test",
-                null,
-                null,
-                null,
-                true,
-                600,
-                MENTOR,
-                Map.of(),
-                ""
-            );
-            byte[] mentorBytes = factory.build(mentorSpec).inputFiles().get(SandboxLayout.RUNNER_SCRIPT_FILENAME);
+            byte[] mentorBytes = factory.build(spec(MENTOR)).inputFiles().get(SandboxLayout.RUNNER_SCRIPT_FILENAME);
             assertThat(mentorBytes).isNotEqualTo(practiceBytes);
         }
 
         @Test
         void shCommandWithPrecomputeOrder() {
             PiPlanSpec spec = new PiPlanSpec(
-                LlmProvider.OPENAI,
-                CredentialMode.API_KEY,
-                "sk-test",
+                "openai-completions",
+                "gpt-x",
                 null,
                 null,
+                false,
                 null,
+                "job-token-123",
                 true,
                 600,
                 PRACTICE,
@@ -502,23 +373,11 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("No shell-side cp of Pi config")
+        @DisplayName("No shell-side cp/export of Pi config — provider.json + settings.json are the whole contract")
         void noCopyShim() {
-            // baseUrl-pinned spec exercises the custom-provider extension, the only conditional input path.
-            PiPlanSpec spec = new PiPlanSpec(
-                LlmProvider.OPENAI,
-                CredentialMode.API_KEY,
-                "sk-test",
-                "gpt-x",
-                "https://gpu.example.com/api",
-                null,
-                true,
-                600,
-                PRACTICE,
-                Map.of(),
-                ""
-            );
-            assertThat(factory.build(spec).command().get(2)).doesNotContain(" cp ");
+            assertThat(factory.build(spec("openai-completions", "gpt-x", false)).command().get(2))
+                .doesNotContain(" cp ")
+                .doesNotContain("export ");
         }
     }
 }

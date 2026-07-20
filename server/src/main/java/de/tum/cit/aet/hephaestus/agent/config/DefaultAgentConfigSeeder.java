@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.config;
 
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.core.event.WorkspacesInitializedEvent;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -90,7 +89,6 @@ class DefaultAgentConfigSeeder {
             .llmApiKey(properties.apiKey())
             .llmBaseUrl(properties.baseUrl())
             .enabled(true)
-            .credentialMode(CredentialMode.PROXY)
             .build();
         var created = agentConfigService.createConfig(
             WorkspaceContext.fromWorkspace(workspace, Set.of(), null),

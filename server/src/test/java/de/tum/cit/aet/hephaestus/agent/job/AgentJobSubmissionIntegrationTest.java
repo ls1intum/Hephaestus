@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.agent.job;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
@@ -87,7 +86,6 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
         agentConfig.setName("test-config");
         agentConfig.setEnabled(true);
         agentConfig.setLlmProvider(LlmProvider.ANTHROPIC);
-        agentConfig.setCredentialMode(CredentialMode.PROXY);
         agentConfig.setTimeoutSeconds(300);
         agentConfig = agentConfigRepository.save(agentConfig);
 

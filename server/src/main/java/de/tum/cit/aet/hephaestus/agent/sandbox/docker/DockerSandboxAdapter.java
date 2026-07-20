@@ -382,14 +382,12 @@ public class DockerSandboxAdapter implements SandboxManager {
                 }
                 env.put("LLM_PROXY_URL", proxyUrl);
             } else if (appServerIp != null) {
-                // Build proxy URL with provider path: http://<ip>:<port>/internal/llm/<provider>
-                String proxyBase =
-                    "http://" + appServerIp + ":" + properties.resolvedLlmProxyPort(serverPort) + "/internal/llm";
-                if (spec.networkPolicy().llmProxyProviderPath() != null) {
-                    env.put("LLM_PROXY_URL", proxyBase + "/" + spec.networkPolicy().llmProxyProviderPath());
-                } else {
-                    env.put("LLM_PROXY_URL", proxyBase);
-                }
+                // Unified proxy route (#1368 slice 5): no per-provider path segment — the proxy
+                // identifies the connection from the authenticated job token, not the URL.
+                env.put(
+                    "LLM_PROXY_URL",
+                    "http://" + appServerIp + ":" + properties.resolvedLlmProxyPort(serverPort) + "/internal/llm"
+                );
             }
 
             if (spec.networkPolicy().llmProxyToken() != null) {

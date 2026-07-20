@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.config;
 
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditSnapshot;
 import java.net.URI;
@@ -33,7 +32,6 @@ record AgentConfigSnapshot(
     @Nullable String modelName,
     @Nullable String modelVersion,
     @Nullable String llmBaseUrl,
-    @Nullable CredentialMode credentialMode,
     boolean llmApiKeySet,
     int timeoutSeconds,
     int maxConcurrentJobs,
@@ -49,7 +47,6 @@ record AgentConfigSnapshot(
             c.getModelName(),
             c.getModelVersion(),
             credentialFreeBaseUrl(c.getLlmBaseUrl()),
-            c.getCredentialMode(),
             c.getLlmApiKey() != null && !c.getLlmApiKey().isBlank(),
             c.getTimeoutSeconds(),
             c.getMaxConcurrentJobs(),

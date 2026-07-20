@@ -11,8 +11,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
@@ -138,11 +136,16 @@ class AgentJobExecutorTest extends BaseUnitTest {
         config.setMaxConcurrentJobs(3);
 
         snapshot = new ConfigSnapshot(
-            1,
+            ConfigSnapshot.SCHEMA_VERSION,
             10L,
             "test-config",
-            LlmProvider.ANTHROPIC,
-            CredentialMode.PROXY,
+            "anthropic-messages",
+            "https://api.anthropic.com",
+            "claude-sonnet-4",
+            null,
+            null,
+            null,
+            false,
             null,
             null,
             null,
@@ -230,7 +233,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 meterRegistry,
                 usageRecorder,
                 Optional.empty(),
-                Optional.of(workerPropsWithLlm(null, null))
+                Optional.of(workerProps("test-worker"))
             );
 
             Message msg = createMessage(jobId);
@@ -533,12 +536,15 @@ class AgentJobExecutorTest extends BaseUnitTest {
     }
 
     @Nested
-    class WorkerLlmOverride {
+    class LlmProxyRouting {
 
         @Test
-        void overridesPracticeRequestWhenWorkerLlmConfigured() {
-            // Configured worker LLM: PROXY snapshot must be overridden to API_KEY with the
-            // worker's apiKey and baseUrl so agent-pi reaches the operator's gateway directly.
+        @DisplayName(
+            "the practice request carries the snapshot's resolved behaviour + the job's own token — ONE credential path"
+        )
+        void requestCarriesSnapshotBehaviourAndJobToken() {
+            // #1368 slice 5: no worker-side BYO-LLM override exists anymore — every host (app-server AND
+            // worker) reaches the LLM proxy the same way, via the job's own token.
             executor = new AgentJobExecutor(
                 natsConnection,
                 NATS_PROPS,
@@ -553,7 +559,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 meterRegistry,
                 usageRecorder,
                 Optional.empty(),
-                Optional.of(workerPropsWithLlm("https://llm-gateway.example/v1", "operator-key"))
+                Optional.of(workerProps("test-worker"))
             );
 
             Message msg = createMessage(jobId);
@@ -577,56 +583,9 @@ class AgentJobExecutorTest extends BaseUnitTest {
             verify(practiceAgent).buildSandboxSpec(captor.capture());
             PracticeAgentRequest request = captor.getValue();
 
-            assertThat(request.credentialMode()).isEqualTo(CredentialMode.API_KEY);
-            assertThat(request.credential()).isEqualTo("operator-key");
-            assertThat(request.baseUrl()).isEqualTo("https://llm-gateway.example/v1");
-            // Snapshot's LLM provider + model still flow through unchanged.
-            assertThat(request.llmProvider()).isEqualTo(LlmProvider.ANTHROPIC);
-        }
-
-        @Test
-        void leavesSnapshotCredentialModeWhenWorkerLlmUnset() {
-            executor = new AgentJobExecutor(
-                natsConnection,
-                NATS_PROPS,
-                jobRepository,
-                configRepository,
-                handlerRegistry,
-                practiceAgent,
-                sandboxManager,
-                sandboxExecutor,
-                transactionTemplate,
-                objectMapper,
-                meterRegistry,
-                usageRecorder,
-                Optional.empty(),
-                Optional.of(workerPropsWithLlm(null, null))
-            );
-
-            Message msg = createMessage(jobId);
-            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
-            when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
-            when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
-            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-            // Snapshot is PROXY mode — jobToken is required, the existing AgentJob fixture has one.
-
-            setupFullExecution();
-
-            AgentJob freshJob = new AgentJob();
-            freshJob.prePersist();
-            when(jobRepository.findById(any(UUID.class))).thenReturn(Optional.of(freshJob));
-            when(jobRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
-            // Worker identity is set ("test-worker"), so the terminal write is fenced to the owner.
-            when(jobRepository.transitionStatusOwnedBy(any(), any(), any(), any(), any(), any())).thenReturn(1);
-
-            executor.executeJob(msg);
-
-            ArgumentCaptor<PracticeAgentRequest> captor = ArgumentCaptor.forClass(PracticeAgentRequest.class);
-            verify(practiceAgent).buildSandboxSpec(captor.capture());
-            PracticeAgentRequest request = captor.getValue();
-
-            assertThat(request.credentialMode()).isEqualTo(CredentialMode.PROXY);
-            assertThat(request.baseUrl()).isNull();
+            assertThat(request.apiProtocol()).isEqualTo("anthropic-messages");
+            assertThat(request.upstreamModelId()).isEqualTo("claude-sonnet-4");
+            assertThat(request.jobToken()).isEqualTo("test-token");
         }
     }
 
@@ -652,7 +611,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             Map.of("config.json", "{}".getBytes()),
             "/output",
             SecurityProfile.DEFAULT,
-            new NetworkPolicy(false, null, "test-token", "anthropic"),
+            new NetworkPolicy(false, null, "test-token"),
             null,
             "prompt-digest"
         );
@@ -677,14 +636,13 @@ class AgentJobExecutorTest extends BaseUnitTest {
         );
     }
 
-    private static WorkerProperties workerPropsWithLlm(String baseUrl, String apiKey) {
+    private static WorkerProperties workerProps(String workerId) {
         return new WorkerProperties(
-            "test-worker",
+            workerId,
             new WorkerProperties.Capacity("2", "1"),
             new WorkerProperties.Drain(Duration.ofMinutes(5)),
             new WorkerProperties.Heartbeat(Duration.ofSeconds(20)),
-            new WorkerProperties.Control(URI.create("ws://example"), "tok", Duration.ofSeconds(10)),
-            new WorkerProperties.Llm(baseUrl, apiKey)
+            new WorkerProperties.Control(URI.create("ws://example"), "tok", Duration.ofSeconds(10))
         );
     }
 

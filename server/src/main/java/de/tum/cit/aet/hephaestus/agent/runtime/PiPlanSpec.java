@@ -1,27 +1,36 @@
 package de.tum.cit.aet.hephaestus.agent.runtime;
 
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Inputs for {@link PiRuntimeFactory#build(PiPlanSpec)}. Validation lives in the compact
- * constructor; callers construct positionally.
+ * Inputs for {@link PiRuntimeFactory#build(PiPlanSpec)}.
  *
- * <p><b>baseUrl trap:</b> exported as {@code OPENAI_BASE_URL} / {@code ANTHROPIC_BASE_URL} only in
- * API_KEY modes — PROXY mode resolves its base URL from the sandbox-injected
- * {@code $LLM_PROXY_URL}, so a baseUrl here would be silently shadowed.
+ * <p>#1368 slice 5 — ONE credential path: every Pi sandbox talks to the in-app LLM proxy over
+ * {@code $LLM_PROXY_URL}/{@code $LLM_PROXY_TOKEN} and NEVER holds a real provider API key.
+ * {@code jobToken} is therefore always required — it is the job-scoped bearer credential the proxy
+ * resolves server-side (see {@code LlmProxyController}), bounded by the job's timeout and revoked on
+ * completion. The task prompt is carried by the {@code task.json} envelope written by the handler —
+ * not by this request.
+ *
+ * @param apiProtocol Pi's own {@code api} token (e.g. {@code openai-completions}), passed through
+ *     verbatim into the {@code hephaestus} provider registration — see {@code pi-provider.mjs}.
+ * @param upstreamModelId the model id the sandbox requests; also {@code settings.json}'s
+ *     {@code defaultModel}.
+ * @param contextWindow optional capability hint written into {@code pi-provider.json}.
+ * @param maxOutputTokens optional capability hint written into {@code pi-provider.json}.
+ * @param cacheControlFormat optional prompt-caching compat flag (e.g. {@code anthropic}).
  */
 public record PiPlanSpec(
-    LlmProvider provider,
-    CredentialMode credentialMode,
-    @Nullable String credential,
-    @Nullable String modelName,
-    @Nullable String baseUrl,
-    @Nullable String jobToken,
+    String apiProtocol,
+    String upstreamModelId,
+    @Nullable Integer contextWindow,
+    @Nullable Integer maxOutputTokens,
+    boolean supportsReasoning,
+    @Nullable String cacheControlFormat,
+    String jobToken,
     boolean allowInternet,
     int timeoutSeconds,
     PiRunnerProfile runnerProfile,
@@ -29,8 +38,12 @@ public record PiPlanSpec(
     String precomputeStep
 ) {
     public PiPlanSpec {
-        Objects.requireNonNull(provider, "provider");
-        Objects.requireNonNull(credentialMode, "credentialMode");
+        if (apiProtocol == null || apiProtocol.isBlank()) {
+            throw new IllegalArgumentException("apiProtocol must not be blank");
+        }
+        if (upstreamModelId == null || upstreamModelId.isBlank()) {
+            throw new IllegalArgumentException("upstreamModelId must not be blank");
+        }
         Objects.requireNonNull(runnerProfile, "runnerProfile");
         if (runnerProfile.runnerScript() == null || runnerProfile.runnerScript().isBlank()) {
             throw new IllegalArgumentException("runnerProfile.runnerScript() must not be blank");
@@ -43,22 +56,8 @@ public record PiPlanSpec(
                     timeoutSeconds
             );
         }
-        switch (credentialMode) {
-            case PROXY -> {
-                if (jobToken == null || jobToken.isBlank()) {
-                    throw new IllegalArgumentException("jobToken is required in PROXY mode");
-                }
-                // PROXY is the DEFAULT credential mode and llmBaseUrl is independently settable, so a valid
-                // persisted config legitimately arrives as PROXY + non-null baseUrl. Normalise the shadowed,
-                // unused value away (see the "baseUrl trap" record javadoc) rather than throwing on a
-                // supported, default topology.
-                baseUrl = null;
-            }
-            case API_KEY -> {
-                if (credential == null || credential.isBlank()) {
-                    throw new IllegalArgumentException("credential is required in " + credentialMode + " mode");
-                }
-            }
+        if (jobToken == null || jobToken.isBlank()) {
+            throw new IllegalArgumentException("jobToken is required — every sandbox talks to the LLM proxy");
         }
         // Map.copyOf freezes the MAP, but byte[] values stay caller-mutable shared references — a caller could
         // mutate file contents after validation passed. Clone each value too so the record is genuinely

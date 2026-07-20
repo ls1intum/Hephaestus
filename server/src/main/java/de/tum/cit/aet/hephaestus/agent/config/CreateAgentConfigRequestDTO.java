@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.config;
 
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
@@ -40,8 +39,6 @@ public record CreateAgentConfigRequestDTO(
     @Schema(description = "Maximum concurrent jobs", example = "3", minimum = "1", maximum = "10")
     Integer maxConcurrentJobs,
     @Schema(description = "Whether agent containers have internet access") Boolean allowInternet,
-    @Schema(description = "Authentication mode: PROXY (internal proxy) or API_KEY (direct)", defaultValue = "PROXY")
-    CredentialMode credentialMode,
     @Schema(description = "Bind to a shared (instance catalog) model. Mutually exclusive with workspaceModelId.")
     Long instanceModelId,
     @Schema(description = "Bind to a model on your own provider. Mutually exclusive with instanceModelId.")
