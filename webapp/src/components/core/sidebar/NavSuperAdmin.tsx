@@ -24,7 +24,12 @@ const ADMIN_SECTIONS = [
 		icon: KeyRound,
 		tooltip: "Sign-in options",
 	},
-	{ to: "/admin/audit", label: "Audit log", icon: ScrollText, tooltip: "Auth audit events" },
+	{
+		to: "/admin/audit",
+		label: "Audit log",
+		icon: ScrollText,
+		tooltip: "Who did what, and when",
+	},
 ] as const;
 
 export function NavSuperAdmin() {

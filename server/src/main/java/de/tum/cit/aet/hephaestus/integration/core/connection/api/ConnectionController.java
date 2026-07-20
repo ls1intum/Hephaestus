@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.core.connection.api;
 
+import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionBusyException;
@@ -117,6 +118,7 @@ public class ConnectionController {
     }
 
     @PostMapping
+    @Audited("connection_audit")
     public ResponseEntity<InitiateConnectionResponseDTO> initiate(
         WorkspaceContext workspace,
         @RequestBody @NotNull InitiateConnectionRequestDTO body,
@@ -165,6 +167,7 @@ public class ConnectionController {
      */
     @PatchMapping("/{id}/status")
     @Operation(operationId = "updateConnectionStatus")
+    @Audited("connection_audit")
     public ResponseEntity<ConnectionSummaryDTO> updateStatus(
         WorkspaceContext workspace,
         @PathVariable Long id,

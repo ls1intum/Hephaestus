@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.core.sync.api;
 
+import de.tum.cit.aet.hephaestus.core.AuditExempt;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
@@ -122,6 +123,7 @@ public class SyncController {
             ),
         }
     )
+    @AuditExempt(reason = "sync job control, not configuration; each run is its own sync_job record")
     public ResponseEntity<SyncJobDTO> triggerConnectionSyncJob(
         WorkspaceContext workspace,
         @PathVariable Long connectionId,
@@ -165,6 +167,7 @@ public class SyncController {
             ),
         }
     )
+    @AuditExempt(reason = "sync job control, not configuration; each run is its own sync_job record")
     public ResponseEntity<SyncJobDTO> updateConnectionSyncJob(
         WorkspaceContext workspace,
         @PathVariable Long connectionId,

@@ -1,6 +1,9 @@
 package de.tum.cit.aet.hephaestus.agent.settings;
 
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -23,9 +26,17 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class AiSettingsService {
 
+    /**
+     * Audit entity ids for the two bindings. There is one of each per workspace, so the binding's own
+     * name is its stable key — the workspace is already a column.
+     */
+    private static final String PRACTICE_CONFIG_BINDING = "practice-config";
+    private static final String MENTOR_CONFIG_BINDING = "mentor-config";
+
     private final WorkspaceRepository workspaceRepository;
     private final AgentConfigRepository agentConfigRepository;
     private final PracticeReviewProperties reviewProperties;
+    private final ConfigAuditPort configAudit;
 
     public AiSettingsViewDTO getSettings(WorkspaceContext workspaceContext) {
         return toView(requireWorkspace(workspaceContext));
@@ -33,15 +44,19 @@ public class AiSettingsService {
 
     @Transactional
     public AiSettingsViewDTO bindPracticeConfig(WorkspaceContext workspaceContext, @Nullable Long configId) {
-        Workspace workspace = requireWorkspace(workspaceContext);
+        Workspace workspace = requireWorkspaceForUpdate(workspaceContext);
+        AgentBindingSnapshot before = new AgentBindingSnapshot(workspace.getPracticeConfigId());
         workspace.setPracticeConfigId(validateConfigId(workspaceContext.id(), configId));
+        auditBinding(workspaceContext, PRACTICE_CONFIG_BINDING, before, workspace.getPracticeConfigId());
         return toView(workspaceRepository.save(workspace));
     }
 
     @Transactional
     public AiSettingsViewDTO bindMentorConfig(WorkspaceContext workspaceContext, @Nullable Long configId) {
-        Workspace workspace = requireWorkspace(workspaceContext);
+        Workspace workspace = requireWorkspaceForUpdate(workspaceContext);
+        AgentBindingSnapshot before = new AgentBindingSnapshot(workspace.getMentorConfigId());
         workspace.setMentorConfigId(validateConfigId(workspaceContext.id(), configId));
+        auditBinding(workspaceContext, MENTOR_CONFIG_BINDING, before, workspace.getMentorConfigId());
         return toView(workspaceRepository.save(workspace));
     }
 
@@ -50,12 +65,39 @@ public class AiSettingsService {
         WorkspaceContext workspaceContext,
         UpdatePracticeReviewSettingsDTO req
     ) {
-        Workspace workspace = requireWorkspace(workspaceContext);
+        Workspace workspace = requireWorkspaceForUpdate(workspaceContext);
         PracticeReviewSettings settings = workspace.getReviewSettings();
+        PracticeReviewSnapshot before = PracticeReviewSnapshot.of(settings);
         // Reset-to-inherit first, then the value patch, so a field can be reset and re-set in one request.
         settings.reset(req.reset());
         settings.applyPatch(req.runForAllUsers(), req.skipDrafts(), req.deliverToMerged(), req.cooldownMinutes());
+        configAudit.record(
+            ConfigAuditEntry.updated(
+                ConfigAuditEntityType.PRACTICE_REVIEW_SETTINGS,
+                workspaceContext.id(),
+                workspaceContext.id(),
+                before,
+                PracticeReviewSnapshot.of(settings)
+            )
+        );
         return toView(workspaceRepository.save(workspace));
+    }
+
+    private void auditBinding(
+        WorkspaceContext workspaceContext,
+        String bindingId,
+        AgentBindingSnapshot before,
+        @Nullable Long boundConfigId
+    ) {
+        configAudit.record(
+            ConfigAuditEntry.updated(
+                ConfigAuditEntityType.AI_CONFIG_BINDING,
+                bindingId,
+                workspaceContext.id(),
+                before,
+                new AgentBindingSnapshot(boundConfigId)
+            )
+        );
     }
 
     /**
@@ -75,6 +117,17 @@ public class AiSettingsService {
     private Workspace requireWorkspace(WorkspaceContext workspaceContext) {
         return workspaceRepository
             .findById(workspaceContext.id())
+            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceContext.slug()));
+    }
+
+    /**
+     * Locking variant for the audited writes: the before-snapshot and the mutation must be serialized,
+     * or two concurrent PATCHes both snapshot the same prior state and the audit trail records a
+     * transition the second write silently reverts.
+     */
+    private Workspace requireWorkspaceForUpdate(WorkspaceContext workspaceContext) {
+        return workspaceRepository
+            .findByIdForUpdate(workspaceContext.id())
             .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceContext.slug()));
     }
 

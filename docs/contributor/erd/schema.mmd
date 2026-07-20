@@ -189,6 +189,21 @@ erDiagram
         BIGINT pull_request_id PK,FK
     }
 
+    ConfigAuditEvent {
+        BIGINT id PK
+        TIMESTAMPTZ occurred_at "NOT NULL"
+        BIGINT workspace_id FK "NOT NULL"
+        VARCHAR(16) actor_kind "NOT NULL"
+        BIGINT actor_account_id FK
+        BIGINT acting_account_id FK
+        VARCHAR(48) entity_type "NOT NULL"
+        VARCHAR(64) entity_id "NOT NULL"
+        VARCHAR(16) action "NOT NULL"
+        ARRAY changed_keys "NOT NULL"
+        JSONB old_value
+        JSONB new_value
+    }
+
     Connection {
         BIGINT id PK,UK
         BIGINT workspace_id FK,UK "NOT NULL"
@@ -1220,6 +1235,9 @@ erDiagram
     Workspace ||--o{ ChatThread : has
     User ||--o{ CommitContributor : has
     GitCommit ||--o{ CommitFileChange : has
+    Workspace ||--o{ ConfigAuditEvent : has
+    Account ||--o{ ConfigAuditEvent : actor_account_id
+    Account ||--o{ ConfigAuditEvent : acting_account_id
     Connection ||--o{ ConnectionAudit : has
     User ||--o{ Discussion : authored_by
     DiscussionCategory ||--o{ Discussion : has

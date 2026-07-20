@@ -26,9 +26,6 @@ import org.springframework.security.oauth2.server.resource.web.BearerTokenResolv
  * {@link #seedKeysOnStartup} runs in {@code @PostConstruct} after the JPA EntityManagerFactory
  * is ready, so the {@code jwt_signing_key} table has at least one row before the first request
  * lands. Production deploys can pre-seed via Liquibase if deterministic kids are needed.
- *
- * <h2>{@link Clock} bean</h2>
- * A local {@code @Bean} so the issuer/decoder can be tested against a fixed {@link Clock}.
  */
 @ConditionalOnServerRole
 @Configuration
@@ -44,16 +41,11 @@ public class AuthJwtConfig {
     }
 
     @Bean
-    public Clock authClock() {
-        return Clock.systemUTC();
-    }
-
-    @Bean
     public RevocationAwareJwtDecoder hephaestusJwtDecoder(
         IssuedJwtRepository issuedJwtRepository,
         AuthProperties properties,
         CacheManager cacheManager,
-        Clock authClock,
+        Clock clock,
         AuthMetrics authMetrics
     ) {
         return new RevocationAwareJwtDecoder(
@@ -61,7 +53,7 @@ public class AuthJwtConfig {
             issuedJwtRepository,
             properties,
             cacheManager,
-            authClock,
+            clock,
             authMetrics
         );
     }

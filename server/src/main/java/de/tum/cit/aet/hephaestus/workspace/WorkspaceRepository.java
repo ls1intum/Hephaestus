@@ -1,18 +1,35 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import jakarta.persistence.LockModeType;
+import jakarta.persistence.QueryHint;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
 @WorkspaceAgnostic("Workspace is the tenant root - queries manage workspaces themselves")
 public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
+    /**
+     * Pessimistic lock, for a read whose value is about to be snapshotted and mutated (the audited
+     * AI-settings writes). Without it the before-snapshot and the write are not serialized: two
+     * concurrent admin PATCHes both read the same prior state, Hibernate's full-column UPDATE makes the
+     * later one silently revert the earlier's field, and the audit trail ends up asserting a transition
+     * that never survived — with no row for the write that undid it.
+     */
+    @WorkspaceAgnostic("Locking read of the tenant root itself, by its own id")
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "5000"))
+    @Query("SELECT w FROM Workspace w WHERE w.id = :id")
+    Optional<Workspace> findByIdForUpdate(@Param("id") Long id);
+
     /**
      * Reverse-lookup a workspace by its GitHub App installation id. Joins through the
      * {@code Connection} row whose {@code kind='GITHUB'} and {@code instance_key=installationId}.

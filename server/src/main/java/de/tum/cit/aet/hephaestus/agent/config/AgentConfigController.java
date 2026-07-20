@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.config;
 
+import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
@@ -76,6 +77,7 @@ public class AgentConfigController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
+    @Audited("AGENT_CONFIG")
     public ResponseEntity<AgentConfigDTO> createConfig(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody CreateAgentConfigRequestDTO request
@@ -101,6 +103,7 @@ public class AgentConfigController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
+    @Audited("AGENT_CONFIG")
     public ResponseEntity<AgentConfigDTO> updateConfig(
         WorkspaceContext workspaceContext,
         @PathVariable Long configId,
@@ -124,6 +127,7 @@ public class AgentConfigController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
+    @Audited("AGENT_CONFIG")
     public ResponseEntity<Void> deleteConfig(WorkspaceContext workspaceContext, @PathVariable Long configId) {
         agentConfigService.deleteConfig(workspaceContext, configId);
         return ResponseEntity.noContent().build();

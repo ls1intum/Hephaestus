@@ -6,12 +6,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.tngtech.archunit.core.domain.JavaAnnotation;
 import com.tngtech.archunit.core.domain.JavaClass;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
+import java.time.Clock;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.stereotype.Component;
 
@@ -237,6 +241,38 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
                     "the wiring leaks runtime testing already exposed (ObjectProvider cascade, etc.) and break role isolation"
             )
             .check(classes);
+    }
+
+    /**
+     * Every ungated bean that injects a server-gated bean crash-loops the worker and webhook pods at
+     * context refresh — a failure no test tier can see, because none boots with
+     * {@code hephaestus.runtime.server.enabled=false}. {@link java.time.Clock} is the case that
+     * actually bit: its only provider used to be the server-gated {@code AuthJwtConfig}, so the first
+     * ungated consumer (the config-audit recorder, which must load on every role) broke both pods
+     * while all 4900 tests stayed green. Pin the provider ungated so it cannot regress.
+     */
+    @Test
+    void clockBeanIsAvailableToEveryRuntimeRole() {
+        Set<JavaClass> providers = classes
+            .stream()
+            .filter(c -> c.isAnnotatedWith(Configuration.class))
+            .filter(c ->
+                c
+                    .getMethods()
+                    .stream()
+                    .anyMatch(m -> m.isAnnotatedWith(Bean.class) && m.getRawReturnType().isAssignableTo(Clock.class))
+            )
+            .collect(Collectors.toSet());
+
+        assertThat(providers).as("exactly one @Bean Clock provider; two would make injection ambiguous").hasSize(1);
+        JavaClass provider = providers.iterator().next();
+        assertThat(conditionalOnPropertyAnnotations(provider).findAny())
+            .as(
+                "%s provides the Clock bean and must NOT be runtime-role gated — ungated beans on every " +
+                    "role inject it, and gating it fails context refresh on worker/webhook",
+                provider.getName()
+            )
+            .isEmpty();
     }
 
     @Test

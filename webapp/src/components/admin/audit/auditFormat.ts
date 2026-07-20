@@ -1,9 +1,7 @@
-import type { AccountRef, AuthEventView } from "@/api/types.gen";
-
+import type { AdminListAuthEventsData } from "@/api/types.gen";
 /**
  * Severity of an audit event, derived from its outcome + type. Drives the row's visual emphasis so a
- * failed login or a privilege change stands out from routine traffic — the pattern Okta (INFO vs WARN),
- * Datadog and Auth0 (Error/Warn/Success) all use for audit/security logs.
+ * failed login or a privilege change stands out from routine traffic.
  */
 export type AuditSeverity = "error" | "warning" | "info";
 
@@ -21,76 +19,52 @@ export function eventSeverity(eventType: string, result: string): AuditSeverity 
 	return "info";
 }
 
-/** A short human label for an event type — `APP_ROLE_CHANGED` → `App role changed`. */
+/** The event types the list endpoint accepts as a filter — the wire contract, not a hand-kept copy. */
+export type AuthEventType = NonNullable<
+	NonNullable<AdminListAuthEventsData["query"]>["eventType"]
+>[number];
+
+/**
+ * Human labels for the auth event types. The filter facet and the table read the same map, so a row
+ * can never disagree with the filter that produced it ("Sessions revoked" vs "Jwt revoked").
+ */
+export const EVENT_TYPE_LABELS: Record<AuthEventType, string> = {
+	LOGIN: "Sign-in",
+	LOGIN_FAILED: "Failed sign-in",
+	LOGOUT: "Sign-out",
+	TOKEN_REFRESH: "Token refresh",
+	JWT_REVOKED: "Sessions revoked",
+	IDENTITY_LINKED: "Identity linked",
+	IDENTITY_UNLINKED: "Identity unlinked",
+	IMPERSONATION_BEGIN: "Impersonation started",
+	IMPERSONATION_END: "Impersonation ended",
+	ACCOUNT_DELETED: "Account deleted",
+	EXPORT_REQUESTED: "Data export requested",
+	APP_ROLE_CHANGED: "Instance role changed",
+	RESEARCH_CONSENT_REVOKED: "Research consent revoked",
+};
+
+/** Falls back to a humanized enum name so an event type added server-side still reads sensibly. */
 export function eventLabel(eventType: string): string {
+	const known = (EVENT_TYPE_LABELS as Record<string, string | undefined>)[eventType];
+	if (known) return known;
 	const lower = eventType.replace(/_/g, " ").toLowerCase();
 	return lower.charAt(0).toUpperCase() + lower.slice(1);
 }
 
-/**
- * Render an account reference as a human label, falling back to `#id` when the account no longer exists
- * (audit rows outlive accounts — deletion, GDPR redaction). `id` is the raw subject/actor id when no
- * resolved ref is available.
- */
-export function accountLabel(ref: AccountRef | undefined, id: number | undefined): string | null {
-	if (ref) return ref.displayName || ref.email || `#${ref.id}`;
-	if (id != null) return `#${id}`;
-	return null;
+/** `SUCCESS` → `Success`, so the Result column matches the Outcome facet. */
+export function resultLabel(result: string): string {
+	return result === "FAILURE" ? "Failure" : "Success";
 }
 
-export interface FormattedTimestamp {
-	/** Absolute time in the viewer's locale + timezone (forensic precision). */
-	local: string;
-	/** The canonical ISO-8601 UTC instant, for the hover tooltip and copy/paste. */
-	isoUtc: string;
-}
+export { refLabel as accountLabel } from "../audit-shared/refLabel";
 
-/**
- * Audit timestamps need precision, so the row shows the absolute local time; the exact ISO-8601 **UTC**
- * instant is kept in the tooltip so events stay comparable across timezones (the convention CloudTrail,
- * Tailscale and GitHub follow: store/serve UTC, render local).
- */
-export function formatTimestamp(value: AuthEventView["occurredAt"]): FormattedTimestamp {
-	// The generated client types this `Date`, but the response transformers aren't wired into the SDK
-	// calls, so it arrives as an ISO string at runtime — coerce defensively (same pattern as elsewhere).
-	const date = value instanceof Date ? value : new Date(value);
-	// Medium date + medium time (incl. seconds) — audit rows need second precision, and the explicit
-	// styles render consistently across locales rather than the browser default's variable shape.
-	const local = date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" });
-	return { local, isoUtc: date.toISOString() };
-}
-
-const RELATIVE_UNITS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
-	["year", 31_536_000_000],
-	["month", 2_592_000_000],
-	["day", 86_400_000],
-	["hour", 3_600_000],
-	["minute", 60_000],
-];
-
-/**
- * A compact relative time ("2 hours ago") for the row, paired with the absolute value on hover — the
- * convention GitHub/Datadog/Tailscale use for log rows (scannable recency + precision on demand).
- */
-export function relativeTime(value: AuthEventView["occurredAt"]): string {
-	const date = value instanceof Date ? value : new Date(value);
-	// Audit events are always in the past; clamp so minor clock skew (or a sub-minute-old event) reads
-	// "just now" instead of a nonsensical "in N seconds".
-	const diffMs = Math.min(date.getTime() - Date.now(), 0);
-	const abs = Math.abs(diffMs);
-	if (abs < 60_000) return "just now";
-	const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
-	for (const [unit, ms] of RELATIVE_UNITS) {
-		if (abs >= ms) return rtf.format(Math.round(diffMs / ms), unit);
-	}
-	return "just now";
-}
+export { formatTimestamp } from "../audit-shared/timeFormat";
 
 /**
  * Turn the JSONB `details` blob into a human sentence where we can — `{"from":"USER","to":"APP_ADMIN"}`
  * → `USER → APP_ADMIN`, other objects → `key: value` pairs — and fall back to the raw string when it is
- * not parseable JSON. Tailscale / Datadog / Vercel all render structured changes as old→new diffs rather
- * than raw JSON; this is the lightweight version of that.
+ * not parseable JSON.
  */
 export function humanizeDetails(details: string | undefined): string | null {
 	if (!details) return null;
@@ -116,12 +90,4 @@ function stringify(value: unknown): string {
 	return String(value);
 }
 
-/** Pretty-print the raw `details` JSON for the detail panel; returns the raw string if not JSON. */
-export function prettyDetails(details: string | undefined): string | null {
-	if (!details) return null;
-	try {
-		return JSON.stringify(JSON.parse(details), null, 2);
-	} catch {
-		return details;
-	}
-}
+export { prettyJson as prettyDetails } from "../audit-shared/prettyJson";

@@ -9,6 +9,7 @@ import {
 	Map as MapIcon,
 	PlayCircle,
 	PlugZapIcon,
+	ScrollText,
 	Settings2,
 	SlidersHorizontal,
 	Trophy,
@@ -277,6 +278,19 @@ export function NavAdmin({
 						</SidebarMenuButton>
 					</SidebarMenuItem>
 				)}
+				{/* Deliberately not feature-gated: a change history must stay reachable after a feature is
+				    turned off, since the record of past changes still exists. */}
+				<SidebarMenuItem>
+					<SidebarMenuButton
+						tooltip="Settings changes in this workspace"
+						render={
+							<Link to="/w/$workspaceSlug/admin/audit" params={{ workspaceSlug }} search={{}} />
+						}
+					>
+						<ScrollText />
+						<span>Audit log</span>
+					</SidebarMenuButton>
+				</SidebarMenuItem>
 			</SidebarMenu>
 		</SidebarGroup>
 	);

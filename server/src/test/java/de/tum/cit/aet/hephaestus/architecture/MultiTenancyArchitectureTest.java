@@ -75,6 +75,22 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
     }
 
     /**
+     * Whether an element is gated by the instance-admin authority alone, which is cross-workspace by
+     * design. Exact match, not {@code contains}: a composite like
+     * {@code hasAnyAuthority('app_admin','workspace_member')} mentions app_admin but is reachable by a
+     * workspace member, and a substring test would hand it this exemption. Anything composite has to
+     * justify itself some other way. {@code InstanceAdminGateExemptionTest} pins this.
+     */
+    static final String INSTANCE_ADMIN_GATE = "hasAuthority('app_admin')";
+
+    static boolean isInstanceAdminGated(com.tngtech.archunit.core.domain.properties.HasAnnotations<?> element) {
+        return element
+            .tryGetAnnotationOfType(org.springframework.security.access.prepost.PreAuthorize.class)
+            .map(a -> INSTANCE_ADMIN_GATE.equals(a.value().trim()))
+            .orElse(false);
+    }
+
+    /**
      * Schedulers that are legitimately workspace-agnostic.
      */
     static final Set<String> WORKSPACE_AGNOSTIC_SCHEDULERS = Set.of();
@@ -891,6 +907,15 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                     // operate outside any single workspace. The module is annotated
                     // @WorkspaceAgnostic at the package level.
                     if (method.getOwner().getPackageName().startsWith("de.tum.cit.aet.hephaestus.core.auth")) {
+                        return;
+                    }
+
+                    // Skip instance-admin endpoints: an endpoint gated by the instance authority is
+                    // cross-workspace BY DEFINITION (that is what an instance admin is for), so demanding
+                    // a WorkspaceContext on it is backwards. This is keyed on the security annotation
+                    // rather than a controller name so the exemption states its own reason. Cross-workspace
+                    // reads behind it still need @WorkspaceAgnostic on the repository.
+                    if (isInstanceAdminGated(method.getOwner()) || isInstanceAdminGated(method)) {
                         return;
                     }
 

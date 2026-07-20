@@ -3,6 +3,9 @@ package de.tum.cit.aet.hephaestus.agent.config;
 import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -21,6 +24,7 @@ public class AgentConfigService {
     private final AgentConfigRepository agentConfigRepository;
     private final AgentJobRepository agentJobRepository;
     private final WorkspaceRepository workspaceRepository;
+    private final ConfigAuditPort configAudit;
 
     @Transactional(readOnly = true)
     public List<AgentConfig> getConfigs(WorkspaceContext workspaceContext) {
@@ -83,17 +87,32 @@ public class AgentConfigService {
 
         validateCredentialMode(config);
 
+        AgentConfig saved;
         try {
-            return agentConfigRepository.save(config);
+            saved = agentConfigRepository.save(config);
         } catch (DataIntegrityViolationException e) {
             // The existsByWorkspaceIdAndName fast-path above is racy: two concurrent creates with the
             // same name both pass the check, and the DB unique constraint uk_agent_config_workspace_name
             // backstops the loser. Translate that loser's violation into the same 409 the fast path
             // advertises, instead of leaking a 500.
+            //
+            // Scoped to the save alone: the audit write below can raise DataIntegrityViolationException
+            // too (its own constraints), and reporting that as "name already exists" would send the
+            // operator hunting a duplicate that isn't there while the real fault — a broken audit trail —
+            // goes unnamed.
             throw new AgentConfigNameConflictException(
                 "An agent config with name '" + request.name() + "' already exists in this workspace."
             );
         }
+        configAudit.record(
+            ConfigAuditEntry.created(
+                ConfigAuditEntityType.AGENT_CONFIG,
+                saved.getId(),
+                workspaceId,
+                AgentConfigSnapshot.of(saved)
+            )
+        );
+        return saved;
     }
 
     @Transactional
@@ -103,8 +122,9 @@ public class AgentConfigService {
         UpdateAgentConfigRequestDTO request
     ) {
         AgentConfig config = agentConfigRepository
-            .findByIdAndWorkspaceId(configId, workspaceContext.id())
+            .findByIdAndWorkspaceIdForUpdate(configId, workspaceContext.id())
             .orElseThrow(() -> new EntityNotFoundException("AgentConfig", configId.toString()));
+        AgentConfigSnapshot before = AgentConfigSnapshot.of(config);
 
         if (request.llmProvider() != null) {
             config.setLlmProvider(request.llmProvider());
@@ -140,7 +160,17 @@ public class AgentConfigService {
 
         validateCredentialMode(config);
 
-        return agentConfigRepository.save(config);
+        AgentConfig saved = agentConfigRepository.save(config);
+        configAudit.record(
+            ConfigAuditEntry.updated(
+                ConfigAuditEntityType.AGENT_CONFIG,
+                saved.getId(),
+                workspaceContext.id(),
+                before,
+                AgentConfigSnapshot.of(saved)
+            )
+        );
+        return saved;
     }
 
     @Transactional
@@ -173,7 +203,11 @@ public class AgentConfigService {
             );
         }
 
+        AgentConfigSnapshot before = AgentConfigSnapshot.of(config);
         agentConfigRepository.delete(config);
+        configAudit.record(
+            ConfigAuditEntry.deleted(ConfigAuditEntityType.AGENT_CONFIG, config.getId(), workspaceContext.id(), before)
+        );
     }
 
     /**

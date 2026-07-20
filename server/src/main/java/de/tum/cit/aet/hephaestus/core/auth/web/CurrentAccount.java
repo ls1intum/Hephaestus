@@ -33,6 +33,30 @@ public final class CurrentAccount {
         }
     }
 
+    /** Whether a validated token is present at all — i.e. someone, rather than a background job, is acting. */
+    public static boolean isAuthenticated() {
+        return jwtOrNull() != null;
+    }
+
+    /**
+     * The authenticated account id ({@code sub}), or {@code null} when there is no token or its subject
+     * is not an account id. Callers that must not fail the request over it use this; controllers want
+     * {@link #requireId()}, which 401s instead. Pair it with {@link #isAuthenticated()} when the two
+     * null causes ("nobody is signed in" vs "signed in but unresolvable") mean different things.
+     */
+    @Nullable
+    public static Long idOrNull() {
+        Jwt jwt = jwtOrNull();
+        if (jwt == null) {
+            return null;
+        }
+        try {
+            return Long.parseLong(jwt.getSubject());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
     /** The jti of the current token, for revocation on logout / refresh. */
     public static UUID requireJti() {
         Jwt jwt = requireJwt();
