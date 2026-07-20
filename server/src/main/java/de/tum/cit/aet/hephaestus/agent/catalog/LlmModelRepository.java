@@ -10,4 +10,6 @@ public interface LlmModelRepository extends JpaRepository<LlmModel, Long> {
     List<LlmModel> findByConnectionId(Long connectionId);
 
     Optional<LlmModel> findByConnectionIdAndSlug(Long connectionId, String slug);
+
+    boolean existsByConnectionId(Long connectionId);
 }

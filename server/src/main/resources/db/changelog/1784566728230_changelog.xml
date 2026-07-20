@@ -461,41 +461,4 @@
         <rollback/>
     </changeSet>
 
-    <!-- 12. Widen the config-audit entity-type CHECK for the new LLM-config audit subjects. Same
-         DROP+ADD shape as prior changelogs; must stay in lockstep with ConfigAuditImmutabilityIntegrationTest. -->
-    <changeSet id="1784566728230-12" author="hephaestus">
-        <preConditions onFail="MARK_RAN" onFailMessage="config_audit_event entity_type CHECK already covers LLM_CONNECTION">
-            <sqlCheck expectedResult="0">
-                SELECT count(*) FROM pg_constraint
-                WHERE conname = 'ck_config_audit_event_entity_type'
-                  AND pg_get_constraintdef(oid) LIKE '%LLM_CONNECTION%'
-            </sqlCheck>
-        </preConditions>
-        <comment>Admit the LLM-config redesign audit subjects on the config-audit trail (#1368)</comment>
-        <sql splitStatements="false"><![CDATA[
-            ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
-            ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
-                CHECK (entity_type IN (
-                    'PRACTICE_REVIEW_SETTINGS', 'AI_CONFIG_BINDING', 'AGENT_CONFIG',
-                    'WORKSPACE_ROLE', 'WORKSPACE_FEATURES', 'WORKSPACE_STATUS',
-                    'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY', 'PRACTICE_ACTIVE',
-                    'WORKSPACE_LLM_BUDGET',
-                    'LLM_CONNECTION', 'LLM_MODEL', 'LLM_MODEL_PRICE', 'LLM_MODEL_GRANT',
-                    'WORKSPACE_LLM_CONNECTION', 'WORKSPACE_LLM_MODEL', 'LLM_MODEL_BINDING',
-                    'INSTANCE_LLM_SETTINGS'
-                ));
-        ]]></sql>
-        <rollback>
-            <sql splitStatements="false"><![CDATA[
-                ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
-                ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
-                    CHECK (entity_type IN (
-                        'PRACTICE_REVIEW_SETTINGS', 'AI_CONFIG_BINDING', 'AGENT_CONFIG',
-                        'WORKSPACE_ROLE', 'WORKSPACE_FEATURES', 'WORKSPACE_STATUS',
-                        'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY', 'PRACTICE_ACTIVE',
-                        'WORKSPACE_LLM_BUDGET'
-                    ));
-            ]]></sql>
-        </rollback>
-    </changeSet>
 </databaseChangeLog>
