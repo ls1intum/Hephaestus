@@ -144,18 +144,28 @@ public class LlmUsageRecorder {
     @Nullable
     private BigDecimal resolveCostUsd(Long workspaceId, @Nullable BigDecimal budget, LlmUsageSample sample) {
         BigDecimal reported = sample.costUsd();
+        boolean burnedTokens = sample.inputTokens() > 0 || sample.outputTokens() > 0;
         if (reported != null) {
-            if (reported.signum() >= 0 && reported.compareTo(COST_USD_SANITY_CAP) <= 0) {
-                return reported;
+            // A reported zero alongside real token consumption is not credible: it means the runtime
+            // didn't price the call, not that the call was free. `PiResultParser` also defaults an
+            // ABSENT costUsd to 0.0, so trusting it would silently bill millions of tokens as $0 and
+            // leave the cap permanently blind — the exact failure this ledger exists to prevent.
+            // Fall through to the pricing table, then to the uncosted path.
+            if (reported.signum() > 0 || (reported.signum() == 0 && !burnedTokens)) {
+                if (reported.compareTo(COST_USD_SANITY_CAP) <= 0) {
+                    return reported;
+                }
             }
-            log.warn(
-                "Implausible LLM cost reported, re-deriving from the pricing table: workspaceId={}, jobType={}, " +
-                    "sourceId={}, reportedCostUsd={}",
-                workspaceId,
-                sample.jobType(),
-                sample.sourceId(),
-                reported
-            );
+            if (reported.signum() < 0 || reported.compareTo(COST_USD_SANITY_CAP) > 0) {
+                log.warn(
+                    "Implausible LLM cost reported, re-deriving from the pricing table: workspaceId={}, jobType={}, " +
+                        "sourceId={}, reportedCostUsd={}",
+                    workspaceId,
+                    sample.jobType(),
+                    sample.sourceId(),
+                    reported
+                );
+            }
         }
         BigDecimal derived =
             sample.model() != null

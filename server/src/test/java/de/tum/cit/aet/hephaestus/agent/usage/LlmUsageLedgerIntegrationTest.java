@@ -190,6 +190,68 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(budgetService.monthToDateCost(workspace.getId())).isEqualByComparingTo("0.000750");
     }
 
+    /**
+     * Observed live on the test instance: the logos proxy reports {@code costUsd: 0} and
+     * {@code PiResultParser} also defaults an ABSENT cost to 0.0 — so a job that burned 4.3M tokens
+     * landed as $0 and the cap could never fire. A zero alongside real tokens must be treated as
+     * "not priced", not as "free".
+     */
+    @Test
+    void reportedZeroCostWithRealTokensFallsBackToPricingInsteadOfBillingZero() {
+        Workspace workspace = setupWorkspace("ledger-zero-cost");
+        ModelPricing pricing = new ModelPricing();
+        pricing.setModelId("zero-reporting-model");
+        pricing.setPer1kInputUsd(new BigDecimal("0.001000"));
+        pricing.setPer1kOutputUsd(new BigDecimal("0.002000"));
+        pricing.setPer1kCacheReadUsd(BigDecimal.ZERO);
+        pricing.setPer1kCacheWriteUsd(BigDecimal.ZERO);
+        pricing.setValidFrom(Instant.now().minusSeconds(60));
+        pricingRepository.save(pricing);
+
+        recorder.record(
+            workspace.getId(),
+            new LlmUsageRecorder.LlmUsageSample(
+                LlmUsageJobType.PULL_REQUEST_REVIEW,
+                UUID.randomUUID(),
+                "zero-reporting-model",
+                1000,
+                1000,
+                0,
+                0,
+                77,
+                BigDecimal.ZERO, // runtime reported "free" for a job that clearly was not
+                Instant.now()
+            )
+        );
+
+        assertThat(budgetService.monthToDateCost(workspace.getId())).isEqualByComparingTo("0.003000");
+    }
+
+    /** A genuine zero — no tokens burned — is still recorded as zero, not re-derived. */
+    @Test
+    void reportedZeroCostWithNoTokensStaysZero() {
+        Workspace workspace = setupWorkspace("ledger-zero-notokens");
+
+        recorder.record(
+            workspace.getId(),
+            new LlmUsageRecorder.LlmUsageSample(
+                LlmUsageJobType.MENTOR_TURN,
+                UUID.randomUUID(),
+                "any-model",
+                0,
+                0,
+                0,
+                0,
+                1,
+                BigDecimal.ZERO,
+                Instant.now()
+            )
+        );
+
+        var event = usageRepository.findByWorkspaceId(workspace.getId()).getFirst();
+        assertThat(event.getCostUsd()).isEqualByComparingTo("0");
+    }
+
     @Test
     void implausibleReportedCostIsRejectedInsteadOfPoisoningTheBudget() {
         Workspace workspace = setupWorkspace("ledger-implausible");
