@@ -9,7 +9,6 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.math.BigDecimal;
 import java.time.YearMonth;
 import java.util.List;
-import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,7 +40,9 @@ public class LlmUsageService {
             .map(row ->
                 new LlmUsageByJobTypeDTO(
                     LlmUsageJobType.valueOf(row.getJobType()),
-                    row.getCostUsd(),
+                    row.getPricedTotalCostUsd(),
+                    row.getByoTotalCostUsd(),
+                    row.getUnpricedEventCount(),
                     row.getInputTokens(),
                     row.getOutputTokens(),
                     row.getCacheReadTokens(),
@@ -55,25 +56,36 @@ public class LlmUsageService {
         List<LlmUsageByDayDTO> byDay = usageRepository
             .aggregateByDay(workspaceId, window.from(), window.to())
             .stream()
-            .map(row -> new LlmUsageByDayDTO(row.getDay(), row.getCostUsd(), row.getEvents()))
+            .map(row ->
+                new LlmUsageByDayDTO(
+                    row.getDay(),
+                    row.getPricedTotalCostUsd(),
+                    row.getByoTotalCostUsd(),
+                    row.getUnpricedEventCount(),
+                    row.getEvents()
+                )
+            )
             .toList();
 
-        BigDecimal total = usageRepository.sumCost(workspaceId, window.from(), window.to());
+        BigDecimal pricedTotal = usageRepository.sumCost(workspaceId, window.from(), window.to());
+        BigDecimal byoTotal = usageRepository.sumByoCost(workspaceId, window.from(), window.to());
         BigDecimal budget = workspace.getMonthlyLlmBudgetUsd();
         long uncosted = usageRepository.countUncosted(workspaceId, window.from(), window.to());
+        boolean hasUnpricedInstanceEvent = usageRepository.existsUnpricedInstanceFunded(
+            workspaceId,
+            window.from(),
+            window.to()
+        );
+        LlmBudgetVerdict verdict = LlmBudgetService.verdictFor(pricedTotal, hasUnpricedInstanceEvent, budget);
         return new WorkspaceLlmUsageReportDTO(
             month.toString(),
             budget,
-            total,
-            isOver(total, budget),
+            pricedTotal,
+            byoTotal,
             uncosted,
+            verdict,
             byJobType,
             byDay
         );
-    }
-
-    /** Shared over-budget predicate for the workspace and instance-admin rollups. */
-    static Boolean isOver(BigDecimal cost, @Nullable BigDecimal budget) {
-        return budget != null && cost.compareTo(budget) >= 0;
     }
 }

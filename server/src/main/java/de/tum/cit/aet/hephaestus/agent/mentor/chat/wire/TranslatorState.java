@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat.wire;
 
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import java.util.ArrayList;
 import java.util.List;
@@ -75,8 +76,39 @@ public final class TranslatorState {
     @Nullable
     private byte[] observedSessionJsonl;
 
+    /**
+     * Which connection funds this turn's LLM calls, frozen at turn start from the resolved
+     * {@code MentorLlmConfig} (#1368 slice 6) — mirrors {@code ConfigSnapshot.connectionScope}/
+     * {@code connectionId} for detection jobs. Read by {@code MentorTurnPersistence} to resolve the
+     * ledger's server-side cost for the same catalog binding the turn actually used. Both null means
+     * a legacy, pre-catalog config. Set once via {@link #bindConnection} right after construction —
+     * not synchronized like the streaming mutators below since it's written once before any runner
+     * event can race it.
+     */
+    @Nullable
+    private FundingSource connectionScope;
+
+    @Nullable
+    private Long connectionId;
+
     public TranslatorState(UUID assistantMessageId) {
         this.assistantMessageId = assistantMessageId;
+    }
+
+    /** Record the catalog binding funding this turn. See the field doc above. */
+    public void bindConnection(@Nullable FundingSource connectionScope, @Nullable Long connectionId) {
+        this.connectionScope = connectionScope;
+        this.connectionId = connectionId;
+    }
+
+    @Nullable
+    public FundingSource connectionScope() {
+        return connectionScope;
+    }
+
+    @Nullable
+    public Long connectionId() {
+        return connectionId;
     }
 
     public UUID assistantMessageId() {

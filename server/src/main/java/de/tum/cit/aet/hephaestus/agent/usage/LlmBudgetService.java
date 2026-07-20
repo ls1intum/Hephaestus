@@ -97,6 +97,35 @@ public class LlmBudgetService {
         return usageRepository.sumCost(workspaceId, window.from(), window.to());
     }
 
+    /**
+     * The month's budget verdict (#1368 slice 6) — a pure function shared by the workspace-scoped
+     * and instance-admin usage rollups so the rule lives in exactly one place.
+     *
+     * <p>{@code EXHAUSTED} takes priority over {@code UNVERIFIABLE}: a workspace that has already
+     * reached its cap on confirmed spend alone doesn't need the softer "some usage is unpriced"
+     * warning — it's already paused. {@code UNVERIFIABLE} only surfaces when the ledger cannot yet
+     * rule out EXHAUSTED being the true state.
+     *
+     * @param pricedInstanceCostUsd this window's confirmed (instance-funded, priced) spend — the
+     *     same figure {@link #monthToDateCost} and {@code LlmUsageEventRepository#sumCost} compute
+     * @param hasUnpricedInstanceEvent whether an instance-funded event this window has no
+     *     resolvable price ({@code LlmUsageEventRepository#existsUnpricedInstanceFunded})
+     * @param monthlyBudgetUsd the workspace's cap; {@code null} = uncapped (never EXHAUSTED)
+     */
+    public static LlmBudgetVerdict verdictFor(
+        BigDecimal pricedInstanceCostUsd,
+        boolean hasUnpricedInstanceEvent,
+        @Nullable BigDecimal monthlyBudgetUsd
+    ) {
+        if (monthlyBudgetUsd != null && pricedInstanceCostUsd.compareTo(monthlyBudgetUsd) >= 0) {
+            return LlmBudgetVerdict.EXHAUSTED;
+        }
+        if (hasUnpricedInstanceEvent) {
+            return LlmBudgetVerdict.UNVERIFIABLE;
+        }
+        return LlmBudgetVerdict.WITHIN;
+    }
+
     /** Half-open UTC instant window [from, to) of one calendar month. */
     public record MonthWindow(Instant from, Instant to) {
         public static MonthWindow of(YearMonth month) {

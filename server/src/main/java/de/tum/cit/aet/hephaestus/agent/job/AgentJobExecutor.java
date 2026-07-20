@@ -32,7 +32,6 @@ import io.nats.client.FetchConsumer;
 import io.nats.client.Message;
 import io.nats.client.StreamContext;
 import jakarta.annotation.PreDestroy;
-import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -868,7 +867,11 @@ public class AgentJobExecutor {
                     freshJob.setLlmTotalReasoningTokens(agentUsage.reasoningTokens());
                     freshJob.setLlmCacheReadTokens(agentUsage.cacheReadTokens());
                     freshJob.setLlmCacheWriteTokens(agentUsage.cacheWriteTokens());
-                    freshJob.setLlmCostUsd(agentUsage.costUsd());
+                    // llmCostUsd deliberately left unset (#1368 slice 6): the runner no longer registers a
+                    // per-token price table with the Pi SDK (see pi-provider.mjs), so agentUsage.costUsd() is
+                    // now a structural constant (always 0.0), never a real measurement. Writing it would make
+                    // this diagnostic column silently lie ("$0.00" reads as "free", not "not measured"). The
+                    // authoritative, catalog-derived cost lives on the llm_usage_event ledger row below.
                     // Use typed snapshot so a future field rename fails compile rather than writing null.
                     String model = agentUsage.model();
                     ConfigSnapshot snap = null;
@@ -888,6 +891,10 @@ public class AgentJobExecutor {
                         freshJob.setLlmModelVersion(snap.modelVersion());
                     }
                     ledgerWorkspaceId.set(freshJob.getWorkspace().getId());
+                    // Cost is derived server-side by LlmUsageRecorder from the frozen catalog binding
+                    // (#1368 slice 6) — the connectionScope/connectionId below identify WHICH binding,
+                    // mirroring what ConfigSnapshot froze at dispatch time. Both null (a legacy,
+                    // pre-catalog config) falls back to the recorder's ModelPricingService path.
                     ledgerSample.set(
                         new LlmUsageRecorder.LlmUsageSample(
                             LlmUsageJobType.from(freshJob.getJobType()),
@@ -897,19 +904,20 @@ public class AgentJobExecutor {
                             nullToZero(agentUsage.outputTokens()),
                             nullToZero(agentUsage.cacheReadTokens()),
                             nullToZero(agentUsage.cacheWriteTokens()),
+                            nullToZero(agentUsage.reasoningTokens()),
                             agentUsage.totalCalls(),
-                            agentUsage.costUsd() != null ? BigDecimal.valueOf(agentUsage.costUsd()) : null,
+                            snap != null ? snap.connectionScope() : null,
+                            snap != null ? snap.connectionId() : null,
                             Instant.now()
                         )
                     );
                     log.info(
-                        "LLM usage (agent-reported): model={}, calls={}, in={}, out={}, reasoning={}, cost={}, jobId={}",
+                        "LLM usage (agent-reported): model={}, calls={}, in={}, out={}, reasoning={}, jobId={}",
                         model,
                         agentUsage.totalCalls(),
                         agentUsage.inputTokens(),
                         agentUsage.outputTokens(),
                         agentUsage.reasoningTokens(),
-                        agentUsage.costUsd(),
                         jobId
                     );
                 }

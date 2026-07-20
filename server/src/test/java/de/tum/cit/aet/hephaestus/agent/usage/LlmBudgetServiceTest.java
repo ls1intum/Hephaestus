@@ -82,6 +82,49 @@ class LlmBudgetServiceTest extends BaseUnitTest {
     }
 
     @Nested
+    class Verdict {
+
+        @Test
+        void withinBudgetWithNoUnpricedEventsIsWithin() {
+            assertThat(LlmBudgetService.verdictFor(new BigDecimal("5.00"), false, new BigDecimal("10.00"))).isEqualTo(
+                LlmBudgetVerdict.WITHIN
+            );
+        }
+
+        @Test
+        void pricedSumAtOrAboveTheCapIsExhausted() {
+            assertThat(LlmBudgetService.verdictFor(new BigDecimal("10.00"), false, new BigDecimal("10.00"))).isEqualTo(
+                LlmBudgetVerdict.EXHAUSTED
+            );
+        }
+
+        @Test
+        void withinBudgetButWithAnUnpricedEventIsUnverifiable() {
+            assertThat(LlmBudgetService.verdictFor(new BigDecimal("5.00"), true, new BigDecimal("10.00"))).isEqualTo(
+                LlmBudgetVerdict.UNVERIFIABLE
+            );
+        }
+
+        @Test
+        void exhaustedTakesPriorityOverUnverifiable() {
+            // Both conditions true at once: already-reached-the-cap is the more actionable signal.
+            assertThat(LlmBudgetService.verdictFor(new BigDecimal("10.00"), true, new BigDecimal("10.00"))).isEqualTo(
+                LlmBudgetVerdict.EXHAUSTED
+            );
+        }
+
+        @Test
+        void uncappedWorkspaceCanNeverBeExhaustedButCanBeUnverifiable() {
+            assertThat(LlmBudgetService.verdictFor(new BigDecimal("999999.00"), false, null)).isEqualTo(
+                LlmBudgetVerdict.WITHIN
+            );
+            assertThat(LlmBudgetService.verdictFor(new BigDecimal("999999.00"), true, null)).isEqualTo(
+                LlmBudgetVerdict.UNVERIFIABLE
+            );
+        }
+    }
+
+    @Nested
     class MonthWindow {
 
         @Test

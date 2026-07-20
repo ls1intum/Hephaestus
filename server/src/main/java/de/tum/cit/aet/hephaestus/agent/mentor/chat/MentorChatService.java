@@ -249,6 +249,10 @@ public class MentorChatService implements MentorTurnRunner {
             request.clientUserMessageId()
         );
         TranslatorState state = new TranslatorState(assistantMessageId);
+        // Freeze the catalog binding onto the turn state so MentorTurnPersistence's ledger write
+        // resolves the SAME price the runner actually used (#1368 slice 6) — mirrors ConfigSnapshot
+        // doing the same for detection jobs.
+        state.bindConnection(llmConfig.connectionScope(), llmConfig.connectionId());
 
         AttachedSandbox sandbox = null;
         MentorRunnerClient client = null;

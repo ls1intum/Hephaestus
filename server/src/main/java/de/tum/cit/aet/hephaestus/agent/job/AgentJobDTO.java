@@ -37,7 +37,11 @@ public record AgentJobDTO(
     @Schema(description = "Total reasoning/thinking tokens") Integer llmTotalReasoningTokens,
     @Schema(description = "Tokens read from prompt cache") Integer llmCacheReadTokens,
     @Schema(description = "Tokens written to prompt cache") Integer llmCacheWriteTokens,
-    @Schema(description = "Estimated cost in USD (agent-reported)") Double llmCostUsd
+    @Schema(
+        description = "Deprecated, always null (#1368 slice 6): the runner no longer reports cost. See the " +
+            "workspace's LLM usage rollup for the authoritative, catalog-derived per-job cost."
+    )
+    Double llmCostUsd
 ) {
     public static AgentJobDTO from(AgentJob job) {
         JsonNode snapshot = job.getConfigSnapshot();

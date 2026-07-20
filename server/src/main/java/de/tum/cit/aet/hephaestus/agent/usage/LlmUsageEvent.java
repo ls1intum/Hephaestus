@@ -138,4 +138,41 @@ public class LlmUsageEvent {
     @Nullable
     @Column(name = "applied_price_id")
     private Long appliedPriceId;
+
+    /**
+     * Provenance: the {@code workspace_llm_model} row applied to this event, if any (BYO path only —
+     * the instance path uses {@link #appliedPriceId} instead). Soft ref (no FK); {@code workspace_llm_model}
+     * carries no price-history table, so there is no analogous "price row id" to reference (#1368 slice 6).
+     */
+    @Nullable
+    @Column(name = "applied_workspace_model_id")
+    private Long appliedWorkspaceModelId;
+
+    /**
+     * Frozen per-1M-token rates actually applied to this event (#1368 slice 6). {@code appliedPriceId} /
+     * {@code appliedWorkspaceModelId} alone are live soft refs — if the referenced row is later
+     * repriced or deleted, its CURRENT rates no longer describe what a HISTORICAL event was actually
+     * charged. These five columns make every dollar falsifiable independent of the catalog's present
+     * state. Set on every PRICED event (both instance and BYO paths); left null for FREE (rate is
+     * moot — cost is definitionally $0) and UNPRICED (no rate was ever resolved).
+     */
+    @Nullable
+    @Column(name = "applied_per_1m_input_usd", precision = 18, scale = 8)
+    private BigDecimal appliedPer1mInputUsd;
+
+    @Nullable
+    @Column(name = "applied_per_1m_output_usd", precision = 18, scale = 8)
+    private BigDecimal appliedPer1mOutputUsd;
+
+    @Nullable
+    @Column(name = "applied_per_1m_cache_read_usd", precision = 18, scale = 8)
+    private BigDecimal appliedPer1mCacheReadUsd;
+
+    @Nullable
+    @Column(name = "applied_per_1m_cache_write_usd", precision = 18, scale = 8)
+    private BigDecimal appliedPer1mCacheWriteUsd;
+
+    @Nullable
+    @Column(name = "applied_per_1m_reasoning_usd", precision = 18, scale = 8)
+    private BigDecimal appliedPer1mReasoningUsd;
 }

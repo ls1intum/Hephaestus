@@ -51,6 +51,11 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         event.setJobType(LlmUsageJobType.PULL_REQUEST_REVIEW);
         event.setSourceId(UUID.randomUUID());
         event.setCostUsd(new BigDecimal(cost));
+        // Budgeted spend only counts PRICED + INSTANCE-funded rows (#1368 slice 6) — both are the
+        // entity defaults, but set them explicitly so this fixture keeps meaning that if the
+        // defaults ever change.
+        event.setPricingState(PricingState.PRICED);
+        event.setFundingSource(FundingSource.INSTANCE);
         event.setOccurredAt(Instant.now());
         usageRepository.save(event);
     }
@@ -80,16 +85,17 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
             .filter(r -> r.workspaceId().equals(spender.getId()))
             .findFirst()
             .orElseThrow();
-        assertThat(spenderRow.costUsd()).isEqualByComparingTo("3.00");
+        assertThat(spenderRow.pricedTotalCostUsd()).isEqualByComparingTo("3.00");
+        assertThat(spenderRow.byoTotalCostUsd()).isEqualByComparingTo("0");
         assertThat(spenderRow.monthlyBudgetUsd()).isEqualByComparingTo("2.00");
-        assertThat(spenderRow.overBudget()).isTrue();
+        assertThat(spenderRow.verdict()).isEqualTo(LlmBudgetVerdict.EXHAUSTED);
         var idleRow = rows
             .stream()
             .filter(r -> r.workspaceId().equals(idle.getId()))
             .findFirst()
             .orElseThrow();
-        assertThat(idleRow.costUsd()).isEqualByComparingTo("0");
-        assertThat(idleRow.overBudget()).isFalse();
+        assertThat(idleRow.pricedTotalCostUsd()).isEqualByComparingTo("0");
+        assertThat(idleRow.verdict()).isEqualTo(LlmBudgetVerdict.WITHIN);
     }
 
     @Test

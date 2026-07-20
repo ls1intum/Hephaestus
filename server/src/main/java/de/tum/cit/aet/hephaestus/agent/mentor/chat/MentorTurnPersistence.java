@@ -16,7 +16,6 @@ import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
-import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -221,10 +220,20 @@ public class MentorTurnPersistence {
         return new UIMessageChunk.Finish(finish.finishReason(), new UIMessageChunk.MessageMetadata(model, usage, cost));
     }
 
+    /**
+     * Wire-facing cost estimate for the chat UI, derived from {@link ModelPricingService}'s global
+     * per-model table over the turn's observed tokens. Unrelated to the ledger's own cost (resolved
+     * separately and later by {@code LlmUsageRecorder} from the frozen catalog binding — see
+     * {@link #billTurn}); this is only what the client sees on the live Finish chunk and what
+     * {@code chat_message.metadata.costUsd} persists for the wire contract.
+     *
+     * <p>#1368 slice 6: previously preferred a cost Pi itself reported on {@code Usage.cost.total}.
+     * The runner no longer registers a per-token price table with the SDK (see {@code pi-provider.mjs}
+     * — cost is a server-side concern now), so Pi can never populate that field; the extraction +
+     * sanity-cap guard for it were deleted as dead code. This fallback is the only source now.
+     */
     @Nullable
     private Double computeFinalCostUsd(TranslatorState state) {
-        Double piCost = extractPiCostUsd(state.observedUsage());
-        if (piCost != null) return piCost;
         UsageBreakdown breakdown = extractUsageFromState(state);
         if (breakdown.model() == null || (breakdown.inputTokens() <= 0 && breakdown.outputTokens() <= 0)) {
             return null;
@@ -314,8 +323,10 @@ public class MentorTurnPersistence {
         meta.put("durationMs", Duration.between(cookie.startedAt(), Instant.now()).toMillis());
         assistant.setMetadata(meta);
         // Capture the ledger write BEFORE the flush: the tokens were burned regardless of who wins
-        // the version race below, so losing that race must not lose the billing.
-        pending.capture(assistant, state, wireCostUsd);
+        // the version race below, so losing that race must not lose the billing. The ledger's own
+        // cost is derived server-side by LlmUsageRecorder (#1368 slice 6) — wireCostUsd is only the
+        // wire-facing estimate persisted above for the chat UI, unrelated to the ledger write.
+        pending.capture(assistant, state);
         // saveAndFlush (not save): force the optimistic-lock check NOW, inside the try/catch, instead of at the
         // REQUIRES_NEW commit boundary where an OptimisticLockingFailureException would escape uncaught and turn
         // a benign reaper race into a logged turn failure.
@@ -364,13 +375,13 @@ public class MentorTurnPersistence {
         private LlmUsageSample sample;
 
         /** No-op when the turn produced no usage at all (nothing to bill) or the thread is detached. */
-        void capture(ChatMessage assistant, TranslatorState state, @Nullable Double costUsd) {
+        void capture(ChatMessage assistant, TranslatorState state) {
             ChatThread thread = assistant.getThread();
             if (thread == null || thread.getWorkspace() == null) {
                 return;
             }
             UsageBreakdown usage = extractUsageFromState(state);
-            if (costUsd == null && usage.inputTokens() <= 0 && usage.outputTokens() <= 0) {
+            if (usage.inputTokens() <= 0 && usage.outputTokens() <= 0) {
                 return;
             }
             this.workspaceId = thread.getWorkspace().getId();
@@ -382,8 +393,12 @@ public class MentorTurnPersistence {
                 usage.outputTokens(),
                 usage.cacheReadTokens(),
                 usage.cacheWriteTokens(),
+                // Mentor turns don't yet surface reasoning-token counts on the wire (#1368 slice 6
+                // scope) — the ledger column defaults to zero for this job type until that lands.
+                0,
                 1,
-                costUsd != null ? BigDecimal.valueOf(costUsd) : null,
+                state.connectionScope(),
+                state.connectionId(),
                 Instant.now()
             );
         }
@@ -463,7 +478,7 @@ public class MentorTurnPersistence {
                 assistant.setMetadata(meta);
                 // Capture before the flush for the same reason as doFinalise: an interrupted turn
                 // still burned its tokens, and losing the version race must not lose the billing.
-                pending.capture(assistant, state, computeFinalCostUsd(state));
+                pending.capture(assistant, state);
                 // saveAndFlush (not save): surface OptimisticLockingFailureException inside the try/catch (the
                 // no-session-bytes interrupt path would otherwise defer the version check to commit, escaping it).
                 chatMessageRepository.saveAndFlush(assistant);
@@ -522,31 +537,6 @@ public class MentorTurnPersistence {
     private static long readLong(JsonNode node, String field) {
         JsonNode v = node.path(field);
         return v.isIntegralNumber() || v.isFloatingPointNumber() ? v.asLong() : 0L;
-    }
-
-    /** ≈10× a worst-case frontier-model turn; guards bad Pi cost values from poisoning the histogram + audit row. */
-    private static final double COST_USD_SANITY_CAP = 100.0d;
-
-    /**
-     * Pi's {@code Usage.cost.total} is computed on the agent host with the provider price table
-     * baked in — preferred over our own pricing lookup so unknown-to-us models still get a real cost.
-     */
-    @Nullable
-    private static Double extractPiCostUsd(@Nullable JsonNode usage) {
-        if (usage == null || !usage.isObject()) return null;
-        JsonNode cost = usage.path("cost");
-        if (!cost.isObject()) return null;
-        JsonNode total = cost.path("total");
-        if (total.isNumber()) {
-            double v = total.asDouble();
-            // Reject NaN/Infinity AND obviously-bogus values (negative, absurdly large) — the
-            // value flows into both `chat_message.metadata.costUsd` (audit) and the
-            // `mentor.turn.cost.usd` distribution summary (SLO panel). One Pi-side regression
-            // returning −50 or 1e9 would skew the histogram for the lifetime of the registry.
-            if (!Double.isFinite(v) || v < 0d || v > COST_USD_SANITY_CAP) return null;
-            return v;
-        }
-        return null;
     }
 
     /** Tracking record carried through the turn pipeline. */

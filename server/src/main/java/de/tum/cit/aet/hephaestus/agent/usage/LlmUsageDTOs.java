@@ -18,15 +18,24 @@ public final class LlmUsageDTOs {
     public record WorkspaceLlmUsageReportDTO(
         @NonNull @Schema(description = "Calendar month (UTC), ISO yyyy-MM", example = "2026-07") String month,
         @Nullable @Schema(description = "Monthly budget cap in USD; null = uncapped") BigDecimal monthlyBudgetUsd,
-        @NonNull @Schema(description = "Total spend in the month, USD") BigDecimal totalCostUsd,
         @NonNull @Schema(
-            description = "Spend reached the cap — detection and mentor turns are paused for the current month"
-        ) Boolean overBudget,
+            description = "This month's confirmed spend on shared (instance) models, in USD — the figure the " +
+                "monthly budget compares against. When unpricedEventCount is non-zero this is a floor, not the " +
+                "full total: render it as \"at least $X\"."
+        ) BigDecimal pricedTotalCostUsd,
         @NonNull @Schema(
-            description = "Events in the month whose cost could not be resolved (unknown model pricing). " +
-                "They count as zero spend, so a non-zero value means the budget cap is not seeing everything — " +
-                "add a model_pricing row for the model."
-        ) Long uncostedEvents,
+            description = "This month's spend on this workspace's own connected provider(s), in USD. Shown " +
+                "separately — it never counts toward the monthly budget and must never be added to " +
+                "pricedTotalCostUsd."
+        ) BigDecimal byoTotalCostUsd,
+        @NonNull @Schema(
+            description = "Calls this month (any provider) whose price is not yet known. They are excluded from " +
+                "both totals above, so a non-zero value means the real spend may be higher than shown."
+        ) Long unpricedEventCount,
+        @NonNull @Schema(
+            description = "Whether this month's confirmed spend is within the cap, has reached it (work is " +
+                "paused), or can't be fully confirmed yet because some usage above has no price set."
+        ) LlmBudgetVerdict verdict,
         @NonNull List<LlmUsageByJobTypeDTO> byJobType,
         @NonNull List<LlmUsageByDayDTO> byDay
     ) {}
@@ -34,7 +43,16 @@ public final class LlmUsageDTOs {
     @Schema(description = "Month spend aggregated by job type")
     public record LlmUsageByJobTypeDTO(
         @NonNull LlmUsageJobType jobType,
-        @NonNull BigDecimal costUsd,
+        @NonNull @Schema(
+            description = "Confirmed spend on shared (instance) models for this job type, in USD."
+        ) BigDecimal pricedTotalCostUsd,
+        @NonNull @Schema(
+            description = "Spend on this workspace's own connected provider(s) for this job type, in USD. Never " +
+                "counts toward the monthly budget."
+        ) BigDecimal byoTotalCostUsd,
+        @NonNull @Schema(
+            description = "Calls for this job type whose price is not yet known. Excluded from both totals above."
+        ) Long unpricedEventCount,
         @NonNull Long inputTokens,
         @NonNull Long outputTokens,
         @NonNull Long cacheReadTokens,
@@ -48,7 +66,20 @@ public final class LlmUsageDTOs {
     ) {}
 
     @Schema(description = "Spend for one UTC day")
-    public record LlmUsageByDayDTO(@NonNull LocalDate day, @NonNull BigDecimal costUsd, @NonNull Long events) {}
+    public record LlmUsageByDayDTO(
+        @NonNull LocalDate day,
+        @NonNull @Schema(
+            description = "Confirmed spend on shared (instance) models for this day, in USD."
+        ) BigDecimal pricedTotalCostUsd,
+        @NonNull @Schema(
+            description = "Spend on this workspace's own connected provider(s) for this day, in USD. Never " +
+                "counts toward the monthly budget."
+        ) BigDecimal byoTotalCostUsd,
+        @NonNull @Schema(
+            description = "Calls this day whose price is not yet known. Excluded from both totals above."
+        ) Long unpricedEventCount,
+        @NonNull Long events
+    ) {}
 
     @Schema(description = "Instance-admin per-workspace month rollup (metadata only, no tenant content)")
     public record AdminWorkspaceLlmUsageDTO(
@@ -56,9 +87,19 @@ public final class LlmUsageDTOs {
         @NonNull String workspaceSlug,
         @NonNull String displayName,
         @Nullable BigDecimal monthlyBudgetUsd,
-        @NonNull BigDecimal costUsd,
-        @NonNull Long events,
-        @NonNull Boolean overBudget
+        @NonNull @Schema(
+            description = "This month's confirmed spend on shared (instance) models, in USD — compared against " +
+                "the budget cap above."
+        ) BigDecimal pricedTotalCostUsd,
+        @NonNull @Schema(
+            description = "This month's spend on the workspace's own connected provider(s), in USD. Never counts " +
+                "toward the budget cap."
+        ) BigDecimal byoTotalCostUsd,
+        @NonNull @Schema(description = "Ledger events (jobs / mentor turns) this month, any provider") Long events,
+        @NonNull @Schema(
+            description = "Whether this month's confirmed spend is within the cap, has reached it, or can't be " +
+                "fully confirmed yet because some usage has no price set."
+        ) LlmBudgetVerdict verdict
     ) {}
 
     @Schema(description = "Set or clear a workspace's monthly LLM budget cap")

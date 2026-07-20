@@ -461,4 +461,35 @@
         <rollback/>
     </changeSet>
 
+    <!-- 12. Ledger provenance completion (#1368 slice 6): applied_price_id alone (changeset 9) is a
+         live soft ref into llm_model_price — if that row is later superseded, the id still resolves
+         but a reader would need to trust its CURRENT rates for a HISTORICAL event, which is wrong the
+         moment pricing changes. Freeze the rates actually applied at record time instead, so a dollar
+         stays falsifiable regardless of what the catalog looks like today. applied_workspace_model_id
+         covers the BYO path, which has no price-history table (workspace_llm_model carries only the
+         current inline rate) and so no analogous "price row id" to soft-ref. Both soft refs, no FK:
+         the ledger must survive catalog-row deletion (see class doc on llm_usage_event.sourceId). -->
+    <changeSet id="1784566728230-12" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="llm_usage_event provenance columns already exist">
+            <not><columnExists tableName="llm_usage_event" columnName="applied_workspace_model_id"/></not>
+        </preConditions>
+        <comment>Ledger provenance: applied_workspace_model_id + frozen per-1M rate snapshot (#1368)</comment>
+        <addColumn tableName="llm_usage_event">
+            <column name="applied_workspace_model_id" type="BIGINT"/>
+            <column name="applied_per_1m_input_usd" type="NUMERIC(18,8)"/>
+            <column name="applied_per_1m_output_usd" type="NUMERIC(18,8)"/>
+            <column name="applied_per_1m_cache_read_usd" type="NUMERIC(18,8)"/>
+            <column name="applied_per_1m_cache_write_usd" type="NUMERIC(18,8)"/>
+            <column name="applied_per_1m_reasoning_usd" type="NUMERIC(18,8)"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="llm_usage_event" columnName="applied_workspace_model_id"/>
+            <dropColumn tableName="llm_usage_event" columnName="applied_per_1m_input_usd"/>
+            <dropColumn tableName="llm_usage_event" columnName="applied_per_1m_output_usd"/>
+            <dropColumn tableName="llm_usage_event" columnName="applied_per_1m_cache_read_usd"/>
+            <dropColumn tableName="llm_usage_event" columnName="applied_per_1m_cache_write_usd"/>
+            <dropColumn tableName="llm_usage_event" columnName="applied_per_1m_reasoning_usd"/>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

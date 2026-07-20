@@ -11,6 +11,13 @@ public interface WorkspaceLlmModelRepository extends JpaRepository<WorkspaceLlmM
 
     List<WorkspaceLlmModel> findByConnectionId(Long connectionId);
 
+    /**
+     * Ledger price-resolution lookup (#1368 slice 6): mirrors {@code LlmModelRepository}'s method of
+     * the same name — see its Javadoc for why this returns a {@link List} rather than an
+     * {@link Optional}.
+     */
+    List<WorkspaceLlmModel> findByConnectionIdAndUpstreamModelId(Long connectionId, String upstreamModelId);
+
     Optional<WorkspaceLlmModel> findByWorkspaceIdAndSlug(Long workspaceId, String slug);
 
     /** Tenancy-safe lookup for a client-supplied id (path variable) — never trust a bare {@code findById}. */

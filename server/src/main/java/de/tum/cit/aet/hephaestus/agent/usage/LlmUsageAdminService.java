@@ -53,9 +53,14 @@ public class LlmUsageAdminService {
                     row.getWorkspaceSlug(),
                     row.getDisplayName(),
                     row.getMonthlyBudgetUsd(),
-                    row.getCostUsd(),
+                    row.getPricedTotalCostUsd(),
+                    row.getByoTotalCostUsd(),
                     row.getEvents(),
-                    LlmUsageService.isOver(row.getCostUsd(), row.getMonthlyBudgetUsd())
+                    LlmBudgetService.verdictFor(
+                        row.getPricedTotalCostUsd(),
+                        row.isHasUnpricedInstanceUsage(),
+                        row.getMonthlyBudgetUsd()
+                    )
                 )
             )
             .toList();

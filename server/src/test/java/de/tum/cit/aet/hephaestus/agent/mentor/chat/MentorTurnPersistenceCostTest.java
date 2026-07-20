@@ -1,6 +1,10 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationalDeliveryReconciler;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.TranslatorState;
@@ -10,21 +14,31 @@ import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.math.BigDecimal;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.JsonNodeFactory;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
- * The Pi-cost extraction + sanity-cap path (augmentFinishWithCost / computeFinalCostUsd / extractPiCostUsd
- * / COST_USD_SANITY_CAP) feeds both the {@code chat_message.metadata.costUsd} audit row and the long-lived
- * {@code mentor.turn.cost.usd} histogram. A {@code >}->{@code >=} or dropped-isFinite regression would poison
- * both for the lifetime of the registry. These unit tests pin the guard.
+ * {@code augmentFinishWithCost} / {@code computeFinalCostUsd} — the mentor chat's wire-facing cost
+ * estimate for the live Finish chunk + {@code chat_message.metadata.costUsd} (#1368 slice 6).
+ *
+ * <p>Historically this preferred a cost Pi itself reported on {@code Usage.cost.total} (with a sanity
+ * cap), falling back to {@link ModelPricingService} only when Pi reported nothing. Slice 6 removed the
+ * Pi-side path as dead code: the runner no longer registers a per-token price table with the SDK (see
+ * {@code pi-provider.mjs}), so Pi can never populate {@code Usage.cost.total} — the extraction +
+ * sanity-cap guard tested nothing but a payload shape the runner can no longer produce.
+ * {@link ModelPricingService}'s global per-model table is now the only source; these tests pin that
+ * fallback (unrelated to and unaffected by the runner change — {@code chat_message.metadata.costUsd}
+ * is a wire-facing estimate, distinct from the ledger's own catalog-derived cost, which
+ * {@code LlmUsageRecorder} resolves separately and later — see {@code MentorTurnPersistence#billTurn}).
  */
 class MentorTurnPersistenceCostTest extends BaseUnitTest {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
 
     @Mock
     ChatThreadRepository chatThreadRepository;
@@ -61,9 +75,17 @@ class MentorTurnPersistenceCostTest extends BaseUnitTest {
         );
     }
 
-    private static TranslatorState stateWithPiCost(String costJson) {
+    private static TranslatorState stateWithUsage(
+        String model,
+        long input,
+        long output,
+        long cacheRead,
+        long cacheWrite
+    ) {
         TranslatorState state = new TranslatorState(UUID.randomUUID());
-        JsonNode usage = MAPPER.readTree("{\"cost\":{\"total\":" + costJson + "}}");
+        state.observeModel(model);
+        ObjectNode usage = NODES.objectNode();
+        usage.put("input", input).put("output", output).put("cacheRead", cacheRead).put("cacheWrite", cacheWrite);
         state.observeUsage(usage);
         return state;
     }
@@ -73,49 +95,82 @@ class MentorTurnPersistenceCostTest extends BaseUnitTest {
     }
 
     @Test
-    void validPiCostIsInjectedIntoFinishMetadata() {
-        UIMessageChunk.Finish out = persistence().augmentFinishWithCost(bareFinish(), stateWithPiCost("0.0123"));
+    void pricingTableCostIsInjectedIntoFinishMetadata() {
+        when(pricingService.computeCost(eq("gpt-5"), eq(1000L), eq(200L), eq(0L), eq(0L))).thenReturn(
+            Optional.of(new BigDecimal("0.0123"))
+        );
+
+        UIMessageChunk.Finish out = persistence().augmentFinishWithCost(
+            bareFinish(),
+            stateWithUsage("gpt-5", 1000, 200, 0, 0)
+        );
+
         assertThat(out.messageMetadata()).isNotNull();
         assertThat(out.messageMetadata().costUsd()).isEqualTo(0.0123);
     }
 
     @Test
-    void costAtTheSanityCapIsAccepted_aboveIsRejected() {
-        // The cap is inclusive ( v > CAP is rejected ), so exactly 100.0 is kept and 100.01 is dropped.
-        UIMessageChunk.Finish atCap = persistence().augmentFinishWithCost(bareFinish(), stateWithPiCost("100.0"));
-        assertThat(atCap.messageMetadata()).isNotNull();
-        assertThat(atCap.messageMetadata().costUsd()).isEqualTo(100.0);
+    void noPricingRowMeansNoCostComputable() {
+        when(pricingService.computeCost(eq("unknown-model"), eq(1000L), eq(200L), eq(0L), eq(0L))).thenReturn(
+            Optional.empty()
+        );
 
-        UIMessageChunk.Finish overCap = persistence().augmentFinishWithCost(bareFinish(), stateWithPiCost("100.01"));
+        UIMessageChunk.Finish in = bareFinish();
+        UIMessageChunk.Finish out = persistence().augmentFinishWithCost(
+            in,
+            stateWithUsage("unknown-model", 1000, 200, 0, 0)
+        );
+
         // No cost computable → finish returned unchanged (no metadata synthesised).
-        assertThat(overCap.messageMetadata()).isNull();
-    }
-
-    @Test
-    void negativeCostIsRejected() {
-        UIMessageChunk.Finish out = persistence().augmentFinishWithCost(bareFinish(), stateWithPiCost("-50.0"));
-        assertThat(out.messageMetadata()).isNull();
-    }
-
-    @Test
-    void absurdlyLargeCostIsRejected() {
-        UIMessageChunk.Finish out = persistence().augmentFinishWithCost(bareFinish(), stateWithPiCost("1000000000"));
-        assertThat(out.messageMetadata()).isNull();
+        assertThat(out).isSameAs(in);
     }
 
     @Test
     void noUsageObserved_returnsFinishUnchanged() {
-        // No Pi cost AND no usage breakdown → computeFinalCostUsd returns null → finish unchanged.
+        // No usage breakdown at all → computeFinalCostUsd returns null → finish unchanged. The
+        // pricing table is never consulted (nothing to price).
         TranslatorState empty = new TranslatorState(UUID.randomUUID());
         UIMessageChunk.Finish in = bareFinish();
+
         assertThat(persistence().augmentFinishWithCost(in, empty)).isSameAs(in);
+        verify(pricingService, never()).computeCost(
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.anyLong()
+        );
     }
 
     @Test
-    void nonObjectCostBlockIsIgnored() {
-        // usage.cost present but not an object → extractPiCostUsd returns null.
-        TranslatorState state = new TranslatorState(UUID.randomUUID());
-        state.observeUsage(MAPPER.readTree("{\"cost\":42}"));
-        assertThat(persistence().augmentFinishWithCost(bareFinish(), state).messageMetadata()).isNull();
+    void modelWithZeroTokensReturnsFinishUnchangedWithoutConsultingThePricingTable() {
+        // A model observed but no tokens burned (e.g. a turn that errored before any LLM call) is
+        // nothing to price — short-circuits before the pricing table lookup.
+        TranslatorState state = stateWithUsage("gpt-5", 0, 0, 0, 0);
+        UIMessageChunk.Finish in = bareFinish();
+
+        assertThat(persistence().augmentFinishWithCost(in, state)).isSameAs(in);
+        verify(pricingService, never()).computeCost(
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.anyLong()
+        );
+    }
+
+    @Test
+    void cacheTokensAreIncludedInThePricingTableLookup() {
+        when(pricingService.computeCost(eq("gpt-5"), eq(1000L), eq(200L), eq(50L), eq(10L))).thenReturn(
+            Optional.of(new BigDecimal("0.05"))
+        );
+
+        UIMessageChunk.Finish out = persistence().augmentFinishWithCost(
+            bareFinish(),
+            stateWithUsage("gpt-5", 1000, 200, 50, 10)
+        );
+
+        assertThat(out.messageMetadata()).isNotNull();
+        assertThat(out.messageMetadata().costUsd()).isEqualTo(0.05);
     }
 }

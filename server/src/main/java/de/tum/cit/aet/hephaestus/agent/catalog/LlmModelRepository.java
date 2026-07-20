@@ -13,6 +13,15 @@ public interface LlmModelRepository extends JpaRepository<LlmModel, Long> {
 
     Optional<LlmModel> findByConnectionIdAndSlug(Long connectionId, String slug);
 
+    /**
+     * Ledger price-resolution lookup (#1368 slice 6): the catalog entry a job's frozen
+     * {@code (connectionId, upstreamModelId)} pair resolves to. Returns a {@link List} rather than
+     * {@link Optional} because {@code upstream_model_id} carries no uniqueness constraint — an admin
+     * may register two catalog entries pointing at the same upstream id (different slugs/capabilities).
+     * The recorder picks the first enabled match.
+     */
+    List<LlmModel> findByConnectionIdAndUpstreamModelId(Long connectionId, String upstreamModelId);
+
     boolean existsByConnectionId(Long connectionId);
 
     /** Eager-fetches {@code connection} so the admin list view avoids one lazy load per row. */

@@ -59,8 +59,82 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         event.setOutputTokens(20);
         event.setTotalCalls(2);
         event.setCostUsd(new BigDecimal(cost));
+        // Budgeted spend only counts PRICED + INSTANCE-funded rows (#1368 slice 6) — both are the
+        // entity defaults, but set them explicitly so this fixture keeps meaning that if the
+        // defaults ever change.
+        event.setPricingState(PricingState.PRICED);
+        event.setFundingSource(FundingSource.INSTANCE);
         event.setOccurredAt(month.atDay(day).atStartOfDay(ZoneOffset.UTC).toInstant().plusSeconds(3600));
         usageRepository.save(event);
+    }
+
+    private void seedByoEvent(Workspace workspace, LlmUsageJobType type, String cost, YearMonth month, int day) {
+        LlmUsageEvent event = new LlmUsageEvent();
+        event.setId(UUID.randomUUID());
+        event.setWorkspace(workspace);
+        event.setJobType(type);
+        event.setSourceId(UUID.randomUUID());
+        event.setModel("byo-model");
+        event.setCostUsd(new BigDecimal(cost));
+        event.setPricingState(PricingState.PRICED);
+        event.setFundingSource(FundingSource.WORKSPACE);
+        event.setOccurredAt(month.atDay(day).atStartOfDay(ZoneOffset.UTC).toInstant().plusSeconds(3600));
+        usageRepository.save(event);
+    }
+
+    private void seedUnpricedEvent(Workspace workspace, LlmUsageJobType type, YearMonth month, int day) {
+        LlmUsageEvent event = new LlmUsageEvent();
+        event.setId(UUID.randomUUID());
+        event.setWorkspace(workspace);
+        event.setJobType(type);
+        event.setSourceId(UUID.randomUUID());
+        event.setModel("no-price-model");
+        event.setCostUsd(null);
+        event.setPricingState(PricingState.UNPRICED);
+        event.setFundingSource(FundingSource.INSTANCE);
+        event.setOccurredAt(month.atDay(day).atStartOfDay(ZoneOffset.UTC).toInstant().plusSeconds(3600));
+        usageRepository.save(event);
+    }
+
+    @Test
+    @WithAdminUser
+    void byJobTypeAndByDaySplitPricedByoAndUnpricedSeparately() {
+        // One job type, one day, mixing all three so a blind SUM(cost_usd) would either merge BYO
+        // into the budgeted figure or silently drop the unpriced event's visibility (#1368 slice 6).
+        Workspace workspace = setupWorkspaceWithAdmin("usage-breakdown");
+        seedEvent(workspace, LlmUsageJobType.PULL_REQUEST_REVIEW, "2.00", CURRENT, 5);
+        seedByoEvent(workspace, LlmUsageJobType.PULL_REQUEST_REVIEW, "50.00", CURRENT, 5);
+        seedUnpricedEvent(workspace, LlmUsageJobType.PULL_REQUEST_REVIEW, CURRENT, 5);
+
+        WorkspaceLlmUsageReportDTO report = webTestClient
+            .get()
+            .uri("/workspaces/{slug}/llm-usage", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(WorkspaceLlmUsageReportDTO.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(report).isNotNull();
+        var prReviews = report
+            .byJobType()
+            .stream()
+            .filter(t -> t.jobType() == LlmUsageJobType.PULL_REQUEST_REVIEW)
+            .findFirst()
+            .orElseThrow();
+        assertThat(prReviews.pricedTotalCostUsd()).isEqualByComparingTo("2.00");
+        assertThat(prReviews.byoTotalCostUsd()).isEqualByComparingTo("50.00");
+        assertThat(prReviews.unpricedEventCount()).isEqualTo(1);
+        assertThat(prReviews.events()).isEqualTo(3);
+
+        assertThat(report.byDay()).hasSize(1);
+        var day = report.byDay().getFirst();
+        assertThat(day.pricedTotalCostUsd()).isEqualByComparingTo("2.00");
+        assertThat(day.byoTotalCostUsd()).isEqualByComparingTo("50.00");
+        assertThat(day.unpricedEventCount()).isEqualTo(1);
+        assertThat(day.events()).isEqualTo(3);
     }
 
     @Test
@@ -88,8 +162,9 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         assertThat(report).isNotNull();
         assertThat(report.month()).isEqualTo(PREVIOUS.toString());
         assertThat(report.monthlyBudgetUsd()).isEqualByComparingTo("5.00");
-        assertThat(report.totalCostUsd()).isEqualByComparingTo("2.50");
-        assertThat(report.overBudget()).isFalse();
+        assertThat(report.pricedTotalCostUsd()).isEqualByComparingTo("2.50");
+        assertThat(report.byoTotalCostUsd()).isEqualByComparingTo("0");
+        assertThat(report.verdict()).isEqualTo(LlmBudgetVerdict.WITHIN);
         assertThat(report.byJobType()).hasSize(2);
         var prReviews = report
             .byJobType()
@@ -97,18 +172,20 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             .filter(t -> t.jobType() == LlmUsageJobType.PULL_REQUEST_REVIEW)
             .findFirst()
             .orElseThrow();
-        assertThat(prReviews.costUsd()).isEqualByComparingTo("2.00");
+        assertThat(prReviews.pricedTotalCostUsd()).isEqualByComparingTo("2.00");
+        assertThat(prReviews.byoTotalCostUsd()).isEqualByComparingTo("0");
+        assertThat(prReviews.unpricedEventCount()).isEqualTo(0);
         assertThat(prReviews.inputTokens()).isEqualTo(200);
         assertThat(prReviews.totalCalls()).isEqualTo(4);
         assertThat(prReviews.events()).isEqualTo(2);
         assertThat(report.byDay()).hasSize(2);
         assertThat(report.byDay().getFirst().day()).isEqualTo(PREVIOUS.atDay(3));
-        assertThat(report.byDay().getFirst().costUsd()).isEqualByComparingTo("2.00");
+        assertThat(report.byDay().getFirst().pricedTotalCostUsd()).isEqualByComparingTo("2.00");
     }
 
     @Test
     @WithAdminUser
-    void overBudgetFlagFlipsWhenSpendReachesTheCap() {
+    void verdictFlipsToExhaustedWhenSpendReachesTheCap() {
         Workspace workspace = setupWorkspaceWithAdmin("usage-over");
         workspace.setMonthlyLlmBudgetUsd(new BigDecimal("1.00"));
         workspaceRepository.save(workspace);
@@ -122,8 +199,8 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             .expectStatus()
             .isOk()
             .expectBody()
-            .jsonPath("$.overBudget")
-            .isEqualTo(true);
+            .jsonPath("$.verdict")
+            .isEqualTo("EXHAUSTED");
     }
 
     @Test
