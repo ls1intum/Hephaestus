@@ -1,6 +1,9 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.ApiProtocolDefaults.AuthDefaults;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -18,6 +21,9 @@ import org.springframework.util.StringUtils;
  * tenant-scoped, workspace-admin-owned, self-funded. Every mutation is gated on the instance-wide
  * {@code allow_workspace_connections} switch — an instance admin can turn this feature off entirely.
  * Every persisted base URL is vetted by {@link EgressPolicy}, same rule as the instance catalog.
+ *
+ * <p>Audited on {@code config_audit_event} (unlike the instance catalog, which audits on
+ * {@code auth_event} — this resource has a workspace id, so it fits the workspace-scoped ledger).
  */
 @Service
 @RequiredArgsConstructor
@@ -29,6 +35,7 @@ public class WorkspaceLlmConnectionService {
     private final EgressPolicy egressPolicy;
     private final InstanceLlmSettingsService instanceLlmSettingsService;
     private final LlmConnectionProbeService probeService;
+    private final ConfigAuditPort configAudit;
 
     @Transactional(readOnly = true)
     public List<WorkspaceLlmConnection> list(WorkspaceContext workspaceContext) {
@@ -84,13 +91,23 @@ public class WorkspaceLlmConnectionService {
             connection.setEnabled(request.enabled());
         }
 
+        WorkspaceLlmConnection saved;
         try {
-            return connectionRepository.save(connection);
+            saved = connectionRepository.save(connection);
         } catch (DataIntegrityViolationException e) {
             // The slug fast-path above is racy; the unique constraint backstops the loser of a concurrent
             // create. Report the same 409 rather than leaking a 500.
             throw new LlmConnectionSlugConflictException(request.slug());
         }
+        configAudit.record(
+            ConfigAuditEntry.created(
+                ConfigAuditEntityType.WORKSPACE_LLM_CONNECTION,
+                saved.getId(),
+                workspaceId,
+                WorkspaceLlmConnectionSnapshot.of(saved)
+            )
+        );
+        return saved;
     }
 
     @Transactional
@@ -101,6 +118,7 @@ public class WorkspaceLlmConnectionService {
     ) {
         requireByoEnabled();
         WorkspaceLlmConnection connection = get(workspaceContext, id);
+        WorkspaceLlmConnectionSnapshot before = WorkspaceLlmConnectionSnapshot.of(connection);
 
         if (request.displayName() != null) {
             connection.setDisplayName(request.displayName());
@@ -134,7 +152,17 @@ public class WorkspaceLlmConnectionService {
             connection.setEnabled(request.enabled());
         }
 
-        return connectionRepository.save(connection);
+        WorkspaceLlmConnection saved = connectionRepository.save(connection);
+        configAudit.record(
+            ConfigAuditEntry.updated(
+                ConfigAuditEntityType.WORKSPACE_LLM_CONNECTION,
+                saved.getId(),
+                workspaceContext.id(),
+                before,
+                WorkspaceLlmConnectionSnapshot.of(saved)
+            )
+        );
+        return saved;
     }
 
     @Transactional
@@ -144,7 +172,11 @@ public class WorkspaceLlmConnectionService {
         if (modelRepository.existsByConnectionIdAndWorkspaceId(id, workspaceContext.id())) {
             throw new LlmConnectionInUseException(id);
         }
+        WorkspaceLlmConnectionSnapshot before = WorkspaceLlmConnectionSnapshot.of(connection);
         connectionRepository.delete(connection);
+        configAudit.record(
+            ConfigAuditEntry.deleted(ConfigAuditEntityType.WORKSPACE_LLM_CONNECTION, id, workspaceContext.id(), before)
+        );
     }
 
     /** "Test connection": workspace-framed (reachable + model count only, never the raw model list). */

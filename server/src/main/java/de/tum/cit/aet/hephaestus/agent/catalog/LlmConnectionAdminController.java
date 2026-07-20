@@ -1,7 +1,9 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
+import de.tum.cit.aet.hephaestus.core.AuditExempt;
 import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -30,6 +32,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 @Tag(name = "Admin LLM", description = "Instance-admin LLM connection and settings management")
 @PreAuthorize("hasAuthority('app_admin')")
 @WorkspaceAgnostic("Instance-admin LLM connection catalog; authorized by app_admin, not workspace context")
+@ConditionalOnServerRole
 @RequiredArgsConstructor
 @Validated
 public class LlmConnectionAdminController {
@@ -51,7 +54,7 @@ public class LlmConnectionAdminController {
 
     @PostMapping
     @Operation(summary = "Create an LLM connection", operationId = "adminCreateLlmConnection")
-    @Audited("LLM_CONNECTION")
+    @Audited("auth_event LLM_CONNECTION_CREATED")
     public ResponseEntity<LlmConnectionDTO> create(@Valid @RequestBody CreateLlmConnectionRequest request) {
         LlmConnection created = connectionService.create(request);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
@@ -63,7 +66,7 @@ public class LlmConnectionAdminController {
 
     @PatchMapping("/{id}")
     @Operation(summary = "Update an LLM connection", operationId = "adminUpdateLlmConnection")
-    @Audited("LLM_CONNECTION")
+    @Audited("auth_event LLM_CONNECTION_UPDATED")
     public ResponseEntity<LlmConnectionDTO> update(
         @PathVariable Long id,
         @Valid @RequestBody UpdateLlmConnectionRequest request
@@ -73,7 +76,7 @@ public class LlmConnectionAdminController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete an LLM connection", operationId = "adminDeleteLlmConnection")
-    @Audited("LLM_CONNECTION")
+    @Audited("auth_event LLM_CONNECTION_DELETED")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         connectionService.delete(id);
         return ResponseEntity.noContent().build();
@@ -81,14 +84,14 @@ public class LlmConnectionAdminController {
 
     @PostMapping("/{id}/probe")
     @Operation(summary = "Test a stored connection and fetch its models", operationId = "adminProbeLlmConnection")
-    @Audited("LLM_CONNECTION")
+    @AuditExempt(reason = "tests a stored credential; stores no configuration")
     public ResponseEntity<LlmProbeResult> probe(@PathVariable Long id) {
         return ResponseEntity.ok(probeService.probeStored(id));
     }
 
     @PostMapping("/probe")
     @Operation(summary = "Test a draft connection and fetch its models", operationId = "adminProbeLlmConnectionDraft")
-    @Audited("LLM_CONNECTION")
+    @AuditExempt(reason = "tests a draft connection before it is saved; stores no configuration")
     public ResponseEntity<LlmProbeResult> probeDraft(@Valid @RequestBody ProbeLlmConnectionRequest request) {
         return ResponseEntity.ok(probeService.probeDraft(request));
     }

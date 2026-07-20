@@ -2,7 +2,9 @@ package de.tum.cit.aet.hephaestus.agent.catalog;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.ApiProtocolDefaults.AuthDefaults;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.auth.spi.LlmConnectionAudit;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -14,15 +16,23 @@ import org.springframework.util.StringUtils;
  * CRUD for instance-owned LLM connections (#1368). GLOBAL, {@code app_admin}-owned, so this service is
  * {@link WorkspaceAgnostic}; access is gated by {@code hasAuthority('app_admin')} on
  * {@link LlmConnectionAdminController}. Every persisted base URL is vetted by {@link EgressPolicy}.
+ *
+ * <p>Audited on {@code auth_event} (not {@code config_audit_event}) via the {@link LlmConnectionAudit} SPI
+ * port: this catalog is GLOBAL, and {@code config_audit_event.workspace_id} is NOT NULL, so a
+ * workspace-less change cannot land there. The port's sole implementation is
+ * {@code @ConditionalOnServerRole}, so this service — nothing outside the admin controller consumes it
+ * — is gated the same way, matching {@code AccountAdminController}'s pattern for the same ledger.
  */
 @Service
 @RequiredArgsConstructor
 @WorkspaceAgnostic("Instance LLM connection catalog is global (app_admin-owned), not tenant-scoped")
+@ConditionalOnServerRole
 public class LlmConnectionService {
 
     private final LlmConnectionRepository connectionRepository;
     private final LlmModelRepository modelRepository;
     private final EgressPolicy egressPolicy;
+    private final LlmConnectionAudit llmConnectionAudit;
 
     @Transactional(readOnly = true)
     public List<LlmConnection> list() {
@@ -66,13 +76,16 @@ public class LlmConnectionService {
             connection.setEnabled(request.enabled());
         }
 
+        LlmConnection saved;
         try {
-            return connectionRepository.save(connection);
+            saved = connectionRepository.save(connection);
         } catch (DataIntegrityViolationException e) {
             // The slug fast-path above is racy; the unique constraint backstops the loser of a concurrent
             // create. Report the same 409 rather than leaking a 500.
             throw new LlmConnectionSlugConflictException(request.slug());
         }
+        llmConnectionAudit.connectionCreated(saved.getId(), saved.getSlug());
+        return saved;
     }
 
     @Transactional
@@ -113,7 +126,9 @@ public class LlmConnectionService {
             connection.setEnabled(request.enabled());
         }
 
-        return connectionRepository.save(connection);
+        LlmConnection saved = connectionRepository.save(connection);
+        llmConnectionAudit.connectionUpdated(saved.getId(), saved.getSlug());
+        return saved;
     }
 
     @Transactional
@@ -125,5 +140,6 @@ public class LlmConnectionService {
             throw new LlmConnectionInUseException(id);
         }
         connectionRepository.delete(connection);
+        llmConnectionAudit.connectionDeleted(connection.getId(), connection.getSlug());
     }
 }

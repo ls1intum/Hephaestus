@@ -40,4 +40,14 @@ public enum ConfigAuditEntityType {
      * when" is exactly the accountability question this trail answers.
      */
     WORKSPACE_LLM_BUDGET,
+
+    /**
+     * A workspace's own "bring your own" LLM provider connection (#1368): the endpoint the workspace
+     * owns the key and the bill for. Workspace-admin-owned and tenant-scoped, unlike the instance
+     * catalog (which is GLOBAL and therefore audited on {@code auth_event} instead — this port cannot
+     * carry a null {@code workspace_id}).
+     */
+    WORKSPACE_LLM_CONNECTION,
+    /** A model on a workspace's own BYO connection (#1368), including its inline price and enablement. */
+    WORKSPACE_LLM_MODEL,
 }

@@ -8,9 +8,11 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.core.auth.spi.LlmModelAudit;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -46,6 +48,9 @@ class LlmModelServiceTest extends BaseUnitTest {
     @Mock
     private AgentConfigRepository agentConfigRepository;
 
+    @Mock
+    private LlmModelAudit llmModelAudit;
+
     @InjectMocks
     private LlmModelService modelService;
 
@@ -58,6 +63,9 @@ class LlmModelServiceTest extends BaseUnitTest {
         model.setSlug("gpt-5");
         model.setDisplayName("GPT-5");
         model.setUpstreamModelId("gpt-5");
+        LlmConnection connection = new LlmConnection();
+        connection.setId(3L);
+        model.setConnection(connection);
         // Not every test looks up model 7 (e.g. the unknown-id 404 case) — lenient so those aren't
         // flagged as unnecessary stubbing.
         lenient().when(modelRepository.findById(7L)).thenReturn(Optional.of(model));
@@ -93,6 +101,10 @@ class LlmModelServiceTest extends BaseUnitTest {
             assertThat(result.getPricingMode()).isEqualTo(PricingMode.PRICED);
             assertThat(result.getPer1mInputUsd()).isEqualByComparingTo("3.00");
             assertThat(result.getEffectiveTo()).isNull();
+
+            // Never the rate itself passed to the audit port — just enough to say what changed, never a
+            // value that could be mistaken for credential material.
+            verify(llmModelAudit).modelPriceChanged(7L, "PRICED");
         }
 
         @Test
@@ -241,6 +253,8 @@ class LlmModelServiceTest extends BaseUnitTest {
             verify(grantRepository).deleteAll(List.of(existing));
             verify(grantRepository, never()).saveAll(anyCollection());
             assertThat(result.getVisibility()).isEqualTo(ModelVisibility.PUBLIC);
+
+            verify(llmModelAudit).modelSharingChanged(7L, "PUBLIC", 0);
         }
 
         @Test
@@ -325,6 +339,16 @@ class LlmModelServiceTest extends BaseUnitTest {
             modelService.delete(7L);
 
             verify(modelRepository).delete(model);
+            verify(llmModelAudit).modelDeleted(7L, 3L, "gpt-5");
+        }
+
+        @Test
+        void deletingAModelDoesNotAuditWhenTheGuardRejectsIt() {
+            when(agentConfigRepository.existsByInstanceModelId(7L)).thenReturn(true);
+
+            assertThatThrownBy(() -> modelService.delete(7L)).isInstanceOf(LlmModelInUseException.class);
+
+            verifyNoInteractions(llmModelAudit);
         }
     }
 

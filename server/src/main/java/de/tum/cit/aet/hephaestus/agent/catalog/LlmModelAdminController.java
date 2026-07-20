@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.catalog;
 
 import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -30,6 +31,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 @Tag(name = "Admin LLM", description = "Instance-admin LLM connection and settings management")
 @PreAuthorize("hasAuthority('app_admin')")
 @WorkspaceAgnostic("Instance-admin LLM model catalog; authorized by app_admin, not workspace context")
+@ConditionalOnServerRole
 @RequiredArgsConstructor
 @Validated
 public class LlmModelAdminController {
@@ -38,7 +40,7 @@ public class LlmModelAdminController {
 
     @PostMapping("/connections/{connectionId}/models")
     @Operation(summary = "Create a model on an LLM connection", operationId = "adminCreateLlmModel")
-    @Audited("LLM_MODEL")
+    @Audited("auth_event LLM_MODEL_CREATED")
     public ResponseEntity<LlmModelDTO> create(
         @PathVariable Long connectionId,
         @Valid @RequestBody CreateLlmModelRequest request
@@ -80,7 +82,7 @@ public class LlmModelAdminController {
 
     @PutMapping("/models/{id}")
     @Operation(summary = "Update a model's metadata", operationId = "adminUpdateLlmModel")
-    @Audited("LLM_MODEL")
+    @Audited("auth_event LLM_MODEL_UPDATED")
     public ResponseEntity<LlmModelDTO> update(
         @PathVariable Long id,
         @Valid @RequestBody UpdateLlmModelRequest request
@@ -90,7 +92,7 @@ public class LlmModelAdminController {
 
     @DeleteMapping("/models/{id}")
     @Operation(summary = "Delete an LLM catalog model", operationId = "adminDeleteLlmModel")
-    @Audited("LLM_MODEL")
+    @Audited("auth_event LLM_MODEL_DELETED")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         modelService.delete(id);
         return ResponseEntity.noContent().build();
@@ -98,7 +100,7 @@ public class LlmModelAdminController {
 
     @PutMapping("/models/{id}/price")
     @Operation(summary = "Reprice a model", operationId = "adminUpdateLlmModelPrice")
-    @Audited("LLM_MODEL")
+    @Audited("auth_event LLM_MODEL_PRICE_CHANGED")
     public ResponseEntity<LlmModelDTO> updatePrice(
         @PathVariable Long id,
         @Valid @RequestBody UpdateLlmModelPriceRequest request
@@ -109,7 +111,7 @@ public class LlmModelAdminController {
 
     @PutMapping("/models/{id}/sharing")
     @Operation(summary = "Share a model with all or selected workspaces", operationId = "adminUpdateLlmModelSharing")
-    @Audited("LLM_MODEL")
+    @Audited("auth_event LLM_MODEL_SHARING_CHANGED")
     public ResponseEntity<LlmModelDTO> updateSharing(
         @PathVariable Long id,
         @Valid @RequestBody UpdateLlmModelSharingRequest request

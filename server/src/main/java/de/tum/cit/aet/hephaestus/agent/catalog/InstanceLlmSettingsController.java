@@ -39,7 +39,7 @@ public class InstanceLlmSettingsController {
 
     @PutMapping
     @Operation(summary = "Update instance-wide LLM governance settings", operationId = "adminUpdateLlmSettings")
-    @Audited("INSTANCE_LLM_SETTINGS")
+    @Audited("auth_event LLM_SETTINGS_CHANGED")
     public ResponseEntity<InstanceLlmSettingsDTO> update(@Valid @RequestBody UpdateInstanceLlmSettingsRequest request) {
         return ResponseEntity.ok(InstanceLlmSettingsDTO.from(settingsService.update(request)));
     }

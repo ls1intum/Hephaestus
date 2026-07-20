@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
+import de.tum.cit.aet.hephaestus.core.AuditExempt;
 import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -93,7 +94,7 @@ public class WorkspaceLlmConnectionController {
     @PostMapping("/{id}/probe")
     @Operation(summary = "Test your AI provider connection", operationId = "workspaceProbeLlmConnection")
     @RequireAtLeastWorkspaceAdmin
-    @Audited("WORKSPACE_LLM_CONNECTION")
+    @AuditExempt(reason = "tests a stored credential; stores no configuration")
     public ResponseEntity<WorkspaceLlmProbeResult> probe(WorkspaceContext workspaceContext, @PathVariable Long id) {
         return ResponseEntity.ok(connectionService.probe(workspaceContext, id));
     }

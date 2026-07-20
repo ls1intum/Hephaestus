@@ -8,6 +8,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditAction;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -21,6 +25,7 @@ import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 
@@ -43,6 +48,9 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
 
     @Mock
     private InstanceLlmSettingsService instanceLlmSettingsService;
+
+    @Mock
+    private ConfigAuditPort configAudit;
 
     @InjectMocks
     private WorkspaceLlmModelService modelService;
@@ -181,6 +189,12 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             WorkspaceLlmModel result = modelService.create(workspaceContext, 50L, unpricedCreateRequest());
 
             assertThat(result.getPricingMode()).isEqualTo(PricingMode.UNPRICED);
+
+            ArgumentCaptor<ConfigAuditEntry> entry = ArgumentCaptor.forClass(ConfigAuditEntry.class);
+            verify(configAudit).record(entry.capture());
+            assertThat(entry.getValue().entityType()).isEqualTo(ConfigAuditEntityType.WORKSPACE_LLM_MODEL);
+            assertThat(entry.getValue().workspaceId()).isEqualTo(1L);
+            assertThat(entry.getValue().action()).isEqualTo(ConfigAuditAction.CREATED);
         }
 
         @Test
@@ -279,6 +293,10 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             modelService.delete(workspaceContext, 7L);
 
             verify(modelRepository).delete(model);
+            ArgumentCaptor<ConfigAuditEntry> entry = ArgumentCaptor.forClass(ConfigAuditEntry.class);
+            verify(configAudit).record(entry.capture());
+            assertThat(entry.getValue().entityType()).isEqualTo(ConfigAuditEntityType.WORKSPACE_LLM_MODEL);
+            assertThat(entry.getValue().action()).isEqualTo(ConfigAuditAction.DELETED);
         }
     }
 

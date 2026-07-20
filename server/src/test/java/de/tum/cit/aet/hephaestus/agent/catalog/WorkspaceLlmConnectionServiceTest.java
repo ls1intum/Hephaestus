@@ -7,6 +7,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditAction;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -20,6 +24,7 @@ import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 
@@ -42,6 +47,9 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
 
     @Mock
     private LlmConnectionProbeService probeService;
+
+    @Mock
+    private ConfigAuditPort configAudit;
 
     @InjectMocks
     private WorkspaceLlmConnectionService connectionService;
@@ -170,6 +178,23 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
             assertThat(result.getWorkspace()).isEqualTo(workspace);
             assertThat(result.getSlug()).isEqualTo("openai-prod");
         }
+
+        @Test
+        void createdConnectionIsRecordedOnTheWorkspaceConfigAuditTrailWithoutTheApiKey() {
+            byoEnabled(true);
+            when(connectionRepository.findByWorkspaceIdAndSlug(1L, "openai-prod")).thenReturn(Optional.empty());
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+            when(connectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            connectionService.create(workspaceContext, createRequest());
+
+            ArgumentCaptor<ConfigAuditEntry> entry = ArgumentCaptor.forClass(ConfigAuditEntry.class);
+            verify(configAudit).record(entry.capture());
+            assertThat(entry.getValue().entityType()).isEqualTo(ConfigAuditEntityType.WORKSPACE_LLM_CONNECTION);
+            assertThat(entry.getValue().workspaceId()).isEqualTo(1L);
+            assertThat(entry.getValue().action()).isEqualTo(ConfigAuditAction.CREATED);
+            assertThat(entry.getValue().after()).asString().contains("openai-prod").doesNotContain("sk-abc");
+        }
     }
 
     @Nested
@@ -194,12 +219,17 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
             byoEnabled(true);
             WorkspaceLlmConnection connection = new WorkspaceLlmConnection();
             connection.setId(5L);
+            connection.setSlug("openai-prod");
             when(connectionRepository.findByIdAndWorkspaceId(5L, 1L)).thenReturn(Optional.of(connection));
             when(modelRepository.existsByConnectionIdAndWorkspaceId(5L, 1L)).thenReturn(false);
 
             connectionService.delete(workspaceContext, 5L);
 
             verify(connectionRepository).delete(connection);
+            ArgumentCaptor<ConfigAuditEntry> entry = ArgumentCaptor.forClass(ConfigAuditEntry.class);
+            verify(configAudit).record(entry.capture());
+            assertThat(entry.getValue().entityType()).isEqualTo(ConfigAuditEntityType.WORKSPACE_LLM_CONNECTION);
+            assertThat(entry.getValue().action()).isEqualTo(ConfigAuditAction.DELETED);
         }
     }
 

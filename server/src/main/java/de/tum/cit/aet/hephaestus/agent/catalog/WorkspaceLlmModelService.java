@@ -1,6 +1,9 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -22,6 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Every mutation is gated on {@code allow_workspace_connections}, same as
  * {@link WorkspaceLlmConnectionService}. Pricing reuses {@link LlmPriceValidation} — same PRICED/FREE/
  * UNPRICED rule as the instance catalog, just applied inline instead of through a temporal history.
+ * Audited on {@code config_audit_event} — see {@link WorkspaceLlmConnectionService} for why this
+ * differs from the instance catalog's {@code auth_event} ledger.
  */
 @Service
 @RequiredArgsConstructor
@@ -33,6 +38,7 @@ public class WorkspaceLlmModelService {
     private final LlmModelPriceRepository instancePriceRepository;
     private final AgentConfigRepository agentConfigRepository;
     private final InstanceLlmSettingsService instanceLlmSettingsService;
+    private final ConfigAuditPort configAudit;
 
     @Transactional(readOnly = true)
     public List<WorkspaceLlmModel> list(WorkspaceContext workspaceContext) {
@@ -102,13 +108,23 @@ public class WorkspaceLlmModelService {
             request.priceNote()
         );
 
+        WorkspaceLlmModel saved;
         try {
-            return modelRepository.save(model);
+            saved = modelRepository.save(model);
         } catch (DataIntegrityViolationException e) {
             // The slug fast-path above is racy; the unique constraint backstops the loser of a concurrent
             // create. Report the same 409 rather than leaking a 500.
             throw new LlmModelSlugConflictException(connectionId, request.slug());
         }
+        configAudit.record(
+            ConfigAuditEntry.created(
+                ConfigAuditEntityType.WORKSPACE_LLM_MODEL,
+                saved.getId(),
+                workspaceId,
+                WorkspaceLlmModelSnapshot.of(saved)
+            )
+        );
+        return saved;
     }
 
     @Transactional
@@ -119,6 +135,7 @@ public class WorkspaceLlmModelService {
     ) {
         requireByoEnabled();
         WorkspaceLlmModel model = get(workspaceContext, id);
+        WorkspaceLlmModelSnapshot before = WorkspaceLlmModelSnapshot.of(model);
 
         if (request.displayName() != null) {
             model.setDisplayName(request.displayName());
@@ -170,7 +187,17 @@ public class WorkspaceLlmModelService {
             );
         }
 
-        return modelRepository.save(model);
+        WorkspaceLlmModel saved = modelRepository.save(model);
+        configAudit.record(
+            ConfigAuditEntry.updated(
+                ConfigAuditEntityType.WORKSPACE_LLM_MODEL,
+                saved.getId(),
+                workspaceContext.id(),
+                before,
+                WorkspaceLlmModelSnapshot.of(saved)
+            )
+        );
+        return saved;
     }
 
     @Transactional
@@ -180,7 +207,11 @@ public class WorkspaceLlmModelService {
         if (agentConfigRepository.existsByWorkspaceModelIdAndWorkspaceId(id, workspaceContext.id())) {
             throw new LlmModelInUseException(id);
         }
+        WorkspaceLlmModelSnapshot before = WorkspaceLlmModelSnapshot.of(model);
         modelRepository.delete(model);
+        configAudit.record(
+            ConfigAuditEntry.deleted(ConfigAuditEntityType.WORKSPACE_LLM_MODEL, id, workspaceContext.id(), before)
+        );
     }
 
     /**

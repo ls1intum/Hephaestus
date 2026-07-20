@@ -113,6 +113,17 @@ public class AuthEvent {
         EXPORT_REQUESTED,
         APP_ROLE_CHANGED,
         RESEARCH_CONSENT_REVOKED,
+        // Instance LLM catalog (#1368): app_admin-owned, GLOBAL — config_audit_event cannot carry it
+        // (workspace_id is NOT NULL there), so this global admin surface audits to auth_event instead.
+        LLM_CONNECTION_CREATED,
+        LLM_CONNECTION_UPDATED,
+        LLM_CONNECTION_DELETED,
+        LLM_MODEL_CREATED,
+        LLM_MODEL_UPDATED,
+        LLM_MODEL_DELETED,
+        LLM_MODEL_PRICE_CHANGED,
+        LLM_MODEL_SHARING_CHANGED,
+        LLM_SETTINGS_CHANGED,
     }
 
     public enum Result {

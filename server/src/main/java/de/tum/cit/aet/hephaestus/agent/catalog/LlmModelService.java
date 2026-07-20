@@ -2,7 +2,9 @@ package de.tum.cit.aet.hephaestus.agent.catalog;
 
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.auth.spi.LlmModelAudit;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
@@ -20,10 +22,16 @@ import org.springframework.transaction.annotation.Transactional;
  * CRUD, pricing, and sharing for instance-owned LLM catalog models (#1368). GLOBAL, {@code
  * app_admin}-owned, so this service is {@link WorkspaceAgnostic}; access is gated by
  * {@code hasAuthority('app_admin')} on {@link LlmModelAdminController}.
+ *
+ * <p>Audited on {@code auth_event} via the {@link LlmModelAudit} SPI port, same reasoning as
+ * {@link LlmConnectionService}: this catalog is GLOBAL and {@code config_audit_event.workspace_id} is
+ * NOT NULL. {@code @ConditionalOnServerRole} follows from the port's sole implementation being
+ * server-role-only — nothing outside the admin controller consumes this service.
  */
 @Service
 @RequiredArgsConstructor
 @WorkspaceAgnostic("Instance LLM model catalog is global (app_admin-owned), not tenant-scoped")
+@ConditionalOnServerRole
 public class LlmModelService {
 
     private final LlmModelRepository modelRepository;
@@ -32,6 +40,7 @@ public class LlmModelService {
     private final LlmModelWorkspaceGrantRepository grantRepository;
     private final WorkspaceRepository workspaceRepository;
     private final AgentConfigRepository agentConfigRepository;
+    private final LlmModelAudit llmModelAudit;
 
     @Transactional(readOnly = true)
     public List<LlmModel> list() {
@@ -114,13 +123,16 @@ public class LlmModelService {
             model.setEnabled(request.enabled());
         }
 
+        LlmModel saved;
         try {
-            return modelRepository.save(model);
+            saved = modelRepository.save(model);
         } catch (DataIntegrityViolationException e) {
             // The slug fast-path above is racy; the unique constraint backstops the loser of a concurrent
             // create. Report the same 409 rather than leaking a 500.
             throw new LlmModelSlugConflictException(connectionId, request.slug());
         }
+        llmModelAudit.modelCreated(saved.getId(), saved.getConnection().getId(), saved.getSlug());
+        return saved;
     }
 
     @Transactional
@@ -155,7 +167,9 @@ public class LlmModelService {
             model.setEnabled(request.enabled());
         }
 
-        return modelRepository.save(model);
+        LlmModel saved = modelRepository.save(model);
+        llmModelAudit.modelUpdated(saved.getId(), saved.getConnection().getId(), saved.getSlug());
+        return saved;
     }
 
     @Transactional
@@ -165,6 +179,7 @@ public class LlmModelService {
             throw new LlmModelInUseException(id);
         }
         modelRepository.delete(model);
+        llmModelAudit.modelDeleted(model.getId(), model.getConnection().getId(), model.getSlug());
     }
 
     /**
@@ -198,7 +213,9 @@ public class LlmModelService {
         price.setNote(blankToNull(request.note()));
         price.setEffectiveFrom(now);
 
-        return priceRepository.save(price);
+        LlmModelPrice saved = priceRepository.save(price);
+        llmModelAudit.modelPriceChanged(modelId, saved.getPricingMode().name());
+        return saved;
     }
 
     private static void validatePriceRequest(UpdateLlmModelPriceRequest request) {
@@ -263,7 +280,13 @@ public class LlmModelService {
         }
 
         model.setVisibility(request.visibility());
-        return modelRepository.save(model);
+        LlmModel saved = modelRepository.save(model);
+        int workspaceCount =
+            request.visibility() == ModelVisibility.GRANTED && request.workspaceIds() != null
+                ? request.workspaceIds().size()
+                : 0;
+        llmModelAudit.modelSharingChanged(modelId, saved.getVisibility().name(), workspaceCount);
+        return saved;
     }
 
     private void assertWorkspacesExist(Set<Long> workspaceIds) {
