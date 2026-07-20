@@ -216,6 +216,37 @@ function UserPage() {
 - Use router context for shared data (query client, auth)
 - Never hand-edit `routeTree.gen.ts`
 
+## Role-Based Gating (OWNER > ADMIN > MEMBER)
+
+Client-side gating is a UX affordance only — the server enforces authorization on every
+endpoint. Never re-invent `role === "ADMIN"` checks; use the shared pieces:
+
+- **Whole admin surfaces — gate by placement, not by a check.** Put workspace-admin pages under
+  `src/routes/_authenticated/w/$workspaceSlug/admin/`; its `route.tsx` layout carries the
+  `beforeLoad` role guard, so every route in the directory inherits it. A file that maps to an
+  `/admin` URL without nesting under that layout silently skips the gate — that is the bug class
+  `admin/-route.test.ts` exists to catch, by driving every admin URL in the generated route tree
+  through the real router as a MEMBER (the leading `-` marks the file as a test rather than a
+  route). Run it with `pnpm run test:webapp`; do not weaken it.
+- **Individual controls**: `useWorkspaceAccess()` returns `role` and `isAdmin`; the role math is
+  `hasMinimumWorkspaceRole` (`src/lib/workspace-roles.ts`). Pure role predicates live in
+  `src/lib/`; QueryClient-coupled resolvers (`resolveWorkspaceMembership`,
+  `workspaceMembershipQueryOptions`) live in `src/integrations/auth/guard.ts`. Fetch membership
+  only via `workspaceMembershipQueryOptions` so every caller shares one cache entry and one
+  `staleTime`.
+- **Hide rather than disable** — for permissions specifically. Disabling is the better default for
+  a control the user could still unlock, but ["hiding is recommended in cases where the user will
+  never be able to use that feature due to their role or license"](https://www.uxtigers.com/post/inactive-buttons),
+  which is this case. A disabled control would also be a poor explanation: a native `disabled`
+  button is unreachable by keyboard, so a tooltip saying why can never be read.
+- **Workspace role ≠ instance role.** `useWorkspaceAccess().isAdmin` is membership in *this*
+  workspace; `useAuth().isAppAdmin` is instance-wide (ADR 0017). They are separate axes — a
+  workspace-role gate on a surface that has no active workspace is always false.
+- There is **no `<RequireRole>` wrapper component today**: route placement covers whole surfaces
+  and a boolean from the hook covers the one control that needs it (`AppSidebar`'s admin nav), so
+  a wrapper would be a third way to say the same thing. Add one when a real call site needs it.
+  When a role-assignment UI lands, its mutation must invalidate the membership query key.
+
 ## Styling (Tailwind CSS v4)
 
 ```typescript

@@ -1,12 +1,18 @@
+import { Progress as ProgressRoot } from "@base-ui/react/progress";
 import { CircleAlert, CircleDollarSign, TriangleAlert } from "lucide-react";
 import type { WorkspaceLlmUsageReport } from "@/api/types.gen";
 import { formatCostUsd, formatTokens } from "@/components/admin/ai/jobUtils";
+import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Spinner } from "@/components/ui/spinner";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Progress, ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
 	Table,
 	TableBody,
+	TableCaption,
 	TableCell,
 	TableHead,
 	TableHeader,
@@ -22,10 +28,18 @@ export interface AdminLlmUsagePageProps {
 	isCurrentMonth: boolean;
 	report?: WorkspaceLlmUsageReport;
 	isLoading: boolean;
-	isError: boolean;
+	/** The thrown request error, if the report failed to load. */
+	error: unknown;
+	/** Retry the failed report load. */
+	onRetry?: () => void;
 	onPrevMonth: () => void;
 	onNextMonth: () => void;
 }
+
+type ByJobTypeRows = WorkspaceLlmUsageReport["byJobType"];
+
+/** One entry per by-job-type header column. */
+const JOB_TYPE_SKELETON_COLUMNS = ["w-32", "w-16", "w-20", "w-16", "w-12", "w-12"];
 
 /**
  * Workspace-admin view of one month of LLM spend: summary stat cards, an over-budget banner for
@@ -37,7 +51,8 @@ export function AdminLlmUsagePage({
 	isCurrentMonth,
 	report,
 	isLoading,
-	isError,
+	error,
+	onRetry,
 	onPrevMonth,
 	onNextMonth,
 }: AdminLlmUsagePageProps) {
@@ -53,10 +68,13 @@ export function AdminLlmUsagePage({
 	const uncostedEvents = report?.uncostedEvents ?? 0;
 
 	return (
-		<div className="container mx-auto py-6 max-w-4xl space-y-6">
+		<div className="mx-auto w-full max-w-4xl space-y-6 py-6">
 			<div className="flex flex-wrap items-center justify-between gap-4">
 				<header className="space-y-1">
-					<h1 className="text-3xl font-bold">AI usage</h1>
+					<div className="flex items-center gap-2">
+						<CircleDollarSign className="size-6 text-muted-foreground" aria-hidden />
+						<h1 className="text-2xl font-semibold">AI usage</h1>
+					</div>
 					<p className="text-sm text-muted-foreground">
 						LLM spend for this workspace, rolled up from the usage ledger (UTC months).
 					</p>
@@ -69,14 +87,31 @@ export function AdminLlmUsagePage({
 				/>
 			</div>
 
-			{isError ? (
-				<p className="py-8 text-center text-sm text-destructive">
-					Failed to load AI usage. Please try again.
-				</p>
+			{error != null ? (
+				<QueryErrorAlert error={error} title="Couldn't load AI usage" onRetry={onRetry} />
 			) : isLoading || report == null ? (
-				<div className="flex items-center justify-center py-12">
-					<Spinner />
-				</div>
+				// Skeleton the real card grid and table shell rather than blanking the page, so nothing
+				// jumps when the report lands.
+				<>
+					<div className="grid gap-4 sm:grid-cols-3">
+						{["spend", "cap", "used"].map((slot) => (
+							<Card key={slot}>
+								<CardHeader>
+									<Skeleton className="h-4 w-28" />
+									<Skeleton className="h-7 w-24" />
+								</CardHeader>
+							</Card>
+						))}
+					</div>
+					<Card>
+						<CardHeader>
+							<CardTitle>By job type</CardTitle>
+						</CardHeader>
+						<CardContent>
+							<ByJobTypeTable />
+						</CardContent>
+					</Card>
+				</>
 			) : (
 				<>
 					{report.overBudget && isCurrentMonth && (
@@ -130,26 +165,21 @@ export function AdminLlmUsagePage({
 							</CardHeader>
 							{budgetUsedPercent != null && (
 								<CardContent>
-									<div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-										<div
-											className={
-												report.overBudget
-													? "h-full rounded-full bg-destructive"
-													: "h-full rounded-full bg-primary"
-											}
-											style={{ width: `${Math.min(budgetUsedPercent, 100)}%` }}
-										/>
-									</div>
+									<BudgetProgress percent={budgetUsedPercent} overBudget={report.overBudget} />
 								</CardContent>
 							)}
 						</Card>
 					</div>
 
 					{!hasUsage ? (
-						<div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">
-							<CircleDollarSign className="size-8" aria-hidden />
-							<p className="text-sm">No AI usage in {formatMonthLabel(month)}.</p>
-						</div>
+						<Empty className="border border-dashed">
+							<EmptyHeader>
+								<EmptyMedia variant="icon">
+									<CircleDollarSign />
+								</EmptyMedia>
+								<EmptyTitle>No AI usage in {formatMonthLabel(month)}</EmptyTitle>
+							</EmptyHeader>
+						</Empty>
 					) : (
 						<>
 							<Card>
@@ -157,54 +187,7 @@ export function AdminLlmUsagePage({
 									<CardTitle>By job type</CardTitle>
 								</CardHeader>
 								<CardContent>
-									<div className="rounded-md border">
-										<Table>
-											<TableHeader>
-												<TableRow>
-													<TableHead scope="col">Job type</TableHead>
-													<TableHead scope="col" className="text-right">
-														Cost
-													</TableHead>
-													<TableHead scope="col" className="text-right">
-														Input tokens
-													</TableHead>
-													<TableHead scope="col" className="text-right">
-														Output tokens
-													</TableHead>
-													<TableHead scope="col" className="text-right">
-														Calls
-													</TableHead>
-													<TableHead scope="col" className="text-right">
-														Events
-													</TableHead>
-												</TableRow>
-											</TableHeader>
-											<TableBody>
-												{report.byJobType.map((row) => (
-													<TableRow key={row.jobType}>
-														<TableCell className="font-medium">
-															{JOB_TYPE_LABELS[row.jobType]}
-														</TableCell>
-														<TableCell className="text-right tabular-nums">
-															{formatCostUsd(row.costUsd)}
-														</TableCell>
-														<TableCell className="text-right tabular-nums">
-															{formatTokens(row.inputTokens)}
-														</TableCell>
-														<TableCell className="text-right tabular-nums">
-															{formatTokens(row.outputTokens)}
-														</TableCell>
-														<TableCell className="text-right tabular-nums">
-															{row.totalCalls.toLocaleString()}
-														</TableCell>
-														<TableCell className="text-right tabular-nums">
-															{row.events.toLocaleString()}
-														</TableCell>
-													</TableRow>
-												))}
-											</TableBody>
-										</Table>
-									</div>
+									<ByJobTypeTable rows={report.byJobType} />
 								</CardContent>
 							</Card>
 
@@ -219,27 +202,28 @@ export function AdminLlmUsagePage({
 										</p>
 									) : (
 										<ul className="space-y-1.5">
-											{report.byDay.map((day) => (
-												<li key={String(day.day)} className="flex items-center gap-3 text-sm">
-													<span className="w-14 shrink-0 text-muted-foreground">
-														{formatUsageDay(day.day)}
-													</span>
-													<div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-														<div
-															className="h-full rounded-full bg-primary"
-															style={{
-																width: `${maxDayCost > 0 ? (day.costUsd / maxDayCost) * 100 : 0}%`,
-															}}
+											{report.byDay.map((day) => {
+												const label = formatUsageDay(day.day);
+												return (
+													<li key={String(day.day)} className="flex items-center gap-3 text-sm">
+														<span className="w-14 shrink-0 text-muted-foreground">{label}</span>
+														<Progress
+															className="flex-1"
+															value={maxDayCost > 0 ? (day.costUsd / maxDayCost) * 100 : 0}
+															aria-label={`Spend on ${label}`}
+															getAriaValueText={() =>
+																`${formatCostUsd(day.costUsd)} of ${formatCostUsd(maxDayCost)} on the busiest day`
+															}
 														/>
-													</div>
-													<span className="w-20 shrink-0 text-right tabular-nums">
-														{formatCostUsd(day.costUsd)}
-													</span>
-													<span className="w-20 shrink-0 text-right tabular-nums text-muted-foreground">
-														{day.events.toLocaleString()} {day.events === 1 ? "event" : "events"}
-													</span>
-												</li>
-											))}
+														<span className="w-20 shrink-0 text-right tabular-nums">
+															{formatCostUsd(day.costUsd)}
+														</span>
+														<span className="w-20 shrink-0 text-right tabular-nums text-muted-foreground">
+															{day.events.toLocaleString()} {day.events === 1 ? "event" : "events"}
+														</span>
+													</li>
+												);
+											})}
 										</ul>
 									)}
 								</CardContent>
@@ -249,5 +233,103 @@ export function AdminLlmUsagePage({
 				</>
 			)}
 		</div>
+	);
+}
+
+interface BudgetProgressProps {
+	percent: number;
+	overBudget: boolean;
+}
+
+/**
+ * The month's budget consumption. Over budget the bar goes destructive, which needs the compound
+ * form so the indicator can be tinted; under budget the plain `Progress` is enough.
+ */
+function BudgetProgress({ percent, overBudget }: BudgetProgressProps) {
+	const value = Math.min(percent, 100);
+	const valueText = `${Math.round(percent)}% of the monthly budget used`;
+
+	if (overBudget) {
+		return (
+			<ProgressRoot.Root
+				value={value}
+				className="flex w-full"
+				aria-label="Budget used"
+				getAriaValueText={() => valueText}
+			>
+				<ProgressTrack className="h-1.5 rounded-full">
+					<ProgressIndicator className="bg-destructive" />
+				</ProgressTrack>
+			</ProgressRoot.Root>
+		);
+	}
+
+	return (
+		<Progress
+			value={value}
+			className="w-full"
+			aria-label="Budget used"
+			getAriaValueText={() => valueText}
+		/>
+	);
+}
+
+interface ByJobTypeTableProps {
+	/** Omit while the report is still loading — the header mounts and the body is skeletoned. */
+	rows?: ByJobTypeRows;
+}
+
+/** Per-job-type cost and token breakdown, sharing one header between loading and loaded states. */
+function ByJobTypeTable({ rows }: ByJobTypeTableProps) {
+	return (
+		<Table containerClassName="rounded-md border">
+			<TableCaption className="sr-only">AI spend by job type</TableCaption>
+			<TableHeader>
+				<TableRow>
+					<TableHead scope="col">Job type</TableHead>
+					<TableHead scope="col" className="text-right">
+						Cost
+					</TableHead>
+					<TableHead scope="col" className="text-right">
+						Input tokens
+					</TableHead>
+					<TableHead scope="col" className="text-right">
+						Output tokens
+					</TableHead>
+					<TableHead scope="col" className="text-right">
+						Calls
+					</TableHead>
+					<TableHead scope="col" className="text-right">
+						Events
+					</TableHead>
+				</TableRow>
+			</TableHeader>
+			{rows == null ? (
+				<TableRowsSkeleton columns={JOB_TYPE_SKELETON_COLUMNS} rows={3} />
+			) : (
+				<TableBody>
+					{rows.map((row) => (
+						<TableRow key={row.jobType}>
+							<TableCell className="font-medium">{JOB_TYPE_LABELS[row.jobType]}</TableCell>
+							<TableCell className="text-right tabular-nums">
+								{formatCostUsd(row.costUsd)}
+							</TableCell>
+							<TableCell className="text-right tabular-nums">
+								{formatTokens(row.inputTokens)}
+							</TableCell>
+							<TableCell className="text-right tabular-nums">
+								{formatTokens(row.outputTokens)}
+							</TableCell>
+							<TableCell className="text-right tabular-nums">
+								{row.totalCalls.toLocaleString()}
+							</TableCell>
+							<TableCell className="text-right tabular-nums">
+								{row.events.toLocaleString()}
+							</TableCell>
+						</TableRow>
+					))}
+				</TableBody>
+			)}
+		</Table>
 	);
 }

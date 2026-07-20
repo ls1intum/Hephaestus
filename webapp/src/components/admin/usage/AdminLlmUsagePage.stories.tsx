@@ -62,7 +62,8 @@ const meta = {
 		isCurrentMonth: true,
 		report: baseReport,
 		isLoading: false,
-		isError: false,
+		error: null,
+		onRetry: fn(),
 		onPrevMonth: fn(),
 		onNextMonth: fn(),
 	},
@@ -189,7 +190,7 @@ export const OverBudgetWithUncostedUsage: Story = {
 	},
 };
 
-/** Report still loading. */
+/** Report still loading — the stat cards and the by-job-type table shell are skeletoned in place. */
 export const Loading: Story = {
 	args: {
 		report: undefined,
@@ -197,10 +198,18 @@ export const Loading: Story = {
 	},
 };
 
-/** Report failed to load. */
+/** Report failed to load — a 5xx is retryable, so the alert offers a Retry. */
 export const ErrorState: Story = {
 	args: {
 		report: undefined,
-		isError: true,
+		error: { status: 500, detail: "Failed to build the usage report." },
+	},
+};
+
+/** A 403 is not retryable, so the alert explains the block without offering a Retry. */
+export const ForbiddenError: Story = {
+	args: {
+		report: undefined,
+		error: { status: 403, detail: "Workspace admin access is required." },
 	},
 };

@@ -3,12 +3,14 @@ package de.tum.cit.aet.hephaestus.agent.settings;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -31,6 +33,9 @@ class AiSettingsServiceTest extends BaseUnitTest {
     @Mock
     private AgentConfigRepository agentConfigRepository;
 
+    @Mock
+    private ConfigAuditPort configAudit;
+
     private AiSettingsService service;
     private Workspace workspace;
     private WorkspaceContext context;
@@ -43,18 +48,21 @@ class AiSettingsServiceTest extends BaseUnitTest {
         "",
         15,
         false,
-        false,
         false
     );
 
     @BeforeEach
     void setUp() {
-        service = new AiSettingsService(workspaceRepository, agentConfigRepository, reviewProperties);
+        service = new AiSettingsService(workspaceRepository, agentConfigRepository, reviewProperties, configAudit);
         workspace = new Workspace();
         workspace.setId(1L);
         workspace.setWorkspaceSlug("ws");
         context = new WorkspaceContext(1L, "ws", "Ws", AccountType.ORG, null, false, false, Set.of());
-        when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+        // lenient: the read-only getter resolves through findById, the audited writes through the
+        // locking variant (which serializes the before-snapshot with the mutation), so each test uses
+        // exactly one of the two.
+        lenient().when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+        lenient().when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(workspace));
     }
 
     @Test

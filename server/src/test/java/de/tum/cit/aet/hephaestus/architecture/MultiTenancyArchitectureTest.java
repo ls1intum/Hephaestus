@@ -75,38 +75,43 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
     }
 
     /**
+     * Whether an element is gated by the instance-admin authority alone, which is cross-workspace by
+     * design. Exact match, not {@code contains}: a composite like
+     * {@code hasAnyAuthority('app_admin','workspace_member')} mentions app_admin but is reachable by a
+     * workspace member, and a substring test would hand it this exemption. Anything composite has to
+     * justify itself some other way. {@code InstanceAdminGateExemptionTest} pins this.
+     */
+    static final String INSTANCE_ADMIN_GATE = "hasAuthority('app_admin')";
+
+    static boolean isInstanceAdminGated(com.tngtech.archunit.core.domain.properties.HasAnnotations<?> element) {
+        return element
+            .tryGetAnnotationOfType(org.springframework.security.access.prepost.PreAuthorize.class)
+            .map(a -> INSTANCE_ADMIN_GATE.equals(a.value().trim()))
+            .orElse(false);
+    }
+
+    /**
      * Schedulers that are legitimately workspace-agnostic.
      */
     static final Set<String> WORKSPACE_AGNOSTIC_SCHEDULERS = Set.of();
 
     /**
-     * Repositories that are legitimately workspace-agnostic.
-     * These are shared infrastructure or lookup tables.
-     *
-     * <p><b>EMPTY:</b> All repositories now use {@link WorkspaceAgnostic} annotation directly.
-     * Prefer annotating classes with {@link WorkspaceAgnostic} instead of adding here.
+     * Repositories that are legitimately workspace-agnostic (shared infrastructure or lookup tables).
+     * Prefer annotating classes with {@link WorkspaceAgnostic} directly over adding here.
      */
     static final Set<String> WORKSPACE_AGNOSTIC_REPOSITORIES = Set.of();
 
     /**
-     * Services that are legitimately workspace-agnostic.
-     * These operate at user, system, or admin scope rather than workspace scope.
-     *
-     * <p><b>EMPTY:</b> All services now use {@link WorkspaceAgnostic} annotation directly.
-     * Prefer annotating classes with {@link WorkspaceAgnostic} instead of adding here.
+     * Services that are legitimately workspace-agnostic (user, system, or admin scope).
+     * Prefer annotating classes with {@link WorkspaceAgnostic} directly over adding here.
      */
     static final Set<String> WORKSPACE_AGNOSTIC_SERVICES = Set.of();
 
     /**
-     * Repository methods that are legitimately workspace-agnostic.
-     * Format: "RepositoryName.methodName"
-     *
-     * <p><b>EMPTY:</b> All methods now use {@link WorkspaceAgnostic} annotation directly,
-     * either on the method itself or on the containing class.
+     * Repository methods that are legitimately workspace-agnostic. Format: "RepositoryName.methodName".
+     * Prefer annotating the method or class with {@link WorkspaceAgnostic} directly over adding here.
      */
     static final Set<String> WORKSPACE_AGNOSTIC_METHODS = Set.of();
-
-    // REPOSITORY WORKSPACE FILTERING
 
     @Nested
     class RepositoryWorkspaceFilteringTests {
@@ -138,37 +143,30 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                     String repoName = method.getOwner().getSimpleName();
                     String methodKey = repoName + "." + method.getName();
 
-                    // Skip integration.scm package - inherently workspace-agnostic ETL layer
+                    // integration.scm is the inherently workspace-agnostic ETL layer
                     if (isInWorkspaceAgnosticPackage(method.getOwner())) {
                         return;
                     }
 
-                    // Skip if class is annotated as workspace-agnostic
                     if (method.getOwner().isAnnotatedWith(WorkspaceAgnostic.class)) {
                         return;
                     }
 
-                    // Skip workspace-agnostic repositories
                     if (WORKSPACE_AGNOSTIC_REPOSITORIES.contains(repoName)) {
                         return;
                     }
 
-                    // Skip explicitly allowed methods
                     if (WORKSPACE_AGNOSTIC_METHODS.contains(methodKey)) {
                         return;
                     }
 
-                    // Skip methods annotated with @WorkspaceAgnostic
                     if (method.isAnnotatedWith(WorkspaceAgnostic.class)) {
                         return;
                     }
 
-                    // Get the query string from annotation
                     Query queryAnnotation = method.getAnnotationOfType(Query.class);
                     String queryValue = queryAnnotation.value();
 
-                    // Check for workspace filtering patterns
-                    // Direct workspace filtering
                     boolean hasDirectWorkspaceFilter =
                         queryValue.contains("workspaceId") ||
                         queryValue.contains("workspace.id") ||
@@ -253,22 +251,19 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                 public void check(JavaClass javaClass, ConditionEvents events) {
                     String repoName = javaClass.getSimpleName();
 
-                    // Skip integration.scm package - inherently workspace-agnostic ETL layer
+                    // integration.scm is the inherently workspace-agnostic ETL layer
                     if (isInWorkspaceAgnosticPackage(javaClass)) {
                         return;
                     }
 
-                    // Skip if class is annotated as workspace-agnostic
                     if (javaClass.isAnnotatedWith(WorkspaceAgnostic.class)) {
                         return;
                     }
 
-                    // Skip workspace-agnostic repositories
                     if (WORKSPACE_AGNOSTIC_REPOSITORIES.contains(repoName)) {
                         return;
                     }
 
-                    // Check if it's a Spring Data repository
                     boolean isSpringDataRepo = javaClass
                         .getAllRawInterfaces()
                         .stream()
@@ -278,14 +273,12 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                         return;
                     }
 
-                    // Get all method names
                     Set<String> methodNames = javaClass
                         .getMethods()
                         .stream()
                         .map(JavaMethod::getName)
                         .collect(Collectors.toSet());
 
-                    // Check for workspace-scoped methods (direct or implicit)
                     boolean hasWorkspaceScopedMethods = methodNames
                         .stream()
                         .anyMatch(
@@ -331,7 +324,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                         )
                         .allMatch(m -> m.getName().contains("ById") || m.getName().contains("AllById"));
 
-                    // Check for @Query methods with workspace filtering (direct or implicit)
                     boolean hasQueryWithWorkspaceFilter = javaClass
                         .getMethods()
                         .stream()
@@ -339,18 +331,14 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                         .anyMatch(m -> {
                             Query q = m.getAnnotationOfType(Query.class);
                             String queryValue = q.value();
-                            // Direct workspace filtering
                             boolean directFilter =
                                 queryValue.contains("workspaceId") ||
                                 queryValue.contains("workspace.id") ||
                                 queryValue.contains("JOIN Workspace");
-                            // Implicit through repository chain
                             boolean repoFilter =
                                 queryValue.contains("repository.id") || queryValue.contains("repositoryId");
-                            // Implicit through pull request chain
                             boolean prFilter =
                                 queryValue.contains("pullRequest.id") || queryValue.contains("pullRequestId");
-                            // Implicit through organization chain
                             boolean orgFilter =
                                 queryValue.contains("organization.id") ||
                                 queryValue.contains("organizationId") ||
@@ -387,8 +375,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // SCHEDULED JOB WORKSPACE CONTEXT
-
     @Nested
     class ScheduledJobContextTests {
 
@@ -412,7 +398,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
             ) {
                 @Override
                 public void check(JavaClass javaClass, ConditionEvents events) {
-                    // Check if class has @Scheduled methods
                     boolean hasScheduledMethods = javaClass
                         .getMethods()
                         .stream()
@@ -422,7 +407,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                         return;
                     }
 
-                    // Skip if class is annotated as workspace-agnostic
                     if (javaClass.isAnnotatedWith(WorkspaceAgnostic.class)) {
                         return;
                     }
@@ -441,12 +425,10 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                         return;
                     }
 
-                    // Skip explicitly workspace-agnostic schedulers
                     if (WORKSPACE_AGNOSTIC_SCHEDULERS.contains(javaClass.getSimpleName())) {
                         return;
                     }
 
-                    // Get all field and constructor parameter types
                     Set<String> dependencies = javaClass
                         .getFields()
                         .stream()
@@ -457,7 +439,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                         .getConstructors()
                         .forEach(c -> c.getRawParameterTypes().forEach(p -> dependencies.add(p.getSimpleName())));
 
-                    // Check for workspace-aware dependencies
                     boolean hasWorkspaceAwareDependency =
                         dependencies.contains("SyncTargetProvider") ||
                         dependencies.contains("SyncContextProvider") ||
@@ -508,15 +489,13 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                         return;
                     }
 
-                    // Check method body for repository calls
-                    // This is a heuristic - we check for method calls to findAll, findById, etc.
+                    // Heuristic: scan the method body for direct unscoped repository calls
                     Set<String> calledMethods = method
                         .getMethodCallsFromSelf()
                         .stream()
                         .map(call -> call.getTarget().getName())
                         .collect(Collectors.toSet());
 
-                    // Dangerous methods that don't filter by workspace
                     Set<String> dangerousMethods = Set.of("findAll", "findById", "count", "existsById");
 
                     Set<String> dangerousCalls = calledMethods
@@ -564,8 +543,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // EVENT LISTENER WORKSPACE VALIDATION
-
     @Nested
     class EventListenerContextTests {
 
@@ -591,8 +568,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                         return;
                     }
 
-                    // Check if the event parameter type carries workspace context
-                    // Domain events should contain workspace ID or entity with workspace relationship
+                    // Domain events must carry a workspaceId or an entity that resolves one
                     method
                         .getRawParameterTypes()
                         .forEach(paramType -> {
@@ -621,7 +597,9 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                 "Activated",
                                 "Deactivated",
                                 "WorkspaceScheduleChangedEvent", // Carries workspaceId for leaderboard reschedule
+                                "SyncStateChangedEvent", // Carries workspaceId directly
                                 "RepositoryAboutToBeDeletedEvent", // Carries repositoryId → workspace via FK
+                                "ScmMirrorErasedEvent", // Carries workspaceId directly (SCM disconnect/purge erase; derived-row listeners in practices + activity)
                                 "ApplicationReadyEvent", // Spring lifecycle, no workspace needed
                                 "ContextRefreshedEvent", // Spring lifecycle, no workspace needed
                                 "WorkspacesInitializedEvent", // Startup lifecycle, signals all workspaces ready
@@ -709,7 +687,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
             ) {
                 @Override
                 public void check(JavaClass javaClass, ConditionEvents events) {
-                    // Check if class has @Async @TransactionalEventListener methods
                     boolean hasAsyncEventListeners = javaClass
                         .getMethods()
                         .stream()
@@ -724,12 +701,10 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                         return;
                     }
 
-                    // Skip listeners that are known to carry context through event payloads
                     if (ASYNC_LISTENERS_WITH_PAYLOAD_CONTEXT.contains(javaClass.getSimpleName())) {
                         return;
                     }
 
-                    // Check for context propagation dependencies
                     Set<String> dependencies = javaClass
                         .getFields()
                         .stream()
@@ -756,7 +731,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                         );
 
                     if (hasRepositoryDependency && !usesPayloadEvents) {
-                        // Async listeners with repo access need explicit context propagation
                         events.add(
                             SimpleConditionEvent.violated(
                                 javaClass,
@@ -781,8 +755,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // SERVICE LAYER WORKSPACE AWARENESS
-
     @Nested
     class ServiceWorkspaceAwarenessTests {
 
@@ -799,12 +771,10 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
             ) {
                 @Override
                 public void check(JavaMethod method, ConditionEvents events) {
-                    // Only check public methods
                     if (!method.getModifiers().contains(JavaModifier.PUBLIC)) {
                         return;
                     }
 
-                    // Check if method returns a List or Collection
                     String returnType = method.getRawReturnType().getName();
                     boolean returnsList =
                         returnType.contains("List") ||
@@ -816,7 +786,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                         return;
                     }
 
-                    // Skip methods that are clearly workspace-aware
                     String methodName = method.getName();
                     boolean isWorkspaceAware =
                         methodName.contains("Workspace") ||
@@ -824,7 +793,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                         methodName.contains("ByTeam") || // Team implies workspace scope
                         methodName.contains("ForUser"); // User in workspace context
 
-                    // Check method parameters for workspace indicators
                     boolean hasWorkspaceParam = method
                         .getRawParameterTypes()
                         .stream()
@@ -845,12 +813,10 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                             return;
                         }
 
-                        // Skip if class is annotated as workspace-agnostic
                         if (method.getOwner().isAnnotatedWith(WorkspaceAgnostic.class)) {
                             return;
                         }
 
-                        // Public methods returning lists without workspace scoping are potential risks
                         if (methodName.startsWith("get") || methodName.startsWith("find")) {
                             events.add(
                                 SimpleConditionEvent.violated(
@@ -881,8 +847,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
     }
-
-    // CONTROLLER WORKSPACE CONTEXT
 
     @Nested
     class ControllerWorkspaceContextTests {
@@ -918,7 +882,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                     String controllerName = method.getOwner().getSimpleName();
                     String methodName = method.getName();
 
-                    // Skip health/status endpoints
                     if (
                         controllerName.contains("Health") ||
                         controllerName.contains("Status") ||
@@ -944,6 +907,15 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                     // operate outside any single workspace. The module is annotated
                     // @WorkspaceAgnostic at the package level.
                     if (method.getOwner().getPackageName().startsWith("de.tum.cit.aet.hephaestus.core.auth")) {
+                        return;
+                    }
+
+                    // Skip instance-admin endpoints: an endpoint gated by the instance authority is
+                    // cross-workspace BY DEFINITION (that is what an instance admin is for), so demanding
+                    // a WorkspaceContext on it is backwards. This is keyed on the security annotation
+                    // rather than a controller name so the exemption states its own reason. Cross-workspace
+                    // reads behind it still need @WorkspaceAgnostic on the repository.
+                    if (isInstanceAdminGated(method.getOwner()) || isInstanceAdminGated(method)) {
                         return;
                     }
 
@@ -979,13 +951,11 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                         return;
                     }
 
-                    // Check for WorkspaceContext parameter
                     boolean hasWorkspaceContext = method
                         .getRawParameterTypes()
                         .stream()
                         .anyMatch(p -> p.getSimpleName().equals("WorkspaceContext"));
 
-                    // Check for workspace security annotations
                     boolean hasWorkspaceSecurityAnnotation =
                         method
                             .getAnnotations()

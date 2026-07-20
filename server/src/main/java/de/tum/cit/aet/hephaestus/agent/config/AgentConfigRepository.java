@@ -31,6 +31,18 @@ public interface AgentConfigRepository extends JpaRepository<AgentConfig, Long> 
     @Query("SELECT c FROM AgentConfig c WHERE c.id = :id")
     Optional<AgentConfig> findByIdForUpdate(@Param("id") Long id);
 
+    /**
+     * Workspace-scoped pessimistic lock, for a read whose value is about to be snapshotted and mutated.
+     * Without it the before-snapshot and the write are not serialized: two concurrent admin PATCHes both
+     * read the same prior state, Hibernate's full-column UPDATE makes the later one silently revert the
+     * earlier's field, and the audit trail ends up asserting a transition that never survived — with no
+     * row for the write that undid it.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "5000"))
+    @Query("SELECT c FROM AgentConfig c WHERE c.id = :id AND c.workspace.id = :workspaceId")
+    Optional<AgentConfig> findByIdAndWorkspaceIdForUpdate(@Param("id") Long id, @Param("workspaceId") Long workspaceId);
+
     boolean existsByWorkspaceIdAndEnabledTrue(Long workspaceId);
 
     /** Deterministic default enabled config (oldest wins) — the mentor fallback when unbound. */

@@ -109,6 +109,34 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         }
 
         @Test
+        void promptDigest_isStableAcrossBuilds_andIndependentOfModel() {
+            // The prompt-version provenance (issue #1363): same scaffolding → same digest, regardless of the
+            // model/workspace the run used — an evaluation groups runs by this value.
+            String first = factory.build(proxySpec(LlmProvider.OPENAI, "model-a")).promptDigest();
+            String second = factory.build(proxySpec(LlmProvider.OPENAI, "model-b")).promptDigest();
+
+            assertThat(first).matches("[0-9a-f]{64}").isEqualTo(second);
+        }
+
+        @Test
+        void promptDigest_matchesScaffoldingBytes() {
+            // The digest is exactly the root digest over orchestrator + runner + sidecars — recomputable
+            // from the plan's own input files, so a replay can verify it.
+            var plan = factory.build(proxySpec(LlmProvider.OPENAI, "m"));
+            var scaffolding = new java.util.LinkedHashMap<String, byte[]>();
+            scaffolding.put(SandboxLayout.ORCHESTRATOR_PATH, plan.inputFiles().get(SandboxLayout.ORCHESTRATOR_PATH));
+            scaffolding.put(
+                SandboxLayout.RUNNER_SCRIPT_FILENAME,
+                plan.inputFiles().get(SandboxLayout.RUNNER_SCRIPT_FILENAME)
+            );
+            for (String sidecar : PRACTICE.sidecarScripts()) {
+                scaffolding.put(sidecar, plan.inputFiles().get(sidecar));
+            }
+
+            assertThat(plan.promptDigest()).isEqualTo(ProvenanceDigest.rootDigestHex(scaffolding));
+        }
+
+        @Test
         void extraInputsMerge() {
             byte[] payload = "deadbeef".getBytes(StandardCharsets.UTF_8);
             PiPlanSpec spec = new PiPlanSpec(

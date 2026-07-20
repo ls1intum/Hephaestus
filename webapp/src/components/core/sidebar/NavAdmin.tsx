@@ -5,14 +5,18 @@ import {
 	ChevronRight,
 	CircleDollarSign,
 	ClipboardCheck,
+	LayoutGridIcon,
 	ListChecks,
 	Map as MapIcon,
 	PlayCircle,
+	PlugZapIcon,
+	ScrollText,
 	Settings2,
 	SlidersHorizontal,
 	Trophy,
 	Users,
 } from "lucide-react";
+import { GithubIcon, GitlabIcon, OutlineIcon, SlackIcon } from "@/components/icons/brand";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
 	SidebarGroup,
@@ -30,19 +34,20 @@ export interface NavAdminProps {
 	achievementsEnabled?: boolean;
 	practicesEnabled?: boolean;
 	mentorEnabled?: boolean;
+	/** Drives the Integrations sub-item's label + icon (GitHub vs GitLab). Defaults to GitHub. */
+	scmProviderType?: "GITHUB" | "GITLAB";
 }
 
-// Workspace administration is one group. "Practices" is the domain — a workspace curates a catalog of
-// practices and the observations/feedback they produce. It owns several surfaces (the catalog, how
-// reviews run, and the run log), so it nests as a collapsible sub-tree. The model/agent/"AI" plumbing is
-// deliberately NOT the headline: "Models" is a separate workspace-infrastructure item (shared with the
-// mentor). Individual practices/areas are not sidebar entries — there are dozens; the catalog is their
-// home, and a practice drills down to its own detail page.
+// "Practices" nests as a collapsible sub-tree because it owns several surfaces (the catalog, review
+// settings, and the run log). "Models" is a separate item, shared with the mentor, rather than living
+// under Practices. Individual practices are not sidebar entries — there are dozens; the catalog is
+// their home and each drills down to its own detail page.
 export function NavAdmin({
 	workspaceSlug,
 	achievementsEnabled = true,
 	practicesEnabled = true,
 	mentorEnabled = false,
+	scmProviderType = "GITHUB",
 }: NavAdminProps) {
 	const modelsVisible = practicesEnabled || mentorEnabled;
 	const matchRoute = useMatchRoute();
@@ -55,6 +60,23 @@ export function NavAdmin({
 	// Catalog is the section's index; a practice's detail page drills down under it, so anything in the
 	// section that isn't Review settings or Runs counts as Catalog.
 	const onCatalog = onSection && !onSettings && !onRuns;
+
+	const onIntegrationsScm = Boolean(
+		matchRoute({ to: "/w/$workspaceSlug/admin/integrations/scm", fuzzy: true }),
+	);
+	const onIntegrationsSlack = Boolean(
+		matchRoute({ to: "/w/$workspaceSlug/admin/integrations/slack", fuzzy: true }),
+	);
+	const onIntegrationsOutline = Boolean(
+		matchRoute({ to: "/w/$workspaceSlug/admin/integrations/outline", fuzzy: true }),
+	);
+	const onIntegrationsSection = Boolean(
+		matchRoute({ to: "/w/$workspaceSlug/admin/integrations", fuzzy: true }),
+	);
+	const onIntegrationsOverview =
+		onIntegrationsSection && !onIntegrationsScm && !onIntegrationsSlack && !onIntegrationsOutline;
+	const ScmIcon = scmProviderType === "GITLAB" ? GitlabIcon : GithubIcon;
+	const scmLabel = scmProviderType === "GITLAB" ? "GitLab" : "GitHub";
 
 	return (
 		<SidebarGroup>
@@ -174,6 +196,78 @@ export function NavAdmin({
 						</CollapsibleContent>
 					</Collapsible>
 				)}
+				<Collapsible defaultOpen={onIntegrationsSection} render={<SidebarMenuItem />}>
+					<CollapsibleTrigger
+						render={
+							<SidebarMenuButton
+								tooltip="Integrations"
+								isActive={onIntegrationsSection}
+								className="group/collapsible"
+							>
+								<PlugZapIcon />
+								<span>Integrations</span>
+								<ChevronRight className="ml-auto transition-transform group-aria-expanded/collapsible:rotate-90" />
+							</SidebarMenuButton>
+						}
+					/>
+					<CollapsibleContent>
+						<SidebarMenuSub>
+							<SidebarMenuSubItem>
+								<SidebarMenuSubButton
+									isActive={onIntegrationsOverview}
+									render={
+										<Link to="/w/$workspaceSlug/admin/integrations" params={{ workspaceSlug }} />
+									}
+								>
+									<LayoutGridIcon />
+									<span>Overview</span>
+								</SidebarMenuSubButton>
+							</SidebarMenuSubItem>
+							<SidebarMenuSubItem>
+								<SidebarMenuSubButton
+									isActive={onIntegrationsScm}
+									render={
+										<Link
+											to="/w/$workspaceSlug/admin/integrations/scm"
+											params={{ workspaceSlug }}
+										/>
+									}
+								>
+									<ScmIcon />
+									<span>{scmLabel}</span>
+								</SidebarMenuSubButton>
+							</SidebarMenuSubItem>
+							<SidebarMenuSubItem>
+								<SidebarMenuSubButton
+									isActive={onIntegrationsSlack}
+									render={
+										<Link
+											to="/w/$workspaceSlug/admin/integrations/slack"
+											params={{ workspaceSlug }}
+										/>
+									}
+								>
+									<SlackIcon />
+									<span>Slack</span>
+								</SidebarMenuSubButton>
+							</SidebarMenuSubItem>
+							<SidebarMenuSubItem>
+								<SidebarMenuSubButton
+									isActive={onIntegrationsOutline}
+									render={
+										<Link
+											to="/w/$workspaceSlug/admin/integrations/outline"
+											params={{ workspaceSlug }}
+										/>
+									}
+								>
+									<OutlineIcon />
+									<span>Outline</span>
+								</SidebarMenuSubButton>
+							</SidebarMenuSubItem>
+						</SidebarMenuSub>
+					</CollapsibleContent>
+				</Collapsible>
 				{modelsVisible && (
 					<SidebarMenuItem>
 						<SidebarMenuButton
@@ -192,6 +286,19 @@ export function NavAdmin({
 					>
 						<CircleDollarSign />
 						<span>Usage</span>
+					</SidebarMenuButton>
+				</SidebarMenuItem>
+				{/* Deliberately not feature-gated: a change history must stay reachable after a feature is
+				    turned off, since the record of past changes still exists. */}
+				<SidebarMenuItem>
+					<SidebarMenuButton
+						tooltip="Settings changes in this workspace"
+						render={
+							<Link to="/w/$workspaceSlug/admin/audit" params={{ workspaceSlug }} search={{}} />
+						}
+					>
+						<ScrollText />
+						<span>Audit log</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
 			</SidebarMenu>

@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.agent.practice.PracticeAgentRequest;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticePiAdapter;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeSandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult;
+import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerCapacityState;
 import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerProperties;
@@ -543,7 +544,25 @@ public class AgentJobExecutor {
             agentSpec,
             snapshot
         );
+        persistProvenanceDigests(jobId, agentSpec.promptDigest(), sandboxSpec.inputFiles());
         return sandboxManager.execute(sandboxSpec);
+    }
+
+    /**
+     * Stamp the job with its run-provenance digests before the sandbox starts: the adapter's prompt-scaffolding
+     * digest, and the digest of the complete merged input set the sandbox will receive. Deliberately NOT
+     * best-effort, unlike every other provenance side-effect here — an observation that cannot be tied to the
+     * inputs that produced it is unfixable evaluation data, so this fails the run before any LLM cost accrues.
+     */
+    private void persistProvenanceDigests(UUID jobId, @Nullable String promptDigest, Map<String, byte[]> inputFiles) {
+        String inputsDigest = ProvenanceDigest.inputsDigestHex(inputFiles, jobId);
+        Integer updated = transactionTemplate.execute(status ->
+            jobRepository.updateProvenanceDigests(jobId, promptDigest, inputsDigest)
+        );
+        if (updated == null || updated != 1) {
+            throw new IllegalStateException("Provenance digest write matched no job row: jobId=" + jobId);
+        }
+        log.debug("Provenance digests: jobId={}, prompt={}, inputs={}", jobId, promptDigest, inputsDigest);
     }
 
     /** Build the final {@link SandboxSpec} by merging handler and adapter inputs. */

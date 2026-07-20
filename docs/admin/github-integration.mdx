@@ -1,0 +1,137 @@
+---
+id: github-integration
+sidebar_position: 2
+title: GitHub Integration
+description: OAuth App for login, PAT or GitHub App for data access, and manual webhook setup.
+---
+
+Hephaestus talks to GitHub through **three separate mechanisms** — easy to confuse, so
+here is the map:
+
+| Mechanism | Purpose | Required? |
+| --- | --- | --- |
+| **OAuth App** | "Sign in with GitHub" | Yes (unless you use GitLab login only) |
+| **PAT** *or* **GitHub App** | Reading repository data (per workspace) | One of the two |
+| **Webhook** | Live event ingestion (PRs, reviews, pushes, …) | Strongly recommended — without it you only get the hourly sync poll |
+
+The OAuth App is covered in the [install guide](./install#3-create-the-github-oauth-app-login--mandatory).
+This page covers the other two.
+
+## Choosing PAT vs GitHub App
+
+**PAT mode is fully supported** and is the right starting point for a single-org install:
+
+| | PAT | GitHub App |
+| --- | --- | --- |
+| Setup effort | Paste a token in the workspace UI | Create + install an App, manage a private key |
+| Environment variables | None | `GH_APP_ID`, `GH_APP_PRIVATE_KEY`, `GH_APP_INSTALLATION_URL` |
+| Rate limits | 5,000 req/h, shared across all of that user's tokens | 5,000+ req/h **per installation**, scaling with org size (up to 12,500) |
+| AI-review feedback posted back to GitHub (PR comments, inline findings, approvals) | Posted as the token's user | Posted as the App (recommended) |
+| Webhooks | Create manually (below) | Configured once on the App |
+
+Tokens are stored encrypted (AES-256-GCM) per workspace in the database.
+
+### PAT mode
+
+1. Create a token: **classic PAT** with `repo` + `read:org` (the `repo` scope already
+   grants PR/issue write for feedback delivery), or a **fine-grained PAT** whose *resource
+   owner* is the organization, with repository permissions Contents, Issues, Pull requests
+   and Discussions (Read — add Write on Issues and Pull requests to deliver AI-review
+   feedback) plus organization permissions Members and Projects (Read). Omitting
+   Discussions or Projects leaves those syncs silently empty.
+2. Leave `GH_APP_ID` unset (defaults to `0` = PAT mode).
+3. Paste the token when creating/configuring the workspace in the UI.
+4. Set up a webhook manually (next section).
+
+### GitHub App mode
+
+Create the App at **Settings → Developer settings → GitHub Apps → New GitHub App**
+(on your org: `https://github.com/organizations/<org>/settings/apps`).
+
+- **Homepage URL:** `https://<APP_HOSTNAME>`
+- **Webhook → Active:** ✔, **Webhook URL:** `https://<APP_HOSTNAME>/webhooks/github`,
+  **Secret:** your `WEBHOOK_SECRET` from `.env` (byte-identical)
+- **Where can this GitHub App be installed:** *Only on this account* is fine — as long as you created the App on the organization that will install it (an App registered under a personal account can never be installed on an org)
+
+**Repository permissions** (GitHub greys out webhook events until the matching permission
+is granted):
+
+| Permission | Level | Why |
+| --- | --- | --- |
+| Metadata | Read | Baseline (mandatory) |
+| Contents | Read | Push/commit sync, repo checkout for AI review |
+| Pull requests | Read & write | PR/review sync; posting review feedback, inline findings, approvals |
+| Issues | Read & write | Issue sync; delivering feedback as issue/PR comments (GraphQL `addComment`) |
+| Discussions | Read | Discussion sync |
+
+**Organization permissions:**
+
+| Permission | Level | Why |
+| --- | --- | --- |
+| Members | Read | Org membership, teams, member events |
+| Projects | Read | `projects_v2*` events + Projects v2 sync (Projects is an org-level permission) |
+
+**Subscribe to events** (check all — this list mirrors what the server actually consumes,
+`GitHubEventType`):
+
+`push`, `pull_request`, `pull_request_review`, `pull_request_review_comment`,
+`pull_request_review_thread`, `issues`, `issue_comment`, `label`, `milestone`, `member`,
+`repository`, `discussion`, `discussion_comment`, `sub_issues`, `issue_dependencies`,
+`organization`, `team`, `membership`
+
+Installation events are delivered to Apps automatically — there is no checkbox for them.
+If `issue_dependencies` isn't offered in your App's list, skip it: Hephaestus also reads
+issue dependencies through its regular GraphQL sync, so you only lose live updates for
+that one relation type.
+
+**Projects v2 is the exception.** GitHub documents `projects_v2`, `projects_v2_item` and
+`projects_v2_status_update` as **organization-webhook** events, so a GitHub App's own
+webhook may not receive them. If you want project boards to sync live, add an
+organization webhook (next section) alongside the App — and grant the App the
+organization **Projects: Read** permission, which the project sync itself needs.
+
+Then:
+
+1. Generate a **private key** (App settings → Private keys) and download the `.pem`.
+2. **Install the App** on your organization (all repositories, or the ones to monitor).
+3. In `.env`, set:
+
+   ```bash
+   GH_APP_ID=123456
+   # Multi-line PEM: quote the whole value; Docker Compose .env preserves the newlines.
+   GH_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----
+   ...
+   -----END RSA PRIVATE KEY-----"
+   # Shown in the workspace-creation wizard so admins can install the App:
+   GH_APP_INSTALLATION_URL=https://github.com/apps/<your-app-slug>/installations/new
+   ```
+
+4. `docker compose up -d` to restart with the new environment.
+
+## GitHub webhooks — manual setup (PAT mode)
+
+Unlike GitLab (where Hephaestus auto-registers a group webhook), **there is no GitHub
+webhook auto-registration**. In GitHub App mode the App's webhook covers everything; in
+PAT mode you create one yourself, or your install ingests **zero live events with no
+error telling you why**.
+
+Prefer one **organization webhook** (repo webhooks can't deliver `organization`, `team`,
+`membership`): `https://github.com/organizations/<org>/settings/hooks` → **Add webhook**.
+
+- **Payload URL:** `https://<APP_HOSTNAME>/webhooks/github`
+- **Content type:** `application/json`
+- **Secret:** your `WEBHOOK_SECRET` (verified as `X-Hub-Signature-256` HMAC)
+- **Events:** "Let me select individual events" → check the same event list as above, plus
+  `projects_v2`, `projects_v2_item` and `projects_v2_status_update` if you use project
+  boards. Those three exist on **organization** webhooks only (never repository webhooks)
+  and only fire for organization-level projects.
+
+## Verify it works
+
+1. GitHub → your App/webhook settings → **Recent Deliveries**: real events return `2xx`.
+   Note the initial `ping` returns `200` even when the secret is wrong (it is answered
+   before signature verification), so judge by a real event. A `401` means the secret
+   doesn't match `.env`; a timeout means `/webhooks` isn't reachable from the internet.
+2. `docker compose logs -f webhook-server` — each accepted delivery is published to NATS.
+3. Open a test PR in a monitored repo; it should appear in Hephaestus within seconds
+   (webhook) rather than on the next hourly sync (polling fallback).

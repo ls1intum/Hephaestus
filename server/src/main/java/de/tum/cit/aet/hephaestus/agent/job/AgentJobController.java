@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
+import de.tum.cit.aet.hephaestus.core.AuditExempt;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
@@ -85,6 +86,7 @@ public class AgentJobController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
+    @AuditExempt(reason = "job control, not configuration; job state is its own record")
     public ResponseEntity<AgentJobDTO> cancelJob(WorkspaceContext workspaceContext, @PathVariable UUID jobId) {
         AgentJob job = agentJobLifecycleService.cancel(workspaceContext.id(), jobId);
         return ResponseEntity.ok(AgentJobDTO.from(job));
@@ -104,6 +106,7 @@ public class AgentJobController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
+    @AuditExempt(reason = "job control, not configuration; job state is its own record")
     public ResponseEntity<AgentJobDTO> retryDelivery(WorkspaceContext workspaceContext, @PathVariable UUID jobId) {
         AgentJob job = agentJobLifecycleService.retryDelivery(workspaceContext.id(), jobId);
         return ResponseEntity.ok(AgentJobDTO.from(job));

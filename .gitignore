@@ -130,6 +130,9 @@ celerybeat.pid
 .env
 .venv
 env/
+
+# Self-host: Traefik writes cert material here inside the operator's checkout
+docker/self-host/letsencrypt/
 venv/
 ENV/
 env.bak/
@@ -266,3 +269,7 @@ MISSION.md
 .ai/
 server/postgres-data-temp-*
 postgres-data-temp-*/
+
+# local .env backups (deploy scratch) — must never be committed
+server/.env.bak.*
+*.env.bak.*

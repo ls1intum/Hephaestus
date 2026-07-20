@@ -86,7 +86,8 @@ function AdminInstanceUsagePage() {
 				rows={rows}
 				isCurrentMonth={month >= currentMonthUtc()}
 				isLoading={listQuery.isLoading}
-				isError={listQuery.isError}
+				error={listQuery.error}
+				onRetry={() => listQuery.refetch()}
 				onEditBudget={setEditing}
 			/>
 

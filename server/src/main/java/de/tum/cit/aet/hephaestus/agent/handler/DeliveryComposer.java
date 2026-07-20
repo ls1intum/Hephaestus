@@ -11,6 +11,7 @@ import static de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.REPO_MOUNT_R
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.StudentTextSanitizer;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
@@ -23,10 +24,12 @@ import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
@@ -66,12 +69,6 @@ import tools.jackson.databind.JsonNode;
  * </ul>
  */
 class DeliveryComposer {
-
-    /**
-     * Provenance stamp for the {@code Feedback} ledger (ADR 0021 C6): which renderer produced a delivered
-     * body. Bump explicitly when the composition changes so a delivered unit is reproducible from its row.
-     */
-    static final String COMPOSER_VERSION = "v4-inline-first";
 
     /** Non-blocking (MINOR/INFO) suggestions surfaced in full before the rest collapse into an overflow line; blocking findings are never capped. */
     static final int MAX_IMPROVEMENT_SUGGESTIONS = 3;
@@ -263,6 +260,10 @@ class DeliveryComposer {
         // diff notes so a slug's "Why this matters" lands exactly once, wherever that finding renders in full.
         Set<String> emittedWhy = new HashSet<>();
 
+        // Dropped findings, reported on the DeliveryContent so the ledger marks them SUPPRESSED, not DELIVERED.
+        List<ValidatedFinding> dedupDropped = new ArrayList<>();
+        List<ValidatedFinding> capDropped = new ArrayList<>();
+
         List<ValidatedFinding> negatives = findings
             .stream()
             .filter(DeliveryComposer::isProblem)
@@ -277,7 +278,9 @@ class DeliveryComposer {
         // the lead we keep; later ones are the redundant siblings we drop. Conservative: ISSUE-only,
         // and only within EPIC_STRUCTURE_PRACTICES, so distinct lessons are never merged.
         if (artifact == WorkArtifact.ISSUE) {
+            List<ValidatedFinding> before = negatives;
             negatives = dedupEpicStructure(negatives);
+            dedupDropped.addAll(identityDiff(before, negatives));
         }
 
         // Co-occurrence dedup (W4): two findings sometimes deliver the SAME underlying fact as separate
@@ -286,7 +289,11 @@ class DeliveryComposer {
         // shouldn't read one root cause as two stacked MAJORs, so the pair collapses to ONE — the more
         // actionable member (the one anchored on the change itself). Defined conservatively as an explicit,
         // small pair set so distinct lessons (e.g. breaks-large-work vs scope) are never merged.
-        negatives = dedupCoOccurringNegatives(negatives);
+        {
+            List<ValidatedFinding> before = negatives;
+            negatives = dedupCoOccurringNegatives(negatives);
+            dedupDropped.addAll(identityDiff(before, negatives));
+        }
 
         // PRIORITISE + CAP THE LONG TAIL. Detection legitimately fires many low-value MINOR/INFO nudges;
         // surfacing all of them buries the 1-3 highest-leverage lessons under a pile-on. Keep EVERY
@@ -303,7 +310,9 @@ class DeliveryComposer {
             .count();
         long improvementTotal = negatives.size() - blockingTotal;
         if (improvementTotal > MAX_IMPROVEMENT_SUGGESTIONS) {
+            List<ValidatedFinding> before = negatives;
             negatives = capImprovementTail(negatives);
+            capDropped.addAll(identityDiff(before, negatives));
             improvementOverflow = (int) (improvementTotal - MAX_IMPROVEMENT_SUGGESTIONS);
         }
 
@@ -316,7 +325,7 @@ class DeliveryComposer {
                 // all-clear on work that was never actually evaluated.
                 return null;
             }
-            return new DeliveryContent(composeNoIssuesNote(observed, whyBySlug, emittedWhy), List.of());
+            return new DeliveryContent(composeNoIssuesNote(observed, whyBySlug, emittedWhy), List.of(), List.of());
         }
 
         // Partition negatives: inlinable (a diff note) vs non-inlinable (expanded in the summary).
@@ -355,7 +364,52 @@ class DeliveryComposer {
         // Diff notes: ALL inlinable negatives get inline comments (grounding guard drops ungrounded anchors)
         List<DiffNote> diffNotes = collectDiffNotes(inlinable, whyBySlug, emittedWhy, grounding);
 
-        return new DeliveryContent(mrNote, diffNotes);
+        return new DeliveryContent(mrNote, diffNotes, withheldFindings(dedupDropped, capDropped));
+    }
+
+    /**
+     * Set difference by reference IDENTITY, not {@code equals}: ValidatedFinding is a record, so two
+     * value-equal findings must not collapse into one dropped slot.
+     */
+    private static List<ValidatedFinding> identityDiff(List<ValidatedFinding> before, List<ValidatedFinding> after) {
+        if (before.size() == after.size()) {
+            return List.of();
+        }
+        Set<ValidatedFinding> kept = Collections.newSetFromMap(new IdentityHashMap<>());
+        kept.addAll(after);
+        List<ValidatedFinding> dropped = new ArrayList<>(before.size() - after.size());
+        for (ValidatedFinding f : before) {
+            if (!kept.contains(f)) {
+                dropped.add(f);
+            }
+        }
+        return dropped;
+    }
+
+    /**
+     * The dropped findings as ledger-reportable {@link WithheldFinding}s. Addressed by {@code occurrenceKey}
+     * (the identity of a single observation) rather than {@code recurrenceKey} (a locus several observations
+     * share), so withholding one finding can never mark a delivered sibling at the same locus as suppressed.
+     * An unstamped finding — an unknown slug, never persisted — has no observation to point at and is skipped.
+     */
+    private static List<PracticeDetectionResultParser.WithheldFinding> withheldFindings(
+        List<ValidatedFinding> dedupDropped,
+        List<ValidatedFinding> capDropped
+    ) {
+        return Stream.concat(
+            dedupDropped.stream().map(f -> withheld(f, FeedbackSuppressionReason.COMPOSER_DEDUPED)),
+            capDropped.stream().map(f -> withheld(f, FeedbackSuppressionReason.VOLUME_CAPPED))
+        )
+            .filter(Objects::nonNull)
+            .toList();
+    }
+
+    private static PracticeDetectionResultParser.@Nullable WithheldFinding withheld(
+        ValidatedFinding f,
+        FeedbackSuppressionReason reason
+    ) {
+        String key = f.occurrenceKey();
+        return key == null ? null : new PracticeDetectionResultParser.WithheldFinding(key, reason);
     }
 
     /**

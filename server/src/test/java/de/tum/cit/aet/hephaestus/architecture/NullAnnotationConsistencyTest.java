@@ -71,6 +71,15 @@ class NullAnnotationConsistencyTest extends HephaestusArchitectureTest {
         ArchRule rule = noClasses()
             .that()
             .resideInAPackage(BASE_PACKAGE + "..")
+            // Rule-scoped exemption for the openapi-generator-emitted Outline wire models: the generator
+            // stamps @jakarta.annotation.Nonnull on every required field and no clean flag suppresses it.
+            // These are generated, never part of the SpringDoc-exposed surface, and are governed on their
+            // own boundary by OutlineApiDtoIsolationTest — so the annotation-consistency rule (which exists
+            // to protect hand-authored code and correct SpringDoc generation) does not apply to them. The
+            // exemption lives here, on the one rule that genuinely trips, rather than as a blanket import
+            // exclusion that would also blind the isolation guard.
+            .and()
+            .resideOutsideOfPackage("..integration.outline.client.model..")
             .should()
             .dependOnClassesThat()
             .haveFullyQualifiedName("jakarta.annotation.Nonnull")

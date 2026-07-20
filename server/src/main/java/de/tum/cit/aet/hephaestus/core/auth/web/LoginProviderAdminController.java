@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.auth.web;
 
+import de.tum.cit.aet.hephaestus.core.AuditExempt;
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderService;
@@ -79,6 +80,9 @@ public class LoginProviderAdminController {
     @PostMapping
     @Operation(summary = "Create a login provider", operationId = "adminCreateLoginProvider")
     @ApiResponse(responseCode = "201", description = "Login provider created; URL in the Location header")
+    @AuditExempt(
+        reason = "instance-scoped; config_audit_event is workspace-scoped until #1356 adds the scope discriminator"
+    )
     public ResponseEntity<LoginProviderViewDTO> create(@Valid @RequestBody CreateLoginProviderRequestDTO body) {
         LoginProvider created = loginProviderService.create(
             new LoginProviderService.Draft(
@@ -101,6 +105,9 @@ public class LoginProviderAdminController {
 
     @PatchMapping("/{registrationId}")
     @Operation(summary = "Update a login provider", operationId = "adminUpdateLoginProvider")
+    @AuditExempt(
+        reason = "instance-scoped; config_audit_event is workspace-scoped until #1356 adds the scope discriminator"
+    )
     public ResponseEntity<LoginProviderViewDTO> update(
         @PathVariable String registrationId,
         @Valid @RequestBody UpdateLoginProviderRequestDTO body
@@ -121,6 +128,9 @@ public class LoginProviderAdminController {
 
     @DeleteMapping("/{registrationId}")
     @Operation(summary = "Delete a login provider", operationId = "adminDeleteLoginProvider")
+    @AuditExempt(
+        reason = "instance-scoped; config_audit_event is workspace-scoped until #1356 adds the scope discriminator"
+    )
     public ResponseEntity<Void> delete(@PathVariable String registrationId) {
         loginProviderService.delete(registrationId);
         return ResponseEntity.noContent().build();

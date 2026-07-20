@@ -33,9 +33,9 @@ public class IssuedJwtCleanupJob {
     private final Clock clock;
     private final Counter prunedCounter;
 
-    public IssuedJwtCleanupJob(IssuedJwtRepository repository, Clock authClock, MeterRegistry meterRegistry) {
+    public IssuedJwtCleanupJob(IssuedJwtRepository repository, Clock clock, MeterRegistry meterRegistry) {
         this.repository = repository;
-        this.clock = authClock;
+        this.clock = clock;
         this.prunedCounter = Counter.builder("auth.issued_jwt.pruned")
             .description("Expired issued_jwt revocation rows physically removed by the daily sweep")
             .register(meterRegistry);

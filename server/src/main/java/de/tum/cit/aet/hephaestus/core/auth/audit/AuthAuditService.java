@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -41,11 +42,24 @@ public class AuthAuditService {
     public record Filter(
         @Nullable Long accountId,
         @Nullable Long actingAccountId,
-        AuthEvent.@Nullable EventType eventType,
-        AuthEvent.@Nullable Result result,
+        @Nullable List<AuthEvent.EventType> eventTypes,
+        @Nullable List<AuthEvent.Result> results,
         @Nullable Instant from,
         @Nullable Instant to
-    ) {}
+    ) {
+        /**
+         * Hibernate cannot bind an empty {@code IN} list, and an empty selection means the same thing
+         * as an absent one, so both collapse to null before reaching the query.
+         */
+        public Filter {
+            eventTypes = nullIfEmpty(eventTypes);
+            results = nullIfEmpty(results);
+        }
+
+        private static <T> @Nullable List<T> nullIfEmpty(@Nullable List<T> values) {
+            return values == null || values.isEmpty() ? null : values;
+        }
+    }
 
     /** A human-readable account identity for an audit row. {@code displayName}/{@code email} may be null. */
     public record AccountRef(long id, @Nullable String displayName, @Nullable String email) {}
@@ -59,8 +73,8 @@ public class AuthAuditService {
         Page<AuthEvent> events = authEventRepository.findForAdmin(
             filter.accountId(),
             filter.actingAccountId(),
-            filter.eventType(),
-            filter.result(),
+            filter.eventTypes(),
+            filter.results(),
             filter.from(),
             filter.to(),
             pageable

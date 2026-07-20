@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "storybook/test";
+import { expect, fn, screen, userEvent, within } from "storybook/test";
 import { SetBudgetDialog } from "./SetBudgetDialog";
 
 /**
@@ -49,4 +49,33 @@ export const Uncapped: Story = {
 /** Save in flight — inputs and actions disabled. */
 export const Pending: Story = {
 	args: { isPending: true },
+};
+
+/**
+ * Submitting a cleared field surfaces *why* it was rejected instead of silently doing nothing.
+ * The dialog is portalled, so the play queries the document rather than the story canvas.
+ */
+export const InvalidEmptyValue: Story = {
+	play: async ({ args }) => {
+		const dialog = within(await screen.findByRole("dialog"));
+		await userEvent.clear(dialog.getByLabelText(/monthly budget/i));
+		await userEvent.click(dialog.getByRole("button", { name: /save cap/i }));
+
+		await expect(dialog.getByRole("alert")).toHaveTextContent(/enter a budget amount/i);
+		await expect(args.onSubmit).not.toHaveBeenCalled();
+	},
+};
+
+/** A negative amount is rejected with its own reason, and nothing is submitted. */
+export const InvalidNegativeValue: Story = {
+	play: async ({ args }) => {
+		const dialog = within(await screen.findByRole("dialog"));
+		const input = dialog.getByLabelText(/monthly budget/i);
+		await userEvent.clear(input);
+		await userEvent.type(input, "-5");
+		await userEvent.click(dialog.getByRole("button", { name: /save cap/i }));
+
+		await expect(dialog.getByRole("alert")).toHaveTextContent(/\$0 or more/i);
+		await expect(args.onSubmit).not.toHaveBeenCalled();
+	},
 };

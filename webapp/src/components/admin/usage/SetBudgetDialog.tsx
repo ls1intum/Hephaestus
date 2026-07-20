@@ -10,8 +10,8 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 
 export interface SetBudgetDialogProps {
@@ -58,13 +58,22 @@ function SetBudgetDialogContent({ workspace, isPending, onSubmit }: SetBudgetDia
 	const [value, setValue] = useState(
 		workspace.monthlyBudgetUsd != null ? String(workspace.monthlyBudgetUsd) : "",
 	);
+	// Withheld until the first submit so the field isn't red before anything was attempted.
+	const [showError, setShowError] = useState(false);
 
 	const parsed = Number.parseFloat(value);
-	const isValid = value.trim() !== "" && Number.isFinite(parsed) && parsed >= 0;
+	const isEmpty = value.trim() === "";
+	const isValid = !isEmpty && Number.isFinite(parsed) && parsed >= 0;
+	const errorMessage = isEmpty
+		? "Enter a budget amount, or remove the cap entirely."
+		: "Enter an amount of $0 or more.";
+	const isInvalid = showError && !isValid;
 
 	const handleSubmit = (event: FormEvent) => {
 		event.preventDefault();
 		if (!isValid) {
+			// The submit button stays enabled precisely so this reveals *why* the value is rejected.
+			setShowError(true);
 			return;
 		}
 		// Sub-cent values are already rejected by the input's native `step={0.01}` validation.
@@ -82,21 +91,31 @@ function SetBudgetDialogContent({ workspace, isPending, onSubmit }: SetBudgetDia
 						month. A cap of $0 pauses immediately.
 					</DialogDescription>
 				</DialogHeader>
-				<div className="grid gap-2">
-					<Label htmlFor="set-budget-usd">Monthly budget (USD)</Label>
-					<Input
-						id="set-budget-usd"
-						type="number"
-						inputMode="decimal"
-						min={0}
-						step={0.01}
-						placeholder="e.g. 25.00"
-						value={value}
-						onChange={(event) => setValue(event.target.value)}
-						disabled={isPending}
-						autoFocus
-					/>
-				</div>
+				<FieldGroup>
+					<Field data-invalid={isInvalid}>
+						<FieldLabel htmlFor="set-budget-usd">Monthly budget (USD)</FieldLabel>
+						<Input
+							id="set-budget-usd"
+							type="number"
+							inputMode="decimal"
+							min={0}
+							step={0.01}
+							placeholder="e.g. 25.00"
+							value={value}
+							aria-invalid={isInvalid}
+							onChange={(event) => {
+								setValue(event.target.value);
+								setShowError(false);
+							}}
+							disabled={isPending}
+							autoFocus
+						/>
+						<FieldDescription>
+							Spend above this amount pauses AI work until the next UTC month.
+						</FieldDescription>
+						{isInvalid && <FieldError>{errorMessage}</FieldError>}
+					</Field>
+				</FieldGroup>
 				<DialogFooter>
 					{workspace.monthlyBudgetUsd != null && (
 						<Button
@@ -112,7 +131,7 @@ function SetBudgetDialogContent({ workspace, isPending, onSubmit }: SetBudgetDia
 					<DialogClose render={<Button type="button" variant="outline" disabled={isPending} />}>
 						Cancel
 					</DialogClose>
-					<Button type="submit" disabled={isPending || !isValid}>
+					<Button type="submit" disabled={isPending}>
 						{isPending ? <Spinner className="size-4" /> : null}
 						Save cap
 					</Button>

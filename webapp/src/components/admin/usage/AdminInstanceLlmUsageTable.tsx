@@ -1,12 +1,15 @@
 import { CircleDollarSign } from "lucide-react";
 import type { AdminWorkspaceLlmUsage } from "@/api/types.gen";
 import { formatCostUsd } from "@/components/admin/ai/jobUtils";
+import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import {
 	Table,
 	TableBody,
+	TableCaption,
 	TableCell,
 	TableHead,
 	TableHeader,
@@ -23,9 +26,15 @@ export interface AdminInstanceLlmUsageTableProps {
 	 */
 	isCurrentMonth: boolean;
 	isLoading: boolean;
-	isError: boolean;
+	/** The thrown request error, if the rollup failed to load. */
+	error: unknown;
+	/** Retry the failed rollup load. */
+	onRetry?: () => void;
 	onEditBudget: (workspace: AdminWorkspaceLlmUsage) => void;
 }
+
+/** One entry per header column — the trailing action slot promises nothing. */
+const SKELETON_COLUMNS = ["w-32", "w-16", "w-16", "w-14", "w-12", null];
 
 /**
  * Instance-admin table of every workspace's LLM spend for one month (metadata only, no tenant
@@ -35,54 +44,53 @@ export function AdminInstanceLlmUsageTable({
 	rows,
 	isCurrentMonth,
 	isLoading,
-	isError,
+	error,
+	onRetry,
 	onEditBudget,
 }: AdminInstanceLlmUsageTableProps) {
-	if (isError) {
-		return (
-			<p className="py-8 text-center text-sm text-destructive">
-				Failed to load LLM usage. Please try again.
-			</p>
-		);
+	if (error != null) {
+		return <QueryErrorAlert error={error} title="Couldn't load LLM usage" onRetry={onRetry} />;
 	}
-	if (isLoading) {
+	if (rows.length === 0 && !isLoading) {
 		return (
-			<div className="flex items-center justify-center py-12">
-				<Spinner />
-			</div>
-		);
-	}
-	if (rows.length === 0) {
-		return (
-			<div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">
-				<CircleDollarSign className="size-8" aria-hidden />
-				{/* The rollup left-joins from workspace, so zero rows means zero workspaces. */}
-				<p className="text-sm">No workspaces on this instance yet.</p>
-			</div>
+			<Empty className="border border-dashed">
+				<EmptyHeader>
+					<EmptyMedia variant="icon">
+						<CircleDollarSign />
+					</EmptyMedia>
+					{/* The rollup left-joins from workspace, so zero rows means zero workspaces. */}
+					<EmptyTitle>No workspaces on this instance yet</EmptyTitle>
+				</EmptyHeader>
+			</Empty>
 		);
 	}
 
 	return (
-		<div className="rounded-md border">
-			<Table>
-				<TableHeader>
-					<TableRow>
-						<TableHead scope="col">Workspace</TableHead>
-						<TableHead scope="col" className="text-right">
-							Spend
-						</TableHead>
-						<TableHead scope="col" className="text-right">
-							Budget cap
-						</TableHead>
-						<TableHead scope="col">Status</TableHead>
-						<TableHead scope="col" className="text-right">
-							Events
-						</TableHead>
-						<TableHead scope="col">
-							<span className="sr-only">Actions</span>
-						</TableHead>
-					</TableRow>
-				</TableHeader>
+		<Table containerClassName="rounded-md border">
+			<TableCaption className="sr-only">
+				Per-workspace AI spend for the selected month, most expensive first
+			</TableCaption>
+			<TableHeader>
+				<TableRow>
+					<TableHead scope="col">Workspace</TableHead>
+					<TableHead scope="col" className="text-right">
+						Spend
+					</TableHead>
+					<TableHead scope="col" className="text-right">
+						Budget cap
+					</TableHead>
+					<TableHead scope="col">Status</TableHead>
+					<TableHead scope="col" className="text-right">
+						Events
+					</TableHead>
+					<TableHead scope="col">
+						<span className="sr-only">Actions</span>
+					</TableHead>
+				</TableRow>
+			</TableHeader>
+			{isLoading ? (
+				<TableRowsSkeleton columns={SKELETON_COLUMNS} rows={5} />
+			) : (
 				<TableBody>
 					{rows.map((row) => (
 						<TableRow key={row.workspaceId}>
@@ -122,7 +130,7 @@ export function AdminInstanceLlmUsageTable({
 						</TableRow>
 					))}
 				</TableBody>
-			</Table>
-		</div>
+			)}
+		</Table>
 	);
 }

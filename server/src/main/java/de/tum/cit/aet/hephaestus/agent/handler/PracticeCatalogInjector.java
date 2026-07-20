@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.nio.charset.StandardCharsets;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -83,7 +84,14 @@ class PracticeCatalogInjector {
             throw new JobPreparationException("Job has no workspace: jobId=" + job.getId());
         }
         Long workspaceId = job.getWorkspace().getId();
-        List<Practice> practices = practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(workspaceId, focus);
+        // Slug order, not SQL order: the catalog is concatenated into all-criteria.md, so an unordered result
+        // set would hand the model a differently-ordered rubric per run — and make inputs_digest disagree
+        // across runs over identical work.
+        List<Practice> practices = practiceRepository
+            .findByWorkspaceIdAndActiveTrueAndArtifactType(workspaceId, focus)
+            .stream()
+            .sorted(Comparator.comparing(Practice::getSlug))
+            .toList();
         // Lifecycle phase-correctness: when the job carries the trigger event that spawned it, materialise
         // ONLY the practices whose triggerEvents include that event — so an authoring practice is not
         // re-litigated on a fixup push (PullRequestSynchronized), a reviewer practice runs only after a

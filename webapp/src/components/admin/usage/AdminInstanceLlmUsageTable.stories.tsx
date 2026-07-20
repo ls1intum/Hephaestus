@@ -44,7 +44,8 @@ const meta = {
 		rows,
 		isCurrentMonth: true,
 		isLoading: false,
-		isError: false,
+		error: null,
+		onRetry: fn(),
 		onEditBudget: fn(),
 	},
 } satisfies Meta<typeof AdminInstanceLlmUsageTable>;
@@ -73,7 +74,18 @@ export const Loading: Story = {
 	args: { rows: [], isLoading: true },
 };
 
-/** Rollup failed to load. */
+/** Rollup failed to load — a 5xx is retryable, so the alert offers a Retry. */
 export const ErrorState: Story = {
-	args: { rows: [], isError: true },
+	args: {
+		rows: [],
+		error: { status: 500, detail: "Failed to roll up LLM usage." },
+	},
+};
+
+/** A 403 is not retryable, so the alert explains the block without offering a Retry. */
+export const ForbiddenError: Story = {
+	args: {
+		rows: [],
+		error: { status: 403, detail: "Instance admin access is required." },
+	},
 };

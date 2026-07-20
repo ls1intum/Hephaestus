@@ -22,17 +22,16 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackThreadKey;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementAnchorKind;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementAnchorSide;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
-import de.tum.cit.aet.hephaestus.practices.feedback.PolicyFloorSelector;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -66,32 +65,41 @@ public class FeedbackLedgerRecorder {
 
     private static final int IN_CONTEXT_UNIT_ORDINAL = 0;
 
+    /**
+     * Slots per ordinal band. A band that overflows would silently address the next band's unit — the
+     * {@code (agent_job_id, position)} guard would read another band's row as "already recorded" and drop the
+     * write. Writers of a variable-length band must bound themselves by this.
+     */
+    public static final int UNIT_ORDINAL_BAND_WIDTH = 1000;
+
     /** SUPPRESSED units (B2) start here so they never collide with the live IN_CONTEXT unit (ordinal 0). */
     private static final int SUPPRESSED_UNIT_ORDINAL_BASE = 1000;
 
-    /** Policy-floor SUPPRESSED units (C3) start here — clear of the live unit (0) and the B2 base (1000). */
-    private static final int POLICY_FLOOR_UNIT_ORDINAL_BASE = 2000;
+    /** Composer-withheld SUPPRESSED units (C3) start here — clear of the live unit (0) and the B2 base (1000). */
+    private static final int COMPOSER_WITHHELD_UNIT_ORDINAL_BASE = 2000;
 
     /**
      * PREPARED conversational units start here so their {@code (agent_job_id, position)} never collides with
-     * the live IN_CONTEXT unit (0), the B2 base (1000), or the policy-floor base (2000). Public so the
+     * the live IN_CONTEXT unit (0), the B2 base (1000), or the composer-withheld base (2000). Public so the
      * {@link ConversationalFeedbackPreparer} derives its
      * positions from the one shared constant rather than a second literal.
      */
     public static final int CONVERSATION_UNIT_ORDINAL_BASE = 3000;
 
     /**
-     * Undelivered (FAILED) units start here — clear of the live unit (0), the B2 base (1000), the policy-floor
-     * base (2000), and the conversational base (3000). One row per job records the composed body a delivery
-     * attempt could not place, so an evaluator can audit what the student WOULD have received.
+     * Undelivered (FAILED) units start here — clear of the live unit (0), the B2 base (1000), the
+     * composer-withheld base (2000), and the conversational base (3000). One row per job records the composed
+     * body a delivery attempt could not place, so an evaluator can audit what the student WOULD have received.
      */
     private static final int UNDELIVERED_UNIT_ORDINAL = 4000;
+
+    /** The gate-suppressed unit (one per job) — clear of every other base. */
+    private static final int GATE_SUPPRESSED_UNIT_ORDINAL = 5000;
 
     private final ObservationRepository observationRepository;
     private final FeedbackRepository feedbackRepository;
     private final FeedbackObservationRepository feedbackObservationRepository;
     private final FeedbackPlacementRepository feedbackPlacementRepository;
-    private final PracticeReviewProperties reviewProperties;
     private final ApplicationEventPublisher eventPublisher;
 
     FeedbackLedgerRecorder(
@@ -99,14 +107,12 @@ public class FeedbackLedgerRecorder {
         FeedbackRepository feedbackRepository,
         FeedbackObservationRepository feedbackObservationRepository,
         FeedbackPlacementRepository feedbackPlacementRepository,
-        PracticeReviewProperties reviewProperties,
         ApplicationEventPublisher eventPublisher
     ) {
         this.observationRepository = observationRepository;
         this.feedbackRepository = feedbackRepository;
         this.feedbackObservationRepository = feedbackObservationRepository;
         this.feedbackPlacementRepository = feedbackPlacementRepository;
-        this.reviewProperties = reviewProperties;
         this.eventPublisher = eventPublisher;
     }
 
@@ -213,27 +219,29 @@ public class FeedbackLedgerRecorder {
             feedbackRepository.updateState(supersedesId, FeedbackDeliveryState.SUPERSEDED.name());
         }
 
-        // Findings already withheld earlier in the flow as SUPPRESSED (B2 reaction suppression writes its
-        // REACTED_* units before this runs). Computed first so neither the DELIVERED binding NOR the policy
-        // floor re-binds them — B2 does NOT delete the Observation row, so a disputed-yet-recurring locus
-        // would otherwise land in the policy-dropped tail and get a SECOND (POLICY_FLOOR_DROP) SUPPRESSED unit.
+        // B2 reaction suppression already wrote its REACTED_* units before this runs and does NOT delete the
+        // Observation, so exclude those rows here or they would be bound a second time.
         Set<UUID> alreadySuppressed = new HashSet<>(
             feedbackObservationRepository.findObservationIdsSuppressedForJob(job.getId())
         );
 
-        // The policy floor (C3) caps the volume surfaced this run; the dropped tail is NOT part of the DELIVERED
-        // unit — it is recorded as SUPPRESSED below. Exclude anything already suppressed so it is dropped once.
-        List<Observation> policyDropped = reviewProperties.policyFloor()
-            ? PolicyFloorSelector.partition(
-                  findings
-                      .stream()
-                      .filter(f -> f.getAssessment() == Assessment.BAD && !alreadySuppressed.contains(f.getId()))
-                      .toList(),
-                  DeliveryComposer.MAX_IMPROVEMENT_SUGGESTIONS
-              ).dropped()
-            : List.of();
-        // The DELIVERED unit binds nothing that was withheld: policy-floor-dropped this run + already-suppressed.
-        Set<UUID> excludedIds = policyDropped
+        // The composer's drops this run, addressed by occurrence key (one observation each).
+        Map<String, FeedbackSuppressionReason> withheldByKey = delivery
+            .withheld()
+            .stream()
+            .collect(
+                Collectors.toMap(
+                    PracticeDetectionResultParser.WithheldFinding::occurrenceKey,
+                    PracticeDetectionResultParser.WithheldFinding::reason
+                )
+            );
+        List<Observation> composerWithheld = findings
+            .stream()
+            .filter(f -> withheldByKey.containsKey(f.getOccurrenceKey()))
+            .filter(f -> !alreadySuppressed.contains(f.getId()))
+            .toList();
+        // The DELIVERED unit binds nothing that was withheld: composer-withheld this run + already-suppressed.
+        Set<UUID> excludedIds = composerWithheld
             .stream()
             .map(Observation::getId)
             .collect(Collectors.toCollection(HashSet::new));
@@ -246,7 +254,7 @@ public class FeedbackLedgerRecorder {
             .stream()
             .filter(f -> f.getPresence() != Presence.NOT_APPLICABLE)
             .filter(f -> !excludedIds.contains(f.getId()))
-            // Stable order matching PolicyFloorSelector: severity, then confidence DESC, then id — so the
+            // Stable order matching the composer’s prioritisation: severity, then confidence DESC, then id — so the
             // persisted PRIMARY ordinal of equal-severity problems is reproducible across re-runs rather
             // than flapping with the repository's findByAgentJobId iteration order.
             .sorted(
@@ -261,15 +269,19 @@ public class FeedbackLedgerRecorder {
             feedbackObservationRepository.insertIfAbsent(feedback.getId(), f.getId(), role.name(), ordinal++);
         }
 
-        // SUMMARY placement — fully recoverable: external_ref is the posted summary comment id.
-        feedbackPlacementRepository.save(
-            FeedbackPlacement.builder()
-                .feedback(feedback)
-                .placementType(PlacementType.SUMMARY)
-                .postedCommentRef(job.getDeliveryCommentId())
-                .createdAt(now)
-                .build()
-        );
+        // SUMMARY placement — fully recoverable: external_ref is the posted summary comment id. Skipped
+        // entirely when no summary comment exists this run (e.g. the body sanitised to blank but inline
+        // notes landed) — a SUMMARY row with a null ref would claim a posting that never happened.
+        if (job.getDeliveryCommentId() != null) {
+            feedbackPlacementRepository.save(
+                FeedbackPlacement.builder()
+                    .feedback(feedback)
+                    .placementType(PlacementType.SUMMARY)
+                    .postedCommentRef(job.getDeliveryCommentId())
+                    .createdAt(now)
+                    .build()
+            );
+        }
 
         // INLINE placements (PR only) — the ANCHOR is always recoverable; the durable vendor handle
         // (external_ref) comes from the per-note DeliveredSignal the channel emitted this run. A note with no
@@ -294,15 +306,9 @@ public class FeedbackLedgerRecorder {
             }
         }
 
-        // C3 policy floor: record the volume-capped tail as SUPPRESSED units so an eval excludes them (they
-        // were model-correct, just policy-withheld) — best-effort, never affects the DELIVERED unit.
-        if (!policyDropped.isEmpty()) {
-            try {
-                recordPolicyFloor(job, policyDropped);
-            } catch (RuntimeException e) {
-                log.warn("Policy-floor ledger write failed (delivery unaffected): jobId={}", job.getId(), e);
-            }
-        }
+        // Deliberately in THIS transaction, uncaught: a DELIVERED unit whose withheld siblings are missing is a
+        // ledger that reads complete and is not — worse than no ledger at all. Both land, or neither does.
+        recordComposerWithheld(job, composerWithheld, withheldByKey);
 
         log.info(
             "Feedback ledger recorded: jobId={}, unit={}, findings={}, inlinePlacements={}, feedbackThreadKey={}",
@@ -328,18 +334,23 @@ public class FeedbackLedgerRecorder {
     }
 
     /**
-     * Record the volume-cap tail (C3): each policy-DROPPED problem is written as a SUPPRESSED /
-     * POLICY_FLOOR_DROP unit so an eval can exclude it rather than score a model-correct-but-policy-withheld
-     * finding as a miss.
+     * Record each never-rendered observation (C3) as a SUPPRESSED unit carrying the composer's reason, so an
+     * eval excludes it rather than scoring a model-correct-but-policy-withheld finding as a miss. Runs in the
+     * caller's transaction so these rows and the DELIVERED unit they qualify commit together.
      */
-    private void recordPolicyFloor(AgentJob job, List<Observation> dropped) {
+    private void recordComposerWithheld(
+        AgentJob job,
+        List<Observation> withheld,
+        Map<String, FeedbackSuppressionReason> reasonByKey
+    ) {
         Instant now = Instant.now();
         int index = 0;
-        for (Observation droppedFinding : dropped) {
-            int unitOrdinal = POLICY_FLOOR_UNIT_ORDINAL_BASE + index++;
+        for (Observation droppedFinding : withheld) {
+            int unitOrdinal = COMPOSER_WITHHELD_UNIT_ORDINAL_BASE + index++;
             if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), unitOrdinal)) {
                 continue;
             }
+            FeedbackSuppressionReason reason = reasonByKey.get(droppedFinding.getOccurrenceKey());
             Feedback unit = feedbackRepository.save(
                 Feedback.builder()
                     .agentJobId(job.getId())
@@ -351,7 +362,7 @@ public class FeedbackLedgerRecorder {
                     .channel(FeedbackChannel.IN_CONTEXT)
                     .position(unitOrdinal)
                     .deliveryState(FeedbackDeliveryState.SUPPRESSED)
-                    .suppressionReason(FeedbackSuppressionReason.POLICY_FLOOR_DROP)
+                    .suppressionReason(reason)
                     .source(FeedbackSource.AGENT)
                     .createdAt(now)
                     .build()
@@ -363,7 +374,74 @@ public class FeedbackLedgerRecorder {
                 0
             );
         }
-        log.info("Policy-floor: jobId={}, dropped(suppressed)={}", job.getId(), dropped.size());
+        log.info("Composer-withheld: jobId={}, dropped(suppressed)={}", job.getId(), withheld.size());
+    }
+
+    /**
+     * Record a whole prepared review that a delivery gate withheld as ONE SUPPRESSED {@code IN_CONTEXT} unit
+     * (ordinal {@link #GATE_SUPPRESSED_UNIT_ORDINAL}) binding its assessed findings, with the composed body
+     * kept for audit. Without it, a gate-withheld review reads exactly like one that was delivered and ignored.
+     *
+     * <p>Publishes NO conversational trigger: a gate decision (closed PR, opted-out author) applies to every
+     * channel, so the loci must not resurface in a mentor turn. No-ops when a DELIVERED unit already exists for
+     * the job or on retry. REQUIRES_NEW, best-effort: callers wrap in try/catch.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordSuppressedUnit(AgentJob job, DeliveryContent delivery, FeedbackSuppressionReason reason) {
+        if (delivery == null || job.getWorkspace() == null) {
+            return;
+        }
+        if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), IN_CONTEXT_UNIT_ORDINAL)) {
+            return; // a DELIVERED unit already exists (a prior run landed) — never contradict it
+        }
+        if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), GATE_SUPPRESSED_UNIT_ORDINAL)) {
+            return; // already recorded (job retry)
+        }
+        List<Observation> findings = observationRepository.findByAgentJobId(job.getId());
+        if (findings.isEmpty()) {
+            return;
+        }
+        Observation any = findings.get(0);
+        Instant now = Instant.now();
+        Feedback feedback = feedbackRepository.save(
+            Feedback.builder()
+                .agentJobId(job.getId())
+                .workspaceId(job.getWorkspace().getId())
+                .artifactType(any.getArtifactType())
+                .artifactId(any.getArtifactId())
+                .recipientUserId(any.getAboutUserId())
+                .aboutUserId(any.getAboutUserId())
+                .channel(FeedbackChannel.IN_CONTEXT)
+                .position(GATE_SUPPRESSED_UNIT_ORDINAL)
+                .deliveryState(FeedbackDeliveryState.SUPPRESSED)
+                .suppressionReason(reason)
+                .body(delivery.mrNote())
+                .source(FeedbackSource.AGENT)
+                .threadKey(feedbackThreadKeyFor(any))
+                .createdAt(now)
+                .build()
+        );
+        int ordinal = 0;
+        List<Observation> assessed = findings
+            .stream()
+            .filter(f -> f.getPresence() != Presence.NOT_APPLICABLE)
+            .sorted(
+                Comparator.comparingInt(FeedbackLedgerRecorder::severityOrdinal)
+                    .thenComparing(Comparator.comparing(FeedbackLedgerRecorder::confidenceOf).reversed())
+                    .thenComparing(f -> f.getId().toString())
+            )
+            .toList();
+        for (Observation f : assessed) {
+            EvidenceRole role = f.getAssessment() == Assessment.BAD ? EvidenceRole.PRIMARY : EvidenceRole.SUPPORTING;
+            feedbackObservationRepository.insertIfAbsent(feedback.getId(), f.getId(), role.name(), ordinal++);
+        }
+        log.info(
+            "Feedback suppressed (delivery gate): jobId={}, unit={}, reason={}, boundFindings={}",
+            job.getId(),
+            feedback.getId(),
+            reason,
+            assessed.size()
+        );
     }
 
     /**
@@ -569,7 +647,7 @@ public class FeedbackLedgerRecorder {
         return f.getSeverity() == null ? Integer.MAX_VALUE : f.getSeverity().ordinal();
     }
 
-    /** Confidence for the stable sort tiebreak, treating a null confidence as 0 (mirrors PolicyFloorSelector). */
+    /** Confidence for the stable sort tiebreak, treating a null confidence as 0 (mirrors DeliveryComposer). */
     private static float confidenceOf(Observation f) {
         return f.getConfidence() == null ? 0f : f.getConfidence();
     }

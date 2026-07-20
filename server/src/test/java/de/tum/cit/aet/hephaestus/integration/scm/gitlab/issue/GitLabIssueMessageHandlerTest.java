@@ -187,18 +187,22 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
     class ConfidentialIssues {
 
         @Test
-        void confidentialIssue_skipsProcessing() throws IOException {
-            GitLabIssueEventDTO event = createEvent("open", "opened", true);
+        void confidentialIssue_purgesSnapshotInsteadOfProcessing() throws IOException {
+            // A public → confidential flip must NOT (re)ingest, but MUST purge any already-mirrored public
+            // snapshot — so the handler resolves the context (to know the repo) and delegates to
+            // purgeConfidential rather than short-circuiting before context resolution.
+            GitLabIssueEventDTO event = createEvent("update", "opened", true);
 
             Message msg = mockMessage(event);
             handler.onMessage(msg);
 
+            verify(issueProcessor).purgeConfidential(eq(event), any(ProcessingContext.class));
             verify(issueProcessor, never()).process(any(), any());
-            verify(contextResolver, never()).resolve(any(), any(), any());
+            verify(issueProcessor, never()).processUpdated(any(), any());
         }
 
         @Test
-        void confidentialIssueEventType_skipsProcessing() throws IOException {
+        void confidentialIssueEventType_purgesSnapshot() throws IOException {
             var attrs = new GitLabIssueEventDTO.ObjectAttributes(
                 422297L,
                 6,
@@ -229,6 +233,20 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
             Message msg = mockMessage(event);
             handler.onMessage(msg);
 
+            verify(issueProcessor).purgeConfidential(eq(event), any(ProcessingContext.class));
+            verify(issueProcessor, never()).process(any(), any());
+        }
+
+        @Test
+        void confidentialIssueOnUntrackedRepo_doesNotPurge() throws IOException {
+            // No context (repo not monitored) → nothing was ever stored → no purge attempt.
+            when(contextResolver.resolve(eq(PROJECT_PATH), any(), any())).thenReturn(null);
+            GitLabIssueEventDTO event = createEvent("update", "opened", true);
+
+            Message msg = mockMessage(event);
+            handler.onMessage(msg);
+
+            verify(issueProcessor, never()).purgeConfidential(any(), any());
             verify(issueProcessor, never()).process(any(), any());
         }
     }

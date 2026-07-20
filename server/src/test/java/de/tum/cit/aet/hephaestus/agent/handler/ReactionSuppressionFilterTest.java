@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -28,6 +29,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 
 /** Unit tests for reaction-aware re-nag suppression (ADR 0021, B2). */
@@ -60,7 +62,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
             observationRepository,
             reactionRepository,
             feedbackLedgerRecorder,
-            new PracticeReviewProperties(false, true, false, "", 15, false, enabled, false)
+            new PracticeReviewProperties(false, true, false, "", 15, false, enabled)
         );
     }
 
@@ -197,8 +199,41 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         );
     }
 
+    @Test
+    void sameLocusSiblings_eachGetTheirOwnSuppressedRow() {
+        // Two findings of one practice on one file share a recurrence key by design, and one reaction on that
+        // locus withholds BOTH. Each must be ledgered against ITS OWN observation: indexing observations by
+        // locus would record the first one twice and leave the sibling withheld with no row — the recorder
+        // would then bind it PRIMARY to the DELIVERED unit, and it would read as feedback the developer saw.
+        Observation first = pf(CK, "occ-first");
+        Observation second = pf(CK, "occ-second");
+        List<Observation> persisted = List.of(first, second);
+        List<Reaction> disputed = List.of(reaction(ReactionAction.DISPUTED));
+        when(observationRepository.findByAgentJobId(any())).thenReturn(persisted);
+        when(reactionRepository.findLatestByRecurrenceKeysAndReactor(any(), eq(CONTRIBUTOR))).thenReturn(disputed);
+
+        var decision = filter(true).evaluate(
+            TestEntities.agentJob(),
+            List.of(vf(SLUG, Presence.ABSENT, CK, "occ-first"), vf(SLUG, Presence.ABSENT, CK, "occ-second"))
+        );
+
+        assertThat(decision.deliverable()).isEmpty();
+        ArgumentCaptor<Observation> ledgered = ArgumentCaptor.forClass(Observation.class);
+        verify(feedbackLedgerRecorder, org.mockito.Mockito.times(2)).recordSuppressed(
+            any(),
+            ledgered.capture(),
+            eq(FeedbackSuppressionReason.REACTED_DISPUTED),
+            org.mockito.ArgumentMatchers.anyInt()
+        );
+        assertThat(ledgered.getAllValues()).containsExactlyInAnyOrder(first, second);
+    }
+
     private static ValidatedFinding vf(String slug, Presence presence) {
         return vf(slug, presence, CK);
+    }
+
+    private static ValidatedFinding vf(String slug, Presence presence, String recurrenceKey, String occurrenceKey) {
+        return vf(slug, presence, recurrenceKey).withKeys(new ObservationKeys(occurrenceKey, recurrenceKey));
     }
 
     private static ValidatedFinding vf(String slug, Presence presence, String recurrenceKey) {
@@ -222,15 +257,20 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
             "because reasons",
             "do x",
             List.of(),
-            recurrenceKey
+            new ObservationKeys("occ-" + recurrenceKey, recurrenceKey)
         );
     }
 
-    private Observation pf(String findingFingerprint) {
+    private Observation pf(String recurrenceKey) {
+        return pf(recurrenceKey, "occ-" + recurrenceKey);
+    }
+
+    private Observation pf(String recurrenceKey, String occurrenceKey) {
         Observation pf = org.mockito.Mockito.mock(Observation.class);
         // aboutUserId is always populated; for author-side findings it equals the contributor.
-        when(pf.getRecurrenceKey()).thenReturn(findingFingerprint);
-        when(pf.getAboutUserId()).thenReturn(CONTRIBUTOR);
+        lenient().when(pf.getRecurrenceKey()).thenReturn(recurrenceKey);
+        lenient().when(pf.getOccurrenceKey()).thenReturn(occurrenceKey);
+        lenient().when(pf.getAboutUserId()).thenReturn(CONTRIBUTOR);
         return pf;
     }
 

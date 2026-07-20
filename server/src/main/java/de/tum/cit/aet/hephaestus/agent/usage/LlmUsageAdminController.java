@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.usage;
 
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageDTOs.AdminWorkspaceLlmUsageDTO;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageDTOs.UpdateWorkspaceLlmBudgetRequestDTO;
+import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -62,6 +63,7 @@ public class LlmUsageAdminController {
         summary = "Set or clear a workspace's monthly LLM budget cap",
         operationId = "adminUpdateWorkspaceLlmBudget"
     )
+    @Audited("WORKSPACE_LLM_BUDGET")
     public ResponseEntity<Void> updateBudget(
         @PathVariable Long workspaceId,
         @Valid @RequestBody UpdateWorkspaceLlmBudgetRequestDTO request

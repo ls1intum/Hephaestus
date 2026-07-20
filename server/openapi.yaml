@@ -71,6 +71,8 @@ tags:
   name: Auth discovery
 - description: GDPR Art. 20 self-service data export
   name: Account
+- description: Workspace-scoped history of admin configuration changes
+  name: Config Audit
 - description: |-
     Vendor OAuth redirect ingress at <code>/oauth/callback/{kind</code>}. Unauthenticated —
      identity comes from the HMAC-signed <code>state</code> param. Browsers get 302 redirects
@@ -98,6 +100,8 @@ tags:
 - description: Workspace-scoped AI configuration (runtime bindings + practice-review
     policy)
   name: AI Settings
+- description: Integration sync observability and manual controls
+  name: Sync
 - description: "Current user identity, linked accounts, deletion"
   name: Account
 paths:
@@ -149,29 +153,33 @@ paths:
         name: eventType
         required: false
         schema:
-          type: string
-          enum:
-          - LOGIN
-          - LOGIN_FAILED
-          - LOGOUT
-          - TOKEN_REFRESH
-          - JWT_REVOKED
-          - IDENTITY_LINKED
-          - IDENTITY_UNLINKED
-          - IMPERSONATION_BEGIN
-          - IMPERSONATION_END
-          - ACCOUNT_DELETED
-          - EXPORT_REQUESTED
-          - APP_ROLE_CHANGED
-          - RESEARCH_CONSENT_REVOKED
+          type: array
+          items:
+            type: string
+            enum:
+            - LOGIN
+            - LOGIN_FAILED
+            - LOGOUT
+            - TOKEN_REFRESH
+            - JWT_REVOKED
+            - IDENTITY_LINKED
+            - IDENTITY_UNLINKED
+            - IMPERSONATION_BEGIN
+            - IMPERSONATION_END
+            - ACCOUNT_DELETED
+            - EXPORT_REQUESTED
+            - APP_ROLE_CHANGED
+            - RESEARCH_CONSENT_REVOKED
       - in: query
         name: result
         required: false
         schema:
-          type: string
-          enum:
-          - SUCCESS
-          - FAILURE
+          type: array
+          items:
+            type: string
+            enum:
+            - SUCCESS
+            - FAILURE
       - in: query
         name: from
         required: false
@@ -214,29 +222,33 @@ paths:
         name: eventType
         required: false
         schema:
-          type: string
-          enum:
-          - LOGIN
-          - LOGIN_FAILED
-          - LOGOUT
-          - TOKEN_REFRESH
-          - JWT_REVOKED
-          - IDENTITY_LINKED
-          - IDENTITY_UNLINKED
-          - IMPERSONATION_BEGIN
-          - IMPERSONATION_END
-          - ACCOUNT_DELETED
-          - EXPORT_REQUESTED
-          - APP_ROLE_CHANGED
-          - RESEARCH_CONSENT_REVOKED
+          type: array
+          items:
+            type: string
+            enum:
+            - LOGIN
+            - LOGIN_FAILED
+            - LOGOUT
+            - TOKEN_REFRESH
+            - JWT_REVOKED
+            - IDENTITY_LINKED
+            - IDENTITY_UNLINKED
+            - IMPERSONATION_BEGIN
+            - IMPERSONATION_END
+            - ACCOUNT_DELETED
+            - EXPORT_REQUESTED
+            - APP_ROLE_CHANGED
+            - RESEARCH_CONSENT_REVOKED
       - in: query
         name: result
         required: false
         schema:
-          type: string
-          enum:
-          - SUCCESS
-          - FAILURE
+          type: array
+          items:
+            type: string
+            enum:
+            - SUCCESS
+            - FAILURE
       - in: query
         name: from
         required: false
@@ -257,6 +269,98 @@ paths:
                 type: string
           description: OK
       summary: "Export the filtered audit log as CSV (newest first, capped)"
+      tags:
+      - Admin
+  /admin/config-audit:
+    get:
+      operationId: adminListConfigAuditEvents
+      parameters:
+      - in: query
+        name: workspaceId
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+      - in: query
+        name: entityType
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - PRACTICE_REVIEW_SETTINGS
+            - AI_CONFIG_BINDING
+            - AGENT_CONFIG
+            - WORKSPACE_ROLE
+            - WORKSPACE_FEATURES
+            - WORKSPACE_STATUS
+            - WORKSPACE_TOKEN
+            - WORKSPACE_VISIBILITY
+            - PRACTICE_ACTIVE
+            - WORKSPACE_LLM_BUDGET
+      - in: query
+        name: entityId
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: changedKey
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: action
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - CREATED
+            - UPDATED
+            - DELETED
+      - in: query
+        name: actorId
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: from
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: to
+        required: false
+        schema:
+          type: string
+          format: date-time
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageConfigAuditEntryView"
+          description: OK
+      summary: "List admin configuration changes across workspaces (paged, newest\
+        \ first)"
       tags:
       - Admin
   /admin/llm-usage:
@@ -1352,6 +1456,98 @@ paths:
       summary: Update per-workspace practice-review policy
       tags:
       - AI Settings
+  /workspaces/{workspaceSlug}/config-audit:
+    get:
+      operationId: listWorkspaceConfigAuditEvents
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+      - in: query
+        name: entityType
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - PRACTICE_REVIEW_SETTINGS
+            - AI_CONFIG_BINDING
+            - AGENT_CONFIG
+            - WORKSPACE_ROLE
+            - WORKSPACE_FEATURES
+            - WORKSPACE_STATUS
+            - WORKSPACE_TOKEN
+            - WORKSPACE_VISIBILITY
+            - PRACTICE_ACTIVE
+            - WORKSPACE_LLM_BUDGET
+      - in: query
+        name: entityId
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: changedKey
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: action
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - CREATED
+            - UPDATED
+            - DELETED
+      - in: query
+        name: actorId
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: from
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: to
+        required: false
+        schema:
+          type: string
+          format: date-time
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageConfigAuditEntryView"
+          description: OK
+      summary: "List this workspace's admin configuration changes (paged, newest first)"
+      tags:
+      - Config Audit
   /workspaces/{workspaceSlug}/connections:
     get:
       operationId: list
@@ -1399,9 +1595,9 @@ paths:
           description: OK
       tags:
       - Connections
-  /workspaces/{workspaceSlug}/connections/outline/status:
+  /workspaces/{workspaceSlug}/connections/catalog:
     get:
-      operationId: getOutlineConnectionStatus
+      operationId: getIntegrationCatalog
       parameters:
       - description: Workspace slug
         in: path
@@ -1415,38 +1611,14 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/OutlineConnectionStatus"
-          description: Connection health snapshot returned
-        "404":
-          description: The workspace has no ACTIVE Outline connection
-      summary: "Health of the workspace's active Outline connection (webhook, last\
-        \ sync, document count)"
+                type: array
+                items:
+                  $ref: "#/components/schemas/IntegrationCatalogEntry"
+          description: OK
+      summary: "Every integration kind this workspace could connect, joined against\
+        \ existing connections"
       tags:
-      - Connections
-  /workspaces/{workspaceSlug}/connections/outline/sync:
-    post:
-      description: Runs off the request thread. Always answers 202 with the connection
-        status resource in the Location header; a duplicate trigger while a reconcile
-        is still running starts nothing new and returns the same 202 pointing at the
-        same monitor.
-      operationId: syncOutlineConnection
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      responses:
-        "202":
-          description: Reconcile accepted (or already running — duplicate submits
-            are absorbed); poll the connection status resource in the Location header
-        "404":
-          description: The workspace has no ACTIVE Outline connection
-      summary: "Trigger the full Outline reconcile for this workspace (async, 202)"
-      tags:
-      - Connections
+      - Sync
   /workspaces/{workspaceSlug}/connections/outline/token:
     get:
       description: "Probes Outline directly. Reports whether the token is still accepted\
@@ -1508,6 +1680,227 @@ paths:
       summary: Post a test message to verify the Slack connection
       tags:
       - Connections
+  /workspaces/{workspaceSlug}/connections/{connectionId}/sync:
+    get:
+      operationId: getConnectionSyncStatus
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: connectionId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectionSyncStatus"
+          description: OK
+      summary: Unified sync status for one connection
+      tags:
+      - Sync
+  /workspaces/{workspaceSlug}/connections/{connectionId}/sync/jobs:
+    get:
+      operationId: listConnectionSyncJobs
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: connectionId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageSyncJob"
+          description: OK
+      summary: Paginated sync job history for one connection
+      tags:
+      - Sync
+    post:
+      description: |-
+        Trigger a manual sync. Idempotent-absorb: a connection that already has an active job answers
+         200 with that job rather than erroring, so a double-click "Sync now" is harmless.
+      operationId: triggerSyncJob
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: connectionId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TriggerSyncJobRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncJob"
+          description: "Idempotent-absorb: a same-type job was already running and\
+            \ is returned unchanged"
+        "202":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncJob"
+          description: A new sync job was created and dispatched
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Missing or invalid request body (e.g. absent sync type)
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Connection not found in this workspace
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "Connection is not ACTIVE, a different sync type is already\
+            \ running, or manual sync is unsupported for the kind"
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The server is too busy to dispatch the sync; retry later
+      summary: Trigger a manual sync or backfill
+      tags:
+      - Sync
+  /workspaces/{workspaceSlug}/connections/{connectionId}/sync/jobs/{jobId}:
+    patch:
+      operationId: updateConnectionSyncJob
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: connectionId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: path
+        name: jobId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSyncJobRequest"
+        required: true
+      responses:
+        "202":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncJob"
+          description: Cancellation requested; the running job stops cooperatively
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The update does not request cancellation
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "Job not found in this workspace, or not owned by this connection"
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Job is already in a terminal status
+      summary: Update a running sync job
+      tags:
+      - Sync
+  /workspaces/{workspaceSlug}/connections/{connectionId}/sync/resources:
+    get:
+      operationId: listConnectionSyncResources
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: connectionId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SyncResourceState"
+          description: OK
+      summary: Per-resource sync state (repos / channels / collections) for one connection
+      tags:
+      - Sync
   /workspaces/{workspaceSlug}/connections/{id}:
     get:
       operationId: read
@@ -4640,6 +5033,19 @@ components:
       - id
       - occurredAt
       - result
+    BackfillSummary:
+      type: object
+      description: Connection-level backfill rollup
+      properties:
+        percent:
+          type: integer
+          format: int32
+          description: "0-100 completion estimate, if computable"
+        state:
+          type: string
+          description: Integration-defined backfill state string
+      required:
+      - state
     BinaryAchievementProgress:
       allOf:
       - $ref: "#/components/schemas/AchievementProgress"
@@ -4731,6 +5137,92 @@ components:
           format: uuid
         title:
           type: string
+    ConfigAuditActorRef:
+      type: object
+      description: |-
+        A human-readable actor identity on an audit row. Resolved at read time, so an erased account
+         degrades here without the trail being rewritten: <code>AccountPurger</code> clears the email, replaces
+         the display name with a placeholder, and nulls the row's actor references.
+
+         <p>Named distinctly from the auth trail's own <code>AccountRefDTO</code>: the OpenAPI schema key is the
+         simple name minus the <code>DTO</code> suffix, so two <code>AccountRefDTO</code> records would collide and one
+         would be silently dropped from the spec.
+      properties:
+        displayName:
+          type: string
+        email:
+          type: string
+        id:
+          type: integer
+          format: int64
+    ConfigAuditEntryView:
+      type: object
+      description: "One audit row, flattened for a viewer. Crosses the module boundary,\
+        \ so it carries no entity."
+      properties:
+        actingAccountId:
+          type: integer
+          format: int64
+        actingActor:
+          $ref: "#/components/schemas/ConfigAuditActorRef"
+          description: "resolved impersonator, present only for {@link ConfigAuditActorKind#IMPERSONATED\
+            \ ConfigAuditActorKind#IMPERSONATED}"
+        action:
+          type: string
+          enum:
+          - CREATED
+          - UPDATED
+          - DELETED
+        actor:
+          $ref: "#/components/schemas/ConfigAuditActorRef"
+          description: |-
+            resolved identity of {@link de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntryViewDTO#actorAccountId #actorAccountId}; null for SYSTEM rows or once the
+                                 account is gone. Read together with {@link de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntryViewDTO#actorKind #actorKind} — that is what keeps
+                                 "a system did this" distinct from "we no longer know who did this".
+        actorAccountId:
+          type: integer
+          format: int64
+        actorKind:
+          type: string
+          enum:
+          - USER
+          - SYSTEM
+          - IMPERSONATED
+        changedKeys:
+          type: array
+          description: "dot-paths that differ between {@link de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntryViewDTO#oldValue\
+            \ #oldValue} and {@link de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntryViewDTO#newValue\
+            \ #newValue}"
+          items:
+            type: string
+        entityId:
+          type: string
+        entityType:
+          type: string
+          enum:
+          - PRACTICE_REVIEW_SETTINGS
+          - AI_CONFIG_BINDING
+          - AGENT_CONFIG
+          - WORKSPACE_ROLE
+          - WORKSPACE_FEATURES
+          - WORKSPACE_STATUS
+          - WORKSPACE_TOKEN
+          - WORKSPACE_VISIBILITY
+          - PRACTICE_ACTIVE
+          - WORKSPACE_LLM_BUDGET
+        id:
+          type: integer
+          format: int64
+        newValue:
+          type: string
+        occurredAt:
+          type: string
+          format: date-time
+        oldValue:
+          type: string
+        workspaceId:
+          type: integer
+          format: int64
     ConnectionAuditEntry:
       type: object
       description: |-
@@ -4891,6 +5383,94 @@ components:
         updatedAt:
           type: string
           format: date-time
+    ConnectionSyncStatus:
+      type: object
+      description: Unified sync-observability status for one connection
+      properties:
+        activeJob:
+          $ref: "#/components/schemas/SyncJob"
+          description: "Currently PENDING/RUNNING job, if any"
+        backfill:
+          $ref: "#/components/schemas/BackfillSummary"
+          description: "Connection-level backfill rollup, if applicable"
+        backfillSupported:
+          type: boolean
+          description: "Whether this kind's runner offers an explicitly triggerable\
+            \ backfill pass. Reflects the vendor capability only — the scheduled-backfill\
+            \ flag does not gate it, so a manual backfill stays available while the\
+            \ automatic cycle is administratively paused."
+        connectionId:
+          type: integer
+          format: int64
+          description: Connection id
+        connectionState:
+          type: string
+          description: Raw connection lifecycle state
+          enum:
+          - PENDING
+          - ACTIVE
+          - SUSPENDED
+          - UNINSTALLED
+        health:
+          type: string
+          description: Derived health
+          enum:
+          - PENDING
+          - HEALTHY
+          - DEGRADED
+          - FAILED
+          - SUSPENDED
+        kind:
+          type: string
+          description: Integration kind
+          enum:
+          - GITHUB
+          - GITLAB
+          - SLACK
+          - OUTLINE
+        lastEventProcessedAt:
+          type: string
+          format: date-time
+          description: "When the last inbound webhook/event was processed for this\
+            \ connection, if any"
+        lastJob:
+          $ref: "#/components/schemas/SyncJob"
+          description: "Most recently finished job, if any"
+        lastSuccessfulSyncAt:
+          type: string
+          format: date-time
+          description: Most recent successful job's finish time
+        nextScheduledSyncAt:
+          type: string
+          format: date-time
+          description: When the next periodic reconciliation is expected
+        rateLimit:
+          $ref: "#/components/schemas/RateLimitSnapshot"
+          description: "Current rate-limit budget, if known"
+        resourceCounts:
+          $ref: "#/components/schemas/ResourceCounts"
+          description: Resource-level rollup
+        syncIntervalSeconds:
+          type: integer
+          format: int64
+          description: "The periodic reconciliation's cadence in seconds, when the\
+            \ schedule has a regular one. This is what makes a resource's lastSyncedAt\
+            \ judgeable: \"synced 4h ago\" is only stale if the cadence is hourly,\
+            \ and a client cannot know that without this. Null when the schedule is\
+            \ irregular or unparseable — clients must then decline to judge staleness\
+            \ rather than assume a default, exactly as the server's own stale rollup\
+            \ does."
+        webhookRegistered:
+          type: boolean
+          description: Whether the vendor webhook registration is present; null if
+            not applicable/unknown
+      required:
+      - backfillSupported
+      - connectionId
+      - connectionState
+      - health
+      - kind
+      - resourceCounts
     Contributor:
       type: object
       description: Information about a contributor to the Hephaestus project
@@ -5523,6 +6103,41 @@ components:
         vendorUrl:
           type: string
           format: uri
+    IntegrationCatalogEntry:
+      type: object
+      description: Integration kind availability + connection status for this workspace
+      properties:
+        connected:
+          type: boolean
+          description: Whether this workspace has a (non-UNINSTALLED) connection for
+            this kind
+        connectionId:
+          type: integer
+          format: int64
+          description: "Connection id, if connected"
+        connectionState:
+          type: string
+          description: "Connection state, if connected"
+          enum:
+          - PENDING
+          - ACTIVE
+          - SUSPENDED
+          - UNINSTALLED
+        displayName:
+          type: string
+          description: Human-readable display name
+        kind:
+          type: string
+          description: Integration kind
+          enum:
+          - GITHUB
+          - GITLAB
+          - SLACK
+          - OUTLINE
+      required:
+      - connected
+      - displayName
+      - kind
     LabelInfo:
       type: object
       description: Information about a label from a repository
@@ -6052,45 +6667,6 @@ components:
       required:
       - alreadyMirrored
       - collectionId
-    OutlineConnectionStatus:
-      type: object
-      description: Health of the workspace's active Outline connection
-      properties:
-        documentCount:
-          type: integer
-          format: int64
-          description: Live (non-tombstoned) mirrored document count across all collections
-        erroredCollections:
-          type: integer
-          format: int64
-          description: Collections whose last sync attempt recorded an error (cleared
-            on the next clean pass)
-        lastSyncedAt:
-          type: string
-          format: date-time
-          description: "When a mirrored collection last completed a full reconcile\
-            \ pass, if any"
-        pendingCollections:
-          type: integer
-          format: int64
-          description: Enabled collections still awaiting a clean sync pass
-        syncRunning:
-          type: boolean
-          description: Whether a manually triggered full reconcile is currently running
-            for this workspace
-        webhookRegistered:
-          type: boolean
-          description: "Whether a webhook subscription id is currently stored for\
-            \ this connection. This is existence only, not a liveness check: Outline\
-            \ auto-disables a subscription after repeated delivery failures, and a\
-            \ stale id here self-heals on the next reconcile rather than being verified\
-            \ live by this endpoint."
-      required:
-      - documentCount
-      - erroredCollections
-      - pendingCollections
-      - syncRunning
-      - webhookRegistered
     OutlineTokenStatus:
       type: object
       description: Live state of the API token behind the workspace's Outline connection
@@ -6182,6 +6758,38 @@ components:
         totalPages:
           type: integer
           format: int32
+    PageConfigAuditEntryView:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConfigAuditEntryView"
+        empty:
+          type: boolean
+        first:
+          type: boolean
+        last:
+          type: boolean
+        number:
+          type: integer
+          format: int32
+        numberOfElements:
+          type: integer
+          format: int32
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        size:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
     PageObservationList:
       type: object
       properties:
@@ -6189,6 +6797,38 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ObservationList"
+        empty:
+          type: boolean
+        first:
+          type: boolean
+        last:
+          type: boolean
+        number:
+          type: integer
+          format: int32
+        numberOfElements:
+          type: integer
+          format: int32
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        size:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PageSyncJob:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/SyncJob"
         empty:
           type: boolean
         first:
@@ -6345,6 +6985,25 @@ components:
       - id
       - name
       - slug
+    ProblemDetail:
+      type: object
+      properties:
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri
+        properties:
+          type: object
+          additionalProperties: {}
+        status:
+          type: integer
+          format: int32
+        title:
+          type: string
+        type:
+          type: string
+          format: uri
     Profile:
       type: object
       description: "User profile header: identity, league standing, contribution surface,\
@@ -6711,6 +7370,38 @@ components:
       - number
       - state
       - title
+    RateLimitSnapshot:
+      type: object
+      description: "Vendor API rate-limit observation, read from in-memory trackers\
+        \ (not persisted across restarts). Every field except observedAt is present\
+        \ only if the vendor actually reported it."
+      properties:
+        limit:
+          type: integer
+          format: int32
+          description: "Window ceiling, if the vendor reported one. Survives window\
+            \ rollover — a ceiling is window-invariant."
+        observedAt:
+          type: string
+          format: date-time
+          description: When the underlying vendor response was seen
+        remaining:
+          type: integer
+          format: int32
+          description: "Remaining budget, if reported and still inside the observed\
+            \ window. Null once the window has rolled over."
+        resetAt:
+          type: string
+          format: date-time
+          description: "When the observed window ends, if reported and still in the\
+            \ future"
+        throttledUntil:
+          type: string
+          format: date-time
+          description: An observed 429's back-off deadline (observedAt + Retry-After);
+            null if the vendor never told us to back off
+      required:
+      - observedAt
     Reaction:
       type: object
       description: Developer reaction to a delivered unit of feedback
@@ -6969,6 +7660,37 @@ components:
       - id
       - name
       - nameWithOwner
+    ResourceCounts:
+      type: object
+      description: Resource-level rollup for the connection overview badge
+      properties:
+        errored:
+          type: integer
+          format: int64
+          description: Resources currently reporting a sync error
+        pending:
+          type: integer
+          format: int64
+          description: "Resources that have never completed a sync (no lastSyncedAt).\
+            \ Defined on the timestamp rather than on a provider's status vocabulary\
+            \ so it means the same thing for a repository, a Slack channel and an\
+            \ Outline collection."
+        stale:
+          type: integer
+          format: int64
+          description: "Resources whose last sync is older than twice the connection's\
+            \ scheduled cadence. Always 0 when the cadence is unknown or the schedule\
+            \ is irregular — staleness is a judgement against a known cron, and without\
+            \ one this declines to guess rather than flagging healthy resources."
+        total:
+          type: integer
+          format: int64
+          description: Total resources known to this connection
+      required:
+      - errored
+      - pending
+      - stale
+      - total
     RevokeSessionsResult:
       type: object
       properties:
@@ -7176,6 +7898,179 @@ components:
           type: boolean
         unsorted:
           type: boolean
+    SyncJob:
+      type: object
+      description: One sync_job row — a single INITIAL/RECONCILIATION/BACKFILL pass
+        for a connection
+      properties:
+        cancelRequested:
+          type: boolean
+          description: Whether a cooperative cancel was requested
+        createdAt:
+          type: string
+          format: date-time
+          description: When the job row was created
+        errorSummary:
+          type: string
+          description: "Truncated error summary, set on FAILED"
+        finishedAt:
+          type: string
+          format: date-time
+          description: When the job finished (any terminal status)
+        id:
+          type: integer
+          format: int64
+          description: Job id
+        itemsProcessed:
+          type: integer
+          format: int32
+          description: "Coarse progress: items processed so far"
+        itemsTotal:
+          type: integer
+          format: int32
+          description: "Coarse progress: total items, if known"
+        progress:
+          type: object
+          additionalProperties: {}
+          description: "Per-phase progress detail, integration-specific shape"
+        startedAt:
+          type: string
+          format: date-time
+          description: When the job started running
+        status:
+          type: string
+          description: Job status
+          enum:
+          - PENDING
+          - RUNNING
+          - SUCCEEDED
+          - SUCCEEDED_WITH_WARNINGS
+          - FAILED
+          - CANCELLED
+        trigger:
+          type: string
+          description: What initiated this job
+          enum:
+          - SCHEDULED
+          - MANUAL
+          - LIFECYCLE
+          - SYSTEM
+        triggeredByUserId:
+          type: integer
+          format: int64
+          description: "Account id of the admin who triggered this job, if MANUAL"
+        type:
+          type: string
+          description: What kind of pass this is
+          enum:
+          - INITIAL
+          - RECONCILIATION
+          - BACKFILL
+      required:
+      - cancelRequested
+      - createdAt
+      - id
+      - status
+      - trigger
+      - type
+    SyncResourceCount:
+      type: object
+      description: "One entity class mirrored within a resource (issues, pull requests,\
+        \ comments, messages, …)"
+      properties:
+        count:
+          type: integer
+          format: int64
+          description: Mirrored row count for this class
+        key:
+          type: string
+          description: Stable machine token for this class
+          enum:
+          - issues
+          - pullRequests
+          - issueComments
+          - reviews
+          - reviewComments
+          - commits
+          - messages
+          - documents
+          example: pullRequests
+        label:
+          type: string
+          description: Display name
+          example: Pull requests
+        lastSyncedAt:
+          type: string
+          format: date-time
+          description: When this class was last synced. Null means the integration
+            does not track a per-class watermark — not that the class has never synced.
+      required:
+      - count
+      - key
+      - label
+    SyncResourceState:
+      type: object
+      description: One synced resource (repository / channel / collection) — unified
+        read-model row
+      properties:
+        backfillCompletedThrough:
+          type: string
+          format: date-time
+          description: Per-resource backfill horizon
+        backfillPercent:
+          type: integer
+          format: int32
+          description: Per-resource backfill percent
+        counts:
+          type: array
+          description: "Per-entity-class breakdown behind itemCount. One entry per\
+            \ class the integration actually mirrors — 6 for an SCM repository, 1\
+            \ for a Slack channel or Outline collection. Never null; empty when the\
+            \ resource has never synced."
+          items:
+            $ref: "#/components/schemas/SyncResourceCount"
+        externalId:
+          type: string
+          description: Vendor-side identifier
+        id:
+          type: integer
+          format: int64
+          description: The integration's own row id
+        itemCount:
+          type: integer
+          format: int64
+          description: Headline mirrored item count — the rollup of `counts`
+        lastError:
+          type: string
+          description: "Last sync error, if any"
+        lastSyncedAt:
+          type: string
+          format: date-time
+          description: Last successful sync timestamp across all entity classes
+        name:
+          type: string
+          description: Display name
+        state:
+          type: string
+          description: Integration-defined status string
+        type:
+          type: string
+          description: Resource kind
+          enum:
+          - REPOSITORY
+          - CHANNEL
+          - COLLECTION
+        upstreamCount:
+          type: integer
+          format: int64
+          description: "Vendor-reported upstream count, if cheaply available"
+      required:
+      - counts
+      - externalId
+      - id
+      - name
+      - state
+      - type
     TeamInfo:
       type: object
       description: "Detailed information about a team including members, repositories,\
@@ -7279,6 +8174,20 @@ components:
       - hidden
       - id
       - name
+    TriggerSyncJobRequest:
+      type: object
+      description: Manual sync trigger request body
+      properties:
+        type:
+          type: string
+          description: "RECONCILIATION for a full re-sync, BACKFILL for historical\
+            \ data"
+          enum:
+          - INITIAL
+          - RECONCILIATION
+          - BACKFILL
+      required:
+      - type
     UpdateAccountRequest:
       type: object
       properties:
@@ -7594,6 +8503,13 @@ components:
           type: boolean
       required:
       - channelMessagesAllowed
+    UpdateSyncJobRequest:
+      type: object
+      properties:
+        cancelRequested:
+          type: boolean
+      required:
+      - cancelRequested
     UpdateTeamSettingsRequest:
       type: object
       description: Request to update team visibility settings in a workspace

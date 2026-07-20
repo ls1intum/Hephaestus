@@ -37,8 +37,6 @@ import org.springframework.web.bind.annotation.RestController;
  */
 class CodeQualityTest extends HephaestusArchitectureTest {
 
-    // GOD CLASS DETECTION
-
     @Nested
     class GodClassTests {
 
@@ -53,7 +51,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
          */
         @Test
         void servicesHaveLimitedConstructorParams() {
-            // Orchestrator services that coordinate many sub-services are allowed more dependencies
             Set<String> orchestratorExceptions = Set.of(
                 "GithubDataSyncService", // Coordinates 15 entity-specific sync services
                 "GitHubHistoricalBackfillService", // Coordinates multiple sync services for historical data backfill
@@ -112,8 +109,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         }
     }
 
-    // METHOD COMPLEXITY LIMITS
-
     @Nested
     class MethodComplexityTests {
 
@@ -171,7 +166,9 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "SlackMessageRepository.tombstone",
                 // JPQL admin-audit query: each nullable filter needs its own @Param for the
                 // CAST(:from AS Instant) IS NULL null-handling — a param object can't express it.
-                "AuthEventRepository.findForAdmin"
+                "AuthEventRepository.findForAdmin",
+                // Atomic JPQL terminal transition; Spring Data query parameters must remain individually bound.
+                "SyncJobRepository.completeActiveJob"
             );
 
             ArchCondition<JavaClass> haveMethodsWithLimitedParams = new ArchCondition<>(
@@ -182,11 +179,11 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     javaClass
                         .getMethods()
                         .stream()
-                        .filter(m -> m.getOwner().equals(javaClass)) // Only declared methods
-                        .filter(m -> !m.getName().startsWith("$")) // Exclude synthetic
-                        .filter(m -> !m.getName().equals("<init>")) // Exclude constructors
-                        .filter(m -> !m.getName().startsWith("lambda$")) // Exclude lambdas
-                        // Exclude @Recover methods (Spring Retry requires matching signatures)
+                        .filter(m -> m.getOwner().equals(javaClass))
+                        .filter(m -> !m.getName().startsWith("$"))
+                        .filter(m -> !m.getName().equals("<init>"))
+                        .filter(m -> !m.getName().startsWith("lambda$"))
+                        // @Recover methods must match the protected method's signature (Spring Retry)
                         .filter(m -> !m.isAnnotatedWith("org.springframework.retry.annotation.Recover"))
                         // Exclude static factory methods (common pattern for parameter objects)
                         .filter(m ->
@@ -195,9 +192,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                                     m.getName().equals("of") ||
                                     m.getName().equals("from")))
                         )
-                        // Exclude allowed overloads with command-object alternatives
                         .filter(m -> !allowedOverloads.contains(javaClass.getSimpleName() + "." + m.getName()))
-                        // Exclude native SQL repository methods (require @Param per column, no param objects)
+                        // Native SQL methods require @Param per column and cannot use parameter objects
                         .filter(m ->
                             !nativeSqlRepositoryMethods.contains(javaClass.getSimpleName() + "." + m.getName())
                         )
@@ -288,8 +284,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         }
     }
 
-    // SECURITY PATTERNS
-
     @Nested
     @DisplayName("Security Patterns")
     class SecurityPatternTests {
@@ -345,8 +339,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
     }
-
-    // INTERFACE SEGREGATION PRINCIPLE
 
     @Nested
     class InterfaceSegregationTests {
@@ -475,8 +467,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         }
     }
 
-    // DEPENDENCY INVERSION
-
     @Nested
     class DependencyInversionTests {
 
@@ -494,6 +484,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "WorkspaceLifecycleService", // IntegrationNatsConsumer absent under the webhook runtime role
                 "GitHubWorkspaceProvisioningAdapter", // Lazy-loaded to break circular reference with GithubDataSyncService
                 "WorkspaceRepositoryMonitorService",
+                "ScmWorkspaceContentEraser", // IntegrationNatsConsumer absent under the webhook runtime role — the erase refreshes the scope consumer once after dropping the workspace's monitors
+                "WorkspaceSyncTargetProvider", // IntegrationNatsConsumer absent under the webhook runtime role — reconcileSyncTargetIdentity refreshes the scope consumer after a rename re-key
                 "GitLabWorkspaceInitializationService", // Optional GitLab beans gated by @ConditionalOnProperty
                 "GitLabWebhookService", // Optional GitLab beans gated by @ConditionalOnProperty
                 "GitlabDataSyncScheduler", // Optional GitLab beans gated by @ConditionalOnProperty
@@ -505,7 +497,10 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "MentorChatService", // InteractiveSandboxService is part of the worker capability (DockerSandboxConfiguration, gated on the worker role); absent on non-worker pods — resolved lazily at attach time
                 "OutlineWorkspacePurgeAdapter", // OutlineWebhookRegistrar is optional (gated by @ConditionalOnProperty(hephaestus.integration.outline.enabled)); the always-on purge contributor resolves it lazily so it still drops leftover documents when Outline is disabled
                 "OutlineWebhookRegistrar", // IntegrationNatsConsumer is optional (gated on hephaestus.sync.nats.enabled and the server runtime role); the registrar reconciles the scope consumer after every subscription-id change and must not require the bean
-                "SlackScopeConsumerReconciler" // same reason as OutlineWebhookRegistrar: IntegrationNatsConsumer is optional (nats/server-role gated); the Slack lifecycle reconciler must not require the bean
+                "SlackScopeConsumerReconciler", // same reason as OutlineWebhookRegistrar: IntegrationNatsConsumer is optional (nats/server-role gated); the Slack lifecycle reconciler must not require the bean
+                "SyncPushService", // Qualified NATS connection is optional when sync push is disabled or under specs
+                "GitlabConnectionSyncStateProvider", // Rate-limit tracker is conditional with the GitLab runtime beans
+                "OutlineConnectionSyncStateProvider" // Rate-limit tracker (OutlineRateLimitTracker) is @ConditionalOnProperty(outline.enabled) — same optional-bean break as the GitLab provider
             );
 
             ArchCondition<JavaField> beInKnownClass = new ArchCondition<>("be in a known cycle-breaking class") {
@@ -535,8 +530,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
     }
-
-    // LISKOV SUBSTITUTION PRINCIPLE
 
     @Nested
     class LiskovSubstitutionTests {
@@ -617,7 +610,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                         .filter(m -> !m.getName().startsWith("lambda$"))
                         .filter(m -> !m.getName().equals("<init>"))
                         .forEach(method -> {
-                            // Check if method instantiates UnsupportedOperationException
                             boolean throwsUnsupported = method
                                 .getConstructorCallsFromSelf()
                                 .stream()

@@ -6,6 +6,9 @@
 > (`docs/decisions/0022-observation-presence-assessment-and-schema-cleanup.md`), which retires
 > "finding" for **observation** (`presence` × `assessment`). Uses the **canonical vocabulary**
 > throughout — *area*, never *goal* — one word per concept across code, schema, API, and UI.
+> The run-level provenance contract (what each detection run persists, delivered-vs-suppressed
+> ledger semantics, and the join chains an evaluation uses) lives in
+> [`evaluation-provenance.md`](./evaluation-provenance.md).
 
 ---
 
@@ -237,7 +240,7 @@ supersession chain.
 | deliveryState | FeedbackDeliveryState | `delivery_state` | no | Lifecycle: prepared → delivered / superseded / suppressed / failed. | Conventional delivery state machine; SUPPRESSED ≈ SARIF `result.suppressions`. |
 | suppressionReason | FeedbackSuppressionReason | `suppression_reason` | yes | Why a unit was withheld (set only when SUPPRESSED). | ≈ SARIF `suppression.justification`. |
 | body | String (TEXT) | `body` | yes | Final student-facing body. | Null while PREPARED or when suppressed. |
-| source | FeedbackSource | `source` | no | `AGENT` / `POLICY_FLOOR` / `FALLBACK`. | Provenance: policy/fallback units must not be scored as model output. |
+| source | FeedbackSource | `source` | no | Who authored the unit. | Provenance: only agent-authored units are scored as model output. |
 | replacesId | UUID | `replaces_id` | yes | Self-FK to the prior row this replaces (`fk_feedback_replaces`). | Re-delivery without duplication; null for first delivery. ≈ SARIF `baselineState=updated`. |
 | threadKey | String(64) | `thread_key` | yes | Cross-run continuity tying successive deliveries of "the same" feedback, independent of job. Indexed (`idx_feedback_continuity`). | Conversation continuity across runs. |
 | createdAt | Instant | `created_at` | no (immutable) | Insert timestamp; `@PrePersist`. | Audit + temporal ordering. |
@@ -312,8 +315,8 @@ revision in force when it was detected, making *which criteria version fired thi
 | **EvidenceRole** | `PRIMARY` (anchors the headline), `SUPPORTING` (corroborates). | Synthesis-time weighting; replaces `display_role`. |
 | **FeedbackChannel** | `IN_CONTEXT` (on the PR/issue), `CONVERSATION` (mentor turn), `PROFILE` (recipient's private dashboard). | Decouples message from channel. Every channel is developer-facing. `PROFILE` replaces legacy `REFLECTION_DASHBOARD`. |
 | **FeedbackDeliveryState** | `PREPARED`, `DELIVERED`, `SUPERSEDED` (replaced via `replaces_id`), `SUPPRESSED` (withheld; see reason), `FAILED`. | Delivery state machine + review-tool edit-in-place (SUPERSEDED) + SARIF `suppressions` (SUPPRESSED). |
-| **FeedbackSuppressionReason** | `REVIEWER_SIDE`, `BELOW_THRESHOLD`, `LOW_CONFIDENCE`, `POLICY_FLOOR_DROP`, `REACTED_DISPUTED` (subject DISPUTED this locus earlier — B2), `REACTED_NOT_APPLICABLE` (subject marked N/A earlier — B2). | ≈ SARIF `suppression.justification`. `REVIEWER_SIDE` replaces legacy `AUDIENCE_REVIEWER`. |
-| **FeedbackSource** | `AGENT` (LLM), `POLICY_FLOOR` (deterministic guaranteed-coverage), `FALLBACK` (synthesis unavailable/failed). | Provenance for honest quality measurement (column `source`). |
+| **FeedbackSuppressionReason** | Why a prepared unit was withheld. The values and their writers are enumerated once, in [evaluation-provenance.md](./evaluation-provenance.md) — that page owns them. | ≈ SARIF `suppression.justification`. Every value names a live writer; a reason with no writer is deleted, not parked. |
+| **FeedbackSource** | `AGENT` (LLM) — the only author today. | Provenance for honest quality measurement (column `source`): a non-agent author, were one added, must not be scored as model output. |
 | **PlacementType** | `SUMMARY`, `INLINE`, `CONVERSATION_TURN`. | Where a placement renders. Replaces the `placement`/`slot` word. |
 | **PlacementAnchorKind** | `LINE`, `RANGE`, `FILE`, `IMAGE`. | Diff-anchor granularity. |
 | **PlacementAnchorSide** | `OLD` (left/base), `NEW` (right/head). | Unified-diff side. |

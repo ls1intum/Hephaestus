@@ -93,7 +93,13 @@ public class GitLabIssueDependencySyncService {
     ) {
         String safeProjectPath = sanitizeForLog(repository.getNameWithOwner());
 
-        List<Issue> allIssues = issueRepository.findAllByRepository_Id(repository.getId());
+        // Issues only: GitLab keeps issue IIDs and merge-request IIDs in separate per-project namespaces
+        // (issue #5 and MR !5 coexist), both under the single-table `issue` table. Iterating the
+        // polymorphic list would call GET /projects/{id}/issues/{iid}/links with a merge request's IID —
+        // fetching the *issue* of that IID and attaching its links to the MR row (cross-contaminating the
+        // dependency graph), plus one wasted rate-limited API call per MR. Issue links are an issue-domain
+        // concept a merge request has no part in.
+        List<Issue> allIssues = issueRepository.findAllIssuesByRepositoryId(repository.getId());
         if (allIssues.isEmpty()) return SyncResult.completed(0);
 
         // Filter to issues updated since cutoff (incremental) or all (full sync)
@@ -269,7 +275,9 @@ public class GitLabIssueDependencySyncService {
         // Instead, we rely on the fact that when the blocked issue is itself processed,
         // its is_blocked_by links will be reconciled. This method handles the case
         // where the blocked issue hasn't been updated recently (incremental skip).
-        List<Issue> allRepoIssues = issueRepository.findAllByRepository_Id(repository.getId());
+        // Issues only (see syncDependenciesForRepository): a merge request sharing an issue's IID must
+        // never enter the bidirectional blocker cleanup.
+        List<Issue> allRepoIssues = issueRepository.findAllIssuesByRepositoryId(repository.getId());
         for (Issue candidate : allRepoIssues) {
             if (currentBlockingIds.contains(candidate.getId())) continue;
             // Check if this candidate currently has blocker in its blockedBy
