@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.agent.config;
 
 import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModel;
 import de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
@@ -86,6 +88,7 @@ public class AgentConfig {
      * the chat/completions surface — needed for providers that don't speak the Responses API.
      */
     @Column(name = "llm_base_url", length = 2048)
+    @ToString.Exclude
     private String llmBaseUrl;
 
     @Enumerated(EnumType.STRING)
@@ -104,6 +107,21 @@ public class AgentConfig {
 
     @Column(name = "allow_internet", nullable = false)
     private boolean allowInternet = false;
+
+    /**
+     * Instance-catalog model this config binds to (#1368). At most one of {@code instanceModel} /
+     * {@code workspaceModel} is set (a DB CHECK enforces it); both null tolerated for legacy rows.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "instance_model_id", foreignKey = @ForeignKey(name = "fk_agent_config_instance_model"))
+    @ToString.Exclude
+    private LlmModel instanceModel;
+
+    /** Workspace BYO model this config binds to (#1368). Mutually exclusive with {@code instanceModel}. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "workspace_model_id", foreignKey = @ForeignKey(name = "fk_agent_config_workspace_model"))
+    @ToString.Exclude
+    private WorkspaceLlmModel workspaceModel;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

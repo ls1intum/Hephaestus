@@ -1,0 +1,501 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        LLM configuration redesign (#1368, scope-expanded to "LLM configuration overall").
+
+        Two ownership scopes, both first-class:
+          • INSTANCE catalog (app_admin-owned, GLOBAL): llm_connection -> llm_model -> llm_model_price,
+            plus llm_model_workspace_grant for GRANTED visibility. Shared, curated, instance-funded.
+          • WORKSPACE BYO (workspace-admin-owned, tenant-scoped): workspace_llm_connection ->
+            workspace_llm_model. Private to one workspace, self-funded, priced by that workspace admin.
+
+        Unifying guardrails:
+          • instance_llm_settings — egress allowlist (empty = allow all) governing EVERY connection,
+            the BYO enable flag, and the default unpriced-usage policy.
+          • agent_config demoted to a binding: it now points at EITHER an instance model OR a workspace
+            model (a CHECK enforces at most one). The legacy llm_* columns are retained this release
+            (deprecate-then-remove) and backfilled into per-workspace BYO connections so nothing breaks.
+          • llm_usage_event gains pricing_state (PRICED|FREE|UNPRICED — "unknown" stops being a silent
+            $0), reasoning_tokens, funding_source (INSTANCE|WORKSPACE), and applied_price_id provenance.
+          • workspace gains a workspace-owned self-cap over BYO spend and an unpriced-usage policy.
+
+        Pricing authority follows credential ownership: instance prices instance-funded usage (counts
+        against the instance backstop); a workspace prices only its own BYO usage (counts against its
+        self-cap). A capped party can never zero-out the price of usage it does not fund.
+
+        VARCHAR + CHECK (never a native PG enum) throughout: released changelogs are immutable and PG
+        cannot drop an enum label, so a closed set that may gain values must be a CHECK.
+    -->
+
+    <!-- 1. INSTANCE connection: an endpoint the instance can talk to. app_admin-owned, GLOBAL. -->
+    <changeSet id="1784566728230-1" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="llm_connection already exists">
+            <not><tableExists tableName="llm_connection"/></not>
+        </preConditions>
+        <comment>Instance-owned LLM provider connection (endpoint + credential + egress) (#1368)</comment>
+        <createTable tableName="llm_connection">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" primaryKeyName="pk_llm_connection" nullable="false"/>
+            </column>
+            <column name="slug" type="VARCHAR(64)">
+                <constraints nullable="false" unique="true" uniqueConstraintName="ux_llm_connection_slug"/>
+            </column>
+            <column name="display_name" type="VARCHAR(128)"><constraints nullable="false"/></column>
+            <column name="base_url" type="VARCHAR(2048)"><constraints nullable="false"/></column>
+            <column name="api_protocol" type="VARCHAR(40)"><constraints nullable="false"/></column>
+            <column name="auth_header_name" type="VARCHAR(64)" defaultValue="Authorization">
+                <constraints nullable="false"/>
+            </column>
+            <column name="auth_value_prefix" type="VARCHAR(16)" defaultValue="Bearer ">
+                <constraints nullable="false"/>
+            </column>
+            <column name="api_key" type="TEXT"/>
+            <column name="azure_api_version" type="VARCHAR(32)"/>
+            <column name="enabled" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </createTable>
+        <!-- No egress_mode: LLM traffic ALWAYS routes through the in-app proxy (running on whichever
+             host executes the job); the API key never enters the sandbox. One path, no toggle. -->
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE llm_connection ADD CONSTRAINT ck_llm_connection_api_protocol
+                CHECK (api_protocol IN ('openai-completions','openai-responses','azure-openai-responses','anthropic-messages'));
+        ]]></sql>
+        <rollback><dropTable tableName="llm_connection"/></rollback>
+    </changeSet>
+
+    <!-- 2. INSTANCE model: a curated model behind a connection. GLOBAL. -->
+    <changeSet id="1784566728230-2" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="llm_model already exists">
+            <not><tableExists tableName="llm_model"/></not>
+        </preConditions>
+        <comment>Instance-curated model (opaque upstream id + capability + lifecycle + visibility) (#1368)</comment>
+        <createTable tableName="llm_model">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" primaryKeyName="pk_llm_model" nullable="false"/>
+            </column>
+            <column name="connection_id" type="BIGINT"><constraints nullable="false"/></column>
+            <column name="slug" type="VARCHAR(64)"><constraints nullable="false"/></column>
+            <column name="display_name" type="VARCHAR(128)"><constraints nullable="false"/></column>
+            <column name="upstream_model_id" type="VARCHAR(256)"><constraints nullable="false"/></column>
+            <column name="api_protocol_override" type="VARCHAR(40)"/>
+            <column name="modality" type="VARCHAR(16)" defaultValue="CHAT"><constraints nullable="false"/></column>
+            <column name="context_window" type="INTEGER"/>
+            <column name="max_output_tokens" type="INTEGER"/>
+            <column name="supports_reasoning" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="cache_control_format" type="VARCHAR(16)"/>
+            <column name="visibility" type="VARCHAR(16)" defaultValue="PUBLIC"><constraints nullable="false"/></column>
+            <column name="enabled" type="BOOLEAN" defaultValueBoolean="true"><constraints nullable="false"/></column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="llm_model" baseColumnNames="connection_id"
+            referencedTableName="llm_connection" referencedColumnNames="id"
+            constraintName="fk_llm_model_connection" onDelete="RESTRICT"/>
+        <addUniqueConstraint tableName="llm_model" columnNames="connection_id, slug"
+            constraintName="ux_llm_model_connection_slug"/>
+        <createIndex tableName="llm_model" indexName="idx_llm_model_connection">
+            <column name="connection_id"/>
+        </createIndex>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE llm_model ADD CONSTRAINT ck_llm_model_modality
+                CHECK (modality IN ('CHAT','EMBEDDING','RERANK'));
+            ALTER TABLE llm_model ADD CONSTRAINT ck_llm_model_visibility
+                CHECK (visibility IN ('PUBLIC','GRANTED'));
+            ALTER TABLE llm_model ADD CONSTRAINT ck_llm_model_api_protocol_override
+                CHECK (api_protocol_override IS NULL OR api_protocol_override IN
+                    ('openai-completions','openai-responses','azure-openai-responses','anthropic-messages'));
+        ]]></sql>
+        <rollback><dropTable tableName="llm_model"/></rollback>
+    </changeSet>
+
+    <!-- 3. INSTANCE model price: effective-dated history. GLOBAL. Surrogate PK fixes model_pricing's
+         fatal model_id-as-PK (which made a second price row a PK collision). Repricing = close the
+         open row's effective_to and INSERT a new one, in one transaction (LlmModelPriceService).
+         Per-1M units (what every vendor pricing page quotes); NUMERIC(18,8) so sub-cent-per-1M rates
+         do not truncate to zero. -->
+    <changeSet id="1784566728230-3" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="llm_model_price already exists">
+            <not><tableExists tableName="llm_model_price"/></not>
+        </preConditions>
+        <comment>Effective-dated price rows for an instance model; tri-state pricing_mode (#1368)</comment>
+        <createTable tableName="llm_model_price">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" primaryKeyName="pk_llm_model_price" nullable="false"/>
+            </column>
+            <column name="model_id" type="BIGINT"><constraints nullable="false"/></column>
+            <column name="pricing_mode" type="VARCHAR(16)"><constraints nullable="false"/></column>
+            <column name="per_1m_input_usd" type="NUMERIC(18,8)"/>
+            <column name="per_1m_output_usd" type="NUMERIC(18,8)"/>
+            <column name="per_1m_cache_read_usd" type="NUMERIC(18,8)"/>
+            <column name="per_1m_cache_write_usd" type="NUMERIC(18,8)"/>
+            <column name="per_1m_reasoning_usd" type="NUMERIC(18,8)"/>
+            <column name="currency" type="VARCHAR(3)" defaultValue="USD"><constraints nullable="false"/></column>
+            <column name="note" type="VARCHAR(500)"/>
+            <column name="effective_from" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="effective_to" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="created_by" type="VARCHAR(255)"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="llm_model_price" baseColumnNames="model_id"
+            referencedTableName="llm_model" referencedColumnNames="id"
+            constraintName="fk_llm_model_price_model" onDelete="CASCADE"/>
+        <createIndex tableName="llm_model_price" indexName="idx_llm_model_price_model_from">
+            <column name="model_id"/>
+            <column name="effective_from"/>
+        </createIndex>
+        <!-- Integrity guards that do NOT need the btree_gist extension (deliberately deferred):
+             a closed window must end after it starts, and at most one OPEN (current) row may exist
+             per model. The service closes the prior open row's effective_to before inserting a new
+             one, so the partial unique index is the backstop against a double-open race. -->
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE llm_model_price ADD CONSTRAINT ck_llm_model_price_mode
+                CHECK (pricing_mode IN ('PRICED','FREE','UNPRICED'));
+            ALTER TABLE llm_model_price ADD CONSTRAINT ck_llm_model_price_window
+                CHECK (effective_to IS NULL OR effective_to > effective_from);
+            CREATE UNIQUE INDEX ux_llm_model_price_open ON llm_model_price (model_id) WHERE effective_to IS NULL;
+        ]]></sql>
+        <rollback><dropTable tableName="llm_model_price"/></rollback>
+    </changeSet>
+
+    <!-- 4. Grant: which workspaces may use a GRANTED-visibility instance model. Composite PK,
+         modeled on account_feature. Allowlist by reference (revocation needs no data migration). -->
+    <changeSet id="1784566728230-4" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="llm_model_workspace_grant already exists">
+            <not><tableExists tableName="llm_model_workspace_grant"/></not>
+        </preConditions>
+        <comment>Per-workspace grant of a GRANTED-visibility instance model (#1368)</comment>
+        <createTable tableName="llm_model_workspace_grant">
+            <column name="model_id" type="BIGINT"><constraints nullable="false"/></column>
+            <column name="workspace_id" type="BIGINT"><constraints nullable="false"/></column>
+            <column name="granted_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="granted_by" type="VARCHAR(255)"/>
+        </createTable>
+        <addPrimaryKey tableName="llm_model_workspace_grant" columnNames="model_id, workspace_id"
+            constraintName="pk_llm_model_workspace_grant"/>
+<!-- sfk_ = scalar FK (ADR 0017): the grant is a pure composite-PK join with no JPA @ManyToOne,
+             so Hibernate emits the columns but never these constraints. The sfk_ prefix keeps them out
+             of the liquibase-hibernate drift diff (pom diffExcludeObjects) while preserving referential
+             integrity in the DB. -->
+        <addForeignKeyConstraint baseTableName="llm_model_workspace_grant" baseColumnNames="model_id"
+            referencedTableName="llm_model" referencedColumnNames="id"
+            constraintName="sfk_llm_model_grant_model" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="llm_model_workspace_grant" baseColumnNames="workspace_id"
+            referencedTableName="workspace" referencedColumnNames="id"
+            constraintName="sfk_llm_model_grant_workspace" onDelete="CASCADE"/>
+        <createIndex tableName="llm_model_workspace_grant" indexName="idx_llm_model_grant_workspace">
+            <column name="workspace_id"/>
+        </createIndex>
+        <rollback><dropTable tableName="llm_model_workspace_grant"/></rollback>
+    </changeSet>
+
+    <!-- 5. WORKSPACE BYO connection: tenant-scoped (has workspace_id, framework enforces isolation).
+         Same shape as llm_connection; the workspace admin owns the key and the bill. -->
+    <changeSet id="1784566728230-5" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace_llm_connection already exists">
+            <not><tableExists tableName="workspace_llm_connection"/></not>
+        </preConditions>
+        <comment>Workspace-owned BYO LLM connection (tenant-scoped) (#1368)</comment>
+        <createTable tableName="workspace_llm_connection">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" primaryKeyName="pk_workspace_llm_connection" nullable="false"/>
+            </column>
+            <column name="workspace_id" type="BIGINT"><constraints nullable="false"/></column>
+            <column name="slug" type="VARCHAR(64)"><constraints nullable="false"/></column>
+            <column name="display_name" type="VARCHAR(128)"><constraints nullable="false"/></column>
+            <column name="base_url" type="VARCHAR(2048)"><constraints nullable="false"/></column>
+            <column name="api_protocol" type="VARCHAR(40)"><constraints nullable="false"/></column>
+            <column name="auth_header_name" type="VARCHAR(64)" defaultValue="Authorization">
+                <constraints nullable="false"/>
+            </column>
+            <column name="auth_value_prefix" type="VARCHAR(16)" defaultValue="Bearer ">
+                <constraints nullable="false"/>
+            </column>
+            <column name="api_key" type="TEXT"/>
+            <column name="azure_api_version" type="VARCHAR(32)"/>
+            <column name="enabled" type="BOOLEAN" defaultValueBoolean="true"><constraints nullable="false"/></column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="workspace_llm_connection" baseColumnNames="workspace_id"
+            referencedTableName="workspace" referencedColumnNames="id"
+            constraintName="fk_ws_llm_connection_workspace" onDelete="CASCADE"/>
+        <addUniqueConstraint tableName="workspace_llm_connection" columnNames="workspace_id, slug"
+            constraintName="ux_ws_llm_connection_ws_slug"/>
+        <!-- Composite target for the same-workspace FK on workspace_llm_model: a BYO model may only
+             reference a connection owned by the SAME workspace. Without this a model row could claim
+             workspace A while pointing at workspace B's connection (and thus decrypt B's key). -->
+        <addUniqueConstraint tableName="workspace_llm_connection" columnNames="id, workspace_id"
+            constraintName="ux_ws_llm_connection_id_ws"/>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE workspace_llm_connection ADD CONSTRAINT ck_ws_llm_connection_api_protocol
+                CHECK (api_protocol IN ('openai-completions','openai-responses','azure-openai-responses','anthropic-messages'));
+        ]]></sql>
+        <rollback><dropTable tableName="workspace_llm_connection"/></rollback>
+    </changeSet>
+
+    <!-- 6. WORKSPACE BYO model: tenant-scoped. workspace_id is denormalized (not just implied via
+         connection_id) so every query carries a workspace_id predicate for the tenancy inspector.
+         Price lives inline (current rate only — a single workspace's own BYO price needs no audit
+         history); pricing_mode tri-state mirrors the instance side. -->
+    <changeSet id="1784566728230-6" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace_llm_model already exists">
+            <not><tableExists tableName="workspace_llm_model"/></not>
+        </preConditions>
+        <comment>Workspace-owned BYO model with inline current price (tenant-scoped) (#1368)</comment>
+        <createTable tableName="workspace_llm_model">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" primaryKeyName="pk_workspace_llm_model" nullable="false"/>
+            </column>
+            <column name="workspace_id" type="BIGINT"><constraints nullable="false"/></column>
+            <column name="connection_id" type="BIGINT"><constraints nullable="false"/></column>
+            <column name="slug" type="VARCHAR(64)"><constraints nullable="false"/></column>
+            <column name="display_name" type="VARCHAR(128)"><constraints nullable="false"/></column>
+            <column name="upstream_model_id" type="VARCHAR(256)"><constraints nullable="false"/></column>
+            <column name="api_protocol_override" type="VARCHAR(40)"/>
+            <column name="modality" type="VARCHAR(16)" defaultValue="CHAT"><constraints nullable="false"/></column>
+            <column name="context_window" type="INTEGER"/>
+            <column name="max_output_tokens" type="INTEGER"/>
+            <column name="supports_reasoning" type="BOOLEAN" defaultValueBoolean="false"><constraints nullable="false"/></column>
+            <column name="cache_control_format" type="VARCHAR(16)"/>
+            <column name="pricing_mode" type="VARCHAR(16)" defaultValue="UNPRICED"><constraints nullable="false"/></column>
+            <column name="per_1m_input_usd" type="NUMERIC(18,8)"/>
+            <column name="per_1m_output_usd" type="NUMERIC(18,8)"/>
+            <column name="per_1m_cache_read_usd" type="NUMERIC(18,8)"/>
+            <column name="per_1m_cache_write_usd" type="NUMERIC(18,8)"/>
+            <column name="per_1m_reasoning_usd" type="NUMERIC(18,8)"/>
+            <column name="currency" type="VARCHAR(3)" defaultValue="USD"><constraints nullable="false"/></column>
+            <column name="price_note" type="VARCHAR(500)"/>
+            <column name="enabled" type="BOOLEAN" defaultValueBoolean="true"><constraints nullable="false"/></column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="workspace_llm_model" baseColumnNames="workspace_id"
+            referencedTableName="workspace" referencedColumnNames="id"
+            constraintName="fk_ws_llm_model_workspace" onDelete="CASCADE"/>
+<addForeignKeyConstraint baseTableName="workspace_llm_model" baseColumnNames="connection_id"
+            referencedTableName="workspace_llm_connection" referencedColumnNames="id"
+            constraintName="fk_ws_llm_model_connection" onDelete="CASCADE"/>
+        <!-- SAME-WORKSPACE guard (sfk_ = excluded from the Hibernate drift diff; the fk_ above is what
+             Hibernate models). (connection_id, workspace_id) must resolve to a connection row of the
+             SAME workspace, so a BYO model can never bind another tenant's connection (and decrypt its
+             key). Referenced columns match ux_ws_llm_connection_id_ws. -->
+        <addForeignKeyConstraint baseTableName="workspace_llm_model" baseColumnNames="connection_id, workspace_id"
+            referencedTableName="workspace_llm_connection" referencedColumnNames="id, workspace_id"
+            constraintName="sfk_ws_llm_model_connection_scope" onDelete="CASCADE"/>
+        <addUniqueConstraint tableName="workspace_llm_model" columnNames="workspace_id, slug"
+            constraintName="ux_ws_llm_model_ws_slug"/>
+        <!-- Composite target for agent_config's same-workspace binding FK (see changeset 8). -->
+        <addUniqueConstraint tableName="workspace_llm_model" columnNames="id, workspace_id"
+            constraintName="ux_ws_llm_model_id_ws"/>
+        <createIndex tableName="workspace_llm_model" indexName="idx_ws_llm_model_connection">
+            <column name="connection_id"/>
+        </createIndex>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE workspace_llm_model ADD CONSTRAINT ck_ws_llm_model_modality
+                CHECK (modality IN ('CHAT','EMBEDDING','RERANK'));
+            ALTER TABLE workspace_llm_model ADD CONSTRAINT ck_ws_llm_model_pricing_mode
+                CHECK (pricing_mode IN ('PRICED','FREE','UNPRICED'));
+            ALTER TABLE workspace_llm_model ADD CONSTRAINT ck_ws_llm_model_api_protocol_override
+                CHECK (api_protocol_override IS NULL OR api_protocol_override IN
+                    ('openai-completions','openai-responses','azure-openai-responses','anthropic-messages'));
+        ]]></sql>
+        <rollback><dropTable tableName="workspace_llm_model"/></rollback>
+    </changeSet>
+
+    <!-- 7. Instance LLM settings singleton (GLOBAL): egress allowlist + BYO enable + default policy.
+         id fixed to 1. allowed_egress_hosts empty/null = allow all (non-breaking on upgrade). -->
+    <changeSet id="1784566728230-7" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="instance_llm_settings already exists">
+            <not><tableExists tableName="instance_llm_settings"/></not>
+        </preConditions>
+        <comment>Instance LLM settings: egress allowlist, BYO enable, default unpriced policy (#1368)</comment>
+        <createTable tableName="instance_llm_settings">
+            <column name="id" type="SMALLINT"><constraints primaryKey="true" primaryKeyName="pk_instance_llm_settings" nullable="false"/></column>
+            <column name="allowed_egress_hosts" type="TEXT"/>
+            <column name="allow_workspace_connections" type="BOOLEAN" defaultValueBoolean="true"><constraints nullable="false"/></column>
+            <column name="default_unpriced_policy" type="VARCHAR(16)" defaultValue="WARN"><constraints nullable="false"/></column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="updated_by" type="VARCHAR(255)"/>
+        </createTable>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE instance_llm_settings ADD CONSTRAINT ck_instance_llm_settings_singleton CHECK (id = 1);
+            ALTER TABLE instance_llm_settings ADD CONSTRAINT ck_instance_llm_settings_policy
+                CHECK (default_unpriced_policy IN ('WARN','BLOCK'));
+            INSERT INTO instance_llm_settings (id, allowed_egress_hosts, allow_workspace_connections, default_unpriced_policy)
+                VALUES (1, NULL, TRUE, 'WARN') ON CONFLICT (id) DO NOTHING;
+        ]]></sql>
+        <rollback><dropTable tableName="instance_llm_settings"/></rollback>
+    </changeSet>
+
+    <!-- 8. agent_config demoted to a binding. instance_model_id XOR workspace_model_id (at most one;
+         both null tolerated for legacy rows until backfill/rebind). Legacy llm_* columns retained
+         (deprecate-then-remove) and stop being read once the runtime resolves via the binding. -->
+    <changeSet id="1784566728230-8" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="agent_config binding columns already exist">
+            <not><columnExists tableName="agent_config" columnName="instance_model_id"/></not>
+        </preConditions>
+        <comment>Demote agent_config to a model binding (instance XOR workspace model) (#1368)</comment>
+        <addColumn tableName="agent_config">
+            <column name="instance_model_id" type="BIGINT"/>
+            <column name="workspace_model_id" type="BIGINT"/>
+        </addColumn>
+        <addForeignKeyConstraint baseTableName="agent_config" baseColumnNames="instance_model_id"
+            referencedTableName="llm_model" referencedColumnNames="id"
+            constraintName="fk_agent_config_instance_model" onDelete="RESTRICT"/>
+        <addForeignKeyConstraint baseTableName="agent_config" baseColumnNames="workspace_model_id"
+            referencedTableName="workspace_llm_model" referencedColumnNames="id"
+            constraintName="fk_agent_config_workspace_model" onDelete="RESTRICT"/>
+        <!-- SAME-WORKSPACE guard for a BYO binding (sfk_ = excluded from drift; fk_ above is Hibernate's):
+             a config may only bind a workspace model owned by its OWN workspace. -->
+        <addForeignKeyConstraint baseTableName="agent_config" baseColumnNames="workspace_model_id, workspace_id"
+            referencedTableName="workspace_llm_model" referencedColumnNames="id, workspace_id"
+            constraintName="sfk_agent_config_workspace_model_scope" onDelete="RESTRICT"/>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE agent_config ADD CONSTRAINT ck_agent_config_single_binding
+                CHECK (NOT (instance_model_id IS NOT NULL AND workspace_model_id IS NOT NULL));
+        ]]></sql>
+        <rollback>
+            <dropColumn tableName="agent_config" columnName="instance_model_id"/>
+            <dropColumn tableName="agent_config" columnName="workspace_model_id"/>
+        </rollback>
+    </changeSet>
+
+    <!-- 9. Ledger: pricing_state tri-state (the blind-cap fix), reasoning_tokens, funding_source,
+         applied_price_id provenance. Backfill: a resolved cost -> PRICED; NULL cost -> UNPRICED
+         (FREE cannot be inferred retroactively). Existing rows are all INSTANCE-funded. -->
+    <changeSet id="1784566728230-9" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="llm_usage_event.pricing_state already exists">
+            <not><columnExists tableName="llm_usage_event" columnName="pricing_state"/></not>
+        </preConditions>
+        <comment>Ledger pricing_state + reasoning_tokens + funding_source + price provenance (#1368)</comment>
+        <addColumn tableName="llm_usage_event">
+            <column name="pricing_state" type="VARCHAR(16)" defaultValue="UNPRICED"><constraints nullable="false"/></column>
+            <column name="reasoning_tokens" type="BIGINT" defaultValueNumeric="0"><constraints nullable="false"/></column>
+            <column name="funding_source" type="VARCHAR(16)" defaultValue="INSTANCE"><constraints nullable="false"/></column>
+            <column name="applied_price_id" type="BIGINT"/>
+        </addColumn>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE llm_usage_event ADD CONSTRAINT ck_llm_usage_event_pricing_state
+                CHECK (pricing_state IN ('PRICED','FREE','UNPRICED'));
+            ALTER TABLE llm_usage_event ADD CONSTRAINT ck_llm_usage_event_funding_source
+                CHECK (funding_source IN ('INSTANCE','WORKSPACE'));
+            -- Classify migrated history conservatively. A positive cost is genuinely PRICED. A zero cost
+            -- with NO tokens burned is a genuine no-op -> FREE. A zero cost WITH burned tokens is the
+            -- "runtime didn't price it" trap (see LlmUsageRecorder) and a NULL cost is unknown: both stay
+            -- UNPRICED (the default) so they surface as unverifiable rather than silently counting as $0.
+            UPDATE llm_usage_event SET pricing_state = 'PRICED' WHERE cost_usd > 0;
+            UPDATE llm_usage_event SET pricing_state = 'FREE'
+                WHERE cost_usd = 0
+                  AND (input_tokens + output_tokens + cache_read_tokens + cache_write_tokens) = 0;
+        ]]></sql>
+        <rollback>
+            <dropColumn tableName="llm_usage_event" columnName="pricing_state"/>
+            <dropColumn tableName="llm_usage_event" columnName="reasoning_tokens"/>
+            <dropColumn tableName="llm_usage_event" columnName="funding_source"/>
+            <dropColumn tableName="llm_usage_event" columnName="applied_price_id"/>
+        </rollback>
+    </changeSet>
+
+    <!-- 11. Backfill: every existing agent_config becomes its OWN workspace-owned BYO connection +
+         model, then binds to it. Per-workspace keys are never shared or dedup'd (each config already
+         holds its own encrypted key — copying the ciphertext verbatim is correct; the same
+         EncryptedStringConverter decrypts it). Slugs 'legacy-<id>' are unique per workspace since
+         agent_config.id is globally unique. NOT EXISTS keeps a re-run additive. -->
+    <changeSet id="1784566728230-11" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="agent_config already migrated to BYO connections">
+            <and>
+                <tableExists tableName="workspace_llm_connection"/>
+                <columnExists tableName="agent_config" columnName="workspace_model_id"/>
+            </and>
+        </preConditions>
+        <comment>Backfill existing agent_config rows into per-workspace BYO connections + models (#1368)</comment>
+        <sql splitStatements="false"><![CDATA[
+            INSERT INTO workspace_llm_connection (workspace_id, slug, display_name, base_url, api_protocol,
+                auth_header_name, auth_value_prefix, api_key, azure_api_version, enabled,
+                created_at, updated_at)
+            SELECT ac.workspace_id, 'legacy-' || ac.id, ac.name,
+                COALESCE(NULLIF(ac.llm_base_url, ''), 'https://api.openai.com'),
+                CASE ac.llm_provider
+                    WHEN 'ANTHROPIC' THEN 'anthropic-messages'
+                    WHEN 'AZURE_OPENAI' THEN 'azure-openai-responses'
+                    ELSE 'openai-completions' END,
+                CASE ac.llm_provider WHEN 'ANTHROPIC' THEN 'x-api-key'
+                    WHEN 'AZURE_OPENAI' THEN 'api-key' ELSE 'Authorization' END,
+                CASE ac.llm_provider WHEN 'OPENAI' THEN 'Bearer ' ELSE '' END,
+                ac.llm_api_key,
+                CASE ac.llm_provider WHEN 'AZURE_OPENAI' THEN '2025-04-01-preview' ELSE NULL END,
+                ac.enabled, COALESCE(ac.created_at, now()), now()
+            FROM agent_config ac
+            WHERE NOT EXISTS (SELECT 1 FROM workspace_llm_connection c
+                WHERE c.workspace_id = ac.workspace_id AND c.slug = 'legacy-' || ac.id);
+
+            INSERT INTO workspace_llm_model (workspace_id, connection_id, slug, display_name,
+                upstream_model_id, modality, pricing_mode, enabled, created_at, updated_at)
+            SELECT ac.workspace_id, c.id, 'legacy-' || ac.id, ac.name,
+                COALESCE(NULLIF(ac.model_name, ''), 'unknown-model'),
+                'CHAT', 'UNPRICED', ac.enabled, COALESCE(ac.created_at, now()), now()
+            FROM agent_config ac
+            JOIN workspace_llm_connection c
+                ON c.workspace_id = ac.workspace_id AND c.slug = 'legacy-' || ac.id
+            WHERE NOT EXISTS (SELECT 1 FROM workspace_llm_model m
+                WHERE m.workspace_id = ac.workspace_id AND m.slug = 'legacy-' || ac.id);
+
+            UPDATE agent_config ac
+            SET workspace_model_id = m.id
+            FROM workspace_llm_model m
+            WHERE m.workspace_id = ac.workspace_id AND m.slug = 'legacy-' || ac.id
+              AND ac.workspace_model_id IS NULL AND ac.instance_model_id IS NULL;
+        ]]></sql>
+        <!-- Empty: the schema rollback (changesets 5,6,8) drops the BYO tables and binding columns
+             wholesale; a targeted DELETE would also remove rows created by the running app post-deploy. -->
+        <rollback/>
+    </changeSet>
+
+    <!-- 12. Widen the config-audit entity-type CHECK for the new LLM-config audit subjects. Same
+         DROP+ADD shape as prior changelogs; must stay in lockstep with ConfigAuditImmutabilityIntegrationTest. -->
+    <changeSet id="1784566728230-12" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="config_audit_event entity_type CHECK already covers LLM_CONNECTION">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'ck_config_audit_event_entity_type'
+                  AND pg_get_constraintdef(oid) LIKE '%LLM_CONNECTION%'
+            </sqlCheck>
+        </preConditions>
+        <comment>Admit the LLM-config redesign audit subjects on the config-audit trail (#1368)</comment>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
+            ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
+                CHECK (entity_type IN (
+                    'PRACTICE_REVIEW_SETTINGS', 'AI_CONFIG_BINDING', 'AGENT_CONFIG',
+                    'WORKSPACE_ROLE', 'WORKSPACE_FEATURES', 'WORKSPACE_STATUS',
+                    'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY', 'PRACTICE_ACTIVE',
+                    'WORKSPACE_LLM_BUDGET',
+                    'LLM_CONNECTION', 'LLM_MODEL', 'LLM_MODEL_PRICE', 'LLM_MODEL_GRANT',
+                    'WORKSPACE_LLM_CONNECTION', 'WORKSPACE_LLM_MODEL', 'LLM_MODEL_BINDING',
+                    'INSTANCE_LLM_SETTINGS'
+                ));
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
+                ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
+                    CHECK (entity_type IN (
+                        'PRACTICE_REVIEW_SETTINGS', 'AI_CONFIG_BINDING', 'AGENT_CONFIG',
+                        'WORKSPACE_ROLE', 'WORKSPACE_FEATURES', 'WORKSPACE_STATUS',
+                        'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY', 'PRACTICE_ACTIVE',
+                        'WORKSPACE_LLM_BUDGET'
+                    ));
+            ]]></sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

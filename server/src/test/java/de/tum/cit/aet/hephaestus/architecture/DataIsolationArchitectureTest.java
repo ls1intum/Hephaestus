@@ -107,6 +107,12 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "IssueType", // GitHub issue types are workspace-scoped through issue
         "IdentityProvider", // Global provider instances (e.g., github.com, gitlab.com)
         "ModelPricing", // Vendor list prices per LLM model — not tenant-scoped
+        // Instance LLM-config catalog (#1368) — app_admin-owned, curated, shared across all workspaces
+        "LlmConnection", // Instance-owned provider connection; global, not tenant-scoped
+        "LlmModel", // Instance-curated model behind a connection; global
+        "LlmModelPrice", // Instance model price history; global pricing authority
+        "LlmModelWorkspaceGrant", // Grant allowlist by reference (which workspaces may use a GRANTED model); global admin table
+        "InstanceLlmSettings", // Instance LLM settings singleton (egress allowlist + BYO enable + default policy); global
         "WorkerTokenDenylist", // Fleet-wide JWT revocation; worker JWTs are not workspace-scoped
         // core.auth (ADR 0017) — identity is user/system-scoped, not workspace-scoped.
         // Account ↔ Workspace association lives on WorkspaceMembership, not on these rows.

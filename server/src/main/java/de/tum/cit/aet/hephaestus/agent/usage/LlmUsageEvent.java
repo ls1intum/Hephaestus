@@ -112,4 +112,30 @@ public class LlmUsageEvent {
     @NonNull
     @Column(name = "occurred_at", nullable = false)
     private Instant occurredAt;
+
+    /**
+     * Resolved pricing outcome (#1368). {@code UNPRICED} stops "unknown price" from being a silent
+     * $0 — it makes the month's budget verdict unverifiable rather than under-counted.
+     */
+    @NonNull
+    @ColumnDefault("'UNPRICED'")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "pricing_state", nullable = false, length = 16)
+    private PricingState pricingState = PricingState.UNPRICED;
+
+    @ColumnDefault("0")
+    @Column(name = "reasoning_tokens", nullable = false)
+    private long reasoningTokens;
+
+    /** Which cap this usage counts against — instance backstop vs. workspace BYO self-cap (#1368). */
+    @NonNull
+    @ColumnDefault("'INSTANCE'")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "funding_source", nullable = false, length = 16)
+    private FundingSource fundingSource = FundingSource.INSTANCE;
+
+    /** Provenance: the {@code llm_model_price} row applied to this event, if any. Soft ref (no FK). */
+    @Nullable
+    @Column(name = "applied_price_id")
+    private Long appliedPriceId;
 }
