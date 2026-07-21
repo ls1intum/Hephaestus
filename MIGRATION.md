@@ -69,7 +69,7 @@ Entries exist only for releases that need operator action. Everything else is in
 
 1. Remove `HEPHAESTUS_WORKER_LLM_BASE_URL`, `HEPHAESTUS_WORKER_LLM_API_KEY`, and `HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED` from your deployment — they are silently ignored, not an error, but keeping them is misleading.
 2. Register your provider(s) under Instance admin → AI models (or have a workspace admin connect their own under the workspace's AI settings).
-3. Existing per-workspace agent configs keep working unchanged via an automatic legacy fallback — no immediate action needed — but migrate them to a catalog-bound model when convenient; the legacy fields will be removed in a future release following the usual deprecate-then-remove cycle.
+3. Existing per-workspace agent configs keep working unchanged — no migration runs against them, and no immediate action is needed. At runtime, any config not yet bound to a catalog model resolves through an automatic legacy fallback using its existing provider/base URL/key. Rebind them to a catalog-bound model when convenient; the legacy fields will be removed in a future release following the usual deprecate-then-remove cycle.
 
 ### v0.69.0
 

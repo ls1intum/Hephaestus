@@ -75,17 +75,22 @@ public class LlmUsageRecorder {
 
     private static final BigDecimal PER_1M = BigDecimal.valueOf(1_000_000L);
 
-    /** {@code NUMERIC(12,6)} column scale — 6 digits after the decimal point. */
+    /** {@code NUMERIC(18,6)} column scale — 6 digits after the decimal point. */
     private static final int COST_SCALE = 6;
 
     /** Smallest amount the column can represent; used instead of silently zeroing a real, tiny cost. */
     private static final BigDecimal MIN_REPRESENTABLE_COST = new BigDecimal("0.000001");
 
-    /** Largest amount {@code NUMERIC(12,6)} can hold (6 integer digits + 6 fractional digits). */
-    private static final BigDecimal MAX_REPRESENTABLE_COST = new BigDecimal("999999.999999");
+    /**
+     * Largest amount {@code NUMERIC(18,6)} can hold (12 integer digits + 6 fractional digits; widened
+     * from {@code NUMERIC(12,6)} — #1368 migration-correctness fix, see changelog 1784566728230-17). A
+     * single ledger event costing ≥ $1 trillion is unreachable in practice; this is a last-ditch guard
+     * against a corrupted rate row, not a bound anyone should ever hit.
+     */
+    private static final BigDecimal MAX_REPRESENTABLE_COST = new BigDecimal("999999999999.999999");
 
-    /** {@code NUMERIC(12,6)} overflows at 10^6 — a computed cost at or above this is clamped. */
-    private static final BigDecimal OVERFLOW_THRESHOLD = BigDecimal.valueOf(1_000_000L);
+    /** {@code NUMERIC(18,6)} overflows at 10^12 — a computed cost at or above this is clamped. */
+    private static final BigDecimal OVERFLOW_THRESHOLD = BigDecimal.valueOf(1_000_000_000_000L);
 
     private static final BigDecimal ZERO_COST = BigDecimal.ZERO.setScale(COST_SCALE, RoundingMode.UNNECESSARY);
 
@@ -383,8 +388,9 @@ public class LlmUsageRecorder {
      * {@link ModelPricingService} registry exactly as before slice 6 — always instance-funded, since
      * BYO connections didn't exist prior to the catalog. No rate snapshot: {@link ModelPricingService}
      * prices in a different unit (per-1K, not per-1M) and is itself already effective-dated
-     * (validFrom/validTo), and this path is deprecate-then-remove — every config here migrates onto a
-     * catalog binding (see the backfill in changeset 11), at which point it gets full provenance above.
+     * (validFrom/validTo), and this path is deprecate-then-remove — an operator rebinds a config onto a
+     * catalog model at their own pace (no automatic backfill, see the changelog's -11 removal note),
+     * at which point it gets full provenance above.
      */
     private PriceResolution resolveLegacyFallback(LlmUsageSample sample) {
         if (sample.model() == null || sample.model().isBlank()) {
@@ -483,15 +489,19 @@ public class LlmUsageRecorder {
     }
 
     /**
-     * {@code NUMERIC(12,6)} storage guard (#1368 slice 6): rounds HALF_EVEN to the column scale, then
-     * defends the two edges a raw computed cost could otherwise hit.
+     * {@code NUMERIC(18,6)} storage guard (#1368 slice 6; widened from {@code NUMERIC(12,6)} — see
+     * changelog 1784566728230-17): rounds HALF_EVEN to the column scale, then defends the two edges a
+     * raw computed cost could otherwise hit.
      *
      * <ul>
      *   <li>A genuinely non-zero cost that rounds to exactly {@code 0.000000} (a very small per-token
      *       rate over very few tokens) would silently look identical to a declared-free model. Store
      *       the smallest representable amount instead so the spend is visible, not erased.</li>
-     *   <li>A cost at or above {@code 10^6} overflows the column's 6 integer digits. Clamp to the max
-     *       representable value rather than let the INSERT fail and drop the whole ledger row.</li>
+     *   <li>A cost at or above {@code 10^12} overflows the column's 12 integer digits. This is not a
+     *       real-world number ($1 trillion for one ledger event) — hitting it means a corrupted price
+     *       row or a unit-conversion bug, not a legitimately large bill, so it logs at ERROR. Still
+     *       clamp to the max representable value rather than let the INSERT fail and drop the whole
+     *       ledger row.</li>
      * </ul>
      */
     private static BigDecimal applyNumericGuard(BigDecimal raw, LlmUsageSample sample) {
@@ -512,8 +522,9 @@ public class LlmUsageRecorder {
             return MIN_REPRESENTABLE_COST;
         }
         if (rounded.compareTo(OVERFLOW_THRESHOLD) >= 0) {
-            log.warn(
-                "Computed LLM cost exceeds the ledger's NUMERIC(12,6) capacity (raw={}) — clamping: sourceId={}",
+            log.error(
+                "Computed LLM cost exceeds the ledger's NUMERIC(18,6) capacity (raw={}) — this should be " +
+                    "unreachable in practice and likely indicates a corrupted price row; clamping: sourceId={}",
                 raw,
                 sample.sourceId()
             );

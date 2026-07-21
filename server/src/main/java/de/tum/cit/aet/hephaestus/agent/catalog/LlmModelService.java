@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -109,6 +110,9 @@ public class LlmModelService {
         if (modelRepository.findByConnectionIdAndSlug(connectionId, request.slug()).isPresent()) {
             throw new LlmModelSlugConflictException(connectionId, request.slug());
         }
+        if (modelRepository.existsByConnectionIdAndUpstreamModelId(connectionId, request.upstreamModelId())) {
+            throw new LlmModelUpstreamIdConflictException(connectionId, request.upstreamModelId());
+        }
 
         LlmModel model = new LlmModel();
         model.setConnection(connection);
@@ -133,8 +137,12 @@ public class LlmModelService {
         try {
             saved = modelRepository.save(model);
         } catch (DataIntegrityViolationException e) {
-            // The slug fast-path above is racy; the unique constraint backstops the loser of a concurrent
-            // create. Report the same 409 rather than leaking a 500.
+            // The fast-path checks above are racy; the unique constraints backstop the loser of a
+            // concurrent create. Report the same 409 rather than leaking a 500 — pick the exception that
+            // matches whichever constraint actually fired so the message names the right conflict.
+            if (isUpstreamIdConflict(e)) {
+                throw new LlmModelUpstreamIdConflictException(connectionId, request.upstreamModelId());
+            }
             throw new LlmModelSlugConflictException(connectionId, request.slug());
         }
         llmModelAudit.modelCreated(saved.getId(), saved.getConnection().getId(), saved.getSlug());
@@ -153,6 +161,16 @@ public class LlmModelService {
             model.setDisplayName(request.displayName());
         }
         if (request.upstreamModelId() != null) {
+            if (
+                !request.upstreamModelId().equals(model.getUpstreamModelId()) &&
+                modelRepository.existsByConnectionIdAndUpstreamModelIdAndIdNot(
+                    model.getConnection().getId(),
+                    request.upstreamModelId(),
+                    id
+                )
+            ) {
+                throw new LlmModelUpstreamIdConflictException(model.getConnection().getId(), request.upstreamModelId());
+            }
             model.setUpstreamModelId(request.upstreamModelId());
         }
         if (request.apiProtocolOverride() != null) {
@@ -177,7 +195,20 @@ public class LlmModelService {
             model.setEnabled(request.enabled());
         }
 
-        LlmModel saved = modelRepository.save(model);
+        LlmModel saved;
+        try {
+            saved = modelRepository.save(model);
+        } catch (DataIntegrityViolationException e) {
+            // The fast-path check above is racy; the unique constraint backstops the loser of a
+            // concurrent update.
+            if (isUpstreamIdConflict(e)) {
+                throw new LlmModelUpstreamIdConflictException(
+                    model.getConnection().getId(),
+                    model.getUpstreamModelId()
+                );
+            }
+            throw e;
+        }
         llmModelAudit.modelUpdated(saved.getId(), saved.getConnection().getId(), saved.getSlug());
         return saved;
     }
@@ -321,5 +352,22 @@ public class LlmModelService {
 
     private static String blankToNull(String value) {
         return value != null && value.isBlank() ? null : value;
+    }
+
+    /**
+     * Matches the {@code ux_llm_model_connection_upstream} unique index by name so a save() failure is
+     * only reported as an upstream-id conflict when that specific constraint fired — any other integrity
+     * failure (e.g. a future NOT NULL column) should not be mislabelled (#1368).
+     */
+    private static boolean isUpstreamIdConflict(DataIntegrityViolationException e) {
+        Throwable cur = e;
+        while (cur != null) {
+            if (cur instanceof ConstraintViolationException cve) {
+                String name = cve.getConstraintName();
+                return name != null && name.equalsIgnoreCase("ux_llm_model_connection_upstream");
+            }
+            cur = cur.getCause();
+        }
+        return false;
     }
 }

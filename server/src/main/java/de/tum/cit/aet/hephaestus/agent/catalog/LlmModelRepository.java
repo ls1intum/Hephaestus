@@ -22,6 +22,12 @@ public interface LlmModelRepository extends JpaRepository<LlmModel, Long> {
      */
     List<LlmModel> findByConnectionIdAndUpstreamModelId(Long connectionId, String upstreamModelId);
 
+    /** Create-path conflict guard for {@code ux_llm_model_connection_upstream} (#1368). */
+    boolean existsByConnectionIdAndUpstreamModelId(Long connectionId, String upstreamModelId);
+
+    /** Update-path conflict guard: same uniqueness, excluding the row being updated (#1368). */
+    boolean existsByConnectionIdAndUpstreamModelIdAndIdNot(Long connectionId, String upstreamModelId, Long id);
+
     boolean existsByConnectionId(Long connectionId);
 
     /** Eager-fetches {@code connection} so the admin list view avoids one lazy load per row. */

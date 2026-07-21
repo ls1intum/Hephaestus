@@ -266,6 +266,109 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
     }
 
     @Nested
+    class UpstreamIdConflict {
+
+        @Test
+        void createRejectsADuplicateUpstreamIdOnTheSameConnection() {
+            byoEnabled(true);
+            when(connectionRepository.findByIdAndWorkspaceId(50L, 1L)).thenReturn(Optional.of(connection()));
+            when(modelRepository.findByWorkspaceIdAndSlug(1L, "gpt-5")).thenReturn(Optional.empty());
+            when(modelRepository.existsByConnectionIdAndUpstreamModelId(50L, "gpt-5")).thenReturn(true);
+
+            assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, unpricedCreateRequest())).isInstanceOf(
+                LlmModelUpstreamIdConflictException.class
+            );
+            verify(modelRepository, never()).save(any());
+        }
+
+        @Test
+        void createSucceedsWhenTheUpstreamIdIsUniqueOnTheConnection() {
+            byoEnabled(true);
+            when(connectionRepository.findByIdAndWorkspaceId(50L, 1L)).thenReturn(Optional.of(connection()));
+            when(modelRepository.findByWorkspaceIdAndSlug(1L, "gpt-5")).thenReturn(Optional.empty());
+            when(modelRepository.existsByConnectionIdAndUpstreamModelId(50L, "gpt-5")).thenReturn(false);
+            when(modelRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            WorkspaceLlmModel result = modelService.create(workspaceContext, 50L, unpricedCreateRequest());
+
+            assertThat(result.getUpstreamModelId()).isEqualTo("gpt-5");
+        }
+
+        @Test
+        void updateRejectsChangingToAnUpstreamIdAlreadyUsedByAnotherModelOnTheSameConnection() {
+            byoEnabled(true);
+            WorkspaceLlmModel existing = new WorkspaceLlmModel();
+            existing.setId(7L);
+            existing.setWorkspace(connection().getWorkspace());
+            existing.setConnection(connection());
+            existing.setUpstreamModelId("gpt-5");
+            when(modelRepository.findByIdAndWorkspaceIdWithConnection(7L, 1L)).thenReturn(Optional.of(existing));
+            when(modelRepository.existsByConnectionIdAndUpstreamModelIdAndIdNot(50L, "gpt-5-turbo", 7L)).thenReturn(
+                true
+            );
+
+            UpdateWorkspaceLlmModelRequestDTO request = new UpdateWorkspaceLlmModelRequestDTO(
+                null, // displayName
+                "gpt-5-turbo", // upstreamModelId
+                null, // apiProtocolOverride
+                null, // modality
+                null, // contextWindow
+                null, // maxOutputTokens
+                null, // supportsReasoning
+                null, // cacheControlFormat
+                null, // enabled
+                null, // pricingMode
+                null, // per1mInputUsd
+                null, // per1mOutputUsd
+                null, // per1mCacheReadUsd
+                null, // per1mCacheWriteUsd
+                null, // per1mReasoningUsd
+                null // priceNote
+            );
+
+            assertThatThrownBy(() -> modelService.update(workspaceContext, 7L, request)).isInstanceOf(
+                LlmModelUpstreamIdConflictException.class
+            );
+            verify(modelRepository, never()).save(any());
+        }
+
+        @Test
+        void updateAllowsKeepingTheSameUpstreamIdWithoutRecheckingUniqueness() {
+            byoEnabled(true);
+            WorkspaceLlmModel existing = new WorkspaceLlmModel();
+            existing.setId(7L);
+            existing.setWorkspace(connection().getWorkspace());
+            existing.setConnection(connection());
+            existing.setUpstreamModelId("gpt-5");
+            when(modelRepository.findByIdAndWorkspaceIdWithConnection(7L, 1L)).thenReturn(Optional.of(existing));
+            when(modelRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            UpdateWorkspaceLlmModelRequestDTO request = new UpdateWorkspaceLlmModelRequestDTO(
+                null, // displayName
+                "gpt-5", // upstreamModelId — unchanged
+                null, // apiProtocolOverride
+                null, // modality
+                null, // contextWindow
+                null, // maxOutputTokens
+                null, // supportsReasoning
+                null, // cacheControlFormat
+                null, // enabled
+                null, // pricingMode
+                null, // per1mInputUsd
+                null, // per1mOutputUsd
+                null, // per1mCacheReadUsd
+                null, // per1mCacheWriteUsd
+                null, // per1mReasoningUsd
+                null // priceNote
+            );
+
+            modelService.update(workspaceContext, 7L, request);
+
+            verify(modelRepository, never()).existsByConnectionIdAndUpstreamModelIdAndIdNot(any(), any(), any());
+        }
+    }
+
+    @Nested
     class Delete {
 
         @Test

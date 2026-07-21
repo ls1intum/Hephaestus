@@ -320,11 +320,14 @@ class LlmUsageRecorderTest extends BaseUnitTest {
         }
 
         @Test
-        void aCostAtOrAboveTenToTheSixIsClampedToTheMaxRepresentableAmount() {
+        void aCostAtOrAboveTenToTheTwelveIsClampedToTheMaxRepresentableAmount() {
+            // NUMERIC(18,6) (widened from NUMERIC(12,6) — #1368 migration-correctness fix, changelog
+            // 1784566728230-17) overflows at 10^12; a rate this absurd is unreachable in practice and
+            // exists only to exercise the clamp.
             LlmModelPrice price = new LlmModelPrice();
             price.setId(42L);
             price.setPricingMode(PricingMode.PRICED);
-            price.setPer1mInputUsd(new BigDecimal("2000000000")); // absurdly high rate
+            price.setPer1mInputUsd(new BigDecimal("2000000000000000")); // absurdly high rate
             price.setPer1mOutputUsd(BigDecimal.ZERO);
             instanceModelWithPrice(price);
 
@@ -332,7 +335,25 @@ class LlmUsageRecorderTest extends BaseUnitTest {
                 sample("gpt-5", 1_000_000, 0, 0, FundingSource.INSTANCE, CONNECTION_ID)
             );
 
-            assertThat(event.getCostUsd()).isEqualByComparingTo("999999.999999");
+            assertThat(event.getCostUsd()).isEqualByComparingTo("999999999999.999999");
+        }
+
+        @Test
+        void aCostWellBelowTenToTheTwelveIsNeverClamped() {
+            // A cost that would have overflowed the OLD NUMERIC(12,6) column (> $999,999.999999) must
+            // now be stored exactly, unclamped, under the widened NUMERIC(18,6) column.
+            LlmModelPrice price = new LlmModelPrice();
+            price.setId(44L);
+            price.setPricingMode(PricingMode.PRICED);
+            price.setPer1mInputUsd(new BigDecimal("5000000")); // $5M per 1M tokens
+            price.setPer1mOutputUsd(BigDecimal.ZERO);
+            instanceModelWithPrice(price);
+
+            LlmUsageEvent event = recordAndCapture(
+                sample("gpt-5", 1_000_000, 0, 0, FundingSource.INSTANCE, CONNECTION_ID)
+            );
+
+            assertThat(event.getCostUsd()).isEqualByComparingTo("5000000.000000");
         }
 
         @Test

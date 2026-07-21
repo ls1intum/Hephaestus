@@ -103,9 +103,13 @@ public class LlmUsageEvent {
     /**
      * USD cost of this unit of work. Nullable: unknown model pricing yields token counts
      * without a cost — rollups treat null as zero (visibility over false precision).
+     *
+     * <p>{@code NUMERIC(18,6)} — widened from {@code NUMERIC(12,6)} (#1368 migration-correctness fix,
+     * changelog 1784566728230-17) so a genuinely large event cost is never silently clamped down
+     * against a workspace's own (potentially very high) budget cap.
      */
     @Nullable
-    @Column(name = "cost_usd", precision = 12, scale = 6)
+    @Column(name = "cost_usd", precision = 18, scale = 6)
     private BigDecimal costUsd;
 
     /** When the work finished (job terminal write / turn finalise) — the rollup time axis. */

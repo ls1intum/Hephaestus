@@ -29,6 +29,12 @@ public interface WorkspaceLlmModelRepository extends JpaRepository<WorkspaceLlmM
      */
     List<WorkspaceLlmModel> findByConnectionIdAndUpstreamModelId(Long connectionId, String upstreamModelId);
 
+    /** Create-path conflict guard for {@code ux_ws_llm_model_connection_upstream} (#1368). */
+    boolean existsByConnectionIdAndUpstreamModelId(Long connectionId, String upstreamModelId);
+
+    /** Update-path conflict guard: same uniqueness, excluding the row being updated (#1368). */
+    boolean existsByConnectionIdAndUpstreamModelIdAndIdNot(Long connectionId, String upstreamModelId, Long id);
+
     Optional<WorkspaceLlmModel> findByWorkspaceIdAndSlug(Long workspaceId, String slug);
 
     /** Tenancy-safe lookup for a client-supplied id (path variable) — never trust a bare {@code findById}. */

@@ -325,6 +325,97 @@ class LlmModelServiceTest extends BaseUnitTest {
     }
 
     @Nested
+    class UpstreamIdConflict {
+
+        private CreateLlmModelRequestDTO createRequest(String upstreamModelId) {
+            return new CreateLlmModelRequestDTO(
+                "gpt-5-eu",
+                "GPT-5 EU",
+                upstreamModelId,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+            );
+        }
+
+        @Test
+        void createRejectsADuplicateUpstreamIdOnTheSameConnection() {
+            LlmConnection connection = new LlmConnection();
+            connection.setId(3L);
+            when(connectionRepository.findById(3L)).thenReturn(Optional.of(connection));
+            when(modelRepository.findByConnectionIdAndSlug(3L, "gpt-5-eu")).thenReturn(Optional.empty());
+            when(modelRepository.existsByConnectionIdAndUpstreamModelId(3L, "gpt-5")).thenReturn(true);
+
+            assertThatThrownBy(() -> modelService.create(3L, createRequest("gpt-5"))).isInstanceOf(
+                LlmModelUpstreamIdConflictException.class
+            );
+            verify(modelRepository, never()).save(any());
+        }
+
+        @Test
+        void createSucceedsWhenTheUpstreamIdIsUniqueOnTheConnection() {
+            LlmConnection connection = new LlmConnection();
+            connection.setId(3L);
+            when(connectionRepository.findById(3L)).thenReturn(Optional.of(connection));
+            when(modelRepository.findByConnectionIdAndSlug(3L, "gpt-5-eu")).thenReturn(Optional.empty());
+            when(modelRepository.existsByConnectionIdAndUpstreamModelId(3L, "gpt-5")).thenReturn(false);
+            stubModelSavePassthrough();
+
+            LlmModel result = modelService.create(3L, createRequest("gpt-5"));
+
+            assertThat(result.getUpstreamModelId()).isEqualTo("gpt-5");
+        }
+
+        @Test
+        void updateRejectsChangingToAnUpstreamIdAlreadyUsedByAnotherModelOnTheSameConnection() {
+            when(modelRepository.existsByConnectionIdAndUpstreamModelIdAndIdNot(3L, "gpt-5-turbo", 7L)).thenReturn(
+                true
+            );
+
+            UpdateLlmModelRequestDTO request = new UpdateLlmModelRequestDTO(
+                null,
+                "gpt-5-turbo",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+            );
+
+            assertThatThrownBy(() -> modelService.update(7L, request)).isInstanceOf(
+                LlmModelUpstreamIdConflictException.class
+            );
+            verify(modelRepository, never()).save(any());
+        }
+
+        @Test
+        void updateAllowsKeepingTheSameUpstreamIdWithoutRecheckingUniqueness() {
+            stubModelSavePassthrough();
+            UpdateLlmModelRequestDTO request = new UpdateLlmModelRequestDTO(
+                null,
+                "gpt-5", // same as the fixture's current upstreamModelId
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+            );
+
+            modelService.update(7L, request);
+
+            verify(modelRepository, never()).existsByConnectionIdAndUpstreamModelIdAndIdNot(any(), any(), any());
+        }
+    }
+
+    @Nested
     class Deletion {
 
         @Test
