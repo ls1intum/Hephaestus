@@ -1,0 +1,88 @@
+name: CD Staging
+
+# Continuously deploy every green commit on main to Staging (app only).
+# Runs after CI/CD succeeds on main and deploys that exact commit's immutable
+# image (:<sha>). Production stays release-gated with manual approval
+# (release.yml -> deploy-prod), so: Staging = main HEAD, Production = released.
+#
+# App only by design: NATS/webhook (core) and the proxy are stateful/disruptive
+# to recreate (a NATS restart forces a JetStream recovery), so they are never
+# auto-deployed. When their compose changes, the flag-infra-changes job warns and
+# an operator runs "Deploy to Staging" with deploy-core/deploy-proxy = true.
+
+on:
+  workflow_run:
+    workflows: ["CI/CD"]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  # Serialize CD runs; the reusable deploy-staging.yml serializes actual deploys
+  # on its own 'deploy-staging' group. Don't cancel in-progress: never interrupt
+  # a running deploy.
+  group: cd-staging
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  preflight:
+    name: "Check image published"
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      image-exists: ${{ steps.check.outputs.exists }}
+    steps:
+      # Every main push builds :<sha>, except when skip-duplicate-actions dedups an
+      # identical tree. Skip the deploy (instead of failing red) when that happens.
+      - name: Look up application-server image for this commit
+        id: check
+        env:
+          IMAGE: ghcr.io/ls1intum/hephaestus/application-server
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$TOKEN" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          if docker manifest inspect "${IMAGE}:${SHA}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "No \`application-server:${SHA}\` image (build deduplicated) — nothing to deploy." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  deploy-staging:
+    needs: preflight
+    if: needs.preflight.outputs.image-exists == 'true'
+    uses: ./.github/workflows/deploy-staging.yml
+    with:
+      # Deploy the exact commit that passed CI, by its immutable SHA tag.
+      image-tag: ${{ github.event.workflow_run.head_sha }}
+      deploy-app: true
+      deploy-core: false
+      deploy-proxy: false
+    secrets: inherit
+
+  flag-infra-changes:
+    name: "Flag core/proxy changes"
+    needs: preflight
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 2
+      - name: Warn when core/proxy compose changed
+        run: |
+          changed=$(git diff --name-only HEAD^ HEAD -- \
+            docker/compose.core.yaml docker/compose.proxy.yaml 2>/dev/null || true)
+          if [ -n "$changed" ]; then
+            list=$(echo "$changed" | paste -sd ', ' -)
+            echo "::warning::Changed but NOT auto-deployed: ${list}. Run 'Deploy to Staging' with deploy-core/deploy-proxy=true to apply (recreates NATS/proxy)."
+            {
+              echo "### ⚠️ Core/proxy compose changed — not auto-deployed"
+              echo "\`${list}\` changed on this commit; staging CD deploys **app only**."
+              echo "Run **Deploy to Staging** manually with \`deploy-core: true\` (and/or \`deploy-proxy: true\`) to apply — this recreates NATS/proxy."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
