@@ -42,13 +42,20 @@ public class WorkspaceLlmModelService {
 
     @Transactional(readOnly = true)
     public List<WorkspaceLlmModel> list(WorkspaceContext workspaceContext) {
-        return modelRepository.findByWorkspaceId(workspaceContext.id());
+        // Eager-fetches connection — the controller converts every row straight to
+        // WorkspaceLlmModelDTO, same reasoning as get()'s javadoc comment.
+        return modelRepository.findByWorkspaceIdWithConnection(workspaceContext.id());
     }
 
     @Transactional(readOnly = true)
     public WorkspaceLlmModel get(WorkspaceContext workspaceContext, Long id) {
+        // Eager-fetches connection: every caller (the controller's GET, and update()/delete() below,
+        // which reuse this lookup) either converts straight to WorkspaceLlmModelDTO — which reads
+        // connection.displayName — after this transaction closes, or needs the connection materialized
+        // for its own checks. A plain findByIdAndWorkspaceId would return a lazy connection proxy that
+        // throws LazyInitializationException once OSIV is off.
         return modelRepository
-            .findByIdAndWorkspaceId(id, workspaceContext.id())
+            .findByIdAndWorkspaceIdWithConnection(id, workspaceContext.id())
             .orElseThrow(() -> new EntityNotFoundException("WorkspaceLlmModel", id));
     }
 

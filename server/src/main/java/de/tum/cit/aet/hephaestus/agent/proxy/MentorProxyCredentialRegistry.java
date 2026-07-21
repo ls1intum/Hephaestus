@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
@@ -23,14 +24,15 @@ import org.springframework.stereotype.Component;
  * is already process-local. A token grants exactly what an {@code AgentJob} token grants: the caller
  * can ask the LLM proxy to resolve ONE connection's credential, nothing else.
  *
- * <h2>Residual risk (documented per #1368 slice 5)</h2>
+ * <h2>Revoke-on-teardown</h2>
  *
  * <p>Unlike an {@code AgentJob} token — whose TTL is the job timeout and which is revoked the moment
- * the job transitions terminal — a mentor token's only lifetime bound today is the fixed {@link #TTL}
- * below; there is no explicit revoke-on-sandbox-teardown hook wired yet (the interactive sandbox
- * lifecycle lives in {@code agent.sandbox.docker.interactive}, outside this slice). A stale token
- * therefore remains valid for up to {@link #TTL} after its sandbox is torn down. Tracked as a
- * follow-up: wire {@link #revoke} into the interactive sandbox's dispose path.
+ * the job transitions terminal — a mentor token has no natural terminal event of its own, so
+ * {@link #mint} is also keyed by the sandbox's {@code sessionId}:
+ * {@code agent.sandbox.docker.interactive.DockerInteractiveSandboxAdapter}
+ * calls {@link #revoke(UUID)} from its dispose path (any close reason — manual, idle-reap, error, or
+ * app-server shutdown) the moment the underlying container is gone. {@link #TTL} remains a backstop for
+ * the case a sandbox never reaches that callback (e.g. a hard process crash).
  */
 @Component
 public class MentorProxyCredentialRegistry {
@@ -39,6 +41,7 @@ public class MentorProxyCredentialRegistry {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final Map<String, Entry> byTokenHash = new ConcurrentHashMap<>();
+    private final Map<UUID, String> tokenHashBySession = new ConcurrentHashMap<>();
 
     /** Routing + expiry for a minted mentor proxy token. */
     private record Entry(
@@ -50,8 +53,14 @@ public class MentorProxyCredentialRegistry {
         Instant expiresAt
     ) {}
 
-    /** Mint a fresh token for a mentor sandbox build. Never returns the same token twice. */
+    /**
+     * Mint a fresh token for a mentor sandbox build. Never returns the same token twice.
+     *
+     * @param sessionId the sandbox's {@code InteractiveSandboxSpec#sessionId} — the correlation key
+     *     {@link #revoke(UUID)} uses to find this token again at sandbox teardown
+     */
     public String mint(
+        UUID sessionId,
         String apiProtocol,
         String baseUrl,
         @Nullable FundingSource connectionScope,
@@ -61,10 +70,12 @@ public class MentorProxyCredentialRegistry {
         byte[] bytes = new byte[32]; // 256 bits — same shape as AgentJob's job token
         SECURE_RANDOM.nextBytes(bytes);
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        String hash = AgentJob.computeTokenHash(token);
         byTokenHash.put(
-            AgentJob.computeTokenHash(token),
+            hash,
             new Entry(apiProtocol, baseUrl, connectionScope, connectionId, legacyConfigId, Instant.now().plus(TTL))
         );
+        tokenHashBySession.put(sessionId, hash);
         return token;
     }
 
@@ -89,5 +100,16 @@ public class MentorProxyCredentialRegistry {
                 entry.legacyConfigId()
             )
         );
+    }
+
+    /**
+     * Revoke the token minted for a sandbox session, if any. Idempotent — a second call (or a call for
+     * a session that never minted a token, e.g. it lost the concurrent-attach race) is a harmless no-op.
+     */
+    public void revoke(UUID sessionId) {
+        String hash = tokenHashBySession.remove(sessionId);
+        if (hash != null) {
+            byTokenHash.remove(hash);
+        }
     }
 }

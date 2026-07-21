@@ -86,9 +86,12 @@ public class MentorPiAdapter {
 
         // ONE credential path (#1368 slice 5): the mentor's interactive sandbox is not an AgentJob row,
         // so it gets an equivalent proxy-scoped token from the in-memory mentor registry rather than a
-        // DB-backed job token. See MentorProxyCredentialRegistry's javadoc for the residual-risk note
-        // (TTL-only expiry, no explicit revoke-on-teardown hook yet).
+        // DB-backed job token. sessionId is generated here (rather than left to the InteractiveSandboxSpec
+        // constructor) so it can also key the mint — DockerInteractiveSandboxAdapter revokes this token by
+        // that same sessionId from its dispose path. See MentorProxyCredentialRegistry's javadoc.
+        UUID sessionId = UUID.randomUUID();
         String proxyToken = proxyCredentialRegistry.mint(
+            sessionId,
             llmConfig.apiProtocol(),
             baseUrl,
             llmConfig.connectionScope(),
@@ -114,7 +117,7 @@ public class MentorPiAdapter {
         PiPlan plan = runtimeFactory.build(planSpec);
 
         return new InteractiveSandboxSpec(
-            UUID.randomUUID(),
+            sessionId,
             Long.toString(request.developerId()),
             Long.toString(request.workspaceId()),
             imageProperties.reference(),

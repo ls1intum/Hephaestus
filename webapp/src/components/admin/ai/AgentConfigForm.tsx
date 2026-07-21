@@ -21,12 +21,6 @@ import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { ModelPicker, type ModelSelection } from "./ModelPicker";
 
-// The create endpoint still requires an `llmProvider` (bean-validated @NotNull) even though a bound
-// config never reads it at runtime — `LlmModelResolver` only falls back to the legacy provider/model
-// fields when *neither* instanceModelId nor workspaceModelId is set (see its class doc). This value is
-// therefore vestigial write-only filler, never shown in the UI.
-const PLACEHOLDER_LLM_PROVIDER: CreateAgentConfigRequest["llmProvider"] = "OPENAI";
-
 const agentConfigSchema = z.object({
 	name: z.string().trim().min(1, "Name is required").max(120, "Name is too long"),
 	timeoutSeconds: z
@@ -149,7 +143,6 @@ export function AgentConfigForm({
 		} else {
 			onCreate({
 				name: form.name.trim(),
-				llmProvider: PLACEHOLDER_LLM_PROVIDER,
 				timeoutSeconds: form.timeoutSeconds,
 				maxConcurrentJobs: form.maxConcurrentJobs,
 				enabled: form.enabled,

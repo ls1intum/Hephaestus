@@ -236,7 +236,7 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             existing.setWorkspace(connection().getWorkspace());
             existing.setConnection(connection());
             existing.setPricingMode(PricingMode.UNPRICED);
-            when(modelRepository.findByIdAndWorkspaceId(7L, 1L)).thenReturn(Optional.of(existing));
+            when(modelRepository.findByIdAndWorkspaceIdWithConnection(7L, 1L)).thenReturn(Optional.of(existing));
             when(modelRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             UpdateWorkspaceLlmModelRequestDTO request = new UpdateWorkspaceLlmModelRequestDTO(
@@ -273,7 +273,7 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             byoEnabled(true);
             WorkspaceLlmModel model = new WorkspaceLlmModel();
             model.setId(7L);
-            when(modelRepository.findByIdAndWorkspaceId(7L, 1L)).thenReturn(Optional.of(model));
+            when(modelRepository.findByIdAndWorkspaceIdWithConnection(7L, 1L)).thenReturn(Optional.of(model));
             when(agentConfigRepository.existsByWorkspaceModelIdAndWorkspaceId(7L, 1L)).thenReturn(true);
 
             assertThatThrownBy(() -> modelService.delete(workspaceContext, 7L)).isInstanceOf(
@@ -287,7 +287,7 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             byoEnabled(true);
             WorkspaceLlmModel model = new WorkspaceLlmModel();
             model.setId(7L);
-            when(modelRepository.findByIdAndWorkspaceId(7L, 1L)).thenReturn(Optional.of(model));
+            when(modelRepository.findByIdAndWorkspaceIdWithConnection(7L, 1L)).thenReturn(Optional.of(model));
             when(agentConfigRepository.existsByWorkspaceModelIdAndWorkspaceId(7L, 1L)).thenReturn(false);
 
             modelService.delete(workspaceContext, 7L);

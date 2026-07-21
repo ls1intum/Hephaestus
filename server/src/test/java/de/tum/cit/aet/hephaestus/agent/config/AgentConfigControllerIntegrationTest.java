@@ -4,6 +4,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelWorkspaceGrant;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelWorkspaceGrantRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.ModelVisibility;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmConnection;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmConnectionRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModel;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
@@ -13,6 +24,7 @@ import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -34,6 +46,60 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
     @Autowired
     private AgentJobRepository agentJobRepository;
+
+    @Autowired
+    private LlmConnectionRepository llmConnectionRepository;
+
+    @Autowired
+    private LlmModelRepository llmModelRepository;
+
+    @Autowired
+    private LlmModelWorkspaceGrantRepository llmModelWorkspaceGrantRepository;
+
+    @Autowired
+    private WorkspaceLlmConnectionRepository workspaceLlmConnectionRepository;
+
+    @Autowired
+    private WorkspaceLlmModelRepository workspaceLlmModelRepository;
+
+    private LlmModel seedInstanceModel(ModelVisibility visibility, boolean modelEnabled, boolean connectionEnabled) {
+        LlmConnection connection = new LlmConnection();
+        connection.setSlug("conn-" + System.nanoTime());
+        connection.setDisplayName("Instance Connection");
+        connection.setBaseUrl("https://api.openai.com");
+        connection.setApiProtocol("openai-completions");
+        connection.setEnabled(connectionEnabled);
+        connection = llmConnectionRepository.save(connection);
+
+        LlmModel model = new LlmModel();
+        model.setConnection(connection);
+        model.setSlug("model-" + System.nanoTime());
+        model.setDisplayName("Instance Model");
+        model.setUpstreamModelId("gpt-5");
+        model.setVisibility(visibility);
+        model.setEnabled(modelEnabled);
+        return llmModelRepository.save(model);
+    }
+
+    private WorkspaceLlmModel seedWorkspaceModel(Workspace workspace) {
+        WorkspaceLlmConnection connection = new WorkspaceLlmConnection();
+        connection.setWorkspace(workspace);
+        connection.setSlug("byo-conn-" + System.nanoTime());
+        connection.setDisplayName("BYO Connection");
+        connection.setBaseUrl("https://api.openai.com");
+        connection.setApiProtocol("openai-completions");
+        connection.setEnabled(true);
+        connection = workspaceLlmConnectionRepository.save(connection);
+
+        WorkspaceLlmModel model = new WorkspaceLlmModel();
+        model.setWorkspace(workspace);
+        model.setConnection(connection);
+        model.setSlug("byo-model-" + System.nanoTime());
+        model.setDisplayName("BYO Model");
+        model.setUpstreamModelId("gpt-5");
+        model.setEnabled(true);
+        return workspaceLlmModelRepository.save(model);
+    }
 
     private Workspace setupWorkspace() {
         User owner = persistUser("agent-config-owner");
@@ -289,7 +355,8 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
     void postWithMissingRequiredFieldsReturns400() {
         Workspace workspace = setupWorkspace();
 
-        // Missing llmProvider (@NotNull)
+        // Neither llmProvider nor a model binding (instanceModelId/workspaceModelId) — #1368 relaxed
+        // llmProvider to optional at the DTO level, but the service still requires ONE of the two.
         var request = Map.of("name", "incomplete-config");
 
         webTestClient
@@ -414,5 +481,171 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         assertThat(responseBody).doesNotContain("sk-super-secret-key");
         assertThat(responseBody).doesNotContain("llmApiKey");
         assertThat(responseBody).contains("hasLlmApiKey");
+    }
+
+    // --- Model-binding create path (#1368: llmProvider relaxed to optional when a binding is given) ---
+
+    @Test
+    @WithAdminUser
+    void postWithoutLlmProviderButWithInstanceModelBindingSucceeds() {
+        Workspace workspace = setupWorkspace();
+        LlmModel model = seedInstanceModel(ModelVisibility.PUBLIC, true, true);
+
+        var request = CreateAgentConfigRequestDTO.builder()
+            .name("bound-instance-model")
+            .enabled(true)
+            .instanceModelId(model.getId())
+            .build();
+
+        AgentConfigDTO created = webTestClient
+            .post()
+            .uri("/workspaces/{slug}/agent-configs", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(request)
+            .exchange()
+            .expectStatus()
+            .isCreated()
+            .expectBody(AgentConfigDTO.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(created).isNotNull();
+        assertThat(created.instanceModelId()).isEqualTo(model.getId());
+        assertThat(created.workspaceModelId()).isNull();
+        // llmProvider is @NonNull on the DTO even for a bound config — the service fills a harmless
+        // placeholder on the entity (the NOT NULL legacy column), never read by a bound config.
+        assertThat(created.llmProvider()).isNotNull();
+    }
+
+    @Test
+    @WithAdminUser
+    void postWithoutLlmProviderButWithWorkspaceModelBindingSucceeds() {
+        Workspace workspace = setupWorkspace();
+        WorkspaceLlmModel model = seedWorkspaceModel(workspace);
+
+        var request = CreateAgentConfigRequestDTO.builder()
+            .name("bound-workspace-model")
+            .enabled(true)
+            .workspaceModelId(model.getId())
+            .build();
+
+        AgentConfigDTO created = webTestClient
+            .post()
+            .uri("/workspaces/{slug}/agent-configs", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(request)
+            .exchange()
+            .expectStatus()
+            .isCreated()
+            .expectBody(AgentConfigDTO.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(created).isNotNull();
+        assertThat(created.workspaceModelId()).isEqualTo(model.getId());
+        assertThat(created.instanceModelId()).isNull();
+    }
+
+    @Test
+    @WithAdminUser
+    void postWithBothInstanceAndWorkspaceModelIdsReturns400() {
+        Workspace workspace = setupWorkspace();
+        LlmModel instanceModel = seedInstanceModel(ModelVisibility.PUBLIC, true, true);
+        WorkspaceLlmModel workspaceModel = seedWorkspaceModel(workspace);
+
+        var request = CreateAgentConfigRequestDTO.builder()
+            .name("both-bindings")
+            .enabled(true)
+            .instanceModelId(instanceModel.getId())
+            .workspaceModelId(workspaceModel.getId())
+            .build();
+
+        webTestClient
+            .post()
+            .uri("/workspaces/{slug}/agent-configs", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(request)
+            .exchange()
+            .expectStatus()
+            .isBadRequest();
+    }
+
+    @Test
+    @WithAdminUser
+    void postBindingANonVisibleInstanceModelReturns400() {
+        Workspace workspace = setupWorkspace();
+        // GRANTED but no grant recorded for this workspace — not visible to it.
+        LlmModel model = seedInstanceModel(ModelVisibility.GRANTED, true, true);
+
+        var request = CreateAgentConfigRequestDTO.builder()
+            .name("non-visible-model")
+            .enabled(true)
+            .instanceModelId(model.getId())
+            .build();
+
+        webTestClient
+            .post()
+            .uri("/workspaces/{slug}/agent-configs", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(request)
+            .exchange()
+            .expectStatus()
+            .isBadRequest();
+    }
+
+    @Test
+    @WithAdminUser
+    void postBindingAGrantedInstanceModelWithAGrantSucceeds() {
+        Workspace workspace = setupWorkspace();
+        LlmModel model = seedInstanceModel(ModelVisibility.GRANTED, true, true);
+        LlmModelWorkspaceGrant grant = new LlmModelWorkspaceGrant(model.getId(), workspace.getId());
+        grant.setGrantedAt(Instant.now());
+        llmModelWorkspaceGrantRepository.save(grant);
+
+        var request = CreateAgentConfigRequestDTO.builder()
+            .name("granted-model")
+            .enabled(true)
+            .instanceModelId(model.getId())
+            .build();
+
+        webTestClient
+            .post()
+            .uri("/workspaces/{slug}/agent-configs", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(request)
+            .exchange()
+            .expectStatus()
+            .isCreated();
+    }
+
+    @Test
+    @WithAdminUser
+    void postBindingOtherWorkspacesBYOModelReturns404() {
+        Workspace workspaceA = setupWorkspace();
+
+        User ownerB = persistUser("bind-owner-b");
+        Workspace workspaceB = createWorkspace("bind-ws-b", "Bind B", "bind-org-b", AccountType.ORG, ownerB);
+        WorkspaceLlmModel modelInB = seedWorkspaceModel(workspaceB);
+
+        var request = CreateAgentConfigRequestDTO.builder()
+            .name("cross-workspace-model")
+            .enabled(true)
+            .workspaceModelId(modelInB.getId())
+            .build();
+
+        webTestClient
+            .post()
+            .uri("/workspaces/{slug}/agent-configs", workspaceA.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(request)
+            .exchange()
+            .expectStatus()
+            .isNotFound();
     }
 }

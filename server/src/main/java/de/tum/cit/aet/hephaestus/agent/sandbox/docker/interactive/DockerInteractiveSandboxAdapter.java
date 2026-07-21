@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.sandbox.docker.interactive;
 
+import de.tum.cit.aet.hephaestus.agent.proxy.MentorProxyCredentialRegistry;
 import de.tum.cit.aet.hephaestus.agent.sandbox.InteractiveSandboxProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.docker.ContainerSecurityPolicy;
@@ -68,6 +69,7 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
     private final String dockerCli;
     private final int serverPort;
     private final Executor closeExecutor;
+    private final MentorProxyCredentialRegistry mentorProxyCredentialRegistry;
 
     public DockerInteractiveSandboxAdapter(
         InteractiveSandboxProperties properties,
@@ -81,7 +83,8 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
         ObjectMapper mapper,
         Executor closeExecutor,
         String dockerCli,
-        int serverPort
+        int serverPort,
+        MentorProxyCredentialRegistry mentorProxyCredentialRegistry
     ) {
         this.properties = properties;
         this.sandboxProperties = sandboxProperties;
@@ -95,6 +98,7 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
         this.closeExecutor = closeExecutor;
         this.dockerCli = dockerCli;
         this.serverPort = serverPort;
+        this.mentorProxyCredentialRegistry = mentorProxyCredentialRegistry;
     }
 
     @Override
@@ -327,8 +331,18 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
             metrics,
             lifecycleOps,
             closeExecutor,
-            registry::onSandboxClosed
+            this::onAttachedSandboxClosed
         );
+    }
+
+    /**
+     * Single dispose choke point for every close reason (manual, idle-reap, error, shutdown): removes
+     * the session from the registry and revokes its mentor LLM-proxy token so a stale credential can't
+     * outlive the container it was minted for (see {@link MentorProxyCredentialRegistry}'s javadoc).
+     */
+    private void onAttachedSandboxClosed(DockerAttachedSandboxAdapter sandbox) {
+        registry.onSandboxClosed(sandbox);
+        mentorProxyCredentialRegistry.revoke(sandbox.identity().sessionId());
     }
 
     private static final int PREP_DRAIN_CAP_BYTES = 16 * 1024;

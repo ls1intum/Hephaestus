@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -410,7 +411,14 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             when(agentJobRepository.findByJobTokenHashAndStatus(any(), eq(AgentJobStatus.RUNNING))).thenReturn(
                 Optional.empty()
             );
-            String mentorToken = mentorRegistry.mint("openai-completions", "https://api.openai.com", null, null, 5L);
+            String mentorToken = mentorRegistry.mint(
+                UUID.randomUUID(),
+                "openai-completions",
+                "https://api.openai.com",
+                null,
+                null,
+                5L
+            );
 
             var authCapture = new AtomicReference<Authentication>();
             doAnswer(invocation -> {

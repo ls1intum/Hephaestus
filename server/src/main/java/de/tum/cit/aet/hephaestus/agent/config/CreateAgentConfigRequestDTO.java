@@ -5,7 +5,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Builder;
 
@@ -29,7 +28,11 @@ public record CreateAgentConfigRequestDTO(
         example = "https://gpu.example.com"
     )
     String llmBaseUrl,
-    @NotNull(message = "LLM provider is required") @Schema(description = "LLM provider") LlmProvider llmProvider,
+    @Schema(
+        description = "LLM provider. Required unless instanceModelId or workspaceModelId is supplied " +
+            "(a bound config never reads this legacy field)."
+    )
+    LlmProvider llmProvider,
     @Min(value = 30, message = "Timeout must be at least 30 seconds")
     @Max(value = 3600, message = "Timeout must not exceed 3600 seconds")
     @Schema(description = "Job timeout in seconds", example = "600", minimum = "30", maximum = "3600")

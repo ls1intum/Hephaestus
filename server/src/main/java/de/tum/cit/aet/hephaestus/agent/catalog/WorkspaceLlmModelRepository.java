@@ -9,6 +9,17 @@ import org.springframework.data.repository.query.Param;
 public interface WorkspaceLlmModelRepository extends JpaRepository<WorkspaceLlmModel, Long> {
     List<WorkspaceLlmModel> findByWorkspaceId(Long workspaceId);
 
+    /**
+     * Like {@link #findByWorkspaceId}, but eager-fetches {@code connection} — needed for the admin list
+     * view, which converts every row straight to {@link WorkspaceLlmModelDTO} (reads
+     * {@code connection.displayName}) outside the owning transaction. See
+     * {@link #findByIdAndWorkspaceIdWithConnection} for the single-row equivalent.
+     */
+    @Query(
+        "SELECT m FROM WorkspaceLlmModel m JOIN FETCH m.connection WHERE m.workspace.id = :workspaceId ORDER BY m.id"
+    )
+    List<WorkspaceLlmModel> findByWorkspaceIdWithConnection(@Param("workspaceId") Long workspaceId);
+
     List<WorkspaceLlmModel> findByConnectionId(Long connectionId);
 
     /**
@@ -22,6 +33,21 @@ public interface WorkspaceLlmModelRepository extends JpaRepository<WorkspaceLlmM
 
     /** Tenancy-safe lookup for a client-supplied id (path variable) — never trust a bare {@code findById}. */
     Optional<WorkspaceLlmModel> findByIdAndWorkspaceId(Long id, Long workspaceId);
+
+    /**
+     * Like {@link #findByIdAndWorkspaceId}, but eager-fetches {@code connection} — needed wherever the
+     * loaded entity outlives the read transaction before being converted to {@link WorkspaceLlmModelDTO}
+     * (which reads {@code connection.displayName}). Without this, {@code WorkspaceLlmModelController}'s
+     * GET/PATCH endpoints throw {@code LazyInitializationException} once OSIV is off, since the plain
+     * lazy {@code connection} proxy is never touched inside the owning {@code @Transactional} method.
+     */
+    @Query(
+        "SELECT m FROM WorkspaceLlmModel m JOIN FETCH m.connection WHERE m.id = :id AND m.workspace.id = :workspaceId"
+    )
+    Optional<WorkspaceLlmModel> findByIdAndWorkspaceIdWithConnection(
+        @Param("id") Long id,
+        @Param("workspaceId") Long workspaceId
+    );
 
     /** Delete-conflict guard for {@code WorkspaceLlmConnectionService#delete}, scoped to the owning workspace. */
     boolean existsByConnectionIdAndWorkspaceId(Long connectionId, Long workspaceId);

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.config;
 
+import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelWorkspaceGrantRepository;
@@ -63,7 +64,18 @@ public class AgentConfigService {
         AgentConfig config = new AgentConfig();
         config.setWorkspace(workspace);
         config.setName(request.name());
-        config.setLlmProvider(request.llmProvider());
+        // #1368: llmProvider is only required for a legacy (unbound) config — a config that binds to
+        // a catalog model (instanceModelId/workspaceModelId) never reads it (see LlmModelResolver's
+        // precedence). Reject only when NEITHER a binding nor the legacy field is supplied; the
+        // `agent_config.llm_provider` column stays NOT NULL (deprecate-then-remove, no schema change
+        // here), so a bound-only create still needs a harmless placeholder value on the entity.
+        boolean hasModelBinding = request.instanceModelId() != null || request.workspaceModelId() != null;
+        if (request.llmProvider() == null && !hasModelBinding) {
+            throw new IllegalArgumentException(
+                "llmProvider is required unless a model binding (instanceModelId or workspaceModelId) is supplied."
+            );
+        }
+        config.setLlmProvider(request.llmProvider() != null ? request.llmProvider() : LlmProvider.OPENAI);
 
         if (request.enabled() != null) {
             config.setEnabled(request.enabled());

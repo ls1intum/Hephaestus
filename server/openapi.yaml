@@ -6271,7 +6271,8 @@ components:
           minLength: 0
         llmProvider:
           type: string
-          description: LLM provider
+          description: LLM provider. Required unless instanceModelId or workspaceModelId
+            is supplied (a bound config never reads this legacy field).
           enum:
           - ANTHROPIC
           - OPENAI
@@ -6308,7 +6309,6 @@ components:
           description: Bind to a model on your own provider. Mutually exclusive with
             instanceModelId.
       required:
-      - llmProvider
       - name
     CreateLlmConnectionRequest:
       type: object

@@ -49,7 +49,13 @@ public class LlmModelService {
 
     @Transactional(readOnly = true)
     public LlmModel get(Long id) {
-        return modelRepository.findById(id).orElseThrow(() -> new EntityNotFoundException("LlmModel", id));
+        // Eager-fetches connection: every caller of get() (the admin controller's GET, and its
+        // toDTO() calls after update-price/other mutations) immediately reads connection.displayName
+        // via LlmModelDTO#from, which would otherwise throw LazyInitializationException once the
+        // transaction below has closed (OSIV is off).
+        return modelRepository
+            .findByIdWithConnection(id)
+            .orElseThrow(() -> new EntityNotFoundException("LlmModel", id));
     }
 
     /** Batched current-price lookup for {@link #list()}, keyed by model id. */
@@ -137,7 +143,11 @@ public class LlmModelService {
 
     @Transactional
     public LlmModel update(Long id, UpdateLlmModelRequestDTO request) {
-        LlmModel model = modelRepository.findById(id).orElseThrow(() -> new EntityNotFoundException("LlmModel", id));
+        // Eager-fetches connection — the controller converts the returned entity straight to
+        // LlmModelDTO after this transaction closes; see get()'s javadoc comment for why.
+        LlmModel model = modelRepository
+            .findByIdWithConnection(id)
+            .orElseThrow(() -> new EntityNotFoundException("LlmModel", id));
 
         if (request.displayName() != null) {
             model.setDisplayName(request.displayName());
@@ -236,8 +246,9 @@ public class LlmModelService {
      */
     @Transactional
     public LlmModel updateSharing(Long modelId, UpdateLlmModelSharingRequestDTO request) {
+        // Eager-fetches connection — same reasoning as update() above.
         LlmModel model = modelRepository
-            .findById(modelId)
+            .findByIdWithConnection(modelId)
             .orElseThrow(() -> new EntityNotFoundException("LlmModel", modelId));
 
         List<LlmModelWorkspaceGrant> existing = grantRepository.findByIdModelId(modelId);

@@ -5,6 +5,7 @@ import com.github.dockerjava.core.DefaultDockerClientConfig;
 import com.github.dockerjava.core.DockerClientImpl;
 import com.github.dockerjava.httpclient5.ApacheDockerHttpClient;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.agent.proxy.MentorProxyCredentialRegistry;
 import de.tum.cit.aet.hephaestus.agent.sandbox.InteractiveSandboxProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.docker.interactive.DockerInteractiveSandboxAdapter;
@@ -217,7 +218,8 @@ public class DockerSandboxConfiguration {
         // adapter runs runClose() here too — docker-java sync calls pin virtual carriers on JDK 21.
         ExecutorService dockerWaitExecutor,
         @Value("${hephaestus.mentor.docker-cli:docker}") String dockerCli,
-        @Value("${server.port:8080}") int serverPort
+        @Value("${server.port:8080}") int serverPort,
+        MentorProxyCredentialRegistry mentorProxyCredentialRegistry
     ) {
         return new DockerInteractiveSandboxAdapter(
             interactiveProperties,
@@ -231,7 +233,8 @@ public class DockerSandboxConfiguration {
             mapper,
             dockerWaitExecutor,
             dockerCli,
-            serverPort
+            serverPort,
+            mentorProxyCredentialRegistry
         );
     }
 

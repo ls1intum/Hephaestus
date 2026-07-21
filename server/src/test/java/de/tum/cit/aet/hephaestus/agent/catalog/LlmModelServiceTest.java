@@ -67,8 +67,11 @@ class LlmModelServiceTest extends BaseUnitTest {
         connection.setId(3L);
         model.setConnection(connection);
         // Not every test looks up model 7 (e.g. the unknown-id 404 case) — lenient so those aren't
-        // flagged as unnecessary stubbing.
+        // flagged as unnecessary stubbing. Both finders are stubbed: updatePrice() still uses the plain
+        // findById, while get()/update()/updateSharing() use the eager-fetch variant (#1368 fix — the
+        // admin controller reads connection.displayName after the transaction closes).
         lenient().when(modelRepository.findById(7L)).thenReturn(Optional.of(model));
+        lenient().when(modelRepository.findByIdWithConnection(7L)).thenReturn(Optional.of(model));
     }
 
     private void stubModelSavePassthrough() {

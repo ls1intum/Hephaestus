@@ -100,16 +100,16 @@ api PATCH "/workspaces/$WS_SLUG/features" -H 'content-type: application/json' \
 say "practice detection enabled on the workspace"
 
 # ---- 5. LLM runtime + bind to practice detection --------------------------
-if [ -n "$LLM_BASE_URL" ]; then CRED=API_KEY; LP=OPENAI; NET=true; MODEL="${MODEL:-openai/gpt-oss-120b}"
-else CRED=PROXY; LP=ANTHROPIC; NET=false; MODEL="${MODEL:-claude-sonnet-4-5}"; fi
+if [ -n "$LLM_BASE_URL" ]; then LP=OPENAI; NET=true; MODEL="${MODEL:-openai/gpt-oss-120b}"
+else LP=ANTHROPIC; NET=false; MODEL="${MODEL:-claude-sonnet-4-5}"; fi
 CFG_ID="$(api GET "/workspaces/$WS_SLUG/agent-configs" | jq -r '.[] | select(.name=="e2e-llm") | .id' | head -1)"
 if [ -z "$CFG_ID" ]; then
   CFG_ID="$(api POST "/workspaces/$WS_SLUG/agent-configs" -H 'content-type: application/json' -d "$(jq -nc \
-    --arg m "$MODEL" --arg k "$LLM_KEY" --arg b "$LLM_BASE_URL" --arg p "$LP" --arg c "$CRED" --argjson net "$NET" \
-    '{name:"e2e-llm",enabled:true,modelName:$m,llmApiKey:$k,llmBaseUrl:($b|select(.!="")),llmProvider:$p,credentialMode:$c,timeoutSeconds:1200,maxConcurrentJobs:1,allowInternet:$net}')" | jq -r '.id')"
+    --arg m "$MODEL" --arg k "$LLM_KEY" --arg b "$LLM_BASE_URL" --arg p "$LP" --argjson net "$NET" \
+    '{name:"e2e-llm",enabled:true,modelName:$m,llmApiKey:$k,llmBaseUrl:($b|select(.!="")),llmProvider:$p,timeoutSeconds:1200,maxConcurrentJobs:1,allowInternet:$net}')" | jq -r '.id')"
 fi
 api PUT "/workspaces/$WS_SLUG/ai-settings/practice-config" -H 'content-type: application/json' -d "{\"configId\":$CFG_ID}" >/dev/null
-say "LLM runtime 'e2e-llm' (id $CFG_ID, $LP/$CRED, $MODEL) bound to practice detection"
+say "LLM runtime 'e2e-llm' (id $CFG_ID, $LP, $MODEL) bound to practice detection"
 
 # ---- 6. the practices ------------------------------------------------------
 practice() { local slug="$1" name="$2" trig="$3" crit="$4"

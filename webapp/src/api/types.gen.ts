@@ -3891,9 +3891,9 @@ export type CreateAgentConfigRequest = {
      */
     llmBaseUrl?: string;
     /**
-     * LLM provider
+     * LLM provider. Required unless instanceModelId or workspaceModelId is supplied (a bound config never reads this legacy field).
      */
-    llmProvider: 'ANTHROPIC' | 'OPENAI' | 'AZURE_OPENAI';
+    llmProvider?: 'ANTHROPIC' | 'OPENAI' | 'AZURE_OPENAI';
     /**
      * Maximum concurrent jobs
      */
