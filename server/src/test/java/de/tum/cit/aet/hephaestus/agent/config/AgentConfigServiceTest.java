@@ -4,11 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
+import de.tum.cit.aet.hephaestus.agent.catalog.EgressPolicy;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
@@ -61,6 +63,9 @@ class AgentConfigServiceTest extends BaseUnitTest {
 
     @Mock
     private LlmModelWorkspaceGrantRepository llmModelWorkspaceGrantRepository;
+
+    @Mock
+    private EgressPolicy egressPolicy;
 
     @InjectMocks
     private AgentConfigService agentConfigService;
@@ -187,6 +192,68 @@ class AgentConfigServiceTest extends BaseUnitTest {
                 .isInstanceOf(AgentConfigNameConflictException.class)
                 .hasMessageContaining("my-agent");
         }
+
+        /**
+         * #1368 fix wave: a legacy {@code llmBaseUrl} previously skipped {@link EgressPolicy} entirely
+         * on write — a workspace admin could park a config on a private/internal host that the LLM proxy
+         * would then happily call live.
+         */
+        @Test
+        void shouldValidateLegacyBaseUrlThroughEgressPolicy() {
+            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "my-agent")).thenReturn(false);
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            var request = CreateAgentConfigRequestDTO.builder()
+                .name("my-agent")
+                .enabled(true)
+                .llmProvider(LlmProvider.OPENAI)
+                .llmBaseUrl("https://gateway.example.com/v1")
+                .build();
+
+            agentConfigService.createConfig(workspaceContext, request);
+
+            verify(egressPolicy).validate("https://gateway.example.com/v1");
+        }
+
+        @Test
+        void shouldRejectLegacyBaseUrlThatFailsEgressPolicy() {
+            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "my-agent")).thenReturn(false);
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+            doThrow(new IllegalArgumentException("Provider host must be a public HTTPS URL"))
+                .when(egressPolicy)
+                .validate("http://169.254.169.254/v1");
+
+            var request = CreateAgentConfigRequestDTO.builder()
+                .name("my-agent")
+                .enabled(true)
+                .llmProvider(LlmProvider.OPENAI)
+                .llmBaseUrl("http://169.254.169.254/v1")
+                .build();
+
+            assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request)).isInstanceOf(
+                IllegalArgumentException.class
+            );
+            verify(agentConfigRepository, never()).save(any());
+        }
+
+        @Test
+        void shouldNotValidateWhenLegacyBaseUrlIsBlank() {
+            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "my-agent")).thenReturn(false);
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            var request = CreateAgentConfigRequestDTO.builder()
+                .name("my-agent")
+                .enabled(true)
+                .llmProvider(LlmProvider.OPENAI)
+                .llmBaseUrl("")
+                .build();
+
+            agentConfigService.createConfig(workspaceContext, request);
+
+            verify(egressPolicy, never()).validate(any());
+        }
     }
 
     @Nested
@@ -214,6 +281,43 @@ class AgentConfigServiceTest extends BaseUnitTest {
             assertThat(result.getId()).isEqualTo(10L);
             assertThat(result.getLlmApiKey()).isEqualTo("sk-existing-secret");
             assertThat(result.getTimeoutSeconds()).isEqualTo(120);
+        }
+
+        @Test
+        void shouldValidateLegacyBaseUrlThroughEgressPolicyOnUpdate() {
+            AgentConfig existing = new AgentConfig();
+            existing.setId(10L);
+            existing.setWorkspace(workspace);
+            existing.setLlmProvider(LlmProvider.ANTHROPIC);
+
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
+            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            var request = UpdateAgentConfigRequestDTO.builder().llmBaseUrl("https://gateway.example.com/v1").build();
+
+            agentConfigService.updateConfig(workspaceContext, 10L, request);
+
+            verify(egressPolicy).validate("https://gateway.example.com/v1");
+        }
+
+        @Test
+        void shouldRejectLegacyBaseUrlThatFailsEgressPolicyOnUpdate() {
+            AgentConfig existing = new AgentConfig();
+            existing.setId(10L);
+            existing.setWorkspace(workspace);
+            existing.setLlmProvider(LlmProvider.ANTHROPIC);
+
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
+            doThrow(new IllegalArgumentException("Provider host must be a public HTTPS URL"))
+                .when(egressPolicy)
+                .validate("http://10.0.0.5/v1");
+
+            var request = UpdateAgentConfigRequestDTO.builder().llmBaseUrl("http://10.0.0.5/v1").build();
+
+            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request)).isInstanceOf(
+                IllegalArgumentException.class
+            );
+            verify(agentConfigRepository, never()).save(any());
         }
 
         @Test

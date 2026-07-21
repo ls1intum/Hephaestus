@@ -135,7 +135,12 @@ public class LlmModelService {
 
         LlmModel saved;
         try {
-            saved = modelRepository.save(model);
+            // saveAndFlush (not save): a generated-id entity like this one doesn't necessarily hit the
+            // DB inside save() — Hibernate can defer the INSERT to the transaction's implicit flush at
+            // commit, which is OUTSIDE this try/catch. A concurrent-create race would then surface the
+            // unique-constraint violation as an uncaught 500 instead of the 409 this catch exists to
+            // produce (#1368 fix wave). Flushing synchronously here brings the violation back inside.
+            saved = modelRepository.saveAndFlush(model);
         } catch (DataIntegrityViolationException e) {
             // The fast-path checks above are racy; the unique constraints backstop the loser of a
             // concurrent create. Report the same 409 rather than leaking a 500 — pick the exception that
@@ -197,7 +202,9 @@ public class LlmModelService {
 
         LlmModel saved;
         try {
-            saved = modelRepository.save(model);
+            // saveAndFlush (not save) — see create()'s identical comment: an unflushed save() would let
+            // a concurrent-update race's constraint violation escape this catch as an uncaught 500.
+            saved = modelRepository.saveAndFlush(model);
         } catch (DataIntegrityViolationException e) {
             // The fast-path check above is racy; the unique constraint backstops the loser of a
             // concurrent update.

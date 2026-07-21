@@ -1,22 +1,23 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.ApiProtocolDefaults.AuthDefaults;
+import de.tum.cit.aet.hephaestus.core.WebClientConnectors;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import java.io.IOException;
-import java.net.HttpURLConnection;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.client.ReactorClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
+import reactor.netty.http.client.HttpClient;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -39,22 +40,31 @@ public class LlmConnectionProbeService {
     private final EgressPolicy egressPolicy;
     private final RestClient restClient;
 
-    LlmConnectionProbeService(LlmConnectionRepository connectionRepository, EgressPolicy egressPolicy) {
+    LlmConnectionProbeService(
+        LlmConnectionRepository connectionRepository,
+        EgressPolicy egressPolicy,
+        @Value("${hephaestus.llm.egress.allow-loopback:false}") boolean allowLoopback
+    ) {
         this.connectionRepository = connectionRepository;
         this.egressPolicy = egressPolicy;
         // Dedicated short-timeout client — deliberately independent of any job/proxy timeout.
-        // Redirects are NEVER followed: only the initial URL is egress-validated, and the custom auth
-        // header (x-api-key / api-key / Authorization) would otherwise survive a cross-origin redirect
-        // and exfiltrate the credential to whatever host the 3xx points at. A redirect response is
-        // reported as an ordinary unreachable/unsupported probe result (its status is not 2xx), never
-        // followed and never treated as an error.
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory() {
-            @Override
-            protected void prepareConnection(HttpURLConnection connection, String httpMethod) throws IOException {
-                super.prepareConnection(connection, httpMethod);
-                connection.setInstanceFollowRedirects(false);
-            }
-        };
+        // Redirects are NEVER followed (Reactor Netty's default: no automatic redirect-following unless
+        // explicitly enabled, reasserted below for clarity): only the initial URL is egress-validated,
+        // and the custom auth header (x-api-key / api-key / Authorization) would otherwise survive a
+        // cross-origin redirect and exfiltrate the credential to whatever host the 3xx points at. A
+        // redirect response is reported as an ordinary unreachable/unsupported probe result (its status
+        // is not 2xx), never followed and never treated as an error.
+        //
+        // Connect-time SSRF guard (#1368 fix wave): EgressPolicy.validate() above only checks the DNS
+        // answer AT VALIDATION TIME — without a guarded resolver here too, a DNS-rebind target (public
+        // answer during validation, private answer at connect time) would sail straight through. The
+        // guarded resolver re-runs the same private-address check on the resolution actually used to
+        // connect, closing that TOCTOU window; the loopback exemption mirrors EgressPolicy's own
+        // literal-host dev/e2e allowance so the two layers agree.
+        HttpClient httpClient = HttpClient.create()
+            .resolver(WebClientConnectors.resolverGroup(allowLoopback))
+            .followRedirect(false);
+        ReactorClientHttpRequestFactory factory = new ReactorClientHttpRequestFactory(httpClient);
         factory.setConnectTimeout(PROBE_TIMEOUT);
         factory.setReadTimeout(PROBE_TIMEOUT);
         this.restClient = RestClient.builder().requestFactory(factory).build();

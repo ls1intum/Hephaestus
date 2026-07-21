@@ -36,6 +36,13 @@ public final class LlmUsageDTOs {
             description = "Whether this month's confirmed spend is within the cap, has reached it (work is " +
                 "paused), or can't be fully confirmed yet because some usage above has no price set."
         ) LlmBudgetVerdict verdict,
+        @NonNull @Schema(
+            description = "Whether new AI work is currently paused for this workspace by this server's budget " +
+                "policy — true when the cap is reached (verdict=EXHAUSTED), or when verdict=UNVERIFIABLE AND " +
+                "this server's unpriced-usage policy is BLOCK (the default WARN policy never pauses on " +
+                "UNVERIFIABLE alone). Authoritative: the webapp cannot derive this from verdict alone because " +
+                "it doesn't know the instance's unpriced-usage policy."
+        ) Boolean usagePaused,
         @NonNull List<LlmUsageByJobTypeDTO> byJobType,
         @NonNull List<LlmUsageByDayDTO> byDay
     ) {}

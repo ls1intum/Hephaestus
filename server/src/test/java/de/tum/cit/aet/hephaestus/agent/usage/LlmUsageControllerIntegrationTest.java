@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.agent.usage;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.agent.catalog.InstanceLlmSettings;
+import de.tum.cit.aet.hephaestus.agent.catalog.InstanceLlmSettingsRepository;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageDTOs.WorkspaceLlmUsageReportDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
@@ -37,6 +39,21 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
     @Autowired
     private WorkspaceRepository workspaceRepository;
+
+    @Autowired
+    private InstanceLlmSettingsRepository instanceLlmSettingsRepository;
+
+    private void setUnpricedPolicy(String policy) {
+        InstanceLlmSettings settings = instanceLlmSettingsRepository
+            .findById((short) 1)
+            .orElseGet(() -> {
+                InstanceLlmSettings created = new InstanceLlmSettings();
+                created.setId((short) 1);
+                return created;
+            });
+        settings.setDefaultUnpricedPolicy(policy);
+        instanceLlmSettingsRepository.save(settings);
+    }
 
     private static final YearMonth CURRENT = YearMonth.now(ZoneOffset.UTC);
     private static final YearMonth PREVIOUS = CURRENT.minusMonths(1);
@@ -200,7 +217,84 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             .isOk()
             .expectBody()
             .jsonPath("$.verdict")
-            .isEqualTo("EXHAUSTED");
+            .isEqualTo("EXHAUSTED")
+            // #1368 fix wave: EXHAUSTED always pauses, regardless of the instance's unpriced-usage policy.
+            .jsonPath("$.usagePaused")
+            .isEqualTo(true);
+    }
+
+    /**
+     * #1368 fix wave: {@code usagePaused} is the webapp's only reliable signal that new AI work is
+     * currently paused — it folds in the instance's unpriced-usage policy (BLOCK vs WARN), which the
+     * webapp otherwise has no way to see. UNVERIFIABLE alone (no policy) must NOT imply paused.
+     */
+    @Test
+    @WithAdminUser
+    void usagePausedReflectsTheInstanceUnpricedPolicyOnAnUnverifiableMonth() {
+        Workspace workspace = setupWorkspaceWithAdmin("usage-unverifiable-warn");
+        workspace.setMonthlyLlmBudgetUsd(new BigDecimal("100.00"));
+        workspaceRepository.save(workspace);
+        seedUnpricedEvent(workspace, LlmUsageJobType.MENTOR_TURN, CURRENT, 1);
+        setUnpricedPolicy("WARN"); // default — never pauses on UNVERIFIABLE alone
+
+        webTestClient
+            .get()
+            .uri("/workspaces/{slug}/llm-usage", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$.verdict")
+            .isEqualTo("UNVERIFIABLE")
+            .jsonPath("$.usagePaused")
+            .isEqualTo(false);
+    }
+
+    @Test
+    @WithAdminUser
+    void usagePausedIsTrueOnAnUnverifiableMonthWhenTheInstancePolicyIsBlock() {
+        Workspace workspace = setupWorkspaceWithAdmin("usage-unverifiable-block");
+        workspace.setMonthlyLlmBudgetUsd(new BigDecimal("100.00"));
+        workspaceRepository.save(workspace);
+        seedUnpricedEvent(workspace, LlmUsageJobType.MENTOR_TURN, CURRENT, 1);
+        setUnpricedPolicy("BLOCK");
+
+        webTestClient
+            .get()
+            .uri("/workspaces/{slug}/llm-usage", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$.verdict")
+            .isEqualTo("UNVERIFIABLE")
+            .jsonPath("$.usagePaused")
+            .isEqualTo(true);
+    }
+
+    @Test
+    @WithAdminUser
+    void usagePausedIsFalseForAPastMonthEvenIfTheCurrentMonthIsExhausted() {
+        // usagePaused is a LIVE gate (always evaluated against "now"), never scoped to the requested
+        // report month — a closed past month can't still be "pausing" new work.
+        Workspace workspace = setupWorkspaceWithAdmin("usage-paused-past-month");
+        workspace.setMonthlyLlmBudgetUsd(new BigDecimal("1.00"));
+        workspaceRepository.save(workspace);
+        seedEvent(workspace, LlmUsageJobType.MENTOR_TURN, "1.00", CURRENT, 1); // exhausts the CURRENT month
+        seedEvent(workspace, LlmUsageJobType.MENTOR_TURN, "0.10", PREVIOUS, 1); // PREVIOUS stays well under cap
+
+        webTestClient
+            .get()
+            .uri("/workspaces/{slug}/llm-usage?month={month}", workspace.getWorkspaceSlug(), PREVIOUS.toString())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$.usagePaused")
+            .isEqualTo(false);
     }
 
     @Test

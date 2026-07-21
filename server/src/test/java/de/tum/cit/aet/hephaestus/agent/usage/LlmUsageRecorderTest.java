@@ -74,9 +74,11 @@ class LlmUsageRecorderTest extends BaseUnitTest {
     private PlatformTransactionManager transactionManager;
 
     private LlmUsageRecorder recorder;
+    private SimpleMeterRegistry meterRegistry;
 
     @BeforeEach
     void setUp() {
+        meterRegistry = new SimpleMeterRegistry();
         recorder = new LlmUsageRecorder(
             usageRepository,
             workspaceRepository,
@@ -85,7 +87,7 @@ class LlmUsageRecorderTest extends BaseUnitTest {
             llmModelRepository,
             llmModelPriceRepository,
             workspaceLlmModelRepository,
-            new SimpleMeterRegistry(),
+            meterRegistry,
             transactionManager
         );
         Workspace workspace = new Workspace();
@@ -439,6 +441,31 @@ class LlmUsageRecorderTest extends BaseUnitTest {
             LlmUsageRecorder.LlmUsageSample sample = sample("gpt-5", 0, 0, 0, FundingSource.INSTANCE, CONNECTION_ID);
 
             assertThatCode(() -> recorder.recordUnverifiable(WORKSPACE_ID, sample)).doesNotThrowAnyException();
+        }
+
+        /**
+         * #1368 fix wave: {@code llm.usage.unverifiable} must count only an ACTUAL insert. Before this
+         * fix, the counter incremented unconditionally after {@code persist()} even when persist
+         * silently swallowed a duplicate {@code source_id} — inflating the metric for a row that was
+         * never written (e.g. a retried cancellation write already recorded by another caller).
+         */
+        @Test
+        void aSwallowedDuplicateDoesNotIncrementTheUnverifiableCounter() {
+            when(usageRepository.saveAndFlush(any(LlmUsageEvent.class))).thenThrow(duplicateSourceViolation());
+            LlmUsageRecorder.LlmUsageSample sample = sample("gpt-5", 0, 0, 0, FundingSource.INSTANCE, CONNECTION_ID);
+
+            recorder.recordUnverifiable(WORKSPACE_ID, sample);
+
+            assertThat(meterRegistry.counter("llm.usage.unverifiable").count()).isZero();
+        }
+
+        @Test
+        void anActualInsertIncrementsTheUnverifiableCounterExactlyOnce() {
+            LlmUsageRecorder.LlmUsageSample sample = sample("gpt-5", 0, 0, 0, FundingSource.INSTANCE, CONNECTION_ID);
+
+            recorder.recordUnverifiable(WORKSPACE_ID, sample);
+
+            assertThat(meterRegistry.counter("llm.usage.unverifiable").count()).isEqualTo(1.0);
         }
     }
 

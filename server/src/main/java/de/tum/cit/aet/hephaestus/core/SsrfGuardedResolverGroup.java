@@ -33,13 +33,27 @@ import java.util.List;
  */
 public final class SsrfGuardedResolverGroup extends AddressResolverGroup<InetSocketAddress> {
 
-    public static final SsrfGuardedResolverGroup INSTANCE = new SsrfGuardedResolverGroup();
+    public static final SsrfGuardedResolverGroup INSTANCE = new SsrfGuardedResolverGroup(false);
 
-    private SsrfGuardedResolverGroup() {}
+    /**
+     * Loopback-exempt variant: still blocks every other private/reserved range (so DNS rebinding to a
+     * non-loopback private address is closed exactly like {@link #INSTANCE}), but lets a RESOLVED
+     * loopback address through. For outbound calls whose policy layer has already decided loopback is
+     * an acceptable dev/e2e target (see {@code EgressPolicy#allowLoopback} /
+     * {@code hephaestus.llm.egress.allow-loopback}) — without this, that policy's own literal-host
+     * loopback allowance would be silently re-blocked at connect time by the general-purpose guard.
+     */
+    public static final SsrfGuardedResolverGroup LOOPBACK_EXEMPT_INSTANCE = new SsrfGuardedResolverGroup(true);
+
+    private final boolean allowLoopback;
+
+    private SsrfGuardedResolverGroup(boolean allowLoopback) {
+        this.allowLoopback = allowLoopback;
+    }
 
     @Override
     protected AddressResolver<InetSocketAddress> newResolver(EventExecutor executor) {
-        return new GuardedResolver(executor, DefaultAddressResolverGroup.INSTANCE.getResolver(executor));
+        return new GuardedResolver(executor, DefaultAddressResolverGroup.INSTANCE.getResolver(executor), allowLoopback);
     }
 
     /**
@@ -47,9 +61,17 @@ public final class SsrfGuardedResolverGroup extends AddressResolverGroup<InetSoc
      * {@link UnknownHostException} (rather than throwing) so it is unit-testable with a stub delegate.
      */
     static UnknownHostException blockedReason(InetSocketAddress resolved) {
+        return blockedReason(resolved, false);
+    }
+
+    /** Overload threading through the loopback exemption — see {@link #LOOPBACK_EXEMPT_INSTANCE}. */
+    static UnknownHostException blockedReason(InetSocketAddress resolved, boolean allowLoopback) {
         InetAddress addr = (resolved == null) ? null : resolved.getAddress();
         if (addr == null) {
             return new UnknownHostException("address did not resolve");
+        }
+        if (allowLoopback && addr.isLoopbackAddress()) {
+            return null;
         }
         if (PrivateAddressGuard.isNonPublic(addr)) {
             return new UnknownHostException("blocked non-public address (SSRF guard): " + addr.getHostAddress());
@@ -62,10 +84,16 @@ public final class SsrfGuardedResolverGroup extends AddressResolverGroup<InetSoc
 
         private final EventExecutor executor;
         private final AddressResolver<InetSocketAddress> delegate;
+        private final boolean allowLoopback;
 
         GuardedResolver(EventExecutor executor, AddressResolver<InetSocketAddress> delegate) {
+            this(executor, delegate, false);
+        }
+
+        GuardedResolver(EventExecutor executor, AddressResolver<InetSocketAddress> delegate, boolean allowLoopback) {
             this.executor = executor;
             this.delegate = delegate;
+            this.allowLoopback = allowLoopback;
         }
 
         @Override
@@ -106,23 +134,14 @@ public final class SsrfGuardedResolverGroup extends AddressResolverGroup<InetSoc
             return gateAll(delegate.resolveAll(address), promise);
         }
 
-        @Override
-        public void close() {
-            // The delegate resolver is owned/cached by the shared DefaultAddressResolverGroup singleton,
-            // which closes it on its own lifecycle — closing it here would yank a process-wide resolver.
-        }
-
-        private static Future<InetSocketAddress> gateOne(
-            Future<InetSocketAddress> source,
-            Promise<InetSocketAddress> target
-        ) {
+        private Future<InetSocketAddress> gateOne(Future<InetSocketAddress> source, Promise<InetSocketAddress> target) {
             source.addListener(
                 (FutureListener<InetSocketAddress>) f -> {
                     if (!f.isSuccess()) {
                         target.setFailure(f.cause());
                         return;
                     }
-                    UnknownHostException blocked = blockedReason(f.getNow());
+                    UnknownHostException blocked = blockedReason(f.getNow(), allowLoopback);
                     if (blocked != null) {
                         target.setFailure(blocked);
                     } else {
@@ -133,7 +152,7 @@ public final class SsrfGuardedResolverGroup extends AddressResolverGroup<InetSoc
             return target;
         }
 
-        private static Future<List<InetSocketAddress>> gateAll(
+        private Future<List<InetSocketAddress>> gateAll(
             Future<List<InetSocketAddress>> source,
             Promise<List<InetSocketAddress>> target
         ) {
@@ -144,7 +163,7 @@ public final class SsrfGuardedResolverGroup extends AddressResolverGroup<InetSoc
                         return;
                     }
                     for (InetSocketAddress isa : f.getNow()) {
-                        UnknownHostException blocked = blockedReason(isa);
+                        UnknownHostException blocked = blockedReason(isa, allowLoopback);
                         if (blocked != null) {
                             target.setFailure(blocked);
                             return;
@@ -154,6 +173,12 @@ public final class SsrfGuardedResolverGroup extends AddressResolverGroup<InetSoc
                 }
             );
             return target;
+        }
+
+        @Override
+        public void close() {
+            // The delegate resolver is owned/cached by the shared DefaultAddressResolverGroup singleton,
+            // which closes it on its own lifecycle — closing it here would yank a process-wide resolver.
         }
     }
 }

@@ -1,8 +1,11 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
+import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageJobType;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerJobCancelDispatcher;
 import java.time.Instant;
@@ -13,8 +16,8 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Post-submission lifecycle operations on an agent job: user-initiated cancel and delivery
@@ -34,19 +37,25 @@ public class AgentJobLifecycleService {
     private final TransactionTemplate transactionTemplate;
     private final @Nullable SandboxManager sandboxManager;
     private final Optional<WorkerJobCancelDispatcher> workerJobCancelDispatcher;
+    private final LlmUsageRecorder usageRecorder;
+    private final ObjectMapper objectMapper;
 
     public AgentJobLifecycleService(
         AgentJobRepository agentJobRepository,
         JobTypeHandlerRegistry handlerRegistry,
         TransactionTemplate transactionTemplate,
         @Nullable SandboxManager sandboxManager,
-        Optional<WorkerJobCancelDispatcher> workerJobCancelDispatcher
+        Optional<WorkerJobCancelDispatcher> workerJobCancelDispatcher,
+        LlmUsageRecorder usageRecorder,
+        ObjectMapper objectMapper
     ) {
         this.agentJobRepository = agentJobRepository;
         this.handlerRegistry = handlerRegistry;
         this.transactionTemplate = transactionTemplate;
         this.sandboxManager = sandboxManager;
         this.workerJobCancelDispatcher = workerJobCancelDispatcher;
+        this.usageRecorder = usageRecorder;
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -115,27 +124,59 @@ public class AgentJobLifecycleService {
         );
     }
 
+    /** Outcome of the transactional cancel CAS — {@code dispatchCancel} gates the post-commit routing. */
+    private record CancelOutcome(AgentJob job, boolean dispatchCancel) {}
+
     /**
      * Cancel an agent job.
      *
      * <p>Uses conditional UPDATE to prevent cancel/executor races. If the job was already
      * cancelled, this is idempotent. If the job is in a terminal state, throws 409.
      *
-     * <p>The sandbox cancel call is best-effort within the transaction. Failures are caught
-     * and logged — they do not roll back the CANCELLED status transition.
+     * <p>The sandbox cancel call and the LLM usage ledger write both run AFTER the status-transition
+     * transaction commits (#1368 fix wave — {@link LlmUsageRecorder#recordUnverifiable} MUST be called
+     * post-commit, matching {@code AgentJobExecutor}'s own cancellation handling). Sandbox-cancel
+     * failures are caught and logged — they do not affect the already-committed CANCELLED status.
      *
      * @param workspaceId workspace ID
      * @param jobId       job UUID
      * @return the cancelled job
      */
-    @Transactional
     public AgentJob cancel(Long workspaceId, UUID jobId) {
+        CancelOutcome outcome = transactionTemplate.execute(status -> cancelTransition(workspaceId, jobId));
+
+        // Split deployment: ask the owning worker to stop its container over the WSS channel (ADR 0009).
+        // No-op if that worker isn't connected here — the DB transition + backstops still finish the cancel.
+        if (outcome.dispatchCancel()) {
+            workerJobCancelDispatcher.ifPresent(d -> d.dispatch(outcome.job().getWorkerId(), jobId, "user-cancel"));
+
+            // Monolith / co-located worker: stop the container in-process.
+            if (sandboxManager != null) {
+                try {
+                    sandboxManager.cancel(jobId);
+                } catch (Exception e) {
+                    log.warn("Sandbox cancel failed for job {} (status already CANCELLED): {}", jobId, e.getMessage());
+                }
+            }
+        }
+
+        // #1368 fix wave: a job that reached RUNNING (worker_id set at claim) may carry real, un-costed
+        // spend regardless of which caller actually won the CANCELLED transition — the executor's own
+        // handleCancellation, worker-drain, or this method on a concurrent/idempotent call. Attempted
+        // unconditionally (no-op for a job that never started); a duplicate write is safely swallowed
+        // by the ledger's unique source_id constraint (first write wins).
+        recordUnverifiableUsageIfStarted(workspaceId, outcome.job());
+        return outcome.job();
+    }
+
+    /** The status-transition CAS + races, run inside {@link #transactionTemplate}. */
+    private CancelOutcome cancelTransition(Long workspaceId, UUID jobId) {
         AgentJob job = agentJobRepository
             .findByIdAndWorkspaceId(jobId, workspaceId)
             .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()));
 
         if (job.getStatus() == AgentJobStatus.CANCELLED) {
-            return job; // idempotent
+            return new CancelOutcome(job, false); // idempotent — already routed/recorded by the original caller
         }
 
         if (job.getStatus().isTerminal()) {
@@ -178,7 +219,7 @@ public class AgentJobLifecycleService {
                         "Cannot cancel job " + jobId + " — executor moved it to " + racedAgain.getStatus()
                     );
                 }
-                return racedAgain;
+                return new CancelOutcome(racedAgain, false);
             }
         }
 
@@ -186,20 +227,51 @@ public class AgentJobLifecycleService {
         AgentJob fresh = agentJobRepository
             .findByIdAndWorkspaceId(jobId, workspaceId)
             .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()));
+        return new CancelOutcome(fresh, true);
+    }
 
-        // Split deployment: ask the owning worker to stop its container over the WSS channel (ADR 0009).
-        // No-op if that worker isn't connected here — the DB transition + backstops still finish the cancel.
-        workerJobCancelDispatcher.ifPresent(d -> d.dispatch(fresh.getWorkerId(), jobId, "user-cancel"));
-
-        // Monolith / co-located worker: stop the container in-process.
-        if (sandboxManager != null) {
-            try {
-                sandboxManager.cancel(jobId);
-            } catch (Exception e) {
-                log.warn("Sandbox cancel failed for job {} (status already CANCELLED): {}", jobId, e.getMessage());
-            }
+    /**
+     * Append an UNPRICED ledger row for a job this call just cancelled (or found already cancelled)
+     * that had started executing — signalled by {@code worker_id} being set, which happens in the SAME
+     * commit as the QUEUED→RUNNING claim transition, so it is a reliable "did this job ever run" flag
+     * independent of which caller won the CANCELLED race. No-op for a job cancelled before it was ever
+     * claimed. Mirrors {@code AgentJobExecutor#recordUnverifiableUsage} — see that method's doc for why
+     * the sample carries zeroed token counts and {@code PricingState.UNPRICED}.
+     */
+    private void recordUnverifiableUsageIfStarted(Long workspaceId, AgentJob job) {
+        if (job.getWorkerId() == null) {
+            return;
         }
+        ConfigSnapshot snap = parseSnapshotQuietly(job);
+        LlmUsageRecorder.LlmUsageSample sample = new LlmUsageRecorder.LlmUsageSample(
+            LlmUsageJobType.from(job.getJobType()),
+            job.getId(),
+            snap != null ? snap.upstreamModelId() : null,
+            0L,
+            0L,
+            0L,
+            0L,
+            0L,
+            0,
+            snap != null ? snap.connectionScope() : null,
+            snap != null ? snap.connectionId() : null,
+            Instant.now()
+        );
+        usageRecorder.recordUnverifiable(workspaceId, sample);
+        log.info("Recorded UNPRICED usage ledger entry (user-cancel): jobId={}", job.getId());
+    }
 
-        return fresh;
+    /** Best-effort {@link ConfigSnapshot} parse; a malformed/missing snapshot just yields no provenance. */
+    private @Nullable ConfigSnapshot parseSnapshotQuietly(AgentJob job) {
+        var snapshotNode = job.getConfigSnapshot();
+        if (snapshotNode == null) {
+            return null;
+        }
+        try {
+            return ConfigSnapshot.fromJson(snapshotNode, objectMapper);
+        } catch (Exception e) {
+            log.warn("Could not deserialise config snapshot for usage ledger provenance: {}", e.getMessage());
+            return null;
+        }
     }
 }

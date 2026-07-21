@@ -106,11 +106,21 @@
                 -- or any value at/above the NUMERIC(12,6) column's 6-integer-digit capacity) would abort
                 -- the whole migration mid-CAST. Store NULL (UNPRICED, per changeset -9 in
                 -- 1784566728230) instead of throwing.
+                --
+                -- Rounding-boundary fix (#1368 fix wave): the bound below MUST be checked against the
+                -- value ROUNDED to the column's 6-decimal scale, not the raw double. A raw value like
+                -- 999999.9999999 passes "< 1000000" unrounded, but ROUND(...,6) carries it to
+                -- 1000000.000000 — 7 integer digits, which overflows NUMERIC(12,6) and aborts the CAST
+                -- in the ELSE branch below. Rounding once here (and reusing that same rounded value in
+                -- ELSE) makes the bound check and the stored value agree.
                 CASE
                     WHEN j.llm_cost_usd IS NULL THEN NULL
                     WHEN j.llm_cost_usd = 'NaN'::double precision THEN NULL
-                    WHEN j.llm_cost_usd >= 1000000 OR j.llm_cost_usd <= -1000000 THEN NULL
-                    ELSE CAST(j.llm_cost_usd AS NUMERIC(12,6))
+                    WHEN j.llm_cost_usd = 'Infinity'::double precision THEN NULL
+                    WHEN j.llm_cost_usd = '-Infinity'::double precision THEN NULL
+                    WHEN ROUND(j.llm_cost_usd::numeric, 6) >= 1000000 OR ROUND(j.llm_cost_usd::numeric, 6) <= -1000000
+                        THEN NULL
+                    ELSE ROUND(j.llm_cost_usd::numeric, 6)
                 END,
                 COALESCE(j.completed_at, j.created_at)
             FROM agent_job j
@@ -184,9 +194,15 @@
                     0
                 )::bigint,
                 1,
+                -- Rounding-boundary fix (#1368 fix wave): the regex's `[0-9]{1,6}` integer-part guard
+                -- only bounds the UNROUNDED string — "999999.9999999" (6 integer digits) matches, but
+                -- casting straight to numeric(12,6) rounds it to 1000000.000000 (7 integer digits),
+                -- overflowing the column and aborting the migration. Round into an unconstrained numeric
+                -- first, then bound-check the ROUNDED value before storing it.
                 CASE WHEN length(m.metadata->>'costUsd') < 50
                           AND m.metadata->>'costUsd' ~ '^-?[0-9]{1,6}(\.[0-9]+)?$'
-                     THEN (m.metadata->>'costUsd')::numeric(12,6) END,
+                          AND ABS(ROUND((m.metadata->>'costUsd')::numeric, 6)) < 1000000
+                     THEN ROUND((m.metadata->>'costUsd')::numeric, 6) END,
                 m.created_at
             FROM chat_message m
             JOIN chat_thread t ON t.id = m.thread_id

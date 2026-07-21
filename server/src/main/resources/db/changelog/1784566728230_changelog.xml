@@ -27,10 +27,15 @@
             Anthropic/self-hosted config's base URL to https://api.openai.com when llm_base_url was
             blank, and it flipped funding_source to WORKSPACE for pre-existing spend, exempting it from
             the very instance budget cap this release ships. Operators migrate to a catalog-bound model
-            at their own pace; the legacy fallback is correct and tested (LlmModelResolverTest).
+            at their own pace; the legacy fallback is correct and tested (LlmProxyIntegrationTest,
+            LlmUsageLedgerIntegrationTest).
           • llm_usage_event gains pricing_state (PRICED|FREE|UNPRICED — "unknown" stops being a silent
             $0), reasoning_tokens, funding_source (INSTANCE|WORKSPACE), and applied_price_id provenance.
-          • workspace gains a workspace-owned self-cap over BYO spend and an unpriced-usage policy.
+          • workspace gains monthly_llm_budget_usd, a workspace-owned cap over its INSTANCE-funded spend
+            only (a workspace's own BYO spend never counts toward it — see LlmUsageRecorder's class doc);
+            there is no per-workspace unpriced-usage policy. instance_llm_settings' default_unpriced_policy
+            above is instance-wide only — it decides whether an UNVERIFIABLE month additionally pauses
+            work, for every workspace alike.
 
         Pricing authority follows credential ownership: instance prices instance-funded usage (counts
         against the instance backstop); a workspace prices only its own BYO usage (counts against its

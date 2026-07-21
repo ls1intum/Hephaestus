@@ -9,6 +9,7 @@ const baseReport: WorkspaceLlmUsageReport = {
 	pricedTotalCostUsd: 13.4821,
 	byoTotalCostUsd: 0,
 	verdict: "WITHIN",
+	usagePaused: false,
 	unpricedEventCount: 0,
 	byJobType: [
 		{
@@ -164,6 +165,7 @@ export const Empty: Story = {
 			pricedTotalCostUsd: 0,
 			byoTotalCostUsd: 0,
 			verdict: "WITHIN",
+			usagePaused: false,
 			unpricedEventCount: 0,
 			byJobType: [],
 			byDay: [],

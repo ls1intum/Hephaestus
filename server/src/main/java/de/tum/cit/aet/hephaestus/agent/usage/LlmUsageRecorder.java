@@ -213,16 +213,27 @@ public class LlmUsageRecorder {
             AppliedRates.NONE,
             funding
         );
-        persist(workspaceId, sample, forced);
-        meterRegistry.counter("llm.usage.unverifiable").increment();
+        // Count only an ACTUAL insert (#1368 fix wave): persist() silently swallows a duplicate
+        // source_id (first write wins — see its own doc), so a caller retrying an already-recorded
+        // cancellation (e.g. AgentJobLifecycleService.cancel's idempotent branch attempting the same
+        // write the executor already made) must not inflate this counter for a row that was never
+        // actually written.
+        if (persist(workspaceId, sample, forced)) {
+            meterRegistry.counter("llm.usage.unverifiable").increment();
+        }
     }
 
     /**
      * Shared ledger-write transaction for {@link #record} and {@link #recordUnverifiable}.
      * {@code forcedResolution} bypasses catalog price resolution entirely when non-null — see
      * {@link #recordUnverifiable}'s doc for why that path must never derive a price.
+     *
+     * @return {@code true} iff a new row was actually inserted — {@code false} for a swallowed
+     *     duplicate {@code source_id} (first write wins) or a failed write (already logged/counted via
+     *     {@link #recordFailed}). Callers that count writes (e.g. {@link #recordUnverifiable}'s
+     *     {@code llm.usage.unverifiable} counter) must gate on this, not on "no exception was thrown".
      */
-    private void persist(Long workspaceId, LlmUsageSample sample, @Nullable PriceResolution forcedResolution) {
+    private boolean persist(Long workspaceId, LlmUsageSample sample, @Nullable PriceResolution forcedResolution) {
         try {
             requiresNewTx.executeWithoutResult(tx -> {
                 Workspace workspace = workspaceRepository.getReferenceById(workspaceId);
@@ -256,16 +267,19 @@ public class LlmUsageRecorder {
                 usageRepository.saveAndFlush(event);
                 alertIfBudgetCrossed(workspaceId, workspace.getMonthlyLlmBudgetUsd(), resolution);
             });
+            return true;
         } catch (DataIntegrityViolationException e) {
             if (isSourceAlreadyBilled(e)) {
                 // The same source billed twice (e.g. a mentor finalise-vs-interrupt race, or a job
                 // re-run under the same id). First write wins — by design, not an error.
                 log.debug("LLM usage already recorded for sourceId={} — skipping duplicate", sample.sourceId());
-                return;
+                return false;
             }
             recordFailed(workspaceId, sample, e);
+            return false;
         } catch (RuntimeException e) {
             recordFailed(workspaceId, sample, e);
+            return false;
         }
     }
 

@@ -68,6 +68,38 @@ class EgressPolicyTest extends BaseUnitTest {
                 .hasMessage("Provider host must be a public HTTPS URL");
         }
 
+        @ParameterizedTest
+        @DisplayName(
+            "#1368 fix wave: IANA special-purpose ranges (via PrivateAddressGuard) are blocked too — " +
+                "multicast, CGNAT, NAT64, and the benchmarking/TEST-NET ranges routinely front internal services"
+        )
+        @ValueSource(
+            strings = {
+                "224.0.0.1", // IPv4 multicast
+                "ff02::1", // IPv6 multicast
+                "100.64.0.1", // 100.64.0.0/10 carrier-grade NAT
+                "100.127.255.255",
+                "0.0.0.0", // "this network"
+                "192.0.0.1", // IETF protocol assignments
+                "192.0.2.1", // TEST-NET-1
+                "198.18.0.1", // benchmarking
+                "198.51.100.1", // TEST-NET-2
+                "203.0.113.1", // TEST-NET-3
+                "240.0.0.1", // reserved (Class E)
+                "255.255.255.255", // broadcast
+                "64:ff9b::1", // NAT64 well-known prefix (RFC 6052) — embeds IPv4, incl. loopback
+                "2001:db8::1", // IPv6 documentation range
+            }
+        )
+        void blocksReservedAndSpecialPurposeRanges(String host) {
+            stubNoSettingsRow();
+            EgressPolicy policy = loopbackBlocked();
+
+            assertThatThrownBy(() -> policy.validate("https://" + wrapIfIpv6(host) + "/v1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Provider host must be a public HTTPS URL");
+        }
+
         @Test
         @DisplayName("a real public IP (8.8.8.8) is not caught by the private-range check — no over-blocking")
         void doesNotOverBlockPublicAddresses() {

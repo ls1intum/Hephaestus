@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -22,12 +23,15 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.ObjectMapper;
 
 class AgentJobLifecycleServiceTest extends BaseUnitTest {
 
@@ -43,23 +47,50 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
     @Mock
     private SandboxManager sandboxManager;
 
+    @Mock
+    private LlmUsageRecorder usageRecorder;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
     private AgentJobLifecycleService service;
 
     private Workspace workspace;
 
     @BeforeEach
+    @SuppressWarnings("unchecked")
     void setUp() {
         service = new AgentJobLifecycleService(
             agentJobRepository,
             handlerRegistry,
             transactionTemplate,
             sandboxManager,
-            Optional.empty()
+            Optional.empty(),
+            usageRecorder,
+            objectMapper
         );
 
         workspace = new Workspace();
         workspace.setId(1L);
         workspace.setWorkspaceSlug("test-ws");
+
+        // cancel() now runs its status-transition CAS through transactionTemplate.execute (#1368 fix
+        // wave — moved off @Transactional so the post-commit ledger write can run strictly after the
+        // status transition commits, matching AgentJobExecutor's own cancellation handling). Lenient:
+        // RetryDelivery's own nested setup re-stubs the same methods for its own tests.
+        lenient()
+            .when(transactionTemplate.execute(any()))
+            .thenAnswer(inv -> {
+                TransactionCallback<?> callback = inv.getArgument(0);
+                return callback.doInTransaction(mock(TransactionStatus.class));
+            });
+        lenient()
+            .doAnswer(inv -> {
+                Consumer<TransactionStatus> action = inv.getArgument(0);
+                action.accept(mock(TransactionStatus.class));
+                return null;
+            })
+            .when(transactionTemplate)
+            .executeWithoutResult(any());
     }
 
     private AgentJob createJobWithStatus(AgentJobStatus status) {
@@ -191,6 +222,80 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
         }
     }
 
+    /**
+     * #1368 fix wave: {@code cancel} must attempt {@link LlmUsageRecorder#recordUnverifiable} for any
+     * job that reached RUNNING (worker_id set at claim), regardless of whether THIS call's own CAS won
+     * the CANCELLED transition — a concurrent executor cancellation or worker-drain may have won it
+     * first. Never for a job cancelled before it was ever claimed.
+     */
+    @Nested
+    @DisplayName("Unpriced usage ledger write on user-cancel (#1368 fix wave)")
+    class UnverifiableUsageLedger {
+
+        @Test
+        void cancellingAClaimedRunningJob_recordsAnUnpricedLedgerEntry() {
+            AgentJob job = createJobWithStatus(AgentJobStatus.RUNNING);
+            job.setWorkerId("worker-1");
+            UUID jobId = job.getId();
+
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
+            when(
+                agentJobRepository.transitionStatus(eq(jobId), eq(AgentJobStatus.CANCELLED), any(), any(), any())
+            ).thenReturn(1);
+            AgentJob cancelledJob = createJobWithStatus(AgentJobStatus.CANCELLED);
+            cancelledJob.setWorkerId("worker-1");
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L))
+                .thenReturn(Optional.of(job))
+                .thenReturn(Optional.of(cancelledJob));
+
+            service.cancel(1L, jobId);
+
+            ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample = ArgumentCaptor.forClass(
+                LlmUsageRecorder.LlmUsageSample.class
+            );
+            verify(usageRecorder).recordUnverifiable(eq(1L), sample.capture());
+            assertThat(sample.getValue().sourceId()).isEqualTo(cancelledJob.getId());
+            assertThat(sample.getValue().inputTokens()).isZero();
+        }
+
+        @Test
+        void cancellingAJobThatNeverStarted_neverTouchesTheLedger() {
+            // QUEUED and never claimed — no worker_id — so cancelling it must not attribute any spend.
+            AgentJob job = createJobWithStatus(AgentJobStatus.QUEUED);
+            UUID jobId = job.getId();
+
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
+            when(
+                agentJobRepository.transitionStatus(eq(jobId), eq(AgentJobStatus.CANCELLED), any(), any(), any())
+            ).thenReturn(1);
+            AgentJob cancelledJob = createJobWithStatus(AgentJobStatus.CANCELLED);
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L))
+                .thenReturn(Optional.of(job))
+                .thenReturn(Optional.of(cancelledJob));
+
+            service.cancel(1L, jobId);
+
+            verify(usageRecorder, never()).recordUnverifiable(any(), any());
+        }
+
+        @Test
+        void idempotentCancelOfAnAlreadyCancelledStartedJob_stillAttemptsTheLedgerWrite() {
+            // Already CANCELLED by some earlier caller (executor / worker-drain / a prior cancel call),
+            // but it DID start executing — the duplicate write attempt is safe (unique source_id) and is
+            // the only backstop against that earlier caller having missed the write itself.
+            AgentJob job = createJobWithStatus(AgentJobStatus.CANCELLED);
+            job.setWorkerId("worker-1");
+            UUID jobId = job.getId();
+
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
+
+            service.cancel(1L, jobId);
+
+            verify(usageRecorder).recordUnverifiable(eq(1L), any());
+            verify(agentJobRepository, never()).transitionStatus(any(), any(), any(), any(), any());
+        }
+    }
+
     @Nested
     class RetryDelivery {
 
@@ -201,24 +306,12 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
         private JobTypeHandler handler;
 
         @BeforeEach
-        @SuppressWarnings("unchecked")
         void setUpRetryDelivery() {
-            // Make transactionTemplate.execute() actually invoke the callback
-            when(transactionTemplate.execute(any())).thenAnswer(inv -> {
-                TransactionCallback<?> callback = inv.getArgument(0);
-                return callback.doInTransaction(mock(TransactionStatus.class));
-            });
-
-            // Make transactionTemplate.executeWithoutResult() invoke the consumer (lenient:
-            // not all tests reach the delivery path that calls executeWithoutResult)
-            lenient()
-                .doAnswer(inv -> {
-                    Consumer<TransactionStatus> action = inv.getArgument(0);
-                    action.accept(mock(TransactionStatus.class));
-                    return null;
-                })
-                .when(transactionTemplate)
-                .executeWithoutResult(any());
+            // transactionTemplate.execute()/executeWithoutResult() already invoke their
+            // callback/consumer via the lenient stubs in the outer setUp() — re-stubbing the same
+            // methods here would re-trigger those stubs during when()'s "record" phase (Mockito
+            // invokes the mock to register the matcher, and an already-answered method runs its
+            // existing answer with a null argument) and NPE.
 
             completedJob = createJobWithStatus(AgentJobStatus.COMPLETED);
             jobId = completedJob.getId();

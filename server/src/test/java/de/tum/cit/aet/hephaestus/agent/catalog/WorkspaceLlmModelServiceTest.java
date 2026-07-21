@@ -28,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.springframework.dao.DataIntegrityViolationException;
 
 class WorkspaceLlmModelServiceTest extends BaseUnitTest {
 
@@ -128,7 +129,7 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, unpricedCreateRequest())).isInstanceOf(
                 AccessForbiddenException.class
             );
-            verify(modelRepository, never()).save(any());
+            verify(modelRepository, never()).saveAndFlush(any());
         }
 
         @Test
@@ -176,7 +177,7 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, unpricedCreateRequest())).isInstanceOf(
                 LlmModelSlugConflictException.class
             );
-            verify(modelRepository, never()).save(any());
+            verify(modelRepository, never()).saveAndFlush(any());
         }
 
         @Test
@@ -184,7 +185,7 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             byoEnabled(true);
             when(connectionRepository.findByIdAndWorkspaceId(50L, 1L)).thenReturn(Optional.of(connection()));
             when(modelRepository.findByWorkspaceIdAndSlug(1L, "gpt-5")).thenReturn(Optional.empty());
-            when(modelRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(modelRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
             WorkspaceLlmModel result = modelService.create(workspaceContext, 50L, unpricedCreateRequest());
 
@@ -208,7 +209,7 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, request)).isInstanceOf(
                 IllegalArgumentException.class
             );
-            verify(modelRepository, never()).save(any());
+            verify(modelRepository, never()).saveAndFlush(any());
         }
 
         @Test
@@ -241,7 +242,7 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("choose Free instead");
-            verify(modelRepository, never()).save(any());
+            verify(modelRepository, never()).saveAndFlush(any());
         }
     }
 
@@ -257,7 +258,7 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             existing.setConnection(connection());
             existing.setPricingMode(PricingMode.UNPRICED);
             when(modelRepository.findByIdAndWorkspaceIdWithConnection(7L, 1L)).thenReturn(Optional.of(existing));
-            when(modelRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(modelRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
             UpdateWorkspaceLlmModelRequestDTO request = new UpdateWorkspaceLlmModelRequestDTO(
                 "New name", // displayName
@@ -298,7 +299,7 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, unpricedCreateRequest())).isInstanceOf(
                 LlmModelUpstreamIdConflictException.class
             );
-            verify(modelRepository, never()).save(any());
+            verify(modelRepository, never()).saveAndFlush(any());
         }
 
         @Test
@@ -307,7 +308,7 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             when(connectionRepository.findByIdAndWorkspaceId(50L, 1L)).thenReturn(Optional.of(connection()));
             when(modelRepository.findByWorkspaceIdAndSlug(1L, "gpt-5")).thenReturn(Optional.empty());
             when(modelRepository.existsByConnectionIdAndUpstreamModelId(50L, "gpt-5")).thenReturn(false);
-            when(modelRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(modelRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
             WorkspaceLlmModel result = modelService.create(workspaceContext, 50L, unpricedCreateRequest());
 
@@ -349,7 +350,7 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             assertThatThrownBy(() -> modelService.update(workspaceContext, 7L, request)).isInstanceOf(
                 LlmModelUpstreamIdConflictException.class
             );
-            verify(modelRepository, never()).save(any());
+            verify(modelRepository, never()).saveAndFlush(any());
         }
 
         @Test
@@ -361,7 +362,7 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             existing.setConnection(connection());
             existing.setUpstreamModelId("gpt-5");
             when(modelRepository.findByIdAndWorkspaceIdWithConnection(7L, 1L)).thenReturn(Optional.of(existing));
-            when(modelRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(modelRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
             UpdateWorkspaceLlmModelRequestDTO request = new UpdateWorkspaceLlmModelRequestDTO(
                 null, // displayName
@@ -385,6 +386,73 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             modelService.update(workspaceContext, 7L, request);
 
             verify(modelRepository, never()).existsByConnectionIdAndUpstreamModelIdAndIdNot(any(), any(), any());
+        }
+
+        /**
+         * #1368 fix wave: the fast-path {@code existsByConnectionIdAndUpstreamModelId} check is racy;
+         * the unique constraint {@code ux_ws_llm_model_connection_upstream} is the real backstop but only
+         * fires on an actual flush — {@code saveAndFlush()} (not {@code save()}) forces that inside the
+         * try/catch so the violation becomes a 409 instead of an uncaught 500.
+         */
+        @Test
+        void createTranslatesAFlushTimeConstraintViolationInto409() {
+            byoEnabled(true);
+            when(connectionRepository.findByIdAndWorkspaceId(50L, 1L)).thenReturn(Optional.of(connection()));
+            when(modelRepository.findByWorkspaceIdAndSlug(1L, "gpt-5")).thenReturn(Optional.empty());
+            when(modelRepository.existsByConnectionIdAndUpstreamModelId(50L, "gpt-5")).thenReturn(false);
+            when(modelRepository.saveAndFlush(any())).thenThrow(upstreamIdConstraintViolation());
+
+            assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, unpricedCreateRequest())).isInstanceOf(
+                LlmModelUpstreamIdConflictException.class
+            );
+        }
+
+        @Test
+        void updateTranslatesAFlushTimeConstraintViolationInto409() {
+            byoEnabled(true);
+            WorkspaceLlmModel existing = new WorkspaceLlmModel();
+            existing.setId(7L);
+            existing.setWorkspace(connection().getWorkspace());
+            existing.setConnection(connection());
+            existing.setUpstreamModelId("gpt-5");
+            when(modelRepository.findByIdAndWorkspaceIdWithConnection(7L, 1L)).thenReturn(Optional.of(existing));
+            when(modelRepository.existsByConnectionIdAndUpstreamModelIdAndIdNot(50L, "gpt-5-turbo", 7L)).thenReturn(
+                false
+            );
+            when(modelRepository.saveAndFlush(any())).thenThrow(upstreamIdConstraintViolation());
+
+            UpdateWorkspaceLlmModelRequestDTO request = new UpdateWorkspaceLlmModelRequestDTO(
+                null, // displayName
+                "gpt-5-turbo", // upstreamModelId
+                null, // apiProtocolOverride
+                null, // modality
+                null, // contextWindow
+                null, // maxOutputTokens
+                null, // supportsReasoning
+                null, // cacheControlFormat
+                null, // enabled
+                null, // pricingMode
+                null, // per1mInputUsd
+                null, // per1mOutputUsd
+                null, // per1mCacheReadUsd
+                null, // per1mCacheWriteUsd
+                null, // per1mReasoningUsd
+                null // priceNote
+            );
+
+            assertThatThrownBy(() -> modelService.update(workspaceContext, 7L, request)).isInstanceOf(
+                LlmModelUpstreamIdConflictException.class
+            );
+        }
+
+        private DataIntegrityViolationException upstreamIdConstraintViolation() {
+            org.hibernate.exception.ConstraintViolationException cve =
+                new org.hibernate.exception.ConstraintViolationException(
+                    "duplicate",
+                    null,
+                    "ux_ws_llm_model_connection_upstream"
+                );
+            return new DataIntegrityViolationException("duplicate", cve);
         }
     }
 

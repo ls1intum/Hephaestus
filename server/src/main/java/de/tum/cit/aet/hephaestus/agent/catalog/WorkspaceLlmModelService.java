@@ -121,7 +121,11 @@ public class WorkspaceLlmModelService {
 
         WorkspaceLlmModel saved;
         try {
-            saved = modelRepository.save(model);
+            // saveAndFlush (not save): a generated-id entity's INSERT can otherwise be deferred by
+            // Hibernate to the transaction's implicit flush at commit — OUTSIDE this try/catch — letting
+            // a concurrent-create race's unique-constraint violation escape as an uncaught 500 instead of
+            // the 409 this catch exists to produce (#1368 fix wave).
+            saved = modelRepository.saveAndFlush(model);
         } catch (DataIntegrityViolationException e) {
             // The fast-path checks above are racy; the unique constraints backstop the loser of a
             // concurrent create. Report the same 409 rather than leaking a 500 — pick the exception that
@@ -214,7 +218,9 @@ public class WorkspaceLlmModelService {
 
         WorkspaceLlmModel saved;
         try {
-            saved = modelRepository.save(model);
+            // saveAndFlush (not save) — see create()'s identical comment: an unflushed save() would let
+            // a concurrent-update race's constraint violation escape this catch as an uncaught 500.
+            saved = modelRepository.saveAndFlush(model);
         } catch (DataIntegrityViolationException e) {
             // The fast-path check above is racy; the unique constraint backstops the loser of a
             // concurrent update.

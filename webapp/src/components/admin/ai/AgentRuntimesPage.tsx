@@ -70,9 +70,9 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 		...workspaceListAvailableLlmModelsOptions({ path: { workspaceSlug } }),
 		enabled: Boolean(workspaceSlug),
 	});
-	// Only feeds the EXHAUSTED banner below, not a full usage breakdown (that's the usage page), so a
-	// longer staleTime than the app default is fine — a minute-old verdict is still an accurate "why
-	// did detection stop" signal.
+	// Only feeds the usagePaused banner below, not a full usage breakdown (that's the usage page), so
+	// a longer staleTime than the app default is fine — a minute-old verdict is still an accurate
+	// "why did detection stop" signal.
 	const usageQuery = useQuery({
 		...getLlmUsageReportOptions({ path: { workspaceSlug }, query: { month: currentMonthUtc() } }),
 		enabled: Boolean(workspaceSlug),
@@ -208,9 +208,9 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 				</p>
 			</div>
 
-			{usageQuery.data?.verdict === "EXHAUSTED" && (
+			{usageQuery.data?.usagePaused && (
 				<div className="mb-6">
-					<BudgetExhaustedAlert />
+					<BudgetExhaustedAlert verdict={usageQuery.data.verdict} />
 				</div>
 			)}
 

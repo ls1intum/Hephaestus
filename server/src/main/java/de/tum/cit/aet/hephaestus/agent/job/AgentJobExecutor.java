@@ -272,6 +272,12 @@ public class AgentJobExecutor {
             } catch (Exception e) {
                 log.warn("Failed to cancel in-flight job {}: {}", jobId, e.getClass().getSimpleName());
             }
+            // #1368 fix wave: every job in localRunningJobs is, by construction, one this worker has
+            // claimed and started executing — so it may carry real, un-costed spend regardless of
+            // whether the CAS above won (a concurrent user-cancel or the executor's own
+            // handleCancellation may already have moved it). Attempt the ledger write unconditionally;
+            // duplicates are swallowed by LlmUsageRecorder#persist's unique source_id constraint.
+            recordUnverifiableUsage(jobId, "worker draining");
         }
     }
 
@@ -627,26 +633,22 @@ public class AgentJobExecutor {
 
     /** Handle a job cancelled during sandbox execution. */
     private void handleCancellation(UUID jobId, Message msg) {
-        AtomicBoolean startedAndWon = new AtomicBoolean(false);
-        transactionTemplate.executeWithoutResult(status -> {
-            int updated = transitionTerminal(
-                jobId,
-                AgentJobStatus.CANCELLED,
-                Instant.now(),
-                "Cancelled during execution"
-            );
-            startedAndWon.set(updated == 1);
-        });
+        transactionTemplate.executeWithoutResult(status ->
+            transitionTerminal(jobId, AgentJobStatus.CANCELLED, Instant.now(), "Cancelled during execution")
+        );
         msg.ack();
         log.info("Agent job cancelled: jobId={}", jobId);
-        // #1368 fix wave: the job HAD started executing (claimed, RUNNING) by the time it was
-        // cancelled, so there may be real, un-costed spend behind it. Record it as UNPRICED (outside
-        // the transition transaction, matching LlmUsageRecorder's after-commit contract) rather than
-        // leaving the month looking falsely fully accounted for. Skipped when the transition lost the
-        // fence (job already moved on / orphan-requeued) — nothing to attribute to this write.
-        if (startedAndWon.get()) {
-            recordUnverifiableUsage(jobId, "cancelled during execution");
-        }
+        // #1368 fix wave: reaching this handler at all means the job HAD started executing (claimed,
+        // RUNNING) — SandboxCancelledException is only thrown from mid-execution, never from the claim
+        // phase — so there may be real, un-costed spend behind it. Record it as UNPRICED (outside the
+        // transition transaction, matching LlmUsageRecorder's after-commit contract) unconditionally,
+        // regardless of whether OUR transition above actually won the CAS: a concurrent user-cancel
+        // (AgentJobLifecycleService.cancel) or worker-drain (cancelInFlight) may have already moved the
+        // job to CANCELLED first, and previously that made this write silently never happen. The
+        // ledger's unique source_id constraint makes a duplicate attempt safe (first write wins,
+        // swallowed by LlmUsageRecorder#persist) — so recording unconditionally here is strictly safer
+        // than gating on a race this handler cannot reliably observe.
+        recordUnverifiableUsage(jobId, "cancelled during execution");
     }
 
     /**

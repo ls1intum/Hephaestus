@@ -679,9 +679,17 @@ class AgentJobExecutorTest extends BaseUnitTest {
         }
 
         @Test
-        void cancelledAfterStart_butFenceLost_recordsNoLedgerEntry() {
-            // transitionStatus returns 0 (job no longer RUNNING-and-ours — e.g. orphan-requeued to a
-            // sibling): must not attribute spend to a run this worker no longer owns.
+        @DisplayName(
+            "#1368 fix wave: even when the CAS transition loses the race (a concurrent user-cancel or " +
+                "worker-drain already moved the job to CANCELLED), the ledger write is still attempted — " +
+                "reaching this handler at all proves the job started executing, and a duplicate write is " +
+                "safely swallowed by the ledger's unique source_id constraint"
+        )
+        void cancelledAfterStart_fenceLost_stillRecordsLedgerEntry() {
+            // transitionStatus returns 0 (job no longer RUNNING-and-ours — e.g. a concurrent user-cancel
+            // or worker-drain path already won the CAS). Previously this silently skipped the ledger
+            // write; now the write is attempted regardless, since only a job that reached sandbox
+            // execution ever throws SandboxCancelledException in the first place.
             Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
@@ -690,14 +698,42 @@ class AgentJobExecutorTest extends BaseUnitTest {
             when(jobRepository.transitionStatus(any(), eq(AgentJobStatus.CANCELLED), any(), any(), any())).thenReturn(
                 0
             );
+            when(jobRepository.findByIdWithWorkspace(jobId)).thenReturn(Optional.of(job));
 
             setupFullExecutionWithException(new SandboxCancelledException("cancelled"));
 
             executor.executeJob(msg);
 
-            // findByIdWithWorkspace IS called earlier in the pipeline (prepareAndExecute reads the
-            // job eagerly) — the fence loss must stop the LEDGER write specifically, not that call.
-            verify(usageRecorder, never()).recordUnverifiable(any(), any());
+            ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample = ArgumentCaptor.forClass(
+                LlmUsageRecorder.LlmUsageSample.class
+            );
+            verify(usageRecorder).recordUnverifiable(eq(99L), sample.capture());
+            assertThat(sample.getValue().sourceId()).isEqualTo(job.getId());
+            verify(usageRecorder, never()).record(any(), any());
+        }
+
+        @Test
+        @DisplayName(
+            "#1368 fix wave: worker-drain (cancelInFlight) records an UNPRICED ledger entry for a " +
+                "locally-running job, regardless of whether its own CAS transition wins"
+        )
+        void workerDrain_cancelInFlight_recordsAnUnpricedLedgerEntry() throws Exception {
+            java.lang.reflect.Field localRunningJobsField = AgentJobExecutor.class.getDeclaredField("localRunningJobs");
+            localRunningJobsField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            Set<UUID> localRunningJobs = (Set<UUID>) localRunningJobsField.get(executor);
+            localRunningJobs.add(jobId);
+
+            when(jobRepository.findByIdWithWorkspace(jobId)).thenReturn(Optional.of(job));
+
+            executor.cancelInFlight(AgentJobCancellationReason.DRAIN_GRACEFUL);
+
+            verify(sandboxManager).cancel(jobId);
+            ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample = ArgumentCaptor.forClass(
+                LlmUsageRecorder.LlmUsageSample.class
+            );
+            verify(usageRecorder).recordUnverifiable(eq(99L), sample.capture());
+            assertThat(sample.getValue().sourceId()).isEqualTo(job.getId());
             verify(usageRecorder, never()).record(any(), any());
         }
 

@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.math.BigDecimal;
 import java.time.YearMonth;
+import java.time.ZoneOffset;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,10 +22,16 @@ public class LlmUsageService {
 
     private final LlmUsageEventRepository usageRepository;
     private final WorkspaceRepository workspaceRepository;
+    private final LlmBudgetService llmBudgetService;
 
-    public LlmUsageService(LlmUsageEventRepository usageRepository, WorkspaceRepository workspaceRepository) {
+    public LlmUsageService(
+        LlmUsageEventRepository usageRepository,
+        WorkspaceRepository workspaceRepository,
+        LlmBudgetService llmBudgetService
+    ) {
         this.usageRepository = usageRepository;
         this.workspaceRepository = workspaceRepository;
+        this.llmBudgetService = llmBudgetService;
     }
 
     @Transactional(readOnly = true)
@@ -77,6 +84,15 @@ public class LlmUsageService {
             window.to()
         );
         LlmBudgetVerdict verdict = LlmBudgetService.verdictFor(pricedTotal, hasUnpricedInstanceEvent, budget);
+        // usagePaused (#1368 fix wave) mirrors LlmBudgetService.blockReason — the SAME live gate
+        // AgentJobService.submit/AgentJobExecutor's claim-time recheck/MentorChatService actually
+        // enforce, which folds in the instance's unpriced-usage policy (BLOCK vs WARN) that the webapp
+        // has no way to see. Only meaningful for the CURRENT month: blockReason always evaluates
+        // against "now", so reporting it for a past month's report would misleadingly imply that
+        // closed month is still pausing new work.
+        boolean usagePaused =
+            month.equals(YearMonth.now(ZoneOffset.UTC)) &&
+            llmBudgetService.blockReason(workspace) != LlmBudgetBlockReason.NONE;
         return new WorkspaceLlmUsageReportDTO(
             month.toString(),
             budget,
@@ -84,6 +100,7 @@ public class LlmUsageService {
             byoTotal,
             uncosted,
             verdict,
+            usagePaused,
             byJobType,
             byDay
         );

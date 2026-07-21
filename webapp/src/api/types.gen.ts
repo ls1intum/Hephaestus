@@ -143,6 +143,10 @@ export type WorkspaceLlmUsageReport = {
      */
     unpricedEventCount: number;
     /**
+     * Whether new AI work is currently paused for this workspace by this server's budget policy — true when the cap is reached (verdict=EXHAUSTED), or when verdict=UNVERIFIABLE AND this server's unpriced-usage policy is BLOCK (the default WARN policy never pauses on UNVERIFIABLE alone). Authoritative: the webapp cannot derive this from verdict alone because it doesn't know the instance's unpriced-usage policy.
+     */
+    usagePaused: boolean;
+    /**
      * Whether this month's confirmed spend is within the cap, has reached it (work is paused), or can't be fully confirmed yet because some usage above has no price set.
      */
     verdict: 'WITHIN' | 'EXHAUSTED' | 'UNVERIFIABLE';
@@ -2592,7 +2596,7 @@ export type AgentJob = {
      */
     configName?: string;
     /**
-     * Frozen agent config at submit time (an INSTANCE-scoped connection's baseUrl is redacted to scheme://host)
+     * Frozen agent config at submit time (an INSTANCE-scoped or legacy connection's baseUrl is redacted to scheme://host; only a WORKSPACE-scoped BYO connection's baseUrl is left intact)
      */
     configSnapshot: unknown;
     /**

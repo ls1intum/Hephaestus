@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.config;
 
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
+import de.tum.cit.aet.hephaestus.agent.catalog.EgressPolicy;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelWorkspaceGrantRepository;
@@ -35,6 +36,7 @@ public class AgentConfigService {
     private final LlmModelRepository llmModelRepository;
     private final WorkspaceLlmModelRepository workspaceLlmModelRepository;
     private final LlmModelWorkspaceGrantRepository llmModelWorkspaceGrantRepository;
+    private final EgressPolicy egressPolicy;
 
     @Transactional(readOnly = true)
     public List<AgentConfig> getConfigs(WorkspaceContext workspaceContext) {
@@ -91,7 +93,14 @@ public class AgentConfigService {
             // this at @Size(max=512), deliberately well under the entity column (length=2048) so trimming
             // after validation can never overflow the column. The wider column is intentional headroom —
             // narrowing it to 512 requires a changelog.
-            config.setLlmBaseUrl(request.llmBaseUrl().isBlank() ? null : request.llmBaseUrl().trim());
+            String trimmedBaseUrl = request.llmBaseUrl().isBlank() ? null : request.llmBaseUrl().trim();
+            // #1368 fix wave: a legacy config's llmBaseUrl is an egress target exactly like a catalog
+            // connection's — previously it skipped EgressPolicy entirely on write, letting a workspace
+            // admin park a config on a private/internal host that the proxy would then happily call.
+            if (trimmedBaseUrl != null) {
+                egressPolicy.validate(trimmedBaseUrl);
+            }
+            config.setLlmBaseUrl(trimmedBaseUrl);
         }
         if (request.timeoutSeconds() != null) {
             config.setTimeoutSeconds(request.timeoutSeconds());
@@ -160,7 +169,13 @@ public class AgentConfigService {
         }
         if (request.llmBaseUrl() != null) {
             // Empty string clears the field; otherwise stores the trimmed value.
-            config.setLlmBaseUrl(request.llmBaseUrl().isBlank() ? null : request.llmBaseUrl().trim());
+            String trimmedBaseUrl = request.llmBaseUrl().isBlank() ? null : request.llmBaseUrl().trim();
+            // #1368 fix wave: see createConfig's identical guard — a legacy config's llmBaseUrl must
+            // clear the same egress guard a catalog connection's base URL does.
+            if (trimmedBaseUrl != null) {
+                egressPolicy.validate(trimmedBaseUrl);
+            }
+            config.setLlmBaseUrl(trimmedBaseUrl);
         }
         if (request.timeoutSeconds() != null) {
             config.setTimeoutSeconds(request.timeoutSeconds());

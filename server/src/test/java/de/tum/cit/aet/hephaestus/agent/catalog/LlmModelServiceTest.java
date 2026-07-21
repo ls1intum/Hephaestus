@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.springframework.dao.DataIntegrityViolationException;
 
 class LlmModelServiceTest extends BaseUnitTest {
 
@@ -75,7 +76,16 @@ class LlmModelServiceTest extends BaseUnitTest {
     }
 
     private void stubModelSavePassthrough() {
-        when(modelRepository.save(any(LlmModel.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        // Stubs both: create()/update() now flush synchronously (saveAndFlush — #1368 fix wave, so a
+        // concurrent unique-constraint violation surfaces inside their try/catch instead of escaping as
+        // an uncaught 500 at the transaction's implicit end-of-method flush), while updateSharing()
+        // (untouched — it never changes upstream_model_id) still calls plain save().
+        lenient()
+            .when(modelRepository.save(any(LlmModel.class)))
+            .thenAnswer(invocation -> invocation.getArgument(0));
+        lenient()
+            .when(modelRepository.saveAndFlush(any(LlmModel.class)))
+            .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     private UpdateLlmModelPriceRequestDTO pricedRequest(String input, String output) {
@@ -393,7 +403,7 @@ class LlmModelServiceTest extends BaseUnitTest {
             assertThatThrownBy(() -> modelService.create(3L, createRequest("gpt-5"))).isInstanceOf(
                 LlmModelUpstreamIdConflictException.class
             );
-            verify(modelRepository, never()).save(any());
+            verify(modelRepository, never()).saveAndFlush(any());
         }
 
         @Test
@@ -431,7 +441,7 @@ class LlmModelServiceTest extends BaseUnitTest {
             assertThatThrownBy(() -> modelService.update(7L, request)).isInstanceOf(
                 LlmModelUpstreamIdConflictException.class
             );
-            verify(modelRepository, never()).save(any());
+            verify(modelRepository, never()).saveAndFlush(any());
         }
 
         @Test
@@ -452,6 +462,64 @@ class LlmModelServiceTest extends BaseUnitTest {
             modelService.update(7L, request);
 
             verify(modelRepository, never()).existsByConnectionIdAndUpstreamModelIdAndIdNot(any(), any(), any());
+        }
+
+        /**
+         * #1368 fix wave: the fast-path {@code existsByConnectionIdAndUpstreamModelId} check above is
+         * racy — two concurrent creates/updates can both pass it. The unique constraint
+         * {@code ux_llm_model_connection_upstream} is the real backstop, but it only fires when the
+         * INSERT/UPDATE is actually flushed to the DB. {@code save()} alone doesn't guarantee that (a
+         * generated-id entity's write can be deferred to the transaction's implicit end-of-method flush,
+         * OUTSIDE the try/catch) — {@code saveAndFlush()} forces it synchronously, so the violation lands
+         * inside the catch and becomes a 409 instead of an uncaught 500. Simulated here via a mocked
+         * {@link DataIntegrityViolationException} thrown directly from {@code saveAndFlush}.
+         */
+        @Test
+        void createTranslatesAFlushTimeConstraintViolationInto409() {
+            LlmConnection connection = new LlmConnection();
+            connection.setId(3L);
+            when(connectionRepository.findById(3L)).thenReturn(Optional.of(connection));
+            when(modelRepository.findByConnectionIdAndSlug(3L, "gpt-5-eu")).thenReturn(Optional.empty());
+            when(modelRepository.existsByConnectionIdAndUpstreamModelId(3L, "gpt-5")).thenReturn(false);
+            when(modelRepository.saveAndFlush(any(LlmModel.class))).thenThrow(upstreamIdConstraintViolation());
+
+            assertThatThrownBy(() -> modelService.create(3L, createRequest("gpt-5"))).isInstanceOf(
+                LlmModelUpstreamIdConflictException.class
+            );
+        }
+
+        @Test
+        void updateTranslatesAFlushTimeConstraintViolationInto409() {
+            when(modelRepository.existsByConnectionIdAndUpstreamModelIdAndIdNot(3L, "gpt-5-turbo", 7L)).thenReturn(
+                false
+            );
+            when(modelRepository.saveAndFlush(any(LlmModel.class))).thenThrow(upstreamIdConstraintViolation());
+
+            UpdateLlmModelRequestDTO request = new UpdateLlmModelRequestDTO(
+                null,
+                "gpt-5-turbo",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+            );
+
+            assertThatThrownBy(() -> modelService.update(7L, request)).isInstanceOf(
+                LlmModelUpstreamIdConflictException.class
+            );
+        }
+
+        private DataIntegrityViolationException upstreamIdConstraintViolation() {
+            org.hibernate.exception.ConstraintViolationException cve =
+                new org.hibernate.exception.ConstraintViolationException(
+                    "duplicate",
+                    null,
+                    "ux_llm_model_connection_upstream"
+                );
+            return new DataIntegrityViolationException("duplicate", cve);
         }
     }
 

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.security.PrivateAddressGuard;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -23,11 +24,14 @@ import org.springframework.stereotype.Component;
  * guard and into snapshots/DTOs/logs, (2) is HTTPS — or plain HTTP but strictly to a localhost/loopback
  * dev target AND {@link #allowLoopback} is enabled (production defaults it OFF: an unconditional
  * loopback allowance is an SSRF hole letting a workspace admin point their "provider" at host-local
- * services), (3) does not resolve to a private / link-local / loopback / unique-local address (which
+ * services), (3) does not resolve to a non-public address per {@link PrivateAddressGuard} — private /
+ * link-local / loopback / unique-local / multicast / CGNAT / NAT64 / IANA benchmarking ranges (which
  * blocks the cloud metadata endpoint {@code 169.254.169.254} as a link-local address) — this check is
  * unconditional and independent of {@link #allowLoopback}, and (4) — when the instance allowlist is
  * non-blank — has a host that appears verbatim in that allowlist. An empty allowlist permits any public
- * host.
+ * host. The same {@link PrivateAddressGuard} predicate is re-applied at connect time by the LLM proxy's
+ * and probe's guarded resolver (see {@code core.WebClientConnectors#resolverGroup}), closing the
+ * DNS-rebind/TOCTOU window a validate-then-reconnect design would otherwise leave open.
  */
 @Component
 @WorkspaceAgnostic("Instance egress policy reads the global instance_llm_settings singleton, not tenant data")
@@ -111,32 +115,15 @@ public class EgressPolicy {
         }
     }
 
+    /**
+     * Delegates to {@link PrivateAddressGuard} — the same predicate the connect-time resolver guard
+     * ({@code core.SsrfGuardedResolverGroup}) enforces (#1368 fix wave). Previously this method
+     * hand-rolled a narrower RFC-1918-plus-loopback-plus-link-local check that missed multicast, CGNAT
+     * (100.64.0.0/10), NAT64, and the IANA benchmarking/TEST-NET ranges — letting validation and the
+     * proxy's actual connection disagree on what counts as private.
+     */
     private static boolean isBlocked(InetAddress address) {
-        if (
-            address.isLoopbackAddress() ||
-            address.isLinkLocalAddress() ||
-            address.isSiteLocalAddress() ||
-            address.isAnyLocalAddress()
-        ) {
-            return true;
-        }
-        byte[] octets = address.getAddress();
-        if (octets.length == 4) {
-            int first = octets[0] & 0xFF;
-            int second = octets[1] & 0xFF;
-            // 10/8, 172.16/12, 192.168/16, 127/8, 169.254/16 (isSiteLocal/isLinkLocal cover most of
-            // these, but re-assert to stay correct if the JDK's classification ever narrows).
-            return (
-                first == 10 ||
-                (first == 172 && second >= 16 && second <= 31) ||
-                (first == 192 && second == 168) ||
-                first == 127 ||
-                (first == 169 && second == 254)
-            );
-        }
-        // IPv6 unique-local fc00::/7 (first 7 bits 1111 110). fe80::/10 link-local and ::1 loopback
-        // are already caught above.
-        return (octets[0] & 0xFE) == 0xFC;
+        return PrivateAddressGuard.isNonPublic(address);
     }
 
     private void assertAllowlisted(String host) {

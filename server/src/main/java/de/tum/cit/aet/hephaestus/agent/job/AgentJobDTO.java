@@ -18,7 +18,7 @@ public record AgentJobDTO(
     @Schema(description = "Job output (agent results)") Object output,
     @NonNull
     @Schema(
-        description = "Frozen agent config at submit time (an INSTANCE-scoped connection's baseUrl is redacted to scheme://host)"
+        description = "Frozen agent config at submit time (an INSTANCE-scoped or legacy connection's baseUrl is redacted to scheme://host; only a WORKSPACE-scoped BYO connection's baseUrl is left intact)"
     )
     Object configSnapshot,
     @Schema(description = "ID of the agent config that ran this job (from the frozen snapshot)") Long configId,
@@ -83,18 +83,31 @@ public record AgentJobDTO(
 
     /**
      * A workspace admin (the {@code /agent-jobs} audience — {@link AgentJobController} requires only
-     * {@code RequireAtLeastWorkspaceAdmin}) must never see an INSTANCE-scoped connection's full base
-     * URL: that connection is owned and configured by the instance admin, potentially shared across many
-     * workspaces, and its URL (an internal gateway, a vendor-specific deployment path, …) is not the
-     * workspace admin's data to read. A WORKSPACE-scoped (BYO) connection's base URL is the workspace's
-     * own configuration, so it is left as-is. Reduces the frozen snapshot's {@code baseUrl} to
-     * {@code scheme://host} — enough to see which provider a job used without exposing path detail.
+     * {@code RequireAtLeastWorkspaceAdmin}) must never see the full path/query detail of a base URL they
+     * don't themselves own end-to-end:
+     *
+     * <ul>
+     *   <li>{@code connectionScope=INSTANCE} — owned and configured by the instance admin, potentially
+     *       shared across many workspaces; its URL (an internal gateway, a vendor-specific deployment
+     *       path, …) is not this workspace admin's data to read.</li>
+     *   <li>{@code connectionScope=null} (legacy, pre-catalog config) — the {@code llmBaseUrl} field is
+     *       instance-config-shaped even though it lives on a per-workspace {@code AgentConfig} row: the
+     *       #1368 fix wave closed the gap where it skipped {@link
+     *       de.tum.cit.aet.hephaestus.agent.catalog.EgressPolicy} entirely on write, and the path/query
+     *       of a hand-entered gateway URL can carry the same operator-sensitive routing detail an
+     *       INSTANCE connection's does — reduced to host-only here too, uniformly, rather than trusting
+     *       that no legacy config was ever pointed at something sensitive.</li>
+     * </ul>
+     *
+     * <p>{@code connectionScope=WORKSPACE} (BYO) is the workspace's own configuration, so it is left
+     * as-is. Reduces the frozen snapshot's {@code baseUrl} to {@code scheme://host} — enough to see
+     * which provider a job used without exposing path detail.
      */
     private static Object redactInstanceBaseUrl(JsonNode snapshot) {
         if (!(snapshot instanceof ObjectNode obj) || !obj.has("baseUrl")) {
             return snapshot;
         }
-        if (!"INSTANCE".equals(snapshotString(snapshot, "connectionScope"))) {
+        if ("WORKSPACE".equals(snapshotString(snapshot, "connectionScope"))) {
             return snapshot;
         }
         ObjectNode redacted = obj.deepCopy();
