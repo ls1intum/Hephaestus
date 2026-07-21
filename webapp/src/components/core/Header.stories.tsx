@@ -16,6 +16,8 @@ const meta = {
 	tags: ["autodocs"],
 	args: {
 		version: "1.0.0",
+		environmentName: "Production",
+		isProduction: true,
 		name: "John Doe",
 		username: "johnDoe",
 		workspaceSlug: "demo-workspace",
@@ -74,13 +76,40 @@ export const Default: Story = {
 };
 
 /**
- * Local development header with non-clickable DEV version badge.
+ * Staging deployment: an amber environment pill instead of a version — the exact
+ * build (commit, branch, deploy time) is shown in the footer.
+ */
+export const Staging: Story = {
+	args: {
+		isAuthenticated: true,
+		isLoading: false,
+		environmentName: "Staging",
+		isProduction: false,
+	},
+};
+
+/**
+ * PR preview deployment: a violet environment pill.
+ */
+export const Preview: Story = {
+	args: {
+		isAuthenticated: true,
+		isLoading: false,
+		environmentName: "Preview",
+		isProduction: false,
+	},
+};
+
+/**
+ * Local development: a neutral environment pill.
  */
 export const Development: Story = {
 	args: {
 		isAuthenticated: true,
 		isLoading: false,
 		version: "DEV",
+		environmentName: "Local",
+		isProduction: false,
 	},
 };
 
