@@ -689,6 +689,24 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName(
+            "#1368 fix wave, finding #4: a body formatted via the real delivery path is found by the " +
+                "real dedup-lookup marker — regression test for the two-different-literals bug"
+        )
+        void formattedBodyIsFoundByTheDedupLookupMarker() {
+            AgentJob job = createJob();
+
+            String formatted = FeedbackDeliveryService.formatPracticeNote("Some review content", job);
+
+            // This is EXACTLY what GithubFeedbackChannel#findExistingSummary does to decide a match
+            // (node.getBody().contains(marker)) — asserting the round trip here, rather than only that
+            // each side individually embeds "some" marker, is what catches a re-introduced drift between
+            // the format side and the lookup side.
+            String lookupMarker = PullRequestCommentPoster.summaryMarkerFor(job);
+            assertThat(formatted).contains(lookupMarker);
+        }
+
+        @Test
         void noPreferencesLink() {
             AgentJob job = createJob();
             job.setStartedAt(Instant.parse("2024-01-01T00:00:00Z"));

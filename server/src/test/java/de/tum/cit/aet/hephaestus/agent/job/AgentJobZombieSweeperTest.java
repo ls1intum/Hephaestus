@@ -265,12 +265,13 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
             AgentJob job = stuckJob((short) 0);
             when(jobRepository.findStuckPendingDeliveries(any(), any())).thenReturn(List.of(job));
             when(jobRepository.claimDeliveryRecoveryAttempt(job.getId(), (short) 0)).thenReturn(1);
-            when(lifecycleService.recoverStuckDelivery(job)).thenReturn(true);
+            when(lifecycleService.recoverStuckDelivery(job, (short) 1)).thenReturn(true);
 
             sweeper.recoverStuckDeliveries();
 
             verify(jobRepository).claimDeliveryRecoveryAttempt(job.getId(), (short) 0);
-            verify(lifecycleService).recoverStuckDelivery(job);
+            // The CAS claimed attempts 0 -> 1; the post-increment value (1) is this attempt's fence token.
+            verify(lifecycleService).recoverStuckDelivery(job, (short) 1);
             assertThat(meterRegistry.counter("agent.job.delivery.recovered").count()).isEqualTo(1d);
         }
 
@@ -285,7 +286,7 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
 
             sweeper.recoverStuckDeliveries();
 
-            verify(lifecycleService, never()).recoverStuckDelivery(any());
+            verify(lifecycleService, never()).recoverStuckDelivery(any(), org.mockito.ArgumentMatchers.anyShort());
             assertThat(meterRegistry.counter("agent.job.delivery.recovered").count()).isZero();
         }
 
@@ -295,7 +296,7 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
             AgentJob job = stuckJob((short) 1);
             when(jobRepository.findStuckPendingDeliveries(any(), any())).thenReturn(List.of(job));
             when(jobRepository.claimDeliveryRecoveryAttempt(job.getId(), (short) 1)).thenReturn(1);
-            when(lifecycleService.recoverStuckDelivery(job)).thenReturn(false);
+            when(lifecycleService.recoverStuckDelivery(job, (short) 2)).thenReturn(false);
 
             sweeper.recoverStuckDeliveries();
 
@@ -313,7 +314,7 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
             sweeper.recoverStuckDeliveries();
 
             verify(jobRepository, never()).claimDeliveryRecoveryAttempt(any(), org.mockito.ArgumentMatchers.anyShort());
-            verify(lifecycleService, never()).recoverStuckDelivery(any());
+            verify(lifecycleService, never()).recoverStuckDelivery(any(), org.mockito.ArgumentMatchers.anyShort());
             verify(jobRepository).updateDeliveryStatus(job.getId(), DeliveryStatus.FAILED, job.getDeliveryCommentId());
         }
 
@@ -325,7 +326,7 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
             sweeper.recoverStuckDeliveries();
 
             verify(jobRepository, never()).claimDeliveryRecoveryAttempt(any(), org.mockito.ArgumentMatchers.anyShort());
-            verify(lifecycleService, never()).recoverStuckDelivery(any());
+            verify(lifecycleService, never()).recoverStuckDelivery(any(), org.mockito.ArgumentMatchers.anyShort());
         }
     }
 

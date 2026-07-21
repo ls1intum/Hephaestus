@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.account.UserPreferencesRepository;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
@@ -85,12 +86,13 @@ class FeedbackDeliveryService {
     }
 
     /**
-     * Delivery-recovery dedup lookup (#1368 hardening) — see {@link PullRequestCommentPoster#findExistingSummaryComment}.
-     * Exposed here so {@link de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewHandler} (which
-     * only holds a reference to this service, not {@code PullRequestCommentPoster} directly) can implement
-     * {@link de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler#findExistingDelivery}.
+     * Delivery-recovery dedup lookup (#1368 hardening; tri-state #1368 fix wave, finding #6) — see
+     * {@link PullRequestCommentPoster#findExistingSummaryComment}. Exposed here so {@link
+     * de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewHandler} (which only holds a reference to
+     * this service, not {@code PullRequestCommentPoster} directly) can implement {@link
+     * de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler#findExistingDelivery}.
      */
-    Optional<String> findExistingDeliveryCommentId(AgentJob job) {
+    ExistingDeliveryLookup findExistingDeliveryCommentId(AgentJob job) {
         return commentPoster.findExistingSummaryComment(job);
     }
 
@@ -497,7 +499,11 @@ class FeedbackDeliveryService {
 
     static String formatPracticeNote(String sanitizedBody, AgentJob job) {
         var sb = new StringBuilder(sanitizedBody.length() + 512);
-        sb.append("<!-- hephaestus:practice-review:").append(job.getId()).append(" -->\n");
+        // #1368 fix wave, finding #4: the canonical marker helper — shared with
+        // PullRequestCommentPoster#findExistingSummaryComment's dedup lookup so a delivery-recovery
+        // retry's marker scan can actually match what this method just posted. See
+        // PullRequestCommentPoster#SUMMARY_MARKER_PREFIX's javadoc for the incident this fixes.
+        sb.append(PullRequestCommentPoster.summaryMarkerFor(job)).append("\n");
         sb.append(sanitizedBody).append("\n\n");
         appendFooter(sb, job);
         return sb.toString();

@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.sandbox.docker;
 
 import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxProperties;
-import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
+import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxInfrastructureException;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CancellationException;
@@ -103,13 +103,13 @@ public class SandboxContainerManager {
                 return new WaitOutcome(SIGKILL_EXIT_CODE, true);
             }
         } catch (CancellationException e) {
-            throw new SandboxException("Wait cancelled for container: " + containerId, e);
+            throw new SandboxInfrastructureException("Wait cancelled for container: " + containerId, e);
         } catch (InterruptedException e) {
             waitFuture.cancel(true);
             Thread.currentThread().interrupt();
-            throw new SandboxException("Interrupted while waiting for container: " + containerId, e);
+            throw new SandboxInfrastructureException("Interrupted while waiting for container: " + containerId, e);
         } catch (ExecutionException e) {
-            throw new SandboxException("Error waiting for container: " + containerId, e.getCause());
+            throw new SandboxInfrastructureException("Error waiting for container: " + containerId, e.getCause());
         }
     }
 

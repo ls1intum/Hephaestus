@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
+import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
@@ -14,7 +15,6 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
@@ -40,8 +40,22 @@ class PullRequestCommentPoster {
     /** Maximum summary length in the collapsible header (prevents total comment from exceeding provider limits). */
     static final int MAX_SUMMARY_LENGTH = 200;
 
-    /** Marker appended to summary posts so a re-review can locate and edit the prior summary in place. */
-    static final String SUMMARY_MARKER_PREFIX = "<!-- hephaestus-agent-feedback:";
+    /**
+     * Marker appended to summary posts so a re-review can locate and edit the prior summary in place.
+     *
+     * <p>#1368 fix wave, finding #4: this MUST be the exact prefix every production delivery path
+     * actually embeds — {@link de.tum.cit.aet.hephaestus.agent.handler.FeedbackDeliveryService#formatPracticeNote}
+     * (the PR-review and issue-review delivery pipelines both post through it) calls {@link
+     * #summaryMarkerFor} for its embedded marker rather than hardcoding its own string, so the value
+     * used to FORMAT a comment and the value used to LOOK ONE UP ({@link #findExistingSummaryComment})
+     * can never drift apart again. Previously they were two different literals ({@code
+     * hephaestus-agent-feedback:} here vs a hardcoded {@code hephaestus:practice-review:} in {@code
+     * FeedbackDeliveryService}) — the dedup lookup could never match a real posted comment, so every
+     * delivery-recovery retry silently double-posted. See {@code PullRequestCommentPosterTest} /
+     * {@code FeedbackDeliveryServiceTest} for the round-trip test (format via the real handler path,
+     * then find via the lookup path).
+     */
+    static final String SUMMARY_MARKER_PREFIX = "<!-- hephaestus:practice-review:";
 
     // Sanitization patterns
 
@@ -347,28 +361,28 @@ class PullRequestCommentPoster {
     }
 
     /**
-     * Delivery-recovery dedup lookup (#1368 hardening): does an already-posted summary comment carrying
-     * THIS job's marker exist? See {@link JobDeliveryException} callers'
-     * {@code JobTypeHandler#findExistingDelivery} for why this matters — a crash between posting and
-     * recording {@code deliveryCommentId} leaves the DB unaware a comment already landed.
+     * Delivery-recovery dedup lookup (#1368 hardening; tri-state #1368 fix wave, finding #6): does an
+     * already-posted summary comment carrying THIS job's marker exist? See {@link JobDeliveryException}
+     * callers' {@code JobTypeHandler#findExistingDelivery} for why this matters — a crash between posting
+     * and recording {@code deliveryCommentId} leaves the DB unaware a comment already landed.
      *
      * <p>Handles both PR ({@code pr_number} metadata) and issue ({@code issue_number} metadata) subjects,
-     * mirroring {@link #buildTarget} / {@link #postIssueFormattedBody} respectively. Best-effort: any
-     * missing metadata, unresolvable channel, or lookup failure returns empty — treated by the caller as
-     * "unknown", never as "confirmed not delivered".
+     * mirroring {@link #buildTarget} / {@link #postIssueFormattedBody} respectively. Any missing metadata,
+     * unresolvable channel, or lookup failure is {@link ExistingDeliveryLookup.Kind#UNKNOWN} — the caller
+     * must not treat that as "confirmed not delivered" (see {@link ExistingDeliveryLookup}'s javadoc).
      */
-    Optional<String> findExistingSummaryComment(AgentJob job) {
+    ExistingDeliveryLookup findExistingSummaryComment(AgentJob job) {
         IntegrationKind kind = job.getIntegrationKind();
         if (kind == null) {
-            return Optional.empty();
+            return ExistingDeliveryLookup.unknown();
         }
         FeedbackChannel channel = channels.get(kind);
         if (channel == null) {
-            return Optional.empty();
+            return ExistingDeliveryLookup.unknown();
         }
         JsonNode metadata = job.getMetadata();
         if (metadata == null || job.getWorkspace() == null) {
-            return Optional.empty();
+            return ExistingDeliveryLookup.unknown();
         }
         try {
             long workspaceId = job.getWorkspace().getId();
@@ -381,16 +395,21 @@ class PullRequestCommentPoster {
             } else if (metadata.has("pr_number")) {
                 target = buildTarget(job, kind, workspaceId);
             } else {
-                return Optional.empty();
+                return ExistingDeliveryLookup.unknown();
             }
-            return channel.findExistingSummary(target, summaryMarkerFor(job)).map(SummaryHandle::externalId);
+            FeedbackChannel.ExistingSummaryLookup lookup = channel.findExistingSummary(target, summaryMarkerFor(job));
+            return switch (lookup.kind()) {
+                case FOUND -> ExistingDeliveryLookup.found(lookup.handle().externalId());
+                case ABSENT -> ExistingDeliveryLookup.absent();
+                case UNKNOWN -> ExistingDeliveryLookup.unknown();
+            };
         } catch (RuntimeException e) {
             log.debug(
                 "Existing-summary dedup lookup failed (treated as unknown): jobId={}, error={}",
                 job.getId(),
                 e.getMessage()
             );
-            return Optional.empty();
+            return ExistingDeliveryLookup.unknown();
         }
     }
 
@@ -431,11 +450,16 @@ class PullRequestCommentPoster {
         return new FeedbackTarget(ref, subjectExternalId, resourceUrl);
     }
 
-    // The dedup marker that actually lands is the one formatComment embeds in the comment BODY
-    // (SUMMARY_MARKER_PREFIX). The FeedbackContent.marker() component passed below is NOT read by any
-    // summary channel today (GithubFeedbackChannel / GitlabFeedbackChannel use only content.body()); it is
-    // populated for parity so a future channel that wants out-of-band marker dedup has it available.
-    private static String summaryMarkerFor(AgentJob job) {
+    // The dedup marker that actually lands is the one formatComment/formatPracticeNote embeds in the
+    // comment BODY (SUMMARY_MARKER_PREFIX). The FeedbackContent.marker() component passed below is NOT
+    // read by any summary channel today (GithubFeedbackChannel / GitlabFeedbackChannel use only
+    // content.body()); it is populated for parity so a future channel that wants out-of-band marker
+    // dedup has it available.
+    //
+    // Package-visible (#1368 fix wave, finding #4) so FeedbackDeliveryService.formatPracticeNote — the
+    // actual production delivery template for PR review AND issue review — embeds THIS SAME marker
+    // rather than a second, independently-hardcoded literal that could drift out of sync again.
+    static String summaryMarkerFor(AgentJob job) {
         return SUMMARY_MARKER_PREFIX + job.getId() + " -->";
     }
 

@@ -275,7 +275,11 @@ public class AgentJobZombieSweeper {
                 if (claimed == null || claimed == 0) {
                     continue; // a concurrent sweeper replica already claimed this pass's attempt
                 }
-                boolean delivered = lifecycleService.recoverStuckDelivery(job);
+                // The CAS above incremented delivery_attempts from expectedAttempts to
+                // expectedAttempts + 1 — that post-increment value is THIS attempt's fence token for its
+                // terminal write (#1368 fix wave, finding #5; see AgentJobLifecycleService#recoverStuckDelivery).
+                short claimedAttempts = (short) (expectedAttempts + 1);
+                boolean delivered = lifecycleService.recoverStuckDelivery(job, claimedAttempts);
                 if (delivered) {
                     deliveryRecovered.increment();
                 }

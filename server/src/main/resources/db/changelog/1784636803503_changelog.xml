@@ -1298,4 +1298,192 @@
         </rollback>
     </changeSet>
 
+    <!--
+        #1368 fix wave (adversarial review of the hardening above, docs/decisions/0025's amendment).
+        Branch-local — this whole file is unreleased, so these are corrective changesets appended after
+        -39 rather than edits to -30/-31/-33/-34/-38/-39 themselves, per the append-only discipline this
+        project holds changelogs to even pre-merge.
+    -->
+
+    <!--
+        BLOCKER finding #1: feedback.agent_job_id (1781092589259-32) carries ON DELETE CASCADE, which
+        transitively cascades to feedback_observation/feedback_placement/reaction — append-only
+        research/product data. AgentJobRetentionService's delete pass now excludes any job still
+        referenced by feedback (application-level guard, see AgentJobRepository#deleteTerminalRowsOlderThan),
+        but the FK itself stayed CASCADE, so any FUTURE agent_job delete (a bug, an ad-hoc admin query, a
+        different retention path added later) could silently repeat this. Hardened to RESTRICT here —
+        verified no application code deletes agent_job rows outside the (now feedback-excluding) retention
+        service, so this can never legitimately fire.
+    -->
+    <changeSet id="1784636803503-40" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="sfk_feedback_agent_job already RESTRICT">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'sfk_feedback_agent_job' AND confdeltype = 'c'
+            </sqlCheck>
+        </preConditions>
+        <comment>Harden feedback.agent_job_id FK from CASCADE to RESTRICT — a deleted agent_job must never silently take feedback history with it (#1368 fix wave, finding #1)</comment>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE feedback DROP CONSTRAINT sfk_feedback_agent_job;
+            ALTER TABLE feedback ADD CONSTRAINT sfk_feedback_agent_job
+                FOREIGN KEY (agent_job_id) REFERENCES agent_job (id) ON DELETE RESTRICT;
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                ALTER TABLE feedback DROP CONSTRAINT sfk_feedback_agent_job;
+                ALTER TABLE feedback ADD CONSTRAINT sfk_feedback_agent_job
+                    FOREIGN KEY (agent_job_id) REFERENCES agent_job (id) ON DELETE CASCADE;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <!--
+        Finding #10: -30/-31/-33/-38/-39 created their indexes with plain CREATE INDEX, which takes an
+        ACCESS EXCLUSIVE lock on agent_job for the build's duration — a table the poll loop hits every
+        second. CONCURRENTLY avoids that lock (at the cost of two table scans and not running inside a
+        transaction — hence runInTransaction="false" on each of these). Each DROP+CREATE pair targets the
+        SAME index name so no application code (repository @Query comments, this file's own later
+        comments) needs to change.
+    -->
+    <changeSet id="1784636803503-41" author="hephaestus" runInTransaction="false">
+        <comment>Rebuild ix_agent_job_running_config with CREATE INDEX CONCURRENTLY (#1368 fix wave, finding #10)</comment>
+        <sql>DROP INDEX CONCURRENTLY IF EXISTS ix_agent_job_running_config;</sql>
+        <sql>
+            CREATE INDEX CONCURRENTLY ix_agent_job_running_config
+                ON agent_job (config_id)
+                WHERE status = 'RUNNING';
+        </sql>
+        <rollback>
+            <sql>DROP INDEX CONCURRENTLY IF EXISTS ix_agent_job_running_config;</sql>
+            <sql>
+                CREATE INDEX CONCURRENTLY ix_agent_job_running_config
+                    ON agent_job (config_id)
+                    WHERE status = 'RUNNING';
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1784636803503-42" author="hephaestus" runInTransaction="false">
+        <comment>Rebuild ix_agent_job_queued_available with CREATE INDEX CONCURRENTLY (#1368 fix wave, finding #10)</comment>
+        <sql>DROP INDEX CONCURRENTLY IF EXISTS ix_agent_job_queued_available;</sql>
+        <sql>
+            CREATE INDEX CONCURRENTLY ix_agent_job_queued_available
+                ON agent_job (available_at, id)
+                WHERE status = 'QUEUED';
+        </sql>
+        <rollback>
+            <sql>DROP INDEX CONCURRENTLY IF EXISTS ix_agent_job_queued_available;</sql>
+            <sql>
+                CREATE INDEX CONCURRENTLY ix_agent_job_queued_available
+                    ON agent_job (available_at, id)
+                    WHERE status = 'QUEUED';
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1784636803503-43" author="hephaestus" runInTransaction="false">
+        <comment>Rebuild ix_agent_job_delivery_pending with CREATE INDEX CONCURRENTLY (#1368 fix wave, finding #10)</comment>
+        <sql>DROP INDEX CONCURRENTLY IF EXISTS ix_agent_job_delivery_pending;</sql>
+        <sql>
+            CREATE INDEX CONCURRENTLY ix_agent_job_delivery_pending
+                ON agent_job (completed_at)
+                WHERE status = 'COMPLETED' AND delivery_status = 'PENDING';
+        </sql>
+        <rollback>
+            <sql>DROP INDEX CONCURRENTLY IF EXISTS ix_agent_job_delivery_pending;</sql>
+            <sql>
+                CREATE INDEX CONCURRENTLY ix_agent_job_delivery_pending
+                    ON agent_job (completed_at)
+                    WHERE status = 'COMPLETED' AND delivery_status = 'PENDING';
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1784636803503-44" author="hephaestus" runInTransaction="false">
+        <comment>Rebuild ix_agent_job_retention with CREATE INDEX CONCURRENTLY (#1368 fix wave, finding #10)</comment>
+        <sql>DROP INDEX CONCURRENTLY IF EXISTS ix_agent_job_retention;</sql>
+        <sql>
+            CREATE INDEX CONCURRENTLY ix_agent_job_retention
+                ON agent_job (completed_at)
+                WHERE status IN ('COMPLETED','FAILED','TIMED_OUT','CANCELLED');
+        </sql>
+        <rollback>
+            <sql>DROP INDEX CONCURRENTLY IF EXISTS ix_agent_job_retention;</sql>
+            <sql>
+                CREATE INDEX CONCURRENTLY ix_agent_job_retention
+                    ON agent_job (completed_at)
+                    WHERE status IN ('COMPLETED','FAILED','TIMED_OUT','CANCELLED');
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <!--
+        Finding #10 (CHECK half): -34's ck_agent_job_status was added with a plain ADD CONSTRAINT, which
+        validates every existing row under the SAME ACCESS EXCLUSIVE lock as the DDL. NOT VALID skips that
+        scan (metadata-only, near-instant); VALIDATE CONSTRAINT in a separate changeset then does the scan
+        under SHARE UPDATE EXCLUSIVE, which blocks other schema changes but NOT ordinary reads/writes —
+        the poll loop and executor keep running normally while it validates.
+    -->
+    <changeSet id="1784636803503-45" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="ck_agent_job_status already re-added NOT VALID">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM pg_constraint WHERE conname = 'ck_agent_job_status' AND convalidated
+            </sqlCheck>
+        </preConditions>
+        <comment>Re-add ck_agent_job_status as NOT VALID — the scan is deferred to -46 (#1368 fix wave, finding #10)</comment>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE agent_job DROP CONSTRAINT IF EXISTS ck_agent_job_status;
+            ALTER TABLE agent_job ADD CONSTRAINT ck_agent_job_status
+                CHECK (status IN ('QUEUED','RUNNING','COMPLETED','FAILED','TIMED_OUT','CANCELLED')) NOT VALID;
+        ]]></sql>
+        <rollback>
+            <!-- Restores exactly what -34 originally left in place (a validated constraint) rather than
+                 just removing the constraint outright, so a rollback of -45 alone (without also rolling
+                 back -34, which Liquibase's bookkeeping still shows as applied) leaves the DB coherent. -->
+            <sql splitStatements="false"><![CDATA[
+                ALTER TABLE agent_job DROP CONSTRAINT IF EXISTS ck_agent_job_status;
+                ALTER TABLE agent_job ADD CONSTRAINT ck_agent_job_status
+                    CHECK (status IN ('QUEUED','RUNNING','COMPLETED','FAILED','TIMED_OUT','CANCELLED'));
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1784636803503-46" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="ck_agent_job_status already validated">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM pg_constraint WHERE conname = 'ck_agent_job_status' AND NOT convalidated
+            </sqlCheck>
+        </preConditions>
+        <comment>Validate ck_agent_job_status under SHARE UPDATE EXCLUSIVE (reads/writes unblocked) (#1368 fix wave, finding #10)</comment>
+        <sql>ALTER TABLE agent_job VALIDATE CONSTRAINT ck_agent_job_status;</sql>
+        <rollback/>
+    </changeSet>
+
+    <!--
+        Finding #14: -36/-37's preconditions only checked whether ANY autovacuum_vacuum_scale_factor
+        option was present, not this release's specific value — a stale or partially-applied option would
+        silently skip the changeset. ALTER TABLE ... SET (...) is idempotent (re-setting the same options
+        is a cheap metadata-only no-op), so these corrective changesets just reapply it unconditionally
+        instead of trying to precondition-match an exact prior state.
+    -->
+    <changeSet id="1784636803503-47" author="hephaestus">
+        <comment>Idempotently (re-)apply agent_job's autovacuum tuning, unconditionally (#1368 fix wave, finding #14)</comment>
+        <sql>
+            ALTER TABLE agent_job SET (autovacuum_vacuum_scale_factor = 0, autovacuum_vacuum_threshold = 500);
+        </sql>
+        <rollback>
+            <sql>ALTER TABLE agent_job RESET (autovacuum_vacuum_scale_factor, autovacuum_vacuum_threshold);</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1784636803503-48" author="hephaestus">
+        <comment>Idempotently (re-)apply worker_registry's autovacuum tuning, unconditionally (#1368 fix wave, finding #14)</comment>
+        <sql>
+            ALTER TABLE worker_registry SET (autovacuum_vacuum_scale_factor = 0, autovacuum_vacuum_threshold = 100);
+        </sql>
+        <rollback>
+            <sql>ALTER TABLE worker_registry RESET (autovacuum_vacuum_scale_factor, autovacuum_vacuum_threshold);</sql>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

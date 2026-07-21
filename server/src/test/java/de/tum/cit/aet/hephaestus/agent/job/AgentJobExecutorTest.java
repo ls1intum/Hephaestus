@@ -271,7 +271,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 Optional.of(workerProps("test-worker"))
             );
 
-            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -292,7 +292,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         void returnsFalseAndNeverExecutesWhenSkipLockedReturnsEmpty() {
-            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.empty());
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.empty());
 
             boolean claimed = executor.processJob(jobId);
 
@@ -302,7 +302,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         void returnsFalseAndLeavesJobQueuedWhenConcurrencyLimitReached() {
-            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(3L); // equals max
 
@@ -316,7 +316,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         void shouldTransitionToRunningOnSuccessfulClaim() {
-            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -345,7 +345,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         void refusesAndCancelsWhenBudgetIsExhaustedAtClaimTime() {
-            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(llmBudgetService.blockReason(99L)).thenReturn(LlmBudgetBlockReason.EXHAUSTED);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -365,7 +365,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         void refusesWithADistinctMessageWhenUnpricedUsageIsBlockedByInstancePolicy() {
-            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(llmBudgetService.blockReason(99L)).thenReturn(LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -386,7 +386,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             // Rejected-pre-start jobs must leave NO ledger trace at all — distinct from the
             // cancelled-after-start / malformed-usage cases, which DO record UNPRICED (see
             // UnpricedUsageLedgerFallback below).
-            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(llmBudgetService.blockReason(99L)).thenReturn(LlmBudgetBlockReason.EXHAUSTED);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -398,7 +398,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         void proceedsToConcurrencyGateWhenBudgetIsNotBlocked() {
-            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(llmBudgetService.blockReason(99L)).thenReturn(LlmBudgetBlockReason.NONE);
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
@@ -420,7 +420,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         void areStampedBeforeTheSandboxRuns_soAFailedRunKeepsThem() {
-            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -439,7 +439,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         void aWriteMatchingNoJobRow_failsTheRunRatherThanBurningTheLlmBudget() {
-            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -461,7 +461,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         void shouldCompleteJobSuccessfully() {
-            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -490,7 +490,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         void shouldMarkFailedOnNonZeroExitCode() {
-            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -516,7 +516,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         void emitsEnvelopeMismatchOnExit42() {
-            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -549,7 +549,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         void shouldMarkTimedOutOnTimeout() {
-            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -579,7 +579,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         void shouldTransitionToCancelledOnCancellation() {
-            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -599,7 +599,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         void shouldMarkFailedOnGenericException() {
-            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -624,13 +624,29 @@ class AgentJobExecutorTest extends BaseUnitTest {
     class ErrorClassification {
 
         @Test
-        @DisplayName("isRetryableInfraFailure: a plain SandboxException (not cancelled) is retryable")
-        void sandboxExceptionIsRetryable() {
+        @DisplayName(
+            "isRetryableInfraFailure: a SandboxInfrastructureException (provably-transient infra) is retryable (#1368 fix wave, finding #7)"
+        )
+        void sandboxInfrastructureExceptionIsRetryable() {
             assertThat(
                 AgentJobExecutor.isRetryableInfraFailure(
-                    new de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException("docker daemon unreachable")
+                    new de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxInfrastructureException(
+                        "docker daemon unreachable"
+                    )
                 )
             ).isTrue();
+        }
+
+        @Test
+        @DisplayName(
+            "isRetryableInfraFailure: a plain SandboxException (validation/config/unexpected) is NOT retryable — narrowed #1368 fix wave, finding #7"
+        )
+        void plainSandboxExceptionIsNotRetryable() {
+            assertThat(
+                AgentJobExecutor.isRetryableInfraFailure(
+                    new de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException("path traversal detected")
+                )
+            ).isFalse();
         }
 
         @Test
@@ -676,7 +692,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 Optional.empty(),
                 Optional.of(workerProps("infra-retry-worker"))
             );
-            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -692,7 +708,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             ).thenReturn(1);
 
             setupFullExecutionWithException(
-                new de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException("image pull failed")
+                new de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxInfrastructureException("image pull failed")
             );
 
             executor.processJob(jobId);
@@ -738,7 +754,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 Optional.empty(),
                 Optional.of(workerProps("infra-retry-worker-2"))
             );
-            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -748,7 +764,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             ).thenReturn(1);
 
             setupFullExecutionWithException(
-                new de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException("image pull failed")
+                new de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxInfrastructureException("image pull failed")
             );
 
             executor.processJob(jobId);
@@ -782,7 +798,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 Optional.empty(),
                 Optional.of(workerProps("infra-retry-worker-3"))
             );
-            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -818,7 +834,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         void cancelledAfterStart_recordsAnUnpricedLedgerEntry() {
-            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -857,7 +873,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             // or worker-drain path already won the CAS). Previously this silently skipped the ledger
             // write; now the write is attempted regardless, since only a job that reached sandbox
             // execution ever throws SandboxCancelledException in the first place.
-            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -905,7 +921,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         void missingOrMalformedUsageJson_recordsAnUnpricedLedgerEntryOnNormalCompletion() {
-            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -962,7 +978,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 Optional.of(workerProps("test-worker"))
             );
 
-            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -1085,7 +1101,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             List<UUID> candidates = jobRepository.findQueuedIdsOldestFirst(5);
 
             assertThat(candidates).isEmpty();
-            verify(jobRepository, never()).findByIdQueuedForUpdateSkipLocked(any());
+            verify(jobRepository, never()).findByIdQueuedForUpdateSkipLocked(any(), any());
         }
 
         @Test
@@ -1162,7 +1178,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 Optional.of(workerProps("rejecting-worker"))
             );
 
-            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -1199,7 +1215,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 Optional.of(workerProps("rejecting-worker"))
             );
 
-            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));

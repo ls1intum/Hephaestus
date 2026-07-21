@@ -40,14 +40,27 @@ public interface FeedbackChannel {
      * post embeds, e.g. {@code PullRequestCommentPoster.SUMMARY_MARKER_PREFIX + jobId}), so a
      * delivery-recovery retry can record the already-posted comment's id instead of posting a duplicate.
      *
-     * <p>Default unsupported (empty) — a channel implements this only when a cheap-enough existing
-     * listing query is available; recovery for an unsupported channel simply falls through to a normal
-     * post, same as before this existed. Deliberately NOT called on the normal (non-recovery) delivery
-     * path — it costs an extra provider call, which is only worth paying when a crash has already put a
-     * job's delivery status in doubt.
+     * <p><b>Tri-state, not a boolean (#1368 fix wave, finding #6).</b> A prior {@link Optional}-based
+     * signature collapsed "confirmed absent" and "could not determine" into the same empty value — every
+     * lookup failure (rate limit, transport error, GraphQL error) or unsupported channel silently fell
+     * through to "proceed and post", which is only safe for a CONFIRMED absence. On an actual error, that
+     * meant every crash-then-recover cycle risked a duplicate post instead of erring toward "leave it
+     * PENDING and try again later". {@link ExistingSummaryLookup.Kind#FOUND} is the only signal a caller
+     * should record-and-skip-posting on; {@link ExistingSummaryLookup.Kind#ABSENT} is the only signal a
+     * caller should proceed to post on; {@link ExistingSummaryLookup.Kind#UNKNOWN} means neither — the
+     * caller must leave the delivery {@code PENDING} for a later recovery attempt (and, once the attempt
+     * cap is exhausted, fail the delivery with a clear message rather than guess).
+     *
+     * <p>Default {@code UNKNOWN} — a channel implements {@code FOUND}/{@code ABSENT} only when a
+     * cheap-enough existing-listing query is available AND can distinguish "searched everything, nothing
+     * matched" from "could not search". A channel with no such query (e.g. {@code GitlabFeedbackChannel},
+     * documented on the class) stays {@code UNKNOWN} forever — its delivery-recovery sweep therefore never
+     * auto-reposts, only ever records a found match or exhausts its attempt cap. Deliberately NOT called
+     * on the normal (non-recovery) delivery path — it costs an extra provider call, which is only worth
+     * paying when a crash has already put a job's delivery status in doubt.
      */
-    default Optional<SummaryHandle> findExistingSummary(FeedbackTarget target, String marker) {
-        return Optional.empty();
+    default ExistingSummaryLookup findExistingSummary(FeedbackTarget target, String marker) {
+        return ExistingSummaryLookup.unknown();
     }
 
     /**
@@ -81,6 +94,34 @@ public interface FeedbackChannel {
 
     /** Vendor-side post identifier recorded on {@code FeedbackPlacement.external_ref} for edit-in-place (ADR 0021 C6). */
     record SummaryHandle(String externalId) {}
+
+    /**
+     * Tri-state result of {@link #findExistingSummary} (#1368 fix wave, finding #6) — see that method's
+     * javadoc for why this is not a boolean/{@link Optional}.
+     */
+    record ExistingSummaryLookup(Kind kind, SummaryHandle handle) {
+        public enum Kind {
+            /** A comment carrying the marker was found. */
+            FOUND,
+            /** The channel searched everything it can and confirmed no comment carries the marker. */
+            ABSENT,
+            /** The channel could not determine either way (error, rate limit, or unsupported). */
+            UNKNOWN,
+        }
+
+        public static ExistingSummaryLookup found(SummaryHandle handle) {
+            Objects.requireNonNull(handle, "FOUND outcome requires a SummaryHandle");
+            return new ExistingSummaryLookup(Kind.FOUND, handle);
+        }
+
+        public static ExistingSummaryLookup absent() {
+            return new ExistingSummaryLookup(Kind.ABSENT, null);
+        }
+
+        public static ExistingSummaryLookup unknown() {
+            return new ExistingSummaryLookup(Kind.UNKNOWN, null);
+        }
+    }
 
     /**
      * The outcome of an {@link #updateSummary} attempt. {@code TRANSIENT} is the load-bearing case: the caller

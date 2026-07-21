@@ -55,6 +55,20 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <p>Authentication is handled by {@link JobTokenAuthenticationFilter} which validates
  * the bearer token and sets a {@link JobTokenAuthentication} on the security context.
+ *
+ * <p><b>Residual window: token rotation does not kill an already-authenticated in-flight stream
+ * (#1368 fix wave, finding #9 — documented, not closed).</b> {@code AgentJobRepository#requeueOrphan}
+ * rotates a job's token when it is requeued (orphan recovery, worker drain, infra-retry), and that
+ * rotation DOES stop any NEW request from authenticating with the old token — the row's
+ * {@code job_token_hash} no longer matches it once the CAS commits. It does NOT stop a request that
+ * was ALREADY authenticated (past {@link JobTokenAuthenticationFilter}) before the rotation: this
+ * method streams the upstream response — an SSE call can run minutes — with no re-validation at chunk
+ * boundaries, so a zombie sandbox mid-call when its job gets requeued keeps consuming its original
+ * call to completion on the now-superseded token. Deliberately left open rather than partially fenced:
+ * {@link LlmProxyWebClientConfig} runs with no read-idle timeout BY DESIGN (LLM SSE streams go silent
+ * during model "thinking"), so a mid-stream liveness check needs its own design, not a quick bolt-on.
+ * Bounded by {@code responseTimeout} (300s) regardless. See ADR 0025's fix-wave amendment for the full
+ * reasoning.
  */
 @RestController
 @Hidden

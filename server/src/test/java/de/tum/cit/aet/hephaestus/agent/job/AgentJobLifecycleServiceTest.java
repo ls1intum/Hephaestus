@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyShort;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
@@ -13,6 +14,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
@@ -386,10 +388,12 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
         }
     }
 
-    /** #1368 hardening: {@code recoverStuckDelivery} — the delivery-recovery sweep's actual attempt. */
+    /** #1368 hardening (tri-state + fenced writes: #1368 fix wave, findings #5/#6): {@code recoverStuckDelivery}. */
     @Nested
     @DisplayName("recoverStuckDelivery (#1368 hardening)")
     class RecoverStuckDelivery {
+
+        private static final short CLAIMED_ATTEMPTS = 1;
 
         private AgentJob completedJob;
         private UUID jobId;
@@ -406,30 +410,62 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("a marker hit records the existing comment id as DELIVERED WITHOUT calling deliver() again")
+        @DisplayName("a FOUND marker hit records the existing comment id as DELIVERED WITHOUT calling deliver() again")
         void markerHitSkipsRedelivery() {
-            lenient().when(handler.findExistingDelivery(completedJob)).thenReturn(Optional.of("existing-comment-id"));
+            lenient()
+                .when(handler.findExistingDelivery(completedJob))
+                .thenReturn(ExistingDeliveryLookup.found("existing-comment-id"));
+            lenient()
+                .when(
+                    agentJobRepository.transitionDeliveryStatusFenced(
+                        eq(jobId),
+                        eq(DeliveryStatus.DELIVERED),
+                        eq("existing-comment-id"),
+                        any(),
+                        eq(CLAIMED_ATTEMPTS)
+                    )
+                )
+                .thenReturn(1);
 
-            boolean result = service.recoverStuckDelivery(completedJob);
+            boolean result = service.recoverStuckDelivery(completedJob, CLAIMED_ATTEMPTS);
 
             assertThat(result).isTrue();
             verify(handler, never()).deliver(any());
-            verify(agentJobRepository).updateDeliveryStatus(jobId, DeliveryStatus.DELIVERED, "existing-comment-id");
+            verify(agentJobRepository).transitionDeliveryStatusFenced(
+                jobId,
+                DeliveryStatus.DELIVERED,
+                "existing-comment-id",
+                java.util.Set.of(DeliveryStatus.PENDING),
+                CLAIMED_ATTEMPTS
+            );
         }
 
         @Test
-        @DisplayName("no marker hit falls through to a normal deliver() attempt, which succeeds")
-        void noMarkerHitFallsThroughToDeliverAndSucceeds() {
-            lenient().when(handler.findExistingDelivery(completedJob)).thenReturn(Optional.empty());
+        @DisplayName("ABSENT falls through to a normal deliver() attempt, which succeeds")
+        void absentFallsThroughToDeliverAndSucceeds() {
+            lenient().when(handler.findExistingDelivery(completedJob)).thenReturn(ExistingDeliveryLookup.absent());
+            lenient()
+                .when(
+                    agentJobRepository.transitionDeliveryStatusFenced(
+                        eq(jobId),
+                        eq(DeliveryStatus.DELIVERED),
+                        any(),
+                        any(),
+                        eq(CLAIMED_ATTEMPTS)
+                    )
+                )
+                .thenReturn(1);
 
-            boolean result = service.recoverStuckDelivery(completedJob);
+            boolean result = service.recoverStuckDelivery(completedJob, CLAIMED_ATTEMPTS);
 
             assertThat(result).isTrue();
             verify(handler).deliver(completedJob);
-            verify(agentJobRepository).updateDeliveryStatus(
+            verify(agentJobRepository).transitionDeliveryStatusFenced(
                 jobId,
                 DeliveryStatus.DELIVERED,
-                completedJob.getDeliveryCommentId()
+                completedJob.getDeliveryCommentId(),
+                java.util.Set.of(DeliveryStatus.PENDING),
+                CLAIMED_ATTEMPTS
             );
         }
 
@@ -438,23 +474,59 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
             "a failed deliver() attempt returns false and does NOT write a terminal status (left PENDING for the next sweep pass)"
         )
         void failedDeliverReturnsFalseAndLeavesPending() {
-            lenient().when(handler.findExistingDelivery(completedJob)).thenReturn(Optional.empty());
+            lenient().when(handler.findExistingDelivery(completedJob)).thenReturn(ExistingDeliveryLookup.absent());
             doThrow(new RuntimeException("GitHub API rate limited")).when(handler).deliver(completedJob);
 
-            boolean result = service.recoverStuckDelivery(completedJob);
+            boolean result = service.recoverStuckDelivery(completedJob, CLAIMED_ATTEMPTS);
 
             assertThat(result).isFalse();
+            verify(agentJobRepository, never()).transitionDeliveryStatusFenced(any(), any(), any(), any(), anyShort());
             verify(agentJobRepository, never()).updateDeliveryStatus(any(), any(), any());
         }
 
         @Test
-        @DisplayName("a handler whose dedup check itself throws is treated as unknown — falls through to deliver()")
-        void dedupCheckThrowingFallsThroughToDeliver() {
+        @DisplayName("UNKNOWN (dedup check inconclusive) does NOT call deliver() — leaves PENDING for a later pass")
+        void unknownLeavesPendingWithoutPosting() {
+            lenient().when(handler.findExistingDelivery(completedJob)).thenReturn(ExistingDeliveryLookup.unknown());
+
+            boolean result = service.recoverStuckDelivery(completedJob, CLAIMED_ATTEMPTS);
+
+            assertThat(result).isFalse();
+            verify(handler, never()).deliver(any());
+            verify(agentJobRepository, never()).transitionDeliveryStatusFenced(any(), any(), any(), any(), anyShort());
+        }
+
+        @Test
+        @DisplayName("a handler whose dedup check itself throws is treated as UNKNOWN — does not post")
+        void dedupCheckThrowingIsTreatedAsUnknown() {
             lenient().when(handler.findExistingDelivery(completedJob)).thenThrow(new RuntimeException("provider down"));
 
-            boolean result = service.recoverStuckDelivery(completedJob);
+            boolean result = service.recoverStuckDelivery(completedJob, CLAIMED_ATTEMPTS);
 
-            assertThat(result).isTrue();
+            assertThat(result).isFalse();
+            verify(handler, never()).deliver(any());
+        }
+
+        @Test
+        @DisplayName("a superseded attempt's fenced write matches no row — returns false without clobbering the winner")
+        void supersededAttemptWriteIsANoOp() {
+            lenient().when(handler.findExistingDelivery(completedJob)).thenReturn(ExistingDeliveryLookup.absent());
+            // Fence lost: a later attempt already advanced delivery_attempts past what this call claimed.
+            lenient()
+                .when(
+                    agentJobRepository.transitionDeliveryStatusFenced(
+                        eq(jobId),
+                        eq(DeliveryStatus.DELIVERED),
+                        any(),
+                        any(),
+                        eq(CLAIMED_ATTEMPTS)
+                    )
+                )
+                .thenReturn(0);
+
+            boolean result = service.recoverStuckDelivery(completedJob, CLAIMED_ATTEMPTS);
+
+            assertThat(result).isFalse();
             verify(handler).deliver(completedJob);
         }
     }

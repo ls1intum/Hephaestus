@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxCancelledException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
+import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxInfrastructureException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxSpec;
@@ -904,6 +905,16 @@ public class AgentJobExecutor {
                     currentRetryCount + 1,
                     errorMessage
                 );
+                // #1368 fix wave, finding #8: this attempt already started executing (claimed, RUNNING;
+                // isRetryableInfraFailure only classifies failures that can occur after sandbox start) and
+                // may carry real, un-costed LLM spend — the retry about to happen buys ANOTHER run with no
+                // ledger row of its own. Without this, N retries of the same job could each spend against
+                // the LLM with only the FINAL attempt's usage (if any) ever recorded, silently undercounting
+                // budget consumption by up to N-1 runs' worth. Recorded unconditionally (whether or not any
+                // spend actually happened this attempt) — the ledger's unique source_id constraint makes a
+                // duplicate/spurious UNPRICED row safe, and erring toward "recorded but maybe unnecessary" is
+                // the conservative direction here (matches recordUnverifiableUsage's other call sites).
+                recordUnverifiableUsage(jobId, "infra-failure retry (attempt " + (currentRetryCount + 1) + ")");
                 return "REQUEUED";
             }
             log.warn(
@@ -919,11 +930,18 @@ public class AgentJobExecutor {
     }
 
     /**
-     * Provably-infra classification (#1368 hardening) — see {@link #handleExecutionFailure} javadoc for
-     * the reasoning. Package-private for testability.
+     * Provably-infra classification (#1368 hardening; narrowed #1368 fix wave, finding #7) — see {@link
+     * #handleExecutionFailure} javadoc for the reasoning. Deliberately checks {@link
+     * SandboxInfrastructureException} rather than the broader {@link SandboxException}: the broader type
+     * also covers validation/config failures (path traversal, size limits, misconfigured network policy)
+     * that are deterministic across retries, and {@code DockerSandboxAdapter}'s catch-all wrap of an
+     * unexpected exception, which is an unknown defect — retrying either would burn the retry budget on
+     * a failure that was never going to resolve itself. {@link SandboxCancelledException} extends {@link
+     * SandboxException} but never {@link SandboxInfrastructureException}, so it is excluded without an
+     * explicit check. Package-private for testability.
      */
     static boolean isRetryableInfraFailure(Exception e) {
-        return (e instanceof SandboxException && !(e instanceof SandboxCancelledException)) || e instanceof IOException;
+        return e instanceof SandboxInfrastructureException || e instanceof IOException;
     }
 
     /**
@@ -971,8 +989,9 @@ public class AgentJobExecutor {
      */
     private Object claimJob(UUID jobId) {
         return transactionTemplate.execute(status -> {
-            // SKIP LOCKED: if another poller has this row locked, returns empty
-            Optional<AgentJob> locked = jobRepository.findByIdQueuedForUpdateSkipLocked(jobId);
+            // SKIP LOCKED: if another poller has this row locked, returns empty. available_at is
+            // re-checked here too (#1368 fix wave, finding #3) — see the query's javadoc.
+            Optional<AgentJob> locked = jobRepository.findByIdQueuedForUpdateSkipLocked(jobId, Instant.now());
             if (locked.isEmpty()) {
                 log.debug("Job already claimed or not QUEUED: jobId={}", jobId);
                 return ClaimOutcome.ALREADY_CLAIMED;

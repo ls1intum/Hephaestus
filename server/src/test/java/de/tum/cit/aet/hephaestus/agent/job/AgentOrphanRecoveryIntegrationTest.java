@@ -98,8 +98,13 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
 
         // #1368 hardening: the requeue backs the job off (available_at = now + AgentJobBackoff), so it
         // is deliberately NOT yet a poll candidate — see jobWithFutureAvailableAtIsNotClaimed below for
-        // that assertion. processJob's own SKIP LOCKED claim does not gate on available_at (only the
-        // candidate-selection query does), so a direct claim still succeeds despite the backoff.
+        // that assertion. #1368 fix wave (finding #3): processJob's own SKIP LOCKED claim NOW also gates
+        // on available_at <= now (closing the stale-poll-result race — see
+        // AgentJobRepository#findByIdQueuedForUpdateSkipLocked's javadoc), so a direct claim attempt
+        // made WHILE still backed off correctly does NOT succeed. Simulate the backoff having elapsed
+        // (a later poll, after available_at has passed) by fast-forwarding it directly.
+        fastForwardAvailableAt(jobId);
+
         boolean claimed = executor.processJob(jobId);
         assertThat(claimed).isTrue();
 
@@ -129,11 +134,39 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         // for the old token even before considering the hash change.
         assertThat(jobRepository.findByJobTokenHashAndStatus(oldTokenHash, AgentJobStatus.RUNNING)).isEmpty();
 
-        // The new token authenticates once the job is claimed (RUNNING) again.
+        // The new token authenticates once the job is claimed (RUNNING) again. #1368 fix wave (finding
+        // #3): the claim now also gates on available_at, so fast-forward past the requeue's backoff
+        // first — see orphanRecoveryRequeuesAndBecomesClaimable's comment for the full reasoning.
+        fastForwardAvailableAt(jobId);
+
         boolean claimed = executor.processJob(jobId);
         assertThat(claimed).isTrue();
         assertThat(jobRepository.findByJobTokenHashAndStatus(newTokenHash, AgentJobStatus.RUNNING)).isPresent();
         assertThat(jobRepository.findByJobTokenHashAndStatus(oldTokenHash, AgentJobStatus.RUNNING)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("#1368 fix wave, finding #3: a direct claim attempt made WHILE still backed off does not succeed")
+    void claimAttemptWhileStillBackedOffDoesNotSucceed() {
+        UUID jobId = runningJobOwnedBy("dead-replica-5", Instant.now().minus(Duration.ofMinutes(5)), 0);
+        registerStaleWorker("dead-replica-5", Instant.now().minus(Duration.ofMinutes(5)));
+
+        sweeper.recoverOrphanedJobs();
+
+        AgentJob requeued = jobRepository.findById(jobId).orElseThrow();
+        assertThat(requeued.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
+        assertThat(requeued.getAvailableAt())
+            .as("the backoff-computed available_at is still in the future")
+            .isAfter(Instant.now());
+
+        // Deliberately NOT fast-forwarded: a claim attempt against a job whose backoff has not yet
+        // elapsed must be refused, closing the stale-poll-result race (a concurrent backoff-requeue
+        // between a candidate poll and this claim must not be bypassable).
+        boolean claimed = executor.processJob(jobId);
+
+        assertThat(claimed).isFalse();
+        AgentJob stillQueued = jobRepository.findById(jobId).orElseThrow();
+        assertThat(stillQueued.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
     }
 
     @Test
@@ -252,5 +285,19 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         w.setLastHeartbeat(lastHeartbeat);
         w.setRegisteredAt(lastHeartbeat);
         workerRegistryRepository.saveAndFlush(w);
+    }
+
+    /**
+     * Simulates the requeue's backoff having elapsed (#1368 fix wave, finding #3): moves
+     * {@code available_at} into the past directly, standing in for "time passed and a later poll
+     * iteration is now attempting the claim" without actually sleeping out the backoff window in the
+     * test.
+     */
+    private void fastForwardAvailableAt(UUID jobId) {
+        transactionTemplate.executeWithoutResult(status -> {
+            AgentJob job = jobRepository.findById(jobId).orElseThrow();
+            job.setAvailableAt(Instant.now().minus(Duration.ofSeconds(1)));
+            jobRepository.saveAndFlush(job);
+        });
     }
 }

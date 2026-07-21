@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.agent.handler.spi;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * Domain-specific handler for a single {@link AgentJobType}.
@@ -76,15 +75,24 @@ public interface JobTypeHandler {
      * {@code AgentJobZombieSweeper#recoverStuckDeliveries}) would blindly call {@link #deliver} again and
      * post a duplicate.
      *
-     * <p>Default "unknown" (empty) — a handler whose delivery channel supports searching for the
-     * embedded job marker overrides this; one that can't (or doesn't post externally at all, e.g.
-     * conversation review) leaves the default, and the caller falls through to a normal {@link #deliver}
-     * attempt exactly as before this existed.
+     * <p><b>Tri-state, not {@code Optional} (#1368 fix wave, finding #6).</b> The caller ({@code
+     * AgentJobLifecycleService#recoverStuckDelivery}) treats the three outcomes very differently: {@link
+     * ExistingDeliveryLookup.Kind#FOUND} records the found comment id as delivered WITHOUT re-posting;
+     * {@link ExistingDeliveryLookup.Kind#ABSENT} proceeds to a normal {@link #deliver} attempt (confirmed
+     * safe to post); {@link ExistingDeliveryLookup.Kind#UNKNOWN} does NEITHER — it leaves the delivery
+     * {@code PENDING} for a later recovery pass rather than guessing, since guessing wrong in the "post"
+     * direction risks a duplicate on exactly the crash-recovery path this exists to protect. Collapsing
+     * these into an {@code Optional} (as before this fix) made "could not determine" indistinguishable
+     * from "confirmed absent" — every lookup failure silently fell through to re-posting.
      *
-     * @return the existing delivery's external comment id if found; empty if not found OR unknown
+     * <p>Default {@code UNKNOWN} — a handler whose delivery channel supports searching for the embedded
+     * job marker overrides this with a real {@code FOUND}/{@code ABSENT}/{@code UNKNOWN} answer; one that
+     * can't (or doesn't post externally at all, e.g. conversation review) leaves the default, and the
+     * caller never auto-reposts for it — only ever records a confirmed match or exhausts the recovery
+     * attempt cap.
      */
-    default Optional<String> findExistingDelivery(AgentJob job) {
-        return Optional.empty();
+    default ExistingDeliveryLookup findExistingDelivery(AgentJob job) {
+        return ExistingDeliveryLookup.unknown();
     }
 
     /**

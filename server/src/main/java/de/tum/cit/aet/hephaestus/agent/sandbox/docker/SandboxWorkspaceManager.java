@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.sandbox.docker;
 
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
+import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxInfrastructureException;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
@@ -106,7 +107,9 @@ public class SandboxWorkspaceManager {
             fileOps.copyArchiveToContainer(containerId, "/workspace", tarStream);
             log.debug("Injected {} files into container {}", files.size(), containerId);
         } catch (IOException e) {
-            throw new SandboxException("Failed to inject files into container: " + containerId, e);
+            // #1368 fix wave, finding #7: a real docker cp / stream I/O failure — transient infra, safe
+            // to classify retryable (unlike the validation throws below in this same file).
+            throw new SandboxInfrastructureException("Failed to inject files into container: " + containerId, e);
         }
     }
 
@@ -166,7 +169,11 @@ public class SandboxWorkspaceManager {
                 fileOps.copyArchiveToContainer(containerId, containerParent.toString(), tarStream);
             }
         } catch (IOException e) {
-            throw new SandboxException("Failed to inject directory " + hostPath + " into container " + containerId, e);
+            // #1368 fix wave, finding #7: real docker cp / disk I/O failure — transient infra.
+            throw new SandboxInfrastructureException(
+                "Failed to inject directory " + hostPath + " into container " + containerId,
+                e
+            );
         } finally {
             if (tempTar != null) {
                 try {
@@ -251,7 +258,8 @@ public class SandboxWorkspaceManager {
                     // Symlinks are silently skipped: Files.walk() does not follow them by default,
                     // and Files.isRegularFile/isDirectory return false for unresolved symlinks.
                 } catch (IOException e) {
-                    throw new SandboxException("Failed to add file to tar: " + path, e);
+                    // #1368 fix wave, finding #7: real disk read/write I/O failure — transient infra.
+                    throw new SandboxInfrastructureException("Failed to add file to tar: " + path, e);
                 }
             });
 
@@ -406,7 +414,8 @@ public class SandboxWorkspaceManager {
             tar.finish();
             return baos.toByteArray();
         } catch (IOException e) {
-            throw new SandboxException("Failed to create tar archive", e);
+            // #1368 fix wave, finding #7: in-memory tar-stream I/O failure — transient infra.
+            throw new SandboxInfrastructureException("Failed to create tar archive", e);
         }
     }
 
