@@ -1,9 +1,9 @@
 // Shared Pi custom-provider registration helper (#1368 slice 5 — ONE credential path).
 //
 // Both pi-runner.mjs and pi-mentor-runner.mjs import this so the two runners can NEVER drift on how
-// the "hephaestus" Pi provider is registered (byte-identical registration is enforced by
-// PiProviderHelperSyncTest on the Java side — the classpath copy staged for each runner must be the
-// same file).
+// the "hephaestus" Pi provider is registered. Byte-identical registration holds by construction, not
+// by a dedicated sync test: both runner profiles stage this same classpath resource verbatim into
+// their sandbox, so there is only ever one copy of this file to drift from.
 //
 // Reads pi-provider.json (written by the server from the job's ConfigSnapshot — wire protocol, model
 // id, capability envelope) for WHAT to request, and $LLM_PROXY_URL / $LLM_PROXY_TOKEN (written by the

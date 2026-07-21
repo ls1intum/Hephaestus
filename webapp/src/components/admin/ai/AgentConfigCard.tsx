@@ -82,12 +82,12 @@ export function AgentConfigCard({
 					<div className="flex flex-wrap gap-1.5">
 						{(designation === "practice" || designation === "both") && (
 							<Badge variant="secondary" className="text-xs">
-								Powers practice detection
+								Model for Practice detection
 							</Badge>
 						)}
 						{(designation === "mentor" || designation === "both") && (
 							<Badge variant="secondary" className="text-xs">
-								Powers mentor
+								Model for Mentor
 							</Badge>
 						)}
 					</div>

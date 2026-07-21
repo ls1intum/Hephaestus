@@ -33,6 +33,16 @@ const rows: AdminWorkspaceLlmUsage[] = [
 		events: 3,
 		verdict: "WITHIN",
 	},
+	{
+		workspaceId: 4,
+		workspaceSlug: "launchpad",
+		displayName: "Launchpad",
+		monthlyBudgetUsd: 50,
+		pricedTotalCostUsd: 9.1,
+		byoTotalCostUsd: 0,
+		events: 22,
+		verdict: "UNVERIFIABLE",
+	},
 ];
 
 /**
@@ -56,7 +66,10 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Current month with mixed statuses: over budget, capped and OK, and uncapped. */
+/**
+ * Current month with mixed statuses: over budget, capped and OK, uncapped, and unverifiable (some
+ * usage has no price set — a warning line, never a badge; see the #1368 glossary).
+ */
 export const Default: Story = {};
 
 /**

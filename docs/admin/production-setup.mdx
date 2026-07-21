@@ -219,9 +219,21 @@ The mentor (Pi agent run in-process) and the sandboxed practice-review proxy bot
 Providers (Anthropic, OpenAI, Azure OpenAI, and self-hosted OpenAI-compatible gateways such as vLLM or Open WebUI) are registered at runtime, not via `.env`:
 
 - An instance admin adds a provider connection and its models under **Instance admin → AI models**, sets per-model pricing, and shares individual models with workspaces.
-- A workspace admin can instead connect its own provider ("bring your own AI provider") under the workspace's AI settings; that workspace's usage is priced and capped independently of the instance catalog.
+- A workspace admin can instead connect its own provider ("bring your own AI provider") under the workspace's AI settings; that workspace's usage is priced independently of the instance catalog and billed directly to them — it is never capped and never counts toward the budget described below.
 
 The proxy resolves the upstream base URL, auth header, and key per model from whichever connection it is bound to, so nothing needs to be pinned at the process level. On a split-pod deployment the worker pod resolves providers from the same catalog as the app pod — no LLM credential passthrough between pods.
+
+#### Workspace budgets and alerting
+
+Every workspace has an optional monthly LLM budget, set by an instance admin under **Instance admin → LLM Usage → Set budget** (per-workspace, per calendar month, UTC). Clearing the field removes the cap (**No cap** — uncapped, the default); setting it to exactly `0` pauses the workspace immediately, which is the supported way to hard-stop a workspace mid-month. The cap only ever compares against spend on shared (instance-funded) models — a workspace's own connected provider is excluded by design (see above).
+
+Once the month's confirmed spend reaches the cap, the workspace's budget verdict flips to **EXHAUSTED**: the two enforcement points — `AgentJobService.submit` (all sandboxed detection work: webhook-triggered, replays, manual triggers, conversation reviews) and `MentorChatService.runTurnInternal` (mentor turns, web and Slack) — refuse new work for that workspace before anything is persisted. Practice detection and the mentor both go silent at that point; nothing crashes or errors visibly to the end user. Work resumes automatically at the next UTC calendar month, or immediately if an instance admin raises or clears the cap. A workspace admin sees the pause explained on their workspace's **AI usage** page and, so it isn't only visible on that one screen, on the **Models** tab too.
+
+Some usage may have no resolvable price (a model with no pricing row on record). While that's true, the workspace's reported monthly total renders as "at least $X" — a floor, not the confirmed total — and the verdict reads **UNVERIFIABLE** instead of **WITHIN** until every model used that month has a price (**EXHAUSTED** still takes priority: a workspace already paused on confirmed spend alone doesn't need the softer warning). An instance admin closes this by setting a price for the model under **Instance admin → AI models**; a model explicitly marked **Free** counts as confirmed $0 spend, not unpriced.
+
+**Alerting hook:** there is no built-in push notification when a workspace crosses its cap — wire your own alert off the Micrometer counters the budget service already emits: `llm.budget.exhausted` (incremented once per usage event whose confirmed contribution pushes a capped workspace's month-to-date spend across the cap) and `llm.budget.blocked` (tagged `surface=agent_job`, incremented every time a detection job submission is skipped because the workspace is already exhausted — the mentor gate does not increment this counter). Each EXHAUSTED transition also logs a WARN, visible in Sentry if configured.
+
+**Known limitation:** mentor turns don't yet report reasoning-token counts on the wire, so every mentor-turn ledger row records `reasoning_tokens = 0` regardless of what the model actually used — a reasoning-heavy model under-counts mentor spend (and therefore budget consumption) until that lands.
 
 **Webhook secret:** Set `WEBHOOK_SECRET` to the secret configured on your GitHub and GitLab webhooks. Prefer SHA-256 (`X-Hub-Signature-256`) and generate with `openssl rand -hex 32` (base64 also works).
 

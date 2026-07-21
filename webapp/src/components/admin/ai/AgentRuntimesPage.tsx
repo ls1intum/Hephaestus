@@ -9,6 +9,7 @@ import {
 	getAiSettingsQueryKey,
 	getConfigsOptions,
 	getConfigsQueryKey,
+	getLlmUsageReportOptions,
 	updateConfigMutation,
 	updateMentorConfigMutation,
 	workspaceListAvailableLlmModelsOptions,
@@ -19,6 +20,7 @@ import type {
 	CreateAgentConfigRequest,
 	UpdateAgentConfigRequest,
 } from "@/api/types.gen";
+import { currentMonthUtc } from "@/components/admin/usage/usageUtils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,6 +42,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AgentConfigCard } from "./AgentConfigCard";
 import { AgentConfigForm } from "./AgentConfigForm";
+import { BudgetExhaustedAlert } from "./BudgetExhaustedAlert";
 import { deriveDesignations } from "./utils";
 import { WorkspaceLlmProviderPanel } from "./WorkspaceLlmProviderPanel";
 
@@ -66,6 +69,14 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 	const availableModelsQuery = useQuery({
 		...workspaceListAvailableLlmModelsOptions({ path: { workspaceSlug } }),
 		enabled: Boolean(workspaceSlug),
+	});
+	// Only feeds the EXHAUSTED banner below, not a full usage breakdown (that's the usage page), so a
+	// longer staleTime than the app default is fine — a minute-old verdict is still an accurate "why
+	// did detection stop" signal.
+	const usageQuery = useQuery({
+		...getLlmUsageReportOptions({ path: { workspaceSlug }, query: { month: currentMonthUtc() } }),
+		enabled: Boolean(workspaceSlug),
+		staleTime: 60_000,
 	});
 
 	const configs = configsQuery.data ?? [];
@@ -142,7 +153,7 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 	const updateMentorConfig = useMutation({
 		...updateMentorConfigMutation(),
 		onSuccess: () => {
-			// The "Powers mentor" badge derives from ai-settings, so invalidate it after a mentor-config change.
+			// The "Model for Mentor" badge derives from ai-settings, so invalidate it after a mentor-config change.
 			invalidateAll();
 			toast.success("Mentor model updated");
 		},
@@ -196,6 +207,12 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 					Set up the models that power practice reviews and the mentor.
 				</p>
 			</div>
+
+			{usageQuery.data?.verdict === "EXHAUSTED" && (
+				<div className="mb-6">
+					<BudgetExhaustedAlert />
+				</div>
+			)}
 
 			<Tabs defaultValue="models">
 				<TabsList>

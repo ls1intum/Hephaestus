@@ -116,7 +116,9 @@ export function AdminInstanceLlmUsageTable({
 								) : row.verdict === "EXHAUSTED" ? (
 									<Badge variant="destructive">Budget reached</Badge>
 								) : row.verdict === "UNVERIFIABLE" ? (
-									<Badge variant="outline">Unverified</Badge>
+									// Not a badge — the #1368 glossary treats "unverifiable" as a warning line, never a
+									// status word (there's no "Unverified" state name to badge).
+									<span className="text-warning text-xs">Some usage has no price set</span>
 								) : row.monthlyBudgetUsd != null ? (
 									<Badge variant="outline">OK</Badge>
 								) : (
