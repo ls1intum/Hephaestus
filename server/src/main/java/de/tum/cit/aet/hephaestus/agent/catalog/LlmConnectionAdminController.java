@@ -55,7 +55,7 @@ public class LlmConnectionAdminController {
     @PostMapping
     @Operation(summary = "Create an LLM connection", operationId = "adminCreateLlmConnection")
     @Audited("auth_event LLM_CONNECTION_CREATED")
-    public ResponseEntity<LlmConnectionDTO> create(@Valid @RequestBody CreateLlmConnectionRequest request) {
+    public ResponseEntity<LlmConnectionDTO> create(@Valid @RequestBody CreateLlmConnectionRequestDTO request) {
         LlmConnection created = connectionService.create(request);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
             .path("/{id}")
@@ -69,7 +69,7 @@ public class LlmConnectionAdminController {
     @Audited("auth_event LLM_CONNECTION_UPDATED")
     public ResponseEntity<LlmConnectionDTO> update(
         @PathVariable Long id,
-        @Valid @RequestBody UpdateLlmConnectionRequest request
+        @Valid @RequestBody UpdateLlmConnectionRequestDTO request
     ) {
         return ResponseEntity.ok(LlmConnectionDTO.from(connectionService.update(id, request)));
     }
@@ -85,14 +85,14 @@ public class LlmConnectionAdminController {
     @PostMapping("/{id}/probe")
     @Operation(summary = "Test a stored connection and fetch its models", operationId = "adminProbeLlmConnection")
     @AuditExempt(reason = "tests a stored credential; stores no configuration")
-    public ResponseEntity<LlmProbeResult> probe(@PathVariable Long id) {
+    public ResponseEntity<LlmProbeResultDTO> probe(@PathVariable Long id) {
         return ResponseEntity.ok(probeService.probeStored(id));
     }
 
     @PostMapping("/probe")
     @Operation(summary = "Test a draft connection and fetch its models", operationId = "adminProbeLlmConnectionDraft")
     @AuditExempt(reason = "tests a draft connection before it is saved; stores no configuration")
-    public ResponseEntity<LlmProbeResult> probeDraft(@Valid @RequestBody ProbeLlmConnectionRequest request) {
+    public ResponseEntity<LlmProbeResultDTO> probeDraft(@Valid @RequestBody ProbeLlmConnectionRequestDTO request) {
         return ResponseEntity.ok(probeService.probeDraft(request));
     }
 }

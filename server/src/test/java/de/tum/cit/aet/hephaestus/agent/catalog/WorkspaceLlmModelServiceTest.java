@@ -87,17 +87,17 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
         return connection;
     }
 
-    private CreateWorkspaceLlmModelRequest unpricedCreateRequest() {
+    private CreateWorkspaceLlmModelRequestDTO unpricedCreateRequest() {
         return createRequest(null, null, null);
     }
 
     /** slug/displayName/upstreamModelId fixed to "gpt-5"/"GPT-5"/"gpt-5"; only pricing varies per test. */
-    private CreateWorkspaceLlmModelRequest createRequest(
+    private CreateWorkspaceLlmModelRequestDTO createRequest(
         PricingMode pricingMode,
         BigDecimal per1mInputUsd,
         BigDecimal per1mOutputUsd
     ) {
-        return new CreateWorkspaceLlmModelRequest(
+        return new CreateWorkspaceLlmModelRequestDTO(
             "gpt-5", // slug
             "GPT-5", // displayName
             "gpt-5", // upstreamModelId
@@ -203,7 +203,7 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             when(connectionRepository.findByIdAndWorkspaceId(50L, 1L)).thenReturn(Optional.of(connection()));
             when(modelRepository.findByWorkspaceIdAndSlug(1L, "gpt-5")).thenReturn(Optional.empty());
 
-            CreateWorkspaceLlmModelRequest request = createRequest(PricingMode.PRICED, new BigDecimal("3.00"), null);
+            CreateWorkspaceLlmModelRequestDTO request = createRequest(PricingMode.PRICED, new BigDecimal("3.00"), null);
 
             assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, request)).isInstanceOf(
                 IllegalArgumentException.class
@@ -217,7 +217,7 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             when(connectionRepository.findByIdAndWorkspaceId(50L, 1L)).thenReturn(Optional.of(connection()));
             when(modelRepository.findByWorkspaceIdAndSlug(1L, "gpt-5")).thenReturn(Optional.empty());
 
-            CreateWorkspaceLlmModelRequest request = createRequest(PricingMode.FREE, null, null);
+            CreateWorkspaceLlmModelRequestDTO request = createRequest(PricingMode.FREE, null, null);
 
             assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -239,7 +239,7 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             when(modelRepository.findByIdAndWorkspaceId(7L, 1L)).thenReturn(Optional.of(existing));
             when(modelRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            UpdateWorkspaceLlmModelRequest request = new UpdateWorkspaceLlmModelRequest(
+            UpdateWorkspaceLlmModelRequestDTO request = new UpdateWorkspaceLlmModelRequestDTO(
                 "New name", // displayName
                 null, // upstreamModelId
                 null, // apiProtocolOverride

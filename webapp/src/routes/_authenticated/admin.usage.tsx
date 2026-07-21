@@ -32,7 +32,8 @@ function AdminInstanceUsagePage() {
 	// Most expensive workspaces first — that's what an instance admin scans for. Name is a stable
 	// tiebreak so the many $0.00 rows don't reshuffle on every refetch.
 	const rows = [...(listQuery.data ?? [])].sort(
-		(a, b) => b.costUsd - a.costUsd || a.displayName.localeCompare(b.displayName),
+		(a, b) =>
+			b.pricedTotalCostUsd - a.pricedTotalCostUsd || a.displayName.localeCompare(b.displayName),
 	);
 
 	const updateBudget = useMutation({

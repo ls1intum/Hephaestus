@@ -51,6 +51,8 @@ tags:
   name: Admin
 - description: Current user's Slack privacy preferences
   name: Slack User Preferences
+- description: Workspace-scoped "bring your own" AI provider models
+  name: Workspace LLM
 - description: Per-workspace Outline collection mirroring control plane
   name: Outline collections
 - description: Team management within workspace
@@ -63,8 +65,12 @@ tags:
   name: Auth
 - description: Active sessions
   name: Account
+- description: Workspace-scoped "bring your own" AI provider connections
+  name: Workspace LLM
 - description: Workspace integration connection management
   name: Connections
+- description: Instance-admin LLM connection and settings management
+  name: Admin LLM
 - description: Up/down votes on mentor assistant messages
   name: Mentor Votes
 - description: Public JWK set for verifying Hephaestus session JWTs
@@ -170,6 +176,15 @@ paths:
             - EXPORT_REQUESTED
             - APP_ROLE_CHANGED
             - RESEARCH_CONSENT_REVOKED
+            - LLM_CONNECTION_CREATED
+            - LLM_CONNECTION_UPDATED
+            - LLM_CONNECTION_DELETED
+            - LLM_MODEL_CREATED
+            - LLM_MODEL_UPDATED
+            - LLM_MODEL_DELETED
+            - LLM_MODEL_PRICE_CHANGED
+            - LLM_MODEL_SHARING_CHANGED
+            - LLM_SETTINGS_CHANGED
       - in: query
         name: result
         required: false
@@ -239,6 +254,15 @@ paths:
             - EXPORT_REQUESTED
             - APP_ROLE_CHANGED
             - RESEARCH_CONSENT_REVOKED
+            - LLM_CONNECTION_CREATED
+            - LLM_CONNECTION_UPDATED
+            - LLM_CONNECTION_DELETED
+            - LLM_MODEL_CREATED
+            - LLM_MODEL_UPDATED
+            - LLM_MODEL_DELETED
+            - LLM_MODEL_PRICE_CHANGED
+            - LLM_MODEL_SHARING_CHANGED
+            - LLM_SETTINGS_CHANGED
       - in: query
         name: result
         required: false
@@ -313,6 +337,8 @@ paths:
             - WORKSPACE_VISIBILITY
             - PRACTICE_ACTIVE
             - WORKSPACE_LLM_BUDGET
+            - WORKSPACE_LLM_CONNECTION
+            - WORKSPACE_LLM_MODEL
       - in: query
         name: entityId
         required: false
@@ -385,6 +411,322 @@ paths:
       summary: Per-workspace LLM spend rollup for one month (all workspaces)
       tags:
       - Admin
+  /admin/llm/connections:
+    get:
+      operationId: adminListLlmConnections
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LlmConnection"
+          description: OK
+      summary: List LLM connections
+      tags:
+      - Admin LLM
+    post:
+      operationId: adminCreateLlmConnection
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLlmConnectionRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LlmConnection"
+          description: OK
+      summary: Create an LLM connection
+      tags:
+      - Admin LLM
+  /admin/llm/connections/probe:
+    post:
+      operationId: adminProbeLlmConnectionDraft
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProbeLlmConnectionRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LlmProbeResult"
+          description: OK
+      summary: Test a draft connection and fetch its models
+      tags:
+      - Admin LLM
+  /admin/llm/connections/{connectionId}/models:
+    post:
+      operationId: adminCreateLlmModel
+      parameters:
+      - in: path
+        name: connectionId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLlmModelRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LlmModel"
+          description: OK
+      summary: Create a model on an LLM connection
+      tags:
+      - Admin LLM
+  /admin/llm/connections/{id}:
+    delete:
+      operationId: adminDeleteLlmConnection
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+      summary: Delete an LLM connection
+      tags:
+      - Admin LLM
+    get:
+      operationId: adminGetLlmConnection
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LlmConnection"
+          description: OK
+      summary: Get an LLM connection
+      tags:
+      - Admin LLM
+    patch:
+      operationId: adminUpdateLlmConnection
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLlmConnectionRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LlmConnection"
+          description: OK
+      summary: Update an LLM connection
+      tags:
+      - Admin LLM
+  /admin/llm/connections/{id}/probe:
+    post:
+      operationId: adminProbeLlmConnection
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LlmProbeResult"
+          description: OK
+      summary: Test a stored connection and fetch its models
+      tags:
+      - Admin LLM
+  /admin/llm/models:
+    get:
+      operationId: adminListLlmModels
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LlmModel"
+          description: OK
+      summary: List LLM catalog models
+      tags:
+      - Admin LLM
+  /admin/llm/models/{id}:
+    delete:
+      operationId: adminDeleteLlmModel
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+      summary: Delete an LLM catalog model
+      tags:
+      - Admin LLM
+    get:
+      operationId: adminGetLlmModel
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LlmModel"
+          description: OK
+      summary: Get an LLM catalog model
+      tags:
+      - Admin LLM
+    put:
+      operationId: adminUpdateLlmModel
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLlmModelRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LlmModel"
+          description: OK
+      summary: Update a model's metadata
+      tags:
+      - Admin LLM
+  /admin/llm/models/{id}/price:
+    put:
+      operationId: adminUpdateLlmModelPrice
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLlmModelPriceRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LlmModel"
+          description: OK
+      summary: Reprice a model
+      tags:
+      - Admin LLM
+  /admin/llm/models/{id}/sharing:
+    put:
+      operationId: adminUpdateLlmModelSharing
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLlmModelSharingRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LlmModel"
+          description: OK
+      summary: Share a model with all or selected workspaces
+      tags:
+      - Admin LLM
+  /admin/llm/settings:
+    get:
+      operationId: adminGetLlmSettings
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstanceLlmSettings"
+          description: OK
+      summary: Get instance-wide LLM governance settings
+      tags:
+      - Admin LLM
+    put:
+      operationId: adminUpdateLlmSettings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateInstanceLlmSettingsRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstanceLlmSettings"
+          description: OK
+      summary: Update instance-wide LLM governance settings
+      tags:
+      - Admin LLM
   /admin/login-providers:
     get:
       operationId: adminListLoginProviders
@@ -1499,6 +1841,8 @@ paths:
             - WORKSPACE_VISIBILITY
             - PRACTICE_ACTIVE
             - WORKSPACE_LLM_BUDGET
+            - WORKSPACE_LLM_CONNECTION
+            - WORKSPACE_LLM_MODEL
       - in: query
         name: entityId
         required: false
@@ -2204,6 +2548,323 @@ paths:
       summary: Get the workspace's LLM usage report for one month
       tags:
       - LLM Usage
+  /workspaces/{workspaceSlug}/llm/available-models:
+    get:
+      operationId: workspaceListAvailableLlmModels
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AvailableLlmModel"
+          description: OK
+      summary: List models this workspace can bind a Task to (shared + your own)
+      tags:
+      - Workspace LLM
+  /workspaces/{workspaceSlug}/llm/connections:
+    get:
+      operationId: workspaceListLlmConnections
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkspaceLlmConnection"
+          description: OK
+      summary: List your AI provider connections
+      tags:
+      - Workspace LLM
+    post:
+      operationId: workspaceCreateLlmConnection
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkspaceLlmConnectionRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceLlmConnection"
+          description: OK
+      summary: Connect your own AI provider
+      tags:
+      - Workspace LLM
+  /workspaces/{workspaceSlug}/llm/connections/{connectionId}/models:
+    post:
+      operationId: workspaceCreateLlmModel
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: connectionId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkspaceLlmModelRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceLlmModel"
+          description: OK
+      summary: Create a model on your AI provider
+      tags:
+      - Workspace LLM
+  /workspaces/{workspaceSlug}/llm/connections/{id}:
+    delete:
+      operationId: workspaceDeleteLlmConnection
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+      summary: Remove your AI provider connection
+      tags:
+      - Workspace LLM
+    get:
+      operationId: workspaceGetLlmConnection
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceLlmConnection"
+          description: OK
+      summary: Get one of your AI provider connections
+      tags:
+      - Workspace LLM
+    patch:
+      operationId: workspaceUpdateLlmConnection
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkspaceLlmConnectionRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceLlmConnection"
+          description: OK
+      summary: Update your AI provider connection
+      tags:
+      - Workspace LLM
+  /workspaces/{workspaceSlug}/llm/connections/{id}/probe:
+    post:
+      operationId: workspaceProbeLlmConnection
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceLlmProbeResult"
+          description: OK
+      summary: Test your AI provider connection
+      tags:
+      - Workspace LLM
+  /workspaces/{workspaceSlug}/llm/models:
+    get:
+      operationId: workspaceListLlmModels
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkspaceLlmModel"
+          description: OK
+      summary: List models on your AI provider
+      tags:
+      - Workspace LLM
+  /workspaces/{workspaceSlug}/llm/models/{id}:
+    delete:
+      operationId: workspaceDeleteLlmModel
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+      summary: Remove a model on your AI provider
+      tags:
+      - Workspace LLM
+    get:
+      operationId: workspaceGetLlmModel
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceLlmModel"
+          description: OK
+      summary: Get a model on your AI provider
+      tags:
+      - Workspace LLM
+    patch:
+      operationId: workspaceUpdateLlmModel
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkspaceLlmModelRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceLlmModel"
+          description: OK
+      summary: Update a model on your AI provider
+      tags:
+      - Workspace LLM
   /workspaces/{workspaceSlug}/members:
     get:
       description: |-
@@ -4677,27 +5338,42 @@ components:
       description: "Instance-admin per-workspace month rollup (metadata only, no tenant\
         \ content)"
       properties:
-        costUsd:
+        byoTotalCostUsd:
           type: number
+          description: "This month's spend on the workspace's own connected provider(s),\
+            \ in USD. Never counts toward the budget cap."
         displayName:
           type: string
         events:
           type: integer
           format: int64
+          description: "Ledger events (jobs / mentor turns) this month, any provider"
         monthlyBudgetUsd:
           type: number
-        overBudget:
-          type: boolean
+        pricedTotalCostUsd:
+          type: number
+          description: "This month's confirmed spend on shared (instance) models,\
+            \ in USD — compared against the budget cap above."
+        verdict:
+          type: string
+          description: "Whether this month's confirmed spend is within the cap, has\
+            \ reached it, or can't be fully confirmed yet because some usage has no\
+            \ price set."
+          enum:
+          - WITHIN
+          - EXHAUSTED
+          - UNVERIFIABLE
         workspaceId:
           type: integer
           format: int64
         workspaceSlug:
           type: string
       required:
-      - costUsd
+      - byoTotalCostUsd
       - displayName
       - events
-      - overBudget
+      - pricedTotalCostUsd
+      - verdict
       - workspaceId
       - workspaceSlug
     AdminWorkspaceView:
@@ -4749,12 +5425,6 @@ components:
           type: string
           format: date-time
           description: Timestamp when the config was created
-        credentialMode:
-          type: string
-          description: Authentication mode
-          enum:
-          - PROXY
-          - API_KEY
         enabled:
           type: boolean
           description: Whether the agent is enabled
@@ -4765,6 +5435,10 @@ components:
           type: integer
           format: int64
           description: Configuration ID
+        instanceModelId:
+          type: integer
+          format: int64
+          description: "Bound shared (instance catalog) model id, if bound to one"
         llmBaseUrl:
           type: string
           description: Optional LLM base URL override
@@ -4794,10 +5468,13 @@ components:
           type: string
           format: date-time
           description: Timestamp when the config was last updated
+        workspaceModelId:
+          type: integer
+          format: int64
+          description: "Bound model id on your own provider, if bound to one"
       required:
       - allowInternet
       - createdAt
-      - credentialMode
       - enabled
       - hasLlmApiKey
       - id
@@ -4870,7 +5547,9 @@ components:
         llmCostUsd:
           type: number
           format: double
-          description: Estimated cost in USD (agent-reported)
+          description: "Deprecated, always null (#1368 slice 6): the runner no longer\
+            \ reports cost. See the workspace's LLM usage rollup for the authoritative,\
+            \ catalog-derived per-job cost."
         llmModel:
           type: string
           description: "LLM model used (e.g. gpt-5.4-mini, claude-sonnet-4-5)"
@@ -5033,6 +5712,66 @@ components:
       - id
       - occurredAt
       - result
+    AvailableLlmModel:
+      type: object
+      description: A model available for this workspace to bind a Task to
+      properties:
+        connectionDisplayName:
+          type: string
+          description: Owning connection's display name
+        displayName:
+          type: string
+          description: Human-readable name
+        id:
+          type: integer
+          format: int64
+          description: "Model id, unique within its scope"
+        modality:
+          type: string
+          description: What surface this model serves
+          enum:
+          - CHAT
+          - EMBEDDING
+          - RERANK
+        per1mCacheReadUsd:
+          type: number
+          description: Cache-read rate per 1M tokens (USD)
+        per1mCacheWriteUsd:
+          type: number
+          description: Cache-write rate per 1M tokens (USD)
+        per1mInputUsd:
+          type: number
+          description: Input rate per 1M tokens (USD)
+        per1mOutputUsd:
+          type: number
+          description: Output rate per 1M tokens (USD)
+        per1mReasoningUsd:
+          type: number
+          description: Reasoning-token rate per 1M tokens (USD)
+        pricingMode:
+          type: string
+          description: Pricing mode
+          enum:
+          - PRICED
+          - FREE
+          - UNPRICED
+        scope:
+          type: string
+          description: SHARED (instance catalog) or WORKSPACE (your own provider)
+          enum:
+          - SHARED
+          - WORKSPACE
+        supportsReasoning:
+          type: boolean
+          description: Whether the model supports a reasoning mode
+      required:
+      - connectionDisplayName
+      - displayName
+      - id
+      - modality
+      - pricingMode
+      - scope
+      - supportsReasoning
     BackfillSummary:
       type: object
       description: Connection-level backfill rollup
@@ -5210,6 +5949,8 @@ components:
           - WORKSPACE_VISIBILITY
           - PRACTICE_ACTIVE
           - WORKSPACE_LLM_BUDGET
+          - WORKSPACE_LLM_CONNECTION
+          - WORKSPACE_LLM_MODEL
         id:
           type: integer
           format: int64
@@ -5509,16 +6250,14 @@ components:
         allowInternet:
           type: boolean
           description: Whether agent containers have internet access
-        credentialMode:
-          type: string
-          default: PROXY
-          description: "Authentication mode: PROXY (internal proxy) or API_KEY (direct)"
-          enum:
-          - PROXY
-          - API_KEY
         enabled:
           type: boolean
           description: Whether the agent is enabled
+        instanceModelId:
+          type: integer
+          format: int64
+          description: Bind to a shared (instance catalog) model. Mutually exclusive
+            with workspaceModelId.
         llmApiKey:
           type: string
           description: LLM API key
@@ -5563,9 +6302,122 @@ components:
           example: 600
           maximum: 3600
           minimum: 30
+        workspaceModelId:
+          type: integer
+          format: int64
+          description: Bind to a model on your own provider. Mutually exclusive with
+            instanceModelId.
       required:
       - llmProvider
       - name
+    CreateLlmConnectionRequest:
+      type: object
+      description: Create an instance LLM provider connection
+      properties:
+        apiKey:
+          type: string
+          description: API key (write-only; never returned)
+        apiProtocol:
+          type: string
+          description: Wire protocol
+          example: openai-completions
+          minLength: 1
+          pattern: openai-completions|anthropic-messages|azure-openai-responses|openai-responses
+        authHeaderName:
+          type: string
+          description: Auth header name; defaults from protocol
+          maxLength: 64
+          minLength: 0
+        authValuePrefix:
+          type: string
+          description: Auth value prefix; defaults from protocol
+          maxLength: 16
+          minLength: 0
+        azureApiVersion:
+          type: string
+          description: "Azure API version, if applicable"
+          maxLength: 32
+          minLength: 0
+        baseUrl:
+          type: string
+          description: Provider base URL
+          maxLength: 2048
+          minLength: 0
+        displayName:
+          type: string
+          description: Human-readable name
+          maxLength: 128
+          minLength: 0
+        enabled:
+          type: boolean
+          description: Whether the connection is enabled (default true)
+        slug:
+          type: string
+          description: Unique slug
+          example: openai-prod
+          minLength: 1
+          pattern: "^[a-z0-9][a-z0-9-]{0,62}$"
+      required:
+      - apiProtocol
+      - baseUrl
+      - displayName
+      - slug
+    CreateLlmModelRequest:
+      type: object
+      description: Create a model on an instance LLM connection
+      properties:
+        apiProtocolOverride:
+          type: string
+          description: Wire protocol override for this model; defaults to the connection's
+            protocol
+          maxLength: 40
+          minLength: 0
+        cacheControlFormat:
+          type: string
+          description: "Cache-control wire format, if applicable"
+          maxLength: 16
+          minLength: 0
+        contextWindow:
+          type: integer
+          format: int32
+          description: Context window in tokens
+        displayName:
+          type: string
+          description: Human-readable name
+          maxLength: 128
+          minLength: 0
+        enabled:
+          type: boolean
+          description: Whether the model is active (default true)
+        maxOutputTokens:
+          type: integer
+          format: int32
+          description: Maximum output tokens
+        modality:
+          type: string
+          description: What surface this model serves (default CHAT)
+          enum:
+          - CHAT
+          - EMBEDDING
+          - RERANK
+        slug:
+          type: string
+          description: Unique slug within the connection
+          example: gpt-5-eu
+          minLength: 1
+          pattern: "^[a-z0-9][a-z0-9-]{0,62}$"
+        supportsReasoning:
+          type: boolean
+          description: Whether the model supports a reasoning mode
+        upstreamModelId:
+          type: string
+          description: Upstream provider model id
+          maxLength: 256
+          minLength: 0
+      required:
+      - displayName
+      - slug
+      - upstreamModelId
     CreateLoginProviderRequest:
       type: object
       properties:
@@ -5729,6 +6581,144 @@ components:
           minLength: 0
       required:
       - action
+    CreateWorkspaceLlmConnectionRequest:
+      type: object
+      description: Connect your own AI provider
+      properties:
+        apiKey:
+          type: string
+          description: API key (write-only; never returned)
+        apiProtocol:
+          type: string
+          description: Wire protocol
+          example: openai-completions
+          minLength: 1
+          pattern: openai-completions|anthropic-messages|azure-openai-responses|openai-responses
+        authHeaderName:
+          type: string
+          description: Auth header name; defaults from protocol
+          maxLength: 64
+          minLength: 0
+        authValuePrefix:
+          type: string
+          description: Auth value prefix; defaults from protocol
+          maxLength: 16
+          minLength: 0
+        azureApiVersion:
+          type: string
+          description: "Azure API version, if applicable"
+          maxLength: 32
+          minLength: 0
+        baseUrl:
+          type: string
+          description: Provider base URL
+          maxLength: 2048
+          minLength: 0
+        displayName:
+          type: string
+          description: Human-readable name
+          maxLength: 128
+          minLength: 0
+        enabled:
+          type: boolean
+          description: Whether the connection is active (default true)
+        slug:
+          type: string
+          description: Unique slug within the workspace
+          example: openai-prod
+          minLength: 1
+          pattern: "^[a-z0-9][a-z0-9-]{0,62}$"
+      required:
+      - apiProtocol
+      - baseUrl
+      - displayName
+      - slug
+    CreateWorkspaceLlmModelRequest:
+      type: object
+      description: Create a model on your AI provider
+      properties:
+        apiProtocolOverride:
+          type: string
+          description: Wire protocol override for this model; defaults to the connection's
+            protocol
+          maxLength: 40
+          minLength: 0
+        cacheControlFormat:
+          type: string
+          description: "Cache-control wire format, if applicable"
+          maxLength: 16
+          minLength: 0
+        contextWindow:
+          type: integer
+          format: int32
+          description: Context window in tokens
+        displayName:
+          type: string
+          description: Human-readable name
+          maxLength: 128
+          minLength: 0
+        enabled:
+          type: boolean
+          description: Whether the model is active (default true)
+        maxOutputTokens:
+          type: integer
+          format: int32
+          description: Maximum output tokens
+        modality:
+          type: string
+          description: What surface this model serves (default CHAT)
+          enum:
+          - CHAT
+          - EMBEDDING
+          - RERANK
+        per1mCacheReadUsd:
+          type: number
+          description: "Cache-read rate per 1M tokens (USD), if applicable"
+        per1mCacheWriteUsd:
+          type: number
+          description: "Cache-write rate per 1M tokens (USD), if applicable"
+        per1mInputUsd:
+          type: number
+          description: Input rate per 1M tokens (USD); required when the model has
+            a price
+        per1mOutputUsd:
+          type: number
+          description: Output rate per 1M tokens (USD); required when the model has
+            a price
+        per1mReasoningUsd:
+          type: number
+          description: "Reasoning-token rate per 1M tokens (USD), if applicable"
+        priceNote:
+          type: string
+          description: "Note; required when the model is free (e.g. self-hosted, no\
+            \ cost)"
+          maxLength: 500
+          minLength: 0
+        pricingMode:
+          type: string
+          description: Pricing mode (default UNPRICED)
+          enum:
+          - PRICED
+          - FREE
+          - UNPRICED
+        slug:
+          type: string
+          description: Unique slug within the workspace
+          example: gpt-5-eu
+          minLength: 1
+          pattern: "^[a-z0-9][a-z0-9-]{0,62}$"
+        supportsReasoning:
+          type: boolean
+          description: Whether the model supports a reasoning mode
+        upstreamModelId:
+          type: string
+          description: Upstream provider model id
+          maxLength: 256
+          minLength: 0
+      required:
+      - displayName
+      - slug
+      - upstreamModelId
     CreateWorkspaceRequest:
       type: object
       description: Request to create a new workspace
@@ -6103,6 +7093,25 @@ components:
         vendorUrl:
           type: string
           format: uri
+    InstanceLlmSettings:
+      type: object
+      description: Instance-wide LLM governance settings
+      properties:
+        allowWorkspaceConnections:
+          type: boolean
+          description: Whether workspaces may register their own LLM connections
+        allowedEgressHosts:
+          type: string
+          description: Comma/newline-delimited egress host allowlist; blank = allow
+            any public host
+          example: "api.openai.com, api.anthropic.com"
+        defaultUnpricedPolicy:
+          type: string
+          description: Default policy for usage reported without a price
+          example: WARN
+      required:
+      - allowWorkspaceConnections
+      - defaultUnpricedPolicy
     IntegrationCatalogEntry:
       type: object
       description: Integration kind availability + connection status for this workspace
@@ -6322,34 +7331,269 @@ components:
           type: string
         type:
           type: string
+    LlmConnection:
+      type: object
+      description: Instance LLM provider connection (API key redacted)
+      properties:
+        apiKeyLast4:
+          type: string
+          description: "Last four characters of the stored API key, if any"
+        apiProtocol:
+          type: string
+          description: Wire protocol
+          example: openai-completions
+        authHeaderName:
+          type: string
+          description: Auth header name
+          example: Authorization
+        authValuePrefix:
+          type: string
+          description: Auth value prefix
+          example: Bearer
+        azureApiVersion:
+          type: string
+          description: "Azure API version, if applicable"
+        baseUrl:
+          type: string
+          description: Provider base URL
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        displayName:
+          type: string
+          description: Human-readable name
+        enabled:
+          type: boolean
+          description: Whether the connection is enabled
+        hasApiKey:
+          type: boolean
+          description: Whether an API key is stored
+        id:
+          type: integer
+          format: int64
+          description: Connection ID
+        slug:
+          type: string
+          description: Unique slug
+          example: openai-prod
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+      required:
+      - apiProtocol
+      - authHeaderName
+      - authValuePrefix
+      - baseUrl
+      - createdAt
+      - displayName
+      - enabled
+      - hasApiKey
+      - id
+      - slug
+    LlmModel:
+      type: object
+      description: Instance catalog model
+      properties:
+        apiProtocolOverride:
+          type: string
+          description: Wire protocol override for this model
+        cacheControlFormat:
+          type: string
+          description: "Cache-control wire format, if applicable"
+        connectionDisplayName:
+          type: string
+          description: Owning connection's display name
+        connectionId:
+          type: integer
+          format: int64
+          description: Owning connection id
+        contextWindow:
+          type: integer
+          format: int32
+          description: Context window in tokens
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        currentPrice:
+          $ref: "#/components/schemas/LlmModelPrice"
+          description: Current price; null if none has ever been set
+        displayName:
+          type: string
+          description: Human-readable name
+        enabled:
+          type: boolean
+          description: Active toggle
+        grantedWorkspaceIds:
+          type: array
+          description: Workspace ids shared with; only meaningful when visibility
+            is GRANTED
+          items:
+            type: integer
+            format: int64
+        id:
+          type: integer
+          format: int64
+          description: Model id
+        maxOutputTokens:
+          type: integer
+          format: int32
+          description: Maximum output tokens
+        modality:
+          type: string
+          description: What surface this model serves
+          enum:
+          - CHAT
+          - EMBEDDING
+          - RERANK
+        slug:
+          type: string
+          description: Unique slug within the connection
+        supportsReasoning:
+          type: boolean
+          description: Whether the model supports a reasoning mode
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+        upstreamModelId:
+          type: string
+          description: Upstream provider model id
+        visibility:
+          type: string
+          description: Share with all workspaces (PUBLIC) or only selected ones (GRANTED)
+          enum:
+          - PUBLIC
+          - GRANTED
+      required:
+      - connectionDisplayName
+      - connectionId
+      - createdAt
+      - displayName
+      - enabled
+      - grantedWorkspaceIds
+      - id
+      - modality
+      - slug
+      - supportsReasoning
+      - upstreamModelId
+      - visibility
+    LlmModelPrice:
+      type: object
+      description: "A model's price, per 1M tokens"
+      properties:
+        currency:
+          type: string
+          description: Currency code
+        effectiveFrom:
+          type: string
+          format: date-time
+          description: When this price took effect
+        effectiveTo:
+          type: string
+          format: date-time
+          description: When this price was superseded; null if still current
+        id:
+          type: integer
+          format: int64
+          description: Price row id
+        note:
+          type: string
+          description: Note
+        per1mCacheReadUsd:
+          type: number
+          description: Cache-read rate per 1M tokens (USD)
+        per1mCacheWriteUsd:
+          type: number
+          description: Cache-write rate per 1M tokens (USD)
+        per1mInputUsd:
+          type: number
+          description: Input rate per 1M tokens (USD)
+        per1mOutputUsd:
+          type: number
+          description: Output rate per 1M tokens (USD)
+        per1mReasoningUsd:
+          type: number
+          description: Reasoning-token rate per 1M tokens (USD)
+        pricingMode:
+          type: string
+          description: Pricing mode
+          enum:
+          - PRICED
+          - FREE
+          - UNPRICED
+      required:
+      - currency
+      - effectiveFrom
+      - id
+      - pricingMode
+    LlmProbeResult:
+      type: object
+      description: Result of testing an LLM connection's /models endpoint
+      properties:
+        message:
+          type: string
+          description: Human-readable diagnostic when not reachable
+        models:
+          type: array
+          description: Model ids returned by the provider (empty if unreachable)
+          items:
+            type: string
+        reachable:
+          type: boolean
+          description: Whether the provider answered with a successful models listing
+        statusCode:
+          type: integer
+          format: int32
+          description: "HTTP status returned by the provider, if any"
+      required:
+      - models
+      - reachable
     LlmUsageByDay:
       type: object
       description: Spend for one UTC day
       properties:
-        costUsd:
+        byoTotalCostUsd:
           type: number
+          description: "Spend on this workspace's own connected provider(s) for this\
+            \ day, in USD. Never counts toward the monthly budget."
         day:
           type: string
           format: date
         events:
           type: integer
           format: int64
+        pricedTotalCostUsd:
+          type: number
+          description: "Confirmed spend on shared (instance) models for this day,\
+            \ in USD."
+        unpricedEventCount:
+          type: integer
+          format: int64
+          description: Calls this day whose price is not yet known. Excluded from
+            both totals above.
       required:
-      - costUsd
+      - byoTotalCostUsd
       - day
       - events
+      - pricedTotalCostUsd
+      - unpricedEventCount
     LlmUsageByJobType:
       type: object
       description: Month spend aggregated by job type
       properties:
+        byoTotalCostUsd:
+          type: number
+          description: "Spend on this workspace's own connected provider(s) for this\
+            \ job type, in USD. Never counts toward the monthly budget."
         cacheReadTokens:
           type: integer
           format: int64
         cacheWriteTokens:
           type: integer
           format: int64
-        costUsd:
-          type: number
         events:
           type: integer
           format: int64
@@ -6367,21 +7611,32 @@ components:
         outputTokens:
           type: integer
           format: int64
+        pricedTotalCostUsd:
+          type: number
+          description: "Confirmed spend on shared (instance) models for this job type,\
+            \ in USD."
         totalCalls:
           type: integer
           format: int64
           description: "LLM API calls, as reported by the runtime. Detection jobs\
             \ report their real call count; a mentor turn reports 1 per turn regardless\
             \ of its internal tool loop, so compare turns to turns, not to job calls."
+        unpricedEventCount:
+          type: integer
+          format: int64
+          description: Calls for this job type whose price is not yet known. Excluded
+            from both totals above.
       required:
+      - byoTotalCostUsd
       - cacheReadTokens
       - cacheWriteTokens
-      - costUsd
       - events
       - inputTokens
       - jobType
       - outputTokens
+      - pricedTotalCostUsd
       - totalCalls
+      - unpricedEventCount
     LoginProviderView:
       type: object
       description: Admin view of a login provider. The client secret is never included.
@@ -6985,6 +8240,31 @@ components:
       - id
       - name
       - slug
+    ProbeLlmConnectionRequest:
+      type: object
+      description: Draft connection probe using a supplied (never-persisted) credential
+      properties:
+        apiKey:
+          type: string
+          description: API key used only for this probe
+        apiProtocol:
+          type: string
+          description: Wire protocol
+          minLength: 1
+          pattern: openai-completions|anthropic-messages|azure-openai-responses|openai-responses
+        authHeaderName:
+          type: string
+          description: Auth header name; defaults from protocol
+        authValuePrefix:
+          type: string
+          description: Auth value prefix; defaults from protocol
+        baseUrl:
+          type: string
+          description: Provider base URL
+          minLength: 1
+      required:
+      - apiProtocol
+      - baseUrl
     ProblemDetail:
       type: object
       properties:
@@ -8213,15 +9493,18 @@ components:
           type: boolean
           description: Set true to remove the stored API key (takes precedence over
             llmApiKey)
-        credentialMode:
-          type: string
-          description: "Authentication mode: PROXY (internal proxy) or API_KEY (direct)"
-          enum:
-          - PROXY
-          - API_KEY
+        clearModelBinding:
+          type: boolean
+          description: Set true to clear the model binding (reverts to the legacy
+            provider fields below)
         enabled:
           type: boolean
           description: Whether the agent is enabled
+        instanceModelId:
+          type: integer
+          format: int64
+          description: Bind to a shared (instance catalog) model. Mutually exclusive
+            with workspaceModelId.
         llmApiKey:
           type: string
           description: LLM API key (omit or null to keep existing key)
@@ -8258,6 +9541,11 @@ components:
           example: 600
           maximum: 3600
           minimum: 30
+        workspaceModelId:
+          type: integer
+          format: int64
+          description: Bind to a model on your own provider. Mutually exclusive with
+            instanceModelId.
     UpdateConnectionStatusRequest:
       type: object
       description: Request to update a connection's lifecycle status
@@ -8276,6 +9564,24 @@ components:
           - UNINSTALLED
       required:
       - state
+    UpdateInstanceLlmSettingsRequest:
+      type: object
+      description: Update instance-wide LLM governance settings (all fields optional)
+      properties:
+        allowWorkspaceConnections:
+          type: boolean
+          description: Whether workspaces may register their own LLM connections
+        allowedEgressHosts:
+          type: string
+          description: Comma/newline-delimited egress host allowlist; blank clears
+            it
+        defaultUnpricedPolicy:
+          type: string
+          description: Default policy for usage reported without a price
+          enum:
+          - WARN
+          - BLOCK
+          pattern: WARN|BLOCK
     UpdateLeaderboardDigestRequest:
       type: object
       description: Request to update the entire weekly leaderboard digest configuration
@@ -8307,6 +9613,151 @@ components:
       required:
       - day
       - time
+    UpdateLlmConnectionRequest:
+      type: object
+      description: Update an instance LLM provider connection (all fields optional)
+      properties:
+        apiKey:
+          type: string
+          description: New API key (write-only; never returned)
+        apiProtocol:
+          type: string
+          description: Wire protocol
+          pattern: openai-completions|anthropic-messages|azure-openai-responses|openai-responses
+        authHeaderName:
+          type: string
+          description: Auth header name
+          maxLength: 64
+          minLength: 0
+        authValuePrefix:
+          type: string
+          description: Auth value prefix
+          maxLength: 16
+          minLength: 0
+        azureApiVersion:
+          type: string
+          description: Azure API version
+          maxLength: 32
+          minLength: 0
+        baseUrl:
+          type: string
+          description: Provider base URL
+          maxLength: 2048
+          minLength: 0
+        clearApiKey:
+          type: boolean
+          description: Set true to clear the stored API key
+        displayName:
+          type: string
+          description: Human-readable name
+          maxLength: 128
+          minLength: 0
+        enabled:
+          type: boolean
+          description: Whether the connection is enabled
+    UpdateLlmModelPriceRequest:
+      type: object
+      description: Reprice a model; supersedes the current price
+      properties:
+        note:
+          type: string
+          description: "Note; required when the model is free (e.g. self-hosted, no\
+            \ cost)"
+          maxLength: 500
+          minLength: 0
+        per1mCacheReadUsd:
+          type: number
+          description: "Cache-read rate per 1M tokens (USD), if applicable"
+        per1mCacheWriteUsd:
+          type: number
+          description: "Cache-write rate per 1M tokens (USD), if applicable"
+        per1mInputUsd:
+          type: number
+          description: Input rate per 1M tokens (USD); required when the model has
+            a price
+        per1mOutputUsd:
+          type: number
+          description: Output rate per 1M tokens (USD); required when the model has
+            a price
+        per1mReasoningUsd:
+          type: number
+          description: "Reasoning-token rate per 1M tokens (USD), if applicable"
+        pricingMode:
+          type: string
+          description: PRICED shows the price itself; FREE is a deliberate no-cost
+            declaration; UNPRICED shows "No price set"
+          enum:
+          - PRICED
+          - FREE
+          - UNPRICED
+      required:
+      - pricingMode
+    UpdateLlmModelRequest:
+      type: object
+      description: Update a model's metadata (all fields optional; pricing and sharing
+        are separate)
+      properties:
+        apiProtocolOverride:
+          type: string
+          description: Wire protocol override for this model; blank clears the override
+          maxLength: 40
+          minLength: 0
+        cacheControlFormat:
+          type: string
+          description: "Cache-control wire format, if applicable; blank clears it"
+          maxLength: 16
+          minLength: 0
+        contextWindow:
+          type: integer
+          format: int32
+          description: Context window in tokens
+        displayName:
+          type: string
+          description: Human-readable name
+          maxLength: 128
+          minLength: 0
+        enabled:
+          type: boolean
+          description: Active toggle (off = existing settings stop working)
+        maxOutputTokens:
+          type: integer
+          format: int32
+          description: Maximum output tokens
+        modality:
+          type: string
+          description: What surface this model serves
+          enum:
+          - CHAT
+          - EMBEDDING
+          - RERANK
+        supportsReasoning:
+          type: boolean
+          description: Whether the model supports a reasoning mode
+        upstreamModelId:
+          type: string
+          description: Upstream provider model id
+          maxLength: 256
+          minLength: 0
+    UpdateLlmModelSharingRequest:
+      type: object
+      description: "Share with: all workspaces, or a selected set"
+      properties:
+        visibility:
+          type: string
+          description: Share with all workspaces (PUBLIC) or only the selected ones
+            (GRANTED)
+          enum:
+          - PUBLIC
+          - GRANTED
+        workspaceIds:
+          type: array
+          description: Workspace ids to share with; required and used only when visibility
+            is GRANTED
+          items:
+            type: integer
+            format: int64
+      required:
+      - visibility
     UpdateLoginProviderRequest:
       type: object
       properties:
@@ -8557,6 +10008,122 @@ components:
           description: "Budget cap in USD; 0 pauses immediately, null removes the\
             \ cap"
           minimum: 0.00
+    UpdateWorkspaceLlmConnectionRequest:
+      type: object
+      description: Update your AI provider connection (all fields optional)
+      properties:
+        apiKey:
+          type: string
+          description: New API key (write-only; never returned)
+        apiProtocol:
+          type: string
+          description: Wire protocol
+          pattern: openai-completions|anthropic-messages|azure-openai-responses|openai-responses
+        authHeaderName:
+          type: string
+          description: Auth header name
+          maxLength: 64
+          minLength: 0
+        authValuePrefix:
+          type: string
+          description: Auth value prefix
+          maxLength: 16
+          minLength: 0
+        azureApiVersion:
+          type: string
+          description: Azure API version
+          maxLength: 32
+          minLength: 0
+        baseUrl:
+          type: string
+          description: Provider base URL
+          maxLength: 2048
+          minLength: 0
+        clearApiKey:
+          type: boolean
+          description: Set true to clear the stored API key
+        displayName:
+          type: string
+          description: Human-readable name
+          maxLength: 128
+          minLength: 0
+        enabled:
+          type: boolean
+          description: Whether the connection is active
+    UpdateWorkspaceLlmModelRequest:
+      type: object
+      description: Update a model on your AI provider (all fields optional)
+      properties:
+        apiProtocolOverride:
+          type: string
+          description: Wire protocol override for this model; blank clears the override
+          maxLength: 40
+          minLength: 0
+        cacheControlFormat:
+          type: string
+          description: "Cache-control wire format, if applicable; blank clears it"
+          maxLength: 16
+          minLength: 0
+        contextWindow:
+          type: integer
+          format: int32
+          description: Context window in tokens
+        displayName:
+          type: string
+          description: Human-readable name
+          maxLength: 128
+          minLength: 0
+        enabled:
+          type: boolean
+          description: Active toggle
+        maxOutputTokens:
+          type: integer
+          format: int32
+          description: Maximum output tokens
+        modality:
+          type: string
+          description: What surface this model serves
+          enum:
+          - CHAT
+          - EMBEDDING
+          - RERANK
+        per1mCacheReadUsd:
+          type: number
+          description: "Cache-read rate per 1M tokens (USD), if applicable"
+        per1mCacheWriteUsd:
+          type: number
+          description: "Cache-write rate per 1M tokens (USD), if applicable"
+        per1mInputUsd:
+          type: number
+          description: Input rate per 1M tokens (USD)
+        per1mOutputUsd:
+          type: number
+          description: Output rate per 1M tokens (USD)
+        per1mReasoningUsd:
+          type: number
+          description: "Reasoning-token rate per 1M tokens (USD), if applicable"
+        priceNote:
+          type: string
+          description: "Note; required when the model is free (e.g. self-hosted, no\
+            \ cost)"
+          maxLength: 500
+          minLength: 0
+        pricingMode:
+          type: string
+          description: "Pricing mode; when given, replaces the price wholesale (see\
+            \ class docs)"
+          enum:
+          - PRICED
+          - FREE
+          - UNPRICED
+        supportsReasoning:
+          type: boolean
+          description: Whether the model supports a reasoning mode
+        upstreamModelId:
+          type: string
+          description: Upstream provider model id
+          maxLength: 256
+          minLength: 0
     UpdateWorkspaceNotificationsRequest:
       type: object
       description: Request to update leaderboard notification settings
@@ -8900,6 +10467,184 @@ components:
       - progressionEnabled
       - status
       - workspaceSlug
+    WorkspaceLlmConnection:
+      type: object
+      description: Your AI provider connection (API key redacted)
+      properties:
+        apiKeyLast4:
+          type: string
+          description: "Last four characters of the stored API key, if any"
+        apiProtocol:
+          type: string
+          description: Wire protocol
+          example: openai-completions
+        authHeaderName:
+          type: string
+          description: Auth header name
+          example: Authorization
+        authValuePrefix:
+          type: string
+          description: Auth value prefix
+          example: Bearer
+        azureApiVersion:
+          type: string
+          description: "Azure API version, if applicable"
+        baseUrl:
+          type: string
+          description: Provider base URL
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        displayName:
+          type: string
+          description: Human-readable name
+        enabled:
+          type: boolean
+          description: Whether the connection is active
+        hasApiKey:
+          type: boolean
+          description: Whether an API key is stored
+        id:
+          type: integer
+          format: int64
+          description: Connection ID
+        slug:
+          type: string
+          description: Unique slug within the workspace
+          example: openai-prod
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+      required:
+      - apiProtocol
+      - authHeaderName
+      - authValuePrefix
+      - baseUrl
+      - createdAt
+      - displayName
+      - enabled
+      - hasApiKey
+      - id
+      - slug
+    WorkspaceLlmModel:
+      type: object
+      description: A model on your AI provider
+      properties:
+        apiProtocolOverride:
+          type: string
+          description: Wire protocol override for this model
+        cacheControlFormat:
+          type: string
+          description: "Cache-control wire format, if applicable"
+        connectionDisplayName:
+          type: string
+          description: Owning connection's display name
+        connectionId:
+          type: integer
+          format: int64
+          description: Owning connection id
+        contextWindow:
+          type: integer
+          format: int32
+          description: Context window in tokens
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        currency:
+          type: string
+          description: Currency code
+        displayName:
+          type: string
+          description: Human-readable name
+        enabled:
+          type: boolean
+          description: Active toggle
+        id:
+          type: integer
+          format: int64
+          description: Model id
+        maxOutputTokens:
+          type: integer
+          format: int32
+          description: Maximum output tokens
+        modality:
+          type: string
+          description: What surface this model serves
+          enum:
+          - CHAT
+          - EMBEDDING
+          - RERANK
+        per1mCacheReadUsd:
+          type: number
+          description: Cache-read rate per 1M tokens (USD)
+        per1mCacheWriteUsd:
+          type: number
+          description: Cache-write rate per 1M tokens (USD)
+        per1mInputUsd:
+          type: number
+          description: Input rate per 1M tokens (USD)
+        per1mOutputUsd:
+          type: number
+          description: Output rate per 1M tokens (USD)
+        per1mReasoningUsd:
+          type: number
+          description: Reasoning-token rate per 1M tokens (USD)
+        priceNote:
+          type: string
+          description: Price note
+        pricingMode:
+          type: string
+          description: Pricing mode
+          enum:
+          - PRICED
+          - FREE
+          - UNPRICED
+        slug:
+          type: string
+          description: Unique slug within the workspace
+        supportsReasoning:
+          type: boolean
+          description: Whether the model supports a reasoning mode
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+        upstreamModelId:
+          type: string
+          description: Upstream provider model id
+      required:
+      - connectionDisplayName
+      - connectionId
+      - createdAt
+      - currency
+      - displayName
+      - enabled
+      - id
+      - modality
+      - pricingMode
+      - slug
+      - supportsReasoning
+      - upstreamModelId
+    WorkspaceLlmProbeResult:
+      type: object
+      description: Result of testing your AI provider connection
+      properties:
+        message:
+          type: string
+          description: Human-readable diagnostic when not reachable
+        modelCount:
+          type: integer
+          format: int32
+          description: How many models the provider listed (0 if unreachable)
+        reachable:
+          type: boolean
+          description: Whether the provider answered
+      required:
+      - modelCount
+      - reachable
     WorkspaceLlmUsageReport:
       type: object
       description: "One calendar month of a workspace's LLM spend, rolled up from\
@@ -8913,6 +10658,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LlmUsageByJobType"
+        byoTotalCostUsd:
+          type: number
+          description: "This month's spend on this workspace's own connected provider(s),\
+            \ in USD. Shown separately — it never counts toward the monthly budget\
+            \ and must never be added to pricedTotalCostUsd."
         month:
           type: string
           description: "Calendar month (UTC), ISO yyyy-MM"
@@ -8920,27 +10670,35 @@ components:
         monthlyBudgetUsd:
           type: number
           description: Monthly budget cap in USD; null = uncapped
-        overBudget:
-          type: boolean
-          description: Spend reached the cap — detection and mentor turns are paused
-            for the current month
-        totalCostUsd:
+        pricedTotalCostUsd:
           type: number
-          description: "Total spend in the month, USD"
-        uncostedEvents:
+          description: "This month's confirmed spend on shared (instance) models,\
+            \ in USD — the figure the monthly budget compares against. When unpricedEventCount\
+            \ is non-zero this is a floor, not the full total: render it as \"at least\
+            \ $X\"."
+        unpricedEventCount:
           type: integer
           format: int64
-          description: "Events in the month whose cost could not be resolved (unknown\
-            \ model pricing). They count as zero spend, so a non-zero value means\
-            \ the budget cap is not seeing everything — add a model_pricing row for\
-            \ the model."
+          description: "Calls this month (any provider) whose price is not yet known.\
+            \ They are excluded from both totals above, so a non-zero value means\
+            \ the real spend may be higher than shown."
+        verdict:
+          type: string
+          description: "Whether this month's confirmed spend is within the cap, has\
+            \ reached it (work is paused), or can't be fully confirmed yet because\
+            \ some usage above has no price set."
+          enum:
+          - WITHIN
+          - EXHAUSTED
+          - UNVERIFIABLE
       required:
       - byDay
       - byJobType
+      - byoTotalCostUsd
       - month
-      - overBudget
-      - totalCostUsd
-      - uncostedEvents
+      - pricedTotalCostUsd
+      - unpricedEventCount
+      - verdict
     WorkspaceMembership:
       type: object
       description: A user's membership in a workspace

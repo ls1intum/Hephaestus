@@ -40,8 +40,8 @@ class InstanceLlmSettingsServiceTest extends BaseUnitTest {
         settingsService = new InstanceLlmSettingsService(settingsRepository, llmSettingsAuditProvider);
     }
 
-    private UpdateInstanceLlmSettingsRequest request() {
-        return new UpdateInstanceLlmSettingsRequest(null, false, "BLOCK");
+    private UpdateInstanceLlmSettingsRequestDTO request() {
+        return new UpdateInstanceLlmSettingsRequestDTO(null, false, "BLOCK");
     }
 
     @Nested

@@ -9,26 +9,29 @@ const rows: AdminWorkspaceLlmUsage[] = [
 		workspaceSlug: "obsphera",
 		displayName: "Obsphera",
 		monthlyBudgetUsd: 25,
-		costUsd: 25.0142,
+		pricedTotalCostUsd: 25.0142,
+		byoTotalCostUsd: 0,
 		events: 118,
-		overBudget: true,
+		verdict: "EXHAUSTED",
 	},
 	{
 		workspaceId: 2,
 		workspaceSlug: "hephaestus-dev",
 		displayName: "Hephaestus Dev",
 		monthlyBudgetUsd: 100,
-		costUsd: 13.4821,
+		pricedTotalCostUsd: 13.4821,
+		byoTotalCostUsd: 2.1,
 		events: 74,
-		overBudget: false,
+		verdict: "WITHIN",
 	},
 	{
 		workspaceId: 3,
 		workspaceSlug: "sandbox",
 		displayName: "Sandbox",
-		costUsd: 0.42,
+		pricedTotalCostUsd: 0.42,
+		byoTotalCostUsd: 0,
 		events: 3,
-		overBudget: false,
+		verdict: "WITHIN",
 	},
 ];
 
@@ -57,7 +60,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {};
 
 /**
- * A past month. `overBudget` is computed from the workspace's *current* cap, so it can't say
+ * A past month. `verdict` is computed from the workspace's *current* cap, so it can't say
  * anything about a finished month — every status reads as a neutral dash.
  */
 export const PastMonth: Story = {

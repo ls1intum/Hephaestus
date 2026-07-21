@@ -52,7 +52,7 @@ public class WorkspaceLlmConnectionService {
     @Transactional
     public WorkspaceLlmConnection create(
         WorkspaceContext workspaceContext,
-        CreateWorkspaceLlmConnectionRequest request
+        CreateWorkspaceLlmConnectionRequestDTO request
     ) {
         requireByoEnabled();
         Long workspaceId = workspaceContext.id();
@@ -114,7 +114,7 @@ public class WorkspaceLlmConnectionService {
     public WorkspaceLlmConnection update(
         WorkspaceContext workspaceContext,
         Long id,
-        UpdateWorkspaceLlmConnectionRequest request
+        UpdateWorkspaceLlmConnectionRequestDTO request
     ) {
         requireByoEnabled();
         WorkspaceLlmConnection connection = get(workspaceContext, id);
@@ -181,17 +181,17 @@ public class WorkspaceLlmConnectionService {
 
     /** "Test connection": workspace-framed (reachable + model count only, never the raw model list). */
     @Transactional(readOnly = true)
-    public WorkspaceLlmProbeResult probe(WorkspaceContext workspaceContext, Long id) {
+    public WorkspaceLlmProbeResultDTO probe(WorkspaceContext workspaceContext, Long id) {
         requireByoEnabled();
         WorkspaceLlmConnection connection = get(workspaceContext, id);
         egressPolicy.validate(connection.getBaseUrl());
-        LlmProbeResult raw = probeService.probeCredential(
+        LlmProbeResultDTO raw = probeService.probeCredential(
             connection.getBaseUrl(),
             connection.getAuthHeaderName(),
             connection.getAuthValuePrefix(),
             connection.getApiKey()
         );
-        return WorkspaceLlmProbeResult.from(raw);
+        return WorkspaceLlmProbeResultDTO.from(raw);
     }
 
     private void requireByoEnabled() {

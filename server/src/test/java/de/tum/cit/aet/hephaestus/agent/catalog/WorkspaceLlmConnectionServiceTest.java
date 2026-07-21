@@ -80,8 +80,8 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
         when(instanceLlmSettingsService.get()).thenReturn(settings);
     }
 
-    private CreateWorkspaceLlmConnectionRequest createRequest() {
-        return new CreateWorkspaceLlmConnectionRequest(
+    private CreateWorkspaceLlmConnectionRequestDTO createRequest() {
+        return new CreateWorkspaceLlmConnectionRequestDTO(
             "openai-prod",
             "OpenAI",
             "https://api.openai.com",
@@ -263,9 +263,9 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
             when(connectionRepository.findByIdAndWorkspaceId(5L, 1L)).thenReturn(Optional.of(connection));
             when(
                 probeService.probeCredential("https://api.openai.com", "Authorization", "Bearer ", "sk-abc")
-            ).thenReturn(LlmProbeResult.reachable(List.of("gpt-5", "gpt-5-mini"), 200));
+            ).thenReturn(LlmProbeResultDTO.reachable(List.of("gpt-5", "gpt-5-mini"), 200));
 
-            WorkspaceLlmProbeResult result = connectionService.probe(workspaceContext, 5L);
+            WorkspaceLlmProbeResultDTO result = connectionService.probe(workspaceContext, 5L);
 
             assertThat(result.reachable()).isTrue();
             assertThat(result.modelCount()).isEqualTo(2);
@@ -279,10 +279,10 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
             connection.setBaseUrl("https://api.openai.com");
             when(connectionRepository.findByIdAndWorkspaceId(5L, 1L)).thenReturn(Optional.of(connection));
             when(probeService.probeCredential(any(), any(), any(), any())).thenReturn(
-                LlmProbeResult.unreachable(503, "Provider returned HTTP 503")
+                LlmProbeResultDTO.unreachable(503, "Provider returned HTTP 503")
             );
 
-            WorkspaceLlmProbeResult result = connectionService.probe(workspaceContext, 5L);
+            WorkspaceLlmProbeResultDTO result = connectionService.probe(workspaceContext, 5L);
 
             assertThat(result.reachable()).isFalse();
             assertThat(result.modelCount()).isEqualTo(0);

@@ -96,7 +96,7 @@ public class LlmModelService {
     }
 
     @Transactional
-    public LlmModel create(Long connectionId, CreateLlmModelRequest request) {
+    public LlmModel create(Long connectionId, CreateLlmModelRequestDTO request) {
         LlmConnection connection = connectionRepository
             .findById(connectionId)
             .orElseThrow(() -> new EntityNotFoundException("LlmConnection", connectionId));
@@ -136,7 +136,7 @@ public class LlmModelService {
     }
 
     @Transactional
-    public LlmModel update(Long id, UpdateLlmModelRequest request) {
+    public LlmModel update(Long id, UpdateLlmModelRequestDTO request) {
         LlmModel model = modelRepository.findById(id).orElseThrow(() -> new EntityNotFoundException("LlmModel", id));
 
         if (request.displayName() != null) {
@@ -188,7 +188,7 @@ public class LlmModelService {
      * open row per model at a time.
      */
     @Transactional
-    public LlmModelPrice updatePrice(Long modelId, UpdateLlmModelPriceRequest request) {
+    public LlmModelPrice updatePrice(Long modelId, UpdateLlmModelPriceRequestDTO request) {
         LlmModel model = modelRepository
             .findById(modelId)
             .orElseThrow(() -> new EntityNotFoundException("LlmModel", modelId));
@@ -218,7 +218,7 @@ public class LlmModelService {
         return saved;
     }
 
-    private static void validatePriceRequest(UpdateLlmModelPriceRequest request) {
+    private static void validatePriceRequest(UpdateLlmModelPriceRequestDTO request) {
         LlmPriceValidation.validate(
             request.pricingMode(),
             request.per1mInputUsd(),
@@ -235,7 +235,7 @@ public class LlmModelService {
      * Unknown workspace ids are rejected with a 400 rather than silently dropped.
      */
     @Transactional
-    public LlmModel updateSharing(Long modelId, UpdateLlmModelSharingRequest request) {
+    public LlmModel updateSharing(Long modelId, UpdateLlmModelSharingRequestDTO request) {
         LlmModel model = modelRepository
             .findById(modelId)
             .orElseThrow(() -> new EntityNotFoundException("LlmModel", modelId));

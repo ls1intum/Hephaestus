@@ -38,7 +38,7 @@ public class InstanceLlmSettingsService {
     }
 
     @Transactional
-    public InstanceLlmSettings update(UpdateInstanceLlmSettingsRequest request) {
+    public InstanceLlmSettings update(UpdateInstanceLlmSettingsRequestDTO request) {
         InstanceLlmSettings settings = settingsRepository
             .findById(SINGLETON_ID)
             .orElseGet(() -> {

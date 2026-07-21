@@ -11,7 +11,7 @@ import org.jspecify.annotations.Nullable;
  * using the supplied credential. The credential is used only for the probe and never persisted.
  */
 @Schema(description = "Draft connection probe using a supplied (never-persisted) credential")
-public record ProbeLlmConnectionRequest(
+public record ProbeLlmConnectionRequestDTO(
     @NonNull @NotBlank @Schema(description = "Provider base URL") String baseUrl,
     @NonNull
     @NotBlank

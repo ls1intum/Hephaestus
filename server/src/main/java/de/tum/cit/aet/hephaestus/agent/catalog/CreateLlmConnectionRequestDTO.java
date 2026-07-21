@@ -9,7 +9,7 @@ import org.jspecify.annotations.Nullable;
 
 /** Create an instance LLM connection (#1368). */
 @Schema(description = "Create an instance LLM provider connection")
-public record CreateLlmConnectionRequest(
+public record CreateLlmConnectionRequestDTO(
     @NonNull
     @NotBlank
     @Pattern(

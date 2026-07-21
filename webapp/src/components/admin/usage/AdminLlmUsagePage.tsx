@@ -57,15 +57,18 @@ export function AdminLlmUsagePage({
 	onNextMonth,
 }: AdminLlmUsagePageProps) {
 	const budget = report?.monthlyBudgetUsd;
-	const spend = report?.totalCostUsd ?? 0;
+	// The confirmed (priced) spend — the figure the budget cap compares against. When some usage this
+	// month has no price on record, it's a floor, not the full total (see `unpricedEventCount` below).
+	const spend = report?.pricedTotalCostUsd ?? 0;
 	// A $0 cap is a supported state ("paused immediately"), so it reads as 100% used — only an
 	// absent cap has no percentage to show.
 	const budgetUsedPercent =
 		budget != null ? (budget > 0 ? (spend / budget) * 100 : 100) : undefined;
 	const hasUsage =
 		report != null && (report.byJobType.length > 0 || report.byDay.length > 0 || spend > 0);
-	const maxDayCost = Math.max(...(report?.byDay.map((d) => d.costUsd) ?? []), 0);
-	const uncostedEvents = report?.uncostedEvents ?? 0;
+	const maxDayCost = Math.max(...(report?.byDay.map((d) => d.pricedTotalCostUsd) ?? []), 0);
+	const unpricedEventCount = report?.unpricedEventCount ?? 0;
+	const overBudget = report?.verdict === "EXHAUSTED";
 
 	return (
 		<div className="mx-auto w-full max-w-4xl space-y-6 py-6">
@@ -114,7 +117,7 @@ export function AdminLlmUsagePage({
 				</>
 			) : (
 				<>
-					{report.overBudget && isCurrentMonth && (
+					{overBudget && isCurrentMonth && (
 						<Alert variant="destructive">
 							<TriangleAlert aria-hidden />
 							<AlertTitle>Monthly AI budget used up</AlertTitle>
@@ -125,16 +128,17 @@ export function AdminLlmUsagePage({
 						</Alert>
 					)}
 
-					{uncostedEvents > 0 && (
+					{unpricedEventCount > 0 && (
 						<Alert variant="warning">
 							<CircleAlert aria-hidden />
-							<AlertTitle>Some usage has no known cost</AlertTitle>
+							<AlertTitle>Some usage has no price set</AlertTitle>
 							<AlertDescription>
-								{uncostedEvents === 1 ? "1 call" : `${uncostedEvents.toLocaleString()} calls`} this
-								month ran on a model with no price on record, so{" "}
-								{uncostedEvents === 1 ? "it counts" : "they count"} as $0 here and the budget cap
-								can't see {uncostedEvents === 1 ? "it" : "them"}. Ask an instance admin to add
-								pricing for the model.
+								{unpricedEventCount === 1
+									? "1 call"
+									: `${unpricedEventCount.toLocaleString()} calls`}{" "}
+								this month ran on a model with no price on record, so{" "}
+								{unpricedEventCount === 1 ? "it's" : "they're"} excluded from the spend below — the
+								real total may be higher. Ask an instance admin to add pricing for the model.
 							</AlertDescription>
 						</Alert>
 					)}
@@ -145,7 +149,11 @@ export function AdminLlmUsagePage({
 								<CardDescription>
 									{isCurrentMonth ? "Month-to-date spend" : "Month spend"}
 								</CardDescription>
-								<CardTitle className="text-2xl tabular-nums">{formatCostUsd(spend)}</CardTitle>
+								<CardTitle className="text-2xl tabular-nums">
+									{unpricedEventCount > 0
+										? `at least ${formatCostUsd(spend)}`
+										: formatCostUsd(spend)}
+								</CardTitle>
 							</CardHeader>
 						</Card>
 						<Card>
@@ -165,7 +173,7 @@ export function AdminLlmUsagePage({
 							</CardHeader>
 							{budgetUsedPercent != null && (
 								<CardContent>
-									<BudgetProgress percent={budgetUsedPercent} overBudget={report.overBudget} />
+									<BudgetProgress percent={budgetUsedPercent} overBudget={overBudget} />
 								</CardContent>
 							)}
 						</Card>
@@ -209,14 +217,16 @@ export function AdminLlmUsagePage({
 														<span className="w-14 shrink-0 text-muted-foreground">{label}</span>
 														<Progress
 															className="flex-1"
-															value={maxDayCost > 0 ? (day.costUsd / maxDayCost) * 100 : 0}
+															value={
+																maxDayCost > 0 ? (day.pricedTotalCostUsd / maxDayCost) * 100 : 0
+															}
 															aria-label={`Spend on ${label}`}
 															getAriaValueText={() =>
-																`${formatCostUsd(day.costUsd)} of ${formatCostUsd(maxDayCost)} on the busiest day`
+																`${formatCostUsd(day.pricedTotalCostUsd)} of ${formatCostUsd(maxDayCost)} on the busiest day`
 															}
 														/>
 														<span className="w-20 shrink-0 text-right tabular-nums">
-															{formatCostUsd(day.costUsd)}
+															{formatCostUsd(day.pricedTotalCostUsd)}
 														</span>
 														<span className="w-20 shrink-0 text-right tabular-nums text-muted-foreground">
 															{day.events.toLocaleString()} {day.events === 1 ? "event" : "events"}
@@ -312,7 +322,7 @@ function ByJobTypeTable({ rows }: ByJobTypeTableProps) {
 						<TableRow key={row.jobType}>
 							<TableCell className="font-medium">{JOB_TYPE_LABELS[row.jobType]}</TableCell>
 							<TableCell className="text-right tabular-nums">
-								{formatCostUsd(row.costUsd)}
+								{formatCostUsd(row.pricedTotalCostUsd)}
 							</TableCell>
 							<TableCell className="text-right tabular-nums">
 								{formatTokens(row.inputTokens)}

@@ -6,13 +6,16 @@ import { AdminLlmUsagePage } from "./AdminLlmUsagePage";
 const baseReport: WorkspaceLlmUsageReport = {
 	month: "2026-07",
 	monthlyBudgetUsd: 25,
-	totalCostUsd: 13.4821,
-	overBudget: false,
-	uncostedEvents: 0,
+	pricedTotalCostUsd: 13.4821,
+	byoTotalCostUsd: 0,
+	verdict: "WITHIN",
+	unpricedEventCount: 0,
 	byJobType: [
 		{
 			jobType: "PULL_REQUEST_REVIEW",
-			costUsd: 8.1034,
+			pricedTotalCostUsd: 8.1034,
+			byoTotalCostUsd: 0,
+			unpricedEventCount: 0,
 			inputTokens: 1_204_331,
 			outputTokens: 88_412,
 			cacheReadTokens: 640_112,
@@ -22,7 +25,9 @@ const baseReport: WorkspaceLlmUsageReport = {
 		},
 		{
 			jobType: "MENTOR_TURN",
-			costUsd: 3.9902,
+			pricedTotalCostUsd: 3.9902,
+			byoTotalCostUsd: 0,
+			unpricedEventCount: 0,
 			inputTokens: 402_118,
 			outputTokens: 61_240,
 			cacheReadTokens: 210_400,
@@ -32,7 +37,9 @@ const baseReport: WorkspaceLlmUsageReport = {
 		},
 		{
 			jobType: "ISSUE_REVIEW",
-			costUsd: 1.3885,
+			pricedTotalCostUsd: 1.3885,
+			byoTotalCostUsd: 0,
+			unpricedEventCount: 0,
 			inputTokens: 150_221,
 			outputTokens: 20_114,
 			cacheReadTokens: 80_010,
@@ -42,10 +49,34 @@ const baseReport: WorkspaceLlmUsageReport = {
 		},
 	],
 	byDay: [
-		{ day: new Date("2026-07-01"), costUsd: 2.1, events: 14 },
-		{ day: new Date("2026-07-02"), costUsd: 4.83, events: 31 },
-		{ day: new Date("2026-07-03"), costUsd: 0.92, events: 6 },
-		{ day: new Date("2026-07-06"), costUsd: 5.6321, events: 66 },
+		{
+			day: new Date("2026-07-01"),
+			pricedTotalCostUsd: 2.1,
+			byoTotalCostUsd: 0,
+			unpricedEventCount: 0,
+			events: 14,
+		},
+		{
+			day: new Date("2026-07-02"),
+			pricedTotalCostUsd: 4.83,
+			byoTotalCostUsd: 0,
+			unpricedEventCount: 0,
+			events: 31,
+		},
+		{
+			day: new Date("2026-07-03"),
+			pricedTotalCostUsd: 0.92,
+			byoTotalCostUsd: 0,
+			unpricedEventCount: 0,
+			events: 6,
+		},
+		{
+			day: new Date("2026-07-06"),
+			pricedTotalCostUsd: 5.6321,
+			byoTotalCostUsd: 0,
+			unpricedEventCount: 0,
+			events: 66,
+		},
 	],
 };
 
@@ -80,8 +111,8 @@ export const OverBudget: Story = {
 	args: {
 		report: {
 			...baseReport,
-			totalCostUsd: 25.0142,
-			overBudget: true,
+			pricedTotalCostUsd: 25.0142,
+			verdict: "EXHAUSTED",
 		},
 	},
 };
@@ -94,8 +125,8 @@ export const OverBudgetPastMonth: Story = {
 		report: {
 			...baseReport,
 			month: "2026-06",
-			totalCostUsd: 25.0142,
-			overBudget: true,
+			pricedTotalCostUsd: 25.0142,
+			verdict: "EXHAUSTED",
 		},
 	},
 };
@@ -106,8 +137,8 @@ export const ZeroCap: Story = {
 		report: {
 			...baseReport,
 			monthlyBudgetUsd: 0,
-			totalCostUsd: 0,
-			overBudget: true,
+			pricedTotalCostUsd: 0,
+			verdict: "EXHAUSTED",
 			byJobType: [],
 			byDay: [],
 		},
@@ -130,9 +161,10 @@ export const Empty: Story = {
 		report: {
 			month: "2026-07",
 			monthlyBudgetUsd: 25,
-			totalCostUsd: 0,
-			overBudget: false,
-			uncostedEvents: 0,
+			pricedTotalCostUsd: 0,
+			byoTotalCostUsd: 0,
+			verdict: "WITHIN",
+			unpricedEventCount: 0,
 			byJobType: [],
 			byDay: [],
 		},
@@ -147,7 +179,7 @@ export const UncostedUsage: Story = {
 	args: {
 		report: {
 			...baseReport,
-			uncostedEvents: 42,
+			unpricedEventCount: 42,
 		},
 	},
 };
@@ -157,7 +189,7 @@ export const SingleUncostedCall: Story = {
 	args: {
 		report: {
 			...baseReport,
-			uncostedEvents: 1,
+			unpricedEventCount: 1,
 		},
 	},
 };
@@ -173,7 +205,7 @@ export const UncostedUsagePastMonth: Story = {
 		report: {
 			...baseReport,
 			month: "2026-06",
-			uncostedEvents: 42,
+			unpricedEventCount: 42,
 		},
 	},
 };
@@ -183,9 +215,9 @@ export const OverBudgetWithUncostedUsage: Story = {
 	args: {
 		report: {
 			...baseReport,
-			totalCostUsd: 25.0142,
-			overBudget: true,
-			uncostedEvents: 42,
+			pricedTotalCostUsd: 25.0142,
+			verdict: "EXHAUSTED",
+			unpricedEventCount: 42,
 		},
 	},
 };

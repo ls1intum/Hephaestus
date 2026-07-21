@@ -16,7 +16,7 @@ import org.jspecify.annotations.Nullable;
  * {@code note} explaining why (e.g. self-hosted, no cost).
  */
 @Schema(description = "Reprice a model; supersedes the current price")
-public record UpdateLlmModelPriceRequest(
+public record UpdateLlmModelPriceRequestDTO(
     @NonNull
     @NotNull
     @Schema(

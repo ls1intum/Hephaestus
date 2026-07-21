@@ -75,8 +75,8 @@ class LlmModelServiceTest extends BaseUnitTest {
         when(modelRepository.save(any(LlmModel.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
-    private UpdateLlmModelPriceRequest pricedRequest(String input, String output) {
-        return new UpdateLlmModelPriceRequest(
+    private UpdateLlmModelPriceRequestDTO pricedRequest(String input, String output) {
+        return new UpdateLlmModelPriceRequestDTO(
             PricingMode.PRICED,
             new BigDecimal(input),
             new BigDecimal(output),
@@ -136,7 +136,7 @@ class LlmModelServiceTest extends BaseUnitTest {
 
         @Test
         void pricedModeRequiresBothInputAndOutputRates() {
-            UpdateLlmModelPriceRequest request = new UpdateLlmModelPriceRequest(
+            UpdateLlmModelPriceRequestDTO request = new UpdateLlmModelPriceRequestDTO(
                 PricingMode.PRICED,
                 new BigDecimal("3.00"),
                 null,
@@ -154,7 +154,7 @@ class LlmModelServiceTest extends BaseUnitTest {
 
         @Test
         void pricedModeRejectsNegativeRates() {
-            UpdateLlmModelPriceRequest request = new UpdateLlmModelPriceRequest(
+            UpdateLlmModelPriceRequestDTO request = new UpdateLlmModelPriceRequestDTO(
                 PricingMode.PRICED,
                 new BigDecimal("-1.00"),
                 new BigDecimal("2.00"),
@@ -172,7 +172,7 @@ class LlmModelServiceTest extends BaseUnitTest {
 
         @Test
         void freeModeRequiresANote() {
-            UpdateLlmModelPriceRequest request = new UpdateLlmModelPriceRequest(
+            UpdateLlmModelPriceRequestDTO request = new UpdateLlmModelPriceRequestDTO(
                 PricingMode.FREE,
                 null,
                 null,
@@ -192,7 +192,7 @@ class LlmModelServiceTest extends BaseUnitTest {
         void freeModeWithNoteAndNoRatesSucceeds() {
             when(priceRepository.findByModelIdAndEffectiveToIsNull(7L)).thenReturn(Optional.empty());
             when(priceRepository.save(any(LlmModelPrice.class))).thenAnswer(invocation -> invocation.getArgument(0));
-            UpdateLlmModelPriceRequest request = new UpdateLlmModelPriceRequest(
+            UpdateLlmModelPriceRequestDTO request = new UpdateLlmModelPriceRequestDTO(
                 PricingMode.FREE,
                 null,
                 null,
@@ -210,7 +210,7 @@ class LlmModelServiceTest extends BaseUnitTest {
 
         @Test
         void unpricedModeRejectsRates() {
-            UpdateLlmModelPriceRequest request = new UpdateLlmModelPriceRequest(
+            UpdateLlmModelPriceRequestDTO request = new UpdateLlmModelPriceRequestDTO(
                 PricingMode.UNPRICED,
                 new BigDecimal("1.00"),
                 null,
@@ -247,7 +247,7 @@ class LlmModelServiceTest extends BaseUnitTest {
 
             LlmModel result = modelService.updateSharing(
                 7L,
-                new UpdateLlmModelSharingRequest(ModelVisibility.PUBLIC, null)
+                new UpdateLlmModelSharingRequestDTO(ModelVisibility.PUBLIC, null)
             );
 
             verify(grantRepository).deleteAll(List.of(existing));
@@ -262,7 +262,7 @@ class LlmModelServiceTest extends BaseUnitTest {
             when(grantRepository.findByIdModelId(7L)).thenReturn(List.of());
             when(workspaceRepository.findAllById(Set.of(1L, 2L))).thenReturn(List.of(workspaceWithId(1L)));
 
-            UpdateLlmModelSharingRequest request = new UpdateLlmModelSharingRequest(
+            UpdateLlmModelSharingRequestDTO request = new UpdateLlmModelSharingRequestDTO(
                 ModelVisibility.GRANTED,
                 List.of(1L, 2L)
             );
@@ -285,7 +285,7 @@ class LlmModelServiceTest extends BaseUnitTest {
                 List.of(workspaceWithId(1L), workspaceWithId(3L))
             );
 
-            UpdateLlmModelSharingRequest request = new UpdateLlmModelSharingRequest(
+            UpdateLlmModelSharingRequestDTO request = new UpdateLlmModelSharingRequestDTO(
                 ModelVisibility.GRANTED,
                 List.of(1L, 3L)
             );
@@ -313,7 +313,7 @@ class LlmModelServiceTest extends BaseUnitTest {
             LlmModelWorkspaceGrant existing = new LlmModelWorkspaceGrant(7L, 1L);
             when(grantRepository.findByIdModelId(7L)).thenReturn(List.of(existing));
 
-            modelService.updateSharing(7L, new UpdateLlmModelSharingRequest(ModelVisibility.GRANTED, List.of()));
+            modelService.updateSharing(7L, new UpdateLlmModelSharingRequestDTO(ModelVisibility.GRANTED, List.of()));
 
             verify(workspaceRepository, never()).findAllById(anyCollection());
             verify(grantRepository).deleteAll(List.of(existing));

@@ -43,7 +43,7 @@ public class LlmModelAdminController {
     @Audited("auth_event LLM_MODEL_CREATED")
     public ResponseEntity<LlmModelDTO> create(
         @PathVariable Long connectionId,
-        @Valid @RequestBody CreateLlmModelRequest request
+        @Valid @RequestBody CreateLlmModelRequestDTO request
     ) {
         LlmModel created = modelService.create(connectionId, request);
         URI location = ServletUriComponentsBuilder.fromCurrentContextPath()
@@ -85,7 +85,7 @@ public class LlmModelAdminController {
     @Audited("auth_event LLM_MODEL_UPDATED")
     public ResponseEntity<LlmModelDTO> update(
         @PathVariable Long id,
-        @Valid @RequestBody UpdateLlmModelRequest request
+        @Valid @RequestBody UpdateLlmModelRequestDTO request
     ) {
         return ResponseEntity.ok(toDTO(modelService.update(id, request)));
     }
@@ -103,7 +103,7 @@ public class LlmModelAdminController {
     @Audited("auth_event LLM_MODEL_PRICE_CHANGED")
     public ResponseEntity<LlmModelDTO> updatePrice(
         @PathVariable Long id,
-        @Valid @RequestBody UpdateLlmModelPriceRequest request
+        @Valid @RequestBody UpdateLlmModelPriceRequestDTO request
     ) {
         modelService.updatePrice(id, request);
         return ResponseEntity.ok(toDTO(modelService.get(id)));
@@ -114,7 +114,7 @@ public class LlmModelAdminController {
     @Audited("auth_event LLM_MODEL_SHARING_CHANGED")
     public ResponseEntity<LlmModelDTO> updateSharing(
         @PathVariable Long id,
-        @Valid @RequestBody UpdateLlmModelSharingRequest request
+        @Valid @RequestBody UpdateLlmModelSharingRequestDTO request
     ) {
         return ResponseEntity.ok(toDTO(modelService.updateSharing(id, request)));
     }

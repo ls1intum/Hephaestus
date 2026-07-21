@@ -11,7 +11,7 @@ import org.jspecify.annotations.Nullable;
  * key, and {@code clearApiKey=true} removes it (clearing wins over a supplied value).
  */
 @Schema(description = "Update your AI provider connection (all fields optional)")
-public record UpdateWorkspaceLlmConnectionRequest(
+public record UpdateWorkspaceLlmConnectionRequestDTO(
     @Nullable @Size(max = 128) @Schema(description = "Human-readable name") String displayName,
     @Nullable @Size(max = 2048) @Schema(description = "Provider base URL") String baseUrl,
     @Nullable

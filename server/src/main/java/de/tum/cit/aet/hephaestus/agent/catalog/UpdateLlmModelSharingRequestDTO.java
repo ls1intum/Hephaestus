@@ -11,7 +11,7 @@ import org.jspecify.annotations.Nullable;
  * existing grants; {@code GRANTED} shares only with {@code workspaceIds}, replacing the current set.
  */
 @Schema(description = "Share with: all workspaces, or a selected set")
-public record UpdateLlmModelSharingRequest(
+public record UpdateLlmModelSharingRequestDTO(
     @NonNull
     @NotNull
     @Schema(description = "Share with all workspaces (PUBLIC) or only the selected ones (GRANTED)")

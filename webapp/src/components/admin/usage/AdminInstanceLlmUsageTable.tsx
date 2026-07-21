@@ -20,7 +20,7 @@ export interface AdminInstanceLlmUsageTableProps {
 	/** Per-workspace month rollups, already sorted by the container (cost desc). */
 	rows: AdminWorkspaceLlmUsage[];
 	/**
-	 * Whether the shown month is the current calendar month (UTC). `overBudget` compares the
+	 * Whether the shown month is the current calendar month (UTC). `verdict` compares the
 	 * workspace's *current* cap against the selected month's spend, so it only describes a real
 	 * pause for the current month — past months show a neutral status instead.
 	 */
@@ -99,7 +99,9 @@ export function AdminInstanceLlmUsageTable({
 								<div className="font-mono text-xs text-muted-foreground">{row.workspaceSlug}</div>
 							</TableCell>
 							<TableCell className="text-right tabular-nums">
-								{formatCostUsd(row.costUsd)}
+								{row.verdict === "UNVERIFIABLE"
+									? `at least ${formatCostUsd(row.pricedTotalCostUsd)}`
+									: formatCostUsd(row.pricedTotalCostUsd)}
 							</TableCell>
 							<TableCell className="text-right tabular-nums">
 								{row.monthlyBudgetUsd != null ? (
@@ -111,8 +113,10 @@ export function AdminInstanceLlmUsageTable({
 							<TableCell>
 								{!isCurrentMonth ? (
 									<span className="text-muted-foreground">—</span>
-								) : row.overBudget ? (
+								) : row.verdict === "EXHAUSTED" ? (
 									<Badge variant="destructive">Over budget</Badge>
+								) : row.verdict === "UNVERIFIABLE" ? (
+									<Badge variant="outline">Unverified</Badge>
 								) : row.monthlyBudgetUsd != null ? (
 									<Badge variant="outline">OK</Badge>
 								) : (

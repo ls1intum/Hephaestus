@@ -38,8 +38,8 @@ class LlmConnectionServiceTest extends BaseUnitTest {
     @InjectMocks
     private LlmConnectionService connectionService;
 
-    private CreateLlmConnectionRequest createRequest() {
-        return new CreateLlmConnectionRequest(
+    private CreateLlmConnectionRequestDTO createRequest() {
+        return new CreateLlmConnectionRequestDTO(
             "openai-prod",
             "OpenAI",
             "https://api.openai.com",
@@ -134,7 +134,7 @@ class LlmConnectionServiceTest extends BaseUnitTest {
             when(connectionRepository.findById(5L)).thenReturn(Optional.of(connection));
             when(connectionRepository.save(any(LlmConnection.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            UpdateLlmConnectionRequest request = new UpdateLlmConnectionRequest(
+            UpdateLlmConnectionRequestDTO request = new UpdateLlmConnectionRequestDTO(
                 "New name",
                 null,
                 null,

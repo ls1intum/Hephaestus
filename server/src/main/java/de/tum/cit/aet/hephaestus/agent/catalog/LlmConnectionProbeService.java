@@ -22,7 +22,7 @@ import tools.jackson.databind.JsonNode;
  * {baseUrl}/models} and reports only whether the provider answered and which model ids it listed.
  *
  * <p>Contract: the probe never throws on an upstream failure — a 4xx, 5xx or timeout is reported as an
- * advisory {@link LlmProbeResult} with {@code reachable=false}. Only the egress guard (a client-side
+ * advisory {@link LlmProbeResultDTO} with {@code reachable=false}. Only the egress guard (a client-side
  * misconfiguration) may reject the request before any network call. The upstream body is never echoed
  * back; only {@code data[].id} is extracted.
  */
@@ -49,7 +49,7 @@ public class LlmConnectionProbeService {
 
     /** Probe a stored connection using its persisted credential. */
     @Transactional(readOnly = true)
-    public LlmProbeResult probeStored(Long connectionId) {
+    public LlmProbeResultDTO probeStored(Long connectionId) {
         LlmConnection connection = connectionRepository
             .findById(connectionId)
             .orElseThrow(() -> new EntityNotFoundException("LlmConnection", connectionId));
@@ -63,7 +63,7 @@ public class LlmConnectionProbeService {
     }
 
     /** Probe an unsaved draft using the supplied credential (never persisted). */
-    public LlmProbeResult probeDraft(ProbeLlmConnectionRequest request) {
+    public LlmProbeResultDTO probeDraft(ProbeLlmConnectionRequestDTO request) {
         egressPolicy.validate(request.baseUrl());
         AuthDefaults defaults = ApiProtocolDefaults.forProtocol(request.apiProtocol());
         String headerName = StringUtils.hasText(request.authHeaderName())
@@ -78,7 +78,7 @@ public class LlmConnectionProbeService {
      * and has already egress-validated {@code baseUrl} itself — reused rather than duplicated so both
      * scopes share the exact same "test & fetch models" mechanics.
      */
-    public LlmProbeResult probeCredential(
+    public LlmProbeResultDTO probeCredential(
         String baseUrl,
         String authHeaderName,
         String authValuePrefix,
@@ -87,7 +87,7 @@ public class LlmConnectionProbeService {
         return probe(baseUrl, authHeaderName, authValuePrefix, apiKey);
     }
 
-    private LlmProbeResult probe(String baseUrl, String authHeaderName, String authValuePrefix, String apiKey) {
+    private LlmProbeResultDTO probe(String baseUrl, String authHeaderName, String authValuePrefix, String apiKey) {
         String url = stripTrailingSlash(baseUrl) + "/models";
         try {
             return restClient
@@ -103,16 +103,16 @@ public class LlmConnectionProbeService {
                 .exchange((clientRequest, clientResponse) -> {
                     int status = clientResponse.getStatusCode().value();
                     if (!clientResponse.getStatusCode().is2xxSuccessful()) {
-                        return LlmProbeResult.unreachable(status, "Provider returned HTTP " + status);
+                        return LlmProbeResultDTO.unreachable(status, "Provider returned HTTP " + status);
                     }
                     JsonNode body = clientResponse.bodyTo(JsonNode.class);
-                    return LlmProbeResult.reachable(extractModelIds(body), status);
+                    return LlmProbeResultDTO.reachable(extractModelIds(body), status);
                 });
         } catch (Exception e) {
             // Any transport-level failure (timeout, DNS, connection refused, malformed body) is advisory,
             // never fatal. The exception message may carry host detail, so keep it out of the response.
             log.info("LLM connection probe failed: reason={}", e.getClass().getSimpleName());
-            return LlmProbeResult.unreachable(null, "Could not reach the provider: " + e.getClass().getSimpleName());
+            return LlmProbeResultDTO.unreachable(null, "Could not reach the provider: " + e.getClass().getSimpleName());
         }
     }
 

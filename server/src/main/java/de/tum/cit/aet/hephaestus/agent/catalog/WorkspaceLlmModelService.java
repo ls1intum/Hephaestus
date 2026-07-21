@@ -56,7 +56,7 @@ public class WorkspaceLlmModelService {
     public WorkspaceLlmModel create(
         WorkspaceContext workspaceContext,
         Long connectionId,
-        CreateWorkspaceLlmModelRequest request
+        CreateWorkspaceLlmModelRequestDTO request
     ) {
         requireByoEnabled();
         Long workspaceId = workspaceContext.id();
@@ -131,7 +131,7 @@ public class WorkspaceLlmModelService {
     public WorkspaceLlmModel update(
         WorkspaceContext workspaceContext,
         Long id,
-        UpdateWorkspaceLlmModelRequest request
+        UpdateWorkspaceLlmModelRequestDTO request
     ) {
         requireByoEnabled();
         WorkspaceLlmModel model = get(workspaceContext, id);

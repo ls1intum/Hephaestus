@@ -10,7 +10,7 @@ import org.jspecify.annotations.Nullable;
  * its current value. Pricing and sharing are updated through their own endpoints, not here.
  */
 @Schema(description = "Update a model's metadata (all fields optional; pricing and sharing are separate)")
-public record UpdateLlmModelRequest(
+public record UpdateLlmModelRequestDTO(
     @Nullable @Size(max = 128) @Schema(description = "Human-readable name") String displayName,
     @Nullable @Size(max = 256) @Schema(description = "Upstream provider model id") String upstreamModelId,
     @Nullable

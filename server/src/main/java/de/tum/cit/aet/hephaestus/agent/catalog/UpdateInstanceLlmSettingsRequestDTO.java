@@ -9,7 +9,7 @@ import org.jspecify.annotations.Nullable;
  * (null) field keeps its current value.
  */
 @Schema(description = "Update instance-wide LLM governance settings (all fields optional)")
-public record UpdateInstanceLlmSettingsRequest(
+public record UpdateInstanceLlmSettingsRequestDTO(
     @Nullable
     @Schema(description = "Comma/newline-delimited egress host allowlist; blank clears it")
     String allowedEgressHosts,

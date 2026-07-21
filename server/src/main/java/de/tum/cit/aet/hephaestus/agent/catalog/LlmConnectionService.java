@@ -45,7 +45,7 @@ public class LlmConnectionService {
     }
 
     @Transactional
-    public LlmConnection create(CreateLlmConnectionRequest request) {
+    public LlmConnection create(CreateLlmConnectionRequestDTO request) {
         if (connectionRepository.findBySlug(request.slug()).isPresent()) {
             throw new LlmConnectionSlugConflictException(request.slug());
         }
@@ -89,7 +89,7 @@ public class LlmConnectionService {
     }
 
     @Transactional
-    public LlmConnection update(Long id, UpdateLlmConnectionRequest request) {
+    public LlmConnection update(Long id, UpdateLlmConnectionRequestDTO request) {
         LlmConnection connection = connectionRepository
             .findById(id)
             .orElseThrow(() -> new EntityNotFoundException("LlmConnection", id));

@@ -9,7 +9,7 @@ import org.jspecify.annotations.Nullable;
 
 /** Connect your own AI provider (#1368): a workspace-owned, tenant-scoped LLM connection. */
 @Schema(description = "Connect your own AI provider")
-public record CreateWorkspaceLlmConnectionRequest(
+public record CreateWorkspaceLlmConnectionRequestDTO(
     @NonNull
     @NotBlank
     @Pattern(

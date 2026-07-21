@@ -58,7 +58,7 @@ public class WorkspaceLlmConnectionController {
     @Audited("WORKSPACE_LLM_CONNECTION")
     public ResponseEntity<WorkspaceLlmConnectionDTO> create(
         WorkspaceContext workspaceContext,
-        @Valid @RequestBody CreateWorkspaceLlmConnectionRequest request
+        @Valid @RequestBody CreateWorkspaceLlmConnectionRequestDTO request
     ) {
         WorkspaceLlmConnection created = connectionService.create(workspaceContext, request);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
@@ -75,7 +75,7 @@ public class WorkspaceLlmConnectionController {
     public ResponseEntity<WorkspaceLlmConnectionDTO> update(
         WorkspaceContext workspaceContext,
         @PathVariable Long id,
-        @Valid @RequestBody UpdateWorkspaceLlmConnectionRequest request
+        @Valid @RequestBody UpdateWorkspaceLlmConnectionRequestDTO request
     ) {
         return ResponseEntity.ok(
             WorkspaceLlmConnectionDTO.from(connectionService.update(workspaceContext, id, request))
@@ -95,7 +95,7 @@ public class WorkspaceLlmConnectionController {
     @Operation(summary = "Test your AI provider connection", operationId = "workspaceProbeLlmConnection")
     @RequireAtLeastWorkspaceAdmin
     @AuditExempt(reason = "tests a stored credential; stores no configuration")
-    public ResponseEntity<WorkspaceLlmProbeResult> probe(WorkspaceContext workspaceContext, @PathVariable Long id) {
+    public ResponseEntity<WorkspaceLlmProbeResultDTO> probe(WorkspaceContext workspaceContext, @PathVariable Long id) {
         return ResponseEntity.ok(connectionService.probe(workspaceContext, id));
     }
 }

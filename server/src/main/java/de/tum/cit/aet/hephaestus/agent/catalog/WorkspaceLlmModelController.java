@@ -42,7 +42,7 @@ public class WorkspaceLlmModelController {
     public ResponseEntity<WorkspaceLlmModelDTO> create(
         WorkspaceContext workspaceContext,
         @PathVariable Long connectionId,
-        @Valid @RequestBody CreateWorkspaceLlmModelRequest request
+        @Valid @RequestBody CreateWorkspaceLlmModelRequestDTO request
     ) {
         WorkspaceLlmModel created = modelService.create(workspaceContext, connectionId, request);
         URI location = ServletUriComponentsBuilder.fromCurrentContextPath()
@@ -73,7 +73,7 @@ public class WorkspaceLlmModelController {
     public ResponseEntity<WorkspaceLlmModelDTO> update(
         WorkspaceContext workspaceContext,
         @PathVariable Long id,
-        @Valid @RequestBody UpdateWorkspaceLlmModelRequest request
+        @Valid @RequestBody UpdateWorkspaceLlmModelRequestDTO request
     ) {
         return ResponseEntity.ok(WorkspaceLlmModelDTO.from(modelService.update(workspaceContext, id, request)));
     }

@@ -123,6 +123,10 @@ export type WorkspaceLlmUsageReport = {
     byDay: Array<LlmUsageByDay>;
     byJobType: Array<LlmUsageByJobType>;
     /**
+     * This month's spend on this workspace's own connected provider(s), in USD. Shown separately — it never counts toward the monthly budget and must never be added to pricedTotalCostUsd.
+     */
+    byoTotalCostUsd: number;
+    /**
      * Calendar month (UTC), ISO yyyy-MM
      */
     month: string;
@@ -131,26 +135,29 @@ export type WorkspaceLlmUsageReport = {
      */
     monthlyBudgetUsd?: number;
     /**
-     * Spend reached the cap — detection and mentor turns are paused for the current month
+     * This month's confirmed spend on shared (instance) models, in USD — the figure the monthly budget compares against. When unpricedEventCount is non-zero this is a floor, not the full total: render it as "at least $X".
      */
-    overBudget: boolean;
+    pricedTotalCostUsd: number;
     /**
-     * Total spend in the month, USD
+     * Calls this month (any provider) whose price is not yet known. They are excluded from both totals above, so a non-zero value means the real spend may be higher than shown.
      */
-    totalCostUsd: number;
+    unpricedEventCount: number;
     /**
-     * Events in the month whose cost could not be resolved (unknown model pricing). They count as zero spend, so a non-zero value means the budget cap is not seeing everything — add a model_pricing row for the model.
+     * Whether this month's confirmed spend is within the cap, has reached it (work is paused), or can't be fully confirmed yet because some usage above has no price set.
      */
-    uncostedEvents: number;
+    verdict: 'WITHIN' | 'EXHAUSTED' | 'UNVERIFIABLE';
 };
 
 /**
  * Month spend aggregated by job type
  */
 export type LlmUsageByJobType = {
+    /**
+     * Spend on this workspace's own connected provider(s) for this job type, in USD. Never counts toward the monthly budget.
+     */
+    byoTotalCostUsd: number;
     cacheReadTokens: number;
     cacheWriteTokens: number;
-    costUsd: number;
     /**
      * Ledger events (jobs / mentor turns)
      */
@@ -159,18 +166,211 @@ export type LlmUsageByJobType = {
     jobType: 'PULL_REQUEST_REVIEW' | 'ISSUE_REVIEW' | 'CONVERSATION_REVIEW' | 'MENTOR_TURN';
     outputTokens: number;
     /**
+     * Confirmed spend on shared (instance) models for this job type, in USD.
+     */
+    pricedTotalCostUsd: number;
+    /**
      * LLM API calls, as reported by the runtime. Detection jobs report their real call count; a mentor turn reports 1 per turn regardless of its internal tool loop, so compare turns to turns, not to job calls.
      */
     totalCalls: number;
+    /**
+     * Calls for this job type whose price is not yet known. Excluded from both totals above.
+     */
+    unpricedEventCount: number;
 };
 
 /**
  * Spend for one UTC day
  */
 export type LlmUsageByDay = {
-    costUsd: number;
+    /**
+     * Spend on this workspace's own connected provider(s) for this day, in USD. Never counts toward the monthly budget.
+     */
+    byoTotalCostUsd: number;
     day: Date;
     events: number;
+    /**
+     * Confirmed spend on shared (instance) models for this day, in USD.
+     */
+    pricedTotalCostUsd: number;
+    /**
+     * Calls this day whose price is not yet known. Excluded from both totals above.
+     */
+    unpricedEventCount: number;
+};
+
+/**
+ * Result of testing your AI provider connection
+ */
+export type WorkspaceLlmProbeResult = {
+    /**
+     * Human-readable diagnostic when not reachable
+     */
+    message?: string;
+    /**
+     * How many models the provider listed (0 if unreachable)
+     */
+    modelCount: number;
+    /**
+     * Whether the provider answered
+     */
+    reachable: boolean;
+};
+
+/**
+ * A model on your AI provider
+ */
+export type WorkspaceLlmModel = {
+    /**
+     * Wire protocol override for this model
+     */
+    apiProtocolOverride?: string;
+    /**
+     * Cache-control wire format, if applicable
+     */
+    cacheControlFormat?: string;
+    /**
+     * Owning connection's display name
+     */
+    connectionDisplayName: string;
+    /**
+     * Owning connection id
+     */
+    connectionId: number;
+    /**
+     * Context window in tokens
+     */
+    contextWindow?: number;
+    /**
+     * Creation timestamp
+     */
+    createdAt: Date;
+    /**
+     * Currency code
+     */
+    currency: string;
+    /**
+     * Human-readable name
+     */
+    displayName: string;
+    /**
+     * Active toggle
+     */
+    enabled: boolean;
+    /**
+     * Model id
+     */
+    id: number;
+    /**
+     * Maximum output tokens
+     */
+    maxOutputTokens?: number;
+    /**
+     * What surface this model serves
+     */
+    modality: 'CHAT' | 'EMBEDDING' | 'RERANK';
+    /**
+     * Cache-read rate per 1M tokens (USD)
+     */
+    per1mCacheReadUsd?: number;
+    /**
+     * Cache-write rate per 1M tokens (USD)
+     */
+    per1mCacheWriteUsd?: number;
+    /**
+     * Input rate per 1M tokens (USD)
+     */
+    per1mInputUsd?: number;
+    /**
+     * Output rate per 1M tokens (USD)
+     */
+    per1mOutputUsd?: number;
+    /**
+     * Reasoning-token rate per 1M tokens (USD)
+     */
+    per1mReasoningUsd?: number;
+    /**
+     * Price note
+     */
+    priceNote?: string;
+    /**
+     * Pricing mode
+     */
+    pricingMode: 'PRICED' | 'FREE' | 'UNPRICED';
+    /**
+     * Unique slug within the workspace
+     */
+    slug: string;
+    /**
+     * Whether the model supports a reasoning mode
+     */
+    supportsReasoning: boolean;
+    /**
+     * Last update timestamp
+     */
+    updatedAt?: Date;
+    /**
+     * Upstream provider model id
+     */
+    upstreamModelId: string;
+};
+
+/**
+ * Your AI provider connection (API key redacted)
+ */
+export type WorkspaceLlmConnection = {
+    /**
+     * Last four characters of the stored API key, if any
+     */
+    apiKeyLast4?: string;
+    /**
+     * Wire protocol
+     */
+    apiProtocol: string;
+    /**
+     * Auth header name
+     */
+    authHeaderName: string;
+    /**
+     * Auth value prefix
+     */
+    authValuePrefix: string;
+    /**
+     * Azure API version, if applicable
+     */
+    azureApiVersion?: string;
+    /**
+     * Provider base URL
+     */
+    baseUrl: string;
+    /**
+     * Creation timestamp
+     */
+    createdAt: Date;
+    /**
+     * Human-readable name
+     */
+    displayName: string;
+    /**
+     * Whether the connection is active
+     */
+    enabled: boolean;
+    /**
+     * Whether an API key is stored
+     */
+    hasApiKey: boolean;
+    /**
+     * Connection ID
+     */
+    id: number;
+    /**
+     * Unique slug within the workspace
+     */
+    slug: string;
+    /**
+     * Last update timestamp
+     */
+    updatedAt?: Date;
 };
 
 /**
@@ -516,6 +716,118 @@ export type UpdateWorkspaceNotificationsRequest = {
 };
 
 /**
+ * Update a model on your AI provider (all fields optional)
+ */
+export type UpdateWorkspaceLlmModelRequest = {
+    /**
+     * Wire protocol override for this model; blank clears the override
+     */
+    apiProtocolOverride?: string;
+    /**
+     * Cache-control wire format, if applicable; blank clears it
+     */
+    cacheControlFormat?: string;
+    /**
+     * Context window in tokens
+     */
+    contextWindow?: number;
+    /**
+     * Human-readable name
+     */
+    displayName?: string;
+    /**
+     * Active toggle
+     */
+    enabled?: boolean;
+    /**
+     * Maximum output tokens
+     */
+    maxOutputTokens?: number;
+    /**
+     * What surface this model serves
+     */
+    modality?: 'CHAT' | 'EMBEDDING' | 'RERANK';
+    /**
+     * Cache-read rate per 1M tokens (USD), if applicable
+     */
+    per1mCacheReadUsd?: number;
+    /**
+     * Cache-write rate per 1M tokens (USD), if applicable
+     */
+    per1mCacheWriteUsd?: number;
+    /**
+     * Input rate per 1M tokens (USD)
+     */
+    per1mInputUsd?: number;
+    /**
+     * Output rate per 1M tokens (USD)
+     */
+    per1mOutputUsd?: number;
+    /**
+     * Reasoning-token rate per 1M tokens (USD), if applicable
+     */
+    per1mReasoningUsd?: number;
+    /**
+     * Note; required when the model is free (e.g. self-hosted, no cost)
+     */
+    priceNote?: string;
+    /**
+     * Pricing mode; when given, replaces the price wholesale (see class docs)
+     */
+    pricingMode?: 'PRICED' | 'FREE' | 'UNPRICED';
+    /**
+     * Whether the model supports a reasoning mode
+     */
+    supportsReasoning?: boolean;
+    /**
+     * Upstream provider model id
+     */
+    upstreamModelId?: string;
+};
+
+/**
+ * Update your AI provider connection (all fields optional)
+ */
+export type UpdateWorkspaceLlmConnectionRequest = {
+    /**
+     * New API key (write-only; never returned)
+     */
+    apiKey?: string;
+    /**
+     * Wire protocol
+     */
+    apiProtocol?: string;
+    /**
+     * Auth header name
+     */
+    authHeaderName?: string;
+    /**
+     * Auth value prefix
+     */
+    authValuePrefix?: string;
+    /**
+     * Azure API version
+     */
+    azureApiVersion?: string;
+    /**
+     * Provider base URL
+     */
+    baseUrl?: string;
+    /**
+     * Set true to clear the stored API key
+     */
+    clearApiKey?: boolean;
+    /**
+     * Human-readable name
+     */
+    displayName?: string;
+    /**
+     * Whether the connection is active
+     */
+    enabled?: boolean;
+};
+
+/**
  * Set or clear a workspace's monthly LLM budget cap
  */
 export type UpdateWorkspaceLlmBudgetRequest = {
@@ -728,6 +1040,138 @@ export type UpdateLoginProviderRequest = {
 };
 
 /**
+ * Share with: all workspaces, or a selected set
+ */
+export type UpdateLlmModelSharingRequest = {
+    /**
+     * Share with all workspaces (PUBLIC) or only the selected ones (GRANTED)
+     */
+    visibility: 'PUBLIC' | 'GRANTED';
+    /**
+     * Workspace ids to share with; required and used only when visibility is GRANTED
+     */
+    workspaceIds?: Array<number>;
+};
+
+/**
+ * Update a model's metadata (all fields optional; pricing and sharing are separate)
+ */
+export type UpdateLlmModelRequest = {
+    /**
+     * Wire protocol override for this model; blank clears the override
+     */
+    apiProtocolOverride?: string;
+    /**
+     * Cache-control wire format, if applicable; blank clears it
+     */
+    cacheControlFormat?: string;
+    /**
+     * Context window in tokens
+     */
+    contextWindow?: number;
+    /**
+     * Human-readable name
+     */
+    displayName?: string;
+    /**
+     * Active toggle (off = existing settings stop working)
+     */
+    enabled?: boolean;
+    /**
+     * Maximum output tokens
+     */
+    maxOutputTokens?: number;
+    /**
+     * What surface this model serves
+     */
+    modality?: 'CHAT' | 'EMBEDDING' | 'RERANK';
+    /**
+     * Whether the model supports a reasoning mode
+     */
+    supportsReasoning?: boolean;
+    /**
+     * Upstream provider model id
+     */
+    upstreamModelId?: string;
+};
+
+/**
+ * Reprice a model; supersedes the current price
+ */
+export type UpdateLlmModelPriceRequest = {
+    /**
+     * Note; required when the model is free (e.g. self-hosted, no cost)
+     */
+    note?: string;
+    /**
+     * Cache-read rate per 1M tokens (USD), if applicable
+     */
+    per1mCacheReadUsd?: number;
+    /**
+     * Cache-write rate per 1M tokens (USD), if applicable
+     */
+    per1mCacheWriteUsd?: number;
+    /**
+     * Input rate per 1M tokens (USD); required when the model has a price
+     */
+    per1mInputUsd?: number;
+    /**
+     * Output rate per 1M tokens (USD); required when the model has a price
+     */
+    per1mOutputUsd?: number;
+    /**
+     * Reasoning-token rate per 1M tokens (USD), if applicable
+     */
+    per1mReasoningUsd?: number;
+    /**
+     * PRICED shows the price itself; FREE is a deliberate no-cost declaration; UNPRICED shows "No price set"
+     */
+    pricingMode: 'PRICED' | 'FREE' | 'UNPRICED';
+};
+
+/**
+ * Update an instance LLM provider connection (all fields optional)
+ */
+export type UpdateLlmConnectionRequest = {
+    /**
+     * New API key (write-only; never returned)
+     */
+    apiKey?: string;
+    /**
+     * Wire protocol
+     */
+    apiProtocol?: string;
+    /**
+     * Auth header name
+     */
+    authHeaderName?: string;
+    /**
+     * Auth value prefix
+     */
+    authValuePrefix?: string;
+    /**
+     * Azure API version
+     */
+    azureApiVersion?: string;
+    /**
+     * Provider base URL
+     */
+    baseUrl?: string;
+    /**
+     * Set true to clear the stored API key
+     */
+    clearApiKey?: boolean;
+    /**
+     * Human-readable name
+     */
+    displayName?: string;
+    /**
+     * Whether the connection is enabled
+     */
+    enabled?: boolean;
+};
+
+/**
  * Request to update the entire weekly leaderboard digest configuration atomically
  */
 export type UpdateLeaderboardDigestRequest = {
@@ -751,6 +1195,24 @@ export type UpdateLeaderboardDigestRequest = {
      * Time in 24-hour format (HH:mm)
      */
     time: string;
+};
+
+/**
+ * Update instance-wide LLM governance settings (all fields optional)
+ */
+export type UpdateInstanceLlmSettingsRequest = {
+    /**
+     * Whether workspaces may register their own LLM connections
+     */
+    allowWorkspaceConnections?: boolean;
+    /**
+     * Comma/newline-delimited egress host allowlist; blank clears it
+     */
+    allowedEgressHosts?: string;
+    /**
+     * Default policy for usage reported without a price
+     */
+    defaultUnpricedPolicy?: 'WARN' | 'BLOCK';
 };
 
 /**
@@ -780,13 +1242,17 @@ export type UpdateAgentConfigRequest = {
      */
     clearLlmApiKey?: boolean;
     /**
-     * Authentication mode: PROXY (internal proxy) or API_KEY (direct)
+     * Set true to clear the model binding (reverts to the legacy provider fields below)
      */
-    credentialMode?: 'PROXY' | 'API_KEY';
+    clearModelBinding?: boolean;
     /**
      * Whether the agent is enabled
      */
     enabled?: boolean;
+    /**
+     * Bind to a shared (instance catalog) model. Mutually exclusive with workspaceModelId.
+     */
+    instanceModelId?: number;
     /**
      * LLM API key (omit or null to keep existing key)
      */
@@ -811,6 +1277,10 @@ export type UpdateAgentConfigRequest = {
      * Job timeout in seconds
      */
     timeoutSeconds?: number;
+    /**
+     * Bind to a model on your own provider. Mutually exclusive with instanceModelId.
+     */
+    workspaceModelId?: number;
 };
 
 /**
@@ -1769,6 +2239,32 @@ export type ProblemDetail = {
 };
 
 /**
+ * Draft connection probe using a supplied (never-persisted) credential
+ */
+export type ProbeLlmConnectionRequest = {
+    /**
+     * API key used only for this probe
+     */
+    apiKey?: string;
+    /**
+     * Wire protocol
+     */
+    apiProtocol: string;
+    /**
+     * Auth header name; defaults from protocol
+     */
+    authHeaderName?: string;
+    /**
+     * Auth value prefix; defaults from protocol
+     */
+    authValuePrefix?: string;
+    /**
+     * Provider base URL
+     */
+    baseUrl: string;
+};
+
+/**
  * A practice area grouping related practices into a learning objective
  */
 export type PracticeArea = {
@@ -2015,7 +2511,7 @@ export type ConfigAuditEntryView = {
      */
     changedKeys?: Array<string>;
     entityId?: string;
-    entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AI_CONFIG_BINDING' | 'AGENT_CONFIG' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'WORKSPACE_LLM_BUDGET';
+    entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AI_CONFIG_BINDING' | 'AGENT_CONFIG' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL';
     id?: number;
     newValue?: string;
     occurredAt?: Date;
@@ -2140,7 +2636,7 @@ export type AgentJob = {
      */
     llmCacheWriteTokens?: number;
     /**
-     * Estimated cost in USD (agent-reported)
+     * Deprecated, always null (#1368 slice 6): the runner no longer reports cost. See the workspace's LLM usage rollup for the authoritative, catalog-derived per-job cost.
      */
     llmCostUsd?: number;
     /**
@@ -2399,6 +2895,214 @@ export type LoginProviderView = {
 };
 
 /**
+ * Result of testing an LLM connection's /models endpoint
+ */
+export type LlmProbeResult = {
+    /**
+     * Human-readable diagnostic when not reachable
+     */
+    message?: string;
+    /**
+     * Model ids returned by the provider (empty if unreachable)
+     */
+    models: Array<string>;
+    /**
+     * Whether the provider answered with a successful models listing
+     */
+    reachable: boolean;
+    /**
+     * HTTP status returned by the provider, if any
+     */
+    statusCode?: number;
+};
+
+/**
+ * A model's price, per 1M tokens
+ */
+export type LlmModelPrice = {
+    /**
+     * Currency code
+     */
+    currency: string;
+    /**
+     * When this price took effect
+     */
+    effectiveFrom: Date;
+    /**
+     * When this price was superseded; null if still current
+     */
+    effectiveTo?: Date;
+    /**
+     * Price row id
+     */
+    id: number;
+    /**
+     * Note
+     */
+    note?: string;
+    /**
+     * Cache-read rate per 1M tokens (USD)
+     */
+    per1mCacheReadUsd?: number;
+    /**
+     * Cache-write rate per 1M tokens (USD)
+     */
+    per1mCacheWriteUsd?: number;
+    /**
+     * Input rate per 1M tokens (USD)
+     */
+    per1mInputUsd?: number;
+    /**
+     * Output rate per 1M tokens (USD)
+     */
+    per1mOutputUsd?: number;
+    /**
+     * Reasoning-token rate per 1M tokens (USD)
+     */
+    per1mReasoningUsd?: number;
+    /**
+     * Pricing mode
+     */
+    pricingMode: 'PRICED' | 'FREE' | 'UNPRICED';
+};
+
+/**
+ * Instance catalog model
+ */
+export type LlmModel = {
+    /**
+     * Wire protocol override for this model
+     */
+    apiProtocolOverride?: string;
+    /**
+     * Cache-control wire format, if applicable
+     */
+    cacheControlFormat?: string;
+    /**
+     * Owning connection's display name
+     */
+    connectionDisplayName: string;
+    /**
+     * Owning connection id
+     */
+    connectionId: number;
+    /**
+     * Context window in tokens
+     */
+    contextWindow?: number;
+    /**
+     * Creation timestamp
+     */
+    createdAt: Date;
+    /**
+     * Current price; null if none has ever been set
+     */
+    currentPrice?: LlmModelPrice;
+    /**
+     * Human-readable name
+     */
+    displayName: string;
+    /**
+     * Active toggle
+     */
+    enabled: boolean;
+    /**
+     * Workspace ids shared with; only meaningful when visibility is GRANTED
+     */
+    grantedWorkspaceIds: Array<number>;
+    /**
+     * Model id
+     */
+    id: number;
+    /**
+     * Maximum output tokens
+     */
+    maxOutputTokens?: number;
+    /**
+     * What surface this model serves
+     */
+    modality: 'CHAT' | 'EMBEDDING' | 'RERANK';
+    /**
+     * Unique slug within the connection
+     */
+    slug: string;
+    /**
+     * Whether the model supports a reasoning mode
+     */
+    supportsReasoning: boolean;
+    /**
+     * Last update timestamp
+     */
+    updatedAt?: Date;
+    /**
+     * Upstream provider model id
+     */
+    upstreamModelId: string;
+    /**
+     * Share with all workspaces (PUBLIC) or only selected ones (GRANTED)
+     */
+    visibility: 'PUBLIC' | 'GRANTED';
+};
+
+/**
+ * Instance LLM provider connection (API key redacted)
+ */
+export type LlmConnection = {
+    /**
+     * Last four characters of the stored API key, if any
+     */
+    apiKeyLast4?: string;
+    /**
+     * Wire protocol
+     */
+    apiProtocol: string;
+    /**
+     * Auth header name
+     */
+    authHeaderName: string;
+    /**
+     * Auth value prefix
+     */
+    authValuePrefix: string;
+    /**
+     * Azure API version, if applicable
+     */
+    azureApiVersion?: string;
+    /**
+     * Provider base URL
+     */
+    baseUrl: string;
+    /**
+     * Creation timestamp
+     */
+    createdAt: Date;
+    /**
+     * Human-readable name
+     */
+    displayName: string;
+    /**
+     * Whether the connection is enabled
+     */
+    enabled: boolean;
+    /**
+     * Whether an API key is stored
+     */
+    hasApiKey: boolean;
+    /**
+     * Connection ID
+     */
+    id: number;
+    /**
+     * Unique slug
+     */
+    slug: string;
+    /**
+     * Last update timestamp
+     */
+    updatedAt?: Date;
+};
+
+/**
  * A provider instance the current user is linked to: its type + server-url origin.
  */
 export type LinkedProvider = {
@@ -2551,6 +3255,24 @@ export type IntegrationCatalogEntry = {
      * Integration kind
      */
     kind: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
+};
+
+/**
+ * Instance-wide LLM governance settings
+ */
+export type InstanceLlmSettings = {
+    /**
+     * Whether workspaces may register their own LLM connections
+     */
+    allowWorkspaceConnections: boolean;
+    /**
+     * Comma/newline-delimited egress host allowlist; blank = allow any public host
+     */
+    allowedEgressHosts?: string;
+    /**
+     * Default policy for usage reported without a price
+     */
+    defaultUnpricedPolicy: string;
 };
 
 /**
@@ -2834,6 +3556,122 @@ export type CreateWorkspaceRequest = {
 };
 
 /**
+ * Create a model on your AI provider
+ */
+export type CreateWorkspaceLlmModelRequest = {
+    /**
+     * Wire protocol override for this model; defaults to the connection's protocol
+     */
+    apiProtocolOverride?: string;
+    /**
+     * Cache-control wire format, if applicable
+     */
+    cacheControlFormat?: string;
+    /**
+     * Context window in tokens
+     */
+    contextWindow?: number;
+    /**
+     * Human-readable name
+     */
+    displayName: string;
+    /**
+     * Whether the model is active (default true)
+     */
+    enabled?: boolean;
+    /**
+     * Maximum output tokens
+     */
+    maxOutputTokens?: number;
+    /**
+     * What surface this model serves (default CHAT)
+     */
+    modality?: 'CHAT' | 'EMBEDDING' | 'RERANK';
+    /**
+     * Cache-read rate per 1M tokens (USD), if applicable
+     */
+    per1mCacheReadUsd?: number;
+    /**
+     * Cache-write rate per 1M tokens (USD), if applicable
+     */
+    per1mCacheWriteUsd?: number;
+    /**
+     * Input rate per 1M tokens (USD); required when the model has a price
+     */
+    per1mInputUsd?: number;
+    /**
+     * Output rate per 1M tokens (USD); required when the model has a price
+     */
+    per1mOutputUsd?: number;
+    /**
+     * Reasoning-token rate per 1M tokens (USD), if applicable
+     */
+    per1mReasoningUsd?: number;
+    /**
+     * Note; required when the model is free (e.g. self-hosted, no cost)
+     */
+    priceNote?: string;
+    /**
+     * Pricing mode (default UNPRICED)
+     */
+    pricingMode?: 'PRICED' | 'FREE' | 'UNPRICED';
+    /**
+     * Unique slug within the workspace
+     */
+    slug: string;
+    /**
+     * Whether the model supports a reasoning mode
+     */
+    supportsReasoning?: boolean;
+    /**
+     * Upstream provider model id
+     */
+    upstreamModelId: string;
+};
+
+/**
+ * Connect your own AI provider
+ */
+export type CreateWorkspaceLlmConnectionRequest = {
+    /**
+     * API key (write-only; never returned)
+     */
+    apiKey?: string;
+    /**
+     * Wire protocol
+     */
+    apiProtocol: string;
+    /**
+     * Auth header name; defaults from protocol
+     */
+    authHeaderName?: string;
+    /**
+     * Auth value prefix; defaults from protocol
+     */
+    authValuePrefix?: string;
+    /**
+     * Azure API version, if applicable
+     */
+    azureApiVersion?: string;
+    /**
+     * Provider base URL
+     */
+    baseUrl: string;
+    /**
+     * Human-readable name
+     */
+    displayName: string;
+    /**
+     * Whether the connection is active (default true)
+     */
+    enabled?: boolean;
+    /**
+     * Unique slug within the workspace
+     */
+    slug: string;
+};
+
+/**
  * Submit a reaction to a delivered feedback unit
  */
 export type CreateReaction = {
@@ -2941,6 +3779,94 @@ export type CreateLoginProviderRequest = {
 };
 
 /**
+ * Create a model on an instance LLM connection
+ */
+export type CreateLlmModelRequest = {
+    /**
+     * Wire protocol override for this model; defaults to the connection's protocol
+     */
+    apiProtocolOverride?: string;
+    /**
+     * Cache-control wire format, if applicable
+     */
+    cacheControlFormat?: string;
+    /**
+     * Context window in tokens
+     */
+    contextWindow?: number;
+    /**
+     * Human-readable name
+     */
+    displayName: string;
+    /**
+     * Whether the model is active (default true)
+     */
+    enabled?: boolean;
+    /**
+     * Maximum output tokens
+     */
+    maxOutputTokens?: number;
+    /**
+     * What surface this model serves (default CHAT)
+     */
+    modality?: 'CHAT' | 'EMBEDDING' | 'RERANK';
+    /**
+     * Unique slug within the connection
+     */
+    slug: string;
+    /**
+     * Whether the model supports a reasoning mode
+     */
+    supportsReasoning?: boolean;
+    /**
+     * Upstream provider model id
+     */
+    upstreamModelId: string;
+};
+
+/**
+ * Create an instance LLM provider connection
+ */
+export type CreateLlmConnectionRequest = {
+    /**
+     * API key (write-only; never returned)
+     */
+    apiKey?: string;
+    /**
+     * Wire protocol
+     */
+    apiProtocol: string;
+    /**
+     * Auth header name; defaults from protocol
+     */
+    authHeaderName?: string;
+    /**
+     * Auth value prefix; defaults from protocol
+     */
+    authValuePrefix?: string;
+    /**
+     * Azure API version, if applicable
+     */
+    azureApiVersion?: string;
+    /**
+     * Provider base URL
+     */
+    baseUrl: string;
+    /**
+     * Human-readable name
+     */
+    displayName: string;
+    /**
+     * Whether the connection is enabled (default true)
+     */
+    enabled?: boolean;
+    /**
+     * Unique slug
+     */
+    slug: string;
+};
+
+/**
  * Request to create a new agent configuration for a workspace
  */
 export type CreateAgentConfigRequest = {
@@ -2949,13 +3875,13 @@ export type CreateAgentConfigRequest = {
      */
     allowInternet?: boolean;
     /**
-     * Authentication mode: PROXY (internal proxy) or API_KEY (direct)
-     */
-    credentialMode?: 'PROXY' | 'API_KEY';
-    /**
      * Whether the agent is enabled
      */
     enabled?: boolean;
+    /**
+     * Bind to a shared (instance catalog) model. Mutually exclusive with workspaceModelId.
+     */
+    instanceModelId?: number;
     /**
      * LLM API key
      */
@@ -2984,6 +3910,10 @@ export type CreateAgentConfigRequest = {
      * Job timeout in seconds
      */
     timeoutSeconds?: number;
+    /**
+     * Bind to a model on your own provider. Mutually exclusive with instanceModelId.
+     */
+    workspaceModelId?: number;
 };
 
 /**
@@ -3241,6 +4171,60 @@ export type BinaryAchievementProgress = Omit<AchievementProgress, 'type'> & {
 };
 
 /**
+ * A model available for this workspace to bind a Task to
+ */
+export type AvailableLlmModel = {
+    /**
+     * Owning connection's display name
+     */
+    connectionDisplayName: string;
+    /**
+     * Human-readable name
+     */
+    displayName: string;
+    /**
+     * Model id, unique within its scope
+     */
+    id: number;
+    /**
+     * What surface this model serves
+     */
+    modality: 'CHAT' | 'EMBEDDING' | 'RERANK';
+    /**
+     * Cache-read rate per 1M tokens (USD)
+     */
+    per1mCacheReadUsd?: number;
+    /**
+     * Cache-write rate per 1M tokens (USD)
+     */
+    per1mCacheWriteUsd?: number;
+    /**
+     * Input rate per 1M tokens (USD)
+     */
+    per1mInputUsd?: number;
+    /**
+     * Output rate per 1M tokens (USD)
+     */
+    per1mOutputUsd?: number;
+    /**
+     * Reasoning-token rate per 1M tokens (USD)
+     */
+    per1mReasoningUsd?: number;
+    /**
+     * Pricing mode
+     */
+    pricingMode: 'PRICED' | 'FREE' | 'UNPRICED';
+    /**
+     * SHARED (instance catalog) or WORKSPACE (your own provider)
+     */
+    scope: 'SHARED' | 'WORKSPACE';
+    /**
+     * Whether the model supports a reasoning mode
+     */
+    supportsReasoning: boolean;
+};
+
+/**
  * Request to assign or update a user's role in a workspace
  */
 export type AssignRoleRequest = {
@@ -3321,10 +4305,6 @@ export type AgentConfig = {
      */
     createdAt: Date;
     /**
-     * Authentication mode
-     */
-    credentialMode: 'PROXY' | 'API_KEY';
-    /**
      * Whether the agent is enabled
      */
     enabled: boolean;
@@ -3336,6 +4316,10 @@ export type AgentConfig = {
      * Configuration ID
      */
     id: number;
+    /**
+     * Bound shared (instance catalog) model id, if bound to one
+     */
+    instanceModelId?: number;
     /**
      * Optional LLM base URL override
      */
@@ -3364,6 +4348,10 @@ export type AgentConfig = {
      * Timestamp when the config was last updated
      */
     updatedAt?: Date;
+    /**
+     * Bound model id on your own provider, if bound to one
+     */
+    workspaceModelId?: number;
 };
 
 /**
@@ -3385,11 +4373,24 @@ export type AdminWorkspaceView = {
  * Instance-admin per-workspace month rollup (metadata only, no tenant content)
  */
 export type AdminWorkspaceLlmUsage = {
-    costUsd: number;
+    /**
+     * This month's spend on the workspace's own connected provider(s), in USD. Never counts toward the budget cap.
+     */
+    byoTotalCostUsd: number;
     displayName: string;
+    /**
+     * Ledger events (jobs / mentor turns) this month, any provider
+     */
     events: number;
     monthlyBudgetUsd?: number;
-    overBudget: boolean;
+    /**
+     * This month's confirmed spend on shared (instance) models, in USD — compared against the budget cap above.
+     */
+    pricedTotalCostUsd: number;
+    /**
+     * Whether this month's confirmed spend is within the cap, has reached it, or can't be fully confirmed yet because some usage has no price set.
+     */
+    verdict: 'WITHIN' | 'EXHAUSTED' | 'UNVERIFIABLE';
     workspaceId: number;
     workspaceSlug: string;
 };
@@ -3468,7 +4469,7 @@ export type AdminListAuthEventsData = {
         size?: number;
         accountId?: number;
         actingAccountId?: number;
-        eventType?: Array<'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'APP_ROLE_CHANGED' | 'RESEARCH_CONSENT_REVOKED'>;
+        eventType?: Array<'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'APP_ROLE_CHANGED' | 'RESEARCH_CONSENT_REVOKED' | 'LLM_CONNECTION_CREATED' | 'LLM_CONNECTION_UPDATED' | 'LLM_CONNECTION_DELETED' | 'LLM_MODEL_CREATED' | 'LLM_MODEL_UPDATED' | 'LLM_MODEL_DELETED' | 'LLM_MODEL_PRICE_CHANGED' | 'LLM_MODEL_SHARING_CHANGED' | 'LLM_SETTINGS_CHANGED'>;
         result?: Array<'SUCCESS' | 'FAILURE'>;
         from?: Date;
         to?: Date;
@@ -3491,7 +4492,7 @@ export type AdminExportAuthEventsData = {
     query?: {
         accountId?: number;
         actingAccountId?: number;
-        eventType?: Array<'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'APP_ROLE_CHANGED' | 'RESEARCH_CONSENT_REVOKED'>;
+        eventType?: Array<'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'APP_ROLE_CHANGED' | 'RESEARCH_CONSENT_REVOKED' | 'LLM_CONNECTION_CREATED' | 'LLM_CONNECTION_UPDATED' | 'LLM_CONNECTION_DELETED' | 'LLM_MODEL_CREATED' | 'LLM_MODEL_UPDATED' | 'LLM_MODEL_DELETED' | 'LLM_MODEL_PRICE_CHANGED' | 'LLM_MODEL_SHARING_CHANGED' | 'LLM_SETTINGS_CHANGED'>;
         result?: Array<'SUCCESS' | 'FAILURE'>;
         from?: Date;
         to?: Date;
@@ -3515,7 +4516,7 @@ export type AdminListConfigAuditEventsData = {
         workspaceId?: number;
         page?: number;
         size?: number;
-        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AI_CONFIG_BINDING' | 'AGENT_CONFIG' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'WORKSPACE_LLM_BUDGET'>;
+        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AI_CONFIG_BINDING' | 'AGENT_CONFIG' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
         entityId?: string;
         changedKey?: string;
         action?: Array<'CREATED' | 'UPDATED' | 'DELETED'>;
@@ -3552,6 +4553,278 @@ export type AdminListLlmUsageResponses = {
 };
 
 export type AdminListLlmUsageResponse = AdminListLlmUsageResponses[keyof AdminListLlmUsageResponses];
+
+export type AdminListLlmConnectionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/admin/llm/connections';
+};
+
+export type AdminListLlmConnectionsResponses = {
+    /**
+     * OK
+     */
+    200: Array<LlmConnection>;
+};
+
+export type AdminListLlmConnectionsResponse = AdminListLlmConnectionsResponses[keyof AdminListLlmConnectionsResponses];
+
+export type AdminCreateLlmConnectionData = {
+    body: CreateLlmConnectionRequest;
+    path?: never;
+    query?: never;
+    url: '/admin/llm/connections';
+};
+
+export type AdminCreateLlmConnectionResponses = {
+    /**
+     * OK
+     */
+    200: LlmConnection;
+};
+
+export type AdminCreateLlmConnectionResponse = AdminCreateLlmConnectionResponses[keyof AdminCreateLlmConnectionResponses];
+
+export type AdminProbeLlmConnectionDraftData = {
+    body: ProbeLlmConnectionRequest;
+    path?: never;
+    query?: never;
+    url: '/admin/llm/connections/probe';
+};
+
+export type AdminProbeLlmConnectionDraftResponses = {
+    /**
+     * OK
+     */
+    200: LlmProbeResult;
+};
+
+export type AdminProbeLlmConnectionDraftResponse = AdminProbeLlmConnectionDraftResponses[keyof AdminProbeLlmConnectionDraftResponses];
+
+export type AdminCreateLlmModelData = {
+    body: CreateLlmModelRequest;
+    path: {
+        connectionId: number;
+    };
+    query?: never;
+    url: '/admin/llm/connections/{connectionId}/models';
+};
+
+export type AdminCreateLlmModelResponses = {
+    /**
+     * OK
+     */
+    200: LlmModel;
+};
+
+export type AdminCreateLlmModelResponse = AdminCreateLlmModelResponses[keyof AdminCreateLlmModelResponses];
+
+export type AdminDeleteLlmConnectionData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/admin/llm/connections/{id}';
+};
+
+export type AdminDeleteLlmConnectionResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type AdminGetLlmConnectionData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/admin/llm/connections/{id}';
+};
+
+export type AdminGetLlmConnectionResponses = {
+    /**
+     * OK
+     */
+    200: LlmConnection;
+};
+
+export type AdminGetLlmConnectionResponse = AdminGetLlmConnectionResponses[keyof AdminGetLlmConnectionResponses];
+
+export type AdminUpdateLlmConnectionData = {
+    body: UpdateLlmConnectionRequest;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/admin/llm/connections/{id}';
+};
+
+export type AdminUpdateLlmConnectionResponses = {
+    /**
+     * OK
+     */
+    200: LlmConnection;
+};
+
+export type AdminUpdateLlmConnectionResponse = AdminUpdateLlmConnectionResponses[keyof AdminUpdateLlmConnectionResponses];
+
+export type AdminProbeLlmConnectionData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/admin/llm/connections/{id}/probe';
+};
+
+export type AdminProbeLlmConnectionResponses = {
+    /**
+     * OK
+     */
+    200: LlmProbeResult;
+};
+
+export type AdminProbeLlmConnectionResponse = AdminProbeLlmConnectionResponses[keyof AdminProbeLlmConnectionResponses];
+
+export type AdminListLlmModelsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/admin/llm/models';
+};
+
+export type AdminListLlmModelsResponses = {
+    /**
+     * OK
+     */
+    200: Array<LlmModel>;
+};
+
+export type AdminListLlmModelsResponse = AdminListLlmModelsResponses[keyof AdminListLlmModelsResponses];
+
+export type AdminDeleteLlmModelData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/admin/llm/models/{id}';
+};
+
+export type AdminDeleteLlmModelResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type AdminGetLlmModelData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/admin/llm/models/{id}';
+};
+
+export type AdminGetLlmModelResponses = {
+    /**
+     * OK
+     */
+    200: LlmModel;
+};
+
+export type AdminGetLlmModelResponse = AdminGetLlmModelResponses[keyof AdminGetLlmModelResponses];
+
+export type AdminUpdateLlmModelData = {
+    body: UpdateLlmModelRequest;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/admin/llm/models/{id}';
+};
+
+export type AdminUpdateLlmModelResponses = {
+    /**
+     * OK
+     */
+    200: LlmModel;
+};
+
+export type AdminUpdateLlmModelResponse = AdminUpdateLlmModelResponses[keyof AdminUpdateLlmModelResponses];
+
+export type AdminUpdateLlmModelPriceData = {
+    body: UpdateLlmModelPriceRequest;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/admin/llm/models/{id}/price';
+};
+
+export type AdminUpdateLlmModelPriceResponses = {
+    /**
+     * OK
+     */
+    200: LlmModel;
+};
+
+export type AdminUpdateLlmModelPriceResponse = AdminUpdateLlmModelPriceResponses[keyof AdminUpdateLlmModelPriceResponses];
+
+export type AdminUpdateLlmModelSharingData = {
+    body: UpdateLlmModelSharingRequest;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/admin/llm/models/{id}/sharing';
+};
+
+export type AdminUpdateLlmModelSharingResponses = {
+    /**
+     * OK
+     */
+    200: LlmModel;
+};
+
+export type AdminUpdateLlmModelSharingResponse = AdminUpdateLlmModelSharingResponses[keyof AdminUpdateLlmModelSharingResponses];
+
+export type AdminGetLlmSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/admin/llm/settings';
+};
+
+export type AdminGetLlmSettingsResponses = {
+    /**
+     * OK
+     */
+    200: InstanceLlmSettings;
+};
+
+export type AdminGetLlmSettingsResponse = AdminGetLlmSettingsResponses[keyof AdminGetLlmSettingsResponses];
+
+export type AdminUpdateLlmSettingsData = {
+    body: UpdateInstanceLlmSettingsRequest;
+    path?: never;
+    query?: never;
+    url: '/admin/llm/settings';
+};
+
+export type AdminUpdateLlmSettingsResponses = {
+    /**
+     * OK
+     */
+    200: InstanceLlmSettings;
+};
+
+export type AdminUpdateLlmSettingsResponse = AdminUpdateLlmSettingsResponses[keyof AdminUpdateLlmSettingsResponses];
 
 export type AdminListLoginProvidersData = {
     body?: never;
@@ -4586,7 +5859,7 @@ export type ListWorkspaceConfigAuditEventsData = {
     query?: {
         page?: number;
         size?: number;
-        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AI_CONFIG_BINDING' | 'AGENT_CONFIG' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'WORKSPACE_LLM_BUDGET'>;
+        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AI_CONFIG_BINDING' | 'AGENT_CONFIG' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
         entityId?: string;
         changedKey?: string;
         action?: Array<'CREATED' | 'UPDATED' | 'DELETED'>;
@@ -5102,6 +6375,262 @@ export type GetLlmUsageReportResponses = {
 };
 
 export type GetLlmUsageReportResponse = GetLlmUsageReportResponses[keyof GetLlmUsageReportResponses];
+
+export type WorkspaceListAvailableLlmModelsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/llm/available-models';
+};
+
+export type WorkspaceListAvailableLlmModelsResponses = {
+    /**
+     * OK
+     */
+    200: Array<AvailableLlmModel>;
+};
+
+export type WorkspaceListAvailableLlmModelsResponse = WorkspaceListAvailableLlmModelsResponses[keyof WorkspaceListAvailableLlmModelsResponses];
+
+export type WorkspaceListLlmConnectionsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/llm/connections';
+};
+
+export type WorkspaceListLlmConnectionsResponses = {
+    /**
+     * OK
+     */
+    200: Array<WorkspaceLlmConnection>;
+};
+
+export type WorkspaceListLlmConnectionsResponse = WorkspaceListLlmConnectionsResponses[keyof WorkspaceListLlmConnectionsResponses];
+
+export type WorkspaceCreateLlmConnectionData = {
+    body: CreateWorkspaceLlmConnectionRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/llm/connections';
+};
+
+export type WorkspaceCreateLlmConnectionResponses = {
+    /**
+     * OK
+     */
+    200: WorkspaceLlmConnection;
+};
+
+export type WorkspaceCreateLlmConnectionResponse = WorkspaceCreateLlmConnectionResponses[keyof WorkspaceCreateLlmConnectionResponses];
+
+export type WorkspaceCreateLlmModelData = {
+    body: CreateWorkspaceLlmModelRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        connectionId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/llm/connections/{connectionId}/models';
+};
+
+export type WorkspaceCreateLlmModelResponses = {
+    /**
+     * OK
+     */
+    200: WorkspaceLlmModel;
+};
+
+export type WorkspaceCreateLlmModelResponse = WorkspaceCreateLlmModelResponses[keyof WorkspaceCreateLlmModelResponses];
+
+export type WorkspaceDeleteLlmConnectionData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/llm/connections/{id}';
+};
+
+export type WorkspaceDeleteLlmConnectionResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type WorkspaceGetLlmConnectionData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/llm/connections/{id}';
+};
+
+export type WorkspaceGetLlmConnectionResponses = {
+    /**
+     * OK
+     */
+    200: WorkspaceLlmConnection;
+};
+
+export type WorkspaceGetLlmConnectionResponse = WorkspaceGetLlmConnectionResponses[keyof WorkspaceGetLlmConnectionResponses];
+
+export type WorkspaceUpdateLlmConnectionData = {
+    body: UpdateWorkspaceLlmConnectionRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/llm/connections/{id}';
+};
+
+export type WorkspaceUpdateLlmConnectionResponses = {
+    /**
+     * OK
+     */
+    200: WorkspaceLlmConnection;
+};
+
+export type WorkspaceUpdateLlmConnectionResponse = WorkspaceUpdateLlmConnectionResponses[keyof WorkspaceUpdateLlmConnectionResponses];
+
+export type WorkspaceProbeLlmConnectionData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/llm/connections/{id}/probe';
+};
+
+export type WorkspaceProbeLlmConnectionResponses = {
+    /**
+     * OK
+     */
+    200: WorkspaceLlmProbeResult;
+};
+
+export type WorkspaceProbeLlmConnectionResponse = WorkspaceProbeLlmConnectionResponses[keyof WorkspaceProbeLlmConnectionResponses];
+
+export type WorkspaceListLlmModelsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/llm/models';
+};
+
+export type WorkspaceListLlmModelsResponses = {
+    /**
+     * OK
+     */
+    200: Array<WorkspaceLlmModel>;
+};
+
+export type WorkspaceListLlmModelsResponse = WorkspaceListLlmModelsResponses[keyof WorkspaceListLlmModelsResponses];
+
+export type WorkspaceDeleteLlmModelData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/llm/models/{id}';
+};
+
+export type WorkspaceDeleteLlmModelResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type WorkspaceGetLlmModelData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/llm/models/{id}';
+};
+
+export type WorkspaceGetLlmModelResponses = {
+    /**
+     * OK
+     */
+    200: WorkspaceLlmModel;
+};
+
+export type WorkspaceGetLlmModelResponse = WorkspaceGetLlmModelResponses[keyof WorkspaceGetLlmModelResponses];
+
+export type WorkspaceUpdateLlmModelData = {
+    body: UpdateWorkspaceLlmModelRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/llm/models/{id}';
+};
+
+export type WorkspaceUpdateLlmModelResponses = {
+    /**
+     * OK
+     */
+    200: WorkspaceLlmModel;
+};
+
+export type WorkspaceUpdateLlmModelResponse = WorkspaceUpdateLlmModelResponses[keyof WorkspaceUpdateLlmModelResponses];
 
 export type ListMembersData = {
     body?: never;

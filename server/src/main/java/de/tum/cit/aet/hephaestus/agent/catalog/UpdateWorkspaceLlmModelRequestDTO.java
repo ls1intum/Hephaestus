@@ -16,7 +16,7 @@ import org.jspecify.annotations.Nullable;
  * {@code pricingMode} is a no-op — send the full price shape together.
  */
 @Schema(description = "Update a model on your AI provider (all fields optional)")
-public record UpdateWorkspaceLlmModelRequest(
+public record UpdateWorkspaceLlmModelRequestDTO(
     @Nullable @Size(max = 128) @Schema(description = "Human-readable name") String displayName,
     @Nullable @Size(max = 256) @Schema(description = "Upstream provider model id") String upstreamModelId,
     @Nullable
