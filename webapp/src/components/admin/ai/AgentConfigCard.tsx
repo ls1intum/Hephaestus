@@ -18,6 +18,12 @@ import { type ConfigDesignation, LLM_PROVIDER_LABELS } from "./utils";
 
 interface AgentConfigCardProps {
 	config: AgentConfig;
+	/**
+	 * The bound model's display name (resolved by the parent from the available-models list), or the
+	 * legacy provider/model-name pair for a config that predates the catalog. Never the raw upstream
+	 * model id or a shared model's owning connection.
+	 */
+	modelLabel?: string;
 	/** How this config is wired into workspace AI features. */
 	designation?: ConfigDesignation;
 	/** Whether this card's config is the one currently open in the form. */
@@ -29,6 +35,7 @@ interface AgentConfigCardProps {
 
 export function AgentConfigCard({
 	config,
+	modelLabel,
 	designation,
 	selected = false,
 	isDeleting = false,
@@ -36,6 +43,7 @@ export function AgentConfigCard({
 	onDelete,
 }: AgentConfigCardProps) {
 	const [confirmOpen, setConfirmOpen] = useState(false);
+	const fallbackLabel = `${LLM_PROVIDER_LABELS[config.llmProvider]}${config.modelName ? ` · ${config.modelName}` : ""}`;
 
 	return (
 		<Card className={selected ? "border-primary" : config.enabled ? "" : "opacity-70"}>
@@ -43,10 +51,7 @@ export function AgentConfigCard({
 				<div className="flex items-start justify-between gap-3">
 					<div className="min-w-0 flex-1">
 						<CardTitle className="text-base">{config.name}</CardTitle>
-						<p className="mt-0.5 text-xs text-muted-foreground">
-							{LLM_PROVIDER_LABELS[config.llmProvider]}
-							{config.modelName ? ` · ${config.modelName}` : ""}
-						</p>
+						<p className="mt-0.5 text-xs text-muted-foreground">{modelLabel ?? fallbackLabel}</p>
 					</div>
 					<div className="flex shrink-0 items-center gap-2">
 						<Badge variant={config.enabled ? "default" : "secondary"} className="text-xs">

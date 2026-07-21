@@ -1,4 +1,4 @@
-import type { AgentConfig, AgentJob, AiSettingsView } from "@/api/types.gen";
+import type { AgentConfig, AgentJob, AiSettingsView, AvailableLlmModel } from "@/api/types.gen";
 
 export const mockConfigProxy: AgentConfig = {
 	id: 1,
@@ -41,7 +41,65 @@ export const mockConfigDisabled: AgentConfig = {
 	createdAt: new Date("2026-03-01T10:00:00Z"),
 };
 
+export const mockConfigBoundShared: AgentConfig = {
+	id: 4,
+	name: "Shared GPT-5",
+	llmProvider: "OPENAI",
+	allowInternet: false,
+	enabled: true,
+	hasLlmApiKey: false,
+	instanceModelId: 1,
+	maxConcurrentJobs: 2,
+	timeoutSeconds: 600,
+	createdAt: new Date("2026-06-01T10:00:00Z"),
+};
+
+export const mockConfigBoundOwn: AgentConfig = {
+	id: 5,
+	name: "My own key",
+	llmProvider: "OPENAI",
+	allowInternet: true,
+	enabled: true,
+	hasLlmApiKey: false,
+	workspaceModelId: 10,
+	maxConcurrentJobs: 1,
+	timeoutSeconds: 900,
+	createdAt: new Date("2026-06-01T10:00:00Z"),
+};
+
 export const mockConfigs: AgentConfig[] = [mockConfigProxy, mockConfigApiKey, mockConfigDisabled];
+
+export const mockAvailableModels: AvailableLlmModel[] = [
+	{
+		id: 1,
+		scope: "SHARED",
+		displayName: "GPT-5 (Azure, EU)",
+		connectionDisplayName: "Azure EU",
+		modality: "CHAT",
+		pricingMode: "PRICED",
+		per1mInputUsd: 3,
+		per1mOutputUsd: 15,
+		supportsReasoning: true,
+	},
+	{
+		id: 2,
+		scope: "SHARED",
+		displayName: "Local Llama (self-hosted)",
+		connectionDisplayName: "On-prem GPU",
+		modality: "CHAT",
+		pricingMode: "FREE",
+		supportsReasoning: false,
+	},
+	{
+		id: 10,
+		scope: "WORKSPACE",
+		displayName: "My OpenAI key",
+		connectionDisplayName: "My provider",
+		modality: "CHAT",
+		pricingMode: "UNPRICED",
+		supportsReasoning: true,
+	},
+];
 
 export const mockAiSettings: AiSettingsView = {
 	practicesEnabled: true,

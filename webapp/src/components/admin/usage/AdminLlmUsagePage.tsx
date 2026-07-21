@@ -120,7 +120,7 @@ export function AdminLlmUsagePage({
 					{overBudget && isCurrentMonth && (
 						<Alert variant="destructive">
 							<TriangleAlert aria-hidden />
-							<AlertTitle>Monthly AI budget used up</AlertTitle>
+							<AlertTitle>Budget reached</AlertTitle>
 							<AlertDescription>
 								Practice detection and mentor turns are paused until next month or until an instance
 								admin raises the cap.
@@ -129,16 +129,18 @@ export function AdminLlmUsagePage({
 					)}
 
 					{unpricedEventCount > 0 && (
+						// Verbatim framing from the #1368 glossary ("the untrusted monthly total" copy moment):
+						// the "at least $X" formulation is the fix — no new vocabulary, direction of error obvious.
 						<Alert variant="warning">
 							<CircleAlert aria-hidden />
-							<AlertTitle>Some usage has no price set</AlertTitle>
+							<AlertTitle>Spent this month: at least {formatCostUsd(spend)}</AlertTitle>
 							<AlertDescription>
+								Some usage has no price set, so the real total may be higher. (
 								{unpricedEventCount === 1
 									? "1 call"
 									: `${unpricedEventCount.toLocaleString()} calls`}{" "}
-								this month ran on a model with no price on record, so{" "}
-								{unpricedEventCount === 1 ? "it's" : "they're"} excluded from the spend below — the
-								real total may be higher. Ask an instance admin to add pricing for the model.
+								this month ran on a model with no price on record.) Ask an instance admin to add
+								pricing for the model.
 							</AlertDescription>
 						</Alert>
 					)}
@@ -178,6 +180,24 @@ export function AdminLlmUsagePage({
 							)}
 						</Card>
 					</div>
+
+					{report.byoTotalCostUsd > 0 && (
+						// Deliberately its own card, outside the budget grid above: your-provider spend is
+						// never counted toward the monthly budget and must never be summed with it
+						// (#1368 glossary rule #2).
+						<Card>
+							<CardHeader>
+								<CardDescription>Your provider</CardDescription>
+								<CardTitle className="text-2xl tabular-nums">
+									{formatCostUsd(report.byoTotalCostUsd)}
+								</CardTitle>
+								<CardDescription>
+									Spend on this workspace's own connected provider this month. Not counted toward
+									the budget above.
+								</CardDescription>
+							</CardHeader>
+						</Card>
+					)}
 
 					{!hasUsage ? (
 						<Empty className="border border-dashed">

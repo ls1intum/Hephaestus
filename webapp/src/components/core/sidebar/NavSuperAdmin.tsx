@@ -1,5 +1,6 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import {
+	BrainCircuit,
 	Building2,
 	ChevronLeft,
 	CircleDollarSign,
@@ -25,6 +26,12 @@ import {
 const ADMIN_SECTIONS = [
 	{ to: "/admin/users", label: "Users", icon: Users, tooltip: "Manage accounts" },
 	{ to: "/admin/workspaces", label: "Workspaces", icon: Building2, tooltip: "All workspaces" },
+	{
+		to: "/admin/llm",
+		label: "AI models",
+		icon: BrainCircuit,
+		tooltip: "Providers and shared models",
+	},
 	{
 		to: "/admin/usage",
 		label: "LLM Usage",

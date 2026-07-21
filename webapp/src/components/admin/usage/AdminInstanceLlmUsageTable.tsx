@@ -114,7 +114,7 @@ export function AdminInstanceLlmUsageTable({
 								{!isCurrentMonth ? (
 									<span className="text-muted-foreground">—</span>
 								) : row.verdict === "EXHAUSTED" ? (
-									<Badge variant="destructive">Over budget</Badge>
+									<Badge variant="destructive">Budget reached</Badge>
 								) : row.verdict === "UNVERIFIABLE" ? (
 									<Badge variant="outline">Unverified</Badge>
 								) : row.monthlyBudgetUsd != null ? (
