@@ -1,6 +1,6 @@
 import { TriangleAlert } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { WorkspaceLlmUsageReport } from "@/api";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface BudgetExhaustedAlertProps {
 	/**
