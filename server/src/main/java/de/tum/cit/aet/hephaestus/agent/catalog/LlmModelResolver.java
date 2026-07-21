@@ -228,8 +228,10 @@ public class LlmModelResolver {
 
     /**
      * Map a pre-catalog {@link AgentConfig} onto a {@link ResolvedLlmModel} using the same
-     * provider→(protocol, auth header, upstream URL) rules the migration backfill used, so behaviour
-     * is unchanged for configs not yet rebound to the catalog.
+     * provider→(protocol, auth header, upstream URL) rules a one-time migration used to backfill early
+     * catalog rows (since removed — the catalog is now created directly by instance/workspace admins).
+     * This runtime fallback is what actually keeps a legacy config working: any config not yet rebound
+     * to an instance or workspace model resolves through here instead.
      */
     private ResolvedLlmModel legacy(AgentConfig config) {
         LlmProvider provider = config.getLlmProvider();

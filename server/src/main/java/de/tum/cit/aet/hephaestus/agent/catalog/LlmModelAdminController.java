@@ -4,6 +4,9 @@ import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -14,6 +17,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -40,6 +44,17 @@ public class LlmModelAdminController {
 
     @PostMapping("/connections/{connectionId}/models")
     @Operation(summary = "Create a model on an LLM connection", operationId = "adminCreateLlmModel")
+    @ApiResponse(responseCode = "201", description = "Model created; URL in the Location header")
+    @ApiResponse(
+        responseCode = "404",
+        description = "LLM connection not found",
+        content = @Content(schema = @Schema(hidden = true))
+    )
+    @ApiResponse(
+        responseCode = "409",
+        description = "A model with this slug or upstream model id already exists on the connection",
+        content = @Content(schema = @Schema(hidden = true))
+    )
     @Audited("auth_event LLM_MODEL_CREATED")
     public ResponseEntity<LlmModelDTO> create(
         @PathVariable Long connectionId,
@@ -76,12 +91,37 @@ public class LlmModelAdminController {
 
     @GetMapping("/models/{id}")
     @Operation(summary = "Get an LLM catalog model", operationId = "adminGetLlmModel")
+    @ApiResponse(
+        responseCode = "200",
+        description = "OK",
+        content = @Content(schema = @Schema(implementation = LlmModelDTO.class))
+    )
+    @ApiResponse(
+        responseCode = "404",
+        description = "LLM model not found",
+        content = @Content(schema = @Schema(hidden = true))
+    )
     public ResponseEntity<LlmModelDTO> get(@PathVariable Long id) {
         return ResponseEntity.ok(toDTO(modelService.get(id)));
     }
 
-    @PutMapping("/models/{id}")
+    @PatchMapping("/models/{id}")
     @Operation(summary = "Update a model's metadata", operationId = "adminUpdateLlmModel")
+    @ApiResponse(
+        responseCode = "200",
+        description = "OK",
+        content = @Content(schema = @Schema(implementation = LlmModelDTO.class))
+    )
+    @ApiResponse(
+        responseCode = "404",
+        description = "LLM model not found",
+        content = @Content(schema = @Schema(hidden = true))
+    )
+    @ApiResponse(
+        responseCode = "409",
+        description = "Another model on the connection already uses this upstream model id",
+        content = @Content(schema = @Schema(hidden = true))
+    )
     @Audited("auth_event LLM_MODEL_UPDATED")
     public ResponseEntity<LlmModelDTO> update(
         @PathVariable Long id,
@@ -92,6 +132,17 @@ public class LlmModelAdminController {
 
     @DeleteMapping("/models/{id}")
     @Operation(summary = "Delete an LLM catalog model", operationId = "adminDeleteLlmModel")
+    @ApiResponse(responseCode = "204", description = "Model deleted")
+    @ApiResponse(
+        responseCode = "404",
+        description = "LLM model not found",
+        content = @Content(schema = @Schema(hidden = true))
+    )
+    @ApiResponse(
+        responseCode = "409",
+        description = "Cannot delete a model still bound to an agent configuration",
+        content = @Content(schema = @Schema(hidden = true))
+    )
     @Audited("auth_event LLM_MODEL_DELETED")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         modelService.delete(id);
@@ -100,6 +151,16 @@ public class LlmModelAdminController {
 
     @PutMapping("/models/{id}/price")
     @Operation(summary = "Reprice a model", operationId = "adminUpdateLlmModelPrice")
+    @ApiResponse(
+        responseCode = "200",
+        description = "OK",
+        content = @Content(schema = @Schema(implementation = LlmModelDTO.class))
+    )
+    @ApiResponse(
+        responseCode = "404",
+        description = "LLM model not found",
+        content = @Content(schema = @Schema(hidden = true))
+    )
     @Audited("auth_event LLM_MODEL_PRICE_CHANGED")
     public ResponseEntity<LlmModelDTO> updatePrice(
         @PathVariable Long id,
@@ -111,6 +172,16 @@ public class LlmModelAdminController {
 
     @PutMapping("/models/{id}/sharing")
     @Operation(summary = "Share a model with all or selected workspaces", operationId = "adminUpdateLlmModelSharing")
+    @ApiResponse(
+        responseCode = "200",
+        description = "OK",
+        content = @Content(schema = @Schema(implementation = LlmModelDTO.class))
+    )
+    @ApiResponse(
+        responseCode = "404",
+        description = "LLM model not found",
+        content = @Content(schema = @Schema(hidden = true))
+    )
     @Audited("auth_event LLM_MODEL_SHARING_CHANGED")
     public ResponseEntity<LlmModelDTO> updateSharing(
         @PathVariable Long id,

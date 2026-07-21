@@ -5,6 +5,9 @@ import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -48,12 +51,28 @@ public class LlmConnectionAdminController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get an LLM connection", operationId = "adminGetLlmConnection")
+    @ApiResponse(
+        responseCode = "200",
+        description = "OK",
+        content = @Content(schema = @Schema(implementation = LlmConnectionDTO.class))
+    )
+    @ApiResponse(
+        responseCode = "404",
+        description = "LLM connection not found",
+        content = @Content(schema = @Schema(hidden = true))
+    )
     public ResponseEntity<LlmConnectionDTO> get(@PathVariable Long id) {
         return ResponseEntity.ok(LlmConnectionDTO.from(connectionService.get(id)));
     }
 
     @PostMapping
     @Operation(summary = "Create an LLM connection", operationId = "adminCreateLlmConnection")
+    @ApiResponse(responseCode = "201", description = "Connection created; URL in the Location header")
+    @ApiResponse(
+        responseCode = "409",
+        description = "An LLM connection with this slug already exists",
+        content = @Content(schema = @Schema(hidden = true))
+    )
     @Audited("auth_event LLM_CONNECTION_CREATED")
     public ResponseEntity<LlmConnectionDTO> create(@Valid @RequestBody CreateLlmConnectionRequestDTO request) {
         LlmConnection created = connectionService.create(request);
@@ -66,6 +85,16 @@ public class LlmConnectionAdminController {
 
     @PatchMapping("/{id}")
     @Operation(summary = "Update an LLM connection", operationId = "adminUpdateLlmConnection")
+    @ApiResponse(
+        responseCode = "200",
+        description = "OK",
+        content = @Content(schema = @Schema(implementation = LlmConnectionDTO.class))
+    )
+    @ApiResponse(
+        responseCode = "404",
+        description = "LLM connection not found",
+        content = @Content(schema = @Schema(hidden = true))
+    )
     @Audited("auth_event LLM_CONNECTION_UPDATED")
     public ResponseEntity<LlmConnectionDTO> update(
         @PathVariable Long id,
@@ -76,6 +105,17 @@ public class LlmConnectionAdminController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete an LLM connection", operationId = "adminDeleteLlmConnection")
+    @ApiResponse(responseCode = "204", description = "Connection deleted")
+    @ApiResponse(
+        responseCode = "404",
+        description = "LLM connection not found",
+        content = @Content(schema = @Schema(hidden = true))
+    )
+    @ApiResponse(
+        responseCode = "409",
+        description = "Cannot delete a connection still referenced by one or more models",
+        content = @Content(schema = @Schema(hidden = true))
+    )
     @Audited("auth_event LLM_CONNECTION_DELETED")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         connectionService.delete(id);

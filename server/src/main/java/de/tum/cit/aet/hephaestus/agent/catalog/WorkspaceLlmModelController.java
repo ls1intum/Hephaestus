@@ -5,6 +5,9 @@ import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspace
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -37,6 +40,17 @@ public class WorkspaceLlmModelController {
 
     @PostMapping("/connections/{connectionId}/models")
     @Operation(summary = "Create a model on your AI provider", operationId = "workspaceCreateLlmModel")
+    @ApiResponse(responseCode = "201", description = "Model created; URL in the Location header")
+    @ApiResponse(
+        responseCode = "404",
+        description = "AI provider connection not found",
+        content = @Content(schema = @Schema(hidden = true))
+    )
+    @ApiResponse(
+        responseCode = "409",
+        description = "A model with this slug or upstream model id already exists on the connection",
+        content = @Content(schema = @Schema(hidden = true))
+    )
     @RequireAtLeastWorkspaceAdmin
     @Audited("WORKSPACE_LLM_MODEL")
     public ResponseEntity<WorkspaceLlmModelDTO> create(
@@ -61,6 +75,16 @@ public class WorkspaceLlmModelController {
 
     @GetMapping("/models/{id}")
     @Operation(summary = "Get a model on your AI provider", operationId = "workspaceGetLlmModel")
+    @ApiResponse(
+        responseCode = "200",
+        description = "OK",
+        content = @Content(schema = @Schema(implementation = WorkspaceLlmModelDTO.class))
+    )
+    @ApiResponse(
+        responseCode = "404",
+        description = "Model not found",
+        content = @Content(schema = @Schema(hidden = true))
+    )
     @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<WorkspaceLlmModelDTO> get(WorkspaceContext workspaceContext, @PathVariable Long id) {
         return ResponseEntity.ok(WorkspaceLlmModelDTO.from(modelService.get(workspaceContext, id)));
@@ -68,6 +92,21 @@ public class WorkspaceLlmModelController {
 
     @PatchMapping("/models/{id}")
     @Operation(summary = "Update a model on your AI provider", operationId = "workspaceUpdateLlmModel")
+    @ApiResponse(
+        responseCode = "200",
+        description = "OK",
+        content = @Content(schema = @Schema(implementation = WorkspaceLlmModelDTO.class))
+    )
+    @ApiResponse(
+        responseCode = "404",
+        description = "Model not found",
+        content = @Content(schema = @Schema(hidden = true))
+    )
+    @ApiResponse(
+        responseCode = "409",
+        description = "Another model on the connection already uses this upstream model id",
+        content = @Content(schema = @Schema(hidden = true))
+    )
     @RequireAtLeastWorkspaceAdmin
     @Audited("WORKSPACE_LLM_MODEL")
     public ResponseEntity<WorkspaceLlmModelDTO> update(
@@ -80,6 +119,17 @@ public class WorkspaceLlmModelController {
 
     @DeleteMapping("/models/{id}")
     @Operation(summary = "Remove a model on your AI provider", operationId = "workspaceDeleteLlmModel")
+    @ApiResponse(responseCode = "204", description = "Model removed")
+    @ApiResponse(
+        responseCode = "404",
+        description = "Model not found",
+        content = @Content(schema = @Schema(hidden = true))
+    )
+    @ApiResponse(
+        responseCode = "409",
+        description = "Cannot delete a model still bound to an agent configuration",
+        content = @Content(schema = @Schema(hidden = true))
+    )
     @RequireAtLeastWorkspaceAdmin
     @Audited("WORKSPACE_LLM_MODEL")
     public ResponseEntity<Void> delete(WorkspaceContext workspaceContext, @PathVariable Long id) {

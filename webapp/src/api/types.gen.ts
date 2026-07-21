@@ -4577,11 +4577,18 @@ export type AdminCreateLlmConnectionData = {
     url: '/admin/llm/connections';
 };
 
+export type AdminCreateLlmConnectionErrors = {
+    /**
+     * An LLM connection with this slug already exists
+     */
+    409: unknown;
+};
+
 export type AdminCreateLlmConnectionResponses = {
     /**
-     * OK
+     * Connection created; URL in the Location header
      */
-    200: LlmConnection;
+    201: LlmConnection;
 };
 
 export type AdminCreateLlmConnectionResponse = AdminCreateLlmConnectionResponses[keyof AdminCreateLlmConnectionResponses];
@@ -4611,11 +4618,22 @@ export type AdminCreateLlmModelData = {
     url: '/admin/llm/connections/{connectionId}/models';
 };
 
+export type AdminCreateLlmModelErrors = {
+    /**
+     * LLM connection not found
+     */
+    404: unknown;
+    /**
+     * A model with this slug or upstream model id already exists on the connection
+     */
+    409: unknown;
+};
+
 export type AdminCreateLlmModelResponses = {
     /**
-     * OK
+     * Model created; URL in the Location header
      */
-    200: LlmModel;
+    201: LlmModel;
 };
 
 export type AdminCreateLlmModelResponse = AdminCreateLlmModelResponses[keyof AdminCreateLlmModelResponses];
@@ -4629,12 +4647,25 @@ export type AdminDeleteLlmConnectionData = {
     url: '/admin/llm/connections/{id}';
 };
 
+export type AdminDeleteLlmConnectionErrors = {
+    /**
+     * LLM connection not found
+     */
+    404: unknown;
+    /**
+     * Cannot delete a connection still referenced by one or more models
+     */
+    409: unknown;
+};
+
 export type AdminDeleteLlmConnectionResponses = {
     /**
-     * OK
+     * Connection deleted
      */
-    200: unknown;
+    204: void;
 };
+
+export type AdminDeleteLlmConnectionResponse = AdminDeleteLlmConnectionResponses[keyof AdminDeleteLlmConnectionResponses];
 
 export type AdminGetLlmConnectionData = {
     body?: never;
@@ -4643,6 +4674,13 @@ export type AdminGetLlmConnectionData = {
     };
     query?: never;
     url: '/admin/llm/connections/{id}';
+};
+
+export type AdminGetLlmConnectionErrors = {
+    /**
+     * LLM connection not found
+     */
+    404: unknown;
 };
 
 export type AdminGetLlmConnectionResponses = {
@@ -4661,6 +4699,13 @@ export type AdminUpdateLlmConnectionData = {
     };
     query?: never;
     url: '/admin/llm/connections/{id}';
+};
+
+export type AdminUpdateLlmConnectionErrors = {
+    /**
+     * LLM connection not found
+     */
+    404: unknown;
 };
 
 export type AdminUpdateLlmConnectionResponses = {
@@ -4715,12 +4760,25 @@ export type AdminDeleteLlmModelData = {
     url: '/admin/llm/models/{id}';
 };
 
+export type AdminDeleteLlmModelErrors = {
+    /**
+     * LLM model not found
+     */
+    404: unknown;
+    /**
+     * Cannot delete a model still bound to an agent configuration
+     */
+    409: unknown;
+};
+
 export type AdminDeleteLlmModelResponses = {
     /**
-     * OK
+     * Model deleted
      */
-    200: unknown;
+    204: void;
 };
+
+export type AdminDeleteLlmModelResponse = AdminDeleteLlmModelResponses[keyof AdminDeleteLlmModelResponses];
 
 export type AdminGetLlmModelData = {
     body?: never;
@@ -4729,6 +4787,13 @@ export type AdminGetLlmModelData = {
     };
     query?: never;
     url: '/admin/llm/models/{id}';
+};
+
+export type AdminGetLlmModelErrors = {
+    /**
+     * LLM model not found
+     */
+    404: unknown;
 };
 
 export type AdminGetLlmModelResponses = {
@@ -4749,6 +4814,17 @@ export type AdminUpdateLlmModelData = {
     url: '/admin/llm/models/{id}';
 };
 
+export type AdminUpdateLlmModelErrors = {
+    /**
+     * LLM model not found
+     */
+    404: unknown;
+    /**
+     * Another model on the connection already uses this upstream model id
+     */
+    409: unknown;
+};
+
 export type AdminUpdateLlmModelResponses = {
     /**
      * OK
@@ -4767,6 +4843,13 @@ export type AdminUpdateLlmModelPriceData = {
     url: '/admin/llm/models/{id}/price';
 };
 
+export type AdminUpdateLlmModelPriceErrors = {
+    /**
+     * LLM model not found
+     */
+    404: unknown;
+};
+
 export type AdminUpdateLlmModelPriceResponses = {
     /**
      * OK
@@ -4783,6 +4866,13 @@ export type AdminUpdateLlmModelSharingData = {
     };
     query?: never;
     url: '/admin/llm/models/{id}/sharing';
+};
+
+export type AdminUpdateLlmModelSharingErrors = {
+    /**
+     * LLM model not found
+     */
+    404: unknown;
 };
 
 export type AdminUpdateLlmModelSharingResponses = {
@@ -6430,11 +6520,18 @@ export type WorkspaceCreateLlmConnectionData = {
     url: '/workspaces/{workspaceSlug}/llm/connections';
 };
 
+export type WorkspaceCreateLlmConnectionErrors = {
+    /**
+     * A connection with this slug already exists in this workspace
+     */
+    409: unknown;
+};
+
 export type WorkspaceCreateLlmConnectionResponses = {
     /**
-     * OK
+     * Connection created; URL in the Location header
      */
-    200: WorkspaceLlmConnection;
+    201: WorkspaceLlmConnection;
 };
 
 export type WorkspaceCreateLlmConnectionResponse = WorkspaceCreateLlmConnectionResponses[keyof WorkspaceCreateLlmConnectionResponses];
@@ -6452,11 +6549,22 @@ export type WorkspaceCreateLlmModelData = {
     url: '/workspaces/{workspaceSlug}/llm/connections/{connectionId}/models';
 };
 
+export type WorkspaceCreateLlmModelErrors = {
+    /**
+     * AI provider connection not found
+     */
+    404: unknown;
+    /**
+     * A model with this slug or upstream model id already exists on the connection
+     */
+    409: unknown;
+};
+
 export type WorkspaceCreateLlmModelResponses = {
     /**
-     * OK
+     * Model created; URL in the Location header
      */
-    200: WorkspaceLlmModel;
+    201: WorkspaceLlmModel;
 };
 
 export type WorkspaceCreateLlmModelResponse = WorkspaceCreateLlmModelResponses[keyof WorkspaceCreateLlmModelResponses];
@@ -6474,12 +6582,25 @@ export type WorkspaceDeleteLlmConnectionData = {
     url: '/workspaces/{workspaceSlug}/llm/connections/{id}';
 };
 
+export type WorkspaceDeleteLlmConnectionErrors = {
+    /**
+     * Connection not found
+     */
+    404: unknown;
+    /**
+     * Cannot delete a connection still referenced by one or more models
+     */
+    409: unknown;
+};
+
 export type WorkspaceDeleteLlmConnectionResponses = {
     /**
-     * OK
+     * Connection removed
      */
-    200: unknown;
+    204: void;
 };
+
+export type WorkspaceDeleteLlmConnectionResponse = WorkspaceDeleteLlmConnectionResponses[keyof WorkspaceDeleteLlmConnectionResponses];
 
 export type WorkspaceGetLlmConnectionData = {
     body?: never;
@@ -6492,6 +6613,13 @@ export type WorkspaceGetLlmConnectionData = {
     };
     query?: never;
     url: '/workspaces/{workspaceSlug}/llm/connections/{id}';
+};
+
+export type WorkspaceGetLlmConnectionErrors = {
+    /**
+     * Connection not found
+     */
+    404: unknown;
 };
 
 export type WorkspaceGetLlmConnectionResponses = {
@@ -6514,6 +6642,13 @@ export type WorkspaceUpdateLlmConnectionData = {
     };
     query?: never;
     url: '/workspaces/{workspaceSlug}/llm/connections/{id}';
+};
+
+export type WorkspaceUpdateLlmConnectionErrors = {
+    /**
+     * Connection not found
+     */
+    404: unknown;
 };
 
 export type WorkspaceUpdateLlmConnectionResponses = {
@@ -6581,12 +6716,25 @@ export type WorkspaceDeleteLlmModelData = {
     url: '/workspaces/{workspaceSlug}/llm/models/{id}';
 };
 
+export type WorkspaceDeleteLlmModelErrors = {
+    /**
+     * Model not found
+     */
+    404: unknown;
+    /**
+     * Cannot delete a model still bound to an agent configuration
+     */
+    409: unknown;
+};
+
 export type WorkspaceDeleteLlmModelResponses = {
     /**
-     * OK
+     * Model removed
      */
-    200: unknown;
+    204: void;
 };
+
+export type WorkspaceDeleteLlmModelResponse = WorkspaceDeleteLlmModelResponses[keyof WorkspaceDeleteLlmModelResponses];
 
 export type WorkspaceGetLlmModelData = {
     body?: never;
@@ -6599,6 +6747,13 @@ export type WorkspaceGetLlmModelData = {
     };
     query?: never;
     url: '/workspaces/{workspaceSlug}/llm/models/{id}';
+};
+
+export type WorkspaceGetLlmModelErrors = {
+    /**
+     * Model not found
+     */
+    404: unknown;
 };
 
 export type WorkspaceGetLlmModelResponses = {
@@ -6621,6 +6776,17 @@ export type WorkspaceUpdateLlmModelData = {
     };
     query?: never;
     url: '/workspaces/{workspaceSlug}/llm/models/{id}';
+};
+
+export type WorkspaceUpdateLlmModelErrors = {
+    /**
+     * Model not found
+     */
+    404: unknown;
+    /**
+     * Another model on the connection already uses this upstream model id
+     */
+    409: unknown;
 };
 
 export type WorkspaceUpdateLlmModelResponses = {

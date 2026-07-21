@@ -118,7 +118,7 @@ class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
             null
         );
         webTestClient
-            .put()
+            .patch()
             .uri("/admin/llm/models/{id}", created.id())
             .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
             .contentType(MediaType.APPLICATION_JSON)

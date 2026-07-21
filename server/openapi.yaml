@@ -435,12 +435,14 @@ paths:
               $ref: "#/components/schemas/CreateLlmConnectionRequest"
         required: true
       responses:
-        "200":
+        "201":
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/LlmConnection"
-          description: OK
+          description: Connection created; URL in the Location header
+        "409":
+          description: An LLM connection with this slug already exists
       summary: Create an LLM connection
       tags:
       - Admin LLM
@@ -480,12 +482,17 @@ paths:
               $ref: "#/components/schemas/CreateLlmModelRequest"
         required: true
       responses:
-        "200":
+        "201":
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/LlmModel"
-          description: OK
+          description: Model created; URL in the Location header
+        "404":
+          description: LLM connection not found
+        "409":
+          description: A model with this slug or upstream model id already exists
+            on the connection
       summary: Create a model on an LLM connection
       tags:
       - Admin LLM
@@ -500,8 +507,13 @@ paths:
           type: integer
           format: int64
       responses:
-        "200":
-          description: OK
+        "204":
+          description: Connection deleted
+        "404":
+          description: LLM connection not found
+        "409":
+          description: Cannot delete a connection still referenced by one or more
+            models
       summary: Delete an LLM connection
       tags:
       - Admin LLM
@@ -521,6 +533,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/LlmConnection"
           description: OK
+        "404":
+          description: LLM connection not found
       summary: Get an LLM connection
       tags:
       - Admin LLM
@@ -546,6 +560,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/LlmConnection"
           description: OK
+        "404":
+          description: LLM connection not found
       summary: Update an LLM connection
       tags:
       - Admin LLM
@@ -595,8 +611,12 @@ paths:
           type: integer
           format: int64
       responses:
-        "200":
-          description: OK
+        "204":
+          description: Model deleted
+        "404":
+          description: LLM model not found
+        "409":
+          description: Cannot delete a model still bound to an agent configuration
       summary: Delete an LLM catalog model
       tags:
       - Admin LLM
@@ -616,10 +636,12 @@ paths:
               schema:
                 $ref: "#/components/schemas/LlmModel"
           description: OK
+        "404":
+          description: LLM model not found
       summary: Get an LLM catalog model
       tags:
       - Admin LLM
-    put:
+    patch:
       operationId: adminUpdateLlmModel
       parameters:
       - in: path
@@ -641,6 +663,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/LlmModel"
           description: OK
+        "404":
+          description: LLM model not found
+        "409":
+          description: Another model on the connection already uses this upstream
+            model id
       summary: Update a model's metadata
       tags:
       - Admin LLM
@@ -667,6 +694,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/LlmModel"
           description: OK
+        "404":
+          description: LLM model not found
       summary: Reprice a model
       tags:
       - Admin LLM
@@ -693,6 +722,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/LlmModel"
           description: OK
+        "404":
+          description: LLM model not found
       summary: Share a model with all or selected workspaces
       tags:
       - Admin LLM
@@ -2611,12 +2642,14 @@ paths:
               $ref: "#/components/schemas/CreateWorkspaceLlmConnectionRequest"
         required: true
       responses:
-        "200":
+        "201":
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkspaceLlmConnection"
-          description: OK
+          description: Connection created; URL in the Location header
+        "409":
+          description: A connection with this slug already exists in this workspace
       summary: Connect your own AI provider
       tags:
       - Workspace LLM
@@ -2644,12 +2677,17 @@ paths:
               $ref: "#/components/schemas/CreateWorkspaceLlmModelRequest"
         required: true
       responses:
-        "200":
+        "201":
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkspaceLlmModel"
-          description: OK
+          description: Model created; URL in the Location header
+        "404":
+          description: AI provider connection not found
+        "409":
+          description: A model with this slug or upstream model id already exists
+            on the connection
       summary: Create a model on your AI provider
       tags:
       - Workspace LLM
@@ -2671,8 +2709,13 @@ paths:
           type: integer
           format: int64
       responses:
-        "200":
-          description: OK
+        "204":
+          description: Connection removed
+        "404":
+          description: Connection not found
+        "409":
+          description: Cannot delete a connection still referenced by one or more
+            models
       summary: Remove your AI provider connection
       tags:
       - Workspace LLM
@@ -2699,6 +2742,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/WorkspaceLlmConnection"
           description: OK
+        "404":
+          description: Connection not found
       summary: Get one of your AI provider connections
       tags:
       - Workspace LLM
@@ -2731,6 +2776,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/WorkspaceLlmConnection"
           description: OK
+        "404":
+          description: Connection not found
       summary: Update your AI provider connection
       tags:
       - Workspace LLM
@@ -2802,8 +2849,12 @@ paths:
           type: integer
           format: int64
       responses:
-        "200":
-          description: OK
+        "204":
+          description: Model removed
+        "404":
+          description: Model not found
+        "409":
+          description: Cannot delete a model still bound to an agent configuration
       summary: Remove a model on your AI provider
       tags:
       - Workspace LLM
@@ -2830,6 +2881,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/WorkspaceLlmModel"
           description: OK
+        "404":
+          description: Model not found
       summary: Get a model on your AI provider
       tags:
       - Workspace LLM
@@ -2862,6 +2915,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/WorkspaceLlmModel"
           description: OK
+        "404":
+          description: Model not found
+        "409":
+          description: Another model on the connection already uses this upstream
+            model id
       summary: Update a model on your AI provider
       tags:
       - Workspace LLM

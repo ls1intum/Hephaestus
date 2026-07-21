@@ -6,6 +6,9 @@ import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspace
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -47,6 +50,16 @@ public class WorkspaceLlmConnectionController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get one of your AI provider connections", operationId = "workspaceGetLlmConnection")
+    @ApiResponse(
+        responseCode = "200",
+        description = "OK",
+        content = @Content(schema = @Schema(implementation = WorkspaceLlmConnectionDTO.class))
+    )
+    @ApiResponse(
+        responseCode = "404",
+        description = "Connection not found",
+        content = @Content(schema = @Schema(hidden = true))
+    )
     @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<WorkspaceLlmConnectionDTO> get(WorkspaceContext workspaceContext, @PathVariable Long id) {
         return ResponseEntity.ok(WorkspaceLlmConnectionDTO.from(connectionService.get(workspaceContext, id)));
@@ -54,6 +67,12 @@ public class WorkspaceLlmConnectionController {
 
     @PostMapping
     @Operation(summary = "Connect your own AI provider", operationId = "workspaceCreateLlmConnection")
+    @ApiResponse(responseCode = "201", description = "Connection created; URL in the Location header")
+    @ApiResponse(
+        responseCode = "409",
+        description = "A connection with this slug already exists in this workspace",
+        content = @Content(schema = @Schema(hidden = true))
+    )
     @RequireAtLeastWorkspaceAdmin
     @Audited("WORKSPACE_LLM_CONNECTION")
     public ResponseEntity<WorkspaceLlmConnectionDTO> create(
@@ -70,6 +89,16 @@ public class WorkspaceLlmConnectionController {
 
     @PatchMapping("/{id}")
     @Operation(summary = "Update your AI provider connection", operationId = "workspaceUpdateLlmConnection")
+    @ApiResponse(
+        responseCode = "200",
+        description = "OK",
+        content = @Content(schema = @Schema(implementation = WorkspaceLlmConnectionDTO.class))
+    )
+    @ApiResponse(
+        responseCode = "404",
+        description = "Connection not found",
+        content = @Content(schema = @Schema(hidden = true))
+    )
     @RequireAtLeastWorkspaceAdmin
     @Audited("WORKSPACE_LLM_CONNECTION")
     public ResponseEntity<WorkspaceLlmConnectionDTO> update(
@@ -84,6 +113,17 @@ public class WorkspaceLlmConnectionController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Remove your AI provider connection", operationId = "workspaceDeleteLlmConnection")
+    @ApiResponse(responseCode = "204", description = "Connection removed")
+    @ApiResponse(
+        responseCode = "404",
+        description = "Connection not found",
+        content = @Content(schema = @Schema(hidden = true))
+    )
+    @ApiResponse(
+        responseCode = "409",
+        description = "Cannot delete a connection still referenced by one or more models",
+        content = @Content(schema = @Schema(hidden = true))
+    )
     @RequireAtLeastWorkspaceAdmin
     @Audited("WORKSPACE_LLM_CONNECTION")
     public ResponseEntity<Void> delete(WorkspaceContext workspaceContext, @PathVariable Long id) {

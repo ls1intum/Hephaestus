@@ -4,19 +4,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmConnection;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmConnectionRepository;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.testconfig.NatsTestContainer;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import java.io.IOException;
-import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import mockwebserver3.MockResponse;
 import mockwebserver3.MockWebServer;
@@ -32,6 +38,41 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import tools.jackson.databind.ObjectMapper;
 
+/**
+ * End-to-end proof of the #1368 slice-5 LLM proxy contract against a REAL Spring context: the
+ * proxy is identified by the AUTHENTICATED token (an {@code AgentJob} job token or a mentor
+ * session token), never by a {@code {provider}} path segment, and the connection funding the
+ * call is re-resolved LIVE — from a real catalog row (instance or workspace) or the legacy
+ * {@code AgentConfig} fallback — on every request via {@link
+ * de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver#resolveProxyCredential}.
+ *
+ * <h2>Why a full Spring context, and how it avoids Docker/real-NATS flakiness</h2>
+ *
+ * <p>{@link LlmProxyController} and {@link LlmProxySecurityConfig} are gated on {@code
+ * hephaestus.agent.nats.enabled AND hephaestus.runtime.worker.enabled} — deliberately the SAME
+ * expression {@code AgentJobExecutor} wires on, so "jobs on, proxy off" is unexpressible. Exercising
+ * the proxy over HTTP therefore means booting the whole job-execution capability, not just the two
+ * proxy beans in isolation. This test does that for real (mirroring the precedent set by {@code
+ * AgentOrphanRecoveryNatsIntegrationTest}), while keeping every other side effect of that capability
+ * inert:
+ *
+ * <ul>
+ *   <li>{@code hephaestus.agent.nats.server} points at a real {@link NatsTestContainer} — cheap,
+ *       already a suite-wide fixture — but this test publishes nothing to it, and uses its OWN
+ *       stream/consumer names so {@link de.tum.cit.aet.hephaestus.agent.job.AgentJobExecutor}'s pull
+ *       loop never contends with {@code AgentOrphanRecoveryNatsIntegrationTest}'s "AGENT" work queue
+ *       on the same (reused) container.
+ *   <li>{@code hephaestus.sandbox.docker-host} points at a socket path that can never exist, so the
+ *       worker-role Docker beans ({@code DockerSandboxConfiguration}, {@code
+ *       AgentImagePullBootstrapper}) wire (they're plain lazy clients / config beans — no I/O at
+ *       construction) but every Docker call they might make at boot fails instantly and is caught +
+ *       logged, never thrown (see {@code DockerClientOperations} / {@code
+ *       ImagePullBootstrapperSupport}) — deterministic regardless of whether the host actually has a
+ *       Docker daemon.
+ *   <li>{@code hephaestus.llm.egress.allow-loopback=true} lets {@link EgressPolicy} accept the
+ *       {@link MockWebServer}'s {@code http://localhost:PORT} target, mirroring local dev.
+ * </ul>
+ */
 class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static MockWebServer mockUpstream;
@@ -44,6 +85,15 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
     private AgentConfigRepository agentConfigRepository;
+
+    @Autowired
+    private LlmConnectionRepository llmConnectionRepository;
+
+    @Autowired
+    private WorkspaceLlmConnectionRepository workspaceLlmConnectionRepository;
+
+    @Autowired
+    private MentorProxyCredentialRegistry mentorProxyCredentialRegistry;
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -61,13 +111,19 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     @DynamicPropertySource
-    static void configureLlmProxy(DynamicPropertyRegistry registry) {
-        registry.add("hephaestus.llm-proxy.anthropic-upstream-url", () ->
-            mockUpstream.url("/").toString().replaceAll("/$", "")
-        );
-        registry.add("hephaestus.llm-proxy.openai-upstream-url", () ->
-            mockUpstream.url("/").toString().replaceAll("/$", "")
-        );
+    static void configureJobExecutionCapability(DynamicPropertyRegistry registry) {
+        registry.add("hephaestus.agent.nats.enabled", () -> "true");
+        registry.add("hephaestus.agent.nats.server", NatsTestContainer::getServerUrl);
+        // Dedicated stream/consumer — see the class Javadoc.
+        registry.add("hephaestus.agent.nats.stream-name", () -> "LLM_PROXY_IT");
+        registry.add("hephaestus.agent.nats.consumer-name", () -> "llm-proxy-it-executor");
+        registry.add("hephaestus.runtime.worker.enabled", () -> "true");
+        // Webhook role off: WebhookConfiguration would otherwise need the unrelated sync
+        // "natsConnection" bean, unrelated to this test (mirrors AgentOrphanRecoveryNatsIntegrationTest).
+        registry.add("hephaestus.runtime.webhook.enabled", () -> "false");
+        registry.add("hephaestus.sandbox.docker-host", () -> "unix:///nonexistent/hephaestus-test-llm-proxy.sock");
+        registry.add("hephaestus.agent.image.pull-policy", () -> "NEVER");
+        registry.add("hephaestus.llm.egress.allow-loopback", () -> "true");
     }
 
     @BeforeEach
@@ -75,25 +131,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         User owner = persistUser("proxy-owner");
         workspace = createWorkspace("proxy-ws", "Proxy Workspace", "proxy-org", AccountType.ORG, owner);
         ensureAdminMembership(workspace);
-    }
-
-    private AgentJob createRunningJobWithApiKey(String apiKey) {
-        AgentConfig config = new AgentConfig();
-        config.setWorkspace(workspace);
-        config.setName("test-config-" + System.nanoTime());
-        config.setLlmProvider(LlmProvider.ANTHROPIC);
-        config = agentConfigRepository.save(config);
-
-        AgentJob job = new AgentJob();
-        job.setWorkspace(workspace);
-        job.setConfig(config);
-        job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-        job.setStatus(AgentJobStatus.RUNNING);
-        job.setLlmApiKey(apiKey);
-        job.setConfigSnapshot(
-            OBJECT_MAPPER.valueToTree(Map.of("agent_type", "CLAUDE_CODE", "model", "claude-sonnet-4-20250514"))
-        );
-        return agentJobRepository.save(job);
     }
 
     /** Drain any queued requests from prior tests so takeRequest() is accurate. */
@@ -107,6 +144,133 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
     }
 
+    // ── fixture builders ──
+
+    /** A bare config used only as the job's FK — no credential material of its own. */
+    private AgentConfig persistBareConfig() {
+        AgentConfig config = new AgentConfig();
+        config.setWorkspace(workspace);
+        config.setName("config-" + System.nanoTime());
+        config.setLlmProvider(LlmProvider.ANTHROPIC);
+        return agentConfigRepository.save(config);
+    }
+
+    /** Legacy (pre-catalog) config carrying its own credential — the proxy's fallback path. */
+    private AgentConfig persistLegacyConfig(String apiKey, String baseUrl) {
+        AgentConfig config = new AgentConfig();
+        config.setWorkspace(workspace);
+        config.setName("legacy-config-" + System.nanoTime());
+        config.setLlmProvider(LlmProvider.ANTHROPIC);
+        config.setLlmApiKey(apiKey);
+        config.setLlmBaseUrl(baseUrl);
+        return agentConfigRepository.save(config);
+    }
+
+    private LlmConnection persistInstanceConnection(
+        String baseUrl,
+        String apiProtocol,
+        String headerName,
+        String valuePrefix,
+        String apiKey,
+        boolean enabled
+    ) {
+        LlmConnection connection = new LlmConnection();
+        connection.setSlug("instance-conn-" + System.nanoTime());
+        connection.setDisplayName("Instance connection");
+        connection.setBaseUrl(baseUrl);
+        connection.setApiProtocol(apiProtocol);
+        connection.setAuthHeaderName(headerName);
+        connection.setAuthValuePrefix(valuePrefix);
+        connection.setApiKey(apiKey);
+        connection.setEnabled(enabled);
+        return llmConnectionRepository.save(connection);
+    }
+
+    private WorkspaceLlmConnection persistWorkspaceConnection(
+        String baseUrl,
+        String apiProtocol,
+        String headerName,
+        String valuePrefix,
+        String apiKey
+    ) {
+        WorkspaceLlmConnection connection = new WorkspaceLlmConnection();
+        connection.setWorkspace(workspace);
+        connection.setSlug("ws-conn-" + System.nanoTime());
+        connection.setDisplayName("Workspace BYO connection");
+        connection.setBaseUrl(baseUrl);
+        connection.setApiProtocol(apiProtocol);
+        connection.setAuthHeaderName(headerName);
+        connection.setAuthValuePrefix(valuePrefix);
+        connection.setApiKey(apiKey);
+        connection.setEnabled(true);
+        return workspaceLlmConnectionRepository.save(connection);
+    }
+
+    private ConfigSnapshot legacySnapshot(AgentConfig config, String apiProtocol) {
+        return new ConfigSnapshot(
+            ConfigSnapshot.SCHEMA_VERSION,
+            config.getId(),
+            config.getName(),
+            apiProtocol,
+            "https://frozen-at-dispatch.invalid", // frozen placeholder — legacy resolution never reads it
+            "claude-sonnet-4-20250514",
+            null,
+            null,
+            null,
+            false,
+            null,
+            null, // connectionScope — null selects the legacy AgentConfig fallback
+            null, // connectionId
+            600,
+            false
+        );
+    }
+
+    private ConfigSnapshot connectionSnapshot(FundingSource scope, Long connectionId, String apiProtocol) {
+        return new ConfigSnapshot(
+            ConfigSnapshot.SCHEMA_VERSION,
+            0L,
+            "connection-bound-config",
+            apiProtocol,
+            "https://frozen-at-dispatch.invalid", // frozen placeholder — the proxy re-resolves live instead
+            "gpt-4o",
+            null,
+            null,
+            null,
+            false,
+            null,
+            scope,
+            connectionId,
+            600,
+            false
+        );
+    }
+
+    private AgentJob persistRunningJob(AgentConfig config, ConfigSnapshot snapshot) {
+        AgentJob job = new AgentJob();
+        job.setWorkspace(workspace);
+        job.setConfig(config);
+        job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
+        job.setStatus(AgentJobStatus.RUNNING);
+        job.setConfigSnapshot(snapshot.toJson(OBJECT_MAPPER));
+        return agentJobRepository.save(job);
+    }
+
+    private AgentJob persistJobWithStatus(AgentJobStatus status) {
+        AgentConfig config = persistBareConfig();
+        AgentJob job = new AgentJob();
+        job.setWorkspace(workspace);
+        job.setConfig(config);
+        job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
+        job.setStatus(status);
+        job.setConfigSnapshot(legacySnapshot(config, "anthropic-messages").toJson(OBJECT_MAPPER));
+        return agentJobRepository.save(job);
+    }
+
+    private String mockUpstreamBaseUrl() {
+        return mockUpstream.url("/").toString().replaceAll("/$", "");
+    }
+
     @Nested
     class SecurityIsolation {
 
@@ -114,7 +278,7 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         void shouldRejectNoAuth() {
             webTestClient
                 .post()
-                .uri("/internal/llm/anthropic/v1/messages")
+                .uri("/internal/llm/v1/messages")
                 .bodyValue("{}")
                 .exchange()
                 .expectStatus()
@@ -126,7 +290,7 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         void shouldRejectJwtOnInternalEndpoints() {
             webTestClient
                 .post()
-                .uri("/internal/llm/anthropic/v1/messages")
+                .uri("/internal/llm/v1/messages")
                 .headers(TestAuthUtils.withCurrentUser())
                 .bodyValue("{}")
                 .exchange()
@@ -136,23 +300,11 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         @Test
         void shouldRejectNonRunningJobToken() {
-            AgentConfig config = new AgentConfig();
-            config.setWorkspace(workspace);
-            config.setName("completed-config");
-            config.setLlmProvider(LlmProvider.ANTHROPIC);
-            config = agentConfigRepository.save(config);
-
-            AgentJob job = new AgentJob();
-            job.setWorkspace(workspace);
-            job.setConfig(config);
-            job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-            job.setStatus(AgentJobStatus.COMPLETED);
-            job.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("agent_type", "CLAUDE_CODE")));
-            job = agentJobRepository.save(job);
+            AgentJob job = persistJobWithStatus(AgentJobStatus.COMPLETED);
 
             webTestClient
                 .post()
-                .uri("/internal/llm/anthropic/v1/messages")
+                .uri("/internal/llm/v1/messages")
                 .header("x-api-key", job.getJobToken())
                 .bodyValue("{}")
                 .exchange()
@@ -162,23 +314,11 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         @Test
         void shouldRejectQueuedJobToken() {
-            AgentConfig config = new AgentConfig();
-            config.setWorkspace(workspace);
-            config.setName("queued-config");
-            config.setLlmProvider(LlmProvider.ANTHROPIC);
-            config = agentConfigRepository.save(config);
-
-            AgentJob job = new AgentJob();
-            job.setWorkspace(workspace);
-            job.setConfig(config);
-            job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-            job.setStatus(AgentJobStatus.QUEUED);
-            job.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("agent_type", "CLAUDE_CODE")));
-            job = agentJobRepository.save(job);
+            AgentJob job = persistJobWithStatus(AgentJobStatus.QUEUED);
 
             webTestClient
                 .post()
-                .uri("/internal/llm/anthropic/v1/messages")
+                .uri("/internal/llm/v1/messages")
                 .header("x-api-key", job.getJobToken())
                 .bodyValue("{}")
                 .exchange()
@@ -188,23 +328,11 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         @Test
         void shouldRejectFailedJobToken() {
-            AgentConfig config = new AgentConfig();
-            config.setWorkspace(workspace);
-            config.setName("failed-config");
-            config.setLlmProvider(LlmProvider.ANTHROPIC);
-            config = agentConfigRepository.save(config);
-
-            AgentJob job = new AgentJob();
-            job.setWorkspace(workspace);
-            job.setConfig(config);
-            job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-            job.setStatus(AgentJobStatus.FAILED);
-            job.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("agent_type", "CLAUDE_CODE")));
-            job = agentJobRepository.save(job);
+            AgentJob job = persistJobWithStatus(AgentJobStatus.FAILED);
 
             webTestClient
                 .post()
-                .uri("/internal/llm/anthropic/v1/messages")
+                .uri("/internal/llm/v1/messages")
                 .header("x-api-key", job.getJobToken())
                 .bodyValue("{}")
                 .exchange()
@@ -218,7 +346,7 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
             webTestClient
                 .post()
-                .uri("/internal/llm/anthropic/v1/messages")
+                .uri("/internal/llm/v1/messages")
                 .header("x-api-key", fakeToken)
                 .bodyValue("{}")
                 .exchange()
@@ -230,7 +358,7 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         void shouldRejectEmptyApiKeyHeader() {
             webTestClient
                 .post()
-                .uri("/internal/llm/anthropic/v1/messages")
+                .uri("/internal/llm/v1/messages")
                 .header("x-api-key", "")
                 .bodyValue("{}")
                 .exchange()
@@ -242,8 +370,32 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         void shouldRejectMalformedToken() {
             webTestClient
                 .post()
-                .uri("/internal/llm/anthropic/v1/messages")
+                .uri("/internal/llm/v1/messages")
                 .header("x-api-key", "invalid token with spaces!!!")
+                .bodyValue("{}")
+                .exchange()
+                .expectStatus()
+                .isUnauthorized();
+        }
+
+        @Test
+        @org.junit.jupiter.api.DisplayName("a mentor token revoked (e.g. sandbox teardown) is refused, not resolved")
+        void shouldRejectRevokedMentorToken() {
+            UUID sessionId = UUID.randomUUID();
+            String token = mentorProxyCredentialRegistry.mint(
+                sessionId,
+                "anthropic-messages",
+                mockUpstreamBaseUrl(),
+                null,
+                null,
+                null
+            );
+            mentorProxyCredentialRegistry.revoke(sessionId);
+
+            webTestClient
+                .post()
+                .uri("/internal/llm/v1/messages")
+                .header("x-api-key", token)
                 .bodyValue("{}")
                 .exchange()
                 .expectStatus()
@@ -260,7 +412,10 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
-        void shouldForwardAnthropicWithRealApiKey() throws Exception {
+        @org.junit.jupiter.api.DisplayName(
+            "legacy (pre-catalog) job token: falls back to AgentConfig.llmApiKey, injecting the REAL key"
+        )
+        void shouldForwardLegacyConfigWithRealApiKey() throws Exception {
             mockUpstream.enqueue(
                 new MockResponse.Builder()
                     .code(200)
@@ -269,11 +424,12 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     .build()
             );
 
-            AgentJob job = createRunningJobWithApiKey("sk-ant-real-key-123");
+            AgentConfig config = persistLegacyConfig("sk-ant-real-key-123", mockUpstreamBaseUrl());
+            AgentJob job = persistRunningJob(config, legacySnapshot(config, "anthropic-messages"));
 
             webTestClient
                 .post()
-                .uri("/internal/llm/anthropic/v1/messages")
+                .uri("/internal/llm/v1/messages")
                 .header("x-api-key", job.getJobToken())
                 .header("Content-Type", "application/json")
                 .bodyValue("{\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":1}")
@@ -289,14 +445,15 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
             // Real API key injected — NOT the job token
             assertThat(upstream.getHeaders().get("x-api-key")).isEqualTo("sk-ant-real-key-123");
             assertThat(upstream.getHeaders().get("x-api-key")).isNotEqualTo(job.getJobToken());
-            // No Bearer auth for Anthropic
             assertThat(upstream.getHeaders().get("Authorization")).isNull();
-            // Body forwarded intact
             assertThat(upstream.getBody().utf8()).contains("claude-sonnet-4-20250514");
         }
 
         @Test
-        void shouldForwardOpenAIWithBearerAuth() throws Exception {
+        @org.junit.jupiter.api.DisplayName(
+            "INSTANCE-scoped catalog connection: the job routes to its own connection, live-resolved"
+        )
+        void shouldForwardInstanceConnectionWithRealApiKey() throws Exception {
             mockUpstream.enqueue(
                 new MockResponse.Builder()
                     .code(200)
@@ -305,11 +462,23 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     .build()
             );
 
-            AgentJob job = createRunningJobWithApiKey("sk-openai-real-key-456");
+            LlmConnection connection = persistInstanceConnection(
+                mockUpstreamBaseUrl(),
+                "openai-completions",
+                "Authorization",
+                "Bearer ",
+                "sk-instance-real-key-456",
+                true
+            );
+            AgentConfig config = persistBareConfig();
+            AgentJob job = persistRunningJob(
+                config,
+                connectionSnapshot(FundingSource.INSTANCE, connection.getId(), "openai-completions")
+            );
 
             webTestClient
                 .post()
-                .uri("/internal/llm/openai/v1/chat/completions")
+                .uri("/internal/llm/v1/chat/completions")
                 .header("Authorization", "Bearer " + job.getJobToken())
                 .header("Content-Type", "application/json")
                 .bodyValue("{\"model\":\"gpt-4\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}")
@@ -322,12 +491,51 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
             RecordedRequest upstream = mockUpstream.takeRequest(5, TimeUnit.SECONDS);
             assertThat(upstream).isNotNull();
             assertThat(upstream.getTarget()).isEqualTo("/v1/chat/completions");
-            // Real API key injected with Bearer prefix
-            assertThat(upstream.getHeaders().get("Authorization")).isEqualTo("Bearer sk-openai-real-key-456");
-            // Job token must NOT appear in upstream headers
+            assertThat(upstream.getHeaders().get("Authorization")).isEqualTo("Bearer sk-instance-real-key-456");
+            // The proxy-scoped job token must NOT reach the upstream
             assertThat(upstream.getHeaders().get("Authorization")).doesNotContain(job.getJobToken());
-            // No x-api-key for OpenAI
-            assertThat(upstream.getHeaders().get("x-api-key")).isNull();
+        }
+
+        @Test
+        @org.junit.jupiter.api.DisplayName(
+            "WORKSPACE-scoped BYO connection: the job routes to the workspace's own connection"
+        )
+        void shouldForwardWorkspaceConnectionWithRealApiKey() throws Exception {
+            mockUpstream.enqueue(
+                new MockResponse.Builder()
+                    .code(200)
+                    .addHeader("Content-Type", "application/json")
+                    .body("{\"id\":\"msg_byo\",\"content\":[]}")
+                    .build()
+            );
+
+            WorkspaceLlmConnection connection = persistWorkspaceConnection(
+                mockUpstreamBaseUrl(),
+                "anthropic-messages",
+                "x-api-key",
+                "",
+                "sk-byo-real-key-789"
+            );
+            AgentConfig config = persistBareConfig();
+            AgentJob job = persistRunningJob(
+                config,
+                connectionSnapshot(FundingSource.WORKSPACE, connection.getId(), "anthropic-messages")
+            );
+
+            webTestClient
+                .post()
+                .uri("/internal/llm/v1/messages")
+                .header("x-api-key", job.getJobToken())
+                .header("Content-Type", "application/json")
+                .bodyValue("{\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":1}")
+                .exchange()
+                .expectStatus()
+                .isOk();
+
+            RecordedRequest upstream = mockUpstream.takeRequest(5, TimeUnit.SECONDS);
+            assertThat(upstream).isNotNull();
+            assertThat(upstream.getHeaders().get("x-api-key")).isEqualTo("sk-byo-real-key-789");
+            assertThat(upstream.getHeaders().get("x-api-key")).isNotEqualTo(job.getJobToken());
         }
 
         @Test
@@ -340,11 +548,23 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     .build()
             );
 
-            AgentJob job = createRunningJobWithApiKey("sk-azure-real-key");
+            LlmConnection connection = persistInstanceConnection(
+                mockUpstreamBaseUrl(),
+                "azure-openai-responses",
+                "api-key",
+                "",
+                "sk-azure-real-key",
+                true
+            );
+            AgentConfig config = persistBareConfig();
+            AgentJob job = persistRunningJob(
+                config,
+                connectionSnapshot(FundingSource.INSTANCE, connection.getId(), "azure-openai-responses")
+            );
 
             webTestClient
                 .post()
-                .uri("/internal/llm/openai/v1/chat/completions")
+                .uri("/internal/llm/v1/chat/completions")
                 .header("api-key", job.getJobToken())
                 .header("Content-Type", "application/json")
                 .bodyValue("{\"model\":\"gpt-4\"}")
@@ -354,9 +574,8 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
             RecordedRequest upstream = mockUpstream.takeRequest(5, TimeUnit.SECONDS);
             assertThat(upstream).isNotNull();
-            // Real API key injected, NOT the job token
-            assertThat(upstream.getHeaders().get("Authorization")).isEqualTo("Bearer sk-azure-real-key");
-            assertThat(upstream.getHeaders().get("api-key")).isNull();
+            assertThat(upstream.getHeaders().get("api-key")).isEqualTo("sk-azure-real-key");
+            assertThat(upstream.getHeaders().get("api-key")).isNotEqualTo(job.getJobToken());
         }
 
         @Test
@@ -369,11 +588,12 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     .build()
             );
 
-            AgentJob job = createRunningJobWithApiKey("sk-list-key");
+            AgentConfig config = persistLegacyConfig("sk-list-key", mockUpstreamBaseUrl());
+            AgentJob job = persistRunningJob(config, legacySnapshot(config, "openai-completions"));
 
             webTestClient
                 .get()
-                .uri("/internal/llm/openai/v1/models")
+                .uri("/internal/llm/v1/models")
                 .header("Authorization", "Bearer " + job.getJobToken())
                 .exchange()
                 .expectStatus()
@@ -389,20 +609,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
-        void shouldReturn404ForUnknownProvider() {
-            AgentJob job = createRunningJobWithApiKey("sk-test-key");
-
-            webTestClient
-                .post()
-                .uri("/internal/llm/unknownprovider/v1/messages")
-                .header("x-api-key", job.getJobToken())
-                .bodyValue("{}")
-                .exchange()
-                .expectStatus()
-                .isNotFound();
-        }
-
-        @Test
         void shouldStreamSseResponse() throws Exception {
             String ssePayload = "data: {\"id\":\"msg_stream\"}\n\ndata: [DONE]\n\n";
             mockUpstream.enqueue(
@@ -413,7 +619,8 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     .build()
             );
 
-            AgentJob job = createRunningJobWithApiKey("sk-ant-sse-key");
+            AgentConfig config = persistLegacyConfig("sk-ant-sse-key", mockUpstreamBaseUrl());
+            AgentJob job = persistRunningJob(config, legacySnapshot(config, "anthropic-messages"));
 
             // SSE body content is verified by ProxyStreamingUtilsTest.
             // WebTestClient cannot capture bytes written directly to HttpServletResponse
@@ -421,7 +628,7 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
             // so we verify status, content-type, and upstream auth header injection here.
             webTestClient
                 .post()
-                .uri("/internal/llm/anthropic/v1/messages")
+                .uri("/internal/llm/v1/messages")
                 .header("x-api-key", job.getJobToken())
                 .header("Content-Type", "application/json")
                 .bodyValue("{\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":1,\"stream\":true}")
@@ -446,11 +653,12 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     .build()
             );
 
-            AgentJob job = createRunningJobWithApiKey("sk-query-key");
+            AgentConfig config = persistLegacyConfig("sk-query-key", mockUpstreamBaseUrl());
+            AgentJob job = persistRunningJob(config, legacySnapshot(config, "openai-completions"));
 
             webTestClient
                 .get()
-                .uri("/internal/llm/openai/v1/models?limit=10&order=desc")
+                .uri("/internal/llm/v1/models?limit=10&order=desc")
                 .header("Authorization", "Bearer " + job.getJobToken())
                 .exchange()
                 .expectStatus()
@@ -466,11 +674,12 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         void shouldForwardUpstreamErrors() throws Exception {
             mockUpstream.enqueue(new MockResponse.Builder().code(429).body("{\"error\":\"rate_limited\"}").build());
 
-            AgentJob job = createRunningJobWithApiKey("sk-test-key");
+            AgentConfig config = persistLegacyConfig("sk-test-key", mockUpstreamBaseUrl());
+            AgentJob job = persistRunningJob(config, legacySnapshot(config, "anthropic-messages"));
 
             webTestClient
                 .post()
-                .uri("/internal/llm/anthropic/v1/messages")
+                .uri("/internal/llm/v1/messages")
                 .header("x-api-key", job.getJobToken())
                 .header("Content-Type", "application/json")
                 .bodyValue("{\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":1}")
@@ -479,6 +688,142 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .isEqualTo(429)
                 .expectBody()
                 .json("{\"error\":\"rate_limited\"}");
+        }
+    }
+
+    @Nested
+    class ConnectionResolutionSecurity {
+
+        @BeforeEach
+        void setUp() {
+            drainMockUpstream();
+        }
+
+        @Test
+        @org.junit.jupiter.api.DisplayName(
+            "a connection disabled after the job's snapshot was frozen is refused with 502, never forwarded"
+        )
+        void shouldRefuseDisabledConnection() {
+            int requestsBefore = mockUpstream.getRequestCount();
+
+            LlmConnection connection = persistInstanceConnection(
+                mockUpstreamBaseUrl(),
+                "openai-completions",
+                "Authorization",
+                "Bearer ",
+                "sk-should-never-be-used",
+                false // disabled — e.g. an admin revoked it after this job's snapshot was frozen
+            );
+            AgentConfig config = persistBareConfig();
+            AgentJob job = persistRunningJob(
+                config,
+                connectionSnapshot(FundingSource.INSTANCE, connection.getId(), "openai-completions")
+            );
+
+            webTestClient
+                .post()
+                .uri("/internal/llm/v1/chat/completions")
+                .header("Authorization", "Bearer " + job.getJobToken())
+                .bodyValue("{}")
+                .exchange()
+                .expectStatus()
+                .isEqualTo(502)
+                .expectBody(String.class)
+                .isEqualTo("No credential configured for this connection");
+
+            assertThat(mockUpstream.getRequestCount())
+                .as("a disabled connection must never be forwarded to")
+                .isEqualTo(requestsBefore);
+        }
+
+        @Test
+        @org.junit.jupiter.api.DisplayName(
+            "a connection deleted after the job's snapshot was frozen is refused with 502, never forwarded"
+        )
+        void shouldRefuseDeletedConnection() {
+            int requestsBefore = mockUpstream.getRequestCount();
+
+            AgentConfig config = persistBareConfig();
+            // 999_999 never exists — simulates a connection deleted after dispatch.
+            AgentJob job = persistRunningJob(
+                config,
+                connectionSnapshot(FundingSource.INSTANCE, 999_999L, "openai-completions")
+            );
+
+            webTestClient
+                .post()
+                .uri("/internal/llm/v1/chat/completions")
+                .header("Authorization", "Bearer " + job.getJobToken())
+                .bodyValue("{}")
+                .exchange()
+                .expectStatus()
+                .isEqualTo(502)
+                .expectBody(String.class)
+                .isEqualTo("No credential configured for this connection");
+
+            assertThat(mockUpstream.getRequestCount()).isEqualTo(requestsBefore);
+        }
+
+        @Test
+        @org.junit.jupiter.api.DisplayName(
+            "an egress-rejected live base URL refuses forwarding with 502, never reaching upstream"
+        )
+        void shouldRefuseEgressRejectedBaseUrl() {
+            int requestsBefore = mockUpstream.getRequestCount();
+
+            // A private, non-loopback host is rejected by EgressPolicy regardless of allow-loopback.
+            AgentConfig config = persistLegacyConfig("sk-should-never-be-used", "http://10.0.0.5:9999");
+            AgentJob job = persistRunningJob(config, legacySnapshot(config, "openai-completions"));
+
+            webTestClient
+                .post()
+                .uri("/internal/llm/v1/chat/completions")
+                .header("Authorization", "Bearer " + job.getJobToken())
+                .bodyValue("{}")
+                .exchange()
+                .expectStatus()
+                .isEqualTo(502)
+                .expectBody(String.class)
+                .isEqualTo("Upstream target not permitted");
+
+            assertThat(mockUpstream.getRequestCount())
+                .as("an egress-rejected host must never be forwarded to")
+                .isEqualTo(requestsBefore);
+        }
+    }
+
+    @Nested
+    class HeaderHandling {
+
+        @BeforeEach
+        void setUp() {
+            drainMockUpstream();
+        }
+
+        @Test
+        @org.junit.jupiter.api.DisplayName(
+            "the inbound Authorization header (carrying the proxy-scoped job token) is never forwarded verbatim"
+        )
+        void shouldStripInboundAuthorizationHeader() throws Exception {
+            mockUpstream.enqueue(new MockResponse.Builder().code(200).body("{}").build());
+
+            AgentConfig config = persistLegacyConfig("sk-real-openai-key", mockUpstreamBaseUrl());
+            AgentJob job = persistRunningJob(config, legacySnapshot(config, "openai-completions"));
+
+            webTestClient
+                .post()
+                .uri("/internal/llm/v1/chat/completions")
+                .header("Authorization", "Bearer " + job.getJobToken())
+                .header("X-Forwarded-For", "203.0.113.7") // an arbitrary extra inbound header should pass through
+                .bodyValue("{}")
+                .exchange()
+                .expectStatus()
+                .isOk();
+
+            RecordedRequest upstream = mockUpstream.takeRequest(5, TimeUnit.SECONDS);
+            assertThat(upstream).isNotNull();
+            assertThat(upstream.getHeaders().get("Authorization")).isEqualTo("Bearer sk-real-openai-key");
+            assertThat(upstream.getHeaders().get("Authorization")).doesNotContain(job.getJobToken());
         }
     }
 
@@ -494,11 +839,12 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         void shouldRejectPathTraversal() {
             int requestsBefore = mockUpstream.getRequestCount();
 
-            AgentJob job = createRunningJobWithApiKey("sk-test-key");
+            AgentConfig config = persistLegacyConfig("sk-test-key", mockUpstreamBaseUrl());
+            AgentJob job = persistRunningJob(config, legacySnapshot(config, "anthropic-messages"));
 
             webTestClient
                 .post()
-                .uri("/internal/llm/anthropic/v1/../../../admin")
+                .uri("/internal/llm/v1/../../../admin")
                 .header("x-api-key", job.getJobToken())
                 .bodyValue("{}")
                 .exchange()
@@ -511,7 +857,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
                         .isIn(400, 401, 404)
                 );
 
-            // Nothing should have been forwarded to the upstream
             assertThat(mockUpstream.getRequestCount())
                 .as("Path traversal must NOT reach the upstream")
                 .isEqualTo(requestsBefore);
@@ -523,7 +868,8 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         @Test
         void shouldPersistTokenHash() {
-            AgentJob job = createRunningJobWithApiKey("sk-test");
+            AgentConfig config = persistLegacyConfig("sk-test", mockUpstreamBaseUrl());
+            AgentJob job = persistRunningJob(config, legacySnapshot(config, "anthropic-messages"));
 
             AgentJob loaded = agentJobRepository.findById(job.getId()).orElseThrow();
             assertThat(loaded.getJobTokenHash()).isNotNull();
@@ -533,7 +879,8 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         @Test
         void shouldLookUpByTokenHash() {
-            AgentJob job = createRunningJobWithApiKey("sk-test");
+            AgentConfig config = persistLegacyConfig("sk-test", mockUpstreamBaseUrl());
+            AgentJob job = persistRunningJob(config, legacySnapshot(config, "anthropic-messages"));
 
             String hash = AgentJob.computeTokenHash(job.getJobToken());
             var found = agentJobRepository.findByJobTokenHashAndStatus(hash, AgentJobStatus.RUNNING);
@@ -543,7 +890,8 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         @Test
         void shouldNotFindJobWithWrongStatus() {
-            AgentJob job = createRunningJobWithApiKey("sk-test");
+            AgentConfig config = persistLegacyConfig("sk-test", mockUpstreamBaseUrl());
+            AgentJob job = persistRunningJob(config, legacySnapshot(config, "anthropic-messages"));
 
             String hash = AgentJob.computeTokenHash(job.getJobToken());
             var found = agentJobRepository.findByJobTokenHashAndStatus(hash, AgentJobStatus.COMPLETED);
@@ -552,8 +900,9 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         @Test
         void jobTokenShouldBeUnique() {
-            AgentJob job1 = createRunningJobWithApiKey("sk-test-1");
-            AgentJob job2 = createRunningJobWithApiKey("sk-test-2");
+            AgentConfig config = persistLegacyConfig("sk-test", mockUpstreamBaseUrl());
+            AgentJob job1 = persistRunningJob(config, legacySnapshot(config, "anthropic-messages"));
+            AgentJob job2 = persistRunningJob(config, legacySnapshot(config, "anthropic-messages"));
 
             assertThat(job1.getJobToken()).isNotEqualTo(job2.getJobToken());
             assertThat(job1.getJobTokenHash()).isNotEqualTo(job2.getJobTokenHash());
@@ -561,7 +910,8 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         @Test
         void jobTokenShouldBe43Chars() {
-            AgentJob job = createRunningJobWithApiKey("sk-test");
+            AgentConfig config = persistLegacyConfig("sk-test", mockUpstreamBaseUrl());
+            AgentJob job = persistRunningJob(config, legacySnapshot(config, "anthropic-messages"));
 
             assertThat(job.getJobToken()).hasSize(43);
             assertThat(job.getJobToken()).matches("[A-Za-z0-9_-]+");
@@ -585,7 +935,8 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         @Test
         @WithAdminUser
         void jobTokenShouldNotAccessMainApi() {
-            AgentJob job = createRunningJobWithApiKey("sk-test");
+            AgentConfig config = persistLegacyConfig("sk-test", mockUpstreamBaseUrl());
+            AgentJob job = persistRunningJob(config, legacySnapshot(config, "anthropic-messages"));
 
             // Job token should NOT work for workspace endpoints (different security chain)
             webTestClient
