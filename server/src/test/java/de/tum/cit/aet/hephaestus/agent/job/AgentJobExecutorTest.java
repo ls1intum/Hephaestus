@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
@@ -26,7 +27,12 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxCancelledException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetBlockReason;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUnpricedUsageBlockedException;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.nats.client.Connection;
 import io.nats.client.Message;
@@ -57,7 +63,10 @@ import tools.jackson.databind.ObjectMapper;
 class AgentJobExecutorTest extends BaseUnitTest {
 
     @Mock
-    private de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder usageRecorder;
+    private LlmUsageRecorder usageRecorder;
+
+    @Mock
+    private LlmBudgetService llmBudgetService;
 
     @Mock
     private Connection natsConnection;
@@ -125,6 +134,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             objectMapper,
             meterRegistry,
             usageRecorder,
+            llmBudgetService,
             Optional.empty(),
             Optional.empty()
         );
@@ -160,6 +170,12 @@ class AgentJobExecutorTest extends BaseUnitTest {
         job.setConfigSnapshot(snapshot.toJson(objectMapper));
         job.setJobToken("test-token");
         job.setStatus(AgentJobStatus.QUEUED);
+        job.setWorkspace(workspaceStub());
+
+        // Claim-time budget recheck (#1368 fix wave): default to NONE so every pre-existing claim
+        // test keeps its original meaning. An unstubbed mock would return null here (not a boolean),
+        // and null != NONE reads as "blocked" — so this default is load-bearing, not decorative.
+        lenient().when(llmBudgetService.blockReason(anyLong())).thenReturn(LlmBudgetBlockReason.NONE);
 
         // Default: transactionTemplate.execute invokes the callback
         lenient()
@@ -189,6 +205,26 @@ class AgentJobExecutorTest extends BaseUnitTest {
         Message msg = mock(Message.class);
         when(msg.getData()).thenReturn(id.toString().getBytes(StandardCharsets.UTF_8));
         return msg;
+    }
+
+    private static Workspace workspaceStub() {
+        Workspace workspace = new Workspace();
+        workspace.setId(99L);
+        return workspace;
+    }
+
+    /**
+     * A terminal-write-stage job the way {@code persistTerminalState} re-reads it: real jobType +
+     * workspace, matching the invariant a persisted {@link AgentJob} always has both (never null in
+     * production). Needed since #1368's fix wave reads both unconditionally when no agent-reported
+     * usage is present, to write the UNPRICED ledger fallback.
+     */
+    private static AgentJob freshJob() {
+        AgentJob freshJob = new AgentJob();
+        freshJob.prePersist();
+        freshJob.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
+        freshJob.setWorkspace(workspaceStub());
+        return freshJob;
     }
 
     @Nested
@@ -232,6 +268,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 objectMapper,
                 meterRegistry,
                 usageRecorder,
+                llmBudgetService,
                 Optional.empty(),
                 Optional.of(workerProps("test-worker"))
             );
@@ -301,6 +338,91 @@ class AgentJobExecutorTest extends BaseUnitTest {
         }
     }
 
+    /**
+     * Claim-time budget recheck (#1368 fix wave): a workspace can pre-queue jobs faster than the
+     * cap updates, so every claim rechecks {@code llmBudgetService.blockReason} before letting a
+     * job start — refusing it terminally (never NAK/redelivered) rather than executing it.
+     */
+    @Nested
+    @DisplayName("Claim-time budget recheck (#1368 fix wave)")
+    class ClaimTimeBudgetRecheck {
+
+        @Test
+        void refusesAndCancelsWhenBudgetIsExhaustedAtClaimTime() {
+            Message msg = createMessage(jobId);
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(llmBudgetService.blockReason(99L)).thenReturn(LlmBudgetBlockReason.EXHAUSTED);
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            executor.executeJob(msg);
+
+            // Refused terminally: acked (no NATS redelivery), never executed, never claimed to RUNNING.
+            verify(msg).ack();
+            verify(msg, never()).nakWithDelay(any());
+            verify(sandboxManager, never()).execute(any());
+            verify(configRepository, never()).findByIdForUpdate(any());
+
+            ArgumentCaptor<AgentJob> saved = ArgumentCaptor.forClass(AgentJob.class);
+            verify(jobRepository).save(saved.capture());
+            assertThat(saved.getValue().getStatus()).isEqualTo(AgentJobStatus.CANCELLED);
+            assertThat(saved.getValue().getErrorMessage()).isEqualTo("Budget reached.");
+            assertThat(saved.getValue().getCancellationReason()).isEqualTo(AgentJobCancellationReason.BUDGET_EXHAUSTED);
+        }
+
+        @Test
+        void refusesWithADistinctMessageWhenUnpricedUsageIsBlockedByInstancePolicy() {
+            Message msg = createMessage(jobId);
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(llmBudgetService.blockReason(99L)).thenReturn(LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED);
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            executor.executeJob(msg);
+
+            verify(msg).ack();
+            verify(sandboxManager, never()).execute(any());
+
+            ArgumentCaptor<AgentJob> saved = ArgumentCaptor.forClass(AgentJob.class);
+            verify(jobRepository).save(saved.capture());
+            assertThat(saved.getValue().getStatus()).isEqualTo(AgentJobStatus.CANCELLED);
+            assertThat(saved.getValue().getErrorMessage()).isEqualTo(LlmUnpricedUsageBlockedException.MESSAGE);
+            assertThat(saved.getValue().getCancellationReason()).isEqualTo(AgentJobCancellationReason.BUDGET_EXHAUSTED);
+        }
+
+        @Test
+        void refusedPreStartJobNeverWritesAUsageLedgerEntry() {
+            // Rejected-pre-start jobs must leave NO ledger trace at all — distinct from the
+            // cancelled-after-start / malformed-usage cases, which DO record UNPRICED (see
+            // UnpricedUsageLedgerFallback below).
+            Message msg = createMessage(jobId);
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(llmBudgetService.blockReason(99L)).thenReturn(LlmBudgetBlockReason.EXHAUSTED);
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            executor.executeJob(msg);
+
+            verify(usageRecorder, never()).record(any(), any());
+            verify(usageRecorder, never()).recordUnverifiable(any(), any());
+        }
+
+        @Test
+        void proceedsToConcurrencyGateWhenBudgetIsNotBlocked() {
+            Message msg = createMessage(jobId);
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(llmBudgetService.blockReason(99L)).thenReturn(LlmBudgetBlockReason.NONE);
+            when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
+            when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            setupFullExecution();
+
+            executor.executeJob(msg);
+
+            ArgumentCaptor<AgentJob> claimed = ArgumentCaptor.forClass(AgentJob.class);
+            verify(jobRepository).save(claimed.capture());
+            assertThat(claimed.getValue().getStatus()).isEqualTo(AgentJobStatus.RUNNING);
+        }
+    }
+
     @Nested
     class ProvenanceDigests {
 
@@ -357,8 +479,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             setupFullExecution();
 
-            AgentJob freshJob = new AgentJob();
-            freshJob.prePersist();
+            AgentJob freshJob = freshJob();
             when(jobRepository.findById(any(UUID.class))).thenReturn(Optional.of(freshJob));
             when(jobRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
             when(jobRepository.transitionStatus(any(), eq(AgentJobStatus.COMPLETED), any(), any(), any())).thenReturn(
@@ -389,8 +510,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             SandboxResult failResult = new SandboxResult(1, Map.of(), "error output", false, Duration.ofMinutes(2));
             setupFullExecution(failResult);
 
-            AgentJob freshJob = new AgentJob();
-            freshJob.prePersist();
+            AgentJob freshJob = freshJob();
             when(jobRepository.findById(any(UUID.class))).thenReturn(Optional.of(freshJob));
             when(jobRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
             when(jobRepository.transitionStatus(any(), any(), any(), any(), any())).thenReturn(1);
@@ -424,8 +544,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             );
             setupFullExecution(envelopeMismatch);
 
-            AgentJob freshJob = new AgentJob();
-            freshJob.prePersist();
+            AgentJob freshJob = freshJob();
             when(jobRepository.findById(any(UUID.class))).thenReturn(Optional.of(freshJob));
             when(jobRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
             when(jobRepository.transitionStatus(any(), any(), any(), any(), any())).thenReturn(1);
@@ -453,8 +572,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             SandboxResult timeoutResult = new SandboxResult(137, Map.of(), "timed out", true, Duration.ofMinutes(10));
             setupFullExecution(timeoutResult);
 
-            AgentJob freshJob = new AgentJob();
-            freshJob.prePersist();
+            AgentJob freshJob = freshJob();
             when(jobRepository.findById(any(UUID.class))).thenReturn(Optional.of(freshJob));
             when(jobRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
             when(jobRepository.transitionStatus(any(), any(), any(), any(), any())).thenReturn(1);
@@ -520,6 +638,102 @@ class AgentJobExecutorTest extends BaseUnitTest {
         }
     }
 
+    /**
+     * #1368 fix wave: a job that started executing (past claim+RUNNING) but ends with no
+     * parseable usage must still leave a ledger trace — an UNPRICED entry, so the month turns
+     * UNVERIFIABLE instead of looking falsely fully accounted for. Never for jobs refused before
+     * RUNNING — see {@code ClaimTimeBudgetRecheck#refusedPreStartJobNeverWritesAUsageLedgerEntry}.
+     */
+    @Nested
+    @DisplayName("Unpriced usage ledger fallback (#1368 fix wave)")
+    class UnpricedUsageLedgerFallback {
+
+        @Test
+        void cancelledAfterStart_recordsAnUnpricedLedgerEntry() {
+            Message msg = createMessage(jobId);
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
+            when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            // The transition wins (job really was RUNNING-and-ours) — the ledger write is gated on this.
+            when(jobRepository.transitionStatus(any(), eq(AgentJobStatus.CANCELLED), any(), any(), any())).thenReturn(
+                1
+            );
+            when(jobRepository.findByIdWithWorkspace(jobId)).thenReturn(Optional.of(job));
+
+            setupFullExecutionWithException(new SandboxCancelledException("cancelled"));
+
+            executor.executeJob(msg);
+
+            ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample = ArgumentCaptor.forClass(
+                LlmUsageRecorder.LlmUsageSample.class
+            );
+            verify(usageRecorder).recordUnverifiable(eq(99L), sample.capture());
+            // job (the claimed entity) has its own id from prePersist() — distinct from the NATS
+            // message's jobId in this fixture; the ledger sourceId must be the entity's real id.
+            assertThat(sample.getValue().sourceId()).isEqualTo(job.getId());
+            assertThat(sample.getValue().model()).isEqualTo("claude-sonnet-4");
+            assertThat(sample.getValue().inputTokens()).isZero();
+            assertThat(sample.getValue().totalCalls()).isZero();
+            verify(usageRecorder, never()).record(any(), any());
+        }
+
+        @Test
+        void cancelledAfterStart_butFenceLost_recordsNoLedgerEntry() {
+            // transitionStatus returns 0 (job no longer RUNNING-and-ours — e.g. orphan-requeued to a
+            // sibling): must not attribute spend to a run this worker no longer owns.
+            Message msg = createMessage(jobId);
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
+            when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(jobRepository.transitionStatus(any(), eq(AgentJobStatus.CANCELLED), any(), any(), any())).thenReturn(
+                0
+            );
+
+            setupFullExecutionWithException(new SandboxCancelledException("cancelled"));
+
+            executor.executeJob(msg);
+
+            // findByIdWithWorkspace IS called earlier in the pipeline (prepareAndExecute reads the
+            // job eagerly) — the fence loss must stop the LEDGER write specifically, not that call.
+            verify(usageRecorder, never()).recordUnverifiable(any(), any());
+            verify(usageRecorder, never()).record(any(), any());
+        }
+
+        @Test
+        void missingOrMalformedUsageJson_recordsAnUnpricedLedgerEntryOnNormalCompletion() {
+            Message msg = createMessage(jobId);
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
+            when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            // setupFullExecution's AgentResult carries no usage — the Pi runner's usage.json was
+            // missing/malformed. The sandbox itself still exits 0 (COMPLETED), unlike a hard failure.
+            setupFullExecution();
+
+            AgentJob freshJob = freshJob();
+            freshJob.setConfigSnapshot(snapshot.toJson(objectMapper));
+            when(jobRepository.findById(any(UUID.class))).thenReturn(Optional.of(freshJob));
+            when(jobRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(jobRepository.transitionStatus(any(), eq(AgentJobStatus.COMPLETED), any(), any(), any())).thenReturn(
+                1
+            );
+
+            executor.executeJob(msg);
+
+            ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample = ArgumentCaptor.forClass(
+                LlmUsageRecorder.LlmUsageSample.class
+            );
+            verify(usageRecorder).recordUnverifiable(eq(99L), sample.capture());
+            assertThat(sample.getValue().sourceId()).isEqualTo(freshJob.getId());
+            assertThat(sample.getValue().model()).isEqualTo("claude-sonnet-4");
+            assertThat(sample.getValue().totalCalls()).isZero();
+            verify(usageRecorder, never()).record(any(), any());
+        }
+    }
+
     @Nested
     class MessageHandling {
 
@@ -558,6 +772,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 objectMapper,
                 meterRegistry,
                 usageRecorder,
+                llmBudgetService,
                 Optional.empty(),
                 Optional.of(workerProps("test-worker"))
             );
@@ -570,8 +785,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             setupFullExecution();
 
-            AgentJob freshJob = new AgentJob();
-            freshJob.prePersist();
+            AgentJob freshJob = freshJob();
             when(jobRepository.findById(any(UUID.class))).thenReturn(Optional.of(freshJob));
             when(jobRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
             // Worker identity is set ("test-worker"), so the terminal write is fenced to the owner.

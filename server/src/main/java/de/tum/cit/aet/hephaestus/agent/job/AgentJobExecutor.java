@@ -18,6 +18,9 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxCancelledException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxSpec;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetBlockReason;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUnpricedUsageBlockedException;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageJobType;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
@@ -107,6 +110,7 @@ public class AgentJobExecutor {
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
     private final LlmUsageRecorder usageRecorder;
+    private final LlmBudgetService llmBudgetService;
     private final ScheduledExecutorService heartbeatScheduler;
 
     private final Timer executionDuration;
@@ -144,6 +148,7 @@ public class AgentJobExecutor {
         ObjectMapper objectMapper,
         MeterRegistry meterRegistry,
         LlmUsageRecorder usageRecorder,
+        LlmBudgetService llmBudgetService,
         Optional<WorkerCapacityState> capacityState,
         Optional<WorkerProperties> workerProperties
     ) {
@@ -159,6 +164,7 @@ public class AgentJobExecutor {
         this.objectMapper = objectMapper;
         this.meterRegistry = meterRegistry;
         this.usageRecorder = usageRecorder;
+        this.llmBudgetService = llmBudgetService;
         this.capacityState = capacityState;
         this.workerProperties = workerProperties;
         this.workerId = workerProperties.map(WorkerProperties::resolvedWorkerId).orElse(null);
@@ -458,7 +464,9 @@ public class AgentJobExecutor {
      * or return the {@link ClaimResult} for the caller to proceed with execution.
      */
     private Optional<ClaimResult> dispatchClaimResult(UUID jobId, Message msg, Object claimResult) {
-        if (claimResult == ClaimOutcome.ALREADY_CLAIMED) {
+        if (claimResult == ClaimOutcome.ALREADY_CLAIMED || claimResult == ClaimOutcome.BUDGET_BLOCKED) {
+            // BUDGET_BLOCKED already transitioned the job to a terminal state inside the claim
+            // transaction (see claimJob) — ack so NATS never redelivers a job that is already done.
             msg.ack();
             return Optional.empty();
         }
@@ -619,11 +627,73 @@ public class AgentJobExecutor {
 
     /** Handle a job cancelled during sandbox execution. */
     private void handleCancellation(UUID jobId, Message msg) {
-        transactionTemplate.executeWithoutResult(status ->
-            transitionTerminal(jobId, AgentJobStatus.CANCELLED, Instant.now(), "Cancelled during execution")
-        );
+        AtomicBoolean startedAndWon = new AtomicBoolean(false);
+        transactionTemplate.executeWithoutResult(status -> {
+            int updated = transitionTerminal(
+                jobId,
+                AgentJobStatus.CANCELLED,
+                Instant.now(),
+                "Cancelled during execution"
+            );
+            startedAndWon.set(updated == 1);
+        });
         msg.ack();
         log.info("Agent job cancelled: jobId={}", jobId);
+        // #1368 fix wave: the job HAD started executing (claimed, RUNNING) by the time it was
+        // cancelled, so there may be real, un-costed spend behind it. Record it as UNPRICED (outside
+        // the transition transaction, matching LlmUsageRecorder's after-commit contract) rather than
+        // leaving the month looking falsely fully accounted for. Skipped when the transition lost the
+        // fence (job already moved on / orphan-requeued) — nothing to attribute to this write.
+        if (startedAndWon.get()) {
+            recordUnverifiableUsage(jobId, "cancelled during execution");
+        }
+    }
+
+    /**
+     * Append an UNPRICED ledger row for a job that started executing (claimed, RUNNING) but ended
+     * with no verifiable usage — see {@link LlmUsageRecorder#recordUnverifiable}. Best-effort:
+     * re-reads the job row for workspace + frozen catalog-binding provenance; a lookup miss just
+     * skips the ledger write (the job's terminal status is unaffected either way).
+     */
+    private void recordUnverifiableUsage(UUID jobId, String reason) {
+        jobRepository
+            .findByIdWithWorkspace(jobId)
+            .ifPresentOrElse(
+                job -> {
+                    ConfigSnapshot snap = parseSnapshotQuietly(job);
+                    LlmUsageRecorder.LlmUsageSample sample = new LlmUsageRecorder.LlmUsageSample(
+                        LlmUsageJobType.from(job.getJobType()),
+                        job.getId(),
+                        snap != null ? snap.upstreamModelId() : null,
+                        0L,
+                        0L,
+                        0L,
+                        0L,
+                        0L,
+                        0,
+                        snap != null ? snap.connectionScope() : null,
+                        snap != null ? snap.connectionId() : null,
+                        Instant.now()
+                    );
+                    usageRecorder.recordUnverifiable(job.getWorkspace().getId(), sample);
+                    log.info("Recorded UNPRICED usage ledger entry ({}): jobId={}", reason, jobId);
+                },
+                () -> log.warn("Could not record unverifiable usage — job row missing: jobId={}", jobId)
+            );
+    }
+
+    /** Best-effort {@link ConfigSnapshot} parse; a malformed/missing snapshot just yields no provenance. */
+    private @Nullable ConfigSnapshot parseSnapshotQuietly(AgentJob job) {
+        var snapshotNode = job.getConfigSnapshot();
+        if (snapshotNode == null) {
+            return null;
+        }
+        try {
+            return ConfigSnapshot.fromJson(snapshotNode, objectMapper);
+        } catch (Exception e) {
+            log.warn("Could not deserialise config snapshot for usage ledger provenance: {}", e.getMessage());
+            return null;
+        }
     }
 
     /**
@@ -657,6 +727,7 @@ public class AgentJobExecutor {
     private enum ClaimOutcome {
         ALREADY_CLAIMED,
         CONCURRENCY_FULL,
+        BUDGET_BLOCKED,
     }
 
     private record ClaimResult(AgentJob job, ConfigSnapshot snapshot) {}
@@ -666,6 +737,7 @@ public class AgentJobExecutor {
      * - {@link ClaimResult} on success
      * - {@link ClaimOutcome#ALREADY_CLAIMED} if job is not QUEUED (caller should ACK)
      * - {@link ClaimOutcome#CONCURRENCY_FULL} if concurrency limit reached (caller should NAK with delay)
+     * - {@link ClaimOutcome#BUDGET_BLOCKED} if the workspace's LLM budget gate refused the job (caller should ACK)
      * - {@code null} if transaction returned null unexpectedly
      */
     private Object claimJob(UUID jobId) {
@@ -678,6 +750,33 @@ public class AgentJobExecutor {
             }
 
             AgentJob job = locked.get();
+
+            // Claim-time budget recheck (#1368 fix wave): AgentJobService.submit already gated
+            // submission, but a workspace can pre-queue jobs faster than the cap updates — every
+            // job queued before the cap was crossed would otherwise still run. Recheck here, right
+            // before the job would start, and refuse it terminally rather than let it execute.
+            // Never re-checked once a job is past this point (no mid-execution kill on budget alone).
+            LlmBudgetBlockReason blockReason = llmBudgetService.blockReason(job.getWorkspace().getId());
+            if (blockReason != LlmBudgetBlockReason.NONE) {
+                String message =
+                    blockReason == LlmBudgetBlockReason.EXHAUSTED
+                        ? "Budget reached."
+                        : LlmUnpricedUsageBlockedException.MESSAGE;
+                job.setStatus(AgentJobStatus.CANCELLED);
+                job.setCompletedAt(Instant.now());
+                job.setErrorMessage(message);
+                job.setCancellationReason(AgentJobCancellationReason.BUDGET_EXHAUSTED);
+                jobRepository.save(job);
+                log.info(
+                    "Refusing claim — {}: jobId={}, workspaceId={}, blockReason={}",
+                    message,
+                    jobId,
+                    job.getWorkspace().getId(),
+                    blockReason
+                );
+                meterRegistry.counter("agent.job.budget.refused").increment();
+                return ClaimOutcome.BUDGET_BLOCKED;
+            }
 
             // Concurrency gate: lock config row, check running count
             if (job.getConfig() != null) {
@@ -829,6 +928,9 @@ public class AgentJobExecutor {
         // own REQUIRES_NEW transaction doesn't hold a second pool connection under this one.
         AtomicReference<Long> ledgerWorkspaceId = new AtomicReference<>();
         AtomicReference<LlmUsageRecorder.LlmUsageSample> ledgerSample = new AtomicReference<>();
+        // #1368 fix wave: true when ledgerSample must be written via recordUnverifiable (forced
+        // UNPRICED) rather than record (normal catalog price resolution) — see the else-branch below.
+        AtomicBoolean ledgerUnverifiable = new AtomicBoolean(false);
 
         Boolean persisted = transactionTemplate.execute(status -> {
             int updated = transitionTerminal(jobId, terminalStatus, Instant.now(), errorMessage);
@@ -860,6 +962,7 @@ public class AgentJobExecutor {
                 }
                 // Primary: agent-reported usage (from the Pi runner's usage.json)
                 var agentUsage = agentResult.usage();
+                ConfigSnapshot snap = parseSnapshotQuietly(freshJob);
                 if (agentUsage != null && agentUsage.totalCalls() > 0) {
                     freshJob.setLlmTotalCalls(agentUsage.totalCalls());
                     freshJob.setLlmTotalInputTokens(agentUsage.inputTokens());
@@ -874,15 +977,6 @@ public class AgentJobExecutor {
                     // authoritative, catalog-derived cost lives on the llm_usage_event ledger row below.
                     // Use typed snapshot so a future field rename fails compile rather than writing null.
                     String model = agentUsage.model();
-                    ConfigSnapshot snap = null;
-                    var snapshotNode = freshJob.getConfigSnapshot();
-                    if (snapshotNode != null) {
-                        try {
-                            snap = ConfigSnapshot.fromJson(snapshotNode, objectMapper);
-                        } catch (Exception e) {
-                            log.warn("Could not deserialise config snapshot for usage metadata: {}", e.getMessage());
-                        }
-                    }
                     if ((model == null || model.isBlank()) && snap != null) {
                         model = snap.upstreamModelId();
                     }
@@ -920,6 +1014,36 @@ public class AgentJobExecutor {
                         agentUsage.reasoningTokens(),
                         jobId
                     );
+                } else {
+                    // #1368 fix wave: the job DID start executing (past claim+RUNNING) but produced no
+                    // parseable usage — a missing or malformed usage.json. Recording nothing here would
+                    // make this month's spend silently look fully accounted for; record an UNPRICED
+                    // ledger entry instead so the budget verdict turns UNVERIFIABLE rather than staying
+                    // falsely green. Never resolves a price — see LlmUsageRecorder#recordUnverifiable.
+                    ledgerWorkspaceId.set(freshJob.getWorkspace().getId());
+                    ledgerUnverifiable.set(true);
+                    ledgerSample.set(
+                        new LlmUsageRecorder.LlmUsageSample(
+                            LlmUsageJobType.from(freshJob.getJobType()),
+                            freshJob.getId(),
+                            snap != null ? snap.upstreamModelId() : null,
+                            0L,
+                            0L,
+                            0L,
+                            0L,
+                            0L,
+                            0,
+                            snap != null ? snap.connectionScope() : null,
+                            snap != null ? snap.connectionId() : null,
+                            Instant.now()
+                        )
+                    );
+                    log.info(
+                        "LLM usage unresolved (missing/malformed usage.json) — recording UNPRICED to keep budget " +
+                            "verification visible: jobId={}, terminalStatus={}",
+                        jobId,
+                        terminalStatus
+                    );
                 }
                 jobRepository.saveAndFlush(freshJob);
             }
@@ -928,7 +1052,11 @@ public class AgentJobExecutor {
 
         boolean won = Boolean.TRUE.equals(persisted);
         if (won && ledgerSample.get() != null) {
-            usageRecorder.record(ledgerWorkspaceId.get(), ledgerSample.get());
+            if (ledgerUnverifiable.get()) {
+                usageRecorder.recordUnverifiable(ledgerWorkspaceId.get(), ledgerSample.get());
+            } else {
+                usageRecorder.record(ledgerWorkspaceId.get(), ledgerSample.get());
+            }
         }
         return won;
     }

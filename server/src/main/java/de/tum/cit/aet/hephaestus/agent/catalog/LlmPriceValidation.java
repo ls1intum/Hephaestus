@@ -11,8 +11,10 @@ import org.springframework.util.StringUtils;
  * and workspace BYO models ({@code WorkspaceLlmModelService}) — same rule, two owners of the rates.
  *
  * <ul>
- *   <li>{@code PRICED} requires at least an input and an output rate (per 1M tokens), and every given
- *       rate must be zero or greater.</li>
+ *   <li>{@code PRICED} requires at least an input and an output rate (per 1M tokens), every given
+ *       rate must be zero or greater, and at least one rate must be strictly greater than zero — an
+ *       all-zero PRICED model would otherwise pass validation and count as verified $0 spend
+ *       forever, which is what {@code Free} is for.</li>
  *   <li>{@code FREE}/{@code UNPRICED} must carry no rates at all; {@code FREE} additionally requires a
  *       note explaining why (e.g. self-hosted, no cost).</li>
  * </ul>
@@ -48,6 +50,12 @@ final class LlmPriceValidation {
             boolean anyNegative = rates.stream().anyMatch(rate -> rate != null && rate.signum() < 0);
             if (anyNegative) {
                 throw new IllegalArgumentException("Rates must be zero or greater.");
+            }
+            boolean anyPositive = rates.stream().anyMatch(rate -> rate != null && rate.signum() > 0);
+            if (!anyPositive) {
+                throw new IllegalArgumentException(
+                    "A price requires at least one rate greater than zero. For a free model, choose Free instead."
+                );
             }
         } else {
             if (anyRatePresent) {

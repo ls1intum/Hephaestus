@@ -21,8 +21,10 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.AttachedSandbox;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetBlockReason;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetExhaustedException;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUnpricedUsageBlockedException;
 import de.tum.cit.aet.hephaestus.core.security.CurrentScmIdentityHolder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
@@ -224,12 +226,19 @@ public class MentorChatService implements MentorTurnRunner {
         MentorChannel channel,
         AtomicReference<MentorRunnerClient> clientHolder
     ) {
-        // Monthly budget cap (#1368): transport-neutral gate covering web SSE and Slack turns.
-        // Checked before ANYTHING persists so a blocked turn leaves no user message or in-flight
-        // assistant row behind. Surfaces as a user-facing error chunk via userFacingError.
-        if (llmBudgetService.isBudgetExhausted(request.workspaceId())) {
+        // Monthly budget cap (#1368, extended by the #1368 fix wave): transport-neutral gate
+        // covering web SSE and Slack turns. Checked before ANYTHING persists so a blocked turn
+        // leaves no user message or in-flight assistant row behind. Surfaces as a user-facing
+        // error chunk via userFacingError. blockReason folds in defaultUnpricedPolicy=BLOCK, so an
+        // UNVERIFIABLE month blocks exactly like EXHAUSTED when the instance opted into it.
+        LlmBudgetBlockReason blockReason = llmBudgetService.blockReason(request.workspaceId());
+        if (blockReason == LlmBudgetBlockReason.EXHAUSTED) {
             metrics.recordBudgetBlocked();
             throw new LlmBudgetExhaustedException(request.workspaceId());
+        }
+        if (blockReason == LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED) {
+            metrics.recordBudgetBlocked();
+            throw new LlmUnpricedUsageBlockedException(request.workspaceId());
         }
         User user = userRepository.getCurrentUserElseThrow();
         ChatThread thread = persistence.ensureThread(
@@ -653,6 +662,9 @@ public class MentorChatService implements MentorTurnRunner {
     private static String userFacingError(Throwable e) {
         if (e instanceof LlmBudgetExhaustedException budget) {
             return budget.getMessage();
+        }
+        if (e instanceof LlmUnpricedUsageBlockedException unpriced) {
+            return unpriced.getMessage();
         }
         if (e instanceof MentorRunnerException) {
             return "The mentor hit an unexpected error. Please try again.";

@@ -223,6 +223,26 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("note");
         }
+
+        @Test
+        void pricedModeReusesTheSharedPriceValidationAndRejectsAllZeroRates() {
+            // #1368 fix wave: an all-zero-rate PRICED model would otherwise pass validation and
+            // count as verified $0 spend forever — that's what Free is for.
+            byoEnabled(true);
+            when(connectionRepository.findByIdAndWorkspaceId(50L, 1L)).thenReturn(Optional.of(connection()));
+            when(modelRepository.findByWorkspaceIdAndSlug(1L, "gpt-5")).thenReturn(Optional.empty());
+
+            CreateWorkspaceLlmModelRequestDTO request = createRequest(
+                PricingMode.PRICED,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO
+            );
+
+            assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("choose Free instead");
+            verify(modelRepository, never()).save(any());
+        }
     }
 
     @Nested

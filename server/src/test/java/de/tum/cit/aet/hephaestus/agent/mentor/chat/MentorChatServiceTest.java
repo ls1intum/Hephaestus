@@ -29,6 +29,7 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxIdentity;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetBlockReason;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
@@ -466,6 +467,60 @@ class MentorChatServiceTest extends BaseUnitTest {
         // Lock released cleanly and the ERROR outcome recorded.
         assertThat(turnLock.activeKeys()).isZero();
         assertOutcomeRecorded(MentorChatMetrics.Outcome.ERROR);
+    }
+
+    // 1e. Monthly LLM budget gate (#1368, extended by the #1368 fix wave): both blocking reasons
+    // must refuse the turn BEFORE anything persists, with their own user-facing message.
+
+    @Test
+    void runTurn_budgetExhausted_blocksBeforePersistingWithBudgetMessage() throws Exception {
+        when(llmBudgetService.blockReason(WORKSPACE_ID)).thenReturn(LlmBudgetBlockReason.EXHAUSTED);
+
+        runTurnSync();
+
+        assertThat(emitter.recordedTypes()).contains("error");
+        assertThat(String.join("\n", emitter.rawData))
+            .contains("The monthly AI budget for this workspace is used up")
+            .doesNotContain("Some usage in this workspace has no price set");
+        verify(persistence, never()).persistInFlight(any(), any(), any(), any());
+        try {
+            verify(interactiveSandboxService, never()).attach(any());
+        } catch (InteractiveSandboxException e) {
+            throw new AssertionError(e);
+        }
+        assertOutcomeRecorded(MentorChatMetrics.Outcome.ERROR);
+        assertThat(meterRegistry.find("llm.budget.blocked").tag("surface", "mentor").counter().count()).isEqualTo(1d);
+    }
+
+    @Test
+    void runTurn_unpricedUsageBlockedByInstancePolicy_blocksBeforePersistingWithDistinctMessage() throws Exception {
+        when(llmBudgetService.blockReason(WORKSPACE_ID)).thenReturn(LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED);
+
+        runTurnSync();
+
+        assertThat(emitter.recordedTypes()).contains("error");
+        assertThat(String.join("\n", emitter.rawData))
+            .contains("Some usage in this workspace has no price set, so spending can't be verified.")
+            .doesNotContain("monthly AI budget");
+        verify(persistence, never()).persistInFlight(any(), any(), any(), any());
+        try {
+            verify(interactiveSandboxService, never()).attach(any());
+        } catch (InteractiveSandboxException e) {
+            throw new AssertionError(e);
+        }
+        assertOutcomeRecorded(MentorChatMetrics.Outcome.ERROR);
+        assertThat(meterRegistry.find("llm.budget.blocked").tag("surface", "mentor").counter().count()).isEqualTo(1d);
+    }
+
+    @Test
+    void runTurn_budgetNotBlocked_proceedsNormally() throws Exception {
+        when(llmBudgetService.blockReason(WORKSPACE_ID)).thenReturn(LlmBudgetBlockReason.NONE);
+        scheduleHappyPathResponses(sandbox).run();
+
+        runTurnSync();
+
+        assertThat(emitter.recordedTypes()).doesNotContain("error");
+        assertOutcomeRecorded(MentorChatMetrics.Outcome.SUCCESS);
     }
 
     @Test

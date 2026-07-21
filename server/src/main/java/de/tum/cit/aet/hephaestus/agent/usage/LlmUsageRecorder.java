@@ -64,6 +64,14 @@ import org.springframework.transaction.support.TransactionTemplate;
  * (Sentry-visible) plus the {@code llm.budget.exhausted} counter — the single "you are now
  * paused" operator signal. A workspace's own (BYO) spend never counts toward its cap and so never
  * fires this alert.
+ *
+ * <h2>Jobs that started but yielded no usage (#1368 fix wave)</h2>
+ *
+ * <p>{@link #recordUnverifiable} is the deliberate exception to "cost is derived server-side"
+ * above: a job that started executing (cancelled mid-run, or finished with a missing/malformed
+ * usage report) has genuinely unknown token counts, so it is never priced — an UNPRICED row is
+ * written directly, which is what turns the month's verdict UNVERIFIABLE instead of leaving no
+ * trace at all. {@code AgentJobExecutor} is the only caller today.
  */
 @Service
 public class LlmUsageRecorder {
@@ -179,10 +187,49 @@ public class LlmUsageRecorder {
      * connection under the caller's, and a caller that rolls back would leave a billed row behind.
      */
     public void record(Long workspaceId, LlmUsageSample sample) {
+        persist(workspaceId, sample, null);
+    }
+
+    /**
+     * Append an UNPRICED ledger row for a job/turn that started executing but produced no
+     * verifiable usage — cancelled mid-run, or a missing/malformed usage report (#1368 fix wave).
+     *
+     * <p>Unlike {@link #record}, this NEVER resolves a price from the catalog: the token counts are
+     * genuinely unknown, so pricing even a model with a live rate would silently understate what
+     * might have been real spend. {@code funding_source} still reflects
+     * {@link LlmUsageSample#connectionScope} (as far as the caller's frozen snapshot allows) so the
+     * event stays attributable, but {@code pricing_state} is always {@code UNPRICED} and
+     * {@code cost_usd} is always {@code null} — this is what turns the month's budget verdict
+     * {@code UNVERIFIABLE} instead of leaving no ledger trace at all. Same never-throws /
+     * {@code REQUIRES_NEW} / after-commit contract as {@link #record}.
+     */
+    public void recordUnverifiable(Long workspaceId, LlmUsageSample sample) {
+        FundingSource funding = sample.connectionScope() != null ? sample.connectionScope() : FundingSource.INSTANCE;
+        PriceResolution forced = new PriceResolution(
+            PricingState.UNPRICED,
+            null,
+            null,
+            null,
+            AppliedRates.NONE,
+            funding
+        );
+        persist(workspaceId, sample, forced);
+        meterRegistry.counter("llm.usage.unverifiable").increment();
+    }
+
+    /**
+     * Shared ledger-write transaction for {@link #record} and {@link #recordUnverifiable}.
+     * {@code forcedResolution} bypasses catalog price resolution entirely when non-null — see
+     * {@link #recordUnverifiable}'s doc for why that path must never derive a price.
+     */
+    private void persist(Long workspaceId, LlmUsageSample sample, @Nullable PriceResolution forcedResolution) {
         try {
             requiresNewTx.executeWithoutResult(tx -> {
                 Workspace workspace = workspaceRepository.getReferenceById(workspaceId);
-                PriceResolution resolution = resolvePricing(workspaceId, workspace.getMonthlyLlmBudgetUsd(), sample);
+                PriceResolution resolution =
+                    forcedResolution != null
+                        ? forcedResolution
+                        : resolvePricing(workspaceId, workspace.getMonthlyLlmBudgetUsd(), sample);
                 LlmUsageEvent event = new LlmUsageEvent();
                 event.setId(UUID.randomUUID());
                 event.setWorkspace(workspace);

@@ -174,6 +174,46 @@ class LlmModelServiceTest extends BaseUnitTest {
         }
 
         @Test
+        void pricedModeRejectsAllZeroRates() {
+            // #1368 fix wave: an all-zero-rate PRICED model would otherwise pass validation and
+            // count as verified $0 spend forever — that's what Free is for.
+            UpdateLlmModelPriceRequestDTO request = new UpdateLlmModelPriceRequestDTO(
+                PricingMode.PRICED,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                null,
+                null,
+                null,
+                null
+            );
+
+            assertThatThrownBy(() -> modelService.updatePrice(7L, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("choose Free instead");
+            verify(priceRepository, never()).save(any());
+        }
+
+        @Test
+        void pricedModeAcceptsOneZeroRateAsLongAsAnotherIsPositive() {
+            when(priceRepository.findByModelIdAndEffectiveToIsNull(7L)).thenReturn(Optional.empty());
+            when(priceRepository.save(any(LlmModelPrice.class))).thenAnswer(invocation -> invocation.getArgument(0));
+            // Free-input, priced-output is a legitimate PRICED model — only the all-zero case is rejected.
+            UpdateLlmModelPriceRequestDTO request = new UpdateLlmModelPriceRequestDTO(
+                PricingMode.PRICED,
+                BigDecimal.ZERO,
+                new BigDecimal("9.00"),
+                null,
+                null,
+                null,
+                null
+            );
+
+            LlmModelPrice result = modelService.updatePrice(7L, request);
+
+            assertThat(result.getPricingMode()).isEqualTo(PricingMode.PRICED);
+        }
+
+        @Test
         void freeModeRequiresANote() {
             UpdateLlmModelPriceRequestDTO request = new UpdateLlmModelPriceRequestDTO(
                 PricingMode.FREE,

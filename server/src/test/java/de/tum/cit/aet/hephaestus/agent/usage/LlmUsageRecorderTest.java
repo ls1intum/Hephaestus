@@ -1,10 +1,12 @@
 package de.tum.cit.aet.hephaestus.agent.usage;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -25,12 +27,14 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.hibernate.exception.ConstraintViolationException;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.PlatformTransactionManager;
 
 /**
@@ -372,5 +376,78 @@ class LlmUsageRecorderTest extends BaseUnitTest {
 
             assertThat(event.getCostUsd()).isEqualByComparingTo("0.000002");
         }
+    }
+
+    /**
+     * #1368 fix wave: {@link LlmUsageRecorder#recordUnverifiable} NEVER resolves a price, even when
+     * the sample's model has a live, resolvable catalog rate — the token counts are genuinely
+     * unknown (cancelled mid-run / malformed usage report), so pricing them would be a guess.
+     */
+    @Nested
+    class RecordUnverifiable {
+
+        @Test
+        void alwaysWritesUnpricedAndNullCost_neverConsultingTheCatalog() {
+            // Deliberately does NOT stub llmModelRepository/llmModelPriceRepository to resolve a
+            // price for "gpt-5" — recordUnverifiable must never even try, so an unstubbed (empty)
+            // lookup proves the point rather than just asserting a stubbed price was ignored.
+            LlmUsageRecorder.LlmUsageSample sample = sample("gpt-5", 0, 0, 0, FundingSource.INSTANCE, CONNECTION_ID);
+            recorder.recordUnverifiable(WORKSPACE_ID, sample);
+
+            ArgumentCaptor<LlmUsageEvent> captor = ArgumentCaptor.forClass(LlmUsageEvent.class);
+            verify(usageRepository).saveAndFlush(captor.capture());
+            LlmUsageEvent event = captor.getValue();
+            assertThat(event.getPricingState()).isEqualTo(PricingState.UNPRICED);
+            assertThat(event.getCostUsd()).isNull();
+            assertThat(event.getAppliedPriceId()).isNull();
+            // The catalog lookup that WOULD have resolved a price is never even attempted.
+            verify(llmModelRepository, never()).findByConnectionIdAndUpstreamModelId(any(), any());
+        }
+
+        @Test
+        void fundingSourceReflectsTheSampleConnectionScope() {
+            LlmUsageRecorder.LlmUsageSample sample = sample("gpt-5", 0, 0, 0, FundingSource.WORKSPACE, CONNECTION_ID);
+            recorder.recordUnverifiable(WORKSPACE_ID, sample);
+
+            ArgumentCaptor<LlmUsageEvent> captor = ArgumentCaptor.forClass(LlmUsageEvent.class);
+            verify(usageRepository).saveAndFlush(captor.capture());
+            assertThat(captor.getValue().getFundingSource()).isEqualTo(FundingSource.WORKSPACE);
+        }
+
+        @Test
+        void nullConnectionScopeFallsBackToInstanceFunding() {
+            LlmUsageRecorder.LlmUsageSample sample = sample("gpt-5", 0, 0, 0, null, null);
+            recorder.recordUnverifiable(WORKSPACE_ID, sample);
+
+            ArgumentCaptor<LlmUsageEvent> captor = ArgumentCaptor.forClass(LlmUsageEvent.class);
+            verify(usageRepository).saveAndFlush(captor.capture());
+            assertThat(captor.getValue().getFundingSource()).isEqualTo(FundingSource.INSTANCE);
+        }
+
+        @Test
+        void neverAlertsOnBudgetCrossing_becauseThereIsNoCost() {
+            LlmUsageRecorder.LlmUsageSample sample = sample("gpt-5", 0, 0, 0, FundingSource.INSTANCE, CONNECTION_ID);
+
+            recorder.recordUnverifiable(WORKSPACE_ID, sample);
+
+            verify(budgetService, never()).monthToDateCost(any());
+        }
+
+        @Test
+        void aDuplicateSourceIdIsSwallowedLikeTheNormalRecordPath() {
+            when(usageRepository.saveAndFlush(any(LlmUsageEvent.class))).thenThrow(duplicateSourceViolation());
+            LlmUsageRecorder.LlmUsageSample sample = sample("gpt-5", 0, 0, 0, FundingSource.INSTANCE, CONNECTION_ID);
+
+            assertThatCode(() -> recorder.recordUnverifiable(WORKSPACE_ID, sample)).doesNotThrowAnyException();
+        }
+    }
+
+    private static DataIntegrityViolationException duplicateSourceViolation() {
+        ConstraintViolationException cve = new ConstraintViolationException(
+            "duplicate",
+            null,
+            "ux_llm_usage_event_source"
+        );
+        return new DataIntegrityViolationException("duplicate", cve);
     }
 }

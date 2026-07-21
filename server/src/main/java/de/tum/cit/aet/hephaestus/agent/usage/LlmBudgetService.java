@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.usage;
 
+import de.tum.cit.aet.hephaestus.agent.catalog.InstanceLlmSettingsService;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -28,9 +29,20 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>{@code AgentJobService.submit} — the single choke point for all sandboxed detection
  *       work: webhook-triggered detection, retrospective replays, dev/bot manual triggers, and
  *       conversation reviews.</li>
+ *   <li>{@code AgentJobExecutor}'s claim-time recheck (#1368 fix wave) — a workspace can pre-queue
+ *       jobs faster than the cap updates; this second check refuses a job whose workspace has
+ *       since crossed the cap instead of letting every pre-queued job run once the gate has
+ *       already closed.</li>
  *   <li>{@code MentorChatService.runTurnInternal} — transport-neutral mentor gate covering web
  *       SSE and Slack turns, checked before the turn persists anything.</li>
  * </ul>
+ *
+ * <p>{@link #blockReason} additionally folds in the instance's {@code defaultUnpricedPolicy}
+ * (#1368 fix wave): when set to {@code BLOCK}, a workspace whose month is
+ * {@link LlmBudgetVerdict#UNVERIFIABLE} (budget set, but at least one instance-funded event has no
+ * resolvable price) is blocked exactly like {@link LlmBudgetVerdict#EXHAUSTED} at all three gates
+ * above. The default {@code WARN} policy never blocks — see {@link #isBudgetExhausted}, which
+ * stays EXHAUSTED-only and is what the gates used before this policy existed.
  */
 @Service
 public class LlmBudgetService {
@@ -39,30 +51,36 @@ public class LlmBudgetService {
 
     private final LlmUsageEventRepository usageRepository;
     private final WorkspaceRepository workspaceRepository;
+    private final InstanceLlmSettingsService instanceLlmSettingsService;
     private final MeterRegistry meterRegistry;
 
     public LlmBudgetService(
         LlmUsageEventRepository usageRepository,
         WorkspaceRepository workspaceRepository,
+        InstanceLlmSettingsService instanceLlmSettingsService,
         MeterRegistry meterRegistry
     ) {
         this.usageRepository = usageRepository;
         this.workspaceRepository = workspaceRepository;
+        this.instanceLlmSettingsService = instanceLlmSettingsService;
         this.meterRegistry = meterRegistry;
     }
 
     /**
-     * Submission-side gate: true when the workspace's cap is reached, in which case the block is
-     * logged and counted ({@code llm.budget.blocked}, surface {@code agent_job}) so operators can
-     * see suppressed work. Callers just skip the submission.
+     * Submission-side gate: true when the workspace is blocked (cap reached, or an UNVERIFIABLE
+     * month under {@code defaultUnpricedPolicy=BLOCK} — see {@link #blockReason}), in which case
+     * the block is logged and counted ({@code llm.budget.blocked}, surface {@code agent_job}) so
+     * operators can see suppressed work. Callers just skip the submission.
      */
     @Transactional(readOnly = true)
     public boolean blockSubmission(Workspace workspace, String jobType) {
-        if (!isBudgetExhausted(workspace)) {
+        LlmBudgetBlockReason reason = blockReason(workspace);
+        if (reason == LlmBudgetBlockReason.NONE) {
             return false;
         }
         log.info(
-            "Skipping agent job submission — monthly LLM budget exhausted: workspaceId={}, jobType={}",
+            "Skipping agent job submission — monthly LLM budget {}: workspaceId={}, jobType={}",
+            reason == LlmBudgetBlockReason.EXHAUSTED ? "exhausted" : "unverifiable (blocked by instance policy)",
             workspace.getId(),
             jobType
         );
@@ -95,6 +113,64 @@ public class LlmBudgetService {
     public BigDecimal monthToDateCost(Long workspaceId) {
         MonthWindow window = MonthWindow.of(YearMonth.now(ZoneOffset.UTC));
         return usageRepository.sumCost(workspaceId, window.from(), window.to());
+    }
+
+    /**
+     * The blocking verdict for a workspace (#1368 fix wave) — the one decision all three
+     * enforcement gates share. See the class doc for how this differs from
+     * {@link #isBudgetExhausted}.
+     */
+    @Transactional(readOnly = true)
+    public LlmBudgetBlockReason blockReason(Workspace workspace) {
+        return blockReason(workspace.getId(), workspace.getMonthlyLlmBudgetUsd());
+    }
+
+    /** Overload for callers holding only the id (mentor gate, claim-time recheck). */
+    @Transactional(readOnly = true)
+    public LlmBudgetBlockReason blockReason(Long workspaceId) {
+        return workspaceRepository
+            .findById(workspaceId)
+            .map(w -> blockReason(w.getId(), w.getMonthlyLlmBudgetUsd()))
+            .orElse(LlmBudgetBlockReason.NONE);
+    }
+
+    private LlmBudgetBlockReason blockReason(Long workspaceId, @Nullable BigDecimal monthlyBudgetUsd) {
+        if (monthlyBudgetUsd == null) {
+            return LlmBudgetBlockReason.NONE; // uncapped = never blocked, either reason
+        }
+        return switch (currentVerdict(workspaceId, monthlyBudgetUsd)) {
+            case EXHAUSTED -> LlmBudgetBlockReason.EXHAUSTED;
+            case UNVERIFIABLE -> blocksUnpricedUsage()
+                ? LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED
+                : LlmBudgetBlockReason.NONE;
+            case WITHIN -> LlmBudgetBlockReason.NONE;
+        };
+    }
+
+    /**
+     * True when the instance's {@code defaultUnpricedPolicy} is {@code BLOCK} — the default
+     * {@code WARN} never blocks, it only surfaces in the usage rollup. Reads the settings singleton
+     * directly (no dedicated accessor on {@link InstanceLlmSettingsService}): the raw string column
+     * is validated to exactly {@code WARN|BLOCK} at the write side
+     * ({@code UpdateInstanceLlmSettingsRequestDTO}).
+     */
+    private boolean blocksUnpricedUsage() {
+        return "BLOCK".equals(instanceLlmSettingsService.get().getDefaultUnpricedPolicy());
+    }
+
+    /**
+     * This month's verdict for one workspace. Short-circuits before the unpriced-event query when
+     * the priced sum alone already proves EXHAUSTED — no need to know about unpriced usage once the
+     * confirmed spend has already crossed the cap.
+     */
+    private LlmBudgetVerdict currentVerdict(Long workspaceId, BigDecimal monthlyBudgetUsd) {
+        MonthWindow window = MonthWindow.of(YearMonth.now(ZoneOffset.UTC));
+        BigDecimal pricedCost = usageRepository.sumCost(workspaceId, window.from(), window.to());
+        if (pricedCost.compareTo(monthlyBudgetUsd) >= 0) {
+            return LlmBudgetVerdict.EXHAUSTED;
+        }
+        boolean hasUnpriced = usageRepository.existsUnpricedInstanceFunded(workspaceId, window.from(), window.to());
+        return verdictFor(pricedCost, hasUnpriced, monthlyBudgetUsd);
     }
 
     /**

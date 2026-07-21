@@ -3,8 +3,12 @@ package de.tum.cit.aet.hephaestus.agent.usage;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.catalog.InstanceLlmSettings;
+import de.tum.cit.aet.hephaestus.agent.catalog.InstanceLlmSettingsService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -24,6 +28,9 @@ class LlmBudgetServiceTest extends BaseUnitTest {
     @Mock
     private WorkspaceRepository workspaceRepository;
 
+    @Mock
+    private InstanceLlmSettingsService instanceLlmSettingsService;
+
     private LlmBudgetService budgetService;
 
     @BeforeEach
@@ -31,6 +38,7 @@ class LlmBudgetServiceTest extends BaseUnitTest {
         budgetService = new LlmBudgetService(
             usageRepository,
             workspaceRepository,
+            instanceLlmSettingsService,
             new io.micrometer.core.instrument.simple.SimpleMeterRegistry()
         );
     }
@@ -45,6 +53,12 @@ class LlmBudgetServiceTest extends BaseUnitTest {
     private void stubMonthSpend(String spend) {
         when(usageRepository.sumCost(eq(42L), any(Instant.class), any(Instant.class))).thenReturn(
             new BigDecimal(spend)
+        );
+    }
+
+    private void stubHasUnpriced(boolean hasUnpriced) {
+        when(usageRepository.existsUnpricedInstanceFunded(eq(42L), any(Instant.class), any(Instant.class))).thenReturn(
+            hasUnpriced
         );
     }
 
@@ -78,6 +92,77 @@ class LlmBudgetServiceTest extends BaseUnitTest {
         void unknownWorkspaceIdIsNotExhausted() {
             when(workspaceRepository.findById(99L)).thenReturn(java.util.Optional.empty());
             assertThat(budgetService.isBudgetExhausted(99L)).isFalse();
+        }
+    }
+
+    /** #1368 fix wave: {@link LlmBudgetService#blockReason} folds in defaultUnpricedPolicy=BLOCK. */
+    @Nested
+    class BlockReason {
+
+        private void stubInstancePolicy(String policy) {
+            InstanceLlmSettings settings = new InstanceLlmSettings();
+            settings.setDefaultUnpricedPolicy(policy);
+            when(instanceLlmSettingsService.get()).thenReturn(settings);
+        }
+
+        @Test
+        void uncappedWorkspaceIsNeverBlocked_evenUnderTheBlockPolicy() {
+            assertThat(budgetService.blockReason(workspaceWithBudget(null))).isEqualTo(LlmBudgetBlockReason.NONE);
+            // Never even asked the ledger or the instance policy — uncapped short-circuits first.
+            verify(usageRepository, never()).sumCost(any(), any(), any());
+            verify(instanceLlmSettingsService, never()).get();
+        }
+
+        @Test
+        void exhaustedBudgetBlocksRegardlessOfPolicy() {
+            stubMonthSpend("10.00");
+
+            assertThat(budgetService.blockReason(workspaceWithBudget(new BigDecimal("10.00")))).isEqualTo(
+                LlmBudgetBlockReason.EXHAUSTED
+            );
+            // EXHAUSTED is provable from the priced sum alone — never needs the unpriced-event query
+            // or the instance policy (which only matters for UNVERIFIABLE).
+            verify(usageRepository, never()).existsUnpricedInstanceFunded(any(), any(), any());
+            verify(instanceLlmSettingsService, never()).get();
+        }
+
+        @Test
+        void withinBudgetAndNoUnpricedUsageIsNeverBlocked() {
+            stubMonthSpend("1.00");
+            stubHasUnpriced(false);
+
+            assertThat(budgetService.blockReason(workspaceWithBudget(new BigDecimal("10.00")))).isEqualTo(
+                LlmBudgetBlockReason.NONE
+            );
+        }
+
+        @Test
+        void unverifiableMonthIsNotBlockedUnderTheDefaultWarnPolicy() {
+            stubMonthSpend("1.00");
+            stubHasUnpriced(true);
+            stubInstancePolicy("WARN");
+
+            assertThat(budgetService.blockReason(workspaceWithBudget(new BigDecimal("10.00")))).isEqualTo(
+                LlmBudgetBlockReason.NONE
+            );
+        }
+
+        @Test
+        void unverifiableMonthIsBlockedUnderTheBlockPolicy_whenBudgetIsSet() {
+            stubMonthSpend("1.00");
+            stubHasUnpriced(true);
+            stubInstancePolicy("BLOCK");
+
+            assertThat(budgetService.blockReason(workspaceWithBudget(new BigDecimal("10.00")))).isEqualTo(
+                LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED
+            );
+        }
+
+        @Test
+        void unknownWorkspaceIdIsNeverBlocked() {
+            when(workspaceRepository.findById(99L)).thenReturn(java.util.Optional.empty());
+
+            assertThat(budgetService.blockReason(99L)).isEqualTo(LlmBudgetBlockReason.NONE);
         }
     }
 
