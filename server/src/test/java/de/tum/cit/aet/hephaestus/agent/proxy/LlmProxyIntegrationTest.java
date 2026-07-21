@@ -932,6 +932,38 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Nested
     class CrossChainSecurity {
 
+        @Autowired
+        private java.util.List<org.springframework.security.web.SecurityFilterChain> filterChains;
+
+        /**
+         * Lives here (not in SecurityFilterChainRuntimeIntegrationTest) because the proxy chain only
+         * exists when the job-execution capability is on — this class's context enables it; the default
+         * integration context does not boot the proxy at all.
+         */
+        @Test
+        void llmProxyChainHasJobTokenFilterBeforeUpaf() {
+            org.springframework.security.web.SecurityFilterChain llmProxy = filterChains
+                .stream()
+                .filter(c -> c.getFilters().stream().anyMatch(JobTokenAuthenticationFilter.class::isInstance))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("LLM proxy chain missing JobTokenAuthenticationFilter"));
+
+            var filters = llmProxy.getFilters();
+            int jobToken = -1;
+            int upaf = -1;
+            for (int i = 0; i < filters.size(); i++) {
+                if (filters.get(i) instanceof JobTokenAuthenticationFilter) jobToken = i;
+                if (
+                    filters.get(i) instanceof
+                        org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
+                ) upaf = i;
+            }
+            assertThat(jobToken).as("JobTokenAuthenticationFilter must be present").isGreaterThanOrEqualTo(0);
+            if (upaf >= 0) {
+                assertThat(jobToken).as("JobToken must precede UsernamePasswordAuthenticationFilter").isLessThan(upaf);
+            }
+        }
+
         @Test
         @WithAdminUser
         void jobTokenShouldNotAccessMainApi() {

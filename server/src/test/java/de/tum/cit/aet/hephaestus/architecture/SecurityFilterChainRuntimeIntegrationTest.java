@@ -51,27 +51,8 @@ class SecurityFilterChainRuntimeIntegrationTest extends BaseIntegrationTest {
             .anyMatch(chain -> chain.getFilters().stream().anyMatch(AuthRateLimitFilter.class::isInstance));
     }
 
-    @Test
-    void llmProxyChainHasJobTokenFilterBeforeUpaf() {
-        SecurityFilterChain llmProxy = filterChains
-            .stream()
-            .filter(c -> c.getFilters().stream().anyMatch(JobTokenAuthenticationFilter.class::isInstance))
-            .findFirst()
-            .orElseThrow(() -> new AssertionError("LLM proxy chain missing JobTokenAuthenticationFilter"));
-
-        List<Filter> filters = llmProxy.getFilters();
-        int jobToken = indexOf(filters, JobTokenAuthenticationFilter.class);
-        int upaf = indexOf(filters, UsernamePasswordAuthenticationFilter.class);
-        assertThat(jobToken).as("JobTokenAuthenticationFilter must be present").isGreaterThanOrEqualTo(0);
-        if (upaf >= 0) {
-            assertThat(jobToken).as("JobToken must precede UsernamePasswordAuthenticationFilter").isLessThan(upaf);
-        }
-    }
-
-    private int indexOf(List<Filter> filters, Class<? extends Filter> type) {
-        for (int i = 0; i < filters.size(); i++) {
-            if (type.isInstance(filters.get(i))) return i;
-        }
-        return -1;
-    }
+    // The LLM proxy chain's filter-order assertion moved to
+    // LlmProxyIntegrationTest.CrossChainSecurity#llmProxyChainHasJobTokenFilterBeforeUpaf: the proxy
+    // beans are gated on the job-execution capability (worker + agent NATS), which the default
+    // integration context deliberately leaves off, so the chain does not exist here.
 }
