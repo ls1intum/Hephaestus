@@ -12,6 +12,7 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,14 +59,30 @@ public class AgentJobZombieSweeper {
     /** Registrations older than this are purged (≫ the orphan lease, so live jobs are recovered first). */
     private static final Duration STALE_REGISTRATION_TTL = Duration.ofHours(1);
 
+    /**
+     * A COMPLETED job's delivery is considered stuck once it has sat at {@code delivery_status=PENDING}
+     * longer than this (#1368 hardening) — long enough that a normal in-flight delivery attempt (a
+     * couple of GraphQL calls, seconds) would have finished; anything still PENDING past this point is
+     * presumed to be a crash between the terminal write (which sets PENDING) and delivery finishing.
+     */
+    private static final Duration DELIVERY_PENDING_STUCK_THRESHOLD = Duration.ofMinutes(10);
+
+    /** Bounded delivery-recovery attempts before a stuck PENDING delivery is given up on (marked FAILED). */
+    static final int MAX_DELIVERY_RECOVERY_ATTEMPTS = 3;
+
+    /** Cap on how many stuck deliveries one sweep pass loads, so a large backlog can't blow up one pass. */
+    private static final int DELIVERY_RECOVERY_BATCH_SIZE = 50;
+
     private final AgentJobRepository jobRepository;
     private final WorkerRegistryRepository workerRegistryRepository;
     private final AgentProperties agentProperties;
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transactionTemplate;
+    private final AgentJobLifecycleService lifecycleService;
     private final Counter zombieReaped;
     private final Counter orphanRequeued;
     private final Counter orphanFailed;
+    private final Counter deliveryRecovered;
 
     public AgentJobZombieSweeper(
         AgentJobRepository jobRepository,
@@ -73,6 +90,7 @@ public class AgentJobZombieSweeper {
         AgentProperties agentProperties,
         ObjectMapper objectMapper,
         TransactionTemplate transactionTemplate,
+        AgentJobLifecycleService lifecycleService,
         MeterRegistry meterRegistry
     ) {
         this.jobRepository = jobRepository;
@@ -80,6 +98,7 @@ public class AgentJobZombieSweeper {
         this.agentProperties = agentProperties;
         this.objectMapper = objectMapper;
         this.transactionTemplate = transactionTemplate;
+        this.lifecycleService = lifecycleService;
         this.zombieReaped = Counter.builder("agent.job.zombie.reaped")
             .description("Stale RUNNING jobs marked as TIMED_OUT")
             .register(meterRegistry);
@@ -88,6 +107,9 @@ public class AgentJobZombieSweeper {
             .register(meterRegistry);
         this.orphanFailed = Counter.builder("agent.job.orphan.failed")
             .description("Orphaned jobs that hit the retry cap and were failed")
+            .register(meterRegistry);
+        this.deliveryRecovered = Counter.builder("agent.job.delivery.recovered")
+            .description("Stuck PENDING deliveries successfully re-attempted by the recovery sweep")
             .register(meterRegistry);
     }
 
@@ -180,8 +202,22 @@ public class AgentJobZombieSweeper {
                     }
                     continue;
                 }
+                // #1368 hardening: backoff-computed available_at + a rotated job token — see
+                // AgentJobExecutor#requeueOrphanWithRotation's javadoc (mirrored here since the sweeper
+                // and executor are independent CAS callers of the same requeueOrphan query).
+                int attemptNumber = orphan.getRetryCount() + 1;
+                Instant availableAt = Instant.now().plus(AgentJobBackoff.compute(attemptNumber));
+                String newToken = AgentJob.generateJobToken();
+                String newTokenHash = AgentJob.computeTokenHash(newToken);
                 Integer requeued = transactionTemplate.execute(s ->
-                    jobRepository.requeueOrphan(orphan.getJobId(), orphan.getWorkerId(), agentProperties.maxRetries())
+                    jobRepository.requeueOrphan(
+                        orphan.getJobId(),
+                        orphan.getWorkerId(),
+                        agentProperties.maxRetries(),
+                        availableAt,
+                        newToken,
+                        newTokenHash
+                    )
                 );
                 if (requeued != null && requeued > 0) {
                     orphanRequeued.increment();
@@ -189,6 +225,62 @@ public class AgentJobZombieSweeper {
                 }
             } catch (Exception e) {
                 log.warn("Failed to recover orphaned job {}: {}", orphan.getJobId(), e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Delivery-recovery sweep (#1368 hardening): re-attempts delivery for jobs stuck at
+     * {@code delivery_status=PENDING} — the executor crashed between the terminal-write transaction
+     * (which sets PENDING) and finishing the actual delivery, so {@link AgentJobLifecycleService#retryDelivery}
+     * (which requires the FAILED CAS source) cannot reach them. Bounded by {@link #MAX_DELIVERY_RECOVERY_ATTEMPTS}
+     * — once exhausted, the delivery is marked FAILED terminally so it does not sit PENDING forever, and
+     * so a human can retry it through the normal (FAILED-sourced) retry endpoint if desired.
+     *
+     * <p>Each candidate's attempt-counter CAS ({@link AgentJobRepository#claimDeliveryRecoveryAttempt})
+     * guards against two sweeper replicas racing the same stuck job.
+     */
+    @Scheduled(fixedDelay = 5, initialDelay = 3, timeUnit = TimeUnit.MINUTES)
+    public void recoverStuckDeliveries() {
+        Instant cutoff = Instant.now().minus(DELIVERY_PENDING_STUCK_THRESHOLD);
+        List<AgentJob> stuck = jobRepository.findStuckPendingDeliveries(
+            cutoff,
+            PageRequest.of(0, DELIVERY_RECOVERY_BATCH_SIZE)
+        );
+        if (stuck.isEmpty()) {
+            return;
+        }
+        log.warn("Found {} agent job(s) stuck at delivery_status=PENDING; attempting recovery", stuck.size());
+        for (AgentJob job : stuck) {
+            try {
+                if (job.getDeliveryAttempts() >= MAX_DELIVERY_RECOVERY_ATTEMPTS) {
+                    transactionTemplate.executeWithoutResult(s ->
+                        jobRepository.updateDeliveryStatus(
+                            job.getId(),
+                            DeliveryStatus.FAILED,
+                            job.getDeliveryCommentId()
+                        )
+                    );
+                    log.warn(
+                        "Delivery recovery exhausted after {} attempt(s); marking FAILED: jobId={}",
+                        job.getDeliveryAttempts(),
+                        job.getId()
+                    );
+                    continue;
+                }
+                short expectedAttempts = job.getDeliveryAttempts();
+                Integer claimed = transactionTemplate.execute(s ->
+                    jobRepository.claimDeliveryRecoveryAttempt(job.getId(), expectedAttempts)
+                );
+                if (claimed == null || claimed == 0) {
+                    continue; // a concurrent sweeper replica already claimed this pass's attempt
+                }
+                boolean delivered = lifecycleService.recoverStuckDelivery(job);
+                if (delivered) {
+                    deliveryRecovered.increment();
+                }
+            } catch (Exception e) {
+                log.warn("Delivery recovery pass failed for job {}: {}", job.getId(), e.getMessage());
             }
         }
     }

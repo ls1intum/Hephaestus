@@ -31,6 +31,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import org.jspecify.annotations.Nullable;
@@ -501,6 +502,20 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         feedbackService.deliverFeedback(job, delivery, deliveredKeys ->
             DeliveryComposer.recomposeMrNote(deliverable, WorkArtifact.PULL_REQUEST, whyBySlug, deliveredKeys)
         );
+    }
+
+    /**
+     * Delivery-recovery dedup lookup (#1368 hardening) — see {@link JobTypeHandler#findExistingDelivery}.
+     * PR-review delivery is the ADR 0021 re-review pipeline (summary + inline notes + ledger), which is
+     * NOT reproduced here; this only guards the narrower "did a summary comment carrying this exact job's
+     * marker already land" question, so a delivery-recovery retry after a crash does not blindly re-post
+     * a duplicate summary. Inline diff notes are reconciled (cleared-then-posted) on every delivery
+     * attempt regardless, so a recovery retry that DOES fall through to a normal {@link #deliver} is safe
+     * there even without a matching dedup check.
+     */
+    @Override
+    public Optional<String> findExistingDelivery(AgentJob job) {
+        return feedbackService.findExistingDeliveryCommentId(job);
     }
 
     // Delivery-phase diff helpers (delegate to GitDiffOperations)

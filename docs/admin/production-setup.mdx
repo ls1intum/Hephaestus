@@ -200,6 +200,22 @@ Practice review is not enabled by a single flag. The following settings must be 
 
 The Docker sandbox itself is activated by the **worker runtime role** (`hephaestus.runtime.worker.enabled`, default `true` in the monolith and in the dedicated `application-worker` pod), not by a flag. `AGENT_ENABLED` and `GIT_CHECKOUT_ENABLED` must be `true` together for practice review — anything else is a half-configured deployment. The agent job queue itself runs on PostgreSQL, not NATS; `NATS_ENABLED` still gates webhook-driven sync consumption and must stay on for that, but it is no longer part of the practice-review bundle.
 
+### Agent queue health & retention
+
+The agent job queue (`agent_job`, polled by `AgentJobExecutor`) exposes its own health signals — wire an alert off these rather than guessing from application logs:
+
+- **`agent.queue.depth`** — QUEUED jobs currently eligible to run (`available_at <= now()`).
+- **`agent.queue.oldest_age_seconds`** — age of the oldest eligible QUEUED job; `0` when the queue is empty. This is the signal to alert on, not depth alone: a briefly busy queue and a stuck one can both show non-zero depth, but only a stuck queue shows a climbing age.
+- **`agent.queue.running`** — jobs currently RUNNING fleet-wide.
+- **`agent.job.claim.latency`** — time between a job becoming eligible and being claimed.
+- **`agent.job.execution.duration`** — tagged by `jobType` and outcome `status` (`COMPLETED`, `FAILED`, `TIMED_OUT`, `CANCELLED`, `REQUEUED`).
+- **`agent.job.delivery.recovered`** — stuck `PENDING` deliveries (executor crashed mid-delivery) successfully re-attempted by the recovery sweep.
+- **`agent.job.retention.stripped`** / **`agent.job.retention.deleted`** — terminal rows whose heavy payload columns were nulled out, and rows deleted outright, by the retention sweep below.
+
+All are sampled every 15s (queue-health gauges) or recorded inline (timers/counters); none run on a request path.
+
+**Retention:** terminal `agent_job` rows are pruned automatically so the table doesn't grow unbounded on a busy instance. `AGENT_PAYLOAD_RETENTION` (default `P14D`) strips `container_logs`/`output` to `NULL` past that age; `AGENT_ROW_RETENTION` (default `P90D`, must be `>= AGENT_PAYLOAD_RETENTION`) deletes the row outright past that age. Both accept an ISO-8601 duration. The defaults are deliberately generous — tighten them only if storage pressure demands it, since a stripped-but-present row is still useful for a "how many jobs ran" count even after its diagnostic payload is gone.
+
 ### Rollout tiers
 
 Use the same variables differently across environments:

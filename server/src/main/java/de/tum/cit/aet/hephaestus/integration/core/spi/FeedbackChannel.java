@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.spi;
 
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Root feedback SPI — every kind that declares {@link Capability#FEEDBACK_DELIVERY}
@@ -31,6 +32,22 @@ public interface FeedbackChannel {
      */
     default UpdateOutcome updateSummary(FeedbackTarget target, String externalId, FeedbackContent content) {
         return UpdateOutcome.unsupported();
+    }
+
+    /**
+     * Best-effort dedup lookup (#1368 hardening — delivery-recovery crash window): search the target's
+     * existing comments for one carrying {@code marker} (the invisible HTML-comment marker every summary
+     * post embeds, e.g. {@code PullRequestCommentPoster.SUMMARY_MARKER_PREFIX + jobId}), so a
+     * delivery-recovery retry can record the already-posted comment's id instead of posting a duplicate.
+     *
+     * <p>Default unsupported (empty) — a channel implements this only when a cheap-enough existing
+     * listing query is available; recovery for an unsupported channel simply falls through to a normal
+     * post, same as before this existed. Deliberately NOT called on the normal (non-recovery) delivery
+     * path — it costs an extra provider call, which is only worth paying when a crash has already put a
+     * job's delivery status in doubt.
+     */
+    default Optional<SummaryHandle> findExistingSummary(FeedbackTarget target, String marker) {
+        return Optional.empty();
     }
 
     /**

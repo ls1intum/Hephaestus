@@ -261,6 +261,71 @@ public class AgentJobLifecycleService {
         log.info("Recorded UNPRICED usage ledger entry (user-cancel): jobId={}", job.getId());
     }
 
+    /**
+     * Delivery-recovery entry point (#1368 hardening), called ONLY by {@link
+     * AgentJobZombieSweeper#recoverStuckDeliveries} for a job stuck at {@code delivery_status=PENDING} —
+     * the executor crashed between the terminal-write transaction (which sets PENDING) and finishing the
+     * actual delivery. Unlike {@link #retryDelivery} (the operator-facing endpoint, which requires the
+     * FAILED CAS source), the caller here has ALREADY won the attempt-counter CAS ({@link
+     * AgentJobRepository#claimDeliveryRecoveryAttempt}), so no further CAS is needed — this method only
+     * performs the actual re-delivery attempt and records its outcome.
+     *
+     * <p>Before re-attempting, asks the handler whether a delivery already landed for this exact job
+     * (the crash may have happened AFTER the comment posted but BEFORE {@code deliveryCommentId} was
+     * persisted — see {@link de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler#findExistingDelivery}).
+     * A hit records the existing comment id as DELIVERED without posting again — the dedup guard against
+     * double-posting on recovery. A miss (or "unknown" from a handler/channel that cannot search) falls
+     * through to a normal {@link de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler#deliver} attempt,
+     * exactly the path {@link AgentJobExecutor#deliverResults} uses on the happy path.
+     *
+     * @return {@code true} if the job is now DELIVERED (either found already-posted, or delivered just
+     *     now); {@code false} if this attempt failed (delivery status is left PENDING for the next sweep
+     *     pass to retry, up to the sweeper's bounded attempt cap)
+     */
+    boolean recoverStuckDelivery(AgentJob job) {
+        JobTypeHandler handler = handlerRegistry.getHandler(job.getJobType());
+
+        Optional<String> existing;
+        try {
+            existing = handler.findExistingDelivery(job);
+        } catch (RuntimeException e) {
+            log.debug(
+                "Existing-delivery dedup check failed (treated as unknown): jobId={}, error={}",
+                job.getId(),
+                e.getMessage()
+            );
+            existing = Optional.empty();
+        }
+        if (existing.isPresent()) {
+            String existingCommentId = existing.get();
+            transactionTemplate.executeWithoutResult(tx ->
+                agentJobRepository.updateDeliveryStatus(job.getId(), DeliveryStatus.DELIVERED, existingCommentId)
+            );
+            log.info(
+                "Delivery recovery found an already-posted comment (crash before recording) — not re-posting: jobId={}, commentId={}",
+                job.getId(),
+                existing.get()
+            );
+            return true;
+        }
+
+        try {
+            handler.deliver(job);
+            transactionTemplate.executeWithoutResult(tx ->
+                agentJobRepository.updateDeliveryStatus(
+                    job.getId(),
+                    DeliveryStatus.DELIVERED,
+                    job.getDeliveryCommentId()
+                )
+            );
+            log.info("Delivery recovery succeeded: jobId={}", job.getId());
+            return true;
+        } catch (Exception e) {
+            log.warn("Delivery recovery attempt failed: jobId={}, error={}", job.getId(), e.getMessage());
+            return false;
+        }
+    }
+
     /** Best-effort {@link ConfigSnapshot} parse; a malformed/missing snapshot just yields no provenance. */
     private @Nullable ConfigSnapshot parseSnapshotQuietly(AgentJob job) {
         var snapshotNode = job.getConfigSnapshot();

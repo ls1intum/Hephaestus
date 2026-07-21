@@ -385,4 +385,77 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
             );
         }
     }
+
+    /** #1368 hardening: {@code recoverStuckDelivery} — the delivery-recovery sweep's actual attempt. */
+    @Nested
+    @DisplayName("recoverStuckDelivery (#1368 hardening)")
+    class RecoverStuckDelivery {
+
+        private AgentJob completedJob;
+        private UUID jobId;
+        private JobTypeHandler handler;
+
+        @BeforeEach
+        void setUpRecovery() {
+            completedJob = createJobWithStatus(AgentJobStatus.COMPLETED);
+            completedJob.setDeliveryStatus(DeliveryStatus.PENDING);
+            jobId = completedJob.getId();
+
+            handler = mock(JobTypeHandler.class);
+            lenient().when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
+        }
+
+        @Test
+        @DisplayName("a marker hit records the existing comment id as DELIVERED WITHOUT calling deliver() again")
+        void markerHitSkipsRedelivery() {
+            lenient().when(handler.findExistingDelivery(completedJob)).thenReturn(Optional.of("existing-comment-id"));
+
+            boolean result = service.recoverStuckDelivery(completedJob);
+
+            assertThat(result).isTrue();
+            verify(handler, never()).deliver(any());
+            verify(agentJobRepository).updateDeliveryStatus(jobId, DeliveryStatus.DELIVERED, "existing-comment-id");
+        }
+
+        @Test
+        @DisplayName("no marker hit falls through to a normal deliver() attempt, which succeeds")
+        void noMarkerHitFallsThroughToDeliverAndSucceeds() {
+            lenient().when(handler.findExistingDelivery(completedJob)).thenReturn(Optional.empty());
+
+            boolean result = service.recoverStuckDelivery(completedJob);
+
+            assertThat(result).isTrue();
+            verify(handler).deliver(completedJob);
+            verify(agentJobRepository).updateDeliveryStatus(
+                jobId,
+                DeliveryStatus.DELIVERED,
+                completedJob.getDeliveryCommentId()
+            );
+        }
+
+        @Test
+        @DisplayName(
+            "a failed deliver() attempt returns false and does NOT write a terminal status (left PENDING for the next sweep pass)"
+        )
+        void failedDeliverReturnsFalseAndLeavesPending() {
+            lenient().when(handler.findExistingDelivery(completedJob)).thenReturn(Optional.empty());
+            doThrow(new RuntimeException("GitHub API rate limited")).when(handler).deliver(completedJob);
+
+            boolean result = service.recoverStuckDelivery(completedJob);
+
+            assertThat(result).isFalse();
+            verify(agentJobRepository, never()).updateDeliveryStatus(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("a handler whose dedup check itself throws is treated as unknown — falls through to deliver()")
+        void dedupCheckThrowingFallsThroughToDeliver() {
+            lenient().when(handler.findExistingDelivery(completedJob)).thenThrow(new RuntimeException("provider down"));
+
+            boolean result = service.recoverStuckDelivery(completedJob);
+
+            assertThat(result).isTrue();
+            verify(handler).deliver(completedJob);
+        }
+    }
 }

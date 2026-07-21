@@ -46,6 +46,16 @@ import org.springframework.validation.annotation.Validated;
  *                          least {@link #MIN_HEARTBEAT_INTERVAL} — a sub-second interval floods
  *                          {@code worker_registry} with writes and risks the interval truncating
  *                          to zero under the persisted column's resolution
+ * @param payloadRetention  age (from {@code completed_at}) at which a TERMINAL job's heavy payload
+ *                          columns ({@code container_logs}, {@code output}) are stripped to {@code
+ *                          NULL} by {@link AgentJobRetentionService}. 14 days by default — long enough
+ *                          to debug a recent run, short enough that a busy instance's {@code
+ *                          container_logs} (up to 64KB each) don't accumulate unbounded (pressure-test
+ *                          verdict, Tier 1 #1: 10k jobs/day is 3.65M rows/yr otherwise)
+ * @param rowRetention      age (from {@code completed_at}) at which a TERMINAL job row is DELETED
+ *                          outright by {@link AgentJobRetentionService}. 90 days by default — well past
+ *                          {@code payloadRetention} so the row spends most of its life stripped-but-queryable
+ *                          before it is finally removed. Must be {@code >= payloadRetention}
  */
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.agent")
@@ -54,7 +64,9 @@ public record AgentProperties(
     @DurationUnit(ChronoUnit.SECONDS) @DefaultValue("1s") @NotNull Duration pollInterval,
     @DefaultValue("5") @Min(1) int claimBatchSize,
     @DefaultValue("5") @PositiveOrZero int maxRetries,
-    @DurationUnit(ChronoUnit.SECONDS) @DefaultValue("25s") @NotNull Duration heartbeatInterval
+    @DurationUnit(ChronoUnit.SECONDS) @DefaultValue("25s") @NotNull Duration heartbeatInterval,
+    @DefaultValue("P14D") @NotNull Duration payloadRetention,
+    @DefaultValue("P90D") @NotNull Duration rowRetention
 ) {
     /** Floor for {@link #pollInterval}: below this the poll loop busy-spins against the DB. */
     public static final Duration MIN_POLL_INTERVAL = Duration.ofMillis(100);
@@ -86,6 +98,20 @@ public record AgentProperties(
                     MIN_HEARTBEAT_INTERVAL +
                     ", got: " +
                     heartbeatInterval
+            );
+        }
+        if (payloadRetention == null || payloadRetention.isNegative() || payloadRetention.isZero()) {
+            throw new IllegalArgumentException(
+                "hephaestus.agent.payload-retention must be positive, got: " + payloadRetention
+            );
+        }
+        if (rowRetention == null || rowRetention.compareTo(payloadRetention) < 0) {
+            throw new IllegalArgumentException(
+                "hephaestus.agent.row-retention (" +
+                    rowRetention +
+                    ") must be >= payload-retention (" +
+                    payloadRetention +
+                    ") — a row cannot be deleted before its payload would already have been stripped"
             );
         }
     }

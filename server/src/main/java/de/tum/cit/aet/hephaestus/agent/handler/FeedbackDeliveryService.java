@@ -18,6 +18,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewSettings;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
@@ -81,6 +82,16 @@ class FeedbackDeliveryService {
      */
     void deliverFeedback(AgentJob job, @Nullable DeliveryContent delivery) {
         deliverFeedback(job, delivery, null);
+    }
+
+    /**
+     * Delivery-recovery dedup lookup (#1368 hardening) — see {@link PullRequestCommentPoster#findExistingSummaryComment}.
+     * Exposed here so {@link de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewHandler} (which
+     * only holds a reference to this service, not {@code PullRequestCommentPoster} directly) can implement
+     * {@link de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler#findExistingDelivery}.
+     */
+    Optional<String> findExistingDeliveryCommentId(AgentJob job) {
+        return commentPoster.findExistingSummaryComment(job);
     }
 
     /**

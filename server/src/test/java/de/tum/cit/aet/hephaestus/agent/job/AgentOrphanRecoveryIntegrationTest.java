@@ -96,16 +96,63 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         assertThat(requeued.getWorkerId()).isNull();
         assertThat(requeued.getRetryCount()).isEqualTo(1);
 
-        // It is a genuine poll candidate — oldest-first, id-only projection.
-        assertThat(jobRepository.findQueuedIdsOldestFirst(10)).contains(jobId);
-
-        // A live poller can claim it: processJob's SKIP LOCKED claim wins and flips it RUNNING.
+        // #1368 hardening: the requeue backs the job off (available_at = now + AgentJobBackoff), so it
+        // is deliberately NOT yet a poll candidate — see jobWithFutureAvailableAtIsNotClaimed below for
+        // that assertion. processJob's own SKIP LOCKED claim does not gate on available_at (only the
+        // candidate-selection query does), so a direct claim still succeeds despite the backoff.
         boolean claimed = executor.processJob(jobId);
         assertThat(claimed).isTrue();
 
         AgentJob reclaimed = jobRepository.findById(jobId).orElseThrow();
         assertThat(reclaimed.getStatus()).isEqualTo(AgentJobStatus.RUNNING);
         assertThat(reclaimed.getRetryCount()).isEqualTo(1); // claim itself doesn't touch retry_count
+    }
+
+    @Test
+    @DisplayName(
+        "#1368 hardening: orphan requeue rotates the job token — the old token no longer authenticates, the new one does"
+    )
+    void orphanRequeueRotatesTheJobToken() {
+        UUID jobId = runningJobOwnedBy("dead-replica", Instant.now().minus(Duration.ofMinutes(5)), 0);
+        registerStaleWorker("dead-replica", Instant.now().minus(Duration.ofMinutes(5)));
+        AgentJob before = jobRepository.findById(jobId).orElseThrow();
+        String oldTokenHash = before.getJobTokenHash();
+
+        sweeper.recoverOrphanedJobs();
+
+        AgentJob requeued = jobRepository.findById(jobId).orElseThrow();
+        String newTokenHash = requeued.getJobTokenHash();
+        assertThat(newTokenHash).isNotEqualTo(oldTokenHash);
+
+        // The old token is dead: this mirrors JobTokenAuthenticationFilter#resolveJobRouting's lookup
+        // (hash + status=RUNNING) — the requeue moved status to QUEUED too, so BOTH conditions now fail
+        // for the old token even before considering the hash change.
+        assertThat(jobRepository.findByJobTokenHashAndStatus(oldTokenHash, AgentJobStatus.RUNNING)).isEmpty();
+
+        // The new token authenticates once the job is claimed (RUNNING) again.
+        boolean claimed = executor.processJob(jobId);
+        assertThat(claimed).isTrue();
+        assertThat(jobRepository.findByJobTokenHashAndStatus(newTokenHash, AgentJobStatus.RUNNING)).isPresent();
+        assertThat(jobRepository.findByJobTokenHashAndStatus(oldTokenHash, AgentJobStatus.RUNNING)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("#1368 hardening: a job whose available_at is in the future is not offered as a poll candidate")
+    void jobWithFutureAvailableAtIsNotClaimed() {
+        UUID jobId = runningJobOwnedBy("dead-replica-4", Instant.now().minus(Duration.ofMinutes(5)), 0);
+        registerStaleWorker("dead-replica-4", Instant.now().minus(Duration.ofMinutes(5)));
+
+        sweeper.recoverOrphanedJobs();
+
+        // The backoff-computed available_at from AgentJobBackoff.compute(1) is >= 15s in the future
+        // (base 1^4 + 15 = 16s, jittered ±10%) — comfortably beyond "now" for this assertion.
+        AgentJob requeued = jobRepository.findById(jobId).orElseThrow();
+        assertThat(requeued.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
+        assertThat(requeued.getAvailableAt()).isAfter(Instant.now());
+
+        assertThat(jobRepository.findQueuedIdsOldestFirst(10))
+            .as("a not-yet-eligible QUEUED job must not be offered as a poll candidate")
+            .doesNotContain(jobId);
     }
 
     @Test
@@ -141,7 +188,17 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         // A stale sweeper pass believes the job is still owned by a worker that has since died AND been
         // superseded — "dead-replica" is not the row's actual current owner. @Modifying queries need an
         // active transaction (the sweeper normally provides one via TransactionTemplate); wrap here too.
-        int updated = transactionTemplate.execute(s -> jobRepository.requeueOrphan(jobId, "dead-replica", 5));
+        String candidateNewToken = AgentJob.generateJobToken();
+        int updated = transactionTemplate.execute(s ->
+            jobRepository.requeueOrphan(
+                jobId,
+                "dead-replica",
+                5,
+                Instant.now(),
+                candidateNewToken,
+                AgentJob.computeTokenHash(candidateNewToken)
+            )
+        );
 
         assertThat(updated)
             .as("the CAS must not match — the row's worker_id does not match the stale caller's")
@@ -157,7 +214,17 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     void requeueOrphanRefusesPastTheRetryCapEvenUnchecked() {
         UUID jobId = runningJobOwnedBy("dead-replica-3", Instant.now(), 5);
 
-        int updated = transactionTemplate.execute(s -> jobRepository.requeueOrphan(jobId, "dead-replica-3", 5));
+        String candidateNewToken = AgentJob.generateJobToken();
+        int updated = transactionTemplate.execute(s ->
+            jobRepository.requeueOrphan(
+                jobId,
+                "dead-replica-3",
+                5,
+                Instant.now(),
+                candidateNewToken,
+                AgentJob.computeTokenHash(candidateNewToken)
+            )
+        );
 
         assertThat(updated).isZero();
         AgentJob unchanged = jobRepository.findById(jobId).orElseThrow();

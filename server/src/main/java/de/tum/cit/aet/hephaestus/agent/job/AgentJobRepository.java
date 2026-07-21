@@ -201,19 +201,25 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      * FOR UPDATE} transaction remains the authoritative gate — this predicate only shapes which
      * candidates are worth fetching in the first place, so a stale read here (a RUNNING job
      * completing between this query and the claim) costs nothing beyond an ordinary skipped
-     * candidate. Backed by {@code ix_agent_job_queued_created} (queued jobs, oldest-first) and {@code
-     * ix_agent_job_running_config} (running jobs per config, for the correlated count).
+     * candidate. Backed by {@code ix_agent_job_queued_available} (queued jobs eligible now, oldest
+     * {@code available_at} first — #1368 hardening) and {@code ix_agent_job_running_config} (running
+     * jobs per config, for the correlated count).
+     *
+     * <p>{@code available_at <= now()} (#1368 hardening) excludes jobs backed off after an infra
+     * failure / orphan requeue / drain requeue (see {@link #requeueOrphan}) until their backoff
+     * elapses — see {@link AgentJobBackoff}.
      */
     @WorkspaceAgnostic("Cross-workspace poll candidates; caller is the @WorkspaceAgnostic job poller")
     @Query(
         value = "SELECT j.id FROM agent_job j " +
             "WHERE j.status = 'QUEUED' " +
+            "AND j.available_at <= now() " +
             "AND (" +
             "  j.config_id IS NULL " +
             "  OR (SELECT count(*) FROM agent_job r WHERE r.config_id = j.config_id AND r.status = 'RUNNING') " +
             "     < (SELECT c.max_concurrent_jobs FROM agent_config c WHERE c.id = j.config_id)" +
             ") " +
-            "ORDER BY j.created_at ASC LIMIT :limit",
+            "ORDER BY j.available_at ASC, j.id ASC LIMIT :limit",
         nativeQuery = true
     )
     List<UUID> findQueuedIdsOldestFirst(@Param("limit") int limit);
@@ -260,19 +266,42 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      * already check {@code retryCount < maxRetries} before calling, but a future caller that forgets
      * to must not be able to requeue past the cap).
      *
-     * <p>Reused by two callers: {@link AgentJobZombieSweeper#recoverOrphanedJobs} (the dead worker's
-     * own id) and {@link AgentJobExecutor#cancelInFlight} on drain timeout (this worker's own id,
+     * <p>Reused by three callers: {@link AgentJobZombieSweeper#recoverOrphanedJobs} (the dead worker's
+     * own id), {@link AgentJobExecutor#cancelInFlight} on drain timeout (this worker's own id,
      * requeuing its own in-flight jobs for a sibling to pick up rather than cancelling them —
-     * matches the documented drain contract).
+     * matches the documented drain contract), and {@link AgentJobExecutor}'s infra-failure retry path
+     * (also this worker's own id, requeuing a job that failed on a provably-infra error instead of
+     * failing it terminally).
+     *
+     * <p>#1368 hardening: also (a) sets {@code available_at} to a backoff-computed future instant
+     * (see {@link AgentJobBackoff}) instead of leaving the job instantly re-claimable — a crash-looping
+     * job would otherwise burn its whole retry budget in seconds; (b) ROTATES the job token
+     * ({@code job_token}/{@code job_token_hash}) — the caller mints a fresh pair (see
+     * {@link AgentJob#generateJobToken}/{@link AgentJob#computeTokenHash}) so a zombie sandbox that is
+     * merely network-partitioned (not actually dead) cannot keep authenticating against the LLM proxy
+     * once a sibling worker re-claims this same row; the old token dies with this CAS regardless of
+     * whether the zombie ever notices.
+     *
+     * @param availableAt when the requeued job becomes claimable again (now + backoff)
+     * @param newJobToken freshly generated plaintext token (encrypted at rest by the entity's converter)
+     * @param newJobTokenHash {@code AgentJob.computeTokenHash(newJobToken)} — indexed lookup hash
      */
     @WorkspaceAgnostic("ID-based orphan/drain requeue; caller is @WorkspaceAgnostic sweeper or worker-local drain")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
         "UPDATE AgentJob j SET j.status = 'QUEUED', j.workerId = null, " +
-            "j.startedAt = null, j.retryCount = j.retryCount + 1 " +
+            "j.startedAt = null, j.retryCount = j.retryCount + 1, j.availableAt = :availableAt, " +
+            "j.jobToken = :newJobToken, j.jobTokenHash = :newJobTokenHash " +
             "WHERE j.id = :id AND j.status = 'RUNNING' AND j.workerId = :workerId AND j.retryCount < :maxRetries"
     )
-    int requeueOrphan(@Param("id") UUID id, @Param("workerId") String workerId, @Param("maxRetries") int maxRetries);
+    int requeueOrphan(
+        @Param("id") UUID id,
+        @Param("workerId") String workerId,
+        @Param("maxRetries") int maxRetries,
+        @Param("availableAt") Instant availableAt,
+        @Param("newJobToken") String newJobToken,
+        @Param("newJobTokenHash") String newJobTokenHash
+    );
 
     /**
      * Self-fenced requeue for a claim this SAME worker just won but could not dispatch (sandbox
@@ -291,6 +320,15 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     @WorkspaceAgnostic("ID-based self-fenced requeue; caller is the claiming worker itself")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
+        // #1368 hardening: available_at is DELIBERATELY left untouched (not backed off) — the job
+        // never actually started executing, so this is a delivery-mechanism hiccup, not a failed
+        // attempt, and it must stay immediately reclaimable. No explicit reset to "now" is needed
+        // either: this row could only have been claimed in the first place because available_at was
+        // already <= now() (findQueuedIdsOldestFirst's eligibility predicate), so it is still in the
+        // past moments later when this requeue runs — leaving it alone already satisfies "immediately
+        // reclaimable" without a second write (and without a JPQL CURRENT_TIMESTAMP, which Hibernate 7
+        // resolves to java.sql.Timestamp and refuses to assign to this Instant-typed column). No token
+        // rotation either: no sandbox was ever handed this token.
         "UPDATE AgentJob j SET j.status = 'QUEUED', j.workerId = null, j.startedAt = null " +
             "WHERE j.id = :id AND j.status = 'RUNNING' AND (:workerId IS NULL OR j.workerId = :workerId)"
     )
@@ -324,4 +362,96 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         @Param("newStatus") DeliveryStatus newStatus,
         @Param("fromStatuses") Collection<DeliveryStatus> fromStatuses
     );
+
+    // Delivery recovery sweep (#1368 hardening): jobs stuck at delivery_status=PENDING because the
+    // executor crashed between marking PENDING (in the terminal-write transaction) and finishing
+    // delivery. See AgentJobZombieSweeper#recoverStuckDeliveries.
+
+    /**
+     * Stuck PENDING deliveries older than {@code cutoff}, oldest completion first. Bounded by
+     * {@code pageable} so one sweep pass never loads an unbounded backlog. Backed by
+     * {@code ix_agent_job_delivery_pending}.
+     */
+    @WorkspaceAgnostic("Cross-workspace delivery-recovery sweep; caller is @WorkspaceAgnostic sweeper")
+    @Query(
+        "SELECT j FROM AgentJob j WHERE j.status = 'COMPLETED' AND j.deliveryStatus = 'PENDING' " +
+            "AND j.completedAt < :cutoff ORDER BY j.completedAt ASC"
+    )
+    List<AgentJob> findStuckPendingDeliveries(@Param("cutoff") Instant cutoff, Pageable pageable);
+
+    /**
+     * Single-row CAS guarding a delivery-recovery attempt: increments {@code delivery_attempts} only
+     * if it still matches {@code expectedAttempts}, so two concurrent sweeper passes (different server
+     * replicas) cannot both attempt (and potentially double-post) the same stuck delivery. The caller
+     * that wins (returns 1) proceeds with the actual redelivery attempt; a loser (0) skips this pass.
+     */
+    @WorkspaceAgnostic("ID-based delivery-recovery CAS; job ID from workspace-scoped sweep candidate")
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        "UPDATE AgentJob j SET j.deliveryAttempts = j.deliveryAttempts + 1 " +
+            "WHERE j.id = :id AND j.status = 'COMPLETED' AND j.deliveryStatus = 'PENDING' " +
+            "AND j.deliveryAttempts = :expectedAttempts"
+    )
+    int claimDeliveryRecoveryAttempt(@Param("id") UUID id, @Param("expectedAttempts") short expectedAttempts);
+
+    // Retention (#1368 hardening): AgentJobRetentionService. Both batched via a bounded subquery so a
+    // large backlog is worked off in many short transactions instead of one long one (mirrors
+    // integration.core.sync.SyncJobService's retention style — no single unbounded UPDATE/DELETE).
+
+    /**
+     * Strip heavy payload columns ({@code container_logs}, {@code output}) from up to
+     * {@code batchSize} TERMINAL rows completed before {@code cutoff} that still carry a payload.
+     * Idempotent — a row with both columns already NULL is not matched again.
+     */
+    @WorkspaceAgnostic("Cross-workspace retention batch; caller is @WorkspaceAgnostic retention service")
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        value = "UPDATE agent_job SET container_logs = NULL, output = NULL " +
+            "WHERE id IN (" +
+            "  SELECT id FROM agent_job " +
+            "  WHERE status IN ('COMPLETED','FAILED','TIMED_OUT','CANCELLED') " +
+            "  AND completed_at < :cutoff " +
+            "  AND (container_logs IS NOT NULL OR output IS NOT NULL) " +
+            "  LIMIT :batchSize" +
+            ")",
+        nativeQuery = true
+    )
+    int stripTerminalPayloads(@Param("cutoff") Instant cutoff, @Param("batchSize") int batchSize);
+
+    /** Delete up to {@code batchSize} TERMINAL rows completed before {@code cutoff} outright. */
+    @WorkspaceAgnostic("Cross-workspace retention batch; caller is @WorkspaceAgnostic retention service")
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        value = "DELETE FROM agent_job WHERE id IN (" +
+            "  SELECT id FROM agent_job " +
+            "  WHERE status IN ('COMPLETED','FAILED','TIMED_OUT','CANCELLED') " +
+            "  AND completed_at < :cutoff " +
+            "  LIMIT :batchSize" +
+            ")",
+        nativeQuery = true
+    )
+    int deleteTerminalRowsOlderThan(@Param("cutoff") Instant cutoff, @Param("batchSize") int batchSize);
+
+    // Queue health gauges (#1368 hardening): AgentQueueHealthSampler. Each is a single cheap
+    // index-backed query, sampled on a timer — not on any request path.
+
+    /**
+     * COUNT of QUEUED jobs currently eligible to run ({@code available_at <= :now}). {@code now} is a
+     * bind parameter rather than JPQL {@code CURRENT_TIMESTAMP} (#1368 hardening) — Hibernate 7 resolves
+     * that function to {@code java.sql.Timestamp}, which a strict-typed comparison against this
+     * {@code Instant}-typed column does not accept.
+     */
+    @WorkspaceAgnostic("Fleet-wide queue-depth gauge; caller is @WorkspaceAgnostic health sampler")
+    @Query("SELECT COUNT(j) FROM AgentJob j WHERE j.status = 'QUEUED' AND j.availableAt <= :now")
+    long countEligibleQueued(@Param("now") Instant now);
+
+    /** Oldest {@code available_at} among currently-eligible QUEUED jobs; empty when the queue is empty. */
+    @WorkspaceAgnostic("Fleet-wide queue-age gauge; caller is @WorkspaceAgnostic health sampler")
+    @Query("SELECT MIN(j.availableAt) FROM AgentJob j WHERE j.status = 'QUEUED' AND j.availableAt <= :now")
+    Optional<Instant> findOldestEligibleQueuedAt(@Param("now") Instant now);
+
+    /** COUNT of RUNNING jobs fleet-wide. */
+    @WorkspaceAgnostic("Fleet-wide running gauge; caller is @WorkspaceAgnostic health sampler")
+    @Query("SELECT COUNT(j) FROM AgentJob j WHERE j.status = 'RUNNING'")
+    long countRunning();
 }

@@ -190,6 +190,27 @@ public class AgentJob {
     private int retryCount = 0;
 
     /**
+     * When this job becomes eligible for a poll-loop claim (#1368 hardening). Defaults to submit time
+     * (immediately eligible); a requeue after an infra failure, orphan recovery, or worker drain pushes
+     * this into the future by {@link AgentJobBackoff#compute}, so a crash-looping job backs off instead
+     * of instantly re-competing for a claim. {@link AgentJobRepository#findQueuedIdsOldestFirst} filters
+     * and orders on this column (backed by {@code ix_agent_job_queued_available}).
+     */
+    @Column(name = "available_at", nullable = false)
+    private Instant availableAt;
+
+    /**
+     * Bounded attempt counter for the delivery-recovery sweep ({@link AgentJobZombieSweeper}): a job
+     * stuck at {@link DeliveryStatus#PENDING} (the executor crashed between marking PENDING and finishing
+     * delivery) is retried up to a small cap before being marked {@link DeliveryStatus#FAILED}
+     * terminally. Distinct from {@link #retryCount}, which counts EXECUTION retries, not delivery
+     * retries — a job can be COMPLETED (no more execution retries possible) while still needing several
+     * delivery attempts.
+     */
+    @Column(name = "delivery_attempts", nullable = false)
+    private short deliveryAttempts = 0;
+
+    /**
      * Worker that owns this job while {@link #status} is {@link AgentJobStatus#RUNNING} (#1138).
      * Soft reference to {@code worker_registry.worker_id} (no FK: a finished job must survive its
      * worker row being reaped). Set on claim; routes cancels to the owner, detects jobs orphaned by a
@@ -270,9 +291,19 @@ public class AgentJob {
         if (this.createdAt == null) {
             this.createdAt = Instant.now();
         }
+        if (this.availableAt == null) {
+            this.availableAt = this.createdAt;
+        }
     }
 
-    private static String generateJobToken() {
+    /**
+     * Generate a fresh 256-bit job token. Public (#1368 hardening) so a requeue path can mint a
+     * replacement without going through {@code prePersist} — see {@link AgentJobRepository#requeueOrphan},
+     * which rotates the token on every orphan/drain requeue so a zombie sandbox that is still alive
+     * (network-partitioned, not actually dead) cannot keep authenticating against the LLM proxy once a
+     * sibling worker has re-claimed the same job row.
+     */
+    public static String generateJobToken() {
         byte[] bytes = new byte[32]; // 256 bits
         SECURE_RANDOM.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);

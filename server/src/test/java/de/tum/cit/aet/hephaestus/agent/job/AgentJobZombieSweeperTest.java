@@ -49,8 +49,13 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
         java.time.Duration.ofSeconds(1),
         5,
         5,
-        java.time.Duration.ofSeconds(25)
+        java.time.Duration.ofSeconds(25),
+        java.time.Duration.ofDays(14),
+        java.time.Duration.ofDays(90)
     );
+
+    @Mock
+    private AgentJobLifecycleService lifecycleService;
 
     @BeforeEach
     void setUp() {
@@ -63,12 +68,22 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
                 TransactionCallback<Object> cb = inv.getArgument(0);
                 return cb.doInTransaction(mock(TransactionStatus.class));
             });
+        lenient()
+            .doAnswer(inv -> {
+                @SuppressWarnings("unchecked")
+                java.util.function.Consumer<TransactionStatus> consumer = inv.getArgument(0);
+                consumer.accept(mock(TransactionStatus.class));
+                return null;
+            })
+            .when(transactionTemplate)
+            .executeWithoutResult(any());
         sweeper = new AgentJobZombieSweeper(
             jobRepository,
             workerRegistryRepository,
             AGENT_PROPS,
             objectMapper,
             transactionTemplate,
+            lifecycleService,
             meterRegistry
         );
     }
@@ -141,11 +156,27 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
             when(jobRepository.findOrphanedRunningJobs(any(), ArgumentMatchers.anyLong())).thenReturn(
                 List.of(orphan(jobId, 7L, 0))
             );
-            when(jobRepository.requeueOrphan(jobId, DEAD_WORKER_ID, AGENT_PROPS.maxRetries())).thenReturn(1);
+            when(
+                jobRepository.requeueOrphan(
+                    eq(jobId),
+                    eq(DEAD_WORKER_ID),
+                    eq(AGENT_PROPS.maxRetries()),
+                    any(),
+                    any(),
+                    any()
+                )
+            ).thenReturn(1);
 
             sweeper.recoverOrphanedJobs();
 
-            verify(jobRepository).requeueOrphan(jobId, DEAD_WORKER_ID, AGENT_PROPS.maxRetries());
+            verify(jobRepository).requeueOrphan(
+                eq(jobId),
+                eq(DEAD_WORKER_ID),
+                eq(AGENT_PROPS.maxRetries()),
+                any(),
+                any(),
+                any()
+            );
             assertThat(meterRegistry.counter("agent.job.orphan.requeued").count()).isEqualTo(1d);
         }
 
@@ -156,11 +187,27 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
             when(jobRepository.findOrphanedRunningJobs(any(), ArgumentMatchers.anyLong())).thenReturn(
                 List.of(orphan(jobId, 7L, 0))
             );
-            when(jobRepository.requeueOrphan(jobId, DEAD_WORKER_ID, AGENT_PROPS.maxRetries())).thenReturn(0); // another replica won
+            when(
+                jobRepository.requeueOrphan(
+                    eq(jobId),
+                    eq(DEAD_WORKER_ID),
+                    eq(AGENT_PROPS.maxRetries()),
+                    any(),
+                    any(),
+                    any()
+                )
+            ).thenReturn(0); // another replica won
 
             sweeper.recoverOrphanedJobs();
 
-            verify(jobRepository).requeueOrphan(jobId, DEAD_WORKER_ID, AGENT_PROPS.maxRetries());
+            verify(jobRepository).requeueOrphan(
+                eq(jobId),
+                eq(DEAD_WORKER_ID),
+                eq(AGENT_PROPS.maxRetries()),
+                any(),
+                any(),
+                any()
+            );
             // No further status write beyond the attempted requeue itself, and no requeue credited.
             verify(jobRepository, never()).transitionStatus(any(), any(), any(), any(), any());
             assertThat(meterRegistry.counter("agent.job.orphan.requeued").count()).isZero();
@@ -176,7 +223,7 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
 
             sweeper.recoverOrphanedJobs();
 
-            verify(jobRepository, never()).requeueOrphan(any(), any(), anyInt());
+            verify(jobRepository, never()).requeueOrphan(any(), any(), anyInt(), any(), any(), any());
             verify(jobRepository).transitionStatus(
                 eq(jobId),
                 eq(AgentJobStatus.FAILED),
@@ -193,8 +240,92 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
 
             sweeper.recoverOrphanedJobs();
 
-            verify(jobRepository, never()).requeueOrphan(any(), any(), anyInt());
+            verify(jobRepository, never()).requeueOrphan(any(), any(), anyInt(), any(), any(), any());
             verify(jobRepository, never()).transitionStatus(any(), any(), any(), any(), any());
+        }
+    }
+
+    /** #1368 hardening: recoverStuckDeliveries — see AgentJobLifecycleServiceTest for the delivery attempt itself. */
+    @Nested
+    @DisplayName("recoverStuckDeliveries (#1368 hardening)")
+    class RecoverStuckDeliveries {
+
+        private AgentJob stuckJob(short attempts) {
+            AgentJob job = new AgentJob();
+            job.setId(UUID.randomUUID());
+            job.setStatus(AgentJobStatus.COMPLETED);
+            job.setDeliveryStatus(DeliveryStatus.PENDING);
+            job.setDeliveryAttempts(attempts);
+            return job;
+        }
+
+        @Test
+        @DisplayName("claims the attempt CAS, delegates to the lifecycle service, and counts a successful recovery")
+        void claimsAndDelegatesOnSuccess() {
+            AgentJob job = stuckJob((short) 0);
+            when(jobRepository.findStuckPendingDeliveries(any(), any())).thenReturn(List.of(job));
+            when(jobRepository.claimDeliveryRecoveryAttempt(job.getId(), (short) 0)).thenReturn(1);
+            when(lifecycleService.recoverStuckDelivery(job)).thenReturn(true);
+
+            sweeper.recoverStuckDeliveries();
+
+            verify(jobRepository).claimDeliveryRecoveryAttempt(job.getId(), (short) 0);
+            verify(lifecycleService).recoverStuckDelivery(job);
+            assertThat(meterRegistry.counter("agent.job.delivery.recovered").count()).isEqualTo(1d);
+        }
+
+        @Test
+        @DisplayName(
+            "a lost attempt-CAS (a concurrent sweeper replica already claimed it) skips the delivery attempt entirely"
+        )
+        void skipsWhenAttemptCasLost() {
+            AgentJob job = stuckJob((short) 0);
+            when(jobRepository.findStuckPendingDeliveries(any(), any())).thenReturn(List.of(job));
+            when(jobRepository.claimDeliveryRecoveryAttempt(job.getId(), (short) 0)).thenReturn(0);
+
+            sweeper.recoverStuckDeliveries();
+
+            verify(lifecycleService, never()).recoverStuckDelivery(any());
+            assertThat(meterRegistry.counter("agent.job.delivery.recovered").count()).isZero();
+        }
+
+        @Test
+        @DisplayName("a delivery attempt that itself fails is not counted as recovered")
+        void failedAttemptIsNotCounted() {
+            AgentJob job = stuckJob((short) 1);
+            when(jobRepository.findStuckPendingDeliveries(any(), any())).thenReturn(List.of(job));
+            when(jobRepository.claimDeliveryRecoveryAttempt(job.getId(), (short) 1)).thenReturn(1);
+            when(lifecycleService.recoverStuckDelivery(job)).thenReturn(false);
+
+            sweeper.recoverStuckDeliveries();
+
+            assertThat(meterRegistry.counter("agent.job.delivery.recovered").count()).isZero();
+        }
+
+        @Test
+        @DisplayName(
+            "attempts already at the cap: marks FAILED directly, without claiming another attempt or calling the lifecycle service"
+        )
+        void exhaustedAttemptsMarksFailedDirectly() {
+            AgentJob job = stuckJob((short) AgentJobZombieSweeper.MAX_DELIVERY_RECOVERY_ATTEMPTS);
+            when(jobRepository.findStuckPendingDeliveries(any(), any())).thenReturn(List.of(job));
+
+            sweeper.recoverStuckDeliveries();
+
+            verify(jobRepository, never()).claimDeliveryRecoveryAttempt(any(), org.mockito.ArgumentMatchers.anyShort());
+            verify(lifecycleService, never()).recoverStuckDelivery(any());
+            verify(jobRepository).updateDeliveryStatus(job.getId(), DeliveryStatus.FAILED, job.getDeliveryCommentId());
+        }
+
+        @Test
+        @DisplayName("no stuck deliveries → no writes")
+        void noStuckDeliveriesNoWork() {
+            when(jobRepository.findStuckPendingDeliveries(any(), any())).thenReturn(List.of());
+
+            sweeper.recoverStuckDeliveries();
+
+            verify(jobRepository, never()).claimDeliveryRecoveryAttempt(any(), org.mockito.ArgumentMatchers.anyShort());
+            verify(lifecycleService, never()).recoverStuckDelivery(any());
         }
     }
 

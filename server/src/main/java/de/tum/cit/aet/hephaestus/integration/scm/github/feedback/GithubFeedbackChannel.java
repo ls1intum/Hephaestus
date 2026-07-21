@@ -6,9 +6,12 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssueComment;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssueCommentConnection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
@@ -167,6 +170,89 @@ public class GithubFeedbackChannel implements FeedbackChannel {
         log.info("Edited GitHub comment in place: workspaceId={}, commentId={}", scopeId, commentNodeId);
         return UpdateOutcome.edited(new SummaryHandle(commentNodeId));
     }
+
+    /**
+     * Dedup lookup (#1368 hardening — delivery-recovery crash window): scans this PR/issue's FIRST page
+     * of comments for one whose body contains {@code marker}. Reuses the same {@code GetPullRequestComments}
+     * / {@code GetIssueComments} queries {@code GitHubIssueCommentSyncService} uses for sync — no new
+     * GraphQL surface.
+     *
+     * <p>Deliberately first-page-only ({@link #EXISTING_SUMMARY_SEARCH_PAGE_SIZE} newest-created-first is
+     * NOT how GitHub orders this connection — it is creation-order ascending — so on a PR/issue with more
+     * comments than one page, a marker posted after the page boundary would be missed. Acceptable here:
+     * this only guards a narrow, already-rare crash window (a delivery-recovery retry), and a miss simply
+     * falls back to a normal post — never a hard failure. Any transport/GraphQL error is treated the same
+     * as "not found" (best-effort, never blocks recovery).
+     */
+    @Override
+    public Optional<SummaryHandle> findExistingSummary(FeedbackTarget target, String marker) {
+        if (marker == null || marker.isBlank()) {
+            return Optional.empty();
+        }
+        long scopeId = target.ref().workspaceId();
+        if (gitHubProvider.isRateLimitCritical(scopeId)) {
+            return Optional.empty();
+        }
+        String subject = target.subjectExternalId();
+        try {
+            String documentName;
+            String owner;
+            String name;
+            int number;
+            String commentsPath;
+            if (isIssueSubject(subject)) {
+                IssueCoordinates issue = parseIssueSubjectExternalId(subject);
+                documentName = "GetIssueComments";
+                owner = issue.owner();
+                name = issue.name();
+                number = issue.number();
+                commentsPath = "repository.issue.comments";
+            } else {
+                PrCoordinates pr = parseSubjectExternalId(subject);
+                documentName = "GetPullRequestComments";
+                owner = pr.owner();
+                name = pr.name();
+                number = pr.number();
+                commentsPath = "repository.pullRequest.comments";
+            }
+
+            ClientGraphQlResponse response = gitHubProvider
+                .forScope(scopeId)
+                .documentName(documentName)
+                .variable("owner", owner)
+                .variable("name", name)
+                .variable("number", number)
+                .variable("first", EXISTING_SUMMARY_SEARCH_PAGE_SIZE)
+                .variable("after", null)
+                .execute()
+                .block(GRAPHQL_TIMEOUT);
+            if (response == null || (response.getErrors() != null && !response.getErrors().isEmpty())) {
+                return Optional.empty();
+            }
+            gitHubProvider.trackRateLimit(scopeId, response);
+
+            GHIssueCommentConnection connection = response.field(commentsPath).toEntity(GHIssueCommentConnection.class);
+            if (connection == null || connection.getNodes() == null) {
+                return Optional.empty();
+            }
+            for (GHIssueComment node : connection.getNodes()) {
+                if (node.getBody() != null && node.getBody().contains(marker) && node.getId() != null) {
+                    return Optional.of(new SummaryHandle(node.getId()));
+                }
+            }
+            return Optional.empty();
+        } catch (RuntimeException e) {
+            log.debug(
+                "Existing-summary dedup lookup failed (treated as not found): scopeId={}, error={}",
+                scopeId,
+                e.getMessage()
+            );
+            return Optional.empty();
+        }
+    }
+
+    /** First-page size for {@link #findExistingSummary}'s best-effort marker scan. */
+    private static final int EXISTING_SUMMARY_SEARCH_PAGE_SIZE = 100;
 
     /** Conservative NOT_FOUND heuristic: GitHub signals a deleted comment via a free-text top-level error. */
     static boolean looksGone(List<String> errors) {

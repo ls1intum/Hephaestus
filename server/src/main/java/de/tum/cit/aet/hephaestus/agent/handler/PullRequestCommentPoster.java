@@ -14,6 +14,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
@@ -342,6 +343,54 @@ class PullRequestCommentPoster {
             return handle.externalId();
         } catch (FeedbackDeliveryException e) {
             throw new JobDeliveryException(e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Delivery-recovery dedup lookup (#1368 hardening): does an already-posted summary comment carrying
+     * THIS job's marker exist? See {@link JobDeliveryException} callers'
+     * {@code JobTypeHandler#findExistingDelivery} for why this matters — a crash between posting and
+     * recording {@code deliveryCommentId} leaves the DB unaware a comment already landed.
+     *
+     * <p>Handles both PR ({@code pr_number} metadata) and issue ({@code issue_number} metadata) subjects,
+     * mirroring {@link #buildTarget} / {@link #postIssueFormattedBody} respectively. Best-effort: any
+     * missing metadata, unresolvable channel, or lookup failure returns empty — treated by the caller as
+     * "unknown", never as "confirmed not delivered".
+     */
+    Optional<String> findExistingSummaryComment(AgentJob job) {
+        IntegrationKind kind = job.getIntegrationKind();
+        if (kind == null) {
+            return Optional.empty();
+        }
+        FeedbackChannel channel = channels.get(kind);
+        if (channel == null) {
+            return Optional.empty();
+        }
+        JsonNode metadata = job.getMetadata();
+        if (metadata == null || job.getWorkspace() == null) {
+            return Optional.empty();
+        }
+        try {
+            long workspaceId = job.getWorkspace().getId();
+            FeedbackTarget target;
+            if (metadata.has("issue_number")) {
+                String repoFullName = requireMetadataText(metadata, "repository_full_name");
+                int issueNumber = requireMetadataInt(metadata, "issue_number");
+                String subjectExternalId = channel.formatIssueSubjectId(repoFullName, issueNumber);
+                target = new FeedbackTarget(new IntegrationRef(kind, workspaceId, null), subjectExternalId, null);
+            } else if (metadata.has("pr_number")) {
+                target = buildTarget(job, kind, workspaceId);
+            } else {
+                return Optional.empty();
+            }
+            return channel.findExistingSummary(target, summaryMarkerFor(job)).map(SummaryHandle::externalId);
+        } catch (RuntimeException e) {
+            log.debug(
+                "Existing-summary dedup lookup failed (treated as unknown): jobId={}, error={}",
+                job.getId(),
+                e.getMessage()
+            );
+            return Optional.empty();
         }
     }
 

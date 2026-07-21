@@ -32,6 +32,17 @@ import org.springframework.stereotype.Component;
  *
  * <p>Gated on {@code hephaestus.integration.gitlab.enabled=true} to track
  * {@link GitLabGraphQlClientProvider}.
+ *
+ * <p><b>{@link #findExistingSummary} is intentionally NOT overridden</b> (#1368 hardening — delivery-recovery
+ * dedup): unlike GitHub, this codebase has no existing "list MR notes with body" query wired to a
+ * reusable Java call site ({@code GetMergeRequestDiscussions.graphql} exists for sync but returns a
+ * nested discussions→notes shape with its own resolver/response mapping, not a drop-in reuse the way
+ * GitHub's {@code GetPullRequestComments}/{@code GetIssueComments} were for {@link
+ * de.tum.cit.aet.hephaestus.integration.scm.github.feedback.GithubFeedbackChannel}). Building and wiring
+ * that mapping is a bigger lift than this hardening slice's scope — the SPI default (unsupported) applies
+ * here, so a GitLab delivery-recovery retry always falls through to a normal re-post rather than deduping
+ * against an already-landed comment. Documented per the task's explicit allowance to skip a
+ * provider where listing is impractical rather than half-build it.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)

@@ -101,7 +101,9 @@ class AgentJobExecutorTest extends BaseUnitTest {
         Duration.ofSeconds(1),
         5,
         5,
-        Duration.ofSeconds(25)
+        Duration.ofSeconds(25),
+        Duration.ofDays(14),
+        Duration.ofDays(90)
     );
 
     private UUID jobId;
@@ -616,6 +618,194 @@ class AgentJobExecutorTest extends BaseUnitTest {
         }
     }
 
+    /** #1368 hardening: error classification — see AgentJobExecutor#handleExecutionFailure's javadoc. */
+    @Nested
+    @DisplayName("Error classification (#1368 hardening)")
+    class ErrorClassification {
+
+        @Test
+        @DisplayName("isRetryableInfraFailure: a plain SandboxException (not cancelled) is retryable")
+        void sandboxExceptionIsRetryable() {
+            assertThat(
+                AgentJobExecutor.isRetryableInfraFailure(
+                    new de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException("docker daemon unreachable")
+                )
+            ).isTrue();
+        }
+
+        @Test
+        @DisplayName(
+            "isRetryableInfraFailure: SandboxCancelledException (a SandboxException subtype) is NOT retryable — it is cancellation, handled separately"
+        )
+        void sandboxCancelledExceptionIsNotRetryable() {
+            assertThat(AgentJobExecutor.isRetryableInfraFailure(new SandboxCancelledException("cancelled"))).isFalse();
+        }
+
+        @Test
+        @DisplayName("isRetryableInfraFailure: a bare IOException is retryable (network-ish)")
+        void ioExceptionIsRetryable() {
+            assertThat(AgentJobExecutor.isRetryableInfraFailure(new java.io.IOException("connection reset"))).isTrue();
+        }
+
+        @Test
+        @DisplayName(
+            "isRetryableInfraFailure: an unclassified RuntimeException is NOT retryable — conservative default"
+        )
+        void unclassifiedExceptionIsNotRetryable() {
+            assertThat(AgentJobExecutor.isRetryableInfraFailure(new RuntimeException("parse error"))).isFalse();
+        }
+
+        @Test
+        @DisplayName(
+            "a classified infra failure is requeued (not failed) with backoff + a rotated token, fenced to this worker"
+        )
+        void infraFailureIsRequeuedNotFailed() {
+            executor = new AgentJobExecutor(
+                AGENT_PROPS,
+                jobRepository,
+                configRepository,
+                handlerRegistry,
+                practiceAgent,
+                sandboxManager,
+                sandboxExecutor,
+                transactionTemplate,
+                objectMapper,
+                meterRegistry,
+                usageRecorder,
+                llmBudgetService,
+                Optional.empty(),
+                Optional.of(workerProps("infra-retry-worker"))
+            );
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
+            when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(
+                jobRepository.requeueOrphan(
+                    eq(jobId),
+                    eq("infra-retry-worker"),
+                    eq(AGENT_PROPS.maxRetries()),
+                    any(),
+                    any(),
+                    any()
+                )
+            ).thenReturn(1);
+
+            setupFullExecutionWithException(
+                new de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException("image pull failed")
+            );
+
+            executor.processJob(jobId);
+
+            verify(jobRepository).requeueOrphan(
+                eq(jobId),
+                eq("infra-retry-worker"),
+                eq(AGENT_PROPS.maxRetries()),
+                any(),
+                any(),
+                any()
+            );
+            // Never falls through to a terminal FAILED write when the requeue CAS won.
+            verify(jobRepository, never()).transitionStatus(any(), eq(AgentJobStatus.FAILED), any(), any(), any());
+            verify(jobRepository, never()).transitionStatusOwnedBy(
+                any(),
+                eq(AgentJobStatus.FAILED),
+                any(),
+                any(),
+                any(),
+                any()
+            );
+        }
+
+        @Test
+        @DisplayName(
+            "a classified infra failure falls through to FAILED when the requeue CAS loses (retry cap exhausted)"
+        )
+        void infraFailureFallsThroughToFailedWhenRequeueLoses() {
+            executor = new AgentJobExecutor(
+                AGENT_PROPS,
+                jobRepository,
+                configRepository,
+                handlerRegistry,
+                practiceAgent,
+                sandboxManager,
+                sandboxExecutor,
+                transactionTemplate,
+                objectMapper,
+                meterRegistry,
+                usageRecorder,
+                llmBudgetService,
+                Optional.empty(),
+                Optional.of(workerProps("infra-retry-worker-2"))
+            );
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
+            when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(jobRepository.requeueOrphan(any(), any(), anyInt(), any(), any(), any())).thenReturn(0);
+            when(
+                jobRepository.transitionStatusOwnedBy(any(), eq(AgentJobStatus.FAILED), any(), any(), any(), any())
+            ).thenReturn(1);
+
+            setupFullExecutionWithException(
+                new de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException("image pull failed")
+            );
+
+            executor.processJob(jobId);
+
+            verify(jobRepository).transitionStatusOwnedBy(
+                any(),
+                eq(AgentJobStatus.FAILED),
+                any(),
+                any(),
+                any(),
+                eq("infra-retry-worker-2")
+            );
+        }
+
+        @Test
+        @DisplayName("an unclassified exception still fails immediately, without attempting a requeue")
+        void unclassifiedExceptionNeverAttemptsRequeue() {
+            executor = new AgentJobExecutor(
+                AGENT_PROPS,
+                jobRepository,
+                configRepository,
+                handlerRegistry,
+                practiceAgent,
+                sandboxManager,
+                sandboxExecutor,
+                transactionTemplate,
+                objectMapper,
+                meterRegistry,
+                usageRecorder,
+                llmBudgetService,
+                Optional.empty(),
+                Optional.of(workerProps("infra-retry-worker-3"))
+            );
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
+            when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(
+                jobRepository.transitionStatusOwnedBy(any(), eq(AgentJobStatus.FAILED), any(), any(), any(), any())
+            ).thenReturn(1);
+
+            setupFullExecutionWithException(new IllegalStateException("unrecognised failure"));
+
+            executor.processJob(jobId);
+
+            verify(jobRepository, never()).requeueOrphan(any(), any(), anyInt(), any(), any(), any());
+            verify(jobRepository).transitionStatusOwnedBy(
+                any(),
+                eq(AgentJobStatus.FAILED),
+                any(),
+                any(),
+                any(),
+                eq("infra-retry-worker-3")
+            );
+        }
+    }
+
     /**
      * #1368 fix wave: a job that started executing (past claim+RUNNING) but ends with no
      * parseable usage must still leave a ledger trace — an UNPRICED entry, so the month turns
@@ -847,7 +1037,15 @@ class AgentJobExecutorTest extends BaseUnitTest {
         @Test
         @DisplayName("capacity is bounded by claimBatchSize even when the pool has more room")
         void capacityIsBoundedByClaimBatchSize() {
-            AgentProperties smallBatch = new AgentProperties(true, Duration.ofSeconds(1), 2, 5, Duration.ofSeconds(25));
+            AgentProperties smallBatch = new AgentProperties(
+                true,
+                Duration.ofSeconds(1),
+                2,
+                5,
+                Duration.ofSeconds(25),
+                Duration.ofDays(14),
+                Duration.ofDays(90)
+            );
             de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerCapacityState capacityState =
                 new de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerCapacityState(
                     new WorkerProperties(
@@ -976,7 +1174,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             assertThat(claimed).isTrue(); // claim itself won; dispatch was rejected afterwards
             verify(jobRepository).requeueRejectedClaim(jobId, "rejecting-worker");
-            verify(jobRepository, never()).requeueOrphan(any(), any(), anyInt());
+            verify(jobRepository, never()).requeueOrphan(any(), any(), anyInt(), any(), any(), any());
             // The claimed job must not still be tracked as locally running / holding capacity.
             verify(sandboxManager, never()).execute(any());
         }
@@ -1058,12 +1256,28 @@ class AgentJobExecutorTest extends BaseUnitTest {
             );
             addToLocalRunningJobs(executor, jobId);
 
-            when(jobRepository.requeueOrphan(jobId, "draining-worker", AGENT_PROPS.maxRetries())).thenReturn(1);
+            when(
+                jobRepository.requeueOrphan(
+                    eq(jobId),
+                    eq("draining-worker"),
+                    eq(AGENT_PROPS.maxRetries()),
+                    any(),
+                    any(),
+                    any()
+                )
+            ).thenReturn(1);
             when(jobRepository.findByIdWithWorkspace(jobId)).thenReturn(Optional.of(job));
 
             executor.cancelInFlight(AgentJobCancellationReason.DRAIN_GRACEFUL);
 
-            verify(jobRepository).requeueOrphan(jobId, "draining-worker", AGENT_PROPS.maxRetries());
+            verify(jobRepository).requeueOrphan(
+                eq(jobId),
+                eq("draining-worker"),
+                eq(AGENT_PROPS.maxRetries()),
+                any(),
+                any(),
+                any()
+            );
             verify(jobRepository, never()).transitionToCancelledOwnedBy(any(), any(), any(), any(), any(), any());
             verify(jobRepository, never()).transitionToCancelled(any(), any(), any(), any(), any());
             verify(sandboxManager).cancel(jobId);
@@ -1092,7 +1306,16 @@ class AgentJobExecutorTest extends BaseUnitTest {
             );
             addToLocalRunningJobs(executor, jobId);
 
-            when(jobRepository.requeueOrphan(jobId, "draining-worker", AGENT_PROPS.maxRetries())).thenReturn(0);
+            when(
+                jobRepository.requeueOrphan(
+                    eq(jobId),
+                    eq("draining-worker"),
+                    eq(AGENT_PROPS.maxRetries()),
+                    any(),
+                    any(),
+                    any()
+                )
+            ).thenReturn(0);
             when(jobRepository.findByIdWithWorkspace(jobId)).thenReturn(Optional.of(job));
 
             executor.cancelInFlight(AgentJobCancellationReason.DRAIN_GRACEFUL);

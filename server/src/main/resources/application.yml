@@ -454,6 +454,10 @@ hephaestus:
         # instead of requeued again. Authoritative budget lives on agent_job.retry_count.
         max-retries: ${AGENT_MAX_RETRIES:5}
         heartbeat-interval: 25s
+        # Retention (#1368 hardening): AgentJobRetentionService. payload-retention strips container_logs/
+        # output to NULL past this age; row-retention deletes the whole terminal row past this age.
+        payload-retention: ${AGENT_PAYLOAD_RETENTION:P14D}
+        row-retention: ${AGENT_ROW_RETENTION:P90D}
         # Dev convenience: seed one workspace model at startup (off by default). See docker/.env.example.
         default-config:
             enabled: ${AGENT_DEFAULT_CONFIG_ENABLED:false}

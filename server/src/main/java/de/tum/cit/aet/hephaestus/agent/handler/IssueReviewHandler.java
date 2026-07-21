@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -210,6 +211,11 @@ public class IssueReviewHandler implements JobTypeHandler {
             whyBySlug
         );
         postIssueNote(job, delivery);
+    }
+
+    @Override
+    public Optional<String> findExistingDelivery(AgentJob job) {
+        return commentPoster.findExistingSummaryComment(job);
     }
 
     /**

@@ -132,3 +132,59 @@ Option 2. The agent job queue is delivered by polling `agent_job` directly:
 Worker replica count grows to where polling load on `agent_job` becomes measurable against the
 database's own budget; or a push-based wakeup (e.g. `LISTEN`/`NOTIFY`) becomes worth the added
 complexity to shave the poll-interval latency off job start.
+
+## Hardening (2026-07-21)
+
+A pressure test against the OSS queue field (Oban, River, pg-boss, Graphile Worker, Solid Queue,
+good_job, Que) confirmed the design above — SKIP LOCKED claim, partial indexes, worker fencing,
+retry cap in SQL, pure polling at this scale — matches or beats free-tier equivalents. It also
+surfaced concrete gaps, closed here:
+
+- **Retention.** `agent_job` had no pruning — 10k jobs/day is ~3.65M rows/year, each carrying up to
+  64KB of `container_logs`. `AgentJobRetentionService` now runs two batched passes (`AGENT_PAYLOAD_RETENTION`,
+  default 14 days: strip `container_logs`/`output` to `NULL`; `AGENT_ROW_RETENTION`, default 90
+  days: delete the row outright), plus autovacuum tuning on `agent_job` and `worker_registry`
+  (`autovacuum_vacuum_scale_factor = 0`, an absolute threshold instead) — Oban's own documented
+  recommendation for a high-churn queue table.
+- **Backoff + `available_at`.** A requeued job (orphan recovery, worker drain, or a classified
+  infra failure — see below) used to become instantly reclaimable, so a crash-looping job burned
+  its whole retry budget in seconds. `agent_job.available_at` (backed by
+  `ix_agent_job_queued_available`) now gates the poll candidate query; `requeueOrphan` sets it to
+  `now() + backoff`, a quartic-with-jitter schedule (`AgentJobBackoff`) capped at 15 minutes. A
+  `CHECK` constraint on `status` closes the gap between the six documented `AgentJobStatus` values
+  and what the column actually enforced.
+- **Error classification.** Every execution failure used to become `FAILED` unconditionally,
+  including sandbox-infrastructure blips (Docker daemon unreachable, image pull failure) that have
+  nothing to do with the job itself. `AgentJobExecutor#handleExecutionFailure` now classifies
+  provably-infra failures (`SandboxException`, `IOException`) as retryable — requeued with backoff,
+  bounded by the same `retry_count < max-retries` cap every other requeue path uses — while
+  everything else (a non-zero agent exit, a parse/envelope-mismatch failure, an unclassified
+  exception) still fails immediately, exactly as before.
+- **Token rotation on requeue.** `requeueOrphan` used to leave the job's `job_token` unchanged, so a
+  zombie sandbox that was merely network-partitioned (not actually dead) could keep authenticating
+  against the LLM proxy once a sibling worker re-claimed the same row — both could spend against
+  the same job. The requeue now mints and stores a fresh token/hash pair; the old one is dead the
+  moment the CAS commits, whether or not the zombie ever notices.
+- **Delivery recovery + dedup.** A job stuck at `delivery_status = PENDING` (the executor crashed
+  between the terminal write and finishing delivery) was previously unrecoverable through the
+  operator-facing retry endpoint, which only accepts a `FAILED` source. `AgentJobZombieSweeper`
+  now sweeps PENDING deliveries older than ~10 minutes and re-attempts them through
+  `AgentJobLifecycleService#recoverStuckDelivery`, bounded by a `delivery_attempts` column (3
+  attempts, then FAILED). Before re-posting, the handler checks whether a comment carrying the
+  job's marker already landed (`JobTypeHandler#findExistingDelivery` /
+  `FeedbackChannel#findExistingSummary`) — closing the crash window where the comment posted but
+  the id was never persisted. Implemented for GitHub (reuses the existing `GetPullRequestComments`/
+  `GetIssueComments` queries); GitLab has no equivalent reusable listing query today, so it is left
+  unsupported — a recovery retry there falls through to a normal re-post rather than half-building
+  a bespoke discussions-pagination path for this hardening slice.
+- **Queue health metrics.** `agent.queue.depth`, `agent.queue.oldest_age_seconds` (the canonical
+  health signal — depth alone can't distinguish "briefly busy" from "stuck"), and
+  `agent.queue.running` are sampled every 15s by `AgentQueueHealthSampler`. `agent.job.claim.latency`
+  times claim minus `available_at`; `agent.job.execution.duration` is now tagged by `jobType` and
+  outcome `status` (previously untagged and only recorded on the success path). The poll loop
+  sleeps `pollInterval × (0.9–1.1)` instead of a fixed interval, so replicas configured identically
+  don't all poll in lockstep.
+
+Deliberately not built in this pass (documented, not forgotten): per-workspace fairness lanes,
+immutable per-attempt records, and a full multi-class decomposition of `AgentJobExecutor` — these
+ride with the replay/backfill epic (#1354), which is what actually needs them.

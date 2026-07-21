@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.handler.spi;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Domain-specific handler for a single {@link AgentJobType}.
@@ -65,6 +66,25 @@ public interface JobTypeHandler {
      */
     default void deliver(AgentJob job) {
         // No-op — overridden by handlers that need result delivery.
+    }
+
+    /**
+     * Best-effort dedup check for delivery recovery (#1368 hardening): has a delivery for THIS job
+     * already landed at the provider, even though {@code deliveryCommentId} was never persisted? This
+     * covers the crash window between {@link #deliver} actually posting a comment and the caller
+     * persisting its id — without this check, a delivery-recovery retry (see
+     * {@code AgentJobZombieSweeper#recoverStuckDeliveries}) would blindly call {@link #deliver} again and
+     * post a duplicate.
+     *
+     * <p>Default "unknown" (empty) — a handler whose delivery channel supports searching for the
+     * embedded job marker overrides this; one that can't (or doesn't post externally at all, e.g.
+     * conversation review) leaves the default, and the caller falls through to a normal {@link #deliver}
+     * attempt exactly as before this existed.
+     *
+     * @return the existing delivery's external comment id if found; empty if not found OR unknown
+     */
+    default Optional<String> findExistingDelivery(AgentJob job) {
+        return Optional.empty();
     }
 
     /**

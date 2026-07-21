@@ -18,19 +18,34 @@ import org.junit.jupiter.api.Test;
  * are covered indirectly through the record's compact constructor / Bean Validation, exercised here
  * via direct construction since {@code @Validated}'s method-level validation only fires through a
  * Spring-managed proxy, not plain {@code new AgentProperties(...)}.
+ *
+ * <p>#1368 hardening adds {@code payloadRetention}/{@code rowRetention} — see the {@code Retention}
+ * nested class below.
  */
 class AgentPropertiesTest extends BaseUnitTest {
 
     private static final Duration VALID_POLL_INTERVAL = Duration.ofSeconds(1);
     private static final Duration VALID_HEARTBEAT_INTERVAL = Duration.ofSeconds(25);
+    private static final Duration VALID_PAYLOAD_RETENTION = Duration.ofDays(14);
+    private static final Duration VALID_ROW_RETENTION = Duration.ofDays(90);
 
     @Test
     @DisplayName("accepts the documented defaults")
     void acceptsDefaults() {
-        AgentProperties properties = new AgentProperties(false, VALID_POLL_INTERVAL, 5, 5, VALID_HEARTBEAT_INTERVAL);
+        AgentProperties properties = new AgentProperties(
+            false,
+            VALID_POLL_INTERVAL,
+            5,
+            5,
+            VALID_HEARTBEAT_INTERVAL,
+            VALID_PAYLOAD_RETENTION,
+            VALID_ROW_RETENTION
+        );
 
         assertThat(properties.pollInterval()).isEqualTo(VALID_POLL_INTERVAL);
         assertThat(properties.heartbeatInterval()).isEqualTo(VALID_HEARTBEAT_INTERVAL);
+        assertThat(properties.payloadRetention()).isEqualTo(VALID_PAYLOAD_RETENTION);
+        assertThat(properties.rowRetention()).isEqualTo(VALID_ROW_RETENTION);
     }
 
     @Test
@@ -41,7 +56,9 @@ class AgentPropertiesTest extends BaseUnitTest {
             AgentProperties.MIN_POLL_INTERVAL,
             5,
             5,
-            VALID_HEARTBEAT_INTERVAL
+            VALID_HEARTBEAT_INTERVAL,
+            VALID_PAYLOAD_RETENTION,
+            VALID_ROW_RETENTION
         );
 
         assertThat(properties.pollInterval()).isEqualTo(AgentProperties.MIN_POLL_INTERVAL);
@@ -50,7 +67,17 @@ class AgentPropertiesTest extends BaseUnitTest {
     @Test
     @DisplayName("rejects a poll-interval below the floor")
     void rejectsPollIntervalBelowFloor() {
-        assertThatThrownBy(() -> new AgentProperties(false, Duration.ofMillis(99), 5, 5, VALID_HEARTBEAT_INTERVAL))
+        assertThatThrownBy(() ->
+            new AgentProperties(
+                false,
+                Duration.ofMillis(99),
+                5,
+                5,
+                VALID_HEARTBEAT_INTERVAL,
+                VALID_PAYLOAD_RETENTION,
+                VALID_ROW_RETENTION
+            )
+        )
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("poll-interval");
     }
@@ -58,7 +85,17 @@ class AgentPropertiesTest extends BaseUnitTest {
     @Test
     @DisplayName("rejects a zero poll-interval — would busy-spin the poll loop")
     void rejectsZeroPollInterval() {
-        assertThatThrownBy(() -> new AgentProperties(false, Duration.ZERO, 5, 5, VALID_HEARTBEAT_INTERVAL))
+        assertThatThrownBy(() ->
+            new AgentProperties(
+                false,
+                Duration.ZERO,
+                5,
+                5,
+                VALID_HEARTBEAT_INTERVAL,
+                VALID_PAYLOAD_RETENTION,
+                VALID_ROW_RETENTION
+            )
+        )
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("poll-interval");
     }
@@ -66,7 +103,17 @@ class AgentPropertiesTest extends BaseUnitTest {
     @Test
     @DisplayName("rejects a negative poll-interval")
     void rejectsNegativePollInterval() {
-        assertThatThrownBy(() -> new AgentProperties(false, Duration.ofSeconds(-1), 5, 5, VALID_HEARTBEAT_INTERVAL))
+        assertThatThrownBy(() ->
+            new AgentProperties(
+                false,
+                Duration.ofSeconds(-1),
+                5,
+                5,
+                VALID_HEARTBEAT_INTERVAL,
+                VALID_PAYLOAD_RETENTION,
+                VALID_ROW_RETENTION
+            )
+        )
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("poll-interval");
     }
@@ -79,7 +126,9 @@ class AgentPropertiesTest extends BaseUnitTest {
             VALID_POLL_INTERVAL,
             5,
             5,
-            AgentProperties.MIN_HEARTBEAT_INTERVAL
+            AgentProperties.MIN_HEARTBEAT_INTERVAL,
+            VALID_PAYLOAD_RETENTION,
+            VALID_ROW_RETENTION
         );
 
         assertThat(properties.heartbeatInterval()).isEqualTo(AgentProperties.MIN_HEARTBEAT_INTERVAL);
@@ -88,7 +137,17 @@ class AgentPropertiesTest extends BaseUnitTest {
     @Test
     @DisplayName("rejects a sub-second heartbeat-interval")
     void rejectsSubSecondHeartbeatInterval() {
-        assertThatThrownBy(() -> new AgentProperties(false, VALID_POLL_INTERVAL, 5, 5, Duration.ofMillis(500)))
+        assertThatThrownBy(() ->
+            new AgentProperties(
+                false,
+                VALID_POLL_INTERVAL,
+                5,
+                5,
+                Duration.ofMillis(500),
+                VALID_PAYLOAD_RETENTION,
+                VALID_ROW_RETENTION
+            )
+        )
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("heartbeat-interval");
     }
@@ -96,8 +155,109 @@ class AgentPropertiesTest extends BaseUnitTest {
     @Test
     @DisplayName("zero max-retries is a valid 'no retries' policy")
     void zeroMaxRetriesIsValid() {
-        AgentProperties properties = new AgentProperties(false, VALID_POLL_INTERVAL, 5, 0, VALID_HEARTBEAT_INTERVAL);
+        AgentProperties properties = new AgentProperties(
+            false,
+            VALID_POLL_INTERVAL,
+            5,
+            0,
+            VALID_HEARTBEAT_INTERVAL,
+            VALID_PAYLOAD_RETENTION,
+            VALID_ROW_RETENTION
+        );
 
         assertThat(properties.maxRetries()).isZero();
+    }
+
+    /** #1368 hardening: payload-retention / row-retention validation. */
+    @org.junit.jupiter.api.Nested
+    @DisplayName("Retention bounds (#1368 hardening)")
+    class Retention {
+
+        @Test
+        @DisplayName("accepts the documented defaults (P14D / P90D)")
+        void acceptsDocumentedDefaults() {
+            AgentProperties properties = new AgentProperties(
+                false,
+                VALID_POLL_INTERVAL,
+                5,
+                5,
+                VALID_HEARTBEAT_INTERVAL,
+                Duration.ofDays(14),
+                Duration.ofDays(90)
+            );
+
+            assertThat(properties.payloadRetention()).isEqualTo(Duration.ofDays(14));
+            assertThat(properties.rowRetention()).isEqualTo(Duration.ofDays(90));
+        }
+
+        @Test
+        @DisplayName("rejects a zero payload-retention")
+        void rejectsZeroPayloadRetention() {
+            assertThatThrownBy(() ->
+                new AgentProperties(
+                    false,
+                    VALID_POLL_INTERVAL,
+                    5,
+                    5,
+                    VALID_HEARTBEAT_INTERVAL,
+                    Duration.ZERO,
+                    VALID_ROW_RETENTION
+                )
+            )
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("payload-retention");
+        }
+
+        @Test
+        @DisplayName("rejects a negative payload-retention")
+        void rejectsNegativePayloadRetention() {
+            assertThatThrownBy(() ->
+                new AgentProperties(
+                    false,
+                    VALID_POLL_INTERVAL,
+                    5,
+                    5,
+                    VALID_HEARTBEAT_INTERVAL,
+                    Duration.ofDays(-1),
+                    VALID_ROW_RETENTION
+                )
+            )
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("payload-retention");
+        }
+
+        @Test
+        @DisplayName("rejects row-retention shorter than payload-retention")
+        void rejectsRowRetentionShorterThanPayloadRetention() {
+            assertThatThrownBy(() ->
+                new AgentProperties(
+                    false,
+                    VALID_POLL_INTERVAL,
+                    5,
+                    5,
+                    VALID_HEARTBEAT_INTERVAL,
+                    Duration.ofDays(90),
+                    Duration.ofDays(14)
+                )
+            )
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("row-retention");
+        }
+
+        @Test
+        @DisplayName("accepts row-retention exactly equal to payload-retention")
+        void acceptsRowRetentionEqualToPayloadRetention() {
+            AgentProperties properties = new AgentProperties(
+                false,
+                VALID_POLL_INTERVAL,
+                5,
+                5,
+                VALID_HEARTBEAT_INTERVAL,
+                Duration.ofDays(30),
+                Duration.ofDays(30)
+            );
+
+            assertThat(properties.rowRetention()).isEqualTo(properties.payloadRetention());
+        }
     }
 }

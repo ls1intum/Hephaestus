@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
+import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
@@ -15,6 +16,7 @@ import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerCapacityState;
 import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxCancelledException;
+import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxSpec;
@@ -29,6 +31,7 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import jakarta.annotation.PreDestroy;
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
@@ -41,6 +44,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -114,8 +118,9 @@ public class AgentJobExecutor {
     private final LlmUsageRecorder usageRecorder;
     private final LlmBudgetService llmBudgetService;
 
-    private final Timer executionDuration;
     private final Counter concurrencyRejected;
+    private final Timer claimLatency;
+    private final Counter infraRetryRequeued;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private volatile Thread pollThread;
     /**
@@ -176,11 +181,14 @@ public class AgentJobExecutor {
         this.workerProperties = workerProperties;
         this.workerId = workerProperties.map(WorkerProperties::resolvedWorkerId).orElse(null);
 
-        this.executionDuration = Timer.builder("agent.job.execution.duration")
-            .description("Total duration of agent job execution")
-            .register(meterRegistry);
         this.concurrencyRejected = Counter.builder("agent.job.concurrency.rejected")
             .description("Jobs rejected due to concurrency limits")
+            .register(meterRegistry);
+        this.claimLatency = Timer.builder("agent.job.claim.latency")
+            .description("Time between a job becoming available (available_at) and being claimed")
+            .register(meterRegistry);
+        this.infraRetryRequeued = Counter.builder("agent.job.infra.retry.requeued")
+            .description("Jobs requeued (not failed) after a classified sandbox-infrastructure failure")
             .register(meterRegistry);
     }
 
@@ -292,8 +300,9 @@ public class AgentJobExecutor {
             try {
                 boolean requeued = false;
                 if (workerId != null) {
+                    int currentRetryCount = jobRepository.findById(jobId).map(AgentJob::getRetryCount).orElse(0);
                     Integer updated = transactionTemplate.execute(status ->
-                        jobRepository.requeueOrphan(jobId, workerId, agentProperties.maxRetries())
+                        requeueOrphanWithRotation(jobId, workerId, currentRetryCount)
                     );
                     requeued = updated != null && updated > 0;
                 }
@@ -453,9 +462,18 @@ public class AgentJobExecutor {
         return Integer.MAX_VALUE;
     }
 
+    /**
+     * Sleeps {@code pollInterval * (0.9 .. 1.1)} rather than a fixed interval (#1368 hardening): with
+     * several replicas all configured with the same {@code pollInterval}, a fixed sleep tends to
+     * synchronize their poll timing (they started within milliseconds of each other and every sleep is
+     * identical), so every poll tends to land in the same instant — amplifying claim contention right
+     * when the queue actually has work. ±10% jitter decorrelates replicas over a few cycles.
+     */
     private void sleepPollInterval() {
         try {
-            Thread.sleep(agentProperties.pollInterval().toMillis());
+            double jitterMultiplier = 0.9 + (ThreadLocalRandom.current().nextDouble() * 0.2);
+            long millis = Math.round(agentProperties.pollInterval().toMillis() * jitterMultiplier);
+            Thread.sleep(millis);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
@@ -605,29 +623,50 @@ public class AgentJobExecutor {
         MDC.put(MDC_JOB_ID, jobId.toString());
         AgentJob job = claim.job;
         MDC.put(MDC_JOB_TYPE, job.getJobType().name());
+        Instant startTime = Instant.now();
+        // Outcome for the tagged agent.job.execution.duration metric (#1368 hardening) — set in every
+        // branch below, including the requeued-not-failed infra-retry outcome, so the metric's status
+        // tag distinguishes "requeued for retry" from a terminal FAILED.
+        String metricOutcome = "unknown";
         try {
             log.info("Executing agent job: jobId={}, jobType={}", jobId, job.getJobType());
-            Instant startTime = Instant.now();
 
             SandboxResult result = prepareAndExecute(jobId, job, claim.snapshot);
             AgentResult agentResult = practiceAgent.parseResult(result);
 
             JobTypeHandler handler = handlerRegistry.getHandler(job.getJobType());
-            completeJob(jobId, agentResult, result, handler, job);
+            AgentJobStatus terminalStatus = completeJob(jobId, agentResult, result, handler, job);
+            metricOutcome = terminalStatus != null ? terminalStatus.name() : "unknown";
 
-            Duration duration = Duration.between(startTime, Instant.now());
-            executionDuration.record(duration);
-            log.info("Agent job completed: jobId={}, duration={}", jobId, duration);
+            log.info("Agent job completed: jobId={}, duration={}", jobId, Duration.between(startTime, Instant.now()));
         } catch (SandboxCancelledException e) {
             handleCancellation(jobId);
+            metricOutcome = AgentJobStatus.CANCELLED.name();
         } catch (Exception e) {
-            handleExecutionFailure(jobId, e);
+            metricOutcome = handleExecutionFailure(jobId, job, e);
         } finally {
+            recordExecutionDuration(job.getJobType(), metricOutcome, Duration.between(startTime, Instant.now()));
             releaseCapacity();
             localRunningJobs.remove(jobId);
             MDC.remove(MDC_JOB_ID);
             MDC.remove(MDC_JOB_TYPE);
         }
+    }
+
+    /**
+     * Records {@code agent.job.execution.duration} tagged by job type and outcome (#1368 hardening —
+     * previously untagged and only recorded on the success path, silently omitting every failure/
+     * cancellation/timeout duration from the metric). Tag cardinality is bounded: {@code jobType} is a
+     * small closed enum, {@code status} is a terminal {@link AgentJobStatus} name plus the synthetic
+     * {@code "requeued"} (infra-retry, not yet terminal) and {@code "unknown"} (defensive fallback).
+     */
+    private void recordExecutionDuration(AgentJobType jobType, String outcome, Duration duration) {
+        Timer.builder("agent.job.execution.duration")
+            .description("Total duration of agent job execution")
+            .tag("jobType", jobType != null ? jobType.name() : "unknown")
+            .tag("status", outcome)
+            .register(meterRegistry)
+            .record(duration);
     }
 
     /**
@@ -816,8 +855,35 @@ public class AgentJobExecutor {
         }
     }
 
-    /** Handle generic execution failures — transitions the job to FAILED. */
-    private void handleExecutionFailure(UUID jobId, Exception e) {
+    /**
+     * Handle execution failures (#1368 hardening — error classification).
+     *
+     * <p>Everything used to become {@link AgentJobStatus#FAILED} unconditionally, so a transient
+     * sandbox-infrastructure blip (Docker daemon unreachable, image pull failed, network partition to
+     * the registry) burned the job's whole retry budget on a failure that had nothing to do with the
+     * job itself. Now: only {@link SandboxException} (and its documented contract — "wraps docker-java
+     * exceptions and other infrastructure errors", see its javadoc) or a bare {@link IOException} —
+     * i.e. errors PROVABLY caused by sandbox/container/network infrastructure rather than the agent's
+     * own run — are treated as retryable: the job is requeued via the same worker-fenced CAS orphan
+     * recovery uses ({@link AgentJobRepository#requeueOrphan}, with a backoff-computed {@code
+     * available_at} and a rotated job token), bounded by {@code retry_count < max-retries} same as
+     * every other requeue path. Once that cap is hit, or the CAS loses the fence (a concurrent
+     * cancel/requeue already moved the job), it falls through to the terminal FAILED write below —
+     * exactly the pre-#1368-hardening behaviour.
+     *
+     * <p>Deliberately conservative: everything else — a non-zero agent exit already handled by {@link
+     * #determineTerminalStatus}, a parse/envelope-mismatch failure, an unrecognised {@code
+     * RuntimeException} from deep in the pipeline — stays FAILED immediately, exactly as before. A
+     * false-positive "infra" classification would let a genuinely broken job (e.g. a permanently
+     * misconfigured LLM endpoint) silently retry {@code max-retries} times before finally failing,
+     * burning real time and (if it gets far enough to spend) budget; under-classifying only costs one
+     * job's retry budget on what's usually a self-healing blip, and is the safe direction to err in.
+     *
+     * @return the outcome to record on {@code agent.job.execution.duration}'s {@code status} tag:
+     *     {@code "REQUEUED"} when this classified-as-infra failure was successfully requeued for
+     *     retry, or the terminal status name ({@code "FAILED"}) otherwise
+     */
+    private String handleExecutionFailure(UUID jobId, AgentJob job, Exception e) {
         if (e instanceof InterruptedException) {
             Thread.currentThread().interrupt();
         }
@@ -825,8 +891,62 @@ public class AgentJobExecutor {
         String errorMessage = truncateErrorMessage(e.getMessage());
         log.error("Agent job failed: jobId={}, error={}", jobId, errorMessage, e);
 
+        if (workerId != null && isRetryableInfraFailure(e)) {
+            int currentRetryCount = job.getRetryCount();
+            Integer updated = transactionTemplate.execute(status ->
+                requeueOrphanWithRotation(jobId, workerId, currentRetryCount)
+            );
+            if (updated != null && updated > 0) {
+                infraRetryRequeued.increment();
+                log.warn(
+                    "Requeuing job {} after classified sandbox-infrastructure failure (attempt {}): {}",
+                    jobId,
+                    currentRetryCount + 1,
+                    errorMessage
+                );
+                return "REQUEUED";
+            }
+            log.warn(
+                "Job {} hit an infra failure but could not be requeued (retry cap exhausted or fence lost) — failing terminally",
+                jobId
+            );
+        }
+
         transactionTemplate.executeWithoutResult(status ->
             transitionTerminal(jobId, AgentJobStatus.FAILED, Instant.now(), errorMessage)
+        );
+        return AgentJobStatus.FAILED.name();
+    }
+
+    /**
+     * Provably-infra classification (#1368 hardening) — see {@link #handleExecutionFailure} javadoc for
+     * the reasoning. Package-private for testability.
+     */
+    static boolean isRetryableInfraFailure(Exception e) {
+        return (e instanceof SandboxException && !(e instanceof SandboxCancelledException)) || e instanceof IOException;
+    }
+
+    /**
+     * Mint a fresh backoff + rotated token and requeue via {@link AgentJobRepository#requeueOrphan}.
+     * Shared by {@link #cancelInFlight} (drain requeue) and {@link #handleExecutionFailure} (infra-retry
+     * requeue) — both requeue a job THIS worker currently owns, fenced on {@code workerId}.
+     *
+     * @param currentRetryCount the job's {@code retry_count} as last read by the caller (used only to
+     *     size the backoff — the UPDATE's own {@code retry_count < max-retries} WHERE clause is the
+     *     authoritative cap, so a stale read here cannot let a job requeue past the cap)
+     */
+    private int requeueOrphanWithRotation(UUID jobId, String owningWorkerId, int currentRetryCount) {
+        int attemptNumber = currentRetryCount + 1;
+        Instant availableAt = Instant.now().plus(AgentJobBackoff.compute(attemptNumber));
+        String newToken = AgentJob.generateJobToken();
+        String newTokenHash = AgentJob.computeTokenHash(newToken);
+        return jobRepository.requeueOrphan(
+            jobId,
+            owningWorkerId,
+            agentProperties.maxRetries(),
+            availableAt,
+            newToken,
+            newTokenHash
         );
     }
 
@@ -911,8 +1031,15 @@ public class AgentJobExecutor {
             }
 
             ConfigSnapshot snapshot = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
+            Instant claimedAt = Instant.now();
+            // Claim latency (#1368 hardening): time between eligibility and claim — the canonical
+            // queue-health signal (judoscale) alongside agent.queue.oldest_age_seconds. availableAt is
+            // null only for rows written before this column existed; skip rather than record garbage.
+            if (job.getAvailableAt() != null && !job.getAvailableAt().isAfter(claimedAt)) {
+                claimLatency.record(Duration.between(job.getAvailableAt(), claimedAt));
+            }
             job.setStatus(AgentJobStatus.RUNNING);
-            job.setStartedAt(Instant.now());
+            job.setStartedAt(claimedAt);
             job.setWorkerId(workerId); // owner for cancel routing, orphan recovery, and terminal-write fencing (#1138)
             jobRepository.save(job);
 
@@ -946,7 +1073,7 @@ public class AgentJobExecutor {
 
     // Complete: micro-transaction #2
 
-    private void completeJob(
+    private AgentJobStatus completeJob(
         UUID jobId,
         AgentResult agentResult,
         SandboxResult sandboxResult,
@@ -962,6 +1089,7 @@ public class AgentJobExecutor {
         } else {
             log.info("Skipping delivery: job no longer owned/RUNNING (requeued or cancelled): jobId={}", jobId);
         }
+        return terminalStatus;
     }
 
     /**
