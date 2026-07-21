@@ -8,9 +8,10 @@ services:
   # ─────────────────────────────────────────────────────────────────────────────
   webhook-server:
     image: "ghcr.io/ls1intum/hephaestus/application-server:${IMAGE_TAG}"
-    # Bounds heap sizing to this container; without it the JVM targets host RAM and co-located
-    # services oversubscribe and swap. Webhook only receives and republishes, so its heap is small.
-    mem_limit: ${WEBHOOK_SERVER_MEM_LIMIT:-1g}
+    # Bounds heap sizing to this container so co-located JVMs don't oversubscribe host RAM.
+    # Must fit the Spring classpath-scan startup spike (well above the small steady footprint),
+    # or the JVM OOMs during boot.
+    mem_limit: ${WEBHOOK_SERVER_MEM_LIMIT:-2g}
     expose:
       - "8080"
     environment:
@@ -20,6 +21,10 @@ services:
       HEPHAESTUS_RUNTIME_SERVER_ENABLED: "false"
       HEPHAESTUS_RUNTIME_WORKER_ENABLED: "false"
       SPRING_LIQUIBASE_ENABLED: "false"
+      # application-prod.yml enables Tomcat file access logging to /var/log/hephaestus, which the
+      # image doesn't create and the core stack gives no writable volume — the access-log valve then
+      # fails the boot. Requests are already logged by Traefik and to stdout, so disable the file valve.
+      SERVER_TOMCAT_ACCESSLOG_ENABLED: "false"
       # NATS — reuses the existing `natsConnection` bean to publish inbound events.
       HEPHAESTUS_SYNC_NATS_ENABLED: "true"
       HEPHAESTUS_SYNC_NATS_SERVER: "nats://nats-server:4222"
@@ -137,7 +142,7 @@ networks:
     driver: bridge
 
 volumes:
-  nats-data: 
+  nats-data:
 
 configs:
   nats-server.conf:
