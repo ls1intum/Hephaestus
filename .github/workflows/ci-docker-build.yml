@@ -36,6 +36,11 @@ jobs:
       docker-file: "./webapp/Dockerfile"
       docker-context: "."
       registry: "ghcr.io"
+      # Bake commit + branch (the Dockerfile's ARGs) so the footer build strip is
+      # populated on CI-built deploys; Coolify sets these itself for previews.
+      build-args: |
+        SOURCE_COMMIT=${{ github.sha }}
+        COOLIFY_BRANCH=${{ github.ref_name }}
       # amd64-only on PRs (main/release build both arches). See reusable-docker-build.yml.
       single-arch: ${{ github.event_name == 'pull_request' }}
       tags: |

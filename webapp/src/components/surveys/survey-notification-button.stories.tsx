@@ -73,6 +73,8 @@ export const FullPagePreview: Story = {
 				<div className="min-h-screen bg-background">
 					<Header
 						version="demo"
+						environmentName="Local"
+						isProduction={false}
 						isAuthenticated
 						isLoading={false}
 						name="Demo"

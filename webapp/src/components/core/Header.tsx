@@ -5,6 +5,7 @@ import { SignInButtons } from "@/components/auth/SignInButtons";
 import { ModeToggle } from "@/components/core/ModeToggle";
 import { SurveyNotificationButton } from "@/components/surveys/survey-notification-button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -17,12 +18,24 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getInitials } from "@/lib/avatar";
+import { cn } from "@/lib/utils";
+import { type EnvironmentTone, resolveHeaderBadge } from "@/lib/version";
+
+const ENV_DOT: Record<EnvironmentTone, string> = {
+	staging: "bg-amber-500 dark:bg-amber-400",
+	preview: "bg-violet-500 dark:bg-violet-400",
+	local: "bg-muted-foreground/50",
+};
 
 export interface HeaderProps {
 	/** Sidebar trigger button component */
 	sidebarTrigger?: React.ReactNode;
-	/** Application version displayed beside logo */
+	/** Application version displayed beside logo (used in production) */
 	version: string;
+	/** Friendly deployment environment name, e.g. "Staging" */
+	environmentName: string;
+	/** Whether this is the production deployment */
+	isProduction: boolean;
 	/** User authentication state */
 	isAuthenticated: boolean;
 	/** Whether the authentication is currently loading */
@@ -48,6 +61,8 @@ export interface HeaderProps {
 export default function Header({
 	sidebarTrigger,
 	version,
+	environmentName,
+	isProduction,
 	isAuthenticated,
 	isLoading,
 	name,
@@ -59,6 +74,7 @@ export default function Header({
 }: HeaderProps) {
 	const hasWorkspace = Boolean(workspaceSlug);
 	const hasUsername = Boolean(username);
+	const badge = resolveHeaderBadge(version, environmentName, isProduction);
 
 	return (
 		<header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 justify-between">
@@ -80,27 +96,37 @@ export default function Header({
 							<span className="text-xl font-semibold">Hephaestus</span>
 						</Link>
 					)}
-					{/* Version badge - clickable for production releases */}
-					{version !== "DEV" && version !== "preview" ? (
+					{/* Release version in production; environment pill elsewhere. */}
+					{badge.kind === "release" ? (
 						<Tooltip>
 							<TooltipTrigger
 								render={
 									<a
-										href={`https://github.com/ls1intum/Hephaestus/releases/tag/v${version}`}
+										href={badge.href}
 										target="_blank"
 										rel="noopener noreferrer"
-										aria-label={`View release v${version}`}
+										aria-label={badge.ariaLabel}
 										className="flex items-center gap-1 text-xs font-mono mt-1 text-muted-foreground hover:text-foreground transition-colors"
 									/>
 								}
 							>
 								<TagIcon size={12} />
-								<span>v{version}</span>
+								<span>{badge.label}</span>
 							</TooltipTrigger>
-							<TooltipContent>View release notes</TooltipContent>
+							<TooltipContent>{badge.tooltip}</TooltipContent>
 						</Tooltip>
 					) : (
-						<span className="text-xs font-mono mt-1 text-muted-foreground">{version}</span>
+						<Tooltip>
+							<TooltipTrigger
+								render={
+									<Badge variant="outline" className="gap-1.5 font-normal text-muted-foreground" />
+								}
+							>
+								<span className={cn("size-1.5 rounded-full", ENV_DOT[badge.tone])} />
+								{badge.label}
+							</TooltipTrigger>
+							<TooltipContent>{badge.label} environment</TooltipContent>
+						</Tooltip>
 					)}
 				</div>
 			</div>
