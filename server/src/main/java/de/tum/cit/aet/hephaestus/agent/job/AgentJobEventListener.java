@@ -45,10 +45,10 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * webhook thread, and {@code runForAllUsers=true} skips the role check entirely.
  * See {@link PracticeReviewDetectionGate} for the standalone contract.
  *
- * <p>Only active when the NATS submitter is available.
+ * <p>Only active when the agent job queue is enabled.
  */
 @Component
-@ConditionalOnProperty(prefix = "hephaestus.agent.nats", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(prefix = "hephaestus.agent", name = "enabled", havingValue = "true")
 public class AgentJobEventListener {
 
     private static final Logger log = LoggerFactory.getLogger(AgentJobEventListener.class);

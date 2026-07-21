@@ -29,7 +29,6 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -52,7 +51,6 @@ public class AgentJobService {
     private final ConnectionService connectionService;
     private final JobTypeHandlerRegistry handlerRegistry;
     private final ObjectMapper objectMapper;
-    private final ApplicationEventPublisher eventPublisher;
     private final TransactionTemplate transactionTemplate;
     private final PracticeReviewProperties reviewProperties;
     private final LlmBudgetService llmBudgetService;
@@ -66,7 +64,6 @@ public class AgentJobService {
         ConnectionService connectionService,
         JobTypeHandlerRegistry handlerRegistry,
         ObjectMapper objectMapper,
-        ApplicationEventPublisher eventPublisher,
         TransactionTemplate transactionTemplate,
         PracticeReviewProperties reviewProperties,
         LlmBudgetService llmBudgetService,
@@ -79,7 +76,6 @@ public class AgentJobService {
         this.connectionService = connectionService;
         this.handlerRegistry = handlerRegistry;
         this.objectMapper = objectMapper;
-        this.eventPublisher = eventPublisher;
         this.transactionTemplate = transactionTemplate;
         this.reviewProperties = reviewProperties;
         this.llmBudgetService = llmBudgetService;
@@ -345,8 +341,8 @@ public class AgentJobService {
                 workspace.getId()
             );
 
-            // Publish event — picked up by AgentJobSubmitter after transaction commits
-            eventPublisher.publishEvent(new AgentJobCreatedEvent(job.getId(), workspace.getId()));
+            // #1368 NATS→Postgres cutover: the QUEUED insert above IS the enqueue — AgentJobExecutor's
+            // poll loop discovers it directly from the agent_job table, no publish event needed.
 
             return job;
         });

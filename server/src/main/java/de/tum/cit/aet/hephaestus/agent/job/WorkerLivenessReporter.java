@@ -35,7 +35,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * so a freshly-claimed job is never seen as orphaned.
  */
 @Component
-@ConditionalOnExpression("${hephaestus.agent.nats.enabled:false} and ${" + RuntimeRole.WORKER_PROPERTY + ":true}")
+@ConditionalOnExpression(
+    "${" + RuntimeRole.AGENT_ENABLED_PROPERTY + ":false} and ${" + RuntimeRole.WORKER_PROPERTY + ":true}"
+)
 @WorkspaceAgnostic("Fleet-wide worker liveness; not workspace-scoped.")
 public class WorkerLivenessReporter {
 
@@ -53,13 +55,13 @@ public class WorkerLivenessReporter {
     public WorkerLivenessReporter(
         WorkerRegistryRepository repository,
         TransactionTemplate transactionTemplate,
-        AgentNatsProperties natsProperties,
+        AgentProperties agentProperties,
         WorkerProperties workerProperties,
         MeterRegistry meterRegistry
     ) {
         this.repository = repository;
         this.transactionTemplate = transactionTemplate;
-        this.interval = natsProperties.heartbeatInterval();
+        this.interval = agentProperties.heartbeatInterval();
         this.workerId = workerProperties.resolvedWorkerId();
         this.heartbeatFailures = Counter.builder("worker.liveness.heartbeat.failures")
             .description("Failed worker_registry heartbeat writes (a stalled reporter risks false orphaning)")

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
@@ -34,17 +35,13 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import io.nats.client.Connection;
-import io.nats.client.Message;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Consumer;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -67,9 +64,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
     @Mock
     private LlmBudgetService llmBudgetService;
-
-    @Mock
-    private Connection natsConnection;
 
     @Mock
     private AgentJobRepository jobRepository;
@@ -100,14 +94,10 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
     private AgentJobExecutor executor;
 
-    private static final AgentNatsProperties NATS_PROPS = new AgentNatsProperties(
+    private static final AgentProperties AGENT_PROPS = new AgentProperties(
         true,
-        "nats://localhost:4222",
-        "AGENT",
-        "hephaestus-agent-executor",
-        Duration.ofMinutes(70),
+        Duration.ofSeconds(1),
         5,
-        16,
         5,
         Duration.ofSeconds(25)
     );
@@ -122,8 +112,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
         meterRegistry = new SimpleMeterRegistry();
 
         executor = new AgentJobExecutor(
-            natsConnection,
-            NATS_PROPS,
+            AGENT_PROPS,
             jobRepository,
             configRepository,
             handlerRegistry,
@@ -189,7 +178,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
         lenient()
             .doAnswer(inv -> {
                 @SuppressWarnings("unchecked")
-                Consumer<TransactionStatus> callback = inv.getArgument(0);
+                java.util.function.Consumer<TransactionStatus> callback = inv.getArgument(0);
                 callback.accept(mock(TransactionStatus.class));
                 return null;
             })
@@ -199,12 +188,18 @@ class AgentJobExecutorTest extends BaseUnitTest {
         // readOnlyTx in prepareAndExecute is built from getTransactionManager(); stub the bridge.
         lenient().when(transactionTemplate.getTransactionManager()).thenReturn(transactionManager);
         lenient().when(transactionManager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
-    }
 
-    private Message createMessage(UUID id) {
-        Message msg = mock(Message.class);
-        when(msg.getData()).thenReturn(id.toString().getBytes(StandardCharsets.UTF_8));
-        return msg;
+        // Dispatch of a claimed job's execution runs on the sandbox executor; run it inline so
+        // processJob() is synchronously observable, mirroring how the old NATS-era executeJob() ran
+        // entirely on the calling (test) thread.
+        lenient()
+            .doAnswer(inv -> {
+                Runnable task = inv.getArgument(0);
+                task.run();
+                return null;
+            })
+            .when(sandboxExecutor)
+            .execute(any());
     }
 
     private static Workspace workspaceStub() {
@@ -256,8 +251,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
         void doesNotDeliverWhenFencedOut() {
             // Worker has identity "test-worker" → terminal writes are fenced to the owner.
             executor = new AgentJobExecutor(
-                natsConnection,
-                NATS_PROPS,
+                AGENT_PROPS,
                 jobRepository,
                 configRepository,
                 handlerRegistry,
@@ -273,7 +267,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 Optional.of(workerProps("test-worker"))
             );
 
-            Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
@@ -282,7 +275,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             // Fence loses: another worker owns the job now (it was orphan-requeued mid-execution).
             when(jobRepository.transitionStatusOwnedBy(any(), any(), any(), any(), any(), any())).thenReturn(0);
 
-            executor.executeJob(msg);
+            executor.processJob(jobId);
 
             // The job is no longer ours — we must not double-deliver the sibling's findings.
             verify(handler, never()).deliver(any());
@@ -294,33 +287,31 @@ class AgentJobExecutorTest extends BaseUnitTest {
     class ClaimPhase {
 
         @Test
-        void shouldAckWhenSkipLockedReturnsEmpty() {
-            Message msg = createMessage(jobId);
+        void returnsFalseAndNeverExecutesWhenSkipLockedReturnsEmpty() {
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.empty());
 
-            executor.executeJob(msg);
+            boolean claimed = executor.processJob(jobId);
 
-            verify(msg).ack();
+            assertThat(claimed).isFalse();
             verify(sandboxManager, never()).execute(any());
         }
 
         @Test
-        void shouldNakWithDelayWhenConcurrencyLimitReached() {
-            Message msg = createMessage(jobId);
+        void returnsFalseAndLeavesJobQueuedWhenConcurrencyLimitReached() {
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(3L); // equals max
 
-            executor.executeJob(msg);
+            boolean claimed = executor.processJob(jobId);
 
-            verify(msg, never()).ack();
-            verify(msg).nakWithDelay(Duration.ofSeconds(30));
+            assertThat(claimed).isFalse();
+            // No status write at all — the row is untouched, still QUEUED; the next poll retries it.
+            verify(jobRepository, never()).save(any());
             verify(sandboxManager, never()).execute(any());
         }
 
         @Test
         void shouldTransitionToRunningOnSuccessfulClaim() {
-            Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
@@ -328,20 +319,21 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             setupFullExecution();
 
-            executor.executeJob(msg);
+            boolean claimed = executor.processJob(jobId);
 
+            assertThat(claimed).isTrue();
             // Assert the actual claim contract, not just "save was called": status flips to RUNNING.
-            ArgumentCaptor<AgentJob> claimed = ArgumentCaptor.forClass(AgentJob.class);
-            verify(jobRepository).save(claimed.capture());
-            assertThat(claimed.getValue().getStatus()).isEqualTo(AgentJobStatus.RUNNING);
-            assertThat(claimed.getValue().getStartedAt()).isNotNull();
+            ArgumentCaptor<AgentJob> captured = ArgumentCaptor.forClass(AgentJob.class);
+            verify(jobRepository).save(captured.capture());
+            assertThat(captured.getValue().getStatus()).isEqualTo(AgentJobStatus.RUNNING);
+            assertThat(captured.getValue().getStartedAt()).isNotNull();
         }
     }
 
     /**
      * Claim-time budget recheck (#1368 fix wave): a workspace can pre-queue jobs faster than the
      * cap updates, so every claim rechecks {@code llmBudgetService.blockReason} before letting a
-     * job start — refusing it terminally (never NAK/redelivered) rather than executing it.
+     * job start — refusing it terminally (never re-considered by a later poll) rather than executing it.
      */
     @Nested
     @DisplayName("Claim-time budget recheck (#1368 fix wave)")
@@ -349,16 +341,14 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         void refusesAndCancelsWhenBudgetIsExhaustedAtClaimTime() {
-            Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
             when(llmBudgetService.blockReason(99L)).thenReturn(LlmBudgetBlockReason.EXHAUSTED);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            executor.executeJob(msg);
+            boolean claimed = executor.processJob(jobId);
 
-            // Refused terminally: acked (no NATS redelivery), never executed, never claimed to RUNNING.
-            verify(msg).ack();
-            verify(msg, never()).nakWithDelay(any());
+            // Refused terminally: never executed, never claimed to RUNNING.
+            assertThat(claimed).isFalse();
             verify(sandboxManager, never()).execute(any());
             verify(configRepository, never()).findByIdForUpdate(any());
 
@@ -371,14 +361,13 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         void refusesWithADistinctMessageWhenUnpricedUsageIsBlockedByInstancePolicy() {
-            Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
             when(llmBudgetService.blockReason(99L)).thenReturn(LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            executor.executeJob(msg);
+            boolean claimed = executor.processJob(jobId);
 
-            verify(msg).ack();
+            assertThat(claimed).isFalse();
             verify(sandboxManager, never()).execute(any());
 
             ArgumentCaptor<AgentJob> saved = ArgumentCaptor.forClass(AgentJob.class);
@@ -393,12 +382,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
             // Rejected-pre-start jobs must leave NO ledger trace at all — distinct from the
             // cancelled-after-start / malformed-usage cases, which DO record UNPRICED (see
             // UnpricedUsageLedgerFallback below).
-            Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
             when(llmBudgetService.blockReason(99L)).thenReturn(LlmBudgetBlockReason.EXHAUSTED);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            executor.executeJob(msg);
+            executor.processJob(jobId);
 
             verify(usageRecorder, never()).record(any(), any());
             verify(usageRecorder, never()).recordUnverifiable(any(), any());
@@ -406,7 +394,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         void proceedsToConcurrencyGateWhenBudgetIsNotBlocked() {
-            Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
             when(llmBudgetService.blockReason(99L)).thenReturn(LlmBudgetBlockReason.NONE);
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
@@ -415,11 +402,12 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             setupFullExecution();
 
-            executor.executeJob(msg);
+            boolean claimed = executor.processJob(jobId);
 
-            ArgumentCaptor<AgentJob> claimed = ArgumentCaptor.forClass(AgentJob.class);
-            verify(jobRepository).save(claimed.capture());
-            assertThat(claimed.getValue().getStatus()).isEqualTo(AgentJobStatus.RUNNING);
+            assertThat(claimed).isTrue();
+            ArgumentCaptor<AgentJob> captured = ArgumentCaptor.forClass(AgentJob.class);
+            verify(jobRepository).save(captured.capture());
+            assertThat(captured.getValue().getStatus()).isEqualTo(AgentJobStatus.RUNNING);
         }
     }
 
@@ -428,14 +416,13 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         void areStampedBeforeTheSandboxRuns_soAFailedRunKeepsThem() {
-            Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
             setupFullExecution();
 
-            executor.executeJob(msg);
+            executor.processJob(jobId);
 
             // The adapter's prompt digest, and an inputs digest over the merged file set — written first, so an
             // observation can always be tied to what produced it even when the sandbox then fails.
@@ -448,7 +435,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         void aWriteMatchingNoJobRow_failsTheRunRatherThanBurningTheLlmBudget() {
-            Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
@@ -460,7 +446,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             when(practiceAgent.buildSandboxSpec(any())).thenReturn(minimalSpec());
             when(jobRepository.updateProvenanceDigests(any(), any(), any())).thenReturn(0); // job row is gone
 
-            executor.executeJob(msg);
+            executor.processJob(jobId);
 
             verify(sandboxManager, never()).execute(any());
         }
@@ -471,7 +457,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         void shouldCompleteJobSuccessfully() {
-            Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
@@ -486,9 +471,9 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 1
             );
 
-            executor.executeJob(msg);
+            boolean claimed = executor.processJob(jobId);
 
-            verify(msg).ack();
+            assertThat(claimed).isTrue();
             verify(sandboxManager).execute(any());
             verify(jobRepository).transitionStatus(
                 any(),
@@ -501,7 +486,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         void shouldMarkFailedOnNonZeroExitCode() {
-            Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
@@ -515,7 +499,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             when(jobRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
             when(jobRepository.transitionStatus(any(), any(), any(), any(), any())).thenReturn(1);
 
-            executor.executeJob(msg);
+            executor.processJob(jobId);
 
             verify(jobRepository).transitionStatus(
                 any(),
@@ -524,12 +508,10 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 any(),
                 eq(Set.of(AgentJobStatus.RUNNING))
             );
-            verify(msg).ack();
         }
 
         @Test
         void emitsEnvelopeMismatchOnExit42() {
-            Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
@@ -549,7 +531,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             when(jobRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
             when(jobRepository.transitionStatus(any(), any(), any(), any(), any())).thenReturn(1);
 
-            executor.executeJob(msg);
+            executor.processJob(jobId);
 
             assertThat(meterRegistry.counter("agent.pi.envelope.mismatch").count()).isEqualTo(1d);
             verify(jobRepository).transitionStatus(
@@ -563,7 +545,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         void shouldMarkTimedOutOnTimeout() {
-            Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
@@ -577,7 +558,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             when(jobRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
             when(jobRepository.transitionStatus(any(), any(), any(), any(), any())).thenReturn(1);
 
-            executor.executeJob(msg);
+            executor.processJob(jobId);
 
             verify(jobRepository).transitionStatus(
                 any(),
@@ -586,7 +567,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 any(),
                 eq(Set.of(AgentJobStatus.RUNNING))
             );
-            verify(msg).ack();
         }
     }
 
@@ -595,7 +575,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         void shouldTransitionToCancelledOnCancellation() {
-            Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
@@ -603,7 +582,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             setupFullExecutionWithException(new SandboxCancelledException("cancelled"));
 
-            executor.executeJob(msg);
+            executor.processJob(jobId);
 
             verify(jobRepository).transitionStatus(
                 any(),
@@ -612,12 +591,10 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 any(),
                 eq(Set.of(AgentJobStatus.RUNNING))
             );
-            verify(msg).ack();
         }
 
         @Test
         void shouldMarkFailedOnGenericException() {
-            Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
@@ -625,7 +602,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             setupFullExecutionWithException(new RuntimeException("Docker daemon unreachable"));
 
-            executor.executeJob(msg);
+            executor.processJob(jobId);
 
             verify(jobRepository).transitionStatus(
                 any(),
@@ -634,7 +611,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 any(),
                 eq(Set.of(AgentJobStatus.RUNNING))
             );
-            verify(msg).ack();
         }
     }
 
@@ -650,7 +626,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         void cancelledAfterStart_recordsAnUnpricedLedgerEntry() {
-            Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
@@ -663,14 +638,14 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             setupFullExecutionWithException(new SandboxCancelledException("cancelled"));
 
-            executor.executeJob(msg);
+            executor.processJob(jobId);
 
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample = ArgumentCaptor.forClass(
                 LlmUsageRecorder.LlmUsageSample.class
             );
             verify(usageRecorder).recordUnverifiable(eq(99L), sample.capture());
-            // job (the claimed entity) has its own id from prePersist() — distinct from the NATS
-            // message's jobId in this fixture; the ledger sourceId must be the entity's real id.
+            // job (the claimed entity) has its own id from prePersist() — distinct from the poll's
+            // jobId in this fixture; the ledger sourceId must be the entity's real id.
             assertThat(sample.getValue().sourceId()).isEqualTo(job.getId());
             assertThat(sample.getValue().model()).isEqualTo("claude-sonnet-4");
             assertThat(sample.getValue().inputTokens()).isZero();
@@ -690,7 +665,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
             // or worker-drain path already won the CAS). Previously this silently skipped the ledger
             // write; now the write is attempted regardless, since only a job that reached sandbox
             // execution ever throws SandboxCancelledException in the first place.
-            Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
@@ -702,7 +676,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             setupFullExecutionWithException(new SandboxCancelledException("cancelled"));
 
-            executor.executeJob(msg);
+            executor.processJob(jobId);
 
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample = ArgumentCaptor.forClass(
                 LlmUsageRecorder.LlmUsageSample.class
@@ -739,7 +713,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         void missingOrMalformedUsageJson_recordsAnUnpricedLedgerEntryOnNormalCompletion() {
-            Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
@@ -757,7 +730,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 1
             );
 
-            executor.executeJob(msg);
+            executor.processJob(jobId);
 
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample = ArgumentCaptor.forClass(
                 LlmUsageRecorder.LlmUsageSample.class
@@ -767,21 +740,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
             assertThat(sample.getValue().model()).isEqualTo("claude-sonnet-4");
             assertThat(sample.getValue().totalCalls()).isZero();
             verify(usageRecorder, never()).record(any(), any());
-        }
-    }
-
-    @Nested
-    class MessageHandling {
-
-        @Test
-        void shouldAckInvalidPayload() {
-            Message msg = mock(Message.class);
-            when(msg.getData()).thenReturn("not-a-uuid".getBytes(StandardCharsets.UTF_8));
-
-            executor.executeJob(msg);
-
-            verify(msg).ack();
-            verify(sandboxManager, never()).execute(any());
         }
     }
 
@@ -796,8 +754,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             // #1368 slice 5: no worker-side BYO-LLM override exists anymore — every host (app-server AND
             // worker) reaches the LLM proxy the same way, via the job's own token.
             executor = new AgentJobExecutor(
-                natsConnection,
-                NATS_PROPS,
+                AGENT_PROPS,
                 jobRepository,
                 configRepository,
                 handlerRegistry,
@@ -813,7 +770,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 Optional.of(workerProps("test-worker"))
             );
 
-            Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
@@ -827,7 +783,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             // Worker identity is set ("test-worker"), so the terminal write is fenced to the owner.
             when(jobRepository.transitionStatusOwnedBy(any(), any(), any(), any(), any(), any())).thenReturn(1);
 
-            executor.executeJob(msg);
+            executor.processJob(jobId);
 
             ArgumentCaptor<PracticeAgentRequest> captor = ArgumentCaptor.forClass(PracticeAgentRequest.class);
             verify(practiceAgent).buildSandboxSpec(captor.capture());
@@ -836,6 +792,100 @@ class AgentJobExecutorTest extends BaseUnitTest {
             assertThat(request.apiProtocol()).isEqualTo("anthropic-messages");
             assertThat(request.upstreamModelId()).isEqualTo("claude-sonnet-4");
             assertThat(request.jobToken()).isEqualTo("test-token");
+        }
+    }
+
+    @Nested
+    @DisplayName("Poll loop capacity math (#1368 NATS→Postgres cutover)")
+    class PollLoopCapacity {
+
+        @Test
+        @DisplayName("no WorkerCapacityState (worker role config absent) falls back to claimBatchSize")
+        void noCapacityStateFallsBackToClaimBatchSize() {
+            assertThat(executor.computeCapacity()).isEqualTo(AGENT_PROPS.claimBatchSize());
+        }
+
+        @Test
+        @DisplayName("free capacity is reviewMax minus jobs already running locally")
+        void freeCapacityIsReviewMaxMinusLocalRunning() throws Exception {
+            de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerCapacityState capacityState =
+                new de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerCapacityState(workerProps("w"));
+            capacityState.claimReview();
+            capacityState.claimReview(); // 2 in flight; reviewMax is 2 (see workerProps)
+
+            executor = new AgentJobExecutor(
+                AGENT_PROPS,
+                jobRepository,
+                configRepository,
+                handlerRegistry,
+                practiceAgent,
+                sandboxManager,
+                sandboxExecutor,
+                transactionTemplate,
+                objectMapper,
+                meterRegistry,
+                usageRecorder,
+                llmBudgetService,
+                Optional.of(capacityState),
+                Optional.empty()
+            );
+            // Mirror the two claimReview() calls above by populating localRunningJobs directly —
+            // computeCapacity reads localRunningJobs.size(), not the capacity state's own counter.
+            java.lang.reflect.Field localRunningJobsField = AgentJobExecutor.class.getDeclaredField("localRunningJobs");
+            localRunningJobsField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            Set<UUID> localRunningJobs = (Set<UUID>) localRunningJobsField.get(executor);
+            localRunningJobs.add(UUID.randomUUID());
+            localRunningJobs.add(UUID.randomUUID());
+
+            // reviewMax (2) - localRunning (2) = 0 free capacity.
+            assertThat(executor.computeCapacity()).isZero();
+        }
+
+        @Test
+        @DisplayName("capacity is bounded by claimBatchSize even when the pool has more room")
+        void capacityIsBoundedByClaimBatchSize() {
+            AgentProperties smallBatch = new AgentProperties(true, Duration.ofSeconds(1), 2, 5, Duration.ofSeconds(25));
+            de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerCapacityState capacityState =
+                new de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerCapacityState(
+                    new WorkerProperties(
+                        "w",
+                        new WorkerProperties.Capacity("10", "1"), // reviewMax=10, far above claimBatchSize=2
+                        new WorkerProperties.Drain(Duration.ofMinutes(5)),
+                        new WorkerProperties.Heartbeat(Duration.ofSeconds(20)),
+                        new WorkerProperties.Control(URI.create("ws://example"), "tok", Duration.ofSeconds(10))
+                    )
+                );
+
+            executor = new AgentJobExecutor(
+                smallBatch,
+                jobRepository,
+                configRepository,
+                handlerRegistry,
+                practiceAgent,
+                sandboxManager,
+                sandboxExecutor,
+                transactionTemplate,
+                objectMapper,
+                meterRegistry,
+                usageRecorder,
+                llmBudgetService,
+                Optional.of(capacityState),
+                Optional.empty()
+            );
+
+            assertThat(executor.computeCapacity()).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("empty candidate list means no claim is even attempted")
+        void emptyPollAttemptsNoClaims() {
+            when(jobRepository.findQueuedIdsOldestFirst(anyInt())).thenReturn(List.of());
+
+            List<UUID> candidates = jobRepository.findQueuedIdsOldestFirst(5);
+
+            assertThat(candidates).isEmpty();
+            verify(jobRepository, never()).findByIdQueuedForUpdateSkipLocked(any());
         }
     }
 

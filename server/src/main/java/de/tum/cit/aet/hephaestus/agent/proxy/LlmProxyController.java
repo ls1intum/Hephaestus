@@ -61,7 +61,7 @@ import tools.jackson.databind.node.ObjectNode;
 @RequestMapping("/internal/llm")
 @PreAuthorize("isAuthenticated()")
 @ConditionalOnExpression(
-    "${" + RuntimeRole.AGENT_NATS_ENABLED_PROPERTY + ":false} and ${" + RuntimeRole.WORKER_PROPERTY + ":true}"
+    "${" + RuntimeRole.AGENT_ENABLED_PROPERTY + ":false} and ${" + RuntimeRole.WORKER_PROPERTY + ":true}"
 )
 class LlmProxyController {
 

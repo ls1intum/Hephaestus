@@ -28,28 +28,19 @@ import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
-import io.nats.client.Connection;
-import io.nats.client.ConsumerContext;
-import io.nats.client.FetchConsumeOptions;
-import io.nats.client.FetchConsumer;
-import io.nats.client.Message;
-import io.nats.client.StreamContext;
 import jakarta.annotation.PreDestroy;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -70,12 +61,21 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * NATS pull consumer that executes agent jobs through the full pipeline.
+ * Polls the {@code agent_job} table for {@code QUEUED} work and executes it through the full
+ * pipeline (#1368 NATS→Postgres cutover: the queue IS the table — a QUEUED insert is the enqueue,
+ * delivery is poll-based rather than pushed).
  *
- * <p>Uses a pull-based consumer pattern to avoid the push+NAK anti-pattern. The pull loop
- * fetches up to {@code maxAckPending} messages and dispatches each to the {@code sandboxExecutor}
- * (bounded platform thread pool). When the pool is full, we simply don't fetch more messages —
- * NATS holds them until we ask.
+ * <p>Each poll iteration computes this worker's free local capacity, fetches at most that many
+ * candidate QUEUED job ids (oldest first), and attempts to claim each one with the same {@code FOR
+ * UPDATE SKIP LOCKED} micro-transaction the NATS-era executor used. Claim is synchronous on the poll
+ * thread (~5ms); a successful claim's actual execution is handed off to the {@code sandboxExecutor}
+ * (bounded platform thread pool) so the poll thread is never blocked by a running sandbox.
+ *
+ * <p>A per-config concurrency-full or already-claimed candidate simply stays/returns to {@code
+ * QUEUED} — there is no NAK-with-delay to schedule; the next poll iteration reconsiders it
+ * naturally. To avoid a maxed-out config spinning this loop into a tight DB-hammering retry, the
+ * loop sleeps {@code pollInterval} whenever an iteration claims nothing at all (empty candidate list,
+ * or every candidate was skipped).
  *
  * <p>Transaction boundaries are deliberately narrow:
  * <ul>
@@ -85,10 +85,12 @@ import tools.jackson.databind.ObjectMapper;
  * </ul>
  */
 @Component
-// Wires when agent NATS is enabled AND the worker role isn't explicitly disabled. Combined into
-// @ConditionalOnExpression because Spring honors only ONE @ConditionalOnProperty per element.
-@ConditionalOnExpression("${hephaestus.agent.nats.enabled:false} and ${" + RuntimeRole.WORKER_PROPERTY + ":true}")
-@WorkspaceAgnostic("NATS consumer processes jobs across all workspaces")
+// Wires when the agent job queue is enabled AND the worker role isn't explicitly disabled. Combined
+// into @ConditionalOnExpression because Spring honors only ONE @ConditionalOnProperty per element.
+@ConditionalOnExpression(
+    "${" + RuntimeRole.AGENT_ENABLED_PROPERTY + ":false} and ${" + RuntimeRole.WORKER_PROPERTY + ":true}"
+)
+@WorkspaceAgnostic("Job poller processes jobs across all workspaces")
 public class AgentJobExecutor {
 
     private static final Logger log = LoggerFactory.getLogger(AgentJobExecutor.class);
@@ -98,8 +100,7 @@ public class AgentJobExecutor {
     private static final int MAX_ERROR_MESSAGE_LENGTH = 4000;
     private static final int MAX_CONTAINER_LOGS_CHARS = 65536; // 64KB
 
-    private final Connection natsConnection;
-    private final AgentNatsProperties natsProperties;
+    private final AgentProperties agentProperties;
     private final AgentJobRepository jobRepository;
     private final AgentConfigRepository configRepository;
     private final JobTypeHandlerRegistry handlerRegistry;
@@ -111,23 +112,23 @@ public class AgentJobExecutor {
     private final MeterRegistry meterRegistry;
     private final LlmUsageRecorder usageRecorder;
     private final LlmBudgetService llmBudgetService;
-    private final ScheduledExecutorService heartbeatScheduler;
 
     private final Timer executionDuration;
     private final Counter concurrencyRejected;
     private final AtomicBoolean running = new AtomicBoolean(false);
-    private volatile Thread pullThread;
+    private volatile Thread pollThread;
     /**
-     * Tracks in-flight {@link #executeJob(Message)} submissions for the drain coordinator's
+     * Tracks in-flight execution submissions for the drain coordinator's
      * {@link #awaitInFlight(Duration)} call. Phaser is the right primitive here: register on
-     * submit, arriveAndDeregister on completion, await-advance to wait for all parties to
+     * dispatch, arriveAndDeregister on completion, await-advance to wait for all parties to
      * deregister. Survives thread restarts and exception paths via the try-finally.
      */
     private final Phaser inFlight = new Phaser(1); // 1 = the executor itself; deregistered on stop
     /**
      * Job ids this worker is currently executing. Source of truth for job-scoped cancellation
      * (#1138): drain and hub-initiated cancels act only on jobs in this set, never on sibling
-     * workers' jobs. Populated on claim, removed in the {@code executeJob} finally block.
+     * workers' jobs. Also doubles as the free-capacity signal for the poll loop (#1368). Populated on
+     * claim, removed once the claimed job reaches a terminal outcome.
      */
     private final Set<UUID> localRunningJobs = ConcurrentHashMap.newKeySet();
     private final Optional<WorkerCapacityState> capacityState;
@@ -136,8 +137,7 @@ public class AgentJobExecutor {
     private final String workerId;
 
     public AgentJobExecutor(
-        @Qualifier("agentNatsConnection") Connection natsConnection,
-        AgentNatsProperties natsProperties,
+        AgentProperties agentProperties,
         AgentJobRepository jobRepository,
         AgentConfigRepository configRepository,
         JobTypeHandlerRegistry handlerRegistry,
@@ -152,8 +152,7 @@ public class AgentJobExecutor {
         Optional<WorkerCapacityState> capacityState,
         Optional<WorkerProperties> workerProperties
     ) {
-        this.natsConnection = natsConnection;
-        this.natsProperties = natsProperties;
+        this.agentProperties = agentProperties;
         this.jobRepository = jobRepository;
         this.configRepository = configRepository;
         this.handlerRegistry = handlerRegistry;
@@ -169,15 +168,6 @@ public class AgentJobExecutor {
         this.workerProperties = workerProperties;
         this.workerId = workerProperties.map(WorkerProperties::resolvedWorkerId).orElse(null);
 
-        // Internal scheduler for NATS InProgress heartbeats — not a @Bean to avoid
-        // blocking Spring's TaskScheduler auto-configuration (ConditionalOnMissingBean).
-        // Single thread suffices: heartbeat tasks are sub-microsecond fire-and-forget calls.
-        this.heartbeatScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "agent-heartbeat");
-            t.setDaemon(true);
-            return t;
-        });
-
         this.executionDuration = Timer.builder("agent.job.execution.duration")
             .description("Total duration of agent job execution")
             .register(meterRegistry);
@@ -187,47 +177,38 @@ public class AgentJobExecutor {
     }
 
     @EventListener(ApplicationReadyEvent.class)
-    @Order(2) // Must run after AgentNatsConsumerConfig.ensureStreamAndConsumer() which uses @Order(1)
+    @Order(2) // Must run after WorkerLivenessReporter.start() (@Order(1)) so the registry row exists pre-first-claim
     public void start() {
         if (!running.compareAndSet(false, true)) {
             return;
         }
 
-        pullThread = Thread.ofPlatform().name("agent-nats-pull").daemon(true).start(this::pullLoop);
+        pollThread = Thread.ofPlatform().name("agent-job-poll").daemon(true).start(this::pollLoop);
 
         log.info(
-            "Agent job executor started: consumer={}, workerId={}, maxAckPending={}",
-            natsProperties.consumerName(),
+            "Agent job executor started: workerId={}, pollInterval={}, claimBatchSize={}",
             workerId,
-            natsProperties.maxAckPending()
+            agentProperties.pollInterval(),
+            agentProperties.claimBatchSize()
         );
     }
 
     /**
-     * Stop the pull loop so no new jobs are claimed. Idempotent. Composable with
+     * Stop the poll loop so no new jobs are claimed. Idempotent. Composable with
      * {@link #awaitInFlight(Duration)} and {@link #cancelInFlight(AgentJobCancellationReason)}
      * from the worker drain coordinator; called standalone from {@link #stop()} for non-worker
      * monolith mode.
      */
     public void stopAcceptingNewJobs() {
         running.set(false);
-        if (pullThread != null) {
-            pullThread.interrupt();
-        }
-        heartbeatScheduler.shutdown();
-        try {
-            if (!heartbeatScheduler.awaitTermination(10, TimeUnit.SECONDS)) {
-                heartbeatScheduler.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            heartbeatScheduler.shutdownNow();
-            Thread.currentThread().interrupt();
+        if (pollThread != null) {
+            pollThread.interrupt();
         }
     }
 
     /**
-     * Wait up to {@code timeout} for in-flight {@link #executeJob(Message)} submissions to
-     * complete. Must be called after {@link #stopAcceptingNewJobs()} so no new parties register.
+     * Wait up to {@code timeout} for in-flight execution submissions to complete. Must be called
+     * after {@link #stopAcceptingNewJobs()} so no new parties register.
      *
      * @return {@code true} if all in-flight work completed within {@code timeout}; {@code false}
      *     on timeout (caller should cancel remaining).
@@ -312,195 +293,180 @@ public class AgentJobExecutor {
     public void stop() {
         stopAcceptingNewJobs();
         awaitInFlight(Duration.ofSeconds(30));
-        // Any survivors will be NAK'd on connection close.
     }
 
-    // Pull loop
+    // Poll loop
 
-    private void pullLoop() {
+    private void pollLoop() {
         while (running.get()) {
             try {
-                StreamContext streamContext = natsConnection.getStreamContext(natsProperties.streamName());
-                ConsumerContext consumerContext = streamContext.getConsumerContext(natsProperties.consumerName());
-
-                // Pull only a worker-local batch (not the cluster-wide maxAckPending) so a single
-                // replica doesn't claim the whole unacked budget and starve siblings (#1138). The
-                // pool-full path NAKs-with-delay, returning surplus to other replicas.
-                FetchConsumeOptions fetchOptions = FetchConsumeOptions.builder()
-                    .maxMessages(natsProperties.fetchBatchSize())
-                    .expiresIn(Duration.ofSeconds(30).toMillis())
-                    .build();
-
-                try (FetchConsumer consumer = consumerContext.fetch(fetchOptions)) {
-                    Message msg;
-                    while (running.get() && (msg = consumer.nextMessage()) != null) {
-                        Message finalMsg = msg;
-                        try {
-                            inFlight.register();
-                            sandboxExecutor.execute(() -> {
-                                try {
-                                    executeJob(finalMsg);
-                                } finally {
-                                    inFlight.arriveAndDeregister();
-                                }
-                            });
-                        } catch (RejectedExecutionException e) {
-                            inFlight.arriveAndDeregister();
-                            // Pool is full — NAK with delay to avoid tight redelivery loop
-                            finalMsg.nakWithDelay(Duration.ofSeconds(10));
-                            log.debug("Sandbox executor full, NAK'd with 10s delay for redelivery");
-                        }
-                    }
+                int capacity = computeCapacity();
+                if (capacity <= 0) {
+                    sleepPollInterval();
+                    continue;
                 }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
-            } catch (Exception e) {
-                if (running.get()) {
-                    log.warn("Pull loop error, retrying in 5s: {}", e.getMessage());
-                    try {
-                        Thread.sleep(5000);
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
+
+                List<UUID> candidates = jobRepository.findQueuedIdsOldestFirst(capacity);
+                if (candidates.isEmpty()) {
+                    sleepPollInterval();
+                    continue;
+                }
+
+                boolean anyClaimed = false;
+                for (UUID jobId : candidates) {
+                    if (!running.get()) {
                         break;
                     }
+                    if (processJob(jobId)) {
+                        anyClaimed = true;
+                    }
                 }
+                // Busy-spin protection: if every candidate in this batch was skipped (already claimed
+                // by a sibling, concurrency-full, budget-blocked, or a lock timeout), sleep before the
+                // next poll instead of immediately re-querying the same still-QUEUED rows.
+                if (!anyClaimed) {
+                    sleepPollInterval();
+                }
+            } catch (Exception e) {
+                log.warn("Poll loop error, retrying in {}: {}", agentProperties.pollInterval(), e.getMessage());
+                sleepPollInterval();
             }
         }
-        log.info("Agent job executor pull loop stopped");
-    }
-
-    // Job execution
-
-    void executeJob(Message msg) {
-        Optional<UUID> parsed = parseJobId(msg);
-        if (parsed.isEmpty()) {
-            msg.ack();
-            return;
-        }
-
-        UUID jobId = parsed.get();
-        MDC.put(MDC_JOB_ID, jobId.toString());
-        boolean claimed = false;
-        try {
-            claimed = claimAndExecute(jobId, msg);
-        } catch (SandboxCancelledException e) {
-            claimed = true;
-            handleCancellation(jobId, msg);
-        } catch (CannotAcquireLockException e) {
-            msg.nakWithDelay(Duration.ofSeconds(5));
-            log.debug("Lock timeout during claim for job {}, NAK'd with 5s delay", jobId);
-        } catch (Exception e) {
-            claimed = true;
-            handleExecutionFailure(jobId, msg, e);
-        } finally {
-            if (claimed) {
-                releaseCapacity();
-            }
-            localRunningJobs.remove(jobId);
-            MDC.remove(MDC_JOB_ID);
-            MDC.remove(MDC_JOB_TYPE);
-        }
+        log.info("Agent job executor poll loop stopped");
     }
 
     /**
-     * Extract and validate a job UUID from the NATS message payload.
-     *
-     * @return the parsed UUID, or empty if the payload is invalid
+     * This worker's free local capacity for new claims: the configured review capacity minus jobs
+     * already running locally, bounded by {@code claimBatchSize} so one poll iteration never
+     * over-fetches candidates it couldn't dispatch anyway. Package-private for testability.
      */
-    private Optional<UUID> parseJobId(Message msg) {
+    int computeCapacity() {
+        int poolCapacity = capacityState
+            .map(cs -> Math.max(0, cs.reviewMax() - localRunningJobs.size()))
+            .orElse(agentProperties.claimBatchSize());
+        return Math.min(poolCapacity, agentProperties.claimBatchSize());
+    }
+
+    private void sleepPollInterval() {
         try {
-            UUID jobId = UUID.fromString(new String(msg.getData(), StandardCharsets.UTF_8).trim());
-            return Optional.of(jobId);
-        } catch (Exception e) {
-            log.warn("Invalid NATS message payload, acking to discard: {}", e.getMessage());
-            return Optional.empty();
+            Thread.sleep(agentProperties.pollInterval().toMillis());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 
+    // Job claim + dispatch
+
     /**
-     * Claim the job, set up heartbeat, prepare sandbox inputs, execute, and complete.
-     * Propagates exceptions to {@link #executeJob(Message)} for centralized error handling.
+     * Attempt to claim {@code jobId} and, on success, dispatch its execution to the sandbox
+     * executor. Package-private for testability.
      *
-     * @return {@code true} if the job was claimed (so the caller should release capacity);
-     *     {@code false} otherwise.
+     * @return {@code true} if the job was actually claimed (RUNNING was won and execution
+     *     dispatched); {@code false} if it was skipped for any reason (already claimed, concurrency
+     *     full, budget blocked, or a transient claim failure) — the job stays/returns to QUEUED for
+     *     the next poll to reconsider.
      */
-    private boolean claimAndExecute(UUID jobId, Message msg) {
-        // CLAIM (micro-transaction #1) — may throw CannotAcquireLockException
+    boolean processJob(UUID jobId) {
         Optional<ClaimResult> claimed;
         try {
-            claimed = dispatchClaimResult(jobId, msg, claimJob(jobId));
-        } catch (CannotAcquireLockException | SandboxCancelledException e) {
-            throw e;
+            claimed = dispatchClaimResult(jobId, claimJob(jobId));
+        } catch (CannotAcquireLockException e) {
+            log.debug("Lock timeout during claim for job {}, will retry on next poll", jobId);
+            return false;
         } catch (Exception e) {
-            throw new ClaimFailedException(e);
+            log.warn("Claim failed for job {}, will retry on next poll: {}", jobId, e.getMessage());
+            return false;
         }
         if (claimed.isEmpty()) {
-            return false; // Already ack'd / nak'd / left for redelivery
+            return false;
         }
+        dispatchExecution(jobId, claimed.get());
+        return true;
+    }
 
-        ClaimResult claim = claimed.get();
-        AgentJob job = claim.job;
-        ConfigSnapshot snapshot = claim.snapshot;
-        MDC.put(MDC_JOB_TYPE, job.getJobType().name());
-        log.info("Executing agent job: jobId={}, jobType={}", jobId, job.getJobType());
-
-        Instant startTime = Instant.now();
-        ScheduledFuture<?> heartbeat = startHeartbeat(msg);
+    /** Dispatch a claimed job's execution onto the sandbox executor; requeues on pool rejection. */
+    private void dispatchExecution(UUID jobId, ClaimResult claim) {
         try {
-            // PREPARE + EXECUTE + COMPLETE
-            SandboxResult result = prepareAndExecute(jobId, job, snapshot);
-            AgentResult agentResult = practiceAgent.parseResult(result);
+            inFlight.register();
+            sandboxExecutor.execute(() -> {
+                try {
+                    runClaimedJob(jobId, claim);
+                } finally {
+                    inFlight.arriveAndDeregister();
+                }
+            });
+        } catch (RejectedExecutionException e) {
+            inFlight.arriveAndDeregister();
+            log.warn(
+                "Sandbox executor rejected claimed job {} (pool smaller than configured worker capacity?) — requeuing",
+                jobId
+            );
+            requeueRejectedClaim(jobId);
+        }
+    }
 
-            JobTypeHandler handler = handlerRegistry.getHandler(job.getJobType());
-            completeJob(jobId, agentResult, result, handler, job);
-            msg.ack();
-
-            Duration duration = Duration.between(startTime, Instant.now());
-            executionDuration.record(duration);
-            log.info("Agent job completed: jobId={}, duration={}", jobId, duration);
-            return true;
+    /** Undo a claim the sandbox executor couldn't accept: RUNNING → QUEUED, ownership cleared. */
+    private void requeueRejectedClaim(UUID jobId) {
+        try {
+            transactionTemplate.executeWithoutResult(status -> jobRepository.requeueOrphan(jobId));
+        } catch (Exception e) {
+            log.warn("Failed to requeue rejected claim {}: {}", jobId, e.getMessage());
         } finally {
-            heartbeat.cancel(false);
+            releaseCapacity();
+            localRunningJobs.remove(jobId);
         }
     }
 
     /**
-     * Dispatch the claim result: ack/nak the message for non-success outcomes,
-     * or return the {@link ClaimResult} for the caller to proceed with execution.
+     * Dispatch the claim result: interpret non-success outcomes as "nothing more to do here — the
+     * job is already terminal (budget-blocked), already claimed by a concurrent poller, or the
+     * config is at capacity and will stay QUEUED until the next poll" — or return the
+     * {@link ClaimResult} for the caller to proceed with execution.
      */
-    private Optional<ClaimResult> dispatchClaimResult(UUID jobId, Message msg, Object claimResult) {
+    private Optional<ClaimResult> dispatchClaimResult(UUID jobId, Object claimResult) {
         if (claimResult == ClaimOutcome.ALREADY_CLAIMED || claimResult == ClaimOutcome.BUDGET_BLOCKED) {
-            // BUDGET_BLOCKED already transitioned the job to a terminal state inside the claim
-            // transaction (see claimJob) — ack so NATS never redelivers a job that is already done.
-            msg.ack();
             return Optional.empty();
         }
         if (claimResult == ClaimOutcome.CONCURRENCY_FULL) {
-            msg.nakWithDelay(Duration.ofSeconds(30));
             return Optional.empty();
         }
         if (claimResult instanceof ClaimResult claim) {
             return Optional.of(claim);
         }
-        log.warn("Unexpected claim result for job {}, leaving for redelivery", jobId);
+        log.warn("Unexpected claim result for job {}, leaving QUEUED for the next poll", jobId);
         return Optional.empty();
     }
 
-    /** Schedule periodic NATS InProgress heartbeats for the given message. */
-    private ScheduledFuture<?> startHeartbeat(Message msg) {
-        return heartbeatScheduler.scheduleAtFixedRate(
-            () -> {
-                try {
-                    msg.inProgress();
-                } catch (Exception e) {
-                    log.debug("InProgress heartbeat failed: {}", e.getMessage());
-                }
-            },
-            0,
-            natsProperties.heartbeatInterval().toSeconds(),
-            TimeUnit.SECONDS
-        );
+    // Job execution (runs on the sandbox executor)
+
+    /** Execute an already-claimed job end to end, then release capacity regardless of outcome. */
+    private void runClaimedJob(UUID jobId, ClaimResult claim) {
+        MDC.put(MDC_JOB_ID, jobId.toString());
+        AgentJob job = claim.job;
+        MDC.put(MDC_JOB_TYPE, job.getJobType().name());
+        try {
+            log.info("Executing agent job: jobId={}, jobType={}", jobId, job.getJobType());
+            Instant startTime = Instant.now();
+
+            SandboxResult result = prepareAndExecute(jobId, job, claim.snapshot);
+            AgentResult agentResult = practiceAgent.parseResult(result);
+
+            JobTypeHandler handler = handlerRegistry.getHandler(job.getJobType());
+            completeJob(jobId, agentResult, result, handler, job);
+
+            Duration duration = Duration.between(startTime, Instant.now());
+            executionDuration.record(duration);
+            log.info("Agent job completed: jobId={}, duration={}", jobId, duration);
+        } catch (SandboxCancelledException e) {
+            handleCancellation(jobId);
+        } catch (Exception e) {
+            handleExecutionFailure(jobId, e);
+        } finally {
+            releaseCapacity();
+            localRunningJobs.remove(jobId);
+            MDC.remove(MDC_JOB_ID);
+            MDC.remove(MDC_JOB_TYPE);
+        }
     }
 
     /**
@@ -623,20 +589,11 @@ public class AgentJobExecutor {
         );
     }
 
-    /** Wrapper that signals the claim phase failed — the job is still QUEUED. */
-    private static class ClaimFailedException extends RuntimeException {
-
-        ClaimFailedException(Exception cause) {
-            super(cause);
-        }
-    }
-
     /** Handle a job cancelled during sandbox execution. */
-    private void handleCancellation(UUID jobId, Message msg) {
+    private void handleCancellation(UUID jobId) {
         transactionTemplate.executeWithoutResult(status ->
             transitionTerminal(jobId, AgentJobStatus.CANCELLED, Instant.now(), "Cancelled during execution")
         );
-        msg.ack();
         log.info("Agent job cancelled: jobId={}", jobId);
         // #1368 fix wave: reaching this handler at all means the job HAD started executing (claimed,
         // RUNNING) — SandboxCancelledException is only thrown from mid-execution, never from the claim
@@ -698,20 +655,10 @@ public class AgentJobExecutor {
         }
     }
 
-    /**
-     * Handle generic execution failures. If the job was never claimed (still QUEUED),
-     * the message is left for NATS redelivery. Otherwise the job is transitioned to FAILED.
-     */
-    private void handleExecutionFailure(UUID jobId, Message msg, Exception e) {
+    /** Handle generic execution failures — transitions the job to FAILED. */
+    private void handleExecutionFailure(UUID jobId, Exception e) {
         if (e instanceof InterruptedException) {
             Thread.currentThread().interrupt();
-        }
-
-        if (e instanceof ClaimFailedException) {
-            // Claim failed (DB timeout, connection pool exhaustion) — don't ack,
-            // let NATS redeliver. Job is still QUEUED.
-            log.warn("Claim failed for job {}, will be redelivered: {}", jobId, e.getCause().getMessage());
-            return;
         }
 
         String errorMessage = truncateErrorMessage(e.getMessage());
@@ -720,12 +667,11 @@ public class AgentJobExecutor {
         transactionTemplate.executeWithoutResult(status ->
             transitionTerminal(jobId, AgentJobStatus.FAILED, Instant.now(), errorMessage)
         );
-        msg.ack();
     }
 
     // Claim: micro-transaction #1
 
-    /** Sentinel values for claimJob results that require post-transaction NATS actions. */
+    /** Sentinel values for claimJob results that require post-transaction handling. */
     private enum ClaimOutcome {
         ALREADY_CLAIMED,
         CONCURRENCY_FULL,
@@ -737,14 +683,14 @@ public class AgentJobExecutor {
     /**
      * Attempt to claim a job within a micro-transaction. Returns:
      * - {@link ClaimResult} on success
-     * - {@link ClaimOutcome#ALREADY_CLAIMED} if job is not QUEUED (caller should ACK)
-     * - {@link ClaimOutcome#CONCURRENCY_FULL} if concurrency limit reached (caller should NAK with delay)
-     * - {@link ClaimOutcome#BUDGET_BLOCKED} if the workspace's LLM budget gate refused the job (caller should ACK)
+     * - {@link ClaimOutcome#ALREADY_CLAIMED} if job is not QUEUED (caller does nothing further)
+     * - {@link ClaimOutcome#CONCURRENCY_FULL} if concurrency limit reached (job stays QUEUED)
+     * - {@link ClaimOutcome#BUDGET_BLOCKED} if the workspace's LLM budget gate refused the job (already terminal)
      * - {@code null} if transaction returned null unexpectedly
      */
     private Object claimJob(UUID jobId) {
         return transactionTemplate.execute(status -> {
-            // SKIP LOCKED: if another executor has this row locked, returns empty
+            // SKIP LOCKED: if another poller has this row locked, returns empty
             Optional<AgentJob> locked = jobRepository.findByIdQueuedForUpdateSkipLocked(jobId);
             if (locked.isEmpty()) {
                 log.debug("Job already claimed or not QUEUED: jobId={}", jobId);
@@ -809,7 +755,8 @@ public class AgentJobExecutor {
             job.setWorkerId(workerId); // owner for cancel routing, orphan recovery, and terminal-write fencing (#1138)
             jobRepository.save(job);
 
-            // Track locally so drain / hub-initiated cancels target only this worker's jobs.
+            // Track locally so drain / hub-initiated cancels target only this worker's jobs, and so
+            // the poll loop's capacity computation reflects this claim immediately.
             localRunningJobs.add(jobId);
             capacityState.ifPresent(WorkerCapacityState::claimReview);
             return new ClaimResult(job, snapshot);

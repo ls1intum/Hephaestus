@@ -68,9 +68,9 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
 
     /**
      * Claim a QUEUED job for execution with {@code FOR UPDATE SKIP LOCKED}.
-     * Returns empty if the row is already locked (duplicate NATS delivery) or not QUEUED.
+     * Returns empty if the row is already locked (a concurrent poller claimed it first) or not QUEUED.
      */
-    @WorkspaceAgnostic("ID-based claim; job ID from workspace-scoped NATS event")
+    @WorkspaceAgnostic("ID-based claim; job ID from a workspace-scoped candidate poll")
     @Query(
         value = "SELECT * FROM agent_job WHERE id = :id AND status = 'QUEUED' FOR UPDATE SKIP LOCKED",
         nativeQuery = true
@@ -157,16 +157,18 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     );
 
     /**
-     * Zombie sweeper: QUEUED jobs older than cutoff (never picked up by the NATS consumer). Returns a
-     * projection (not entities) so the sweeper can re-publish outside any transaction — without it the
-     * lazy {@code workspace} access would force the publish loop to hold a DB connection across NATS I/O.
+     * Poll-loop candidate lookup (#1368 NATS→Postgres cutover): the oldest {@code QUEUED} job ids, up
+     * to this worker's free local capacity. A light id-only projection — {@link
+     * #findByIdQueuedForUpdateSkipLocked} re-checks and locks each candidate individually, so a stale
+     * read here (a job already claimed by a sibling between this query and the claim attempt) just
+     * costs a skipped candidate, never a double-claim.
      */
-    @WorkspaceAgnostic("Cross-workspace zombie recovery; caller is @WorkspaceAgnostic sweeper")
+    @WorkspaceAgnostic("Cross-workspace poll candidates; caller is the @WorkspaceAgnostic job poller")
     @Query(
-        "SELECT j.id AS jobId, j.workspace.id AS workspaceId, j.retryCount AS retryCount " +
-            "FROM AgentJob j WHERE j.status = 'QUEUED' AND j.createdAt < :cutoff"
+        value = "SELECT id FROM agent_job WHERE status = 'QUEUED' ORDER BY created_at ASC LIMIT :limit",
+        nativeQuery = true
     )
-    List<OrphanedJobRef> findStaleQueuedJobs(@Param("cutoff") Instant cutoff);
+    List<UUID> findQueuedIdsOldestFirst(@Param("limit") int limit);
 
     /** Stale RUNNING reaper: find RUNNING jobs that exceeded their expected lifetime. */
     @WorkspaceAgnostic("Cross-workspace stale job reaper; caller is @WorkspaceAgnostic sweeper")

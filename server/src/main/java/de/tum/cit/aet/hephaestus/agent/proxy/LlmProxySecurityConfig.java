@@ -26,7 +26,7 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Configuration
 @ConditionalOnExpression(
-    "${" + RuntimeRole.AGENT_NATS_ENABLED_PROPERTY + ":false} and ${" + RuntimeRole.WORKER_PROPERTY + ":true}"
+    "${" + RuntimeRole.AGENT_ENABLED_PROPERTY + ":false} and ${" + RuntimeRole.WORKER_PROPERTY + ":true}"
 )
 class LlmProxySecurityConfig {
 

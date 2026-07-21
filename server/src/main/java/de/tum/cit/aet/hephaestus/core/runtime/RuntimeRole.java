@@ -29,7 +29,7 @@ public final class RuntimeRole {
 
     /**
      * Wired property key for the worker-role gate. Gates {@code DockerSandboxConfiguration}
-     * and {@code AgentNatsConsumerConfig}.
+     * and the poll-based {@code AgentJobExecutor}.
      */
     public static final String WORKER_PROPERTY = PROPERTY_PREFIX + ".worker.enabled";
 
@@ -47,10 +47,11 @@ public final class RuntimeRole {
     public static final String WEBHOOK_PROPERTY = PROPERTY_PREFIX + ".webhook.enabled";
 
     /**
-     * Property key for the job-execution capability check (NATS agent-job consumer enabled). The LLM
-     * proxy controller/security chain gates on this AND {@link #WORKER_PROPERTY} — the same expression
-     * {@code AgentJobExecutor} wires on — so "jobs on, proxy off" is unexpressible (#1368 slice 5: the
-     * proxy is the ONLY LLM credential path, every job-executing host must run it).
+     * Property key for the job-execution capability check (the PostgreSQL-backed agent job poller
+     * enabled). The LLM proxy controller/security chain gates on this AND {@link #WORKER_PROPERTY} —
+     * the same expression {@code AgentJobExecutor} wires on — so "jobs on, proxy off" is
+     * unexpressible (#1368 slice 5: the proxy is the ONLY LLM credential path, every job-executing
+     * host must run it).
      */
-    public static final String AGENT_NATS_ENABLED_PROPERTY = "hephaestus.agent.nats.enabled";
+    public static final String AGENT_ENABLED_PROPERTY = "hephaestus.agent.enabled";
 }

@@ -235,8 +235,8 @@ hephaestus:
     #   server  — WIRED. Gates ServerSchedulingConfig (@EnableScheduling),
     #     IntegrationNatsConsumer (the unified NATS pull consumer), and WorkspaceStartupListener.
     #     Setting false silences all @Scheduled methods and prevents workspace bootstrap.
-    #   worker  — WIRED. Gates DockerSandboxConfiguration + AgentNatsConsumerConfig.
-    #     Setting false removes the Docker sandbox runtime + agent NATS pull consumer.
+    #   worker  — WIRED. Gates DockerSandboxConfiguration + the poll-based AgentJobExecutor.
+    #     Setting false removes the Docker sandbox runtime + the agent job poller.
     #   webhook — WIRED. Gates the integration.webhook receiver (controllers, HMAC
     #     verifier, JetStream publisher, stream bootstrap, health, lifecycle).
     #     The webhook-server production container deploys with server=false + worker=false
@@ -412,7 +412,7 @@ hephaestus:
 
     sandbox:
         # The LLM proxy controller/security chain (agent.proxy) is gated on the job-execution
-        # capability expression (hephaestus.agent.nats.enabled AND hephaestus.runtime.worker.enabled)
+        # capability expression (hephaestus.agent.enabled AND hephaestus.runtime.worker.enabled)
         # — the same one AgentJobExecutor wires on — not a standalone flag (#1368 slice 5: it is the
         # ONLY LLM credential path, so "jobs on, proxy off" must be unexpressible).
         docker-host: ${SANDBOX_DOCKER_HOST:unix:///var/run/docker.sock}
@@ -439,24 +439,21 @@ hephaestus:
         trigger-enabled: false
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # AGENT JOB NATS CONFIGURATION
+    # AGENT JOB QUEUE (PostgreSQL-backed, #1368 NATS→Postgres cutover)
     # ═══════════════════════════════════════════════════════════════════════════
-    # NATS stream and consumer for agent job execution pipeline.
-    # Disabled by default — requires a reachable NATS server.
+    # The queue IS the agent_job table — a QUEUED insert is the enqueue. AgentJobExecutor polls
+    # for QUEUED rows on a fixed interval instead of a NATS push consumer. Disabled by default.
     agent:
-        nats:
-            enabled: ${AGENT_NATS_ENABLED:false}
-            server: ${NATS_SERVER:nats://localhost:4222}
-            stream-name: AGENT
-            consumer-name: hephaestus-agent-executor
-            # Must exceed max container timeout (1hr) + buffer
-            ack-wait: 70m
-            max-deliver: 5
-            # Cluster-wide unacked bound across all worker replicas. Set ≈ replicas × per-worker
-            # concurrency; the per-replica pull is capped by fetch-batch-size so no replica starves siblings.
-            max-ack-pending: ${AGENT_NATS_MAX_ACK_PENDING:16}
-            fetch-batch-size: ${AGENT_NATS_FETCH_BATCH_SIZE:5}
-            heartbeat-interval: 25s
+        enabled: ${AGENT_ENABLED:false}
+        # How long the poll loop sleeps when there is nothing to claim.
+        poll-interval: ${AGENT_POLL_INTERVAL:1s}
+        # Max candidate QUEUED jobs considered per poll iteration; bounded by this worker's own
+        # free local capacity so one poll never over-claims.
+        claim-batch-size: ${AGENT_CLAIM_BATCH_SIZE:5}
+        # Max orphan-requeue attempts before a RUNNING job whose owning worker was lost is failed
+        # instead of requeued again. Authoritative budget lives on agent_job.retry_count.
+        max-retries: ${AGENT_MAX_RETRIES:5}
+        heartbeat-interval: 25s
         # Dev convenience: seed one workspace model at startup (off by default). See docker/.env.example.
         default-config:
             enabled: ${AGENT_DEFAULT_CONFIG_ENABLED:false}

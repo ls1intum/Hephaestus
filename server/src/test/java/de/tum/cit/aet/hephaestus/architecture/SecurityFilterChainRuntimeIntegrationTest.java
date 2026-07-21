@@ -53,6 +53,6 @@ class SecurityFilterChainRuntimeIntegrationTest extends BaseIntegrationTest {
 
     // The LLM proxy chain's filter-order assertion moved to
     // LlmProxyIntegrationTest.CrossChainSecurity#llmProxyChainHasJobTokenFilterBeforeUpaf: the proxy
-    // beans are gated on the job-execution capability (worker + agent NATS), which the default
-    // integration context deliberately leaves off, so the chain does not exist here.
+    // beans are gated on the job-execution capability (worker role + hephaestus.agent.enabled), which
+    // the default integration context deliberately leaves off, so the chain does not exist here.
 }

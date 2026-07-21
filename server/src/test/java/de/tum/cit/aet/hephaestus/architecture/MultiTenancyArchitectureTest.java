@@ -585,7 +585,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                 "Commit", // Through repository.organization.workspaceId
                                 "Project", // Through organization.workspaceId
                                 "ActivitySavedEvent", // Carries user context for achievement evaluation
-                                "AgentJob", // AgentJobCreatedEvent carries workspaceId directly
                                 "PracticeDetectionCompletedEvent", // carries workspaceId directly (mentor cache eviction)
                                 "PracticeDetectionDeliveredEvent", // carries workspaceId directly (conversational routing)
                                 "ConversationFeedbackPreparedEvent", // carries workspaceId directly (Slack nudge)
@@ -658,9 +657,9 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
             "ActivityEventListener",
             // AchievementEventListener handles ActivitySavedEvent which carries workspaceId context
             "AchievementEventListener",
-            // AgentJobSubmitter handles AgentJobCreatedEvent which directly carries workspaceId
-            "AgentJobSubmitter",
-            // AgentJobEventListener handles AgentJobCreatedEvent which directly carries workspaceId
+            // AgentJobEventListener handles ScmDomainEvent.PullRequest{Created,Ready,Synchronized,
+            // Merged,Closed}/ReviewSubmitted whose EventContext carries the originating repository →
+            // workspaceId is resolved per-event
             "AgentJobEventListener",
             // IssueAgentJobEventListener handles ScmDomainEvent.Issue{Created,Labeled} whose EventContext
             // carries the originating repository → workspaceId is resolved per-event (mirrors the PR listener)

@@ -43,7 +43,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * </ul>
  */
 @Component
-@ConditionalOnProperty(prefix = "hephaestus.agent.nats", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(prefix = "hephaestus.agent", name = "enabled", havingValue = "true")
 public class BotCommandProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(BotCommandProcessor.class);

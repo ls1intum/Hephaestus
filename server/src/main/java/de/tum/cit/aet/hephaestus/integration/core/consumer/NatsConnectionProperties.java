@@ -16,8 +16,8 @@ import org.springframework.validation.annotation.Validated;
  * tuning (ack-wait, max-ack-pending, poison handling, …) lives on {@link NatsConsumerProperties}
  * under {@code hephaestus.integration.consumer.*}.
  *
- * <p>The agent runtime's {@code hephaestus.agent.nats.*} prefix is a deliberately separate
- * connection (different cluster in some deployments); this bean does NOT bind it.
+ * <p>This connection serves webhook/sync ingest only. The agent job queue runs on PostgreSQL
+ * (ADR 0025) and has no NATS connection of its own.
  */
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.sync.nats")

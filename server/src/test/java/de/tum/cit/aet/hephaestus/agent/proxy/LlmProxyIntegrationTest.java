@@ -16,7 +16,6 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.testconfig.NatsTestContainer;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
@@ -46,22 +45,22 @@ import tools.jackson.databind.ObjectMapper;
  * {@code AgentConfig} fallback — on every request via {@link
  * de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver#resolveProxyCredential}.
  *
- * <h2>Why a full Spring context, and how it avoids Docker/real-NATS flakiness</h2>
+ * <h2>Why a full Spring context, and how it avoids Docker flakiness</h2>
  *
  * <p>{@link LlmProxyController} and {@link LlmProxySecurityConfig} are gated on {@code
- * hephaestus.agent.nats.enabled AND hephaestus.runtime.worker.enabled} — deliberately the SAME
+ * hephaestus.agent.enabled AND hephaestus.runtime.worker.enabled} — deliberately the SAME
  * expression {@code AgentJobExecutor} wires on, so "jobs on, proxy off" is unexpressible. Exercising
  * the proxy over HTTP therefore means booting the whole job-execution capability, not just the two
  * proxy beans in isolation. This test does that for real (mirroring the precedent set by {@code
- * AgentOrphanRecoveryNatsIntegrationTest}), while keeping every other side effect of that capability
+ * AgentOrphanRecoveryIntegrationTest}), while keeping every other side effect of that capability
  * inert:
  *
  * <ul>
- *   <li>{@code hephaestus.agent.nats.server} points at a real {@link NatsTestContainer} — cheap,
- *       already a suite-wide fixture — but this test publishes nothing to it, and uses its OWN
- *       stream/consumer names so {@link de.tum.cit.aet.hephaestus.agent.job.AgentJobExecutor}'s pull
- *       loop never contends with {@code AgentOrphanRecoveryNatsIntegrationTest}'s "AGENT" work queue
- *       on the same (reused) container.
+ *   <li>{@code hephaestus.agent.poll-interval} is set to an hour so {@code AgentJobExecutor}'s
+ *       background poll loop stays quiescent for the duration of the test — this test only exercises
+ *       the proxy HTTP surface, never the poll-claim pipeline, so there is nothing for it to contend
+ *       with (the #1368 NATS→Postgres cutover replaced the old separate-stream-per-test trick with
+ *       simply not polling).
  *   <li>{@code hephaestus.sandbox.docker-host} points at a socket path that can never exist, so the
  *       worker-role Docker beans ({@code DockerSandboxConfiguration}, {@code
  *       AgentImagePullBootstrapper}) wire (they're plain lazy clients / config beans — no I/O at
@@ -112,14 +111,12 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @DynamicPropertySource
     static void configureJobExecutionCapability(DynamicPropertyRegistry registry) {
-        registry.add("hephaestus.agent.nats.enabled", () -> "true");
-        registry.add("hephaestus.agent.nats.server", NatsTestContainer::getServerUrl);
-        // Dedicated stream/consumer — see the class Javadoc.
-        registry.add("hephaestus.agent.nats.stream-name", () -> "LLM_PROXY_IT");
-        registry.add("hephaestus.agent.nats.consumer-name", () -> "llm-proxy-it-executor");
+        registry.add("hephaestus.agent.enabled", () -> "true");
+        // See the class Javadoc: keeps AgentJobExecutor's background poll loop quiescent.
+        registry.add("hephaestus.agent.poll-interval", () -> "1h");
         registry.add("hephaestus.runtime.worker.enabled", () -> "true");
         // Webhook role off: WebhookConfiguration would otherwise need the unrelated sync
-        // "natsConnection" bean, unrelated to this test (mirrors AgentOrphanRecoveryNatsIntegrationTest).
+        // "natsConnection" bean, unrelated to this test.
         registry.add("hephaestus.runtime.webhook.enabled", () -> "false");
         registry.add("hephaestus.sandbox.docker-host", () -> "unix:///nonexistent/hephaestus-test-llm-proxy.sock");
         registry.add("hephaestus.agent.image.pull-policy", () -> "NEVER");

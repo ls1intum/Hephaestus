@@ -45,7 +45,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
@@ -74,9 +73,6 @@ class AgentJobServiceTest extends BaseUnitTest {
     private JobTypeHandlerRegistry handlerRegistry;
 
     @Mock
-    private ApplicationEventPublisher eventPublisher;
-
-    @Mock
     private TransactionTemplate transactionTemplate;
 
     @Mock
@@ -102,7 +98,6 @@ class AgentJobServiceTest extends BaseUnitTest {
             connectionService,
             handlerRegistry,
             objectMapper,
-            eventPublisher,
             transactionTemplate,
             new PracticeReviewProperties(false, true, false, "", 15, false, false),
             llmBudgetService,
@@ -301,7 +296,7 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldCreateJobAndPublishEvent() {
+        void shouldCreateJobQueued() {
             when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(enabledConfig));
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
@@ -333,11 +328,9 @@ class AgentJobServiceTest extends BaseUnitTest {
             assertThat(job.getJobType()).isEqualTo(AgentJobType.PULL_REQUEST_REVIEW);
             assertThat(job.getIdempotencyKey()).isEqualTo("pr_review:owner/repo:42:authoring:abc123:config:10");
             assertThat(job.getConfigSnapshot()).isNotNull();
-
-            // Verify event published
-            ArgumentCaptor<AgentJobCreatedEvent> eventCaptor = ArgumentCaptor.forClass(AgentJobCreatedEvent.class);
-            verify(eventPublisher).publishEvent(eventCaptor.capture());
-            assertThat(eventCaptor.getValue().workspaceId()).isEqualTo(1L);
+            // #1368 NATS→Postgres cutover: the QUEUED insert IS the enqueue — AgentJobExecutor's poll
+            // loop discovers it directly from the agent_job table, no publish event to verify anymore.
+            assertThat(job.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
         }
 
         @Test
@@ -402,7 +395,6 @@ class AgentJobServiceTest extends BaseUnitTest {
             );
 
             assertThat(result).isEmpty();
-            verify(eventPublisher, never()).publishEvent(any());
         }
 
         @Test
@@ -462,7 +454,6 @@ class AgentJobServiceTest extends BaseUnitTest {
 
             assertThat(result).isEmpty();
             verify(agentJobRepository, never()).saveAndFlush(any());
-            verify(eventPublisher, never()).publishEvent(any());
         }
 
         @Test
