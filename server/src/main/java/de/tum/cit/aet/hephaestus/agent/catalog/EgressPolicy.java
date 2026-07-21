@@ -9,29 +9,51 @@ import java.util.Arrays;
 import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
  * SSRF egress guard for instance-owned LLM provider connections (#1368). Shared: the LLM proxy will
- * reuse it to vet where credentialed traffic may egress. Kept a plain component (its only dependency
- * is the {@link InstanceLlmSettingsRepository} singleton) so it is straightforward to unit-test.
+ * reuse it to vet where credentialed traffic may egress. Kept a plain component (its only dependencies
+ * are the {@link InstanceLlmSettingsRepository} singleton and the loopback dev toggle) so it is
+ * straightforward to unit-test.
  *
- * <p>A base URL passes only when it (1) parses, (2) is HTTPS — or plain HTTP but strictly to a
- * localhost/loopback dev target, (3) does not resolve to a private / link-local / loopback /
- * unique-local address (which blocks the cloud metadata endpoint {@code 169.254.169.254} as a
- * link-local address), and (4) — when the instance allowlist is non-blank — has a host that appears
- * verbatim in that allowlist. An empty allowlist permits any public host.
+ * <p>A base URL passes only when it (1) parses with no userinfo, query string, or fragment — those
+ * are how a gateway URL smuggles a credential (e.g. {@code https://gw/v1?api-key=SECRET}) past the
+ * guard and into snapshots/DTOs/logs, (2) is HTTPS — or plain HTTP but strictly to a localhost/loopback
+ * dev target AND {@link #allowLoopback} is enabled (production defaults it OFF: an unconditional
+ * loopback allowance is an SSRF hole letting a workspace admin point their "provider" at host-local
+ * services), (3) does not resolve to a private / link-local / loopback / unique-local address (which
+ * blocks the cloud metadata endpoint {@code 169.254.169.254} as a link-local address) — this check is
+ * unconditional and independent of {@link #allowLoopback}, and (4) — when the instance allowlist is
+ * non-blank — has a host that appears verbatim in that allowlist. An empty allowlist permits any public
+ * host.
  */
 @Component
-@RequiredArgsConstructor
 @WorkspaceAgnostic("Instance egress policy reads the global instance_llm_settings singleton, not tenant data")
 public class EgressPolicy {
 
     private static final String NOT_PUBLIC_HTTPS = "Provider host must be a public HTTPS URL";
+    private static final String NO_CREDENTIALS_OR_QUERY =
+        "Provider URLs must not contain credentials or query parameters.";
     private static final Set<String> LOCAL_DEV_HOSTS = Set.of("localhost", "127.0.0.1", "::1", "[::1]");
 
     private final InstanceLlmSettingsRepository settingsRepository;
+
+    /**
+     * Gates the localhost/loopback HTTP allowance (default {@code false} — production SSRF hardening).
+     * Mirrors how other dev-only toggles, e.g. {@code hephaestus.auth.dev-login-enabled}, are
+     * property-gated: off unless a local/dev profile explicitly turns it on.
+     */
+    private final boolean allowLoopback;
+
+    public EgressPolicy(
+        InstanceLlmSettingsRepository settingsRepository,
+        @Value("${hephaestus.llm.egress.allow-loopback:false}") boolean allowLoopback
+    ) {
+        this.settingsRepository = settingsRepository;
+        this.allowLoopback = allowLoopback;
+    }
 
     /**
      * @throws IllegalArgumentException with an operator-facing message when {@code baseUrl} is not a
@@ -39,13 +61,16 @@ public class EgressPolicy {
      */
     public void validate(String baseUrl) {
         URI uri = parse(baseUrl);
+        if (uri.getRawUserInfo() != null || uri.getRawQuery() != null || uri.getRawFragment() != null) {
+            throw new IllegalArgumentException(NO_CREDENTIALS_OR_QUERY);
+        }
         String host = uri.getHost();
         String scheme = uri.getScheme();
         if (host == null || host.isBlank() || scheme == null) {
             throw new IllegalArgumentException(NOT_PUBLIC_HTTPS);
         }
         String normalizedHost = host.toLowerCase(Locale.ROOT);
-        boolean localDev = LOCAL_DEV_HOSTS.contains(normalizedHost);
+        boolean localDev = allowLoopback && LOCAL_DEV_HOSTS.contains(normalizedHost);
 
         String normalizedScheme = scheme.toLowerCase(Locale.ROOT);
         boolean https = normalizedScheme.equals("https");

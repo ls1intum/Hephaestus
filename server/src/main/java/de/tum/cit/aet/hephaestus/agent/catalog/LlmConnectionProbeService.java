@@ -3,6 +3,8 @@ package de.tum.cit.aet.hephaestus.agent.catalog;
 import de.tum.cit.aet.hephaestus.agent.catalog.ApiProtocolDefaults.AuthDefaults;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import java.io.IOException;
+import java.net.HttpURLConnection;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,7 +43,18 @@ public class LlmConnectionProbeService {
         this.connectionRepository = connectionRepository;
         this.egressPolicy = egressPolicy;
         // Dedicated short-timeout client — deliberately independent of any job/proxy timeout.
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        // Redirects are NEVER followed: only the initial URL is egress-validated, and the custom auth
+        // header (x-api-key / api-key / Authorization) would otherwise survive a cross-origin redirect
+        // and exfiltrate the credential to whatever host the 3xx points at. A redirect response is
+        // reported as an ordinary unreachable/unsupported probe result (its status is not 2xx), never
+        // followed and never treated as an error.
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory() {
+            @Override
+            protected void prepareConnection(HttpURLConnection connection, String httpMethod) throws IOException {
+                super.prepareConnection(connection, httpMethod);
+                connection.setInstanceFollowRedirects(false);
+            }
+        };
         factory.setConnectTimeout(PROBE_TIMEOUT);
         factory.setReadTimeout(PROBE_TIMEOUT);
         this.restClient = RestClient.builder().requestFactory(factory).build();

@@ -2592,7 +2592,7 @@ export type AgentJob = {
      */
     configName?: string;
     /**
-     * Frozen agent config at submit time
+     * Frozen agent config at submit time (an INSTANCE-scoped connection's baseUrl is redacted to scheme://host)
      */
     configSnapshot: unknown;
     /**

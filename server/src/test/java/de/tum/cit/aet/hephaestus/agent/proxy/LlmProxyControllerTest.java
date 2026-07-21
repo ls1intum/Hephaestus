@@ -104,6 +104,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
         @Test
         void shouldStripXApiKey() {
             LlmModelResolver.ProxyCredential credential = new LlmModelResolver.ProxyCredential(
+                "https://api.example.com",
                 "x-api-key",
                 "",
                 null,
@@ -123,6 +124,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
         @Test
         void shouldStripAuthorization() {
             LlmModelResolver.ProxyCredential credential = new LlmModelResolver.ProxyCredential(
+                "https://api.example.com",
                 "Authorization",
                 "Bearer ",
                 null,
@@ -141,6 +143,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
         @Test
         void shouldStripAzureApiKey() {
             LlmModelResolver.ProxyCredential credential = new LlmModelResolver.ProxyCredential(
+                "https://api.example.com",
                 "api-key",
                 "",
                 null,
@@ -157,6 +160,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
         @Test
         void shouldStripAllAuthHeaders() {
             LlmModelResolver.ProxyCredential credential = new LlmModelResolver.ProxyCredential(
+                "https://api.example.com",
                 "x-api-key",
                 "",
                 null,
@@ -176,6 +180,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
         @Test
         void shouldRemoveHostAndSetAcceptEncodingIdentity() {
             LlmModelResolver.ProxyCredential credential = new LlmModelResolver.ProxyCredential(
+                "https://api.example.com",
                 "x-api-key",
                 "",
                 null,
@@ -194,6 +199,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
         @Test
         void shouldStripHopByHopHeaders() {
             LlmModelResolver.ProxyCredential credential = new LlmModelResolver.ProxyCredential(
+                "https://api.example.com",
                 "x-api-key",
                 "",
                 null,
@@ -211,6 +217,46 @@ class LlmProxyControllerTest extends BaseUnitTest {
             assertThat(out.get(HttpHeaders.TRANSFER_ENCODING)).isNull();
             assertThat(out.get("Keep-Alive")).isNull();
             assertThat(out.getFirst("Content-Type")).isEqualTo("application/json");
+        }
+
+        @Test
+        @DisplayName("a keyless connection (null apiKey) forwards with auth headers stripped, none injected")
+        void shouldForwardWithoutAuthHeaderWhenKeyless() {
+            LlmModelResolver.ProxyCredential credential = new LlmModelResolver.ProxyCredential(
+                "http://localhost:11434",
+                "Authorization",
+                "Bearer ",
+                null,
+                null
+            );
+            HttpHeaders incoming = new HttpHeaders();
+            incoming.set("x-api-key", "job-token-should-be-stripped");
+            incoming.set(HttpHeaders.AUTHORIZATION, "Bearer job-token-should-be-stripped");
+            incoming.set("Content-Type", "application/json");
+
+            HttpHeaders out = controller.buildUpstreamHeaders(incoming, credential);
+
+            assertThat(out.get("x-api-key")).isNull();
+            assertThat(out.get(HttpHeaders.AUTHORIZATION)).isNull();
+            assertThat(out.get("api-key")).isNull();
+            assertThat(out.getFirst("Content-Type")).isEqualTo("application/json");
+        }
+
+        @Test
+        @DisplayName("a keyless connection with a blank (non-null) apiKey also forwards without an auth header")
+        void shouldForwardWithoutAuthHeaderWhenApiKeyBlank() {
+            LlmModelResolver.ProxyCredential credential = new LlmModelResolver.ProxyCredential(
+                "http://localhost:11434",
+                "x-api-key",
+                "",
+                null,
+                "   "
+            );
+            HttpHeaders incoming = new HttpHeaders();
+
+            HttpHeaders out = controller.buildUpstreamHeaders(incoming, credential);
+
+            assertThat(out.get("x-api-key")).isNull();
         }
     }
 
@@ -253,7 +299,10 @@ class LlmProxyControllerTest extends BaseUnitTest {
         void egressPolicyRejectionIsRefused() {
             ProxyRouting routing = anthropicRouting();
             authenticate(routing);
-            stubCredential(routing, new LlmModelResolver.ProxyCredential("x-api-key", "", null, "sk-real-key"));
+            stubCredential(
+                routing,
+                new LlmModelResolver.ProxyCredential("https://api.anthropic.com", "x-api-key", "", null, "sk-real-key")
+            );
             doThrow(new IllegalArgumentException("Provider host must be a public HTTPS URL"))
                 .when(egressPolicy)
                 .validate(routing.baseUrl());
@@ -265,6 +314,67 @@ class LlmProxyControllerTest extends BaseUnitTest {
 
             assertThat(result.getStatusCode().value()).isEqualTo(502);
             assertThat(result.getBody()).isEqualTo("Upstream target not permitted");
+        }
+
+        @Test
+        @DisplayName(
+            "egress + upstream routing use the LIVE credential's base URL, never the job's frozen " +
+                "ProxyRouting#baseUrl() — a connection repointed to a new host after dispatch must not send " +
+                "its rotated key to the stale old host (rotation split-brain)"
+        )
+        void usesLiveCredentialBaseUrlNotFrozenRoutingBaseUrl() {
+            ProxyRouting routing = new ProxyRouting(
+                "job:test",
+                "anthropic-messages",
+                "https://old-frozen-host.example.com", // frozen in the job's ConfigSnapshot at dispatch
+                FundingSource.INSTANCE,
+                7L,
+                null
+            );
+            authenticate(routing);
+            stubCredential(
+                routing,
+                new LlmModelResolver.ProxyCredential(
+                    "https://new-live-host.example.com", // the connection was repointed after dispatch
+                    "x-api-key",
+                    "",
+                    null,
+                    "sk-rotated-key"
+                )
+            );
+            // Only the LIVE host is stubbed to reject — the frozen host is left as a default (no-op)
+            // mock, so this only fails 502/"Upstream target not permitted" if the controller validated
+            // the live credential's base URL, not routing.baseUrl().
+            doThrow(new IllegalArgumentException("blocked"))
+                .when(egressPolicy)
+                .validate("https://new-live-host.example.com");
+
+            var request = new MockHttpServletRequest("POST", "/internal/llm/v1/messages");
+            var response = new MockHttpServletResponse();
+
+            var result = controller.proxy(request, response, new HttpHeaders(), "{}".getBytes());
+
+            assertThat(result.getStatusCode().value()).isEqualTo(502);
+            assertThat(result.getBody()).isEqualTo("Upstream target not permitted");
+        }
+
+        @Test
+        @DisplayName("a resolved connection with no api key is treated as keyless, not refused as \"no credential\"")
+        void keylessConnectionIsNotRefusedAsMissingCredential() {
+            ProxyRouting routing = anthropicRouting();
+            authenticate(routing);
+            stubCredential(
+                routing,
+                new LlmModelResolver.ProxyCredential("http://localhost:11434", "Authorization", "Bearer ", null, null)
+            );
+
+            var request = new MockHttpServletRequest("POST", "/internal/llm/v1/messages");
+            var response = new MockHttpServletResponse();
+
+            var result = controller.proxy(request, response, new HttpHeaders(), "{}".getBytes());
+
+            assertThat(result).isNotNull();
+            assertThat(result.getBody()).isNotEqualTo("No credential configured for this connection");
         }
     }
 
@@ -384,7 +494,10 @@ class LlmProxyControllerTest extends BaseUnitTest {
         void shouldRejectSsrfHostMismatchViaAtInjection() {
             ProxyRouting routing = anthropicRouting();
             authenticate(routing);
-            stubCredential(routing, new LlmModelResolver.ProxyCredential("x-api-key", "", null, "sk-real-key"));
+            stubCredential(
+                routing,
+                new LlmModelResolver.ProxyCredential("https://api.anthropic.com", "x-api-key", "", null, "sk-real-key")
+            );
 
             // Craft path where stripping "/internal/llm" leaves "@evil.com/v1/messages".
             // buildUpstreamUrl produces: "https://api.anthropic.com@evil.com/v1/messages"
@@ -403,7 +516,10 @@ class LlmProxyControllerTest extends BaseUnitTest {
         void shouldHandleMalformedUri() {
             ProxyRouting routing = anthropicRouting();
             authenticate(routing);
-            stubCredential(routing, new LlmModelResolver.ProxyCredential("x-api-key", "", null, "sk-real-key"));
+            stubCredential(
+                routing,
+                new LlmModelResolver.ProxyCredential("https://api.anthropic.com", "x-api-key", "", null, "sk-real-key")
+            );
 
             var request = new MockHttpServletRequest("POST", "/internal/llm/v1/messages with spaces");
             var response = new MockHttpServletResponse();
@@ -479,7 +595,10 @@ class LlmProxyControllerTest extends BaseUnitTest {
         void shouldAcceptNullBody() {
             ProxyRouting routing = anthropicRouting();
             authenticate(routing);
-            stubCredential(routing, new LlmModelResolver.ProxyCredential("x-api-key", "", null, "sk-real-key"));
+            stubCredential(
+                routing,
+                new LlmModelResolver.ProxyCredential("https://api.anthropic.com", "x-api-key", "", null, "sk-real-key")
+            );
 
             var request = new MockHttpServletRequest("GET", "/internal/llm/v1/models");
             var response = new MockHttpServletResponse();
@@ -529,7 +648,10 @@ class LlmProxyControllerTest extends BaseUnitTest {
 
             ProxyRouting routing = anthropicRouting();
             authenticate(routing);
-            stubCredential(routing, new LlmModelResolver.ProxyCredential("x-api-key", "", null, "sk-real-key"));
+            stubCredential(
+                routing,
+                new LlmModelResolver.ProxyCredential("https://api.anthropic.com", "x-api-key", "", null, "sk-real-key")
+            );
 
             var request = new MockHttpServletRequest("POST", "/internal/llm/v1/messages");
             var response = new MockHttpServletResponse();
@@ -576,7 +698,10 @@ class LlmProxyControllerTest extends BaseUnitTest {
 
             ProxyRouting routing = anthropicRouting();
             authenticate(routing);
-            stubCredential(routing, new LlmModelResolver.ProxyCredential("x-api-key", "", null, "sk-real-key"));
+            stubCredential(
+                routing,
+                new LlmModelResolver.ProxyCredential("https://api.anthropic.com", "x-api-key", "", null, "sk-real-key")
+            );
 
             var request = new MockHttpServletRequest("POST", "/internal/llm/v1/messages");
             var response = new MockHttpServletResponse();
@@ -701,12 +826,14 @@ class LlmProxyControllerTest extends BaseUnitTest {
         )
         void shouldInjectCorrectAuthPerConnection() {
             LlmModelResolver.ProxyCredential anthropicCredential = new LlmModelResolver.ProxyCredential(
+                "https://api.anthropic.com",
                 "x-api-key",
                 "",
                 null,
                 "sk-ant"
             );
             LlmModelResolver.ProxyCredential openaiCredential = new LlmModelResolver.ProxyCredential(
+                "https://api.openai.com",
                 "Authorization",
                 "Bearer ",
                 null,

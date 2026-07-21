@@ -2,10 +2,12 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.net.URI;
 import java.time.Instant;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
 
 @Schema(description = "Agent job execution record (job_token intentionally omitted)")
 public record AgentJobDTO(
@@ -14,7 +16,11 @@ public record AgentJobDTO(
     @NonNull @Schema(description = "Current job status") AgentJobStatus status,
     @Schema(description = "Job metadata (routing/display info)") Object metadata,
     @Schema(description = "Job output (agent results)") Object output,
-    @NonNull @Schema(description = "Frozen agent config at submit time") Object configSnapshot,
+    @NonNull
+    @Schema(
+        description = "Frozen agent config at submit time (an INSTANCE-scoped connection's baseUrl is redacted to scheme://host)"
+    )
+    Object configSnapshot,
     @Schema(description = "ID of the agent config that ran this job (from the frozen snapshot)") Long configId,
     @Schema(description = "Name of the agent config that ran this job (from the frozen snapshot)") String configName,
     @Schema(description = "Docker container ID") String containerId,
@@ -51,7 +57,7 @@ public record AgentJobDTO(
             job.getStatus(),
             job.getMetadata(),
             job.getOutput(),
-            snapshot,
+            redactInstanceBaseUrl(snapshot),
             snapshotLong(snapshot, "configId"),
             snapshotString(snapshot, "configName"),
             job.getContainerId(),
@@ -73,6 +79,41 @@ public record AgentJobDTO(
             job.getLlmCacheWriteTokens(),
             job.getLlmCostUsd()
         );
+    }
+
+    /**
+     * A workspace admin (the {@code /agent-jobs} audience — {@link AgentJobController} requires only
+     * {@code RequireAtLeastWorkspaceAdmin}) must never see an INSTANCE-scoped connection's full base
+     * URL: that connection is owned and configured by the instance admin, potentially shared across many
+     * workspaces, and its URL (an internal gateway, a vendor-specific deployment path, …) is not the
+     * workspace admin's data to read. A WORKSPACE-scoped (BYO) connection's base URL is the workspace's
+     * own configuration, so it is left as-is. Reduces the frozen snapshot's {@code baseUrl} to
+     * {@code scheme://host} — enough to see which provider a job used without exposing path detail.
+     */
+    private static Object redactInstanceBaseUrl(JsonNode snapshot) {
+        if (!(snapshot instanceof ObjectNode obj) || !obj.has("baseUrl")) {
+            return snapshot;
+        }
+        if (!"INSTANCE".equals(snapshotString(snapshot, "connectionScope"))) {
+            return snapshot;
+        }
+        ObjectNode redacted = obj.deepCopy();
+        redacted.put("baseUrl", hostOnly(obj.path("baseUrl").asString(null)));
+        return redacted;
+    }
+
+    private static String hostOnly(String baseUrl) {
+        if (baseUrl == null || baseUrl.isBlank()) {
+            return baseUrl;
+        }
+        try {
+            URI uri = URI.create(baseUrl);
+            String scheme = uri.getScheme();
+            String host = uri.getHost();
+            return scheme != null && host != null ? scheme + "://" + host : "(redacted)";
+        } catch (IllegalArgumentException e) {
+            return "(redacted)";
+        }
     }
 
     private static Long snapshotLong(JsonNode snapshot, String field) {

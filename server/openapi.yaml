@@ -5499,7 +5499,8 @@ components:
           description: Name of the agent config that ran this job (from the frozen
             snapshot)
         configSnapshot:
-          description: Frozen agent config at submit time
+          description: Frozen agent config at submit time (an INSTANCE-scoped connection's
+            baseUrl is redacted to scheme://host)
         containerId:
           type: string
           description: Docker container ID

@@ -18,14 +18,25 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <h2>Deliberately excluded fields (#1368 slice 5 — runtime switch-over)</h2>
  *
- * <p>Everything here is non-secret, frozen BEHAVIOUR: the wire protocol, the upstream base URL, the
- * model id, and its capability envelope. The credential itself — and any header material
- * ({@code authHeaderName}/{@code authValuePrefix}/{@code azureApiVersion}) — is deliberately NEVER
- * frozen here. {@link #connectionScope}/{@link #connectionId} instead identify WHICH connection row
- * funds the job, so the LLM proxy can re-resolve the live credential at call time via
+ * <p>Everything here is non-secret, frozen BEHAVIOUR: the wire protocol, the model id, and its
+ * capability envelope. The credential itself — and any header material ({@code authHeaderName}/
+ * {@code authValuePrefix}/{@code azureApiVersion}) — is deliberately NEVER frozen here.
+ * {@link #connectionScope}/{@link #connectionId} instead identify WHICH connection row funds the job,
+ * so the LLM proxy can re-resolve the live credential at call time via
  * {@link LlmModelResolver#resolveProxyCredential}, picking up rotation/revocation immediately. A
  * legacy (pre-catalog) config carries {@code connectionScope=null}/{@code connectionId=null}; the
  * proxy then falls back to the live {@code AgentConfig.llmApiKey} via {@link #configId}.
+ *
+ * <h3>{@link #baseUrl} is split: frozen here, but NOT what the proxy routes on</h3>
+ *
+ * <p>{@link #baseUrl} is frozen at dispatch and stays that way for non-proxy consumers (e.g. runner
+ * config that needs a host to render into the sandbox at build time, before any credential exists). The
+ * LLM proxy, however, deliberately does NOT read {@link #baseUrl} — it re-resolves the base URL LIVE,
+ * from the same connection row the credential comes from, via
+ * {@link LlmModelResolver#resolveProxyCredential}. Routing and credential must travel together: if a
+ * connection is repointed to a new host after a job's snapshot was frozen, resolving the credential live
+ * while trusting this frozen {@link #baseUrl} would send the connection's NEW (rotated) key to the OLD
+ * (stale) host — a split-brain that leaks the new credential to whatever now answers at the old address.
  *
  * <ul>
  *   <li>{@code maxConcurrentJobs} — concurrency gate read live from AgentConfig so admin

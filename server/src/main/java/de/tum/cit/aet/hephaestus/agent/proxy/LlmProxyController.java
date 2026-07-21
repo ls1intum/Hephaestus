@@ -42,12 +42,16 @@ import tools.jackson.databind.node.ObjectNode;
  * <p><b>#1368 slice 5 — connection identified by the AUTHENTICATED token, not the URL.</b> There is
  * no {@code /internal/llm/<provider>} path segment: {@link JobTokenAuthenticationFilter} resolves the
  * caller's {@link ProxyRouting} from its bearer token (an {@code AgentJob}'s frozen
- * {@code ConfigSnapshot}, or a mentor session's registry entry), and THAT identifies which connection
- * funds the call. The upstream base URL / wire protocol are the snapshot's FROZEN behaviour; the auth
- * header name/prefix/value and the api key are re-resolved LIVE from the connection row on every
- * request via {@link LlmModelResolver#resolveProxyCredential} — so a rotated or revoked key takes
- * effect immediately without waiting for the job to finish. {@link EgressPolicy} is re-checked here
- * too, so a connection disabled or edited to an unsafe host mid-flight cannot be used to egress.
+ * {@code ConfigSnapshot}, or a mentor session's registry entry), and THAT identifies WHICH connection
+ * funds the call — only the wire protocol is the snapshot's FROZEN behaviour. The upstream base URL,
+ * the auth header name/prefix/value, and the api key are all re-resolved TOGETHER, LIVE, from the same
+ * connection row on every request via {@link LlmModelResolver#resolveProxyCredential} — so a rotated or
+ * revoked key, or a connection repointed to a new host, takes effect immediately without waiting for the
+ * job to finish, and without ever pairing a freshly-rotated key with a stale frozen host.
+ * {@link EgressPolicy} is re-checked here too, against that same live base URL, so a connection disabled
+ * or edited to an unsafe host mid-flight cannot be used to egress. A connection with no api key
+ * configured (a deliberately keyless self-hosted gateway) is forwarded without an auth header rather
+ * than refused.
  *
  * <p>Authentication is handled by {@link JobTokenAuthenticationFilter} which validates
  * the bearer token and sets a {@link JobTokenAuthentication} on the security context.
@@ -174,19 +178,24 @@ class LlmProxyController {
             return ResponseEntity.badRequest().body("Invalid path");
         }
 
+        // Routing (base URL) and credential are resolved TOGETHER from the live connection row — never
+        // split between the job's frozen ConfigSnapshot and a live credential lookup, or a connection
+        // repointed to a new host after dispatch would send its rotated key to the stale old host.
         LlmModelResolver.ProxyCredential credential = llmModelResolver.resolveProxyCredential(
             new LlmModelResolver.ConnectionRef(routing.connectionScope(), routing.connectionId()),
             routing.legacyConfigId(),
             routing.apiProtocol()
         );
-        if (credential == null || credential.apiKey() == null || credential.apiKey().isBlank()) {
-            log.warn("No live credential resolvable for principal {}", routing.principalDescription());
+        if (credential == null) {
+            log.warn("No live connection resolvable for principal {}", routing.principalDescription());
             incrementErrors(routing.apiProtocol());
             return ResponseEntity.status(502).body("No credential configured for this connection");
         }
-
+        // A null/blank api key is a deliberately keyless connection (self-hosted vLLM/Ollama gateways
+        // commonly run without auth) — buildUpstreamHeaders forwards without injecting an auth header
+        // rather than refusing.
         try {
-            egressPolicy.validate(routing.baseUrl());
+            egressPolicy.validate(credential.baseUrl());
         } catch (IllegalArgumentException e) {
             log.warn(
                 "Egress policy rejected base URL for principal {}: {}",
@@ -213,14 +222,14 @@ class LlmProxyController {
             incomingQuery =
                 incomingQuery == null || incomingQuery.isBlank() ? versionParam : incomingQuery + "&" + versionParam;
         }
-        String upstreamUrl = buildUpstreamUrl(routing.baseUrl(), subPath, incomingQuery);
+        String upstreamUrl = buildUpstreamUrl(credential.baseUrl(), subPath, incomingQuery);
 
         // SSRF defense: verify constructed URL still points at expected upstream host and scheme
         URI upstreamUri;
         URI expectedBase;
         try {
             upstreamUri = URI.create(upstreamUrl);
-            expectedBase = URI.create(routing.baseUrl());
+            expectedBase = URI.create(credential.baseUrl());
         } catch (IllegalArgumentException e) {
             log.warn("Malformed upstream URL for principal {}: {}", routing.principalDescription(), e.getMessage());
             return ResponseEntity.badRequest().body("Invalid request path");
@@ -247,7 +256,14 @@ class LlmProxyController {
             outBody = injectStreamUsageOption(outBody);
         }
 
-        log.debug("Proxying {} {} for principal {}", request.getMethod(), upstreamUrl, routing.principalDescription());
+        // Host-only — never log the full upstream URL (path/query can carry provider-specific,
+        // operator-sensitive routing detail; the credential itself is already excluded from headers).
+        log.debug(
+            "Proxying {} to host={} for principal {}",
+            request.getMethod(),
+            upstreamUri.getHost(),
+            routing.principalDescription()
+        );
 
         UpstreamResult upstream;
         try {
@@ -266,11 +282,21 @@ class LlmProxyController {
 
             upstream = readySpec.exchangeToMono(ProxyStreamingUtils::consumeResponse).block(BLOCK_TIMEOUT);
         } catch (WebClientRequestException e) {
-            log.warn("Upstream unreachable for principal {}: {}", routing.principalDescription(), e.getMessage());
+            // Never log e.getMessage() here — WebClientRequestException embeds the full request URI
+            // (including path/query) in its message.
+            log.warn(
+                "Upstream unreachable for principal {}: reason={}",
+                routing.principalDescription(),
+                e.getClass().getSimpleName()
+            );
             incrementErrors(routing.apiProtocol());
             return ResponseEntity.status(502).body("Upstream provider unreachable");
         } catch (Exception e) {
-            log.warn("Upstream request failed for principal {}: {}", routing.principalDescription(), e.getMessage());
+            log.warn(
+                "Upstream request failed for principal {}: reason={}",
+                routing.principalDescription(),
+                e.getClass().getSimpleName()
+            );
             incrementErrors(routing.apiProtocol());
             return ResponseEntity.status(502).body("Upstream request failed");
         }
@@ -311,9 +337,13 @@ class LlmProxyController {
         out.remove("api-key");
         out.remove(HttpHeaders.AUTHORIZATION);
 
-        // Inject the real, live-resolved API key in the connection's configured header shape
-        String prefix = credential.authValuePrefix() != null ? credential.authValuePrefix() : "";
-        out.set(credential.authHeaderName(), prefix + credential.apiKey());
+        // Inject the real, live-resolved API key in the connection's configured header shape — unless
+        // the connection is deliberately keyless (self-hosted vLLM/Ollama gateways), in which case the
+        // request is forwarded with the auth headers stripped and nothing injected in their place.
+        if (credential.apiKey() != null && !credential.apiKey().isBlank()) {
+            String prefix = credential.authValuePrefix() != null ? credential.authValuePrefix() : "";
+            out.set(credential.authHeaderName(), prefix + credential.apiKey());
+        }
 
         return out;
     }

@@ -51,7 +51,9 @@ import tools.jackson.databind.JsonNode;
  *   <li>{@link #jobToken} is a 256-bit SecureRandom token encrypted at rest, used for LLM proxy
  *       authentication. It is never exposed in API responses, logs, or NATS messages.</li>
  *   <li>{@link #configSnapshot} freezes the agent config at submit time so in-flight jobs
- *       are not affected by config changes.</li>
+ *       are not affected by config changes. Excluded from {@code toString()}; the API-facing
+ *       {@code AgentJobDTO} additionally redacts an INSTANCE-scoped connection's base URL down to
+ *       {@code scheme://host} before returning it to a workspace admin.</li>
  * </ul>
  */
 @Entity
@@ -122,8 +124,14 @@ public class AgentJob {
     @Column(name = "output", columnDefinition = "jsonb")
     private JsonNode output;
 
+    /**
+     * Frozen agent config, including the connection's base URL (see {@code ConfigSnapshot}'s Javadoc
+     * for why the LLM proxy does NOT route on this field). Excluded from {@code toString()} — a stray
+     * {@code log.info("{}", job)} must not spill provider host/URL detail into application logs.
+     */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "config_snapshot", columnDefinition = "jsonb", nullable = false)
+    @ToString.Exclude
     private JsonNode configSnapshot;
 
     @JsonIgnore
