@@ -8,6 +8,9 @@ services:
   # ─────────────────────────────────────────────────────────────────────────────
   webhook-server:
     image: "ghcr.io/ls1intum/hephaestus/application-server:${IMAGE_TAG}"
+    # Bounds heap sizing to this container; without it the JVM targets host RAM and co-located
+    # services oversubscribe and swap. Webhook only receives and republishes, so its heap is small.
+    mem_limit: ${WEBHOOK_SERVER_MEM_LIMIT:-1g}
     expose:
       - "8080"
     environment:

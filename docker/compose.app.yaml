@@ -93,6 +93,9 @@ services:
 
   application-server:
     image: "ghcr.io/ls1intum/hephaestus/application-server:${IMAGE_TAG}"
+    # Bounds heap sizing to this container; without it the JVM targets host RAM and co-located
+    # services oversubscribe and swap. Hosts the NATS sync consumers, so it takes the largest limit.
+    mem_limit: ${APPLICATION_SERVER_MEM_LIMIT:-5g}
     ports:
       - "8080"
     environment:
@@ -291,6 +294,8 @@ services:
   # Worker runtime — same image, worker profile, no HTTP server, dials the hub over WSS.
   application-worker:
     image: "ghcr.io/ls1intum/hephaestus/application-server:${IMAGE_TAG}"
+    # Bounds heap sizing to this container (see application-server).
+    mem_limit: ${APPLICATION_WORKER_MEM_LIMIT:-3g}
     environment:
       APP_VERSION: ${IMAGE_TAG}
       SPRING_PROFILES_ACTIVE: prod,worker
