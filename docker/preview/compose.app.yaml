@@ -196,12 +196,11 @@ services:
       DATABASE_USERNAME: hephaestus
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-hephaestus-preview}
       NATS_SERVER: nats://nats-server:4222
-      # hephaestus.sync.nats.server and hephaestus.agent.nats.server BOTH default to ${NATS_SERVER}
-      # and must be pinned separately. The integration consumer may point at an upstream NATS (e.g.
-      # staging's) to consume events a shared GitHub App delivers there; the agent job queue must
-      # stay local, or this stack's jobs land in that environment's queue and its workers run them.
+      # hephaestus.sync.nats.server defaults to ${NATS_SERVER} and can be pinned separately: the
+      # integration consumer may point at an upstream NATS (e.g. staging's) to consume events a
+      # shared GitHub App delivers there. The agent job queue runs on PostgreSQL, not NATS, so it
+      # has no server to pin — it is always local to this stack's own database.
       HEPHAESTUS_SYNC_NATS_SERVER: ${HEPHAESTUS_SYNC_NATS_SERVER:-nats://nats-server:4222}
-      HEPHAESTUS_AGENT_NATS_SERVER: nats://nats-server:4222
       NATS_ENABLED: ${NATS_ENABLED:-true}
       # Per-deploy durable name, so base and previews get their own JetStream consumers instead of
       # competing for one and stealing each other's messages.
@@ -255,7 +254,7 @@ services:
       OUTLINE_OAUTH_CLIENT_SECRET: ${OUTLINE_OAUTH_CLIENT_SECRET:-}
       PRACTICE_REVIEW_FOR_ALL: ${PRACTICE_REVIEW_FOR_ALL:-false}
       HEPHAESTUS_FEATURES_FLAGS_PRACTICE_REVIEW_FOR_ALL: ${PRACTICE_REVIEW_FOR_ALL:-false}
-      AGENT_NATS_ENABLED: ${AGENT_NATS_ENABLED:-false}
+      AGENT_ENABLED: ${AGENT_ENABLED:-false}
       GIT_CHECKOUT_ENABLED: ${GIT_CHECKOUT_ENABLED:-false}
       GIT_STORAGE_PATH: /data/git-repos
       # There is no separate worker container: hephaestus.runtime.worker.enabled defaults to true,

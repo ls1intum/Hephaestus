@@ -193,12 +193,12 @@ Practice review is not enabled by a single flag. The following settings must be 
 | `PRACTICE_REVIEW_DELIVER_TO_MERGED` | Allows delivery after merge |
 | `PRACTICE_REVIEW_COOLDOWN_MINUTES` | Minimum delay between repeated reviews of the same PR/MR |
 | `PRACTICE_REVIEW_APP_BASE_URL` | Footer link in review comments |
-| `AGENT_NATS_ENABLED` | Enables the agent job queue and executor |
+| `AGENT_ENABLED` | Enables the PostgreSQL-backed agent job queue and executor |
 | `GIT_CHECKOUT_ENABLED` | Enables local repo checkout and bind-mount into agent containers |
-| `NATS_ENABLED` | Enables webhook-driven sync consumption |
+| `NATS_ENABLED` | Enables webhook-driven sync consumption (unrelated to the agent job queue) |
 | `NATS_DURABLE_CONSUMER_NAME` | Durable consumer name for sync processing |
 
-The Docker sandbox itself is activated by the **worker runtime role** (`hephaestus.runtime.worker.enabled`, default `true` in the monolith and in the dedicated `application-worker` pod), not by a flag. `AGENT_NATS_ENABLED`, `GIT_CHECKOUT_ENABLED`, and `NATS_ENABLED` must be `true` together for practice review — anything else is a half-configured deployment.
+The Docker sandbox itself is activated by the **worker runtime role** (`hephaestus.runtime.worker.enabled`, default `true` in the monolith and in the dedicated `application-worker` pod), not by a flag. `AGENT_ENABLED` and `GIT_CHECKOUT_ENABLED` must be `true` together for practice review — anything else is a half-configured deployment. The agent job queue itself runs on PostgreSQL, not NATS; `NATS_ENABLED` still gates webhook-driven sync consumption and must stay on for that, but it is no longer part of the practice-review bundle.
 
 ### Rollout tiers
 
@@ -207,7 +207,7 @@ Use the same variables differently across environments:
 | Environment | Intended scope |
 | --- | --- |
 | Preview | Limited by default. Keep GitLab login, GitLab workspaces, sandbox, git checkout, and agent job execution disabled unless preview is explicitly being used as rollout validation. |
-| Staging | Uses the production compose files, but should still be a controlled rollout. Start by enabling GitLab login and GitLab workspace creation first. Only enable `AGENT_NATS_ENABLED`, `GIT_CHECKOUT_ENABLED`, and `NATS_ENABLED` when staging is intentionally validating practice review execution. |
+| Staging | Uses the production compose files, but should still be a controlled rollout. Start by enabling GitLab login and GitLab workspace creation first. Only enable `AGENT_ENABLED` and `GIT_CHECKOUT_ENABLED` when staging is intentionally validating practice review execution. |
 | Production | Full rollout only after staging has validated the exact same bundle. |
 
 Staging and production both use the production compose files. The difference should come from the `.env` values, not from a different compose topology.
@@ -270,7 +270,7 @@ The sync scheduler fetches recent GitHub activity (issues, PRs, reviews) for mon
    - Designate the first super-admin **before first boot** via the allowlist `HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS=<provider>:@<username>` (e.g. `github:@octocat`), or use the one-time break-glass `HEPHAESTUS_AUTH_BOOTSTRAP_TOKEN` — both are idempotent and lockout-safe (see the `docs/runbooks/auth-cutover.md` runbook → *First instance admin*). They promote on login; subsequent admins are managed from `/admin/users`. Hand-editing `account.app_role = 'APP_ADMIN'` in SQL is a last-resort fallback only.
    - Verify that the super admin user can access workspace admin endpoints for workspaces where they have membership (they are automatically elevated to workspace ADMIN level for those workspaces).
    - Trigger a test webhook from GitHub or GitLab to validate the ingest pipeline.
-   - Verify that `GITLAB_ENABLED`, `GITLAB_WORKSPACE_CREATION`, `AGENT_NATS_ENABLED`, `GIT_CHECKOUT_ENABLED`, and `NATS_ENABLED` are all present in the deployed environment before testing GitLab practice review.
+   - Verify that `GITLAB_ENABLED`, `GITLAB_WORKSPACE_CREATION`, `AGENT_ENABLED`, `GIT_CHECKOUT_ENABLED`, and `NATS_ENABLED` (needed for sync/webhook ingest, not the agent job queue) are all present in the deployed environment before testing GitLab practice review.
    - Open `/imprint` and `/privacy`. If the red "not configured" banner is shown, configure a [legal profile or overrides](./legal-pages) **before** opening the deployment to end users — serving the built-in disclaimer is a § 5 DDG / Art. 13 GDPR violation.
 
 ## Global admin privileges
@@ -289,7 +289,7 @@ This allows platform administrators to troubleshoot and manage workspaces where 
 - Monitor services with the central Prometheus/Loki stack; ensure trace IDs appear in logs.
 - Schedule regular backups for PostgreSQL (it now holds auth state — accounts, identity links, sessions — in addition to application data).
 - Review weekly leaderboard Slack posts to ensure the automation is active.
-- Preview deployments do not currently represent the full GitLab practice-review rollout unless they are explicitly wired with the same GitLab IdP, sandbox, git checkout, and agent NATS settings.
+- Preview deployments do not currently represent the full GitLab practice-review rollout unless they are explicitly wired with the same GitLab IdP, sandbox, git checkout, and agent job queue settings.
 
 ## Support
 

@@ -147,10 +147,10 @@ in `.env` and `docker compose up -d`. Each is documented in
 | AI practice review | Automated PR feedback from the coding agent | [Practice review bundle](./production-setup#practice-review-rollout-bundle) |
 
 **AI practice review needs two things, not one:** the environment bundle above
-(`AGENT_NATS_ENABLED`, `GIT_CHECKOUT_ENABLED`, `PRACTICE_REVIEW_FOR_ALL` — set together, plus
-an `LLM_PROXY_*` upstream), **and** a model with an API key configured per workspace in the
-UI under **Workspace settings → AI**. With the flags on but no workspace model, nothing is
-reviewed and no error explains why.
+(`AGENT_ENABLED`, `GIT_CHECKOUT_ENABLED`, `PRACTICE_REVIEW_FOR_ALL` — set together; the job
+queue itself runs on PostgreSQL, no NATS setup needed for this bundle), **and** a model with an
+API key configured per workspace in the UI under **Workspace settings → AI**. With the flags on
+but no workspace model, nothing is reviewed and no error explains why.
 
 ## 8. Legal pages (public instances)
 

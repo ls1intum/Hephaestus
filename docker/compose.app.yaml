@@ -197,8 +197,9 @@ services:
       SANDBOX_MAX_CONCURRENT: ${SANDBOX_MAX_CONCURRENT:-5}
       SANDBOX_MEMORY_BYTES: ${SANDBOX_MEMORY_BYTES:-4294967296}
       SANDBOX_CPUS: ${SANDBOX_CPUS:-2.0}
-      # Agent NATS (job queue for practice review)
-      AGENT_NATS_ENABLED: ${AGENT_NATS_ENABLED:-false}
+      # Agent job queue (practice review). The queue runs on PostgreSQL — no NATS involved. NATS
+      # stays required elsewhere on this pod for webhook-driven sync consumption (NATS_ENABLED above).
+      AGENT_ENABLED: ${AGENT_ENABLED:-false}
       # Git checkout (bind-mount repos into agent containers)
       GIT_CHECKOUT_ENABLED: ${GIT_CHECKOUT_ENABLED:-false}
       GIT_STORAGE_PATH: /data/git-repos
@@ -292,15 +293,16 @@ services:
       HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: ${HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST:-true}
       HEPHAESTUS_HUB_URL: ws://application-server:8080/api/workers/connect
       HEPHAESTUS_WORKER_REGISTRATION_TOKEN: ${HEPHAESTUS_WORKER_REGISTRATION_TOKEN:-}
-      NATS_SERVER: nats://nats-server:4222
-      AGENT_NATS_ENABLED: ${AGENT_NATS_ENABLED:-false}
+      # Agent job queue (practice review). The queue runs on PostgreSQL — this pod needs no NATS at
+      # all (it runs no sync/webhook role), so no NATS_SERVER is set here.
+      AGENT_ENABLED: ${AGENT_ENABLED:-false}
       SANDBOX_DOCKER_HOST: ${SANDBOX_DOCKER_HOST:-unix:///var/run/docker.sock}
       SANDBOX_CONTAINER_RUNTIME: ${SANDBOX_CONTAINER_RUNTIME:-}
       SANDBOX_MAX_CONCURRENT: ${SANDBOX_MAX_CONCURRENT:-5}
       SANDBOX_MEMORY_BYTES: ${SANDBOX_MEMORY_BYTES:-4294967296}
       SANDBOX_CPUS: ${SANDBOX_CPUS:-2.0}
       # No LLM credential passthrough needed: the proxy runs in-process on this pod (it follows
-      # job-execution capability, i.e. AGENT_NATS_ENABLED + the worker role) and reads providers
+      # job-execution capability, i.e. AGENT_ENABLED + the worker role) and reads providers
       # from the same instance/workspace catalog as application-server.
       HEPHAESTUS_WORKER_CAPACITY_REVIEW_MAX: ${HEPHAESTUS_WORKER_REVIEW_MAX:-auto}
       HEPHAESTUS_WORKER_CAPACITY_MENTOR_MAX: ${HEPHAESTUS_WORKER_MENTOR_MAX:-auto}

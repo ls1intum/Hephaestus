@@ -71,6 +71,21 @@ Entries exist only for releases that need operator action. Everything else is in
 2. Register your provider(s) under Instance admin → AI models (or have a workspace admin connect their own under the workspace's AI settings).
 3. Existing per-workspace agent configs keep working unchanged — no migration runs against them, and no immediate action is needed. At runtime, any config not yet bound to a catalog model resolves through an automatic legacy fallback using its existing provider/base URL/key. Rebind them to a catalog-bound model when convenient; the legacy fields will be removed in a future release following the usual deprecate-then-remove cycle.
 
+#### 🔴 Agent job queue moved from NATS to PostgreSQL
+
+**Affected**: any deployment setting `AGENT_NATS_ENABLED`, `HEPHAESTUS_AGENT_NATS_SERVER`, `AGENT_NATS_MAX_ACK_PENDING`, or `AGENT_NATS_FETCH_BATCH_SIZE`.
+
+**Before**: the agent job queue (practice review, mentor-triggered work) was delivered over a NATS JetStream stream (`AGENT`); a worker pulled a job id off the stream, then loaded the job from PostgreSQL to execute it.
+
+**After**: workers poll `agent_job` directly and claim a batch with `FOR UPDATE SKIP LOCKED` — PostgreSQL, already the source of truth for job state, is now also the delivery mechanism. `AGENT_NATS_ENABLED` is replaced by `AGENT_ENABLED` (default `false`) on whichever role executes jobs (the worker role). New optional tuning: `AGENT_POLL_INTERVAL` (default `1s`), `AGENT_CLAIM_BATCH_SIZE` (default `5`), `AGENT_MAX_RETRIES` (default `5`). NATS itself is unaffected everywhere else — it remains required for webhook ingest and SCM/Slack sync. See [ADR 0025](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0025-agent-job-queue-on-postgresql.md).
+
+**Migration**:
+
+1. Replace `AGENT_NATS_ENABLED=true` with `AGENT_ENABLED=true` on the role that executes jobs (the `application-worker` pod in a split-pod deployment, or the monolith).
+2. Remove `HEPHAESTUS_AGENT_NATS_SERVER`, `AGENT_NATS_MAX_ACK_PENDING`, and `AGENT_NATS_FETCH_BATCH_SIZE` from your deployment — they are silently ignored, not an error, but keeping them is misleading.
+3. Optional cleanup: the `AGENT` JetStream stream is no longer read from or written to. Delete it with `nats stream rm AGENT` if you want to reclaim its storage; leaving it in place is harmless.
+4. Do not remove NATS itself or `NATS_ENABLED` — webhook ingest and SCM/Slack sync still require it.
+
 ### v0.69.0
 
 #### 🔴 Agent image pin moved from `docker/agent-image-pin.env` to a signed release asset

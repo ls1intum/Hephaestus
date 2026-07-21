@@ -1,6 +1,6 @@
 # ADR 0006: LLM proxy stays on the coordinator (BYO trust model)
 
-**Status:** Accepted (amended 2026-07-20 — capability flag removed, #1368)
+**Status:** Accepted (amended 2026-07-20 — capability flag removed; amended 2026-07-21 — agent NATS property renamed, #1368)
 **Date:** 2026-05-20
 **Authors:** Server foundations epic (#1097)
 
@@ -17,6 +17,14 @@
 > OpenAI-compatible gateways) are registered at runtime via the instance-admin catalog or a
 > workspace's own "bring your own AI provider" connection — never via env var — see the
 > LLM configuration redesign design notes for the full catalog/pricing model.
+
+> **Amendment (2026-07-21):** The job-execution capability expression the 2026-07-20 amendment
+> above names, `hephaestus.agent.nats.enabled AND hephaestus.runtime.worker.enabled`, changed
+> shape when the agent job queue moved off NATS JetStream onto PostgreSQL polling (see
+> **ADR 0025**). `LlmProxyController` and `LlmProxySecurityConfig` now key off
+> `hephaestus.agent.enabled AND hephaestus.runtime.worker.enabled` — same gate composition, same
+> coordinator-hosted trust model, only the left-hand property renamed. NATS is unaffected for
+> webhook ingest and SCM/Slack sync, which this change does not touch.
 
 ## Context
 

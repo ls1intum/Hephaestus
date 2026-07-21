@@ -89,3 +89,15 @@ above no longer exists — see **ADR 0006**'s 2026-07-20 amendment. The proxy's 
 from the same job-execution capability expression `AgentJobExecutor` wires on
 (`hephaestus.agent.nats.enabled AND hephaestus.runtime.worker.enabled`), not a standalone
 property.
+
+## Update — 2026-07-21 (issue #1368)
+
+The "agent NATS pull consumer" named in the Context section, and `hephaestus.agent.nats.enabled`
+in the 2026-07-20 update above, no longer exist. The agent job queue moved off NATS JetStream onto
+PostgreSQL — each worker replica polls `agent_job` and claims a batch with
+`FOR UPDATE SKIP LOCKED` instead of pulling ids off a stream — see **ADR 0025**. The job-execution
+capability expression `AgentJobExecutor` and the LLM proxy key off is now
+`hephaestus.agent.enabled AND hephaestus.runtime.worker.enabled`: same shape, the left-hand
+property renamed. This ADR's "server ↔ worker" boundary and the `hephaestus.runtime.worker.enabled`
+gate it establishes are unaffected — only what feeds work to the worker changed. NATS remains
+required for webhook ingest (ADR 0008) and SCM/Slack sync, which this change does not touch.

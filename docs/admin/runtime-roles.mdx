@@ -49,7 +49,7 @@ Split the webhook receiver out when:
 Each role ships with a Spring profile YAML that flips the other two flags off and prunes the bean graph:
 
 - `application-worker.yml` — `runtime.server=false`, `runtime.webhook=false`, `web-application-type=none`, OAuth2 autoconfigure excluded, JPA still enabled.
-- `application-webhook.yml` — `runtime.server=false`, `runtime.worker=false`, sync NATS enabled, agent NATS disabled.
+- `application-webhook.yml` — `runtime.server=false`, `runtime.worker=false`, sync NATS enabled, agent job queue disabled (webhook pods never claim jobs).
 - No `application-server.yml` — the monolith default _is_ the server profile.
 
 To deploy a worker pod set `SPRING_PROFILES_ACTIVE=prod,worker` and point `HEPHAESTUS_HUB_URL` at the app pod's WSS endpoint. See `docker/compose.app.yaml` for a working compose template.
@@ -62,7 +62,7 @@ To deploy a worker pod set `SPRING_PROFILES_ACTIVE=prod,worker` and point `HEPHA
 | `hephaestus.workspace.init-default` | true | false | false |
 | `hephaestus.git.enabled` | true | true | false |
 | `hephaestus.sync.nats.enabled` | true | false | true |
-| `hephaestus.agent.nats.enabled` | true | true | false |
+| `hephaestus.agent.enabled` | true | true | false |
 | `hephaestus.sandbox.enabled` | true | true | false |
 | Needs user-auth wiring | yes | no | no |
 
@@ -91,7 +91,8 @@ On SIGTERM the worker:
 
 1. Sends `Heartbeat{draining=true}` to the hub so the dispatcher stops claiming new jobs for it.
 2. Waits up to `hephaestus.worker.drain.timeout` (default 5 min) for in-flight jobs to finish.
-3. Cancels remaining jobs cleanly — the NATS consumer redelivers via MaxDeliver.
+3. Cancels remaining jobs cleanly — they return to the PostgreSQL-backed queue and are picked up by
+   another worker's poll, bounded by `AGENT_MAX_RETRIES`.
 
 The compose template pins `stop_grace_period: 6m` to give the JVM 60s of headroom before Docker SIGKILLs.
 
@@ -102,3 +103,4 @@ The full design rationale lives in the architecture decision records under `docs
 - **ADR 0005** — `0005-two-role-runtime-via-conditional-on-property.md`. Original two-role design.
 - **ADR 0008** — `0008-webhook-runtime-role.md`. Webhook role rationale.
 - **ADR 0009** — `0009-worker-runtime-substrate-wss-control-channel.md`. Worker substrate + WSS.
+- **ADR 0025** — `0025-agent-job-queue-on-postgresql.md`. Agent job queue moved off NATS onto PostgreSQL.
