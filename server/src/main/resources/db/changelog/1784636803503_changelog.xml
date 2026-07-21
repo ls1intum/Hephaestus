@@ -1,9 +1,547 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
 <databaseChangeLog
-    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
-        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Evaluation provenance: per-run digests on agent_job, and the live suppression-reason set. -->
+
+    <changeSet author="hephaestus-provenance" id="1784636803503-1">
+        <preConditions onFail="MARK_RAN" onFailMessage="agent_job.prompt_digest already present">
+            <not>
+                <columnExists tableName="agent_job" columnName="prompt_digest"/>
+            </not>
+        </preConditions>
+        <comment>The run's prompt-template version: a digest of the prompt scaffolding the sandbox received.</comment>
+        <addColumn tableName="agent_job">
+            <column name="prompt_digest" type="VARCHAR(64)"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="agent_job" columnName="prompt_digest"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-provenance" id="1784636803503-2">
+        <preConditions onFail="MARK_RAN" onFailMessage="agent_job.inputs_digest already present">
+            <not>
+                <columnExists tableName="agent_job" columnName="inputs_digest"/>
+            </not>
+        </preConditions>
+        <comment>The run's input snapshot: a digest over all materialised sandbox input files, job id elided.</comment>
+        <addColumn tableName="agent_job">
+            <column name="inputs_digest" type="VARCHAR(64)"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="agent_job" columnName="inputs_digest"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-provenance" id="1784636803503-3">
+        <preConditions onFail="MARK_RAN" onFailMessage="chk_feedback_suppression_reason not present to realign">
+            <sqlCheck expectedResult="1">SELECT count(*) FROM pg_constraint WHERE conname = 'chk_feedback_suppression_reason'</sqlCheck>
+        </preConditions>
+        <comment>Realign suppression reasons to the ones that have writers: drop BELOW_THRESHOLD/LOW_CONFIDENCE (no such gate exists), rename POLICY_FLOOR_DROP to VOLUME_CAPPED (the policy floor is gone; a volume cap remains), drop the never-written REVIEWER_SIDE, and add the delivery-gate + composer reasons.</comment>
+        <sql>
+            ALTER TABLE feedback DROP CONSTRAINT chk_feedback_suppression_reason;
+            UPDATE feedback SET suppression_reason = 'VOLUME_CAPPED' WHERE suppression_reason = 'POLICY_FLOOR_DROP';
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_suppression_reason CHECK (suppression_reason IS NULL OR suppression_reason IN ('VOLUME_CAPPED', 'COMPOSER_DEDUPED', 'REACTED_DISPUTED', 'REACTED_NOT_APPLICABLE', 'CONVERSATION_EXPIRED', 'ARTIFACT_GONE', 'ARTIFACT_CLOSED', 'ARTIFACT_MERGED', 'ARTIFACT_DRAFT', 'RECIPIENT_OPTED_OUT', 'EMPTY_AFTER_SANITIZE'));
+        </sql>
+        <rollback>
+            <sql>
+                ALTER TABLE feedback DROP CONSTRAINT chk_feedback_suppression_reason;
+                UPDATE feedback SET suppression_reason = 'POLICY_FLOOR_DROP' WHERE suppression_reason = 'VOLUME_CAPPED';
+                -- Reasons the restored code cannot express. NULL (permitted by the restored CHECK) keeps the
+                -- rollback executable and stays honest: the row was withheld, for a reason this schema lost.
+                UPDATE feedback SET suppression_reason = NULL WHERE suppression_reason IN ('COMPOSER_DEDUPED', 'ARTIFACT_GONE', 'ARTIFACT_CLOSED', 'ARTIFACT_MERGED', 'ARTIFACT_DRAFT', 'RECIPIENT_OPTED_OUT', 'EMPTY_AFTER_SANITIZE');
+                ALTER TABLE feedback ADD CONSTRAINT chk_feedback_suppression_reason CHECK (suppression_reason IS NULL OR suppression_reason IN ('REVIEWER_SIDE', 'BELOW_THRESHOLD', 'LOW_CONFIDENCE', 'POLICY_FLOOR_DROP', 'REACTED_DISPUTED', 'REACTED_NOT_APPLICABLE', 'CONVERSATION_EXPIRED'));
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-provenance" id="1784636803503-4">
+        <preConditions onFail="MARK_RAN" onFailMessage="chk_feedback_source not present to realign">
+            <sqlCheck expectedResult="1">SELECT count(*) FROM pg_constraint WHERE conname = 'chk_feedback_source'</sqlCheck>
+        </preConditions>
+        <comment>Realign feedback.source the same way: POLICY_FLOOR and FALLBACK are authors FeedbackSource cannot express, so the CHECK admitted values no code can write.</comment>
+        <sql>
+            ALTER TABLE feedback DROP CONSTRAINT chk_feedback_source;
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_source CHECK (source IN ('AGENT'));
+        </sql>
+        <rollback>
+            <sql>
+                ALTER TABLE feedback DROP CONSTRAINT chk_feedback_source;
+                ALTER TABLE feedback ADD CONSTRAINT chk_feedback_source CHECK (source IN ('AGENT', 'POLICY_FLOOR', 'FALLBACK'));
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <!--
+        Admin configuration audit trail (#1359): append-only, workspace-scoped, unpartitioned
+        (~10^4 rows/year, and no read pattern leads with occurred_at, so partitions would prune
+        nothing). Retention is a trigger-permitted DELETE past the window (changeset -2) rather than
+        auth_event's DROP PARTITION. Scalar FKs (sfk_*) — no JPA @ManyToOne, so they are excluded
+        from the JPA-vs-DB drift gate. workspace_id is NOT NULL: every producer today is
+        workspace-scoped; #1356 adds the scope discriminator instance-scoped controls will need.
+    -->
+    <changeSet author="FelixTJDietrich" id="1784636803503-5">
+        <preConditions onFail="MARK_RAN" onFailMessage="config_audit_event already present">
+            <not>
+                <tableExists tableName="config_audit_event"/>
+            </not>
+        </preConditions>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE config_audit_event (
+                id BIGSERIAL PRIMARY KEY,
+                occurred_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                workspace_id BIGINT NOT NULL
+                    CONSTRAINT sfk_config_audit_event_workspace_id REFERENCES workspace(id),
+                actor_kind VARCHAR(16) NOT NULL,
+                actor_account_id BIGINT
+                    CONSTRAINT sfk_config_audit_event_actor_account_id REFERENCES account(id) ON DELETE SET NULL,
+                acting_account_id BIGINT
+                    CONSTRAINT sfk_config_audit_event_acting_account_id REFERENCES account(id) ON DELETE SET NULL,
+                entity_type VARCHAR(48) NOT NULL,
+                entity_id VARCHAR(64) NOT NULL,
+                action VARCHAR(16) NOT NULL,
+                changed_keys TEXT[] NOT NULL,
+                old_value JSONB,
+                new_value JSONB,
+                CONSTRAINT ck_config_audit_event_actor_kind
+                    CHECK (actor_kind IN ('USER', 'SYSTEM', 'IMPERSONATED')),
+                CONSTRAINT ck_config_audit_event_action
+                    CHECK (action IN ('CREATED', 'UPDATED', 'DELETED')),
+                CONSTRAINT ck_config_audit_event_entity_type
+                    CHECK (entity_type IN ('PRACTICE_REVIEW_SETTINGS', 'AI_CONFIG_BINDING', 'AGENT_CONFIG'))
+                -- No "old_value OR new_value IS NOT NULL" check: it would forbid the erasure UPDATE that
+                -- changeset -2 exists to permit (erasure NULLs both). Enforced at the write path instead,
+                -- in ConfigAuditEntry's constructor.
+            );
+
+            -- workspace_id: NO ACTION, not CASCADE — CASCADE would be a one-click audit eraser, and the
+            -- cascaded DELETE would trip the changeset -2 trigger (FK referential actions fire triggers,
+            -- PG 37.1). The account FKs are ON DELETE SET NULL, which is exactly what that trigger's
+            -- per-column erasure carve-out permits, so the two agree rather than deadlock.
+
+            -- Per-resource and per-control history (#1357): the settings pages filter by entity, then
+            -- by changed key.
+            CREATE INDEX ix_config_audit_event_entity
+                ON config_audit_event (workspace_id, entity_type, entity_id, occurred_at DESC, id DESC);
+
+            -- Workspace timeline.
+            CREATE INDEX ix_config_audit_event_workspace_occurred
+                ON config_audit_event (workspace_id, occurred_at DESC, id DESC);
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DROP TABLE IF EXISTS config_audit_event;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <!--
+        Immutability at the storage layer. context="prod" because the test tier's fixtures do UPDATE and
+        DELETE. The REVOKE is inert until a non-superuser app role exists (the app connects as the image's
+        bootstrap superuser, which skips privilege checks); the triggers are the binding control. TRUNCATE
+        needs a statement-level trigger — row triggers never fire on it.
+    -->
+    <changeSet author="FelixTJDietrich" id="1784636803503-6" context="prod">
+        <preConditions onFail="MARK_RAN" onFailMessage="config_audit_event immutability trigger already present">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_trigger WHERE tgname = 'trg_config_audit_event_block_mutation'
+            </sqlCheck>
+        </preConditions>
+        <sql splitStatements="false"><![CDATA[
+            REVOKE UPDATE, TRUNCATE ON config_audit_event FROM CURRENT_USER;
+
+            CREATE OR REPLACE FUNCTION config_audit_event_block_mutation() RETURNS trigger AS $cfg_immut$
+            BEGIN
+                IF TG_OP = 'DELETE' THEN
+                    -- Retention is the ONLY sanctioned delete (ConfigAuditRetentionJob, 365 days).
+                    -- Keeping the window here rather than blocking DELETE outright is what lets this
+                    -- table stay unpartitioned while still honouring storage limitation (GDPR Art.
+                    -- 5(1)(e)). Inside the window the row is untouchable.
+                    IF OLD.occurred_at >= now() - interval '365 days' THEN
+                        RAISE EXCEPTION 'config_audit_event is append-only: DELETE is only permitted past the 365-day retention window';
+                    END IF;
+                    RETURN OLD;
+                END IF;
+                -- Permit ONLY erasure, per column: each redactable column may stay or go to NULL. Per-column
+            -- (not all-at-once) so an FK's ON DELETE SET NULL, which touches one column, does not trip
+            -- this. Comparing to_jsonb(NEW) minus the redactable keys covers future columns with no edit here.
+
+                IF (NEW.actor_account_id IS NULL OR NEW.actor_account_id = OLD.actor_account_id)
+                   AND (NEW.acting_account_id IS NULL OR NEW.acting_account_id = OLD.acting_account_id)
+                   AND (NEW.old_value IS NULL OR NEW.old_value = OLD.old_value)
+                   AND (NEW.new_value IS NULL OR NEW.new_value = OLD.new_value)
+                   AND (to_jsonb(NEW) - 'actor_account_id' - 'acting_account_id' - 'old_value' - 'new_value')
+                        IS NOT DISTINCT FROM (to_jsonb(OLD) - 'actor_account_id' - 'acting_account_id' - 'old_value' - 'new_value')
+                THEN
+                    RETURN NEW;
+                END IF;
+                RAISE EXCEPTION 'config_audit_event is append-only: only erasure (setting actor refs / snapshots to NULL) is permitted';
+            END;
+            $cfg_immut$ LANGUAGE plpgsql;
+
+            CREATE TRIGGER trg_config_audit_event_block_mutation
+                BEFORE UPDATE OR DELETE ON config_audit_event
+                FOR EACH ROW EXECUTE FUNCTION config_audit_event_block_mutation();
+
+            CREATE OR REPLACE FUNCTION config_audit_event_block_truncate() RETURNS trigger AS $cfg_trunc$
+            BEGIN
+                RAISE EXCEPTION 'config_audit_event is append-only: TRUNCATE is not permitted';
+            END;
+            $cfg_trunc$ LANGUAGE plpgsql;
+
+            CREATE TRIGGER trg_config_audit_event_block_truncate
+                BEFORE TRUNCATE ON config_audit_event
+                FOR EACH STATEMENT EXECUTE FUNCTION config_audit_event_block_truncate();
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DROP TRIGGER IF EXISTS trg_config_audit_event_block_truncate ON config_audit_event;
+                DROP TRIGGER IF EXISTS trg_config_audit_event_block_mutation ON config_audit_event;
+                DROP FUNCTION IF EXISTS config_audit_event_block_truncate();
+                DROP FUNCTION IF EXISTS config_audit_event_block_mutation();
+                GRANT UPDATE, TRUNCATE ON config_audit_event TO CURRENT_USER;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <!--
+        Widen the entity-type CHECK to cover the workspace-administration events (roles, feature flags,
+        lifecycle status, token rotation, visibility). DROP + ADD, the same shape 1782980500800-15 uses
+        for auth_event's event_type: the ADD validates against every existing row in one pass (no data
+        rewrite) under a momentary ACCESS EXCLUSIVE lock — trivial at this table's size. Kept as a
+        separate changeSet (not an edit to -1) because -1 is already applied on deployed databases.
+    -->
+    <changeSet author="FelixTJDietrich" id="1784636803503-7">
+        <preConditions onFail="MARK_RAN" onFailMessage="config_audit_event entity_type CHECK already widened">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'ck_config_audit_event_entity_type'
+                  AND pg_get_constraintdef(oid) LIKE '%WORKSPACE_ROLE%'
+            </sqlCheck>
+        </preConditions>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
+            ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
+                CHECK (entity_type IN (
+                    'PRACTICE_REVIEW_SETTINGS', 'AI_CONFIG_BINDING', 'AGENT_CONFIG',
+                    'WORKSPACE_ROLE', 'WORKSPACE_FEATURES', 'WORKSPACE_STATUS',
+                    'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY'
+                ));
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
+                ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
+                    CHECK (entity_type IN ('PRACTICE_REVIEW_SETTINGS', 'AI_CONFIG_BINDING', 'AGENT_CONFIG'));
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1784636803503-8">
+        <preConditions onFail="MARK_RAN" onFailMessage="config_audit_event entity_type CHECK already covers PRACTICE_ACTIVE">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'ck_config_audit_event_entity_type'
+                  AND pg_get_constraintdef(oid) LIKE '%PRACTICE_ACTIVE%'
+            </sqlCheck>
+        </preConditions>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
+            ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
+                CHECK (entity_type IN (
+                    'PRACTICE_REVIEW_SETTINGS', 'AI_CONFIG_BINDING', 'AGENT_CONFIG',
+                    'WORKSPACE_ROLE', 'WORKSPACE_FEATURES', 'WORKSPACE_STATUS',
+                    'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY', 'PRACTICE_ACTIVE'
+                ));
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
+                ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
+                    CHECK (entity_type IN (
+                        'PRACTICE_REVIEW_SETTINGS', 'AI_CONFIG_BINDING', 'AGENT_CONFIG',
+                        'WORKSPACE_ROLE', 'WORKSPACE_FEATURES', 'WORKSPACE_STATUS',
+                        'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY'
+                    ));
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1784636803503-9">
+        <preConditions onFail="MARK_RAN" onFailMessage="config_audit_event read-path indexes already present">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_indexes WHERE indexname = 'ix_config_audit_event_occurred'
+            </sqlCheck>
+        </preConditions>
+        <sql splitStatements="false"><![CDATA[
+            -- The instance-admin view spans workspaces, so neither workspace-leading index serves it.
+            CREATE INDEX ix_config_audit_event_occurred
+                ON config_audit_event (occurred_at DESC, id DESC);
+
+            -- "What did this administrator change" is the first question of an access review.
+            CREATE INDEX ix_config_audit_event_actor
+                ON config_audit_event (actor_account_id, occurred_at DESC)
+                WHERE actor_account_id IS NOT NULL;
+
+            -- changed_keys is persisted rather than derived precisely so it can be filtered on.
+            CREATE INDEX ix_config_audit_event_changed_keys
+                ON config_audit_event USING GIN (changed_keys);
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DROP INDEX IF EXISTS ix_config_audit_event_occurred;
+                DROP INDEX IF EXISTS ix_config_audit_event_actor;
+                DROP INDEX IF EXISTS ix_config_audit_event_changed_keys;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <!--
+        Unified LLM usage ledger + per-workspace monthly budget cap (#1368).
+
+        1. llm_usage_event — append-only accounting ledger; one row per LLM-consuming unit of
+           work (agent job / mentor turn). source_id soft-refs the origin row (unique = no
+           double billing); workspace FK cascades so a purged tenant leaves no residue.
+        2. workspace.monthly_llm_budget_usd — instance-admin-set cap; null = uncapped.
+        3. Backfill from agent_job llm_* columns (detection/replay history).
+        4. Backfill from chat_message.metadata JSONB (mentor turn history) — after this, code
+           never aggregates over the JSON again; the ledger is the accounting source.
+    -->
+
+    <changeSet id="1784636803503-10" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="llm_usage_event already exists">
+            <not><tableExists tableName="llm_usage_event"/></not>
+        </preConditions>
+        <comment>Create the unified LLM usage ledger (#1368)</comment>
+        <createTable tableName="llm_usage_event">
+            <column name="id" type="UUID">
+                <constraints primaryKey="true" primaryKeyName="pk_llm_usage_event" nullable="false"/>
+            </column>
+            <column name="workspace_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="job_type" type="VARCHAR(40)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="source_id" type="UUID">
+                <constraints nullable="false" unique="true" uniqueConstraintName="ux_llm_usage_event_source"/>
+            </column>
+            <column name="model" type="VARCHAR(128)"/>
+            <column name="input_tokens" type="BIGINT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="output_tokens" type="BIGINT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="cache_read_tokens" type="BIGINT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="cache_write_tokens" type="BIGINT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="total_calls" type="INTEGER" defaultValueNumeric="1">
+                <constraints nullable="false"/>
+            </column>
+            <column name="cost_usd" type="NUMERIC(12,6)"/>
+            <column name="occurred_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addForeignKeyConstraint
+            baseTableName="llm_usage_event"
+            baseColumnNames="workspace_id"
+            referencedTableName="workspace"
+            referencedColumnNames="id"
+            constraintName="fk_llm_usage_event_workspace"
+            onDelete="CASCADE"/>
+        <createIndex tableName="llm_usage_event" indexName="idx_llm_usage_ws_time">
+            <column name="workspace_id"/>
+            <column name="occurred_at"/>
+        </createIndex>
+        <rollback>
+            <dropTable tableName="llm_usage_event"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1784636803503-11" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace.monthly_llm_budget_usd already exists">
+            <not><columnExists tableName="workspace" columnName="monthly_llm_budget_usd"/></not>
+        </preConditions>
+        <comment>Per-workspace monthly LLM budget cap in USD; null = uncapped (#1368)</comment>
+        <addColumn tableName="workspace">
+            <column name="monthly_llm_budget_usd" type="NUMERIC(10,2)"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="workspace" columnName="monthly_llm_budget_usd"/>
+        </rollback>
+    </changeSet>
+
+    <!-- Backfill detection/replay job history. NOT EXISTS keeps a re-run additive-only; the
+         WHERE mirrors the executor's write guard (usage reported OR a cost recorded). -->
+    <changeSet id="1784636803503-12" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="llm_usage_event missing — nothing to backfill into">
+            <tableExists tableName="llm_usage_event"/>
+        </preConditions>
+        <comment>Backfill the LLM usage ledger from agent_job (#1368)</comment>
+        <sql><![CDATA[
+            INSERT INTO llm_usage_event (id, workspace_id, job_type, source_id, model, input_tokens,
+                output_tokens, cache_read_tokens, cache_write_tokens, total_calls, cost_usd, occurred_at)
+            SELECT gen_random_uuid(), j.workspace_id, j.job_type, j.id, j.llm_model,
+                COALESCE(j.llm_total_input_tokens, 0),
+                COALESCE(j.llm_total_output_tokens, 0),
+                COALESCE(j.llm_cache_read_tokens, 0),
+                COALESCE(j.llm_cache_write_tokens, 0),
+                GREATEST(COALESCE(j.llm_total_calls, 1), 1),
+                -- Guarded cast (#1368 migration-correctness fix): llm_cost_usd is a DOUBLE PRECISION
+                -- column, so historical bad data (a divide-by-zero bug upstream producing NaN/Infinity,
+                -- or any value at/above the NUMERIC(12,6) column's 6-integer-digit capacity) would abort
+                -- the whole migration mid-CAST. Store NULL (UNPRICED, per changeset -9 in
+                -- 1784566728230) instead of throwing.
+                --
+                -- Rounding-boundary fix (#1368 fix wave): the bound below MUST be checked against the
+                -- value ROUNDED to the column's 6-decimal scale, not the raw double. A raw value like
+                -- 999999.9999999 passes "< 1000000" unrounded, but ROUND(...,6) carries it to
+                -- 1000000.000000 — 7 integer digits, which overflows NUMERIC(12,6) and aborts the CAST
+                -- in the ELSE branch below. Rounding once here (and reusing that same rounded value in
+                -- ELSE) makes the bound check and the stored value agree.
+                CASE
+                    WHEN j.llm_cost_usd IS NULL THEN NULL
+                    WHEN j.llm_cost_usd = 'NaN'::double precision THEN NULL
+                    WHEN j.llm_cost_usd = 'Infinity'::double precision THEN NULL
+                    WHEN j.llm_cost_usd = '-Infinity'::double precision THEN NULL
+                    WHEN ROUND(j.llm_cost_usd::numeric, 6) >= 1000000 OR ROUND(j.llm_cost_usd::numeric, 6) <= -1000000
+                        THEN NULL
+                    ELSE ROUND(j.llm_cost_usd::numeric, 6)
+                END,
+                COALESCE(j.completed_at, j.created_at)
+            FROM agent_job j
+            WHERE (COALESCE(j.llm_total_calls, 0) > 0 OR j.llm_cost_usd IS NOT NULL)
+              AND NOT EXISTS (SELECT 1 FROM llm_usage_event e WHERE e.source_id = j.id);
+        ]]></sql>
+        <!-- Intentionally empty: a DELETE keyed on agent_job would also wipe the rows the running
+             application has appended since the deploy, i.e. live spend history the budget cap reads.
+             Rolling the schema back (changeset 1) drops the whole table anyway; rolling back only the
+             backfill has no safe, targeted inverse. -->
+        <rollback/>
+    </changeSet>
+
+    <!-- Backfill mentor turn history from chat_message.metadata. Tolerates both the nested
+         {usage:{input,...}} shape (current writer) and legacy flat inputTokens keys; float
+         token counts floor to bigint (mirrors the reader's readLong). -->
+    <changeSet id="1784636803503-13" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="llm_usage_event missing — nothing to backfill into">
+            <tableExists tableName="llm_usage_event"/>
+        </preConditions>
+        <comment>Backfill the LLM usage ledger from chat_message.metadata (#1368)</comment>
+        <!-- Guarded casts (#1368 migration-correctness fix): metadata is free-form JSONB written by
+             historical app versions (or hand-edited), so a raw `::numeric` cast on any one malformed
+             row (a non-numeric string, "NaN"/"Infinity", or a value wider than the target column can
+             hold) would throw and abort the ENTIRE migration. Every value pulled out of metadata is
+             first validated with a regex + length guard and only cast if it passes; anything else
+             becomes NULL, which the token COALESCEs already treat as "no value" (falls through to the
+             next source, or 0) and which the cost column already treats as UNPRICED (no silent $0).
+             Token buckets: up to 15 integer digits — far beyond any real token count, comfortably
+             inside BIGINT once floored. Cost: up to 6 integer digits, matching this table's cost_usd
+             NUMERIC(12,6) precision at the point this changeset runs (widened later in 1784566728230). -->
+        <sql><![CDATA[
+            INSERT INTO llm_usage_event (id, workspace_id, job_type, source_id, model, input_tokens,
+                output_tokens, cache_read_tokens, cache_write_tokens, total_calls, cost_usd, occurred_at)
+            SELECT gen_random_uuid(), t.workspace_id, 'MENTOR_TURN', m.id,
+                NULLIF(COALESCE(m.metadata->>'model', ''), ''),
+                COALESCE(
+                    floor(CASE WHEN length(m.metadata->'usage'->>'input') < 50
+                                    AND m.metadata->'usage'->>'input' ~ '^[0-9]{1,15}(\.[0-9]+)?$'
+                               THEN (m.metadata->'usage'->>'input')::numeric END),
+                    floor(CASE WHEN length(m.metadata->>'inputTokens') < 50
+                                    AND m.metadata->>'inputTokens' ~ '^[0-9]{1,15}(\.[0-9]+)?$'
+                               THEN (m.metadata->>'inputTokens')::numeric END),
+                    0
+                )::bigint,
+                COALESCE(
+                    floor(CASE WHEN length(m.metadata->'usage'->>'output') < 50
+                                    AND m.metadata->'usage'->>'output' ~ '^[0-9]{1,15}(\.[0-9]+)?$'
+                               THEN (m.metadata->'usage'->>'output')::numeric END),
+                    floor(CASE WHEN length(m.metadata->>'outputTokens') < 50
+                                    AND m.metadata->>'outputTokens' ~ '^[0-9]{1,15}(\.[0-9]+)?$'
+                               THEN (m.metadata->>'outputTokens')::numeric END),
+                    0
+                )::bigint,
+                COALESCE(
+                    floor(CASE WHEN length(m.metadata->'usage'->>'cacheRead') < 50
+                                    AND m.metadata->'usage'->>'cacheRead' ~ '^[0-9]{1,15}(\.[0-9]+)?$'
+                               THEN (m.metadata->'usage'->>'cacheRead')::numeric END),
+                    floor(CASE WHEN length(m.metadata->>'cacheReadTokens') < 50
+                                    AND m.metadata->>'cacheReadTokens' ~ '^[0-9]{1,15}(\.[0-9]+)?$'
+                               THEN (m.metadata->>'cacheReadTokens')::numeric END),
+                    0
+                )::bigint,
+                COALESCE(
+                    floor(CASE WHEN length(m.metadata->'usage'->>'cacheWrite') < 50
+                                    AND m.metadata->'usage'->>'cacheWrite' ~ '^[0-9]{1,15}(\.[0-9]+)?$'
+                               THEN (m.metadata->'usage'->>'cacheWrite')::numeric END),
+                    floor(CASE WHEN length(m.metadata->>'cacheWriteTokens') < 50
+                                    AND m.metadata->>'cacheWriteTokens' ~ '^[0-9]{1,15}(\.[0-9]+)?$'
+                               THEN (m.metadata->>'cacheWriteTokens')::numeric END),
+                    0
+                )::bigint,
+                1,
+                -- Rounding-boundary fix (#1368 fix wave): the regex's `[0-9]{1,6}` integer-part guard
+                -- only bounds the UNROUNDED string — "999999.9999999" (6 integer digits) matches, but
+                -- casting straight to numeric(12,6) rounds it to 1000000.000000 (7 integer digits),
+                -- overflowing the column and aborting the migration. Round into an unconstrained numeric
+                -- first, then bound-check the ROUNDED value before storing it.
+                CASE WHEN length(m.metadata->>'costUsd') < 50
+                          AND m.metadata->>'costUsd' ~ '^-?[0-9]{1,6}(\.[0-9]+)?$'
+                          AND ABS(ROUND((m.metadata->>'costUsd')::numeric, 6)) < 1000000
+                     THEN ROUND((m.metadata->>'costUsd')::numeric, 6) END,
+                m.created_at
+            FROM chat_message m
+            JOIN chat_thread t ON t.id = m.thread_id
+            WHERE m.metadata IS NOT NULL
+              AND (m.metadata->>'costUsd' IS NOT NULL
+                   OR m.metadata->'usage'->>'input' IS NOT NULL
+                   OR m.metadata->>'inputTokens' IS NOT NULL)
+              AND NOT EXISTS (SELECT 1 FROM llm_usage_event e WHERE e.source_id = m.id);
+        ]]></sql>
+        <!-- Intentionally empty for the same reason as changeset 3's rollback. -->
+        <rollback/>
+    </changeSet>
+
+    <!--
+        Widen the config_audit_event entity-type CHECK to admit WORKSPACE_LLM_BUDGET. Same DROP + ADD
+        shape as 1784242879917-4: the ADD validates every existing row in one pass (no rewrite) under a
+        momentary ACCESS EXCLUSIVE lock. The enum and this constraint must stay in lockstep —
+        ConfigAuditImmutabilityIntegrationTest reads pg_constraint and fails on drift.
+    -->
+    <changeSet id="1784636803503-14" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="config_audit_event entity_type CHECK already covers WORKSPACE_LLM_BUDGET">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'ck_config_audit_event_entity_type'
+                  AND pg_get_constraintdef(oid) LIKE '%WORKSPACE_LLM_BUDGET%'
+            </sqlCheck>
+        </preConditions>
+        <comment>Admit WORKSPACE_LLM_BUDGET on the config-audit trail (#1368)</comment>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
+            ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
+                CHECK (entity_type IN (
+                    'PRACTICE_REVIEW_SETTINGS', 'AI_CONFIG_BINDING', 'AGENT_CONFIG',
+                    'WORKSPACE_ROLE', 'WORKSPACE_FEATURES', 'WORKSPACE_STATUS',
+                    'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY', 'PRACTICE_ACTIVE',
+                    'WORKSPACE_LLM_BUDGET'
+                ));
+        ]]></sql>
+        <!-- Empty (#1368 migration-correctness fix): re-adding the narrower CHECK is not a
+             data-preserving downgrade once any row carries WORKSPACE_LLM_BUDGET — the audit trail is
+             append-only and immutable (1784242879917-2), so there is no safe way to remap or delete
+             those rows on rollback. -->
+        <rollback/>
+    </changeSet>
 
     <!--
         LLM configuration redesign (#1368, scope-expanded to "LLM configuration overall").
@@ -46,7 +584,7 @@
     -->
 
     <!-- 1. INSTANCE connection: an endpoint the instance can talk to. app_admin-owned, GLOBAL. -->
-    <changeSet id="1784566728230-1" author="hephaestus">
+    <changeSet id="1784636803503-15" author="hephaestus">
         <preConditions onFail="MARK_RAN" onFailMessage="llm_connection already exists">
             <not><tableExists tableName="llm_connection"/></not>
         </preConditions>
@@ -85,7 +623,7 @@
     </changeSet>
 
     <!-- 2. INSTANCE model: a curated model behind a connection. GLOBAL. -->
-    <changeSet id="1784566728230-2" author="hephaestus">
+    <changeSet id="1784636803503-16" author="hephaestus">
         <preConditions onFail="MARK_RAN" onFailMessage="llm_model already exists">
             <not><tableExists tableName="llm_model"/></not>
         </preConditions>
@@ -136,7 +674,7 @@
          open row's effective_to and INSERT a new one, in one transaction (LlmModelPriceService).
          Per-1M units (what every vendor pricing page quotes); NUMERIC(18,8) so sub-cent-per-1M rates
          do not truncate to zero. -->
-    <changeSet id="1784566728230-3" author="hephaestus">
+    <changeSet id="1784636803503-17" author="hephaestus">
         <preConditions onFail="MARK_RAN" onFailMessage="llm_model_price already exists">
             <not><tableExists tableName="llm_model_price"/></not>
         </preConditions>
@@ -182,7 +720,7 @@
 
     <!-- 4. Grant: which workspaces may use a GRANTED-visibility instance model. Composite PK,
          modeled on account_feature. Allowlist by reference (revocation needs no data migration). -->
-    <changeSet id="1784566728230-4" author="hephaestus">
+    <changeSet id="1784636803503-18" author="hephaestus">
         <preConditions onFail="MARK_RAN" onFailMessage="llm_model_workspace_grant already exists">
             <not><tableExists tableName="llm_model_workspace_grant"/></not>
         </preConditions>
@@ -213,7 +751,7 @@
 
     <!-- 5. WORKSPACE BYO connection: tenant-scoped (has workspace_id, framework enforces isolation).
          Same shape as llm_connection; the workspace admin owns the key and the bill. -->
-    <changeSet id="1784566728230-5" author="hephaestus">
+    <changeSet id="1784636803503-19" author="hephaestus">
         <preConditions onFail="MARK_RAN" onFailMessage="workspace_llm_connection already exists">
             <not><tableExists tableName="workspace_llm_connection"/></not>
         </preConditions>
@@ -260,7 +798,7 @@
          connection_id) so every query carries a workspace_id predicate for the tenancy inspector.
          Price lives inline (current rate only — a single workspace's own BYO price needs no audit
          history); pricing_mode tri-state mirrors the instance side. -->
-    <changeSet id="1784566728230-6" author="hephaestus">
+    <changeSet id="1784636803503-20" author="hephaestus">
         <preConditions onFail="MARK_RAN" onFailMessage="workspace_llm_model already exists">
             <not><tableExists tableName="workspace_llm_model"/></not>
         </preConditions>
@@ -327,7 +865,7 @@
 
     <!-- 7. Instance LLM settings singleton (GLOBAL): egress allowlist + BYO enable + default policy.
          id fixed to 1. allowed_egress_hosts empty/null = allow all (non-breaking on upgrade). -->
-    <changeSet id="1784566728230-7" author="hephaestus">
+    <changeSet id="1784636803503-21" author="hephaestus">
         <preConditions onFail="MARK_RAN" onFailMessage="instance_llm_settings already exists">
             <not><tableExists tableName="instance_llm_settings"/></not>
         </preConditions>
@@ -353,7 +891,7 @@
     <!-- 8. agent_config demoted to a binding. instance_model_id XOR workspace_model_id (at most one;
          both null tolerated for legacy rows until backfill/rebind). Legacy llm_* columns retained
          (deprecate-then-remove) and stop being read once the runtime resolves via the binding. -->
-    <changeSet id="1784566728230-8" author="hephaestus">
+    <changeSet id="1784636803503-22" author="hephaestus">
         <preConditions onFail="MARK_RAN" onFailMessage="agent_config binding columns already exist">
             <not><columnExists tableName="agent_config" columnName="instance_model_id"/></not>
         </preConditions>
@@ -386,7 +924,7 @@
     <!-- 9. Ledger: pricing_state tri-state (the blind-cap fix), reasoning_tokens, funding_source,
          applied_price_id provenance. Backfill: a resolved cost -> PRICED; NULL cost -> UNPRICED
          (FREE cannot be inferred retroactively). Existing rows are all INSTANCE-funded. -->
-    <changeSet id="1784566728230-9" author="hephaestus">
+    <changeSet id="1784636803503-23" author="hephaestus">
         <preConditions onFail="MARK_RAN" onFailMessage="llm_usage_event.pricing_state already exists">
             <not><columnExists tableName="llm_usage_event" columnName="pricing_state"/></not>
         </preConditions>
@@ -436,7 +974,7 @@
          covers the BYO path, which has no price-history table (workspace_llm_model carries only the
          current inline rate) and so no analogous "price row id" to soft-ref. Both soft refs, no FK:
          the ledger must survive catalog-row deletion (see class doc on llm_usage_event.sourceId). -->
-    <changeSet id="1784566728230-12" author="hephaestus">
+    <changeSet id="1784636803503-24" author="hephaestus">
         <preConditions onFail="MARK_RAN" onFailMessage="llm_usage_event provenance columns already exist">
             <not><columnExists tableName="llm_usage_event" columnName="applied_workspace_model_id"/></not>
         </preConditions>
@@ -465,7 +1003,7 @@
          AccountAdminController already uses for APP_ROLE_CHANGED. Same DROP + ADD shape as
          1782980500800-15: the ADD validates every existing row in one pass under a momentary ACCESS
          EXCLUSIVE lock. -->
-    <changeSet id="1784566728230-13" author="hephaestus">
+    <changeSet id="1784636803503-25" author="hephaestus">
         <preConditions onFail="MARK_RAN" onFailMessage="ck_auth_event_event_type already admits the LLM catalog event types">
             <sqlCheck expectedResult="0">
                 SELECT COUNT(*) FROM pg_constraint
@@ -499,7 +1037,7 @@
          config_audit_event — same DROP + ADD shape as 1784534949268-5 (which added
          WORKSPACE_LLM_BUDGET). The enum and this constraint must stay in lockstep —
          ConfigAuditImmutabilityIntegrationTest reads pg_constraint and fails on drift. -->
-    <changeSet id="1784566728230-14" author="hephaestus">
+    <changeSet id="1784636803503-26" author="hephaestus">
         <preConditions onFail="MARK_RAN" onFailMessage="config_audit_event entity_type CHECK already covers WORKSPACE_LLM_MODEL">
             <sqlCheck expectedResult="0">
                 SELECT count(*) FROM pg_constraint
@@ -534,7 +1072,7 @@
          upstream id) pair — e.g. one FREE, one PRICED, or a re-registration with a stale slug — gets a
          nondeterministic pricing outcome; a FREE sibling can silently shadow a PRICED one. One catalog
          entry per (connection, upstream id) closes that. -->
-    <changeSet id="1784566728230-15" author="hephaestus">
+    <changeSet id="1784636803503-27" author="hephaestus">
         <preConditions onFail="MARK_RAN" onFailMessage="ux_llm_model_connection_upstream already exists">
             <not><indexExists indexName="ux_llm_model_connection_upstream"/></not>
         </preConditions>
@@ -549,7 +1087,7 @@
     </changeSet>
 
     <!-- 16. Same guard on the workspace BYO side — mirrors LlmUsageRecorder#firstWorkspaceMatch. -->
-    <changeSet id="1784566728230-16" author="hephaestus">
+    <changeSet id="1784636803503-28" author="hephaestus">
         <preConditions onFail="MARK_RAN" onFailMessage="ux_ws_llm_model_connection_upstream already exists">
             <not><indexExists indexName="ux_ws_llm_model_connection_upstream"/></not>
         </preConditions>
@@ -569,7 +1107,7 @@
          against a workspace's own budget cap (which can be set arbitrarily high) the moment a real
          charge exceeds $1M. Widen to NUMERIC(18,6): a NUMERIC precision widen is metadata-only in PG
          (no table rewrite, momentary ACCESS EXCLUSIVE lock only). -->
-    <changeSet id="1784566728230-17" author="hephaestus">
+    <changeSet id="1784636803503-29" author="hephaestus">
         <preConditions onFail="MARK_RAN" onFailMessage="llm_usage_event.cost_usd already widened to NUMERIC(18,6)">
             <sqlCheck expectedResult="0">
                 SELECT count(*) FROM information_schema.columns

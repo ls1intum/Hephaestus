@@ -105,7 +105,7 @@ public class LlmUsageEvent {
      * without a cost — rollups treat null as zero (visibility over false precision).
      *
      * <p>{@code NUMERIC(18,6)} — widened from {@code NUMERIC(12,6)} (#1368 migration-correctness fix,
-     * changelog 1784566728230-17) so a genuinely large event cost is never silently clamped down
+     * changelog 1784636803503-29) so a genuinely large event cost is never silently clamped down
      * against a workspace's own (potentially very high) budget cap.
      */
     @Nullable

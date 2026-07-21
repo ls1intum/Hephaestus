@@ -328,7 +328,7 @@ class LlmUsageRecorderTest extends BaseUnitTest {
         @Test
         void aCostAtOrAboveTenToTheTwelveIsClampedToTheMaxRepresentableAmount() {
             // NUMERIC(18,6) (widened from NUMERIC(12,6) — #1368 migration-correctness fix, changelog
-            // 1784566728230-17) overflows at 10^12; a rate this absurd is unreachable in practice and
+            // 1784636803503-29) overflows at 10^12; a rate this absurd is unreachable in practice and
             // exists only to exercise the clamp.
             LlmModelPrice price = new LlmModelPrice();
             price.setId(42L);

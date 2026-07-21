@@ -91,7 +91,7 @@ public class LlmUsageRecorder {
 
     /**
      * Largest amount {@code NUMERIC(18,6)} can hold (12 integer digits + 6 fractional digits; widened
-     * from {@code NUMERIC(12,6)} — #1368 migration-correctness fix, see changelog 1784566728230-17). A
+     * from {@code NUMERIC(12,6)} — #1368 migration-correctness fix, see changelog 1784636803503-29). A
      * single ledger event costing ≥ $1 trillion is unreachable in practice; this is a last-ditch guard
      * against a corrupted rate row, not a bound anyone should ever hit.
      */
@@ -551,7 +551,7 @@ public class LlmUsageRecorder {
 
     /**
      * {@code NUMERIC(18,6)} storage guard (#1368 slice 6; widened from {@code NUMERIC(12,6)} — see
-     * changelog 1784566728230-17): rounds HALF_EVEN to the column scale, then defends the two edges a
+     * changelog 1784636803503-29): rounds HALF_EVEN to the column scale, then defends the two edges a
      * raw computed cost could otherwise hit.
      *
      * <ul>
