@@ -171,6 +171,9 @@ services:
     expose:
       - "8080"
     environment:
+      # The buildpack's 10M MaxDirectMemorySize sits below this role's steady NIO
+      # footprint (NATS + HTTP); give it headroom.
+      JAVA_TOOL_OPTIONS: "-XX:MaxDirectMemorySize=${APP_MAX_DIRECT_MEMORY:-128M}"
       SPRING_PROFILES_ACTIVE: prod
       # prod runs forward-headers=native, so ProxyTrustGuard aborts the boot unless this is set.
       # Write this Tomcat internal-proxies regex WITHOUT backslashes: Coolify re-escapes them when
