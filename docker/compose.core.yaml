@@ -107,7 +107,9 @@ services:
     image: nats:alpine
     restart: unless-stopped
     ports:
-      - "127.0.0.1:4222:4222"
+      # Loopback-only by default. Set NATS_BIND_HOST=0.0.0.0 (or a specific interface) to let other
+      # hosts reach the bus — only on a trusted or firewalled network, as NATS runs unauthenticated.
+      - "${NATS_BIND_HOST:-127.0.0.1}:4222:4222"
     command: ["--config", "/etc/nats/nats-server.conf"]
     volumes:
       - nats-data:/data
