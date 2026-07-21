@@ -69,6 +69,8 @@ erDiagram
         VARCHAR(16) credential_mode "NOT NULL"
         VARCHAR(50) model_version
         VARCHAR(2048) llm_base_url
+        BIGINT instance_model_id FK
+        BIGINT workspace_model_id FK
     }
 
     AgentJob {
@@ -398,6 +400,15 @@ erDiagram
         TIMESTAMPTZ created_at "NOT NULL"
     }
 
+    InstanceLlmSetting {
+        SMALLINT id PK
+        TEXT allowed_egress_hosts
+        BOOLEAN allow_workspace_connections "NOT NULL"
+        VARCHAR(16) default_unpriced_policy "NOT NULL"
+        TIMESTAMPTZ updated_at
+        VARCHAR(255) updated_by
+    }
+
     Issue {
         VARCHAR(31) issue_type UK "NOT NULL"
         BIGINT id PK
@@ -514,6 +525,63 @@ erDiagram
         BIGINT provider_id FK,UK "NOT NULL"
     }
 
+    LlmConnection {
+        BIGINT id PK
+        VARCHAR(64) slug UK "NOT NULL"
+        VARCHAR(128) display_name "NOT NULL"
+        VARCHAR(2048) base_url "NOT NULL"
+        VARCHAR(40) api_protocol "NOT NULL"
+        VARCHAR(64) auth_header_name "NOT NULL"
+        VARCHAR(16) auth_value_prefix "NOT NULL"
+        TEXT api_key
+        VARCHAR(32) azure_api_version
+        BOOLEAN enabled "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at
+    }
+
+    LlmModel {
+        BIGINT id PK
+        BIGINT connection_id FK,UK "NOT NULL"
+        VARCHAR(64) slug UK "NOT NULL"
+        VARCHAR(128) display_name "NOT NULL"
+        VARCHAR(256) upstream_model_id "NOT NULL"
+        VARCHAR(40) api_protocol_override
+        VARCHAR(16) modality "NOT NULL"
+        INTEGER context_window
+        INTEGER max_output_tokens
+        BOOLEAN supports_reasoning "NOT NULL"
+        VARCHAR(16) cache_control_format
+        VARCHAR(16) visibility "NOT NULL"
+        BOOLEAN enabled "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at
+    }
+
+    LlmModelPrice {
+        BIGINT id PK
+        BIGINT model_id FK "NOT NULL"
+        VARCHAR(16) pricing_mode "NOT NULL"
+        NUMERIC(18,8) per_1m_input_usd
+        NUMERIC(18,8) per_1m_output_usd
+        NUMERIC(18,8) per_1m_cache_read_usd
+        NUMERIC(18,8) per_1m_cache_write_usd
+        NUMERIC(18,8) per_1m_reasoning_usd
+        VARCHAR(3) currency "NOT NULL"
+        VARCHAR(500) note
+        TIMESTAMPTZ effective_from "NOT NULL"
+        TIMESTAMPTZ effective_to
+        VARCHAR(255) created_by
+        TIMESTAMPTZ created_at "NOT NULL"
+    }
+
+    LlmModelWorkspaceGrant {
+        BIGINT model_id PK,FK
+        BIGINT workspace_id PK,FK
+        TIMESTAMPTZ granted_at "NOT NULL"
+        VARCHAR(255) granted_by
+    }
+
     LlmUsageEvent {
         UUID id PK
         BIGINT workspace_id FK "NOT NULL"
@@ -527,6 +595,16 @@ erDiagram
         INTEGER total_calls "NOT NULL"
         NUMERIC(12,6) cost_usd
         TIMESTAMPTZ occurred_at "NOT NULL"
+        VARCHAR(16) pricing_state "NOT NULL"
+        BIGINT reasoning_tokens "NOT NULL"
+        VARCHAR(16) funding_source "NOT NULL"
+        BIGINT applied_price_id
+        BIGINT applied_workspace_model_id
+        NUMERIC(18,8) applied_per_1m_input_usd
+        NUMERIC(18,8) applied_per_1m_output_usd
+        NUMERIC(18,8) applied_per_1m_cache_read_usd
+        NUMERIC(18,8) applied_per_1m_cache_write_usd
+        NUMERIC(18,8) applied_per_1m_reasoning_usd
     }
 
     LoginProvider {
@@ -1142,6 +1220,48 @@ erDiagram
         NUMERIC(10,2) monthly_llm_budget_usd
     }
 
+    WorkspaceLlmConnection {
+        BIGINT id PK,UK
+        BIGINT workspace_id FK,UK "NOT NULL"
+        VARCHAR(64) slug UK "NOT NULL"
+        VARCHAR(128) display_name "NOT NULL"
+        VARCHAR(2048) base_url "NOT NULL"
+        VARCHAR(40) api_protocol "NOT NULL"
+        VARCHAR(64) auth_header_name "NOT NULL"
+        VARCHAR(16) auth_value_prefix "NOT NULL"
+        TEXT api_key
+        VARCHAR(32) azure_api_version
+        BOOLEAN enabled "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at
+    }
+
+    WorkspaceLlmModel {
+        BIGINT id PK,UK
+        BIGINT workspace_id FK,UK "NOT NULL"
+        BIGINT connection_id FK "NOT NULL"
+        VARCHAR(64) slug UK "NOT NULL"
+        VARCHAR(128) display_name "NOT NULL"
+        VARCHAR(256) upstream_model_id "NOT NULL"
+        VARCHAR(40) api_protocol_override
+        VARCHAR(16) modality "NOT NULL"
+        INTEGER context_window
+        INTEGER max_output_tokens
+        BOOLEAN supports_reasoning "NOT NULL"
+        VARCHAR(16) cache_control_format
+        VARCHAR(16) pricing_mode "NOT NULL"
+        NUMERIC(18,8) per_1m_input_usd
+        NUMERIC(18,8) per_1m_output_usd
+        NUMERIC(18,8) per_1m_cache_read_usd
+        NUMERIC(18,8) per_1m_cache_write_usd
+        NUMERIC(18,8) per_1m_reasoning_usd
+        VARCHAR(3) currency "NOT NULL"
+        VARCHAR(500) price_note
+        BOOLEAN enabled "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at
+    }
+
     WorkspaceMembership {
         TIMESTAMPTZ created_at "NOT NULL"
         INTEGER league_points "NOT NULL"
@@ -1184,6 +1304,7 @@ erDiagram
     Account ||--|| AccountFeature : has
     Workspace ||--|| ActivityEvent : has
     Workspace ||--|| AgentConfig : has
+    WorkspaceLlmModel ||--|| AgentConfig : has
     ChatMessage ||--|| ChatMessageVote : has
     GitCommit ||--|| CommitContributor : has
     Workspace ||--|| Connection : has
@@ -1199,6 +1320,7 @@ erDiagram
     IdentityProvider ||--|| IssueComment : commented_on
     Repository ||--|| Label : labeled
     IdentityProvider ||--|| Label : labeled
+    LlmConnection ||--|| LlmModel : has
     Workspace ||--|| MentorSlackThread : has
     Repository ||--|| Milestone : has
     IdentityProvider ||--|| Milestone : references
@@ -1231,6 +1353,9 @@ erDiagram
     User ||--|| UserAchievement : has
     User ||--|| UserPreference : has
     Organization ||--|| Workspace : has
+    Workspace ||--|| WorkspaceLlmConnection : has
+    Workspace ||--|| WorkspaceLlmModel : has
+    WorkspaceLlmConnection ||--|| WorkspaceLlmModel : has
     User ||--|| WorkspaceMembership : belongs_to
     Workspace ||--|| WorkspaceMembership : belongs_to
 
@@ -1238,6 +1363,9 @@ erDiagram
     Account ||--o{ AccountExport : has
     User ||--o{ ActivityEvent : references
     Repository ||--o{ ActivityEvent : has
+    LlmModel ||--o{ AgentConfig : references
+    WorkspaceLlmModel ||--o{ AgentConfig : workspace_model_id
+    WorkspaceLlmModel ||--o{ AgentConfig : workspace_model_id
     Workspace ||--o{ AgentJob : has
     AgentConfig ||--o{ AgentJob : has
     Account ||--o{ AuthEvent : account_id
@@ -1280,6 +1408,7 @@ erDiagram
     Issue ||--o{ IssueComment : commented_on
     Organization ||--o{ IssueType : has
     Account ||--o{ IssuedJwt : has
+    LlmModel ||--o{ LlmModelPrice : has
     Workspace ||--o{ LlmUsageEvent : has
     ChatThread ||--o{ MentorSlackThread : has
     User ||--o{ Milestone : created_by
@@ -1316,6 +1445,8 @@ erDiagram
     Connection ||--o{ SyncJob : connection_id
     AgentConfig ||--o{ Workspace : practice_config_id
     AgentConfig ||--o{ Workspace : mentor_config_id
+    WorkspaceLlmConnection ||--o{ WorkspaceLlmModel : connection_id
+    WorkspaceLlmConnection ||--o{ WorkspaceLlmModel : connection_id
     Workspace ||--o{ WorkspaceSlugHistory : has
 
     %% Many-to-Many relationships
@@ -1333,6 +1464,8 @@ erDiagram
     Issue }o--o{ IssueBlocking : blocking_issue_id
     Issue }o--o{ IssueLabel : labeled
     Label }o--o{ IssueLabel : labeled
+    LlmModel }o--o{ LlmModelWorkspaceGrant : has
+    Workspace }o--o{ LlmModelWorkspaceGrant : has
     Issue }o--o{ PullRequestRequestedReviewer : reviewed
     User }o--o{ PullRequestRequestedReviewer : reviewed
     Repository }o--o{ RepositoryCollaborator : has

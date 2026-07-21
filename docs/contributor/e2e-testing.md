@@ -53,10 +53,10 @@ Two ways to trigger a real practice-detection review:
   then auto-registers a group hook (needs Owner + Premium on the group). Push an MR → review runs.
 
 The agent runs in a Docker sandbox (`ghcr.io/ls1intum/hephaestus/agent-pi`) and calls the LLM through
-the in-app proxy. When the app runs on the **host** (not a container) the sandbox must reach the proxy
-via the host gateway, which forces `allowInternet=true` + `credentialMode=API_KEY` on the runtime — the
-script's `--llm-base-url` path. Findings are posted back to the MR and shown under the workspace's AI →
-Activity view.
+the in-app proxy — the only path a sandbox has to a provider key, never injected directly. When the app
+runs on the **host** (not a container) the sandbox must reach the proxy via the host gateway, which
+forces `allowInternet=true` on the runtime — the script's `--llm-base-url` path. Findings are posted
+back to the MR and shown under the workspace's AI → Activity view.
 
 ## Browser tests (Playwright)
 

@@ -214,17 +214,14 @@ Staging and production both use the production compose files. The difference sho
 
 ### AI model configuration
 
-The mentor (Pi agent run in-process) and the sandboxed practice-review proxy both flow through the application server's LLM proxy routes. There is no separate intelligence service to configure.
+The mentor (Pi agent run in-process) and the sandboxed practice-review proxy both flow through the application server's LLM proxy — the only path a sandbox has to a provider key, never injected directly. There is no separate intelligence service to configure, and there are no LLM env vars to set.
 
-For Azure-backed practice review in the application server:
+Providers (Anthropic, OpenAI, Azure OpenAI, and self-hosted OpenAI-compatible gateways such as vLLM or Open WebUI) are registered at runtime, not via `.env`:
 
-| Variable | Purpose |
-| --- | --- |
-| `LLM_PROXY_AZURE_OPENAI_URL` | Azure OpenAI resource URL used by the dedicated Azure proxy route |
-| `LLM_PROXY_AZURE_OPENAI_AUTH_HEADER` | Usually `api-key` |
-| `LLM_PROXY_AZURE_OPENAI_USE_BEARER` | Usually `false` for Azure OpenAI |
+- An instance admin adds a provider connection and its models under **Instance admin → AI models**, sets per-model pricing, and shares individual models with workspaces.
+- A workspace admin can instead connect its own provider ("bring your own AI provider") under the workspace's AI settings; that workspace's usage is priced and capped independently of the instance catalog.
 
-The generic `LLM_PROXY_OPENAI_*` settings only affect the OpenAI-compatible proxy route. The sandboxed Pi agent uses the dedicated Azure route when configured for Azure OpenAI.
+The proxy resolves the upstream base URL, auth header, and key per model from whichever connection it is bound to, so nothing needs to be pinned at the process level. On a split-pod deployment the worker pod resolves providers from the same catalog as the app pod — no LLM credential passthrough between pods.
 
 **Webhook secret:** Set `WEBHOOK_SECRET` to the secret configured on your GitHub and GitLab webhooks. Prefer SHA-256 (`X-Hub-Signature-256`) and generate with `openssl rand -hex 32` (base64 also works).
 

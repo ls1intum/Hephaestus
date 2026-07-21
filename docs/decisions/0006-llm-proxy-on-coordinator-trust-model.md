@@ -1,8 +1,22 @@
 # ADR 0006: LLM proxy stays on the coordinator (BYO trust model)
 
-**Status:** Accepted
+**Status:** Accepted (amended 2026-07-20 — capability flag removed, #1368)
 **Date:** 2026-05-20
 **Authors:** Server foundations epic (#1097)
+
+> **Amendment (2026-07-20):** The `hephaestus.sandbox.llm-proxy.enabled` capability flag
+> (Option 1 below) was removed. The LLM configuration redesign (#1368) made the proxy the
+> **only** LLM credential path — sandboxes never see a provider key directly — so "jobs on,
+> proxy off" became a state the system must not be able to express. `LlmProxyController` and
+> `LlmProxySecurityConfig` now key off the same job-execution capability expression
+> `AgentJobExecutor` wires on (`hephaestus.agent.nats.enabled AND hephaestus.runtime.worker.enabled`)
+> instead of a standalone property. The coordinator-hosted trust model itself — credentials never
+> leave the JVM that decrypts them, workers/sandboxes call back over the network — is unchanged;
+> what changed is that "which JVM hosts the proxy" is now derived from where jobs actually run,
+> not a separately configurable toggle. Providers (Anthropic, OpenAI, Azure OpenAI, self-hosted
+> OpenAI-compatible gateways) are registered at runtime via the instance-admin catalog or a
+> workspace's own "bring your own AI provider" connection — never via env var — see the
+> LLM configuration redesign design notes for the full catalog/pricing model.
 
 ## Context
 

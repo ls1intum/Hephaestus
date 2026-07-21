@@ -81,3 +81,11 @@ The revisit trigger has fired. `RuntimeRole.WEBHOOK_PROPERTY` is now wired (thir
 time. `ServerSchedulingConfig`, `NatsConsumerService`, and `WorkspaceStartupListener` are gated
 by `SERVER_PROPERTY` so they do not duplicate-run on the dedicated `webhook-server` pod. See
 **ADR 0008**.
+
+## Update — 2026-07-20 (issue #1368)
+
+The `hephaestus.sandbox.llm-proxy.enabled` capability flag referenced in the Decision section
+above no longer exists — see **ADR 0006**'s 2026-07-20 amendment. The proxy's gate is now derived
+from the same job-execution capability expression `AgentJobExecutor` wires on
+(`hephaestus.agent.nats.enabled AND hephaestus.runtime.worker.enabled`), not a standalone
+property.

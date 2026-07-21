@@ -220,7 +220,10 @@ Filters don't delete data – they just skip sync operations. Workspace and orga
 
 ### AI model (local)
 
-Practice detection and the mentor need at least one enabled model. You can add one through the admin UI (**AI → Agents**), or seed one automatically at startup so a fresh boot is ready without clicking through the UI:
+Practice detection and the mentor need at least one enabled model. Providers are registered at
+runtime — either an instance-wide catalog entry (Instance admin → AI models) or a workspace's own
+"bring your own AI provider" connection — never via env var. For local development, seed one
+automatically at startup so a fresh boot is ready without clicking through the UI:
 
 ```bash
 # server/.env
@@ -228,9 +231,10 @@ AGENT_DEFAULT_CONFIG_ENABLED=true
 AGENT_DEFAULT_CONFIG_PROVIDER=OPENAI          # or ANTHROPIC, AZURE_OPENAI
 AGENT_DEFAULT_CONFIG_MODEL_NAME=gpt-5.4-mini  # optional; blank = provider default
 AGENT_DEFAULT_CONFIG_API_KEY=sk-...           # required when enabled
+AGENT_DEFAULT_CONFIG_BASE_URL=                # optional OpenAI-compatible endpoint override
 ```
 
-The seeder runs once the default workspace exists, is idempotent (skips if a model of the same name is already present), and stores the key encrypted. Models always use the in-app LLM proxy: the key is injected by the proxy and never reaches the sandbox, so also set the upstream the proxy forwards to (`LLM_PROXY_OPENAI_URL` — any OpenAI-compatible gateway works).
+The seeder runs once the default workspace exists, is idempotent (skips if a model of the same name is already present), and stores the key encrypted. Models always use the in-app LLM proxy: the key is injected by the proxy and never reaches the sandbox. The proxy resolves the upstream per model from the seeded connection — there's no separate proxy-wide upstream env var.
 
 ### Authentication (local)
 

@@ -75,10 +75,13 @@ SPRING_PROFILES_ACTIVE=prod,worker
 HEPHAESTUS_HUB_URL=wss://app.example.com/api/workers/connect
 HEPHAESTUS_WORKER_REGISTRATION_TOKEN=<shared bootstrap secret>
 HEPHAESTUS_WORKER_HUB_SIGNING_KEY=<RSA-2048 PEM>     # only on the app pod
-HEPHAESTUS_WORKER_LLM_BASE_URL=https://gpu.example.com
-HEPHAESTUS_WORKER_LLM_API_KEY=<llm provider key>
 HEPHAESTUS_WORKER_DRAIN_TIMEOUT=5m
 ```
+
+No LLM env vars are needed: the LLM proxy runs in-process on this pod (it follows the same
+job-execution capability gate as job execution itself, not a standalone flag) and reads providers
+from the same instance/workspace catalog as the app pod. Register providers at runtime under
+Instance admin → AI models, or per-workspace under "bring your own AI provider" — never via env var.
 
 Capacity (`HEPHAESTUS_WORKER_REVIEW_MAX`, `HEPHAESTUS_WORKER_MENTOR_MAX`) defaults to `auto` and auto-sizes from `Runtime.availableProcessors()`. Override only if the host is noisy.
 

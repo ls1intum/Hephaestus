@@ -55,6 +55,22 @@ Before upgrading to any new `0.x.0` version:
 Entries exist only for releases that need operator action. Everything else is in the
 [release notes](https://github.com/ls1intum/Hephaestus/releases).
 
+### Next release
+
+#### 🔴 LLM provider configuration moved from env vars to the admin console
+
+**Affected**: any deployment setting `HEPHAESTUS_WORKER_LLM_BASE_URL`, `HEPHAESTUS_WORKER_LLM_API_KEY`, or `HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED`.
+
+**Before**: the worker pod's LLM upstream/key were passed through env vars (`HEPHAESTUS_WORKER_LLM_BASE_URL` / `HEPHAESTUS_WORKER_LLM_API_KEY`), and the LLM proxy could be toggled per pod with `HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED` (`hephaestus.sandbox.llm-proxy.enabled`).
+
+**After**: LLM providers (Anthropic, OpenAI, Azure OpenAI, and self-hosted OpenAI-compatible gateways) are registered at runtime under **Instance admin → AI models**, with per-model pricing and optional sharing with workspaces. Workspaces can also connect their own provider ("bring your own AI provider"). The LLM proxy — the only path a sandbox has to a provider key — now runs automatically wherever agent jobs execute; it has no standalone enable flag. The three env vars above are no longer read.
+
+**Migration**:
+
+1. Remove `HEPHAESTUS_WORKER_LLM_BASE_URL`, `HEPHAESTUS_WORKER_LLM_API_KEY`, and `HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED` from your deployment — they are silently ignored, not an error, but keeping them is misleading.
+2. Register your provider(s) under Instance admin → AI models (or have a workspace admin connect their own under the workspace's AI settings).
+3. Existing per-workspace agent configs keep working unchanged via an automatic legacy fallback — no immediate action needed — but migrate them to a catalog-bound model when convenient; the legacy fields will be removed in a future release following the usual deprecate-then-remove cycle.
+
 ### v0.69.0
 
 #### 🔴 Agent image pin moved from `docker/agent-image-pin.env` to a signed release asset

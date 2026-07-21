@@ -211,14 +211,8 @@ services:
       # Feature flags
       HEPHAESTUS_FEATURES_FLAGS_PRACTICE_REVIEW_FOR_ALL: ${PRACTICE_REVIEW_FOR_ALL:-false}
       HEPHAESTUS_FEATURES_FLAGS_GITLAB_WORKSPACE_CREATION: ${GITLAB_WORKSPACE_CREATION:-false}
-      # LLM proxy (generic OpenAI-compatible route)
-      LLM_PROXY_OPENAI_URL: ${LLM_PROXY_OPENAI_URL:-https://api.openai.com}
-      LLM_PROXY_OPENAI_AUTH_HEADER: ${LLM_PROXY_OPENAI_AUTH_HEADER:-Authorization}
-      LLM_PROXY_OPENAI_USE_BEARER: ${LLM_PROXY_OPENAI_USE_BEARER:-true}
-      # LLM proxy (dedicated Azure OpenAI route used by Pi)
-      LLM_PROXY_AZURE_OPENAI_URL: ${LLM_PROXY_AZURE_OPENAI_URL:-}
-      LLM_PROXY_AZURE_OPENAI_AUTH_HEADER: ${LLM_PROXY_AZURE_OPENAI_AUTH_HEADER:-api-key}
-      LLM_PROXY_AZURE_OPENAI_USE_BEARER: ${LLM_PROXY_AZURE_OPENAI_USE_BEARER:-false}
+      # LLM providers are registered at runtime (Instance admin → AI models), not via env vars —
+      # the proxy reads each connection's base URL/auth from the catalog per request.
       # Worker control channel: same env var feeds the worker pod's registration-token claim.
       HEPHAESTUS_WORKER_HUB_TOKEN_REGISTRATION_TOKEN: ${HEPHAESTUS_WORKER_REGISTRATION_TOKEN:-}
       # thc healthcheck target: actuator liveness on the management port.
@@ -305,10 +299,9 @@ services:
       SANDBOX_MAX_CONCURRENT: ${SANDBOX_MAX_CONCURRENT:-5}
       SANDBOX_MEMORY_BYTES: ${SANDBOX_MEMORY_BYTES:-4294967296}
       SANDBOX_CPUS: ${SANDBOX_CPUS:-2.0}
-      # BYO LLM credentials: when both set, agent-pi reaches the operator's LLM directly
-      # instead of the app-pod's bundled proxy (not reachable from a separate host).
-      HEPHAESTUS_LLM_BASE_URL: ${HEPHAESTUS_WORKER_LLM_BASE_URL:-}
-      HEPHAESTUS_LLM_API_KEY: ${HEPHAESTUS_WORKER_LLM_API_KEY:-}
+      # No LLM credential passthrough needed: the proxy runs in-process on this pod (it follows
+      # job-execution capability, i.e. AGENT_NATS_ENABLED + the worker role) and reads providers
+      # from the same instance/workspace catalog as application-server.
       HEPHAESTUS_WORKER_CAPACITY_REVIEW_MAX: ${HEPHAESTUS_WORKER_REVIEW_MAX:-auto}
       HEPHAESTUS_WORKER_CAPACITY_MENTOR_MAX: ${HEPHAESTUS_WORKER_MENTOR_MAX:-auto}
       HEPHAESTUS_WORKER_DRAIN_TIMEOUT: ${HEPHAESTUS_WORKER_DRAIN_TIMEOUT:-5m}

@@ -266,14 +266,11 @@ services:
       SANDBOX_MAX_CONCURRENT: ${SANDBOX_MAX_CONCURRENT:-2}
       SANDBOX_MEMORY_BYTES: ${SANDBOX_MEMORY_BYTES:-4294967296}
       SANDBOX_CPUS: ${SANDBOX_CPUS:-2.0}
-      # Verbatim path passthrough: the sandbox appends its own request path, so this is the API
-      # root, not a /v1 endpoint (same convention as the https://api.openai.com default).
-      LLM_PROXY_OPENAI_URL: ${LLM_PROXY_OPENAI_URL:-https://api.openai.com}
-      LLM_PROXY_OPENAI_AUTH_HEADER: ${LLM_PROXY_OPENAI_AUTH_HEADER:-Authorization}
-      LLM_PROXY_OPENAI_USE_BEARER: ${LLM_PROXY_OPENAI_USE_BEARER:-true}
-      # The LLM key and model live per-workspace in AgentConfig, encrypted at rest. A preview starts
-      # from a seeded DB with nobody to fill that in, so seed a default config at boot — without a
-      # model name the Pi provider is never registered and the mentor silently has no LLM.
+      # LLM providers are registered at runtime (Instance admin → AI models); the proxy reads each
+      # connection's base URL/auth from the catalog per request, so no env var routes it here.
+      # A preview starts from a seeded DB with nobody to click through the admin UI, so seed a
+      # default config at boot — without a model name the Pi provider is never registered and the
+      # mentor silently has no LLM.
       AGENT_DEFAULT_CONFIG_ENABLED: ${AGENT_DEFAULT_CONFIG_ENABLED:-false}
       AGENT_DEFAULT_CONFIG_NAME: ${AGENT_DEFAULT_CONFIG_NAME:-Default}
       AGENT_DEFAULT_CONFIG_PROVIDER: ${AGENT_DEFAULT_CONFIG_PROVIDER:-OPENAI}
