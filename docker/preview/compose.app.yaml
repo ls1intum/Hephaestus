@@ -148,10 +148,9 @@ services:
     command:
       - sh
       - -c
-      - chown -R 1002:1001 /data/git-repos /var/log/hephaestus && chmod 0755 /data/git-repos /var/log/hephaestus
+      - chown -R 1002:1001 /data/git-repos && chmod 0755 /data/git-repos
     volumes:
       - git-repos:/data/git-repos
-      - appserver-logs:/var/log/hephaestus
     restart: "no"
 
   # The service name must stay dash-free. Coolify stores a service's configured domain under the
@@ -298,7 +297,6 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - git-repos:/data/git-repos
-      - appserver-logs:/var/log/hephaestus
     depends_on:
       postgres:
         condition: service_healthy
@@ -359,4 +357,3 @@ services:
 volumes:
   postgres-data:
   git-repos:
-  appserver-logs:
