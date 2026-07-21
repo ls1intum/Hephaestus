@@ -22,9 +22,18 @@ import org.springframework.stereotype.Component;
  *       HEPHAESTUS_WORKER_LLM_API_KEY} / {@code HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED} — LLM
  *       providers moved from env vars to the admin console.</li>
  *   <li>#1368 (NATS→Postgres agent queue cutover): {@code AGENT_NATS_ENABLED} / {@code
- *       hephaestus.agent.nats.server} — the agent job queue is now the {@code agent_job} table,
- *       polled rather than pushed over NATS.</li>
+ *       HEPHAESTUS_AGENT_NATS_SERVER} / {@code AGENT_NATS_MAX_ACK_PENDING} / {@code
+ *       AGENT_NATS_FETCH_BATCH_SIZE} — the agent job queue is now the {@code agent_job} table,
+ *       polled rather than pushed over NATS; every tuning knob the old JetStream consumer had
+ *       (ack-pending, fetch batch size) has no poll-based equivalent and is simply dropped.</li>
  * </ul>
+ *
+ * <p>Deliberately checks the retired {@code hephaestus.agent.nats.*} keys, not any surviving
+ * property with a similar name — {@code application-worker.yml} no longer sets {@code
+ * hephaestus.agent.nats.enabled} itself (that YAML assignment used to make this warner false-positive
+ * on every worker boot, since a YAML-set placeholder default resolves to a present-but-empty value,
+ * not absent), so a real WARN here now means the operator's own deployment config still sets one of
+ * these, not the shipped profile.
  */
 @Component
 public class DeprecatedEnvVarStartupWarner {
@@ -54,6 +63,14 @@ public class DeprecatedEnvVarStartupWarner {
         RETIRED_PROPERTIES.put(
             "hephaestus.agent.nats.server",
             "the agent queue now runs on PostgreSQL; set AGENT_ENABLED instead"
+        );
+        RETIRED_PROPERTIES.put(
+            "hephaestus.agent.nats.max-ack-pending",
+            "the agent queue now runs on PostgreSQL; there is no ack-pending equivalent for poll-based delivery"
+        );
+        RETIRED_PROPERTIES.put(
+            "hephaestus.agent.nats.fetch-batch-size",
+            "the agent queue now runs on PostgreSQL; set AGENT_CLAIM_BATCH_SIZE instead"
         );
     }
 

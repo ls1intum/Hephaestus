@@ -124,7 +124,11 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
 
     /**
      * Conditional transition to {@link AgentJobStatus#CANCELLED} that also records the
-     * cancellation reason. Used by the worker drain coordinator and explicit user-cancel paths.
+     * cancellation reason. Used by explicit user-cancel paths and as the drain coordinator's
+     * fallback when a worker-fenced requeue ({@link #requeueOrphan}) isn't possible (no worker
+     * identity known). Unfenced by worker — callers with a known worker id should prefer
+     * {@link #transitionToCancelledOwnedBy} so a belated cancel from a worker that already lost
+     * the job (orphan-requeued to a sibling) cannot clobber the sibling's run.
      *
      * @return number of rows updated (0 or 1)
      */
@@ -141,6 +145,30 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         @Param("error") String error,
         @Param("reason") AgentJobCancellationReason reason,
         @Param("fromStatuses") Collection<AgentJobStatus> fromStatuses
+    );
+
+    /**
+     * Like {@link #transitionToCancelled}, fenced to the owning worker (#1368 fix wave, mirrors
+     * {@link #transitionStatusOwnedBy}): a worker draining a job it believes it still owns must not
+     * cancel a sibling's run if the job was orphan-requeued out from under it between the drain
+     * snapshot and this write.
+     *
+     * @return number of rows updated (0 or 1)
+     */
+    @WorkspaceAgnostic("ID-based fenced cancel; job ID + owner from worker-local drain context")
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        "UPDATE AgentJob j SET j.status = de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.CANCELLED, " +
+            "j.completedAt = :now, j.errorMessage = :error, j.cancellationReason = :reason " +
+            "WHERE j.id = :id AND j.status IN :fromStatuses AND j.workerId = :workerId"
+    )
+    int transitionToCancelledOwnedBy(
+        @Param("id") UUID id,
+        @Param("now") Instant now,
+        @Param("error") String error,
+        @Param("reason") AgentJobCancellationReason reason,
+        @Param("fromStatuses") Collection<AgentJobStatus> fromStatuses,
+        @Param("workerId") String workerId
     );
 
     /**
@@ -162,10 +190,30 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      * #findByIdQueuedForUpdateSkipLocked} re-checks and locks each candidate individually, so a stale
      * read here (a job already claimed by a sibling between this query and the claim attempt) just
      * costs a skipped candidate, never a double-claim.
+     *
+     * <p>Fairness predicate (#1368 fix wave): excludes candidates whose {@code agent_config} is
+     * already at its {@code max_concurrent_jobs} cap. Without this, a config with a deep QUEUED
+     * backlog that is fully saturated on RUNNING jobs monopolises every LIMIT window — {@code
+     * processJob} would re-check and skip every one of them (correctly refusing to over-claim), but a
+     * younger, immediately-runnable job from a different config never even gets fetched into the
+     * candidate batch, so it waits out poll cycle after poll cycle behind jobs nobody can claim yet
+     * (head-of-line starvation). The concurrency count re-check inside {@code claimJob}'s {@code
+     * FOR UPDATE} transaction remains the authoritative gate — this predicate only shapes which
+     * candidates are worth fetching in the first place, so a stale read here (a RUNNING job
+     * completing between this query and the claim) costs nothing beyond an ordinary skipped
+     * candidate. Backed by {@code ix_agent_job_queued_created} (queued jobs, oldest-first) and {@code
+     * ix_agent_job_running_config} (running jobs per config, for the correlated count).
      */
     @WorkspaceAgnostic("Cross-workspace poll candidates; caller is the @WorkspaceAgnostic job poller")
     @Query(
-        value = "SELECT id FROM agent_job WHERE status = 'QUEUED' ORDER BY created_at ASC LIMIT :limit",
+        value = "SELECT j.id FROM agent_job j " +
+            "WHERE j.status = 'QUEUED' " +
+            "AND (" +
+            "  j.config_id IS NULL " +
+            "  OR (SELECT count(*) FROM agent_job r WHERE r.config_id = j.config_id AND r.status = 'RUNNING') " +
+            "     < (SELECT c.max_concurrent_jobs FROM agent_config c WHERE c.id = j.config_id)" +
+            ") " +
+            "ORDER BY j.created_at ASC LIMIT :limit",
         nativeQuery = true
     )
     List<UUID> findQueuedIdsOldestFirst(@Param("limit") int limit);
@@ -185,7 +233,8 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      */
     @WorkspaceAgnostic("Cross-workspace orphan recovery; caller is @WorkspaceAgnostic sweeper")
     @Query(
-        value = "SELECT j.id AS jobId, j.workspace_id AS workspaceId, j.retry_count AS retryCount " +
+        value = "SELECT j.id AS jobId, j.workspace_id AS workspaceId, j.retry_count AS retryCount, " +
+            "j.worker_id AS workerId " +
             "FROM agent_job j WHERE j.status = 'RUNNING' AND j.worker_id IS NOT NULL " +
             "AND j.started_at < :graceCutoff " +
             "AND NOT EXISTS (SELECT 1 FROM worker_registry w WHERE w.worker_id = j.worker_id " +
@@ -198,16 +247,54 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     );
 
     /**
-     * CAS requeue of an orphaned job: RUNNING → QUEUED, clear ownership, bump retry_count. Returns 1
-     * if this caller won the race (so it should re-publish), 0 if another sweeper already moved it.
+     * CAS requeue of an orphaned (or draining) job: RUNNING → QUEUED, clear ownership, bump
+     * retry_count. Returns 1 if this caller won the race, 0 otherwise.
+     *
+     * <p>Fenced on {@code worker_id = :workerId} (#1368 fix wave): checking status alone let a
+     * belated requeue attempt (e.g. a slow sweeper pass, or a second replica's concurrent sweep)
+     * match a row that a DIFFERENT worker has since legitimately re-claimed — status is RUNNING
+     * again, just under a new owner — silently stealing that worker's in-progress job back to
+     * QUEUED. Fencing on the worker id this caller believes it is recovering from closes that: the
+     * UPDATE only matches while the row is still owned by the worker the caller identified as
+     * dead/draining. Also enforces the retry cap in the WHERE clause (defense in depth — callers
+     * already check {@code retryCount < maxRetries} before calling, but a future caller that forgets
+     * to must not be able to requeue past the cap).
+     *
+     * <p>Reused by two callers: {@link AgentJobZombieSweeper#recoverOrphanedJobs} (the dead worker's
+     * own id) and {@link AgentJobExecutor#cancelInFlight} on drain timeout (this worker's own id,
+     * requeuing its own in-flight jobs for a sibling to pick up rather than cancelling them —
+     * matches the documented drain contract).
      */
-    @WorkspaceAgnostic("ID-based orphan requeue; caller is @WorkspaceAgnostic sweeper")
+    @WorkspaceAgnostic("ID-based orphan/drain requeue; caller is @WorkspaceAgnostic sweeper or worker-local drain")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
         "UPDATE AgentJob j SET j.status = 'QUEUED', j.workerId = null, " +
-            "j.startedAt = null, j.retryCount = j.retryCount + 1 WHERE j.id = :id AND j.status = 'RUNNING'"
+            "j.startedAt = null, j.retryCount = j.retryCount + 1 " +
+            "WHERE j.id = :id AND j.status = 'RUNNING' AND j.workerId = :workerId AND j.retryCount < :maxRetries"
     )
-    int requeueOrphan(@Param("id") UUID id);
+    int requeueOrphan(@Param("id") UUID id, @Param("workerId") String workerId, @Param("maxRetries") int maxRetries);
+
+    /**
+     * Self-fenced requeue for a claim this SAME worker just won but could not dispatch (sandbox
+     * executor pool rejection, #1368 fix wave): RUNNING → QUEUED, ownership cleared, {@code
+     * retry_count} left untouched. The job never actually started executing — refusing it before
+     * dispatch is a delivery-mechanism hiccup, not a failed attempt, so it must not burn part of the
+     * job's retry budget (that would let a chronically undersized sandbox pool exhaust {@code
+     * max-retries} on jobs that never ran). Always fenced to the worker id that just claimed it
+     * (this call happens synchronously, moments after the claim, on the same poll thread), so no
+     * orphan risk from fencing here — {@code :workerId} may be {@code null} only when the worker
+     * role runs with no identity configured, in which case the check is skipped.
+     *
+     * @return 1 if requeued, 0 if the row is no longer RUNNING-and-ours (should not normally happen
+     *     given the timing, but the caller treats 0 the same as 1 — either way the claim is gone)
+     */
+    @WorkspaceAgnostic("ID-based self-fenced requeue; caller is the claiming worker itself")
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        "UPDATE AgentJob j SET j.status = 'QUEUED', j.workerId = null, j.startedAt = null " +
+            "WHERE j.id = :id AND j.status = 'RUNNING' AND (:workerId IS NULL OR j.workerId = :workerId)"
+    )
+    int requeueRejectedClaim(@Param("id") UUID id, @Param("workerId") String workerId);
 
     // Delivery tracking (issue #748)
 

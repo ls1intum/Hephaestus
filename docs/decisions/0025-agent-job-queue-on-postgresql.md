@@ -1,9 +1,36 @@
 # ADR 0025: Agent job queue moves off NATS onto PostgreSQL
 
-**Status:** Accepted
+**Status:** Accepted (amended 2026-07-21 — fairness + fencing fix wave)
 **Date:** 2026-07-21
 **Authors:** Felix T.J. Dietrich
 **Builds on:** [ADR 0005](0005-two-role-runtime-via-conditional-on-property.md) (two-role runtime, original agent NATS consumer), [ADR 0006](0006-llm-proxy-on-coordinator-trust-model.md) (LLM proxy job-execution capability gate), [ADR 0013](0013-no-jetstream-dlq-stream.md) (no JetStream DLQ stream)
+
+> **Amendment (2026-07-21, adversarial review fix wave):** Two gaps in the initial cutover, both
+> fixed without changing the decision above:
+>
+> - **Head-of-line starvation.** The poll candidate query (`findQueuedIdsOldestFirst`) was a plain
+>   `WHERE status='QUEUED' ORDER BY created_at LIMIT n`. If the oldest `n` QUEUED rows all belonged to
+>   a config already at its `max_concurrent_jobs` cap, every claim attempt in that batch correctly
+>   skipped them — but a younger, immediately-runnable job from a *different* config never even
+>   entered the candidate batch, and could starve indefinitely behind an unclaimable backlog. The
+>   query now excludes candidates whose config is already at its RUNNING cap (a correlated subquery,
+>   supported by a new partial index `ix_agent_job_running_config`); the per-row `FOR UPDATE`
+>   concurrency recheck inside the claim transaction remains the authoritative gate, so a stale read
+>   in this predicate costs nothing beyond an ordinary skipped candidate.
+> - **Unfenced orphan requeue.** `requeueOrphan` CAS'd on `status='RUNNING'` alone. If a job was
+>   requeued by the sweeper and immediately re-claimed by a live sibling before a second, belated
+>   sweep pass (or a second replica's concurrent pass) processed the same stale orphan snapshot, the
+>   belated requeue matched the row again — status was RUNNING once more, just under the new owner —
+>   and silently stole the sibling's legitimately in-progress job back to QUEUED. `requeueOrphan` now
+>   additionally fences on `worker_id = :deadWorkerId` (the id the caller identified as dead) and
+>   enforces the retry cap in the SQL `WHERE` itself, not just in the caller. The same CAS is reused by
+>   the worker drain path (see ADR 0009's amendment) so a draining worker's own jobs return to the
+>   queue through the identical fenced mechanism.
+>
+> Also new: `AgentJobExecutor`'s poll capacity is now bounded by the sandbox executor's actual free
+> thread-pool slots (previously only `WorkerCapacityState.reviewMax`, an independently-configured
+> knob that can exceed the pool size), and a sandbox-pool rejection backs off the poll loop instead of
+> immediately re-claiming — closing a retry-budget-burning churn loop a saturated pool could trigger.
 
 ## Context
 

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -99,7 +100,13 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
         return job;
     }
 
+    private static final String DEAD_WORKER_ID = "dead-replica";
+
     private static OrphanedJobRef orphan(UUID jobId, Long workspaceId, int retryCount) {
+        return orphan(jobId, workspaceId, retryCount, DEAD_WORKER_ID);
+    }
+
+    private static OrphanedJobRef orphan(UUID jobId, Long workspaceId, int retryCount, String workerId) {
         return new OrphanedJobRef() {
             @Override
             public UUID getJobId() {
@@ -115,6 +122,11 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
             public int getRetryCount() {
                 return retryCount;
             }
+
+            @Override
+            public String getWorkerId() {
+                return workerId;
+            }
         };
     }
 
@@ -129,11 +141,11 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
             when(jobRepository.findOrphanedRunningJobs(any(), ArgumentMatchers.anyLong())).thenReturn(
                 List.of(orphan(jobId, 7L, 0))
             );
-            when(jobRepository.requeueOrphan(jobId)).thenReturn(1);
+            when(jobRepository.requeueOrphan(jobId, DEAD_WORKER_ID, AGENT_PROPS.maxRetries())).thenReturn(1);
 
             sweeper.recoverOrphanedJobs();
 
-            verify(jobRepository).requeueOrphan(jobId);
+            verify(jobRepository).requeueOrphan(jobId, DEAD_WORKER_ID, AGENT_PROPS.maxRetries());
             assertThat(meterRegistry.counter("agent.job.orphan.requeued").count()).isEqualTo(1d);
         }
 
@@ -144,11 +156,11 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
             when(jobRepository.findOrphanedRunningJobs(any(), ArgumentMatchers.anyLong())).thenReturn(
                 List.of(orphan(jobId, 7L, 0))
             );
-            when(jobRepository.requeueOrphan(jobId)).thenReturn(0); // another replica won
+            when(jobRepository.requeueOrphan(jobId, DEAD_WORKER_ID, AGENT_PROPS.maxRetries())).thenReturn(0); // another replica won
 
             sweeper.recoverOrphanedJobs();
 
-            verify(jobRepository).requeueOrphan(jobId);
+            verify(jobRepository).requeueOrphan(jobId, DEAD_WORKER_ID, AGENT_PROPS.maxRetries());
             // No further status write beyond the attempted requeue itself, and no requeue credited.
             verify(jobRepository, never()).transitionStatus(any(), any(), any(), any(), any());
             assertThat(meterRegistry.counter("agent.job.orphan.requeued").count()).isZero();
@@ -164,7 +176,7 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
 
             sweeper.recoverOrphanedJobs();
 
-            verify(jobRepository, never()).requeueOrphan(any());
+            verify(jobRepository, never()).requeueOrphan(any(), any(), anyInt());
             verify(jobRepository).transitionStatus(
                 eq(jobId),
                 eq(AgentJobStatus.FAILED),
@@ -181,7 +193,7 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
 
             sweeper.recoverOrphanedJobs();
 
-            verify(jobRepository, never()).requeueOrphan(any());
+            verify(jobRepository, never()).requeueOrphan(any(), any(), anyInt());
             verify(jobRepository, never()).transitionStatus(any(), any(), any(), any(), any());
         }
     }

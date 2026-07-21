@@ -1123,4 +1123,43 @@
         <rollback/>
     </changeSet>
 
+    <!--
+        Poll-query indexes for the agent job queue (#1368 fix wave — adversarial review of the
+        NATS→Postgres cutover). AgentJobExecutor.pollLoop's candidate lookup
+        (findQueuedIdsOldestFirst) had no dedicated index: it fell back to a sequential scan of
+        agent_job filtered by status, ordered by created_at. The fairness predicate the same fix wave
+        adds (excluding QUEUED jobs whose config is already at its concurrency cap, closing a
+        head-of-line-starvation gap) adds a correlated per-config RUNNING count, which needs its own
+        supporting index.
+    -->
+    <changeSet id="1784636803503-30" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="ix_agent_job_queued_created already exists">
+            <not><indexExists indexName="ix_agent_job_queued_created"/></not>
+        </preConditions>
+        <comment>Oldest-first QUEUED poll candidates (#1368 fix wave)</comment>
+        <sql>
+            CREATE INDEX ix_agent_job_queued_created
+                ON agent_job (created_at ASC, id)
+                WHERE status = 'QUEUED';
+        </sql>
+        <rollback>
+            <sql>DROP INDEX IF EXISTS ix_agent_job_queued_created;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1784636803503-31" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="ix_agent_job_running_config already exists">
+            <not><indexExists indexName="ix_agent_job_running_config"/></not>
+        </preConditions>
+        <comment>Per-config RUNNING count for the poll query's concurrency-cap fairness predicate (#1368 fix wave)</comment>
+        <sql>
+            CREATE INDEX ix_agent_job_running_config
+                ON agent_job (config_id)
+                WHERE status = 'RUNNING';
+        </sql>
+        <rollback>
+            <sql>DROP INDEX IF EXISTS ix_agent_job_running_config;</sql>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

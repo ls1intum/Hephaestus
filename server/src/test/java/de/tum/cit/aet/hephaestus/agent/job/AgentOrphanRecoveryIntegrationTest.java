@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -70,6 +71,9 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private TransactionTemplate transactionTemplate;
+
     private Workspace workspace;
 
     @BeforeEach
@@ -117,6 +121,48 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         assertThat(failed.getErrorMessage()).contains("retry limit reached");
         // Never went back through QUEUED — no poll candidate left behind.
         assertThat(jobRepository.findQueuedIdsOldestFirst(10)).doesNotContain(jobId);
+    }
+
+    /**
+     * #1368 fix wave: {@code requeueOrphan} used to CAS on {@code status='RUNNING'} alone. A belated
+     * requeue attempt — e.g. a slow/duplicate sweeper pass working from a stale {@link OrphanedJobRef}
+     * snapshot — could match a row that a LIVE sibling has since legitimately re-claimed: status is
+     * RUNNING again, just under a different {@code worker_id}. Without the {@code worker_id} fence,
+     * that belated write would silently steal the sibling's in-progress job back to QUEUED. This
+     * proves the fence holds at the repository level directly (no need to orchestrate an actual race).
+     */
+    @Test
+    @DisplayName(
+        "requeueOrphan is fenced on worker_id — a stale caller cannot steal a job a live sibling has re-claimed"
+    )
+    void requeueOrphanDoesNotStealAJobReclaimedBySomeoneElse() {
+        UUID jobId = runningJobOwnedBy("live-sibling", Instant.now(), 0);
+
+        // A stale sweeper pass believes the job is still owned by a worker that has since died AND been
+        // superseded — "dead-replica" is not the row's actual current owner. @Modifying queries need an
+        // active transaction (the sweeper normally provides one via TransactionTemplate); wrap here too.
+        int updated = transactionTemplate.execute(s -> jobRepository.requeueOrphan(jobId, "dead-replica", 5));
+
+        assertThat(updated)
+            .as("the CAS must not match — the row's worker_id does not match the stale caller's")
+            .isZero();
+        AgentJob untouched = jobRepository.findById(jobId).orElseThrow();
+        assertThat(untouched.getStatus()).isEqualTo(AgentJobStatus.RUNNING);
+        assertThat(untouched.getWorkerId()).isEqualTo("live-sibling");
+        assertThat(untouched.getRetryCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("requeueOrphan enforces the retry cap in SQL even if a caller forgets to check it first")
+    void requeueOrphanRefusesPastTheRetryCapEvenUnchecked() {
+        UUID jobId = runningJobOwnedBy("dead-replica-3", Instant.now(), 5);
+
+        int updated = transactionTemplate.execute(s -> jobRepository.requeueOrphan(jobId, "dead-replica-3", 5));
+
+        assertThat(updated).isZero();
+        AgentJob unchanged = jobRepository.findById(jobId).orElseThrow();
+        assertThat(unchanged.getStatus()).isEqualTo(AgentJobStatus.RUNNING);
+        assertThat(unchanged.getRetryCount()).isEqualTo(5);
     }
 
     // ── helpers ──

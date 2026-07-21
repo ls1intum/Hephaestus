@@ -56,6 +56,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
@@ -135,6 +136,13 @@ public class AgentJobExecutor {
     private final Optional<WorkerProperties> workerProperties;
     /** This worker's identity (null only when the worker role is off); stamped on claimed jobs to fence terminal writes. */
     private final String workerId;
+    /**
+     * Set by {@link #dispatchExecution} when the sandbox executor pool rejected the just-claimed job;
+     * read by the poll loop immediately after each {@link #processJob} call to decide whether to back
+     * off (#1368 fix wave). Poll-thread-owned: written and read only from the single poll thread (or,
+     * in tests, the single calling thread), so no synchronization is needed.
+     */
+    private boolean lastClaimPoolRejected;
 
     public AgentJobExecutor(
         AgentProperties agentProperties,
@@ -193,16 +201,42 @@ public class AgentJobExecutor {
         );
     }
 
+    /** Bound on how long {@link #stopAcceptingNewJobs()} waits for the poll thread to actually exit. */
+    private static final Duration POLL_THREAD_JOIN_TIMEOUT = Duration.ofSeconds(10);
+
     /**
      * Stop the poll loop so no new jobs are claimed. Idempotent. Composable with
      * {@link #awaitInFlight(Duration)} and {@link #cancelInFlight(AgentJobCancellationReason)}
      * from the worker drain coordinator; called standalone from {@link #stop()} for non-worker
      * monolith mode.
+     *
+     * <p>Joins the poll thread before returning (#1368 fix wave — drain admission race): without this,
+     * a claim already in flight when {@code running} flips false can still finish claiming a job (RUNNING,
+     * owned) and register with {@link #inFlight} <em>after</em> the drain coordinator has already called
+     * {@link #awaitInFlight(Duration)}. Phaser semantics make that registration land in the NEXT phase, so
+     * the coordinator's {@code awaitAdvanceInterruptibly} on the OLD (already-complete) phase returns
+     * immediately, believing drain is clean — the late-claimed job is then neither awaited nor cancelled,
+     * silently escaping the drain contract entirely. Joining here (the claim transaction is ~5ms, so this
+     * is normally instantaneous) guarantees no further claim/register can happen once this method returns,
+     * closing the window structurally rather than trying to out-race it.
      */
     public void stopAcceptingNewJobs() {
         running.set(false);
-        if (pollThread != null) {
-            pollThread.interrupt();
+        Thread thread = pollThread;
+        if (thread == null) {
+            return;
+        }
+        thread.interrupt();
+        try {
+            thread.join(POLL_THREAD_JOIN_TIMEOUT.toMillis());
+            if (thread.isAlive()) {
+                log.warn(
+                    "Poll thread did not stop within {} of stopAcceptingNewJobs() — a claim may still be in flight",
+                    POLL_THREAD_JOIN_TIMEOUT
+                );
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 
@@ -230,28 +264,67 @@ public class AgentJobExecutor {
     }
 
     /**
-     * Transition the jobs THIS worker is currently running to {@link AgentJobStatus#CANCELLED}
-     * with the given reason, and stop their containers promptly. Scoped to {@link #localRunningJobs}
-     * so sibling workers' jobs are untouched — this is the fix for #1138 that makes running more
-     * than one worker replica safe.
+     * Stop the containers of the jobs THIS worker is currently running, and hand each one back to
+     * the queue for a sibling to pick up — matching the documented drain contract (docs/admin/
+     * runtime-roles.mdx: "cancels remaining jobs cleanly — they return to the PostgreSQL-backed
+     * queue... bounded by AGENT_MAX_RETRIES"). Scoped to {@link #localRunningJobs} so sibling
+     * workers' jobs are untouched — this is the fix for #1138 that makes running more than one
+     * worker replica safe.
+     *
+     * <p>#1368 fix wave: previously this always wrote a terminal {@link AgentJobStatus#CANCELLED},
+     * contradicting the documented "returns to the queue" behaviour and discarding the job instead
+     * of retrying it. Now it first attempts a worker-fenced requeue (RUNNING → QUEUED, retry_count
+     * bumped, capped by {@code max-retries} — the same CAS {@link AgentJobZombieSweeper} uses for
+     * orphan recovery, see {@link AgentJobRepository#requeueOrphan}). Only when that CAS loses — the
+     * job already left this worker's ownership (a concurrent user-cancel / fence race), or the retry
+     * cap is already exhausted — does it fall back to a worker-fenced terminal cancel, so a genuinely
+     * exhausted job still ends up FAILED/CANCELLED rather than requeued forever.
      */
     public void cancelInFlight(AgentJobCancellationReason reason) {
         Set<UUID> snapshot = Set.copyOf(localRunningJobs);
         if (snapshot.isEmpty()) {
             return;
         }
-        log.info("Cancelling {} in-flight job(s) owned by this worker with reason {}", snapshot.size(), reason);
+        log.info("Draining {} in-flight job(s) owned by this worker with reason {}", snapshot.size(), reason);
         Instant now = Instant.now();
         String error = "worker draining";
         for (UUID jobId : snapshot) {
             try {
-                transactionTemplate.executeWithoutResult(status ->
-                    jobRepository.transitionToCancelled(jobId, now, error, reason, Set.of(AgentJobStatus.RUNNING))
-                );
-                // Stop the container so drain doesn't wait for the agent to finish naturally.
+                boolean requeued = false;
+                if (workerId != null) {
+                    Integer updated = transactionTemplate.execute(status ->
+                        jobRepository.requeueOrphan(jobId, workerId, agentProperties.maxRetries())
+                    );
+                    requeued = updated != null && updated > 0;
+                }
+                if (!requeued) {
+                    // Fence lost, retry cap already exhausted, or no worker identity — fail terminally
+                    // instead of requeuing forever.
+                    transactionTemplate.executeWithoutResult(status -> {
+                        if (workerId != null) {
+                            jobRepository.transitionToCancelledOwnedBy(
+                                jobId,
+                                now,
+                                error,
+                                reason,
+                                Set.of(AgentJobStatus.RUNNING),
+                                workerId
+                            );
+                        } else {
+                            jobRepository.transitionToCancelled(
+                                jobId,
+                                now,
+                                error,
+                                reason,
+                                Set.of(AgentJobStatus.RUNNING)
+                            );
+                        }
+                    });
+                }
+                // Stop the container either way so drain doesn't wait for the agent to finish naturally.
                 sandboxManager.cancel(jobId);
             } catch (Exception e) {
-                log.warn("Failed to cancel in-flight job {}: {}", jobId, e.getClass().getSimpleName());
+                log.warn("Failed to drain in-flight job {}: {}", jobId, e.getClass().getSimpleName());
             }
             // #1368 fix wave: every job in localRunningJobs is, by construction, one this worker has
             // claimed and started executing — so it may carry real, un-costed spend regardless of
@@ -312,19 +385,33 @@ public class AgentJobExecutor {
                     continue;
                 }
 
-                boolean anyClaimed = false;
+                boolean anyDispatched = false;
+                boolean poolRejected = false;
                 for (UUID jobId : candidates) {
                     if (!running.get()) {
                         break;
                     }
+                    // A pool rejection means the sandbox executor is already saturated — trying more
+                    // candidates this iteration would just requeue-churn them too. Stop the batch and
+                    // fall through to the backoff sleep below instead (#1368 fix wave).
+                    if (poolRejected) {
+                        break;
+                    }
+                    lastClaimPoolRejected = false;
                     if (processJob(jobId)) {
-                        anyClaimed = true;
+                        if (lastClaimPoolRejected) {
+                            poolRejected = true;
+                        } else {
+                            anyDispatched = true;
+                        }
                     }
                 }
-                // Busy-spin protection: if every candidate in this batch was skipped (already claimed
-                // by a sibling, concurrency-full, budget-blocked, or a lock timeout), sleep before the
-                // next poll instead of immediately re-querying the same still-QUEUED rows.
-                if (!anyClaimed) {
+                // Busy-spin / retry-burn protection: if every candidate in this batch was skipped
+                // (already claimed by a sibling, concurrency-full, budget-blocked, or a lock timeout),
+                // OR the sandbox executor pool rejected a claim, sleep before the next poll instead of
+                // immediately re-querying/re-claiming (#1368 fix wave: a saturated pool without this
+                // backoff claims-then-immediately-requeues in a tight loop, hammering the DB).
+                if (!anyDispatched || poolRejected) {
                     sleepPollInterval();
                 }
             } catch (Exception e) {
@@ -338,13 +425,32 @@ public class AgentJobExecutor {
     /**
      * This worker's free local capacity for new claims: the configured review capacity minus jobs
      * already running locally, bounded by {@code claimBatchSize} so one poll iteration never
-     * over-fetches candidates it couldn't dispatch anyway. Package-private for testability.
+     * over-fetches candidates it couldn't dispatch anyway, and further bounded by the sandbox
+     * executor's actual free thread-pool slots (#1368 fix wave). {@code WorkerCapacityState.reviewMax}
+     * and the sandbox executor's pool size are two independently-configured knobs
+     * ({@code HEPHAESTUS_WORKER_CAPACITY_REVIEW_MAX} auto-sizes from CPU count;
+     * {@code SANDBOX_MAX_CONCURRENT} defaults to a flat 5) — nothing enforces they agree, so without
+     * this bound a reviewMax larger than the pool routinely claims jobs the pool then rejects,
+     * burning claim/requeue churn on every such poll. Package-private for testability.
      */
     int computeCapacity() {
         int poolCapacity = capacityState
             .map(cs -> Math.max(0, cs.reviewMax() - localRunningJobs.size()))
             .orElse(agentProperties.claimBatchSize());
-        return Math.min(poolCapacity, agentProperties.claimBatchSize());
+        int bounded = Math.min(poolCapacity, agentProperties.claimBatchSize());
+        return Math.min(bounded, sandboxExecutorFreeCapacity());
+    }
+
+    /**
+     * Free slots in the sandbox executor's thread pool, or {@link Integer#MAX_VALUE} (no additional
+     * bound) when the injected {@link AsyncTaskExecutor} isn't a {@link ThreadPoolTaskExecutor} (e.g.
+     * a test double) — this method only ever narrows {@link #computeCapacity()}, never widens it.
+     */
+    private int sandboxExecutorFreeCapacity() {
+        if (sandboxExecutor instanceof ThreadPoolTaskExecutor pool) {
+            return Math.max(0, pool.getMaxPoolSize() - pool.getActiveCount());
+        }
+        return Integer.MAX_VALUE;
     }
 
     private void sleepPollInterval() {
@@ -397,6 +503,7 @@ public class AgentJobExecutor {
             });
         } catch (RejectedExecutionException e) {
             inFlight.arriveAndDeregister();
+            lastClaimPoolRejected = true;
             log.warn(
                 "Sandbox executor rejected claimed job {} (pool smaller than configured worker capacity?) — requeuing",
                 jobId
@@ -405,15 +512,69 @@ public class AgentJobExecutor {
         }
     }
 
-    /** Undo a claim the sandbox executor couldn't accept: RUNNING → QUEUED, ownership cleared. */
+    /** Bounded retry budget for the pool-rejection requeue write (transient DB blips only). */
+    private static final int REQUEUE_REJECTED_CLAIM_ATTEMPTS = 3;
+    private static final Duration REQUEUE_REJECTED_CLAIM_RETRY_DELAY = Duration.ofMillis(200);
+
+    /**
+     * Undo a claim the sandbox executor couldn't accept: RUNNING → QUEUED, ownership cleared,
+     * {@code retry_count} left untouched (see {@link AgentJobRepository#requeueRejectedClaim} —
+     * the job never started executing, so this must not burn its retry budget).
+     *
+     * <p>#1368 fix wave: retries the write a few times before giving up — this is normally a purely
+     * local, contention-free UPDATE (self-fenced, this worker's own just-won claim), so a failure is
+     * almost always a transient DB blip. If every attempt fails, the row is left RUNNING under this
+     * worker's id with capacity/local-tracking already released here; it does not hang forever even
+     * then: {@link WorkerLivenessReporter} heartbeats independently of any single job; a sustained DB
+     * outage that breaks every requeue attempt also breaks that heartbeat, so once connectivity
+     * returns, {@link AgentJobZombieSweeper#recoverOrphanedJobs} reclaims the row through the normal
+     * dead-worker path, and {@link AgentJobZombieSweeper#reapStaleRunningJobs} is the absolute-timeout
+     * backstop regardless.
+     */
     private void requeueRejectedClaim(UUID jobId) {
         try {
-            transactionTemplate.executeWithoutResult(status -> jobRepository.requeueOrphan(jobId));
-        } catch (Exception e) {
-            log.warn("Failed to requeue rejected claim {}: {}", jobId, e.getMessage());
+            boolean requeued = false;
+            Exception lastFailure = null;
+            for (int attempt = 1; attempt <= REQUEUE_REJECTED_CLAIM_ATTEMPTS && !requeued; attempt++) {
+                try {
+                    transactionTemplate.executeWithoutResult(status ->
+                        jobRepository.requeueRejectedClaim(jobId, workerId)
+                    );
+                    requeued = true;
+                } catch (Exception e) {
+                    lastFailure = e;
+                    if (attempt < REQUEUE_REJECTED_CLAIM_ATTEMPTS) {
+                        log.debug(
+                            "Requeue of rejected claim {} failed (attempt {}/{}), retrying: {}",
+                            jobId,
+                            attempt,
+                            REQUEUE_REJECTED_CLAIM_ATTEMPTS,
+                            e.getMessage()
+                        );
+                        sleepQuietly(REQUEUE_REJECTED_CLAIM_RETRY_DELAY);
+                    }
+                }
+            }
+            if (!requeued) {
+                log.error(
+                    "Failed to requeue rejected claim {} after {} attempts — row stays RUNNING under this worker " +
+                        "until liveness/timeout recovery reclaims it: {}",
+                    jobId,
+                    REQUEUE_REJECTED_CLAIM_ATTEMPTS,
+                    lastFailure != null ? lastFailure.getMessage() : "unknown"
+                );
+            }
         } finally {
             releaseCapacity();
             localRunningJobs.remove(jobId);
+        }
+    }
+
+    private static void sleepQuietly(Duration duration) {
+        try {
+            Thread.sleep(duration.toMillis());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 

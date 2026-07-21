@@ -23,8 +23,19 @@ spring:
         timeout-per-shutdown-phase: 6m
 
 server:
-    # -1 disables the application HTTP connector; actuator stays on management.server.port.
-    port: -1
+    # A real port (#1368 fix wave — was -1). The LLM proxy is the ONLY LLM credential path (ADR 0006's
+    # 2026-07-20 amendment): LlmProxyController/LlmProxySecurityConfig wire wherever
+    # hephaestus.agent.enabled AND hephaestus.runtime.worker.enabled are both true — which, on THIS
+    # profile, is exactly this pod when AGENT_ENABLED is set. With no HTTP connector (-1), that proxy
+    # controller existed as a bean but could never actually be reached — the sandbox's
+    # `http://<thisPod>:<serverPort>/internal/llm` target resolved to a negative port, so every
+    # sandboxed job this pod claimed would fail to reach its LLM. Internal-only: no `ports:` mapping
+    # in docker/compose.app.yaml's application-worker service publishes this externally, and no
+    # Traefik router targets it — only /internal/llm/** and /actuator/** answer here, since the entire
+    # user-facing auth/web surface stays off (hephaestus.runtime.server.enabled=false below leaves
+    # every @ConditionalOnServerRole bean, including the JwtDecoder, unwired — Spring Security's
+    # fallback chain denies everything else it doesn't otherwise recognize).
+    port: ${SERVER_PORT:8080}
 
 hephaestus:
     runtime:
@@ -38,15 +49,17 @@ hephaestus:
     sync:
         nats:
             enabled: false
+
+    # Same AGENT_ENABLED env var as every other role (application.yml's base default is `false`), but
+    # the DEFAULT flips to true on this profile (#1368 fix wave): job execution IS this pod's purpose,
+    # so a worker booted with only the documented "bare minimum" env vars (docs/admin/runtime-roles.mdx)
+    # — none of which mention AGENT_ENABLED — now actually polls and executes instead of idling. An
+    # operator who genuinely wants a job-execution-disabled worker (e.g. drain-only) can still set
+    # AGENT_ENABLED=false explicitly; that override is unchanged.
     agent:
-        nats:
-            enabled: true
+        enabled: ${AGENT_ENABLED:true}
 
     worker:
         control:
             endpoint: ${HEPHAESTUS_HUB_URL:}
             registration-token: ${HEPHAESTUS_WORKER_REGISTRATION_TOKEN:}
-        # BYO LLM credentials override the app-pod proxy when both fields are set.
-        llm:
-            base-url: ${HEPHAESTUS_LLM_BASE_URL:}
-            api-key: ${HEPHAESTUS_LLM_API_KEY:}

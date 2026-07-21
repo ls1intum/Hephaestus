@@ -180,7 +180,9 @@ public class AgentJobZombieSweeper {
                     }
                     continue;
                 }
-                Integer requeued = transactionTemplate.execute(s -> jobRepository.requeueOrphan(orphan.getJobId()));
+                Integer requeued = transactionTemplate.execute(s ->
+                    jobRepository.requeueOrphan(orphan.getJobId(), orphan.getWorkerId(), agentProperties.maxRetries())
+                );
                 if (requeued != null && requeued > 0) {
                     orphanRequeued.increment();
                     log.warn("Requeued orphaned job {} (retry {})", orphan.getJobId(), orphan.getRetryCount() + 1);

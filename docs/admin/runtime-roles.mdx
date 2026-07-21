@@ -48,7 +48,7 @@ Split the webhook receiver out when:
 
 Each role ships with a Spring profile YAML that flips the other two flags off and prunes the bean graph:
 
-- `application-worker.yml` — `runtime.server=false`, `runtime.webhook=false`, `web-application-type=none`, OAuth2 autoconfigure excluded, JPA still enabled.
+- `application-worker.yml` — `runtime.server=false`, `runtime.webhook=false`, `agent.enabled` defaults to `true` on this profile specifically (job execution IS this pod's purpose — see the `AGENT_ENABLED` note below), OAuth2 autoconfigure excluded, JPA still enabled. The servlet container stays on (`web-application-type=servlet`) with a real `server.port`: the internal LLM proxy (`/internal/llm/**`, the only credential path a sandboxed job has) is served here whenever this pod executes jobs, and no `ports:`/Traefik mapping exposes it externally.
 - `application-webhook.yml` — `runtime.server=false`, `runtime.worker=false`, sync NATS enabled, agent job queue disabled (webhook pods never claim jobs).
 - No `application-server.yml` — the monolith default _is_ the server profile.
 
@@ -65,6 +65,18 @@ To deploy a worker pod set `SPRING_PROFILES_ACTIVE=prod,worker` and point `HEPHA
 | `hephaestus.agent.enabled` | true | true | false |
 | `hephaestus.sandbox.enabled` | true | true | false |
 | Needs user-auth wiring | yes | no | no |
+
+`hephaestus.agent.enabled` (`AGENT_ENABLED`) gates two independent things that must agree, or a
+split deployment silently does half its job: **submission** (`AgentJobEventListener` /
+`IssueAgentJobEventListener` / `BotCommandProcessor`, which turn PR/issue/bot events into `agent_job`
+rows) and **orphan recovery** (`AgentJobZombieSweeper`, which reclaims a dead worker's stuck jobs) run
+wherever this flag is `true` — the server role, independent of the worker role. **Execution**
+(`AgentJobExecutor`, the poll loop that claims and runs jobs) additionally requires the worker role.
+Set `AGENT_ENABLED=true` on **every** pod that needs any of these — in the split-pod topology that
+is both `application-server` (submission + recovery) and `application-worker` (execution); the
+`application-worker` profile now defaults it to `true` on its own, but `application-server` does not,
+so it needs the env var explicitly. `docker/compose.app.yaml` sets the same `AGENT_ENABLED` value on
+both services already.
 
 ## Worker pod env vars
 
@@ -91,8 +103,12 @@ On SIGTERM the worker:
 
 1. Sends `Heartbeat{draining=true}` to the hub so the dispatcher stops claiming new jobs for it.
 2. Waits up to `hephaestus.worker.drain.timeout` (default 5 min) for in-flight jobs to finish.
-3. Cancels remaining jobs cleanly — they return to the PostgreSQL-backed queue and are picked up by
-   another worker's poll, bounded by `AGENT_MAX_RETRIES`.
+3. Stops the containers of whatever is still running and hands each job back to the queue — a
+   worker-fenced requeue (`RUNNING → QUEUED`, retry-capped), not a plain cancel, so another worker's
+   poll picks it back up, bounded by `AGENT_MAX_RETRIES`. Only a job that has already exhausted its
+   retry budget (or lost the fence to a concurrent user-cancel) ends up terminally
+   cancelled/failed instead. `timeout=0` (immediate drain) skips step 2 and applies this same
+   requeue-first behaviour right away.
 
 The compose template pins `stop_grace_period: 6m` to give the JVM 60s of headroom before Docker SIGKILLs.
 

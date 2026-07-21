@@ -12,6 +12,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.env.YamlPropertySourceLoader;
+import org.springframework.core.env.PropertySource;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.mock.env.MockEnvironment;
 
 /**
@@ -56,11 +59,13 @@ class DeprecatedEnvVarStartupWarnerTest extends BaseUnitTest {
         environment.setProperty("hephaestus.sandbox.llm-proxy.enabled", "true");
         environment.setProperty("hephaestus.agent.nats.enabled", "true");
         environment.setProperty("hephaestus.agent.nats.server", "nats://localhost:4222");
+        environment.setProperty("hephaestus.agent.nats.max-ack-pending", "16");
+        environment.setProperty("hephaestus.agent.nats.fetch-batch-size", "5");
 
         new DeprecatedEnvVarStartupWarner(environment).warnOnRetiredProperties();
 
         List<String> messages = warnMessages();
-        assertThat(messages).hasSize(5);
+        assertThat(messages).hasSize(7);
         assertThat(messages)
             .anySatisfy(m -> assertThat(m).contains("hephaestus.worker.llm.base-url").contains("AI models"))
             .anySatisfy(m -> assertThat(m).contains("hephaestus.worker.llm.api-key").contains("AI models"))
@@ -68,7 +73,11 @@ class DeprecatedEnvVarStartupWarnerTest extends BaseUnitTest {
                 assertThat(m).contains("hephaestus.sandbox.llm-proxy.enabled").contains("no standalone enable flag")
             )
             .anySatisfy(m -> assertThat(m).contains("hephaestus.agent.nats.enabled").contains("AGENT_ENABLED"))
-            .anySatisfy(m -> assertThat(m).contains("hephaestus.agent.nats.server").contains("AGENT_ENABLED"));
+            .anySatisfy(m -> assertThat(m).contains("hephaestus.agent.nats.server").contains("AGENT_ENABLED"))
+            .anySatisfy(m -> assertThat(m).contains("hephaestus.agent.nats.max-ack-pending").contains("PostgreSQL"))
+            .anySatisfy(m ->
+                assertThat(m).contains("hephaestus.agent.nats.fetch-batch-size").contains("AGENT_CLAIM_BATCH_SIZE")
+            );
     }
 
     @Test
@@ -102,5 +111,83 @@ class DeprecatedEnvVarStartupWarnerTest extends BaseUnitTest {
         List<String> messages = warnMessages();
         assertThat(messages).hasSize(1);
         assertThat(messages.get(0)).contains("hephaestus.agent.nats.enabled").contains("PostgreSQL");
+    }
+
+    /**
+     * #1368 fix wave: {@code application-worker.yml} used to set {@code hephaestus.agent.nats.enabled}
+     * and the (also-retired) {@code hephaestus.worker.llm.base-url}/{@code api-key} via {@code
+     * ${VAR:}}-style placeholders with an EMPTY-STRING default. Spring's YAML property source binds
+     * the key regardless — an unset env var resolves to {@code ""}, not "absent" — so {@link
+     * DeprecatedEnvVarStartupWarner#warnOnRetiredProperties()} (which checks {@code getProperty(...) !=
+     * null}) fired a false-positive WARN on every single worker boot, even when the operator never
+     * touched any of those env vars. This is a static-content regression guard, not an env/property
+     * simulation: it loads the actual shipped profile and asserts none of the currently-retired keys
+     * are defined in it any more.
+     */
+    @Test
+    void workerProfileNoLongerDefinesAnyRetiredKey() throws Exception {
+        YamlPropertySourceLoader loader = new YamlPropertySourceLoader();
+        List<PropertySource<?>> sources = loader.load(
+            "application-worker.yml",
+            new ClassPathResource("application-worker.yml")
+        );
+
+        List<String> retiredKeysStillDefined = sources
+            .stream()
+            .flatMap(source ->
+                java.util.Arrays.stream(
+                    ((org.springframework.core.env.EnumerablePropertySource<?>) source).getPropertyNames()
+                )
+            )
+            .filter(
+                name ->
+                    name.equals("hephaestus.agent.nats.enabled") ||
+                    name.equals("hephaestus.agent.nats.server") ||
+                    name.equals("hephaestus.agent.nats.max-ack-pending") ||
+                    name.equals("hephaestus.agent.nats.fetch-batch-size") ||
+                    name.equals("hephaestus.worker.llm.base-url") ||
+                    name.equals("hephaestus.worker.llm.api-key")
+            )
+            .toList();
+
+        assertThat(retiredKeysStillDefined)
+            .as(
+                "application-worker.yml must not (re-)define retired properties — even an empty-string " +
+                    "placeholder default makes DeprecatedEnvVarStartupWarner false-positive on every worker boot"
+            )
+            .isEmpty();
+    }
+
+    /**
+     * #1368 fix wave (finding 1 — worker can't serve the LLM proxy): {@code application-worker.yml}
+     * used to set {@code server.port: -1}, which disables the HTTP connector entirely. Since
+     * {@code LlmProxyController}/{@code LlmProxySecurityConfig} wire on this exact profile whenever
+     * {@code hephaestus.agent.enabled=true} (the job-execution capability gate, ADR 0006), that made
+     * the proxy unreachable on every worker pod that actually executes jobs. This regression guard
+     * loads the shipped YAML directly (no Spring context — {@code webEnvironment=RANDOM_PORT} test
+     * infra would force a real port regardless of the YAML default, masking a regression here) and
+     * asserts the unresolved placeholder default is no longer the disabled-connector sentinel.
+     */
+    @Test
+    void workerProfileServerPortIsNotTheDisabledConnectorSentinel() throws Exception {
+        YamlPropertySourceLoader loader = new YamlPropertySourceLoader();
+        List<PropertySource<?>> sources = loader.load(
+            "application-worker.yml",
+            new ClassPathResource("application-worker.yml")
+        );
+
+        String resolvedPort = sources
+            .stream()
+            .filter(source -> source.containsProperty("server.port"))
+            .findFirst()
+            .map(source -> String.valueOf(source.getProperty("server.port")))
+            .orElseThrow(() -> new AssertionError("application-worker.yml no longer sets server.port at all"));
+
+        assertThat(resolvedPort)
+            .as(
+                "server.port must not be the disabled-HTTP-connector sentinel (-1) — the LLM proxy " +
+                    "must be reachable on any pod that executes jobs"
+            )
+            .doesNotContain("-1");
     }
 }

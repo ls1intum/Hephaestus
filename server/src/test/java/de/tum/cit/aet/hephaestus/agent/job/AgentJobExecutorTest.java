@@ -5,6 +5,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -886,6 +888,264 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             assertThat(candidates).isEmpty();
             verify(jobRepository, never()).findByIdQueuedForUpdateSkipLocked(any());
+        }
+
+        @Test
+        @DisplayName(
+            "#1368 fix wave: capacity is further bounded by the sandbox executor's actual free pool " +
+                "slots — reviewMax alone is not enough, it can exceed the pool size"
+        )
+        void capacityIsBoundedBySandboxExecutorFreeSlots() throws Exception {
+            org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor realPool =
+                new org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor();
+            realPool.setCorePoolSize(1);
+            realPool.setMaxPoolSize(2); // pool cap of 2, far below reviewMax (10) and claimBatchSize (5)
+            realPool.setQueueCapacity(0);
+            realPool.initialize();
+            try {
+                de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerCapacityState capacityState =
+                    new de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerCapacityState(
+                        new WorkerProperties(
+                            "w",
+                            new WorkerProperties.Capacity("10", "1"),
+                            new WorkerProperties.Drain(Duration.ofMinutes(5)),
+                            new WorkerProperties.Heartbeat(Duration.ofSeconds(20)),
+                            new WorkerProperties.Control(URI.create("ws://example"), "tok", Duration.ofSeconds(10))
+                        )
+                    );
+
+                executor = new AgentJobExecutor(
+                    AGENT_PROPS,
+                    jobRepository,
+                    configRepository,
+                    handlerRegistry,
+                    practiceAgent,
+                    sandboxManager,
+                    realPool,
+                    transactionTemplate,
+                    objectMapper,
+                    meterRegistry,
+                    usageRecorder,
+                    llmBudgetService,
+                    Optional.of(capacityState),
+                    Optional.empty()
+                );
+
+                // Nothing active yet: bounded by the pool's max size (2), not reviewMax (10) or
+                // claimBatchSize (5, AGENT_PROPS's default).
+                assertThat(executor.computeCapacity()).isEqualTo(2);
+            } finally {
+                realPool.shutdown();
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Sandbox pool rejection (#1368 fix wave)")
+    class PoolRejection {
+
+        @Test
+        @DisplayName("a pool-rejected claim is requeued WITHOUT incrementing retry_count, self-fenced to this worker")
+        void requeuesWithoutRetryIncrementSelfFenced() {
+            executor = new AgentJobExecutor(
+                AGENT_PROPS,
+                jobRepository,
+                configRepository,
+                handlerRegistry,
+                practiceAgent,
+                sandboxManager,
+                sandboxExecutor,
+                transactionTemplate,
+                objectMapper,
+                meterRegistry,
+                usageRecorder,
+                llmBudgetService,
+                Optional.empty(),
+                Optional.of(workerProps("rejecting-worker"))
+            );
+
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
+            when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            doThrow(new java.util.concurrent.RejectedExecutionException("pool saturated"))
+                .when(sandboxExecutor)
+                .execute(any());
+
+            boolean claimed = executor.processJob(jobId);
+
+            assertThat(claimed).isTrue(); // claim itself won; dispatch was rejected afterwards
+            verify(jobRepository).requeueRejectedClaim(jobId, "rejecting-worker");
+            verify(jobRepository, never()).requeueOrphan(any(), any(), anyInt());
+            // The claimed job must not still be tracked as locally running / holding capacity.
+            verify(sandboxManager, never()).execute(any());
+        }
+
+        @Test
+        @DisplayName("retries the requeue write a bounded number of times before giving up")
+        void retriesTheRequeueWriteOnTransientFailure() {
+            executor = new AgentJobExecutor(
+                AGENT_PROPS,
+                jobRepository,
+                configRepository,
+                handlerRegistry,
+                practiceAgent,
+                sandboxManager,
+                sandboxExecutor,
+                transactionTemplate,
+                objectMapper,
+                meterRegistry,
+                usageRecorder,
+                llmBudgetService,
+                Optional.empty(),
+                Optional.of(workerProps("rejecting-worker"))
+            );
+
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
+            when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            doThrow(new java.util.concurrent.RejectedExecutionException("pool saturated"))
+                .when(sandboxExecutor)
+                .execute(any());
+            // First two requeue attempts fail (transient — the transaction itself throws before the
+            // callback runs), third succeeds and actually invokes the callback (so the underlying
+            // repository call happens exactly once, on the winning attempt).
+            java.util.concurrent.atomic.AtomicInteger attempts = new java.util.concurrent.atomic.AtomicInteger();
+            doAnswer(inv -> {
+                if (attempts.incrementAndGet() <= 2) {
+                    throw new org.springframework.dao.TransientDataAccessResourceException("blip");
+                }
+                @SuppressWarnings("unchecked")
+                java.util.function.Consumer<TransactionStatus> callback = inv.getArgument(0);
+                callback.accept(mock(TransactionStatus.class));
+                return null;
+            })
+                .when(transactionTemplate)
+                .executeWithoutResult(any());
+
+            executor.processJob(jobId);
+
+            // 3 transaction attempts (2 failed, 1 succeeded); the underlying repository write only
+            // actually happens on the attempt whose transaction callback ran.
+            verify(transactionTemplate, org.mockito.Mockito.times(3)).executeWithoutResult(any());
+            verify(jobRepository, org.mockito.Mockito.times(1)).requeueRejectedClaim(jobId, "rejecting-worker");
+        }
+    }
+
+    @Nested
+    @DisplayName("Drain requeue-first (#1368 fix wave — matches the documented drain contract)")
+    class DrainRequeue {
+
+        @Test
+        @DisplayName("draining an in-flight job requeues it (RUNNING -> QUEUED) instead of cancelling it")
+        void drainRequeuesInsteadOfCancelling() throws Exception {
+            executor = new AgentJobExecutor(
+                AGENT_PROPS,
+                jobRepository,
+                configRepository,
+                handlerRegistry,
+                practiceAgent,
+                sandboxManager,
+                sandboxExecutor,
+                transactionTemplate,
+                objectMapper,
+                meterRegistry,
+                usageRecorder,
+                llmBudgetService,
+                Optional.empty(),
+                Optional.of(workerProps("draining-worker"))
+            );
+            addToLocalRunningJobs(executor, jobId);
+
+            when(jobRepository.requeueOrphan(jobId, "draining-worker", AGENT_PROPS.maxRetries())).thenReturn(1);
+            when(jobRepository.findByIdWithWorkspace(jobId)).thenReturn(Optional.of(job));
+
+            executor.cancelInFlight(AgentJobCancellationReason.DRAIN_GRACEFUL);
+
+            verify(jobRepository).requeueOrphan(jobId, "draining-worker", AGENT_PROPS.maxRetries());
+            verify(jobRepository, never()).transitionToCancelledOwnedBy(any(), any(), any(), any(), any(), any());
+            verify(jobRepository, never()).transitionToCancelled(any(), any(), any(), any(), any());
+            verify(sandboxManager).cancel(jobId);
+        }
+
+        @Test
+        @DisplayName(
+            "falls back to a worker-fenced terminal cancel when the requeue CAS loses (retry cap exhausted / fence lost)"
+        )
+        void fallsBackToFencedCancelWhenRequeueLoses() throws Exception {
+            executor = new AgentJobExecutor(
+                AGENT_PROPS,
+                jobRepository,
+                configRepository,
+                handlerRegistry,
+                practiceAgent,
+                sandboxManager,
+                sandboxExecutor,
+                transactionTemplate,
+                objectMapper,
+                meterRegistry,
+                usageRecorder,
+                llmBudgetService,
+                Optional.empty(),
+                Optional.of(workerProps("draining-worker"))
+            );
+            addToLocalRunningJobs(executor, jobId);
+
+            when(jobRepository.requeueOrphan(jobId, "draining-worker", AGENT_PROPS.maxRetries())).thenReturn(0);
+            when(jobRepository.findByIdWithWorkspace(jobId)).thenReturn(Optional.of(job));
+
+            executor.cancelInFlight(AgentJobCancellationReason.DRAIN_GRACEFUL);
+
+            verify(jobRepository).transitionToCancelledOwnedBy(
+                eq(jobId),
+                any(),
+                any(),
+                eq(AgentJobCancellationReason.DRAIN_GRACEFUL),
+                eq(Set.of(AgentJobStatus.RUNNING)),
+                eq("draining-worker")
+            );
+            verify(sandboxManager).cancel(jobId);
+        }
+
+        @SuppressWarnings("unchecked")
+        private void addToLocalRunningJobs(AgentJobExecutor exec, UUID id) throws Exception {
+            java.lang.reflect.Field field = AgentJobExecutor.class.getDeclaredField("localRunningJobs");
+            field.setAccessible(true);
+            ((Set<UUID>) field.get(exec)).add(id);
+        }
+    }
+
+    @Nested
+    @DisplayName("Drain admission race (#1368 fix wave)")
+    class DrainAdmissionRace {
+
+        @Test
+        @DisplayName("stopAcceptingNewJobs() joins the poll thread before returning — no thread left running")
+        void stopAcceptingNewJobsJoinsThePollThread() {
+            // An empty candidate list keeps the poll loop harmlessly sleeping/spinning without ever
+            // reaching a real claim — this test is about the join, not claim behaviour.
+            lenient().when(jobRepository.findQueuedIdsOldestFirst(anyInt())).thenReturn(List.of());
+
+            executor.start();
+            try {
+                assertThat(threadIsAlive(executor)).isTrue();
+            } finally {
+                executor.stopAcceptingNewJobs();
+            }
+
+            assertThat(threadIsAlive(executor)).isFalse();
+        }
+
+        private boolean threadIsAlive(AgentJobExecutor exec) {
+            try {
+                java.lang.reflect.Field field = AgentJobExecutor.class.getDeclaredField("pollThread");
+                field.setAccessible(true);
+                Thread thread = (Thread) field.get(exec);
+                return thread != null && thread.isAlive();
+            } catch (ReflectiveOperationException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 
