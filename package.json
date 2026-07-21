@@ -1,6 +1,6 @@
 {
 	"name": "hephaestus",
-	"version": "0.73.2",
+	"version": "0.74.0",
 	"private": true,
 	"packageManager": "pnpm@11.1.2",
 	"scripts": {
