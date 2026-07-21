@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.slack.sync.status;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationSyncRunner;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Component;
 
 /** Runs Slack reconciliation through the consent-gated history sync. */
 @Component
+@ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 public class SlackIntegrationSyncRunner implements IntegrationSyncRunner {
 
