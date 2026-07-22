@@ -51,8 +51,22 @@ const defaults: RuntimeEnvVars = {
 
 const env = (key: keyof RuntimeEnvVars): string => window.__ENV__?.[key] ?? defaults[key] ?? "";
 
+// Deployment identity from SENTRY_ENVIRONMENT (production / staging / preview / local).
+const DEPLOYMENT_NAMES: Record<string, string> = {
+	production: "Production",
+	staging: "Staging",
+	preview: "Preview",
+	local: "Local",
+};
+const deploymentEnvironment = env("SENTRY_ENVIRONMENT") || "local";
+
 const environment = {
 	version: env("APPLICATION_VERSION").replace(/^v/, "") || "DEV",
+	deployment: {
+		environment: deploymentEnvironment,
+		name: DEPLOYMENT_NAMES[deploymentEnvironment] ?? "Local",
+		isProduction: deploymentEnvironment === "production",
+	},
 	clientUrl: env("APPLICATION_CLIENT_URL"),
 	serverUrl: env("APPLICATION_SERVER_URL"),
 	// CSRF double-submit cookie name. `__Host-`-prefixed in production; dropped for local http E2E

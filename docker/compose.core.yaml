@@ -8,6 +8,10 @@ services:
   # ─────────────────────────────────────────────────────────────────────────────
   webhook-server:
     image: "ghcr.io/ls1intum/hephaestus/application-server:${IMAGE_TAG}"
+    # Bounds heap sizing to this container so co-located JVMs don't oversubscribe host RAM.
+    # Must fit the Spring classpath-scan startup spike (well above the small steady footprint),
+    # or the JVM OOMs during boot.
+    mem_limit: ${WEBHOOK_SERVER_MEM_LIMIT:-2g}
     expose:
       - "8080"
     environment:
@@ -104,7 +108,9 @@ services:
     image: nats:alpine
     restart: unless-stopped
     ports:
-      - "127.0.0.1:4222:4222"
+      # Loopback-only by default. Set NATS_BIND_HOST=0.0.0.0 (or a specific interface) to let other
+      # hosts reach the bus — only on a trusted or firewalled network, as NATS runs unauthenticated.
+      - "${NATS_BIND_HOST:-127.0.0.1}:4222:4222"
     command: ["--config", "/etc/nats/nats-server.conf"]
     volumes:
       - nats-data:/data
@@ -132,7 +138,7 @@ networks:
     driver: bridge
 
 volumes:
-  nats-data: 
+  nats-data:
 
 configs:
   nats-server.conf:

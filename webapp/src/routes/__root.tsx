@@ -100,7 +100,12 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 								<main className={isFullscreenRoute ? "" : "flex-1 p-4"}>
 									<Outlet />
 								</main>
-								{!isFullscreenRoute && <Footer buildInfo={environment.buildInfo} />}
+								{!isFullscreenRoute && (
+									<Footer
+										buildInfo={environment.buildInfo}
+										isProduction={environment.deployment.isProduction}
+									/>
+								)}
 							</div>
 						</SidebarInset>
 					</SidebarProvider>
@@ -237,6 +242,8 @@ function HeaderContainer() {
 		<Header
 			sidebarTrigger={isAuthenticated && <SidebarTrigger className="-ml-1" />}
 			version={environment.version}
+			environmentName={environment.deployment.name}
+			isProduction={environment.deployment.isProduction}
 			isAuthenticated={isAuthenticated}
 			isLoading={isLoading}
 			name={effectiveName}

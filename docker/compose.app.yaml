@@ -93,9 +93,15 @@ services:
 
   application-server:
     image: "ghcr.io/ls1intum/hephaestus/application-server:${IMAGE_TAG}"
+    # Bounds heap sizing to this container; without it the JVM targets host RAM and co-located
+    # services oversubscribe and swap. Hosts the NATS sync consumers, so it takes the largest limit.
+    mem_limit: ${APPLICATION_SERVER_MEM_LIMIT:-5g}
     ports:
       - "8080"
     environment:
+      # The buildpack's 10M MaxDirectMemorySize sits below this role's steady NIO
+      # footprint (NATS + HTTP); give it headroom.
+      JAVA_TOOL_OPTIONS: "-XX:MaxDirectMemorySize=${APP_MAX_DIRECT_MEMORY:-128M}"
       APP_VERSION: ${IMAGE_TAG}
       SPRING_PROFILES_ACTIVE: prod
       APPLICATION_HOST_URL: https://${APP_HOSTNAME}
@@ -228,7 +234,6 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - git-repos:/data/git-repos
-      - application-server-logs:/var/log/hephaestus
       - release-pin:/pin:ro
     networks:
       - shared-network
@@ -286,7 +291,11 @@ services:
   # Worker runtime — same image, worker profile, no HTTP server, dials the hub over WSS.
   application-worker:
     image: "ghcr.io/ls1intum/hephaestus/application-server:${IMAGE_TAG}"
+    # Bounds heap sizing to this container (see application-server).
+    mem_limit: ${APPLICATION_WORKER_MEM_LIMIT:-3g}
     environment:
+      # See application-server: the buildpack's 10M direct-memory default is too small.
+      JAVA_TOOL_OPTIONS: "-XX:MaxDirectMemorySize=${APP_MAX_DIRECT_MEMORY:-128M}"
       APP_VERSION: ${IMAGE_TAG}
       SPRING_PROFILES_ACTIVE: prod,worker
       HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES:-}
@@ -395,5 +404,4 @@ networks:
 volumes:
   postgresql-data:
   git-repos:
-  application-server-logs:
   release-pin:
