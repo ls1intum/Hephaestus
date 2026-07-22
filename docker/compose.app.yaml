@@ -288,7 +288,7 @@ services:
         max-size: "50m"
         max-file: "5"
 
-  # Worker runtime — same image, worker profile, no HTTP server, dials the hub over WSS.
+  # Worker runtime — same image, worker profile, internal-only HTTP proxy, dials the hub over WSS.
   application-worker:
     image: "ghcr.io/ls1intum/hephaestus/application-server:${IMAGE_TAG}"
     # Bounds heap sizing to this container (see application-server).
@@ -311,7 +311,7 @@ services:
       SANDBOX_MEMORY_BYTES: ${SANDBOX_MEMORY_BYTES:-4294967296}
       SANDBOX_CPUS: ${SANDBOX_CPUS:-2.0}
       # No LLM credential passthrough needed: the proxy runs in-process on this pod (it follows
-      # job-execution capability, i.e. AGENT_ENABLED + the worker role) and reads providers
+      # the worker/sandbox capability) and reads providers
       # from the same instance/workspace catalog as application-server.
       HEPHAESTUS_WORKER_CAPACITY_REVIEW_MAX: ${HEPHAESTUS_WORKER_REVIEW_MAX:-auto}
       HEPHAESTUS_WORKER_CAPACITY_MENTOR_MAX: ${HEPHAESTUS_WORKER_MENTOR_MAX:-auto}

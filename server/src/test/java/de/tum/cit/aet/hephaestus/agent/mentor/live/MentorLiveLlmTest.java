@@ -578,6 +578,9 @@ class MentorLiveLlmTest {
         Path sdkNodeModules = SDK_DIR.resolve("node_modules");
         Files.createSymbolicLink(nodeModulesLink, sdkNodeModules);
         Files.copy(RUNNER, tmp.resolve("pi-mentor-runner.mjs"));
+        for (String sidecar : new MentorRunnerProfile().sidecarScripts()) {
+            Files.copy(Path.of("src", "main", "resources", "agent", sidecar), tmp.resolve(sidecar));
+        }
 
         // System prompt the runner loads from /workspace/agent/mentor/system.md. Keep it minimal —
         // the live LLM doesn't need the full production prompt to prove the round-trip works.

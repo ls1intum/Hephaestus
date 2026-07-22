@@ -411,10 +411,8 @@ hephaestus:
         personal-api-key: ${POSTHOG_PERSONAL_API_KEY:}
 
     sandbox:
-        # The LLM proxy controller/security chain (agent.proxy) is gated on the job-execution
-        # capability expression (hephaestus.agent.enabled AND hephaestus.runtime.worker.enabled)
-        # — the same one AgentJobExecutor wires on — not a standalone flag (#1368 slice 5: it is the
-        # ONLY LLM credential path, so "jobs on, proxy off" must be unexpressible).
+        # The LLM proxy controller/security chain follows the worker/sandbox capability. It serves
+        # both queued jobs and interactive mentor sandboxes, so AGENT_ENABLED must not gate it.
         docker-host: ${SANDBOX_DOCKER_HOST:unix:///var/run/docker.sock}
         tls-verify: ${SANDBOX_TLS_VERIFY:false}
         max-concurrent-containers: ${SANDBOX_MAX_CONCURRENT:5}
@@ -436,7 +434,7 @@ hephaestus:
     # Dev-only actuator for manually triggering PR reviews (never enable in production).
     # Layered safety: (1) this flag, (2) not in endpoint exposure list, (3) Spring Security auth.
     dev:
-        trigger-enabled: false
+        trigger-enabled: ${HEPHAESTUS_DEV_TRIGGER_ENABLED:false}
 
     # ═══════════════════════════════════════════════════════════════════════════
     # AGENT JOB QUEUE (PostgreSQL-backed, #1368 NATS→Postgres cutover)

@@ -47,13 +47,9 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <h2>Why a full Spring context, and how it avoids Docker flakiness</h2>
  *
- * <p>{@link LlmProxyController} and {@link LlmProxySecurityConfig} are gated on {@code
- * hephaestus.agent.enabled AND hephaestus.runtime.worker.enabled} — deliberately the SAME
- * expression {@code AgentJobExecutor} wires on, so "jobs on, proxy off" is unexpressible. Exercising
- * the proxy over HTTP therefore means booting the whole job-execution capability, not just the two
- * proxy beans in isolation. This test does that for real (mirroring the precedent set by {@code
- * AgentOrphanRecoveryIntegrationTest}), while keeping every other side effect of that capability
- * inert:
+ * <p>{@link LlmProxyController} and {@link LlmProxySecurityConfig} follow the worker/sandbox
+ * capability because both queued jobs and interactive mentor sessions use the proxy. This test
+ * boots the complete capability while keeping its unrelated side effects inert:
  *
  * <ul>
  *   <li>{@code hephaestus.agent.poll-interval} is set to an hour so {@code AgentJobExecutor}'s

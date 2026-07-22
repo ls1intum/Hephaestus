@@ -1227,9 +1227,9 @@ public class AgentJobExecutor {
                     freshJob.setLlmTotalReasoningTokens(agentUsage.reasoningTokens());
                     freshJob.setLlmCacheReadTokens(agentUsage.cacheReadTokens());
                     freshJob.setLlmCacheWriteTokens(agentUsage.cacheWriteTokens());
-                    // llmCostUsd deliberately left unset (#1368 slice 6): the runner no longer registers a
-                    // per-token price table with the Pi SDK (see pi-provider.mjs), so agentUsage.costUsd() is
-                    // now a structural constant (always 0.0), never a real measurement. Writing it would make
+                    // llmCostUsd deliberately left unset (#1368 slice 6): pi-provider.mjs registers zero
+                    // SDK-local rates only because Pi requires the cost object shape, so agentUsage.costUsd()
+                    // is a structural constant (always 0.0), never a real measurement. Writing it would make
                     // this diagnostic column silently lie ("$0.00" reads as "free", not "not measured"). The
                     // authoritative, catalog-derived cost lives on the llm_usage_event ledger row below.
                     // Use typed snapshot so a future field rename fails compile rather than writing null.
@@ -1262,6 +1262,18 @@ public class AgentJobExecutor {
                             Instant.now()
                         )
                     );
+                    if (
+                        nullToZero(agentUsage.inputTokens()) == 0L &&
+                        nullToZero(agentUsage.outputTokens()) == 0L &&
+                        nullToZero(agentUsage.cacheReadTokens()) == 0L &&
+                        nullToZero(agentUsage.cacheWriteTokens()) == 0L &&
+                        nullToZero(agentUsage.reasoningTokens()) == 0L
+                    ) {
+                        // Some OpenAI-compatible gateways report that a call occurred but omit
+                        // every token counter. Pricing that as confirmed $0 would make the budget
+                        // lie; preserve the call count but force the ledger row to UNPRICED.
+                        ledgerUnverifiable.set(true);
+                    }
                     log.info(
                         "LLM usage (agent-reported): model={}, calls={}, in={}, out={}, reasoning={}, jobId={}",
                         model,

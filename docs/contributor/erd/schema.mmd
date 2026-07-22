@@ -112,6 +112,8 @@ erDiagram
         VARCHAR(48) subject_class
         VARCHAR(64) prompt_digest
         VARCHAR(64) inputs_digest
+        TIMESTAMPTZ available_at "NOT NULL"
+        SMALLINT delivery_attempts "NOT NULL"
     }
 
     AuthEvent {
@@ -593,7 +595,7 @@ erDiagram
         BIGINT cache_read_tokens "NOT NULL"
         BIGINT cache_write_tokens "NOT NULL"
         INTEGER total_calls "NOT NULL"
-        NUMERIC(12,6) cost_usd
+        NUMERIC(18,6) cost_usd
         TIMESTAMPTZ occurred_at "NOT NULL"
         VARCHAR(16) pricing_state "NOT NULL"
         BIGINT reasoning_tokens "NOT NULL"

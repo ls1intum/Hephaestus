@@ -23,6 +23,7 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
@@ -70,6 +71,7 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
     private final int serverPort;
     private final Executor closeExecutor;
     private final MentorProxyCredentialRegistry mentorProxyCredentialRegistry;
+    private final Object[] attachLocks = new Object[64];
 
     public DockerInteractiveSandboxAdapter(
         InteractiveSandboxProperties properties,
@@ -99,18 +101,32 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
         this.dockerCli = dockerCli;
         this.serverPort = serverPort;
         this.mentorProxyCredentialRegistry = mentorProxyCredentialRegistry;
+        java.util.Arrays.setAll(attachLocks, ignored -> new Object());
     }
 
     @Override
     public AttachedSandbox attach(InteractiveSandboxSpec spec) {
+        int lockIndex = Math.floorMod(Objects.hash(spec.userId(), spec.workspaceId()), attachLocks.length);
+        synchronized (attachLocks[lockIndex]) {
+            return attachLocked(spec);
+        }
+    }
+
+    private AttachedSandbox attachLocked(InteractiveSandboxSpec spec) {
         // Per-workspace gating happens upstream in MentorChatController via
         // WorkspaceFeatures.mentorEnabled — there is no deployment-wide mentor enable flag.
 
-        // tryRegister below is the authoritative race resolver; this fast path just avoids
-        // spawning a container that would immediately lose the race.
+        InteractiveSandboxRuntimeKey runtimeKey = runtimeKey(spec);
         DockerAttachedSandboxAdapter existing = registry.findLive(spec.userId(), spec.workspaceId());
         if (existing != null) {
-            return existing;
+            if (existing.hasRuntimeKey(runtimeKey)) {
+                // The caller minted a fresh token before attach. A compatible warm sandbox keeps
+                // using its original token, so discard the unused credential immediately.
+                mentorProxyCredentialRegistry.revoke(spec.sessionId());
+                return existing;
+            }
+            existing.terminate(EvictionReason.RUNTIME_CHANGED);
+            existing.awaitClosed(Duration.ofSeconds(properties.graceTimeoutSeconds() + 5L));
         }
 
         MDC.put(MDC_SESSION_ID, spec.sessionId().toString());
@@ -195,7 +211,7 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
             }
 
             // Build + await first frame BEFORE register: a stillborn runner never becomes visible.
-            sandbox = buildSandbox(spec, containerId, networkId, process);
+            sandbox = buildSandbox(spec, runtimeKey, containerId, networkId, process);
             sandbox.start();
 
             Duration firstFrameTimeout = Duration.ofSeconds(properties.attachFirstFrameTimeoutSeconds());
@@ -221,6 +237,11 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
                         // Loser leaks container/network/process/pump/writer VTs unless we tear it down.
                         // Fire-and-forget: don't block the caller for grace+5s.
                         sandbox.terminate(EvictionReason.ERROR);
+                        if (!winner.hasRuntimeKey(runtimeKey)) {
+                            throw new InteractiveSandboxException(
+                                "Concurrent attach resolved to an incompatible runtime"
+                            );
+                        }
                         return winner;
                     }
                     throw new InteractiveSandboxException("Race lost but no winner found in registry");
@@ -290,6 +311,7 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
 
     private DockerAttachedSandboxAdapter buildSandbox(
         InteractiveSandboxSpec spec,
+        InteractiveSandboxRuntimeKey runtimeKey,
         String containerId,
         String networkId,
         PiProcessHandle process
@@ -320,6 +342,7 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
             spec.workspaceId(),
             containerId,
             networkId,
+            runtimeKey,
             process,
             mapper,
             ring,
@@ -333,6 +356,12 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
             closeExecutor,
             this::onAttachedSandboxClosed
         );
+    }
+
+    private InteractiveSandboxRuntimeKey runtimeKey(InteractiveSandboxSpec spec) {
+        String token = spec.networkPolicy() != null ? spec.networkPolicy().llmProxyToken() : null;
+        var routing = token != null ? mentorProxyCredentialRegistry.validate(token).orElse(null) : null;
+        return InteractiveSandboxRuntimeKey.of(spec, routing);
     }
 
     /**

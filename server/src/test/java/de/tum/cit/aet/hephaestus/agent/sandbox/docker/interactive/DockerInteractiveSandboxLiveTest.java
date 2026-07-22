@@ -80,6 +80,7 @@ class DockerInteractiveSandboxLiveTest {
     private DockerInteractiveSandboxAdapter adapter;
     private ExecutorService dockerWaitExecutor;
     private SimpleMeterRegistry meterRegistry;
+    private MentorProxyCredentialRegistry proxyCredentialRegistry;
     private byte[] runnerBytes;
 
     @BeforeAll
@@ -139,6 +140,7 @@ class DockerInteractiveSandboxLiveTest {
             watchdog,
             meterRegistry
         );
+        proxyCredentialRegistry = new MentorProxyCredentialRegistry();
         adapter = new DockerInteractiveSandboxAdapter(
             interactiveProperties,
             sandboxProperties,
@@ -152,7 +154,7 @@ class DockerInteractiveSandboxLiveTest {
             dockerWaitExecutor,
             "docker",
             8080,
-            new MentorProxyCredentialRegistry()
+            proxyCredentialRegistry
         );
 
         runnerBytes = Files.readAllBytes(Path.of("src/main/resources/agent/pi-mentor-runner.mjs"));
@@ -205,6 +207,48 @@ class DockerInteractiveSandboxLiveTest {
             sec,
             Map.of(".runner/pi-mentor-runner.mjs", runnerBytes),
             Map.of()
+        );
+    }
+
+    private InteractiveSandboxSpec buildSpecWithProxyRoute(
+        String userId,
+        String workspaceId,
+        String baseUrl,
+        AtomicReference<String> token
+    ) {
+        InteractiveSandboxSpec base = buildMentorSpec(userId, workspaceId);
+        String minted = proxyCredentialRegistry.mint(base.sessionId(), "openai-completions", baseUrl, null, null, 1L);
+        token.set(minted);
+        return new InteractiveSandboxSpec(
+            base.sessionId(),
+            base.userId(),
+            base.workspaceId(),
+            base.image(),
+            base.command(),
+            base.environment(),
+            new NetworkPolicy(true, null, minted),
+            base.resourceLimits(),
+            base.securityProfile(),
+            base.inputFiles(),
+            base.volumeMounts()
+        );
+    }
+
+    private static InteractiveSandboxSpec withContextSnapshot(InteractiveSandboxSpec base, String snapshot) {
+        Map<String, byte[]> inputs = new HashMap<>(base.inputFiles());
+        inputs.put("inputs/context/current_thread_history.json", snapshot.getBytes(StandardCharsets.UTF_8));
+        return new InteractiveSandboxSpec(
+            base.sessionId(),
+            base.userId(),
+            base.workspaceId(),
+            base.image(),
+            base.command(),
+            base.environment(),
+            base.networkPolicy(),
+            base.resourceLimits(),
+            base.securityProfile(),
+            inputs,
+            base.volumeMounts()
         );
     }
 
@@ -354,6 +398,52 @@ class DockerInteractiveSandboxLiveTest {
             AttachedSandbox b = adapter.attach(buildSpec("u5", "w5"));
             assertThat(b).isSameAs(a);
             a.close(Duration.ofSeconds(2));
+        }
+
+        @Test
+        void compatibleReuseRevokesTheUnusedFreshProxyToken() {
+            AtomicReference<String> firstToken = new AtomicReference<>();
+            AtomicReference<String> unusedToken = new AtomicReference<>();
+            AttachedSandbox first = adapter.attach(
+                withContextSnapshot(
+                    buildSpecWithProxyRoute("u_reuse", "w_reuse", "https://gateway.example/v1", firstToken),
+                    "first turn"
+                )
+            );
+
+            AttachedSandbox reused = adapter.attach(
+                withContextSnapshot(
+                    buildSpecWithProxyRoute("u_reuse", "w_reuse", "https://gateway.example/v1", unusedToken),
+                    "second turn"
+                )
+            );
+
+            assertThat(reused).isSameAs(first);
+            assertThat(proxyCredentialRegistry.validate(firstToken.get())).isPresent();
+            assertThat(proxyCredentialRegistry.validate(unusedToken.get())).isEmpty();
+            first.close(Duration.ofSeconds(2));
+        }
+
+        @Test
+        void changedProxyRouteReplacesTheWarmSandbox() {
+            AtomicReference<String> oldToken = new AtomicReference<>();
+            AtomicReference<String> newToken = new AtomicReference<>();
+            AttachedSandbox oldSandbox = adapter.attach(
+                buildSpecWithProxyRoute("u_route", "w_route", "https://old.example/v1", oldToken)
+            );
+
+            AttachedSandbox replacement = adapter.attach(
+                buildSpecWithProxyRoute("u_route", "w_route", "https://new.example/v1", newToken)
+            );
+
+            assertThat(replacement).isNotSameAs(oldSandbox);
+            assertThat(((DockerAttachedSandboxAdapter) oldSandbox).state()).isEqualTo(AttachedSandboxState.CLOSED);
+            assertThat(proxyCredentialRegistry.validate(oldToken.get())).isEmpty();
+            assertThat(proxyCredentialRegistry.validate(newToken.get()))
+                .get()
+                .extracting(route -> route.baseUrl())
+                .isEqualTo("https://new.example/v1");
+            replacement.close(Duration.ofSeconds(2));
         }
 
         @Test

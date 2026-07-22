@@ -101,3 +101,12 @@ capability expression `AgentJobExecutor` and the LLM proxy key off is now
 property renamed. This ADR's "server ↔ worker" boundary and the `hephaestus.runtime.worker.enabled`
 gate it establishes are unaffected — only what feeds work to the worker changed. NATS remains
 required for webhook ingest (ADR 0008) and SCM/Slack sync, which this change does not touch.
+
+## Update — 2026-07-22 (issue #1368)
+
+Interactive mentor sandboxes run on the application-server replica serving the user's SSE request;
+they are worker/sandbox capability, but not queued agent jobs. The LLM proxy therefore follows
+`hephaestus.runtime.worker.enabled` alone, while `AgentJobExecutor` retains the two-part
+`hephaestus.agent.enabled AND hephaestus.runtime.worker.enabled` gate. This lets operators disable
+practice reviews without disabling mentor and makes the split topology explicit: application-server
+keeps local Docker capability for mentor; dedicated workers claim queued practice jobs.

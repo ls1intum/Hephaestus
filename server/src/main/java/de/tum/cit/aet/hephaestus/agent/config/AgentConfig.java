@@ -22,6 +22,7 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
+import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -94,10 +95,13 @@ public class AgentConfig {
     @Column(name = "llm_provider", nullable = false, length = 32)
     private LlmProvider llmProvider;
 
-    // NOTE: the `credential_mode` DB column is deliberately no longer mapped (#1368 slice 5 — the LLM
-    // proxy is now the ONLY credential path; API_KEY-direct mode was deleted). The column itself is
-    // left in place — dropping it is a schema change out of scope for this slice (see
-    // docs/contributor/database-migration.mdx's deprecate-then-remove policy).
+    // Kept as a read-only mapping until the deprecated DB column can be removed in a later release.
+    // Runtime code must not branch on it: the proxy is now the only credential path.
+    @Column(name = "credential_mode", nullable = false, length = 16, updatable = false)
+    @Getter(AccessLevel.NONE)
+    @Setter(AccessLevel.NONE)
+    @ToString.Exclude
+    private String legacyCredentialMode = "PROXY";
 
     @Column(name = "timeout_seconds", nullable = false)
     private int timeoutSeconds = 600;

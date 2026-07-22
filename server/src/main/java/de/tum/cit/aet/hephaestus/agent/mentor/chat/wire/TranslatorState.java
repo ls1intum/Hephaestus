@@ -46,6 +46,9 @@ public final class TranslatorState {
     /** Did we emit at least one {@code Start} chunk? Defensive — runner may replay an event. */
     private boolean started = false;
 
+    /** True once the prompt request has been handed to the live runner. */
+    private boolean llmCallStarted = false;
+
     /** Step counter — Pi internally tracks turns; we surface them as AI SDK steps for grouping. */
     private int stepDepth = 0;
 
@@ -121,6 +124,14 @@ public final class TranslatorState {
 
     public synchronized void markStarted() {
         this.started = true;
+    }
+
+    public synchronized void markLlmCallStarted() {
+        this.llmCallStarted = true;
+    }
+
+    public synchronized boolean hasLlmCallStarted() {
+        return llmCallStarted;
     }
 
     public synchronized int incrementStep() {

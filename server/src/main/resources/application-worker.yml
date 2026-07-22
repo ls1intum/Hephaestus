@@ -24,9 +24,8 @@ spring:
 
 server:
     # A real port (#1368 fix wave — was -1). The LLM proxy is the ONLY LLM credential path (ADR 0006's
-    # 2026-07-20 amendment): LlmProxyController/LlmProxySecurityConfig wire wherever
-    # hephaestus.agent.enabled AND hephaestus.runtime.worker.enabled are both true — which, on THIS
-    # profile, is exactly this pod when AGENT_ENABLED is set. With no HTTP connector (-1), that proxy
+    # 2026-07-22 amendment): LlmProxyController/LlmProxySecurityConfig wire wherever the worker /
+    # sandbox capability is present. With no HTTP connector (-1), that proxy
     # controller existed as a bean but could never actually be reached — the sandbox's
     # `http://<thisPod>:<serverPort>/internal/llm` target resolved to a negative port, so every
     # sandboxed job this pod claimed would fail to reach its LLM. Internal-only: no `ports:` mapping

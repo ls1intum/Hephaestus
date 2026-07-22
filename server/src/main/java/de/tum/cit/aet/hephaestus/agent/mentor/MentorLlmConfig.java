@@ -28,6 +28,7 @@ public record MentorLlmConfig(
     @Nullable String cacheControlFormat,
     @Nullable FundingSource connectionScope,
     @Nullable Long connectionId,
+    boolean allowInternet,
     int timeoutSeconds,
     /**
      * The pre-catalog config's OWN raw {@code llmBaseUrl} (only ever non-null when
@@ -52,6 +53,7 @@ public record MentorLlmConfig(
             resolved.cacheControlFormat(),
             ref.scope(),
             ref.connectionId(),
+            config.isAllowInternet(),
             config.getTimeoutSeconds(),
             ref.scope() == null ? config.getLlmBaseUrl() : null
         );

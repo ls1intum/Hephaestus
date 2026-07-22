@@ -32,9 +32,8 @@ hephaestus:
         nats:
             enabled: true
 
-    # The LLM proxy controller gates on the job-execution capability expression
-    # (agent.enabled AND runtime.worker.enabled) — runtime.worker.enabled=false above already
-    # keeps it off this pod; no separate flag needed (#1368 slice 5).
+    # The LLM proxy follows the worker/sandbox capability. runtime.worker.enabled=false above keeps
+    # it off this pod; no separate flag is needed.
 
 logging:
     level:

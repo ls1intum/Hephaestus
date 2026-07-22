@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.practice.live;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
+import de.tum.cit.aet.hephaestus.agent.practice.PracticeRunnerProfile;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiResultParser;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
@@ -281,6 +282,13 @@ class PracticeRunnerLiveLlmTest {
 
         // Copy the production runner verbatim — same bytes that ship to the agent container.
         Files.copy(RUNNER, WORKSPACE.resolve("pi-runner.mjs"), StandardCopyOption.REPLACE_EXISTING);
+        for (String sidecar : new PracticeRunnerProfile().sidecarScripts()) {
+            Files.copy(
+                Path.of("src", "main", "resources", "agent", sidecar),
+                WORKSPACE.resolve(sidecar),
+                StandardCopyOption.REPLACE_EXISTING
+            );
+        }
 
         // Orchestrator instructions live at WORKSPACE/.pi/AGENTS.md — same layout production uses,
         // with PI_CODING_AGENT_DIR pointed inside the workspace.
@@ -292,16 +300,13 @@ class PracticeRunnerLiveLlmTest {
             StandardCopyOption.REPLACE_EXISTING
         );
 
-        // Pi-side settings + custom provider via models.json. The mentor test registers a provider
-        // through an extension because its createAgentSession path drains pendingProviderRegistrations
-        // via createAgentSessionServices. The practice runner uses createAgentSession() directly —
-        // that path resolves findInitialModel() BEFORE extensions ever run, so an extension here
-        // would be ignored. models.json is loaded inside ModelRegistry.create(), so the provider is
-        // visible at model-resolution time without modifying the production runner.
+        // Pi-side settings + the same pi-provider.json contract production uses. The runner registers
+        // this provider directly before createAgentSession(), so the live test must not maintain a
+        // parallel models.json shape that can drift from production.
         Path piHome = WORKSPACE.resolve(".pi-home");
         Files.createDirectories(piHome);
         Files.write(piHome.resolve("settings.json"), buildSettingsJson(creds.model()));
-        Files.write(piHome.resolve("models.json"), buildModelsJson(creds));
+        Files.write(WORKSPACE.resolve("pi-provider.json"), buildProviderConfigJson(creds));
 
         // Practice catalog under /workspace/inputs/practices/ — the agent reads index.json (slug list)
         // and all-criteria.md (per-practice rules) per the orchestrator instructions.
@@ -352,12 +357,10 @@ class PracticeRunnerLiveLlmTest {
     }
 
     private static byte[] buildSettingsJson(String modelId) throws IOException {
-        // Same shape as PiRuntimeFactory.buildPiSettingsJson but with the custom provider name. We
-        // intentionally do NOT call PiRuntimeFactory.buildPiSettingsJson directly because the
-        // production helper emits {defaultProvider: "openai"} which would hit api.openai.com — the
-        // TUM gateway is reached via the tum-openai extension registered below.
+        // Same shape as PiRuntimeFactory.buildPiSettingsJson. Kept local because this live harness
+        // stages files directly rather than building a full server-side PiPlan.
         Map<String, Object> settings = new LinkedHashMap<>();
-        settings.put("defaultProvider", "tum-openai");
+        settings.put("defaultProvider", "hephaestus");
         settings.put("defaultModel", modelId);
         settings.put("transport", "sse");
         Map<String, Object> compaction = new HashMap<>();
@@ -367,39 +370,14 @@ class PracticeRunnerLiveLlmTest {
         return MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(settings);
     }
 
-    private static byte[] buildModelsJson(LiveLlmCredentials creds) throws IOException {
-        // Pi loads providers from models.json during ModelRegistry.create() — before any session is
-        // built. We register tum-openai as a custom provider with api: "openai-completions" (the
-        // chat-completions impl Pi ships, matching Cerebras / Cloudflare AI Gateway) so the request
-        // routes to the TUM gateway with Authorization: Bearer $OPENAI_API_KEY.
-        Map<String, Object> model = new LinkedHashMap<>();
-        model.put("id", creds.model());
-        model.put("name", "GPT OSS 120B (TUM)");
-        model.put("reasoning", false);
-        model.put("input", List.of("text"));
-        Map<String, Object> cost = new LinkedHashMap<>();
-        cost.put("input", 0);
-        cost.put("output", 0);
-        cost.put("cacheRead", 0);
-        cost.put("cacheWrite", 0);
-        model.put("cost", cost);
-        model.put("contextWindow", 131072);
-        model.put("maxTokens", 4096);
-
-        Map<String, Object> tumProvider = new LinkedHashMap<>();
-        tumProvider.put("name", "TUM AET ASE Gateway");
-        tumProvider.put("baseUrl", creds.baseUrl());
-        tumProvider.put("apiKey", "OPENAI_API_KEY");
-        tumProvider.put("authHeader", true);
-        tumProvider.put("api", "openai-completions");
-        tumProvider.put("models", List.of(model));
-
-        Map<String, Object> providers = new LinkedHashMap<>();
-        providers.put("tum-openai", tumProvider);
-
-        Map<String, Object> root = new LinkedHashMap<>();
-        root.put("providers", providers);
-        return MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(root);
+    private static byte[] buildProviderConfigJson(LiveLlmCredentials creds) throws IOException {
+        Map<String, Object> config = new LinkedHashMap<>();
+        config.put("apiProtocol", "openai-completions");
+        config.put("modelId", creds.model());
+        config.put("contextWindow", 131072);
+        config.put("maxOutputTokens", 4096);
+        config.put("supportsReasoning", false);
+        return MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(config);
     }
 
     private static void copyFixture(String relativePath, Path dest) throws IOException {
@@ -412,7 +390,8 @@ class PracticeRunnerLiveLlmTest {
         ProcessBuilder pb = new ProcessBuilder("node", "pi-runner.mjs");
         pb.directory(WORKSPACE.toFile());
         Map<String, String> env = pb.environment();
-        env.putAll(creds.asProcessEnv()); // OPENAI_API_KEY + OPENAI_BASE_URL
+        env.put("LLM_PROXY_URL", creds.baseUrl());
+        env.put("LLM_PROXY_TOKEN", creds.apiKey());
         // PI_CODING_AGENT_DIR points Pi at our staged extension + settings, away from ~/.pi.
         env.put("PI_CODING_AGENT_DIR", WORKSPACE.resolve(".pi-home").toString());
         env.put("AGENT_BUDGET_MS", Long.toString(AGENT_BUDGET_MS));

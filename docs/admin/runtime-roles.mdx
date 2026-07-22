@@ -48,7 +48,7 @@ Split the webhook receiver out when:
 
 Each role ships with a Spring profile YAML that flips the other two flags off and prunes the bean graph:
 
-- `application-worker.yml` — `runtime.server=false`, `runtime.webhook=false`, `agent.enabled` defaults to `true` on this profile specifically (job execution IS this pod's purpose — see the `AGENT_ENABLED` note below), OAuth2 autoconfigure excluded, JPA still enabled. The servlet container stays on (`web-application-type=servlet`) with a real `server.port`: the internal LLM proxy (`/internal/llm/**`, the only credential path a sandboxed job has) is served here whenever this pod executes jobs, and no `ports:`/Traefik mapping exposes it externally.
+- `application-worker.yml` — `runtime.server=false`, `runtime.webhook=false`, `agent.enabled` defaults to `true` on this profile specifically (job execution IS this pod's purpose — see the `AGENT_ENABLED` note below), OAuth2 autoconfigure excluded, JPA still enabled. The servlet container stays on (`web-application-type=servlet`) with a real `server.port`: the internal LLM proxy (`/internal/llm/**`, the only credential path a sandbox has) is served with the worker/sandbox capability, and no `ports:`/Traefik mapping exposes it externally.
 - `application-webhook.yml` — `runtime.server=false`, `runtime.worker=false`, sync NATS enabled, agent job queue disabled (webhook pods never claim jobs).
 - No `application-server.yml` — the monolith default _is_ the server profile.
 
@@ -78,6 +78,17 @@ is both `application-server` (submission + recovery) and `application-worker` (e
 so it needs the env var explicitly. `docker/compose.app.yaml` sets the same `AGENT_ENABLED` value on
 both services already.
 
+Interactive mentor turns are different from queued practice-review jobs: the HTTP/SSE request and
+its reusable sandbox live on the **application-server replica that accepted the request**. Keep the
+worker capability and Docker access enabled on application-server even in a split deployment. A
+dedicated `application-worker` adds queue capacity but does not receive mentor HTTP turns; when
+`AGENT_ENABLED=true`, every worker-capable replica may claim queued practice jobs.
+`AGENT_ENABLED=false` may disable practice jobs without disabling mentor's sandbox or LLM proxy.
+The compose topology keeps sticky workspace affinity so consecutive turns can reuse the same warm
+sandbox. A change to its model, upstream route, image, prompt/runtime files, or security limits
+closes that sandbox and creates a compatible replacement instead of silently reusing stale runtime
+state; per-turn context is refreshed through the runner callback without restarting it.
+
 ## Worker pod env vars
 
 The bare minimum to boot a worker against a remote hub:
@@ -90,8 +101,8 @@ HEPHAESTUS_WORKER_HUB_SIGNING_KEY=<RSA-2048 PEM>     # only on the app pod
 HEPHAESTUS_WORKER_DRAIN_TIMEOUT=5m
 ```
 
-No LLM env vars are needed: the LLM proxy runs in-process on this pod (it follows the same
-job-execution capability gate as job execution itself, not a standalone flag) and reads providers
+No LLM env vars are needed: the LLM proxy runs in-process on this pod (it follows the worker/sandbox
+capability, not `AGENT_ENABLED`) and reads providers
 from the same instance/workspace catalog as the app pod. Register providers at runtime under
 Instance admin → AI models, or per-workspace under "bring your own AI provider" — never via env var.
 

@@ -107,7 +107,7 @@ public class MentorPiAdapter {
             llmConfig.supportsReasoning(),
             llmConfig.cacheControlFormat(),
             proxyToken,
-            false,
+            llmConfig.allowInternet(),
             timeoutSeconds,
             PROFILE,
             extraInputs,

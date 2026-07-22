@@ -949,6 +949,36 @@ class AgentJobExecutorTest extends BaseUnitTest {
             assertThat(sample.getValue().totalCalls()).isZero();
             verify(usageRecorder, never()).record(any(), any());
         }
+
+        @Test
+        void reportedCallWithZeroTokens_recordsAnUnpricedLedgerEntry() {
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
+            when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
+            when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            setupFullExecution();
+            when(practiceAgent.parseResult(any())).thenReturn(
+                new AgentResult(
+                    true,
+                    Map.of("review", "LGTM"),
+                    new AgentResult.LlmUsage("claude-sonnet-4", 0, 0, 0, 0, 0, 0.0, 1)
+                )
+            );
+
+            AgentJob freshJob = freshJob();
+            freshJob.setConfigSnapshot(snapshot.toJson(objectMapper));
+            when(jobRepository.findById(any(UUID.class))).thenReturn(Optional.of(freshJob));
+            when(jobRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(jobRepository.transitionStatus(any(), eq(AgentJobStatus.COMPLETED), any(), any(), any())).thenReturn(
+                1
+            );
+
+            executor.processJob(jobId);
+
+            verify(usageRecorder).recordUnverifiable(eq(99L), any());
+            verify(usageRecorder, never()).record(any(), any());
+        }
     }
 
     @Nested

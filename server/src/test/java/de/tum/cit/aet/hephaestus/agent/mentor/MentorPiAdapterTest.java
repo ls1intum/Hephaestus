@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.mentor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -67,6 +68,10 @@ class MentorPiAdapterTest extends BaseUnitTest {
 
     /** A legacy (pre-catalog) mentor config — connectionScope/connectionId are null. */
     private static MentorLlmConfig llmConfig(String rawBaseUrl) {
+        return llmConfig(rawBaseUrl, false);
+    }
+
+    private static MentorLlmConfig llmConfig(String rawBaseUrl, boolean allowInternet) {
         String resolvedBaseUrl =
             rawBaseUrl != null && !rawBaseUrl.isBlank() ? rawBaseUrl.trim() : "https://api.openai.com";
         return new MentorLlmConfig(
@@ -80,6 +85,7 @@ class MentorPiAdapterTest extends BaseUnitTest {
             null,
             null,
             null,
+            allowInternet,
             120,
             rawBaseUrl
         );
@@ -150,6 +156,16 @@ class MentorPiAdapterTest extends BaseUnitTest {
         PiPlanSpec spec = capturePlanSpec(llmConfig(null), Map.of(), null);
         assertThat(spec.jobToken()).isNotBlank();
         assertThat(proxyRegistry.validate(spec.jobToken())).isPresent();
+    }
+
+    @Test
+    void carriesConfiguredInternetPolicyIntoTheRuntimePlan() {
+        adapter.buildSandboxSpec(REQUEST, llmConfig(null, true), Map.of(), null);
+        adapter.buildSandboxSpec(REQUEST, llmConfig(null, false), Map.of(), null);
+
+        ArgumentCaptor<PiPlanSpec> captor = ArgumentCaptor.forClass(PiPlanSpec.class);
+        verify(runtimeFactory, times(2)).build(captor.capture());
+        assertThat(captor.getAllValues()).extracting(PiPlanSpec::allowInternet).containsExactly(true, false);
     }
 
     @Test

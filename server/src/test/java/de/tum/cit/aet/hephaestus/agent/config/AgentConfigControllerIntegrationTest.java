@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelWorkspaceGrant;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelWorkspaceGrantRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.ModelVisibility;
@@ -52,6 +53,9 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
     @Autowired
     private LlmModelRepository llmModelRepository;
+
+    @Autowired
+    private LlmModelResolver llmModelResolver;
 
     @Autowired
     private LlmModelWorkspaceGrantRepository llmModelWorkspaceGrantRepository;
@@ -516,6 +520,38 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         // llmProvider is @NonNull on the DTO even for a bound config — the service fills a harmless
         // placeholder on the entity (the NOT NULL legacy column), never read by a bound config.
         assertThat(created.llmProvider()).isNotNull();
+    }
+
+    @Test
+    @WithAdminUser
+    void workspaceScopedLookupFetchesBoundModelRuntimeOutsideRepositoryTransaction() {
+        Workspace workspace = setupWorkspace();
+        LlmModel model = seedInstanceModel(ModelVisibility.PUBLIC, true, true);
+        AgentConfigDTO created = webTestClient
+            .post()
+            .uri("/workspaces/{slug}/agent-configs", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(
+                CreateAgentConfigRequestDTO.builder()
+                    .name("detached-runtime-model")
+                    .enabled(true)
+                    .instanceModelId(model.getId())
+                    .build()
+            )
+            .exchange()
+            .expectStatus()
+            .isCreated()
+            .expectBody(AgentConfigDTO.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(created).isNotNull();
+        AgentConfig detached = agentConfigRepository
+            .findByIdAndWorkspaceId(created.id(), workspace.getId())
+            .orElseThrow();
+
+        assertThat(llmModelResolver.resolve(detached).baseUrl()).isEqualTo("https://api.openai.com");
     }
 
     @Test

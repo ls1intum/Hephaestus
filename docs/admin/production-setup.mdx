@@ -198,7 +198,7 @@ Practice review is not enabled by a single flag. The following settings must be 
 | `NATS_ENABLED` | Enables webhook-driven sync consumption (unrelated to the agent job queue) |
 | `NATS_DURABLE_CONSUMER_NAME` | Durable consumer name for sync processing |
 
-The Docker sandbox itself is activated by the **worker runtime role** (`hephaestus.runtime.worker.enabled`, default `true` in the monolith and in the dedicated `application-worker` pod), not by a flag. `AGENT_ENABLED` and `GIT_CHECKOUT_ENABLED` must be `true` together for practice review — anything else is a half-configured deployment. The agent job queue itself runs on PostgreSQL, not NATS; `NATS_ENABLED` still gates webhook-driven sync consumption and must stay on for that, but it is no longer part of the practice-review bundle.
+The Docker sandbox itself is activated by the **worker runtime role** (`hephaestus.runtime.worker.enabled`), not by `AGENT_ENABLED`. Keep that capability and Docker access on the application server because interactive mentor sandboxes are request-affine and run there; a dedicated `application-worker` adds capacity for queued practice reviews. When `AGENT_ENABLED` is also true, any worker-capable replica may claim those PostgreSQL jobs. `AGENT_ENABLED` and `GIT_CHECKOUT_ENABLED` must be `true` together for practice review — anything else is a half-configured deployment. `NATS_ENABLED` still gates webhook-driven sync consumption and must stay on for that, but it is no longer part of the practice-review bundle.
 
 ### Agent queue health & retention
 
@@ -230,14 +230,14 @@ Staging and production both use the production compose files. The difference sho
 
 ### AI model configuration
 
-The mentor (Pi agent run in-process) and the sandboxed practice-review proxy both flow through the application server's LLM proxy — the only path a sandbox has to a provider key, never injected directly. There is no separate intelligence service to configure, and there are no LLM env vars to set.
+The mentor's interactive sandbox uses the application-server replica's LLM proxy; a queued practice review uses the proxy beside the worker that claimed it. That proxy is the only path a sandbox has to a provider key, which is never injected directly. There is no separate intelligence service to configure, and there are no LLM env vars to set.
 
 Providers (Anthropic, OpenAI, Azure OpenAI, and self-hosted OpenAI-compatible gateways such as vLLM or Open WebUI) are registered at runtime, not via `.env`:
 
 - An instance admin adds a provider connection and its models under **Instance admin → AI models**, sets per-model pricing, and shares individual models with workspaces.
 - A workspace admin can instead connect its own provider ("bring your own AI provider") under the workspace's AI settings; that workspace's usage is priced independently of the instance catalog and billed directly to them — it is never capped and never counts toward the budget described below.
 
-The proxy resolves the upstream base URL, auth header, and key per model from whichever connection it is bound to, so nothing needs to be pinned at the process level. On a split-pod deployment the worker pod resolves providers from the same catalog as the app pod — no LLM credential passthrough between pods.
+The proxy resolves the upstream base URL, auth header, and key per model from whichever connection it is bound to, so nothing needs to be pinned at the process level. On a split-pod deployment the worker pod resolves providers from the same catalog as the app pod — no LLM credential passthrough between pods. Warm mentor sandboxes are reused only while their complete non-secret runtime identity still matches; changing the bound model/route, image, prompt/runtime files, or limits replaces the sandbox before the next prompt. Per-turn context is refreshed inside a compatible warm sandbox rather than forcing a restart.
 
 #### Workspace budgets and alerting
 

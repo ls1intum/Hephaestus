@@ -6,8 +6,8 @@ import { AdminInstanceLlmUsageTable } from "./AdminInstanceLlmUsageTable";
 const rows: AdminWorkspaceLlmUsage[] = [
 	{
 		workspaceId: 1,
-		workspaceSlug: "obsphera",
-		displayName: "Obsphera",
+		workspaceSlug: "example-workspace",
+		displayName: "Example Workspace",
 		monthlyBudgetUsd: 25,
 		pricedTotalCostUsd: 25.0142,
 		byoTotalCostUsd: 0,

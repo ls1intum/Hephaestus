@@ -353,13 +353,16 @@ public class MentorChatService implements MentorTurnRunner {
                     client = runner.client();
                     client.openThread(request.threadId()).get(10, TimeUnit.SECONDS);
                 }
-                client
-                    .prompt(request.threadId(), MentorTurnPromptFactory.forRunner(request, contextInputs))
-                    .whenComplete((result, ex) -> {
-                        if (ex != null && !turnComplete.isDone()) {
-                            turnComplete.completeExceptionally(ex);
-                        }
-                    });
+                var prompt = client.prompt(
+                    request.threadId(),
+                    MentorTurnPromptFactory.forRunner(request, contextInputs)
+                );
+                state.markLlmCallStarted();
+                prompt.whenComplete((result, ex) -> {
+                    if (ex != null && !turnComplete.isDone()) {
+                        turnComplete.completeExceptionally(ex);
+                    }
+                });
 
                 turnComplete.get(MentorRunnerClient.DEFAULT_PROMPT_TIMEOUT.toMillis() + 30_000, TimeUnit.MILLISECONDS);
             }

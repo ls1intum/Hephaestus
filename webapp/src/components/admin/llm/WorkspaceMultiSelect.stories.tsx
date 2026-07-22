@@ -3,7 +3,7 @@ import { expect, fn, screen, userEvent, within } from "storybook/test";
 import { WorkspaceMultiSelect, type WorkspaceMultiSelectOption } from "./WorkspaceMultiSelect";
 
 const mockOptions: WorkspaceMultiSelectOption[] = [
-	{ id: 1, displayName: "Obsphera", workspaceSlug: "obsphera" },
+	{ id: 1, displayName: "Example Workspace", workspaceSlug: "example-workspace" },
 	{ id: 2, displayName: "Acme Corp", workspaceSlug: "acme" },
 	{ id: 3, displayName: "TUM CIT", workspaceSlug: "tum-cit" },
 ];
@@ -49,7 +49,9 @@ export const OpensAndListsOptions: Story = {
 		await userEvent.click(canvas.getByRole("button"));
 		// The popup renders in a portal → query the document. `toBeInTheDocument` (not `toBeVisible`):
 		// the popup's enter transition can still be animating opacity when this assertion runs.
-		await expect(await screen.findByRole("checkbox", { name: /Obsphera/i })).toBeInTheDocument();
+		await expect(
+			await screen.findByRole("checkbox", { name: /Example Workspace/i }),
+		).toBeInTheDocument();
 		await expect(await screen.findByRole("checkbox", { name: /Acme Corp/i })).toBeInTheDocument();
 	},
 };

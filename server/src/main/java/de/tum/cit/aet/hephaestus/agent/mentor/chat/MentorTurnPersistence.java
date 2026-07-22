@@ -228,8 +228,8 @@ public class MentorTurnPersistence {
      * {@code chat_message.metadata.costUsd} persists for the wire contract.
      *
      * <p>#1368 slice 6: previously preferred a cost Pi itself reported on {@code Usage.cost.total}.
-     * The runner no longer registers a per-token price table with the SDK (see {@code pi-provider.mjs}
-     * — cost is a server-side concern now), so Pi can never populate that field; the extraction +
+     * The runner registers zero SDK-local rates only because Pi requires the cost object shape (see
+     * {@code pi-provider.mjs}), so Pi can never populate a real cost there; the extraction +
      * sanity-cap guard for it were deleted as dead code. This fallback is the only source now.
      */
     @Nullable
@@ -359,7 +359,11 @@ public class MentorTurnPersistence {
         if (sample == null) {
             return;
         }
-        usageRecorder.record(pending.workspaceId(), sample);
+        if (pending.unverifiable()) {
+            usageRecorder.recordUnverifiable(pending.workspaceId(), sample);
+        } else {
+            usageRecorder.record(pending.workspaceId(), sample);
+        }
     }
 
     /**
@@ -374,7 +378,9 @@ public class MentorTurnPersistence {
         @Nullable
         private LlmUsageSample sample;
 
-        /** No-op when the turn produced no usage at all (nothing to bill) or the thread is detached. */
+        private boolean unverifiable;
+
+        /** No-op only when no LLM call started or the thread is detached. */
         void capture(ChatMessage assistant, TranslatorState state) {
             ChatThread thread = assistant.getThread();
             if (thread == null || thread.getWorkspace() == null) {
@@ -382,7 +388,10 @@ public class MentorTurnPersistence {
             }
             UsageBreakdown usage = extractUsageFromState(state);
             if (usage.inputTokens() <= 0 && usage.outputTokens() <= 0) {
-                return;
+                if (!state.hasLlmCallStarted()) {
+                    return;
+                }
+                unverifiable = true;
             }
             this.workspaceId = thread.getWorkspace().getId();
             this.sample = new LlmUsageSample(
@@ -411,6 +420,10 @@ public class MentorTurnPersistence {
         @Nullable
         Long workspaceId() {
             return workspaceId;
+        }
+
+        boolean unverifiable() {
+            return unverifiable;
         }
     }
 

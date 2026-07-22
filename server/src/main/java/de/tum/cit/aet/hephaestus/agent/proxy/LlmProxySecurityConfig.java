@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -20,14 +20,12 @@ import tools.jackson.databind.ObjectMapper;
  * Authenticates requests using proxy-scoped bearer tokens instead of JWTs.
  * The main chain for all other endpoints remains unchanged.
  *
- * <p><b>Gating (#1368 slice 5):</b> the LLM proxy is the ONLY LLM credential path, so it must be
- * present on every job-executing host. Gated on the SAME expression {@code AgentJobExecutor} wires
- * on — job-execution capability, not a standalone flag — so "jobs on, proxy off" cannot be configured.
+ * <p><b>Gating (#1368 slice 5):</b> the LLM proxy is the only credential path for both queued jobs
+ * and interactive mentor sandboxes. It therefore follows the worker/sandbox capability, not the
+ * practice-job feature flag: disabling practice reviews must not break mentor turns.
  */
 @Configuration
-@ConditionalOnExpression(
-    "${" + RuntimeRole.AGENT_ENABLED_PROPERTY + ":false} and ${" + RuntimeRole.WORKER_PROPERTY + ":true}"
-)
+@ConditionalOnProperty(name = RuntimeRole.WORKER_PROPERTY, havingValue = "true", matchIfMissing = true)
 class LlmProxySecurityConfig {
 
     @Bean

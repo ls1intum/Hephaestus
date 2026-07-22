@@ -87,7 +87,7 @@ Option 2. The agent job queue is delivered by polling `agent_job` directly:
 
 - `AGENT_ENABLED` (default `false`) replaces `AGENT_NATS_ENABLED` as the flag that lets a JVM
   claim and execute jobs, combined with the worker runtime role exactly as before
-  (`hephaestus.agent.enabled AND hephaestus.runtime.worker.enabled` — see ADR 0006's amendment).
+  (`hephaestus.agent.enabled AND hephaestus.runtime.worker.enabled` — see ADR 0005's amendment).
 - `AGENT_POLL_INTERVAL` (default `1s`) controls how often each eligible replica polls for claimable
   work.
 - `AGENT_CLAIM_BATCH_SIZE` (default `5`) bounds how many rows one poll claims via

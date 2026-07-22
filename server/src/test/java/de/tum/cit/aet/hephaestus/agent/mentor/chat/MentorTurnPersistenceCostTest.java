@@ -28,8 +28,8 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <p>Historically this preferred a cost Pi itself reported on {@code Usage.cost.total} (with a sanity
  * cap), falling back to {@link ModelPricingService} only when Pi reported nothing. Slice 6 removed the
- * Pi-side path as dead code: the runner no longer registers a per-token price table with the SDK (see
- * {@code pi-provider.mjs}), so Pi can never populate {@code Usage.cost.total} — the extraction +
+ * Pi-side path as dead code: the runner registers only zero SDK-local rates (see
+ * {@code pi-provider.mjs}), so Pi can never populate a real {@code Usage.cost.total} — the extraction +
  * sanity-cap guard tested nothing but a payload shape the runner can no longer produce.
  * {@link ModelPricingService}'s global per-model table is now the only source; these tests pin that
  * fallback (unrelated to and unaffected by the runner change — {@code chat_message.metadata.costUsd}

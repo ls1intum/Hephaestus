@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.exception.TurnAlreadyInFlightException;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.TranslatorState;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageEventRepository;
+import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -72,6 +74,9 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private ChatMessageRepository chatMessageRepository;
+
+    @Autowired
+    private LlmUsageEventRepository usageEventRepository;
 
     @Autowired
     private DataSource dataSource;
@@ -449,6 +454,51 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         ChatMessage assistant = chatMessageRepository.findById(assistantId).orElseThrow();
         assertThat(assistant.getStatus()).isEqualTo(ChatMessage.Status.interrupted);
         assertThat(assistant.getMetadata().path("error").asString()).isEqualTo("upstream timeout");
+    }
+
+    @Test
+    void interrupt_afterLlmCallStarted_writesUnverifiableLedgerEventWhenUsageIsMissing() {
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
+        UUID assistantId = UUID.randomUUID();
+        MentorTurnPersistence.TurnPersistenceCookie cookie = persistence.persistInFlight(
+            thread,
+            "hello",
+            assistantId,
+            null
+        );
+        TranslatorState state = new TranslatorState(assistantId);
+        state.markLlmCallStarted();
+
+        persistence.interrupt(cookie, state, new IllegalStateException("upstream disconnected"));
+
+        var event = usageEventRepository
+            .findAll()
+            .stream()
+            .filter(row -> row.getSourceId().equals(assistantId))
+            .findFirst();
+        assertThat(event).isPresent();
+        assertThat(event.orElseThrow().getPricingState()).isEqualTo(PricingState.UNPRICED);
+        assertThat(event.orElseThrow().getCostUsd()).isNull();
+    }
+
+    @Test
+    void interrupt_beforeLlmCallStarted_doesNotInventAUsageEvent() {
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
+        UUID assistantId = UUID.randomUUID();
+        MentorTurnPersistence.TurnPersistenceCookie cookie = persistence.persistInFlight(
+            thread,
+            "hello",
+            assistantId,
+            null
+        );
+
+        persistence.interrupt(
+            cookie,
+            new TranslatorState(assistantId),
+            new IllegalStateException("sandbox attach failed")
+        );
+
+        assertThat(usageEventRepository.findAll()).noneMatch(row -> row.getSourceId().equals(assistantId));
     }
 
     @Test

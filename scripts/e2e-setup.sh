@@ -45,7 +45,7 @@ curl -fsS -m5 "$APP_URL/identity-providers" >/dev/null || die "app not reachable
 
 # ---- 1. dev-login → bearer JWT (cookie value is the JWT; Bearer is CSRF-exempt) --
 login() { curl -fsS -i -m10 -X POST "$APP_URL/auth/dev-login" -H 'content-type: application/json' \
-  -d "{\"username\":\"$USERNAME\",\"admin\":true}" | grep -i 'set-cookie: HEPHAESTUS_AT' | sed -E 's/.*HEPHAESTUS_AT=([^;]+).*/\1/' | tr -d '\r'; }
+  -d "{\"username\":\"$USERNAME\",\"admin\":true}" | grep -Ei 'set-cookie: (__Host-)?HEPHAESTUS_AT=' | sed -E 's/.*(__Host-)?HEPHAESTUS_AT=([^;]+).*/\2/' | tr -d '\r'; }
 JWT="$(login)"; [ -n "$JWT" ] || die "dev-login failed (is dev-login-enabled on? need the 'local' profile)"
 api() { local m="$1" p="$2"; shift 2; curl -fsS -m30 -X "$m" "$APP_URL$p" -H "authorization: Bearer $JWT" "$@"; }
 ACCOUNT_ID="$(api GET /user | jq -r '.id')"; say "dev-login OK (account id $ACCOUNT_ID, app-admin)"
@@ -69,12 +69,12 @@ say "resolved SCM user: $SCM_LOGIN (id $SCM_ID) on $PROVIDER_ORIGIN"
 
 # ---- 3. seed the SCM identity for the dev account (so it can OWN/navigate the workspace) ----
 q() { psql "$DB_URL" -tAqc "$1"; }   # one statement, value-only output
-PROVIDER_ID="$(q "INSERT INTO git_provider (type, server_url, created_at) VALUES ('$KIND','$PROVIDER_ORIGIN',now()) ON CONFLICT (type, server_url) DO UPDATE SET server_url=EXCLUDED.server_url RETURNING id")"
+PROVIDER_ID="$(q "INSERT INTO identity_provider (type, server_url, created_at) VALUES ('$KIND','$PROVIDER_ORIGIN',now()) ON CONFLICT (type, server_url) DO UPDATE SET server_url=EXCLUDED.server_url RETURNING id")"
 USER_ID="$(q "INSERT INTO \"user\" (native_id, provider_id, login, type, avatar_url, html_url, created_at, updated_at) VALUES ($SCM_ID,$PROVIDER_ID,'$SCM_LOGIN','USER','','$PROVIDER_ORIGIN/$SCM_LOGIN',now(),now()) ON CONFLICT (provider_id, native_id) DO UPDATE SET login=EXCLUDED.login RETURNING id")"
 # Target the account-scoped unique index so a same-account re-run is idempotent, while a *cross-account*
 # collision on (git_provider_id, subject) — a genuine misconfig — still surfaces loudly via the other
 # unique index (matching identity_link's uq_identity_link_active_per_provider, added in 1780825201546).
-q "INSERT INTO identity_link (account_id, git_provider_id, subject, linked_at, linked_via, external_actor_id, username_at_signup) VALUES ($ACCOUNT_ID,$PROVIDER_ID,'$SCM_ID',now(),'OAUTH_LOGIN',$USER_ID,'$SCM_LOGIN') ON CONFLICT (account_id, git_provider_id, COALESCE(team_id, '')) WHERE disabled_at IS NULL DO NOTHING" >/dev/null
+q "INSERT INTO identity_link (account_id, provider_id, subject, linked_at, linked_via, external_actor_id, username_at_signup) VALUES ($ACCOUNT_ID,$PROVIDER_ID,'$SCM_ID',now(),'OAUTH_LOGIN',$USER_ID,'$SCM_LOGIN') ON CONFLICT (account_id, provider_id, COALESCE(team_id, '')) WHERE disabled_at IS NULL DO NOTHING" >/dev/null
 say "seeded SCM identity (user id $USER_ID, linked to account $ACCOUNT_ID)"
 JWT="$(login)"; [ -n "$JWT" ] || die "re-login failed after seeding the SCM identity"  # so the JWT's preferred_username resolves to the linked SCM user
 

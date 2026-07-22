@@ -1,6 +1,6 @@
 # ADR 0006: LLM proxy stays on the coordinator (BYO trust model)
 
-**Status:** Accepted (amended 2026-07-20 — capability flag removed; amended 2026-07-21 — agent NATS property renamed, #1368)
+**Status:** Accepted (amended 2026-07-20, 2026-07-21, and 2026-07-22, #1368)
 **Date:** 2026-05-20
 **Authors:** Server foundations epic (#1097)
 
@@ -25,6 +25,13 @@
 > `hephaestus.agent.enabled AND hephaestus.runtime.worker.enabled` — same gate composition, same
 > coordinator-hosted trust model, only the left-hand property renamed. NATS is unaffected for
 > webhook ingest and SCM/Slack sync, which this change does not touch.
+
+> **Amendment (2026-07-22):** Interactive mentor sandboxes use the same proxy but are not queued
+> `AgentJob`s. The proxy now follows `hephaestus.runtime.worker.enabled` (the local Docker/sandbox
+> capability) without the `hephaestus.agent.enabled` practice-job flag. This preserves the invariant
+> that every sandbox host has its proxy while allowing operators to disable practice reviews without
+> breaking mentor turns. In the split topology, mentor sandboxes remain request-affine to the
+> application-server replica; dedicated workers claim queued practice jobs only.
 
 ## Context
 

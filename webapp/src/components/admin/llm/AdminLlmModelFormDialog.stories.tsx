@@ -28,7 +28,7 @@ const mockModel: LlmModel = {
 };
 
 const mockWorkspaces: WorkspaceMultiSelectOption[] = [
-	{ id: 1, displayName: "Obsphera", workspaceSlug: "obsphera" },
+	{ id: 1, displayName: "Example Workspace", workspaceSlug: "example-workspace" },
 	{ id: 2, displayName: "Acme Corp", workspaceSlug: "acme" },
 ];
 

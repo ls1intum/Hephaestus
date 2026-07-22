@@ -11,8 +11,9 @@
 // this process — the proxy resolves it server-side from the live connection row on every call.
 //
 // The server derives cost from reported token usage + the model's price table (see LlmUsageRecorder /
-// LlmModelPrice); this module intentionally reports NO per-token `cost` on the model registration —
-// the runner only ever reports token counts as it observes them.
+// LlmModelPrice). Pi nevertheless requires the model's local `cost` shape while finalising assistant
+// messages, so register zero rates here. They prevent an SDK crash without competing with the
+// authoritative server-side catalog price.
 
 import { existsSync, readFileSync } from "fs";
 
@@ -55,6 +56,7 @@ export function registerHephaestusProvider(modelRegistry, config, env = process.
         name: config.modelId,
         reasoning: Boolean(config.supportsReasoning),
         input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     };
     if (Number.isFinite(config.contextWindow)) {
         model.contextWindow = config.contextWindow;

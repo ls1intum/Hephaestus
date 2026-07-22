@@ -16,7 +16,7 @@ import java.util.Locale;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
@@ -74,9 +74,7 @@ import tools.jackson.databind.node.ObjectNode;
 @Hidden
 @RequestMapping("/internal/llm")
 @PreAuthorize("isAuthenticated()")
-@ConditionalOnExpression(
-    "${" + RuntimeRole.AGENT_ENABLED_PROPERTY + ":false} and ${" + RuntimeRole.WORKER_PROPERTY + ":true}"
-)
+@ConditionalOnProperty(name = RuntimeRole.WORKER_PROPERTY, havingValue = "true", matchIfMissing = true)
 class LlmProxyController {
 
     private static final Logger log = LoggerFactory.getLogger(LlmProxyController.class);

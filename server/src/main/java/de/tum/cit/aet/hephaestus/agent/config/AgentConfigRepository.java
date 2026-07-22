@@ -5,6 +5,7 @@ import jakarta.persistence.LockModeType;
 import jakarta.persistence.QueryHint;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Repository;
 public interface AgentConfigRepository extends JpaRepository<AgentConfig, Long> {
     List<AgentConfig> findByWorkspaceId(Long workspaceId);
 
+    @EntityGraph(attributePaths = { "instanceModel.connection", "workspaceModel.connection" })
     Optional<AgentConfig> findByIdAndWorkspaceId(Long id, Long workspaceId);
 
     boolean existsByWorkspaceIdAndName(Long workspaceId, String name);
@@ -46,6 +48,7 @@ public interface AgentConfigRepository extends JpaRepository<AgentConfig, Long> 
     boolean existsByWorkspaceIdAndEnabledTrue(Long workspaceId);
 
     /** Deterministic default enabled config (oldest wins) — the mentor fallback when unbound. */
+    @EntityGraph(attributePaths = { "instanceModel.connection", "workspaceModel.connection" })
     Optional<AgentConfig> findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(Long workspaceId);
 
     /** Whether any config still binds the given instance-catalog model (#1368) — guards model deletion. */

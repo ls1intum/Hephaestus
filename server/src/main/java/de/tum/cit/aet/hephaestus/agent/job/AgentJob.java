@@ -33,6 +33,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
@@ -207,6 +208,7 @@ public class AgentJob {
      * retries — a job can be COMPLETED (no more execution retries possible) while still needing several
      * delivery attempts.
      */
+    @ColumnDefault("0")
     @Column(name = "delivery_attempts", nullable = false)
     private short deliveryAttempts = 0;
 
