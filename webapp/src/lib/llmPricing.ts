@@ -6,6 +6,7 @@ export type PricingMode = "PRICED" | "NO_CHARGE" | "UNPRICED";
 export interface PriceFields {
 	pricingMode: PricingMode;
 	per1mInputUsd?: number;
+	per1mOutputUsd?: number;
 }
 
 /** An instance catalog model's price lives in `currentPrice`, absent until one has ever been set. */
@@ -13,6 +14,7 @@ export function priceFieldsOf(model: Pick<LlmModel, "currentPrice">): PriceField
 	return {
 		pricingMode: model.currentPrice?.pricingMode ?? "UNPRICED",
 		per1mInputUsd: model.currentPrice?.per1mInputUsd,
+		per1mOutputUsd: model.currentPrice?.per1mOutputUsd,
 	};
 }
 
@@ -28,5 +30,8 @@ export function priceLabel(model: PriceFields, audience: "instance" | "workspace
 	if (model.pricingMode === "UNPRICED" || model.per1mInputUsd == null) {
 		return audience === "instance" ? "No price set" : "Price not set";
 	}
-	return `${formatCostUsd(model.per1mInputUsd)} / 1M input tokens`;
+	if (model.per1mOutputUsd == null) {
+		return `${formatCostUsd(model.per1mInputUsd)} / 1M input tokens`;
+	}
+	return `${formatCostUsd(model.per1mInputUsd)} input · ${formatCostUsd(model.per1mOutputUsd)} output / 1M tokens`;
 }

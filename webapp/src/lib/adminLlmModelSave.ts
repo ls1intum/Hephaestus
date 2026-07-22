@@ -8,7 +8,8 @@ import type {
 export interface AdminLlmModelSaveBody {
 	metadata: CreateLlmModelRequest | UpdateLlmModelRequest;
 	price: UpdateLlmModelPriceRequest;
-	sharing: UpdateLlmModelSharingRequest;
+	/** Set during creation. Existing-model access is changed only through the dedicated access flow. */
+	sharing?: UpdateLlmModelSharingRequest;
 }
 
 interface ModelSaveOperations {
@@ -51,6 +52,7 @@ export async function saveAdminLlmModelSafely({
 
 	try {
 		if (!editing) {
+			if (!body.sharing) throw new Error("Workspace access is required when creating a model");
 			const created = await operations.create(connectionId, {
 				...(body.metadata as CreateLlmModelRequest),
 				enabled: false,
@@ -67,7 +69,7 @@ export async function saveAdminLlmModelSafely({
 		}
 
 		await operations.updatePrice(modelId, body.price);
-		await operations.updateSharing(modelId, body.sharing);
+		if (!editing && body.sharing) await operations.updateSharing(modelId, body.sharing);
 
 		if (!editing && shouldEnable) {
 			await operations.updateMetadata(modelId, { enabled: true });

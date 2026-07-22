@@ -310,7 +310,16 @@ public class AgentJobService {
             job.setSubjectClass(subjectClassFor(jobType));
             job.setMetadata(submission.metadata());
             job.setIdempotencyKey(configScopedKey);
-            job.setConfigSnapshot(ConfigSnapshot.from(config, llmModelResolver).toJson(objectMapper));
+            try {
+                job.setConfigSnapshot(ConfigSnapshot.from(config, llmModelResolver).toJson(objectMapper));
+            } catch (IllegalStateException unavailableModel) {
+                log.warn(
+                    "Skipping agent config whose model is no longer available: workspaceId={}, configId={}",
+                    workspace.getId(),
+                    config.getId()
+                );
+                return null;
+            }
             // The SCM kind drives delivery (which channel posts the comment/diff notes). Resolve it
             // from the workspace's active connection so EVERY path (events + dev-trigger) sets it —
             // a null integrationKind made the comment poster NPE and silently drop delivery. We log

@@ -66,10 +66,16 @@ const meta = {
 	tags: ["autodocs"],
 	args: {
 		connectionDisplayName: "OpenAI production",
+		connectionEnabled: true,
+		workspaceOptions: [
+			{ id: 10, displayName: "Teaching team", workspaceSlug: "teaching" },
+			{ id: 11, displayName: "Research team", workspaceSlug: "research" },
+		],
 		models: mockModels,
 		mutatingId: null,
 		onAdd: fn(),
 		onEdit: fn(),
+		onManageAccess: fn(),
 		onDelete: fn(),
 	},
 } satisfies Meta<typeof AdminLlmModelsSection>;

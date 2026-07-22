@@ -69,8 +69,8 @@ class LlmModelServiceTest extends BaseUnitTest {
         model.setConnection(connection);
         // Not every test looks up model 7 (e.g. the unknown-id 404 case) — lenient so those aren't
         // flagged as unnecessary stubbing. Both finders are stubbed: updatePrice() still uses the plain
-        // findById, while get()/updateSharing() use the eager-fetch variant and activation/repricing use
-        // the write-locked variant.
+        // findById, get() uses the eager-fetch variant, and activation/repricing/sharing use the
+        // write-locked variant.
         lenient().when(modelRepository.findById(7L)).thenReturn(Optional.of(model));
         lenient().when(modelRepository.findByIdWithConnection(7L)).thenReturn(Optional.of(model));
         lenient().when(modelRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(model));
@@ -312,6 +312,17 @@ class LlmModelServiceTest extends BaseUnitTest {
 
     @Nested
     class SharingReplace {
+
+        @Test
+        void locksTheModelWhileReplacingItsGrantSet() {
+            stubModelSavePassthrough();
+            when(grantRepository.findByIdModelId(7L)).thenReturn(List.of());
+
+            modelService.updateSharing(7L, new UpdateLlmModelSharingRequestDTO(ModelVisibility.GRANTED, List.of()));
+
+            verify(modelRepository).findByIdForUpdate(7L);
+            verify(modelRepository, never()).findByIdWithConnection(7L);
+        }
 
         @Test
         void publicVisibilityDeletesAllExistingGrants() {

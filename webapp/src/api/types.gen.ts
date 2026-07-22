@@ -988,7 +988,7 @@ export type UpdateLlmModelSharingRequest = {
      */
     visibility: 'PUBLIC' | 'GRANTED';
     /**
-     * Workspace ids to share with; required and used only when visibility is GRANTED
+     * Workspace ids to share with when visibility is GRANTED; empty or omitted stages the model without workspace access
      */
     workspaceIds?: Array<number>;
 };
@@ -5678,6 +5678,10 @@ export type UpdatePracticeConfigErrors = {
      * Config not found in this workspace
      */
     404: unknown;
+    /**
+     * Config is disabled or its catalog model is unavailable
+     */
+    409: unknown;
 };
 
 export type UpdatePracticeConfigResponses = {

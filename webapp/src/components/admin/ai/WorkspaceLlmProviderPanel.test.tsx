@@ -104,6 +104,19 @@ describe("WorkspaceLlmProviderPanel", () => {
 		expect(screen.queryByRole("button", { name: "Connect provider" })).toBeNull();
 	});
 
+	it("does not present a failed model request as an empty catalog", async () => {
+		server.use(
+			http.get("*/workspaces/demo/llm/connections", () => HttpResponse.json([connections[0]])),
+			http.get("*/workspaces/demo/llm/models", () =>
+				HttpResponse.json({ title: "Unavailable" }, { status: 503 }),
+			),
+		);
+		renderPanel();
+
+		expect(await screen.findByText("Could not load your provider models")).toBeTruthy();
+		expect(screen.queryByText("No models yet")).toBeNull();
+	});
+
 	it("hides new providers and models while keeping existing entries manageable", async () => {
 		server.use(
 			http.get("*/workspaces/demo/llm/connections", () => HttpResponse.json([connections[0]])),

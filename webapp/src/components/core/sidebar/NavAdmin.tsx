@@ -46,10 +46,8 @@ export function NavAdmin({
 	workspaceSlug,
 	achievementsEnabled = true,
 	practicesEnabled = true,
-	mentorEnabled = false,
 	scmProviderType = "GITHUB",
 }: NavAdminProps) {
-	const modelsVisible = practicesEnabled || mentorEnabled;
 	const matchRoute = useMatchRoute();
 
 	const onSettings = Boolean(
@@ -268,17 +266,17 @@ export function NavAdmin({
 						</SidebarMenuSub>
 					</CollapsibleContent>
 				</Collapsible>
-				{modelsVisible && (
-					<SidebarMenuItem>
-						<SidebarMenuButton
-							tooltip="AI setup"
-							render={<Link to="/w/$workspaceSlug/admin/models" params={{ workspaceSlug }} />}
-						>
-							<Bot />
-							<span>AI setup</span>
-						</SidebarMenuButton>
-					</SidebarMenuItem>
-				)}
+				{/* Provider credentials and model bindings still need maintenance while consuming features are
+				    off, and admins should be able to configure them before enabling a feature. */}
+				<SidebarMenuItem>
+					<SidebarMenuButton
+						tooltip="AI setup"
+						render={<Link to="/w/$workspaceSlug/admin/models" params={{ workspaceSlug }} />}
+					>
+						<Bot />
+						<span>AI setup</span>
+					</SidebarMenuButton>
+				</SidebarMenuItem>
 				<SidebarMenuItem>
 					<SidebarMenuButton
 						tooltip="AI usage"

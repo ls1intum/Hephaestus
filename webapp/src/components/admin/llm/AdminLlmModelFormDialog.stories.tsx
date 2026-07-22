@@ -55,11 +55,11 @@ export const EditModel: Story = {
 	args: { editing: mockModel },
 };
 
-/** Shared with only the selected workspaces — the multi-select appears once "Selected workspaces" is chosen. */
-export const SharedWithSelectedWorkspaces: Story = {
+/** Existing-model access is intentionally managed only through the dedicated Access dialog. */
+export const EditKeepsAccessSeparate: Story = {
 	args: { editing: mockModel },
 	play: async () => {
-		await expect(await screen.findByText("Selected workspaces")).toBeInTheDocument();
+		await expect(screen.queryByText("Initial workspace access")).not.toBeInTheDocument();
 	},
 };
 

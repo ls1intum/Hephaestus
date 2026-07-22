@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
 	CreateLlmConnectionRequest,
 	LlmConnection,
@@ -17,13 +17,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import {
-	Field,
-	FieldContent,
-	FieldDescription,
-	FieldError,
-	FieldLabel,
-} from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
 	Select,
@@ -32,7 +26,6 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import {
 	authModeDefaultFor,
 	baseUrlDefaultFor,
@@ -91,13 +84,16 @@ export function AdminLlmConnectionFormDialog({
 	const [authMode, setAuthMode] = useState<LlmAuthMode>("BEARER");
 	const [apiKey, setApiKey] = useState("");
 	const [clearApiKey, setClearApiKey] = useState(false);
-	const [enabled, setEnabled] = useState(false);
 	const [probeResult, setProbeResult] = useState<LlmProbeResult | null>(null);
 	const [probeError, setProbeError] = useState<string | null>(null);
 	const [errors, setErrors] = useState<{ displayName?: string; baseUrl?: string }>({});
+	const probeGeneration = useRef(0);
+	const openRef = useRef(open);
+	openRef.current = open;
 
 	useEffect(() => {
 		if (!open) return;
+		probeGeneration.current += 1;
 		setDisplayName(editing?.displayName ?? "");
 		setBaseUrl(editing?.baseUrl ?? baseUrlDefaultFor("OPENAI"));
 		setPreset(editing ? presetForConnection(editing) : "OPENAI");
@@ -105,13 +101,18 @@ export function AdminLlmConnectionFormDialog({
 		setAuthMode(editing?.authMode ?? "BEARER");
 		setApiKey("");
 		setClearApiKey(false);
-		setEnabled(editing?.enabled ?? false);
 		setProbeResult(null);
 		setProbeError(null);
 		setErrors({});
 	}, [open, editing]);
 
 	const apiProtocol = defaultProtocolFor(useResponsesApi);
+	const clearProbe = () => {
+		probeGeneration.current += 1;
+		setProbeResult(null);
+		setProbeError(null);
+		onProbed?.([]);
+	};
 
 	const validate = (): boolean => {
 		const next: typeof errors = {};
@@ -122,16 +123,22 @@ export function AdminLlmConnectionFormDialog({
 	};
 
 	const handleTest = () => {
+		const generation = probeGeneration.current + 1;
+		probeGeneration.current = generation;
 		setProbeResult(null);
 		setProbeError(null);
+		onProbed?.([]);
 		const callbacks = {
 			onSuccess: (result: LlmProbeResult) => {
+				if (probeGeneration.current !== generation || !openRef.current) return;
 				setProbeResult(result);
 				if (result.reachable) onProbed?.(result.models);
 			},
-			onError: setProbeError,
+			onError: (message: string) => {
+				if (probeGeneration.current === generation && openRef.current) setProbeError(message);
+			},
 		};
-		if (editing) {
+		if (editing && !apiKey.trim() && !clearApiKey) {
 			onProbeSaved?.(editing.id, callbacks);
 			return;
 		}
@@ -151,7 +158,7 @@ export function AdminLlmConnectionFormDialog({
 		if (!validate()) return;
 
 		if (editing) {
-			const body: UpdateLlmConnectionRequest = { displayName: displayName.trim(), enabled };
+			const body: UpdateLlmConnectionRequest = { displayName: displayName.trim() };
 			if (apiKey.trim()) body.apiKey = apiKey.trim();
 			if (clearApiKey) body.clearApiKey = true;
 			onUpdate(editing.id, body);
@@ -206,6 +213,7 @@ export function AdminLlmConnectionFormDialog({
 									}
 									setAuthMode(authModeDefaultFor(next));
 									setPreset(next);
+									clearProbe();
 								}}
 							>
 								<SelectTrigger id="llm-conn-provider-preset" className="w-full">
@@ -223,7 +231,10 @@ export function AdminLlmConnectionFormDialog({
 								<Checkbox
 									id="llm-conn-responses-api"
 									checked={useResponsesApi}
-									onCheckedChange={(checked) => setUseResponsesApi(checked === true)}
+									onCheckedChange={(checked) => {
+										setUseResponsesApi(checked === true);
+										clearProbe();
+									}}
 								/>
 								<label htmlFor="llm-conn-responses-api">
 									Use the Responses API instead of Chat Completions
@@ -244,7 +255,10 @@ export function AdminLlmConnectionFormDialog({
 							id="llm-conn-base-url"
 							type="url"
 							value={baseUrl}
-							onChange={(event) => setBaseUrl(event.target.value)}
+							onChange={(event) => {
+								setBaseUrl(event.target.value);
+								clearProbe();
+							}}
 							disabled={isEdit}
 							placeholder="https://api.openai.com/v1"
 							aria-invalid={Boolean(errors.baseUrl)}
@@ -267,7 +281,11 @@ export function AdminLlmConnectionFormDialog({
 									{ value: "API_KEY", label: "api-key header" },
 								]}
 								value={authMode}
-								onValueChange={(value) => value && setAuthMode(value as LlmAuthMode)}
+								onValueChange={(value) => {
+									if (!value) return;
+									setAuthMode(value as LlmAuthMode);
+									clearProbe();
+								}}
 							>
 								<SelectTrigger id="llm-conn-auth-mode" className="w-full">
 									<SelectValue />
@@ -286,7 +304,10 @@ export function AdminLlmConnectionFormDialog({
 							id="llm-conn-api-key"
 							type="password"
 							value={apiKey}
-							onChange={(event) => setApiKey(event.target.value)}
+							onChange={(event) => {
+								setApiKey(event.target.value);
+								clearProbe();
+							}}
 							disabled={clearApiKey}
 							placeholder={
 								editing?.hasApiKey
@@ -306,6 +327,7 @@ export function AdminLlmConnectionFormDialog({
 									onCheckedChange={(checked) => {
 										setClearApiKey(checked === true);
 										if (checked === true) setApiKey("");
+										clearProbe();
 									}}
 								/>
 								<label htmlFor="llm-conn-clear-api-key">Remove stored API key</label>
@@ -313,22 +335,12 @@ export function AdminLlmConnectionFormDialog({
 						)}
 					</Field>
 
-					<Field orientation="horizontal">
-						<FieldContent>
-							<FieldLabel htmlFor="llm-conn-enabled">Active</FieldLabel>
-							<FieldDescription>
-								{isEdit
-									? "Turn off to stop new requests using this connection."
-									: "New connections start inactive. Save and test this connection, add a priced model, then activate both."}
-							</FieldDescription>
-						</FieldContent>
-						<Switch
-							id="llm-conn-enabled"
-							checked={enabled}
-							disabled={!isEdit}
-							onCheckedChange={setEnabled}
-						/>
-					</Field>
+					{!isEdit && (
+						<p className="text-sm text-muted-foreground">
+							New connections start inactive. Save and test the connection, add a priced model, then
+							activate it from the connections table.
+						</p>
+					)}
 
 					<div className="space-y-2">
 						<Button
@@ -338,7 +350,13 @@ export function AdminLlmConnectionFormDialog({
 							disabled={isProbing || !baseUrl.trim()}
 							onClick={handleTest}
 						>
-							{isProbing ? "Testing…" : isEdit ? "Test saved connection" : "Test & fetch models"}
+							{isProbing
+								? "Testing…"
+								: isEdit && !apiKey.trim() && !clearApiKey
+									? "Test saved connection"
+									: isEdit
+										? "Test changes"
+										: "Test & fetch models"}
 						</Button>
 						{probeResult?.reachable && (
 							<Alert variant="success">

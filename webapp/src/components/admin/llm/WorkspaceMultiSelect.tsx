@@ -1,6 +1,8 @@
 import { ChevronsUpDownIcon } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
@@ -20,9 +22,8 @@ export interface WorkspaceMultiSelectProps {
 }
 
 /**
- * Checkbox-list picker for "Share with: Selected workspaces" (#1368). A plain popover rather than a
- * combobox — the option count is the instance's workspace count, which stays small enough that a
- * scrollable checklist reads faster than a filterable search box.
+ * Searchable checkbox-list picker for model access. Search keeps the same simple interaction usable
+ * for both small installations and instances with many workspaces.
  */
 export function WorkspaceMultiSelect({
 	id,
@@ -32,6 +33,7 @@ export function WorkspaceMultiSelect({
 	disabled = false,
 	className,
 }: WorkspaceMultiSelectProps) {
+	const [query, setQuery] = useState("");
 	const toggle = (workspaceId: number, checked: boolean) => {
 		onChange(
 			checked
@@ -46,6 +48,14 @@ export function WorkspaceMultiSelect({
 			: selectedIds.length === 1
 				? (options.find((o) => o.id === selectedIds[0])?.displayName ?? "1 workspace")
 				: `${selectedIds.length} workspaces`;
+	const normalizedQuery = query.trim().toLowerCase();
+	const filteredOptions = normalizedQuery
+		? options.filter(
+				(option) =>
+					option.displayName.toLowerCase().includes(normalizedQuery) ||
+					option.workspaceSlug.toLowerCase().includes(normalizedQuery),
+			)
+		: options;
 
 	return (
 		<Popover>
@@ -65,35 +75,49 @@ export function WorkspaceMultiSelect({
 					</Button>
 				}
 			/>
-			<PopoverContent align="start" className="max-h-72 overflow-y-auto">
+			<PopoverContent align="start" className="w-80">
 				{options.length === 0 ? (
 					<p className="text-muted-foreground py-2 text-center text-sm">No workspaces yet.</p>
 				) : (
-					<ul className="space-y-1">
-						{options.map((option) => {
-							const checked = selectedIds.includes(option.id);
-							const checkboxId = `${id ?? "workspace-multiselect"}-${option.id}`;
-							return (
-								<li key={option.id} className="flex items-center gap-2 py-0.5">
-									<Checkbox
-										id={checkboxId}
-										checked={checked}
-										disabled={disabled}
-										onCheckedChange={(next) => toggle(option.id, next === true)}
-									/>
-									<label
-										htmlFor={checkboxId}
-										className="min-w-0 flex-1 cursor-pointer truncate text-sm"
-									>
-										{option.displayName}
-										<span className="text-muted-foreground ml-1.5 text-xs">
-											{option.workspaceSlug}
-										</span>
-									</label>
-								</li>
-							);
-						})}
-					</ul>
+					<>
+						<Input
+							aria-label="Search workspaces"
+							value={query}
+							onChange={(event) => setQuery(event.target.value)}
+							placeholder="Search workspaces…"
+							autoComplete="off"
+						/>
+						<ul className="max-h-60 space-y-1 overflow-y-auto">
+							{filteredOptions.map((option) => {
+								const checked = selectedIds.includes(option.id);
+								const checkboxId = `${id ?? "workspace-multiselect"}-${option.id}`;
+								return (
+									<li key={option.id} className="flex items-center gap-2 py-0.5">
+										<Checkbox
+											id={checkboxId}
+											checked={checked}
+											disabled={disabled}
+											onCheckedChange={(next) => toggle(option.id, next === true)}
+										/>
+										<label
+											htmlFor={checkboxId}
+											className="min-w-0 flex-1 cursor-pointer truncate text-sm"
+										>
+											{option.displayName}
+											<span className="text-muted-foreground ml-1.5 text-xs">
+												{option.workspaceSlug}
+											</span>
+										</label>
+									</li>
+								);
+							})}
+						</ul>
+						{filteredOptions.length === 0 && (
+							<p className="text-muted-foreground py-2 text-center text-sm">
+								No matching workspaces.
+							</p>
+						)}
+					</>
 				)}
 			</PopoverContent>
 		</Popover>

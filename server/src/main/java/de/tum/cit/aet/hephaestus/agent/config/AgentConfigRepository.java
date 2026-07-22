@@ -15,6 +15,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface AgentConfigRepository extends JpaRepository<AgentConfig, Long> {
+    @EntityGraph(attributePaths = { "instanceModel.connection", "workspaceModel.connection" })
     List<AgentConfig> findByWorkspaceId(Long workspaceId);
 
     @EntityGraph(attributePaths = { "instanceModel.connection", "workspaceModel.connection" })

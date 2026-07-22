@@ -63,8 +63,10 @@ describe("AdminLlmModelFormDialog", () => {
 			/>,
 		);
 		expect((screen.getByLabelText("Upstream model id") as HTMLInputElement).disabled).toBe(true);
+		expect(screen.queryByLabelText("Initial workspace access")).toBeNull();
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 		expect(onSave.mock.calls[0]?.[0].metadata).not.toHaveProperty("upstreamModelId");
+		expect(onSave.mock.calls[0]?.[0]).not.toHaveProperty("sharing");
 	});
 
 	it("turns an active model off when its price becomes unknown", () => {
@@ -106,6 +108,7 @@ describe("AdminLlmModelFormDialog", () => {
 		expect(screen.getByRole("switch", { name: "Active" }).getAttribute("aria-checked")).toBe(
 			"false",
 		);
+		expect(screen.getByText("Existing configurations will stop immediately")).toBeTruthy();
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 		expect(onSave.mock.calls[0]?.[0].metadata).toEqual(expect.objectContaining({ enabled: false }));
 	});

@@ -244,8 +244,8 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 
 			<Tabs defaultValue="models">
 				<TabsList>
-					<TabsTrigger value="models">Agent settings</TabsTrigger>
-					<TabsTrigger value="provider">Your providers</TabsTrigger>
+					<TabsTrigger value="models">Configurations</TabsTrigger>
+					<TabsTrigger value="provider">Workspace providers</TabsTrigger>
 				</TabsList>
 
 				<TabsContent value="models" className="mt-6">
@@ -265,9 +265,12 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 							{isError ? (
 								<Alert variant="destructive">
 									<AlertCircle />
-									<AlertTitle>Failed to load models</AlertTitle>
+									<AlertTitle>Failed to load AI setup</AlertTitle>
 									<AlertDescription>
-										<p>The model list could not be loaded.</p>
+										<p>
+											Configurations, workspace policy, or the available model list could not be
+											loaded.
+										</p>
 										<Button variant="outline" size="sm" className="mt-2" onClick={handleRetry}>
 											Retry
 										</Button>
@@ -348,32 +351,58 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 							)}
 						</div>
 
-						<Card>
-							<CardHeader>
-								<CardTitle className="text-base">
-									{selectedConfig ? `Edit: ${selectedConfig.name}` : "New agent configuration"}
-								</CardTitle>
-							</CardHeader>
-							<CardContent>
-								<AgentConfigForm
-									key={selectedConfig?.id ?? NEW_RUNTIME}
-									config={selectedConfig}
-									availableModels={availableModels}
-									isPending={formPending}
-									onCreate={handleCreate}
-									onUpdate={handleUpdate}
-									onCancel={selectedConfig ? () => setSelectedId(null) : undefined}
-								/>
-							</CardContent>
-						</Card>
+						{!isError && !isLoading && (
+							<Card>
+								<CardHeader>
+									<CardTitle className="text-base">
+										{selectedConfig ? `Edit: ${selectedConfig.name}` : "New agent configuration"}
+									</CardTitle>
+								</CardHeader>
+								<CardContent>
+									<AgentConfigForm
+										key={selectedConfig?.id ?? NEW_RUNTIME}
+										config={selectedConfig}
+										availableModels={availableModels}
+										isPending={formPending}
+										onCreate={handleCreate}
+										onUpdate={handleUpdate}
+										onCancel={selectedConfig ? () => setSelectedId(null) : undefined}
+									/>
+								</CardContent>
+							</Card>
+						)}
 					</div>
 				</TabsContent>
 
 				<TabsContent value="provider" className="mt-6">
-					<WorkspaceLlmProviderPanel
-						workspaceSlug={workspaceSlug}
-						workspaceConnectionsAllowed={aiSettingsQuery.data?.workspaceConnectionsAllowed ?? false}
-					/>
+					{aiSettingsQuery.isError ? (
+						<Alert variant="destructive">
+							<AlertCircle aria-hidden />
+							<AlertTitle>Could not load provider policy</AlertTitle>
+							<AlertDescription>
+								The workspace provider policy could not be loaded. Retry before making changes.
+								<Button
+									variant="outline"
+									size="sm"
+									className="mt-2"
+									onClick={() => aiSettingsQuery.refetch()}
+								>
+									Retry
+								</Button>
+							</AlertDescription>
+						</Alert>
+					) : aiSettingsQuery.isLoading ? (
+						<div className="flex h-32 items-center justify-center">
+							<Spinner className="size-6" />
+						</div>
+					) : (
+						<WorkspaceLlmProviderPanel
+							workspaceSlug={workspaceSlug}
+							workspaceConnectionsAllowed={
+								aiSettingsQuery.data?.workspaceConnectionsAllowed ?? false
+							}
+						/>
+					)}
 				</TabsContent>
 			</Tabs>
 		</div>

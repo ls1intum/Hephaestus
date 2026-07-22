@@ -39,6 +39,8 @@ export interface AdminLlmConnectionsTableProps {
 	connections: LlmConnection[];
 	/** Model count per connection id, computed by the container from the (unscoped) models list. */
 	modelCounts: Record<number, number>;
+	/** False while the model catalog is unavailable; destructive connection actions are blocked. */
+	modelCountsAvailable?: boolean;
 	isLoading: boolean;
 	isError: boolean;
 	error?: unknown;
@@ -67,6 +69,7 @@ const SKELETON_ROWS = ["a", "b", "c"];
 export function AdminLlmConnectionsTable({
 	connections,
 	modelCounts,
+	modelCountsAvailable = true,
 	isLoading,
 	isError,
 	error,
@@ -80,6 +83,7 @@ export function AdminLlmConnectionsTable({
 	onAdd,
 }: AdminLlmConnectionsTableProps) {
 	const [deleting, setDeleting] = useState<LlmConnection | null>(null);
+	const [turningOff, setTurningOff] = useState<LlmConnection | null>(null);
 	const isDeletePending = deleting != null && mutatingId === deleting.id;
 
 	if (isError) {
@@ -162,15 +166,20 @@ export function AdminLlmConnectionsTable({
 										{PROVIDER_PRESET_LABELS[presetForConnection(connection)]}
 									</Badge>
 								</TableCell>
-								<TableCell className="tabular-nums">{modelCounts[connection.id] ?? 0}</TableCell>
+								<TableCell className="tabular-nums">
+									{modelCountsAvailable ? (modelCounts[connection.id] ?? 0) : "—"}
+								</TableCell>
 								<TableCell>
 									<div className="flex items-center gap-2">
 										<Switch
 											checked={connection.enabled}
-											disabled={busy}
+											disabled={busy || (connection.enabled && !modelCountsAvailable)}
 											aria-busy={busy}
 											aria-label={`${connection.enabled ? "Turn off" : "Turn on"} ${connection.displayName}`}
-											onCheckedChange={(checked) => onToggleEnabled(connection, checked)}
+											onCheckedChange={(checked) => {
+												if (checked) onToggleEnabled(connection, true);
+												else setTurningOff(connection);
+											}}
 										/>
 										{busy && <Spinner className="size-3.5 text-muted-foreground" />}
 									</div>
@@ -237,6 +246,32 @@ export function AdminLlmConnectionsTable({
 							onClick={() => deleting && onDelete(deleting)}
 						>
 							{isDeletePending ? "Deleting…" : "Delete"}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
+			<AlertDialog open={turningOff != null} onOpenChange={(open) => !open && setTurningOff(null)}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Turn off “{turningOff?.displayName}”?</AlertDialogTitle>
+						<AlertDialogDescription>
+							This immediately stops requests through all{" "}
+							{turningOff ? (modelCounts[turningOff.id] ?? 0) : 0}
+							models on this connection. Existing practice and mentor configurations that use them
+							will not run until the connection is turned on again or another model is selected.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Keep active</AlertDialogCancel>
+						<AlertDialogAction
+							variant="destructive"
+							onClick={() => {
+								if (turningOff) onToggleEnabled(turningOff, false);
+								setTurningOff(null);
+							}}
+						>
+							Turn off connection
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>

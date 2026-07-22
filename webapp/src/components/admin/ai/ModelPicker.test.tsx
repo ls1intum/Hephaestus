@@ -37,7 +37,7 @@ describe("ModelPicker", () => {
 		fireEvent.click(screen.getByRole("combobox"));
 		expect(screen.getByRole("option", { name: "GPT-5 · Organization endpoint" })).toBeTruthy();
 		expect(screen.getByRole("option", { name: "GPT-5 · Workspace endpoint" })).toBeTruthy();
-		expect(screen.getByText("Organization models")).toBeTruthy();
-		expect(screen.getByText("Your providers")).toBeTruthy();
+		expect(screen.getByText("Shared models")).toBeTruthy();
+		expect(screen.getByText("Workspace models")).toBeTruthy();
 	});
 });

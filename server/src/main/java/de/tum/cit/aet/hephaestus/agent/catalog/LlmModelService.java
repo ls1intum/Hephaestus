@@ -291,9 +291,10 @@ public class LlmModelService {
      */
     @Transactional
     public LlmModel updateSharing(Long modelId, UpdateLlmModelSharingRequestDTO request) {
-        // Eager-fetches connection — same reasoning as update() above.
+        // Serialize replace-all updates so concurrent admins cannot silently overwrite one another's
+        // grant changes or leave stale grants behind after switching to PUBLIC.
         LlmModel model = modelRepository
-            .findByIdWithConnection(modelId)
+            .findByIdForUpdate(modelId)
             .orElseThrow(() -> new EntityNotFoundException("LlmModel", modelId));
 
         List<LlmModelWorkspaceGrant> existing = grantRepository.findByIdModelId(modelId);
@@ -339,7 +340,7 @@ public class LlmModelService {
         LlmModel saved = modelRepository.save(model);
         int workspaceCount =
             request.visibility() == ModelVisibility.GRANTED && request.workspaceIds() != null
-                ? request.workspaceIds().size()
+                ? new LinkedHashSet<>(request.workspaceIds()).size()
                 : 0;
         llmModelAudit.modelSharingChanged(modelId, saved.getVisibility().name(), workspaceCount);
         return saved;

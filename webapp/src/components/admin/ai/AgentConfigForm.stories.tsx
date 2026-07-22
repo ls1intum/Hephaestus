@@ -60,7 +60,7 @@ export const Saving: Story = {
 export const ValidationError: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await userEvent.click(canvas.getByRole("button", { name: /create model/i }));
+		await userEvent.click(canvas.getByRole("button", { name: /create configuration/i }));
 		await expect(canvas.getByText(/name is required/i)).toBeVisible();
 		// Exact text: the trigger's "Select a model…" placeholder would otherwise also match /select a model/i.
 		await expect(canvas.getByText("Select a model.")).toBeVisible();

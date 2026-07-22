@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -260,6 +261,37 @@ class AgentJobServiceTest extends BaseUnitTest {
             assertThat(result).isEmpty();
             verify(agentJobRepository, never()).saveAndFlush(any());
             verify(agentConfigRepository, never()).findByWorkspaceId(anyLong());
+        }
+
+        @Test
+        void shouldSkipRevokedConfigWithoutBlockingHealthyFanOut() {
+            AgentConfig revoked = new AgentConfig();
+            revoked.setId(11L);
+            revoked.setWorkspace(workspace);
+            revoked.setName("revoked");
+            revoked.setEnabled(true);
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(revoked, enabledConfig));
+            when(agentConfigRepository.findByIdAndWorkspaceId(11L, 1L)).thenReturn(Optional.of(revoked));
+            when(llmModelResolver.resolve(revoked)).thenThrow(new IllegalStateException("model unavailable"));
+
+            JobTypeHandler handler = mock(JobTypeHandler.class);
+            when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
+            when(handler.createSubmission(any())).thenReturn(createSubmission());
+            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any())).thenReturn(
+                Optional.empty()
+            );
+            when(agentJobRepository.saveAndFlush(any(AgentJob.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            Optional<AgentJob> result = service.submit(
+                1L,
+                AgentJobType.PULL_REQUEST_REVIEW,
+                mock(JobSubmissionRequest.class)
+            );
+
+            assertThat(result).isPresent();
+            verify(agentJobRepository).saveAndFlush(argThat(job -> job.getConfig().getId().equals(10L)));
+            verify(agentJobRepository, never()).saveAndFlush(argThat(job -> job.getConfig().getId().equals(11L)));
         }
 
         @Test

@@ -2,6 +2,7 @@ import { AlertCircle } from "lucide-react";
 import type {
 	AgentConfig,
 	AiSettingsView,
+	AvailableLlmModel,
 	UpdatePracticeReviewSettings,
 	UpdateWorkspaceFeaturesRequest,
 } from "@/api/types.gen";
@@ -35,6 +36,7 @@ const COVERAGE_ITEMS = [
 export interface PracticeDetectionPolicyCardProps {
 	settings?: AiSettingsView;
 	configs: AgentConfig[];
+	availableModels: AvailableLlmModel[];
 	autoTriggerEnabled: boolean;
 	manualTriggerEnabled: boolean;
 	isLoading: boolean;
@@ -50,6 +52,7 @@ export interface PracticeDetectionPolicyCardProps {
 export function PracticeDetectionPolicyCard({
 	settings,
 	configs,
+	availableModels,
 	autoTriggerEnabled,
 	manualTriggerEnabled,
 	isLoading,
@@ -91,10 +94,33 @@ export function PracticeDetectionPolicyCard({
 	const boundConfig = hasBoundConfig
 		? configs.find((config) => config.id === boundConfigId)
 		: undefined;
-	const boundRuntimePaused = boundConfig?.enabled === false;
+	const isExecutableConfig = (config: AgentConfig) => {
+		if (!config.enabled) return false;
+		const modelId = config.instanceModelId ?? config.workspaceModelId;
+		if (modelId == null) return false;
+		const scope = config.instanceModelId != null ? "SHARED" : "WORKSPACE";
+		return availableModels.some((model) => model.scope === scope && model.id === modelId);
+	};
+	const selectableConfigs = configs.filter(isExecutableConfig);
+	const noExecutableConfigs = selectableConfigs.length === 0;
+	const boundConfigUnavailable =
+		hasBoundConfig && (boundConfig == null || !isExecutableConfig(boundConfig));
 	const runtimeItems = [
-		{ value: FANOUT, label: "All enabled models" },
-		...configs.map((config) => ({ value: String(config.id), label: config.name })),
+		{ value: FANOUT, label: "All available configurations", disabled: noExecutableConfigs },
+		...selectableConfigs.map((config) => ({
+			value: String(config.id),
+			label: config.name,
+			disabled: false,
+		})),
+		...(boundConfigUnavailable
+			? [
+					{
+						value: String(boundConfigId),
+						label: `${boundConfig?.name ?? `Configuration #${boundConfigId}`} (unavailable)`,
+						disabled: true,
+					},
+				]
+			: []),
 	];
 
 	// Each policy knob shows whether its value is an explicit workspace override or inherited — and when
@@ -120,15 +146,25 @@ export function PracticeDetectionPolicyCard({
 		<div className="space-y-6">
 			<Card>
 				<CardHeader>
-					<CardTitle className="text-base">AI model</CardTitle>
+					<CardTitle className="text-base">Practice detection configuration</CardTitle>
 				</CardHeader>
 				<CardContent className="space-y-4">
+					{noExecutableConfigs && (
+						<Alert variant="destructive">
+							<AlertCircle />
+							<AlertTitle>No runnable configuration</AlertTitle>
+							<AlertDescription>
+								Create or repair an enabled configuration with an available model before turning on
+								practice detection.
+							</AlertDescription>
+						</Alert>
+					)}
 					<Field>
-						<FieldLabel htmlFor="practice-runtime">Model</FieldLabel>
+						<FieldLabel htmlFor="practice-runtime">Configuration</FieldLabel>
 						<Select
 							items={runtimeItems}
 							value={hasBoundConfig ? String(boundConfigId) : FANOUT}
-							disabled={isSaving}
+							disabled={isSaving || noExecutableConfigs}
 							onValueChange={(value) => {
 								if (!value) return;
 								onBindConfig(value === FANOUT ? null : Number(value));
@@ -138,26 +174,34 @@ export function PracticeDetectionPolicyCard({
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
-								<SelectItem value={FANOUT}>All enabled models</SelectItem>
-								{configs.map((config) => (
-									<SelectItem key={config.id} value={String(config.id)}>
-										{config.name}
+								{runtimeItems.map((item) => (
+									<SelectItem key={item.value} value={item.value} disabled={item.disabled}>
+										{item.label}
 									</SelectItem>
 								))}
 							</SelectContent>
 						</Select>
 						<FieldDescription>
-							Use one specific model, or run every enabled model in parallel.
+							Use one specific configuration, or run every available configuration in parallel.
 						</FieldDescription>
 					</Field>
 
-					{boundRuntimePaused && (
+					{boundConfigUnavailable && (
 						<Alert variant="destructive">
 							<AlertCircle />
-							<AlertTitle>Selected model is disabled</AlertTitle>
+							<AlertTitle>Selected configuration is unavailable</AlertTitle>
 							<AlertDescription>
-								“{boundConfig?.name}” is turned off — practice reviews won't run until you re-enable
-								it (on the Models page) or pick a different model.
+								The selected configuration cannot run. Choose an available configuration, or clear
+								the binding.
+								<Button
+									variant="outline"
+									size="sm"
+									className="mt-2"
+									disabled={isSaving}
+									onClick={() => onBindConfig(null)}
+								>
+									Clear binding
+								</Button>
 							</AlertDescription>
 						</Alert>
 					)}
@@ -177,7 +221,7 @@ export function PracticeDetectionPolicyCard({
 						<Switch
 							id="trigger-auto"
 							checked={autoTriggerEnabled}
-							disabled={isSaving}
+							disabled={isSaving || (!autoTriggerEnabled && noExecutableConfigs)}
 							onCheckedChange={(checked) =>
 								onUpdateFeatures({ practiceReviewAutoTriggerEnabled: checked })
 							}
@@ -193,7 +237,7 @@ export function PracticeDetectionPolicyCard({
 						<Switch
 							id="trigger-manual"
 							checked={manualTriggerEnabled}
-							disabled={isSaving}
+							disabled={isSaving || (!manualTriggerEnabled && noExecutableConfigs)}
 							onCheckedChange={(checked) =>
 								onUpdateFeatures({ practiceReviewManualTriggerEnabled: checked })
 							}

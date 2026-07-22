@@ -1,3 +1,4 @@
+import { AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
 import type {
 	CreateLlmModelRequest,
@@ -6,6 +7,7 @@ import type {
 	UpdateLlmModelRequest,
 	UpdateLlmModelSharingRequest,
 } from "@/api/types.gen";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -55,9 +57,8 @@ export interface AdminLlmModelFormDialogProps {
 }
 
 /**
- * Create/edit an instance catalog model (#1368): metadata, price, and sharing are three separate
- * server calls (each with its own dedicated endpoint) but one guided form — the container sequences
- * them on save.
+ * Create/edit an instance catalog model (#1368). Creation includes initial access; later access
+ * changes use the dedicated access dialog so their immediate impact cannot be bypassed.
  */
 export function AdminLlmModelFormDialog({
 	open,
@@ -147,11 +148,13 @@ export function AdminLlmModelFormDialog({
 			note: price.pricingMode === "NO_CHARGE" ? price.note?.trim() : undefined,
 		};
 
-		const sharingBody: UpdateLlmModelSharingRequest = shareAll
-			? { visibility: "PUBLIC" }
-			: { visibility: "GRANTED", workspaceIds: sharedWorkspaceIds };
+		const sharingBody: UpdateLlmModelSharingRequest | undefined = isEdit
+			? undefined
+			: shareAll
+				? { visibility: "PUBLIC" }
+				: { visibility: "GRANTED", workspaceIds: sharedWorkspaceIds };
 
-		onSave({ metadata, price: priceBody, sharing: sharingBody });
+		onSave({ metadata, price: priceBody, ...(sharingBody ? { sharing: sharingBody } : {}) });
 	};
 
 	return (
@@ -259,6 +262,17 @@ export function AdminLlmModelFormDialog({
 						/>
 					</Field>
 
+					{editing?.enabled && !enabled && (
+						<Alert variant="warning">
+							<AlertTriangle aria-hidden />
+							<AlertTitle>Existing configurations will stop immediately</AlertTitle>
+							<AlertDescription>
+								Practice detection and Mentor configurations using this model cannot run until the
+								model is reactivated or replaced.
+							</AlertDescription>
+						</Alert>
+					)}
+
 					<PriceModeEditor
 						audience="instance"
 						idPrefix="llm-model-price"
@@ -270,33 +284,43 @@ export function AdminLlmModelFormDialog({
 						errors={errors}
 					/>
 
-					<Field>
-						<FieldLabel htmlFor="llm-model-share-with">Share with</FieldLabel>
-						<Select
-							items={SHARE_WITH_ITEMS}
-							value={shareAll ? "ALL" : "SELECTED"}
-							onValueChange={(v) => {
-								if (v) setShareAll(v === "ALL");
-							}}
-						>
-							<SelectTrigger id="llm-model-share-with" className="w-full">
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="ALL">All workspaces</SelectItem>
-								<SelectItem value="SELECTED">Selected workspaces</SelectItem>
-							</SelectContent>
-						</Select>
-						{!shareAll && (
-							<WorkspaceMultiSelect
-								id="llm-model-share-workspaces"
-								className="mt-2"
-								options={workspaceOptions}
-								selectedIds={sharedWorkspaceIds}
-								onChange={setSharedWorkspaceIds}
-							/>
-						)}
-					</Field>
+					{!isEdit && (
+						<Field>
+							<FieldLabel htmlFor="llm-model-share-with">Initial workspace access</FieldLabel>
+							<Select
+								items={SHARE_WITH_ITEMS}
+								value={shareAll ? "ALL" : "SELECTED"}
+								onValueChange={(v) => {
+									if (v) setShareAll(v === "ALL");
+								}}
+							>
+								<SelectTrigger id="llm-model-share-with" className="w-full">
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="ALL">All workspaces</SelectItem>
+									<SelectItem value="SELECTED">Selected workspaces</SelectItem>
+								</SelectContent>
+							</Select>
+							{!shareAll && (
+								<>
+									<WorkspaceMultiSelect
+										id="llm-model-share-workspaces"
+										className="mt-2"
+										options={workspaceOptions}
+										selectedIds={sharedWorkspaceIds}
+										onChange={setSharedWorkspaceIds}
+									/>
+									{sharedWorkspaceIds.length === 0 && (
+										<FieldDescription>
+											No workspace can use this model yet. This is safe for staging; manage access
+											from the model table when it is ready.
+										</FieldDescription>
+									)}
+								</>
+							)}
+						</Field>
+					)}
 
 					<DialogFooter>
 						<Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

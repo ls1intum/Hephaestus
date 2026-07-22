@@ -1,9 +1,11 @@
+import { AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
 import type {
 	CreateWorkspaceLlmConnectionRequest,
 	UpdateWorkspaceLlmConnectionRequest,
 	WorkspaceLlmConnection,
 } from "@/api/types.gen";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -280,6 +282,16 @@ export function WorkspaceLlmConnectionFormDialog({
 							onCheckedChange={setEnabled}
 						/>
 					</Field>
+					{editing?.enabled && !enabled && (
+						<Alert variant="warning">
+							<AlertTriangle aria-hidden />
+							<AlertTitle>All workspace models will stop immediately</AlertTitle>
+							<AlertDescription>
+								Existing Practice and Mentor configurations using this provider cannot run until the
+								connection is reactivated or another model is selected.
+							</AlertDescription>
+						</Alert>
+					)}
 					<DialogFooter>
 						<Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
 							Cancel

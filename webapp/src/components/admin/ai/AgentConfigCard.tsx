@@ -81,12 +81,12 @@ export function AgentConfigCard({
 					<div className="flex flex-wrap gap-1.5">
 						{(designation === "practice" || designation === "both") && (
 							<Badge variant="secondary" className="text-xs">
-								Model for Practice detection
+								Practice detection
 							</Badge>
 						)}
 						{(designation === "mentor" || designation === "both") && (
 							<Badge variant="secondary" className="text-xs">
-								Model for Mentor
+								Mentor
 							</Badge>
 						)}
 					</div>
@@ -98,8 +98,8 @@ export function AgentConfigCard({
 					<AlertDialogHeader>
 						<AlertDialogTitle>Delete &ldquo;{config.name}&rdquo;?</AlertDialogTitle>
 						<AlertDialogDescription>
-							This permanently removes this model. A model bound to practice detection or the mentor
-							can't be deleted until you unbind it.
+							This permanently removes this agent configuration. A configuration bound to practice
+							detection or the mentor can't be deleted until you unbind it.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
@@ -112,7 +112,7 @@ export function AgentConfigCard({
 								setConfirmOpen(false);
 							}}
 						>
-							{isDeleting ? "Deleting…" : "Delete model"}
+							{isDeleting ? "Deleting…" : "Delete configuration"}
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>

@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
 import { PracticeDetectionPolicyCard } from "./PracticeDetectionPolicyCard";
-import { mockAiSettings, mockConfigs } from "./storyMockData";
+import { mockAiSettings, mockAvailableModels, mockConfigs } from "./storyMockData";
 
 /**
  * Policy editor for practice-detection reviews: runtime binding, automatic/manual
@@ -14,6 +14,7 @@ const meta = {
 	args: {
 		settings: mockAiSettings,
 		configs: mockConfigs,
+		availableModels: mockAvailableModels,
 		autoTriggerEnabled: true,
 		manualTriggerEnabled: true,
 		isLoading: false,
@@ -38,7 +39,7 @@ type Story = StoryObj<typeof meta>;
 /** A specific model is selected; triggers and policy populated. */
 export const RuntimeBound: Story = {};
 
-/** No specific model selected — reviews run on every enabled model (the Select shows "All enabled models"). */
+/** No specific configuration selected — reviews run on every available configuration. */
 export const FanOut: Story = {
 	args: {
 		settings: { ...mockAiSettings, practiceConfigId: undefined },

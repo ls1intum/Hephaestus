@@ -36,9 +36,8 @@ function renderDialog(overrides: Partial<Parameters<typeof AdminLlmConnectionFor
 describe("AdminLlmConnectionFormDialog", () => {
 	it("offers the three OpenAI-compatible create-time presets", () => {
 		renderDialog();
-		const active = screen.getByRole("switch", { name: "Active" }) as HTMLButtonElement;
-		expect(active.getAttribute("aria-checked")).toBe("false");
-		expect(active.hasAttribute("data-disabled")).toBe(true);
+		expect(screen.queryByRole("switch", { name: "Active" })).toBeNull();
+		expect(screen.getByText(/new connections start inactive/i)).toBeTruthy();
 		expect(screen.queryByLabelText("Slug")).toBeNull();
 		fireEvent.click(screen.getByRole("combobox", { name: "Endpoint preset" }));
 		expect(screen.queryByRole("option", { name: "Anthropic" })).toBeNull();
@@ -59,6 +58,37 @@ describe("AdminLlmConnectionFormDialog", () => {
 		expect(onProbe).not.toHaveBeenCalled();
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 		const update = onUpdate.mock.calls[0]?.[1];
-		expect(update).toEqual({ displayName: "Custom endpoint", enabled: true });
+		expect(update).toEqual({ displayName: "Custom endpoint" });
+	});
+
+	it("tests a replacement credential instead of reporting the old saved credential", () => {
+		const onProbe = vi.fn();
+		const onProbeSaved = vi.fn();
+		renderDialog({ editing: connection, onProbe, onProbeSaved });
+		fireEvent.change(screen.getByLabelText("API key"), { target: { value: "replacement-key" } });
+
+		fireEvent.click(screen.getByRole("button", { name: "Test changes" }));
+
+		expect(onProbe).toHaveBeenCalledWith(
+			expect.objectContaining({ apiKey: "replacement-key" }),
+			expect.any(Object),
+		);
+		expect(onProbeSaved).not.toHaveBeenCalled();
+	});
+
+	it("ignores an in-flight probe after its connection inputs change", () => {
+		const onProbe = vi.fn();
+		const onProbed = vi.fn();
+		renderDialog({ onProbe, onProbed });
+		fireEvent.click(screen.getByRole("button", { name: "Test & fetch models" }));
+		const callbacks = onProbe.mock.calls[0]?.[1];
+
+		fireEvent.change(screen.getByLabelText("Base URL"), {
+			target: { value: "https://different.example.test/v1" },
+		});
+		callbacks.onSuccess({ reachable: true, models: ["wrong-endpoint-model"] });
+
+		expect(screen.queryByText("wrong-endpoint-model")).toBeNull();
+		expect(onProbed).not.toHaveBeenCalledWith(["wrong-endpoint-model"]);
 	});
 });

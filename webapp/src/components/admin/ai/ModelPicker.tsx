@@ -36,7 +36,7 @@ function decode(value: string): ModelSelection {
 
 /**
  * Model picker for an agent config binding (#1368) — replaces the old raw provider/base-url/API-key/
- * model-name fields. Groups by funding source: organization models and models billed through the
+ * model-name fields. Groups by funding source: instance-shared models and models billed through the
  * workspace's own provider accounts. Never shows the upstream
  * model id or the owning connection's endpoint, only the display name and price framing.
  */
@@ -76,9 +76,9 @@ export function ModelPicker({
 				{shared.length > 0 && (
 					<SelectGroup>
 						<SelectLabel>
-							Organization models
+							Shared models
 							<span className="block font-normal normal-case text-muted-foreground/80">
-								provided by your organization
+								managed and funded by the instance
 							</span>
 						</SelectLabel>
 						{shared.map((model) => (
@@ -103,7 +103,7 @@ export function ModelPicker({
 				{own.length > 0 && (
 					<SelectGroup>
 						<SelectLabel>
-							Your providers
+							Workspace models
 							<span className="block font-normal normal-case text-muted-foreground/80">
 								billed to the account that owns the credential
 							</span>

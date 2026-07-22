@@ -91,6 +91,10 @@ export function AgentConfigForm({
 	const isEdit = config !== undefined;
 	const needsModelBinding =
 		isEdit && config.instanceModelId == null && config.workspaceModelId == null;
+	const noAvailableModels = availableModels.length === 0;
+	const isSelectionAvailable = (selection: ModelSelection | null) =>
+		selection != null &&
+		availableModels.some((model) => model.scope === selection.scope && model.id === selection.id);
 
 	const [form, setForm] = useState<FormState>(() => initialState(config));
 	const [errors, setErrors] = useState<Record<string, string>>({});
@@ -117,6 +121,8 @@ export function AgentConfigForm({
 		}
 		if (form.selection === null) {
 			next.selection = "Select a model.";
+		} else if (form.enabled && !isSelectionAvailable(form.selection)) {
+			next.selection = "Select an available model, or turn off this configuration.";
 		}
 		if (Object.keys(next).length > 0) {
 			setErrors(next);
@@ -186,6 +192,30 @@ export function AgentConfigForm({
 					</Alert>
 				)}
 
+				{isEdit &&
+					form.enabled &&
+					form.selection !== null &&
+					!isSelectionAvailable(form.selection) && (
+						<Alert variant="destructive">
+							<AlertDescription>
+								<strong className="text-foreground block">Current model is unavailable.</strong>
+								Choose an available model, or turn off this configuration before saving.
+							</AlertDescription>
+						</Alert>
+					)}
+
+				{noAvailableModels && (
+					<Alert>
+						<AlertDescription>
+							<strong className="text-foreground block">
+								No models are available to this workspace.
+							</strong>
+							Ask an instance admin to grant access to a shared model, or use Workspace providers if
+							that option is enabled.
+						</AlertDescription>
+					</Alert>
+				)}
+
 				<Field data-invalid={Boolean(errors.selection)}>
 					<FieldLabel htmlFor="agent-model">
 						Model
@@ -198,7 +228,7 @@ export function AgentConfigForm({
 						availableModels={availableModels}
 						value={form.selection}
 						onChange={(selection) => set("selection", selection)}
-						disabled={isPending}
+						disabled={isPending || noAvailableModels}
 						invalid={Boolean(errors.selection)}
 						aria-describedby={errors.selection ? "agent-model-error" : undefined}
 					/>
@@ -262,7 +292,7 @@ export function AgentConfigForm({
 					<FieldContent>
 						<FieldLabel htmlFor="agent-enabled">Enabled</FieldLabel>
 						<FieldDescription>
-							Disabled models are skipped when running all models.
+							Disabled configurations cannot run or power workspace features.
 						</FieldDescription>
 					</FieldContent>
 					<Switch
@@ -280,7 +310,7 @@ export function AgentConfigForm({
 						Cancel
 					</Button>
 				)}
-				<Button type="submit" disabled={isPending}>
+				<Button type="submit" disabled={isPending || (!isEdit && noAvailableModels)}>
 					{isPending ? (
 						<>
 							<Spinner className="mr-2 h-4 w-4" />
@@ -289,7 +319,7 @@ export function AgentConfigForm({
 					) : isEdit ? (
 						"Save changes"
 					) : (
-						"Create model"
+						"Create configuration"
 					)}
 				</Button>
 			</div>

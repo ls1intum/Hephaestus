@@ -10,6 +10,7 @@ import {
 	updateFeaturesMutation,
 	updatePracticeConfigMutation,
 	updatePracticeReviewSettingsMutation,
+	workspaceListAvailableLlmModelsOptions,
 } from "@/api/@tanstack/react-query.gen";
 import type { UpdatePracticeReviewSettings, UpdateWorkspaceFeaturesRequest } from "@/api/types.gen";
 import {
@@ -34,6 +35,11 @@ function ReviewSettingsContainer() {
 
 	const configsQuery = useQuery({
 		...getConfigsOptions({ path: { workspaceSlug: slug } }),
+		enabled: Boolean(workspaceSlug),
+	});
+
+	const availableModelsQuery = useQuery({
+		...workspaceListAvailableLlmModelsOptions({ path: { workspaceSlug: slug } }),
 		enabled: Boolean(workspaceSlug),
 	});
 
@@ -127,15 +133,22 @@ function ReviewSettingsContainer() {
 			<PracticeDetectionPolicyCard
 				settings={aiSettingsQuery.data}
 				configs={configsQuery.data ?? []}
+				availableModels={availableModelsQuery.data ?? []}
 				autoTriggerEnabled={workspaceQuery.data?.practiceReviewAutoTriggerEnabled ?? true}
 				manualTriggerEnabled={workspaceQuery.data?.practiceReviewManualTriggerEnabled ?? true}
 				isLoading={
 					aiSettingsQuery.isLoading ||
 					configsQuery.isLoading ||
+					availableModelsQuery.isLoading ||
 					workspaceQuery.isLoading ||
 					!workspaceSlug
 				}
-				isError={aiSettingsQuery.isError || configsQuery.isError || workspaceQuery.isError}
+				isError={
+					aiSettingsQuery.isError ||
+					configsQuery.isError ||
+					availableModelsQuery.isError ||
+					workspaceQuery.isError
+				}
 				isSaving={
 					updatePracticeConfig.isPending ||
 					updatePracticeReviewSettings.isPending ||
@@ -148,6 +161,7 @@ function ReviewSettingsContainer() {
 				onRetry={() => {
 					aiSettingsQuery.refetch();
 					configsQuery.refetch();
+					availableModelsQuery.refetch();
 					workspaceQuery.refetch();
 				}}
 			/>

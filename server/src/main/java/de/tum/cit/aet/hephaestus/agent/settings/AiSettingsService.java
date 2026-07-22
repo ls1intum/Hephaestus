@@ -51,7 +51,7 @@ public class AiSettingsService {
     public AiSettingsViewDTO bindPracticeConfig(WorkspaceContext workspaceContext, @Nullable Long configId) {
         Workspace workspace = requireWorkspaceForUpdate(workspaceContext);
         AgentBindingSnapshot before = new AgentBindingSnapshot(workspace.getPracticeConfigId());
-        workspace.setPracticeConfigId(validateConfigId(workspaceContext.id(), configId));
+        workspace.setPracticeConfigId(validateExecutableConfigId(workspaceContext.id(), configId));
         auditBinding(workspaceContext, PRACTICE_CONFIG_BINDING, before, workspace.getPracticeConfigId());
         return toView(workspaceRepository.save(workspace));
     }
@@ -60,7 +60,7 @@ public class AiSettingsService {
     public AiSettingsViewDTO bindMentorConfig(WorkspaceContext workspaceContext, @Nullable Long configId) {
         Workspace workspace = requireWorkspaceForUpdate(workspaceContext);
         AgentBindingSnapshot before = new AgentBindingSnapshot(workspace.getMentorConfigId());
-        workspace.setMentorConfigId(validateMentorConfigId(workspaceContext.id(), configId));
+        workspace.setMentorConfigId(validateExecutableConfigId(workspaceContext.id(), configId));
         auditBinding(workspaceContext, MENTOR_CONFIG_BINDING, before, workspace.getMentorConfigId());
         return toView(workspaceRepository.save(workspace));
     }
@@ -105,22 +105,8 @@ public class AiSettingsService {
         );
     }
 
-    /**
-     * Validate that the config belongs to this workspace (tenancy-safe scoped lookup). Returns the
-     * id unchanged when valid, {@code null} to unbind, or throws 404 for a foreign/missing id.
-     */
-    private @Nullable Long validateConfigId(Long workspaceId, @Nullable Long configId) {
-        if (configId == null) {
-            return null;
-        }
-        agentConfigRepository
-            .findByIdAndWorkspaceId(configId, workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("AgentConfig", configId.toString()));
-        return configId;
-    }
-
-    /** Mentor is interactive and must never silently switch models, so only executable bindings are accepted. */
-    private @Nullable Long validateMentorConfigId(Long workspaceId, @Nullable Long configId) {
+    /** Practice detection and mentor bindings must name an enabled config whose model is usable now. */
+    private @Nullable Long validateExecutableConfigId(Long workspaceId, @Nullable Long configId) {
         if (configId == null) {
             return null;
         }
@@ -128,20 +114,20 @@ public class AiSettingsService {
             .findByIdAndWorkspaceId(configId, workspaceId)
             .orElseThrow(() -> new EntityNotFoundException("AgentConfig", configId.toString()));
         if (!config.isEnabled()) {
-            throw mentorModelUnavailable();
+            throw agentConfigurationUnavailable();
         }
         try {
             if (llmModelResolver.resolve(config) == null) {
-                throw mentorModelUnavailable();
+                throw agentConfigurationUnavailable();
             }
         } catch (IllegalStateException ignored) {
-            throw mentorModelUnavailable();
+            throw agentConfigurationUnavailable();
         }
         return configId;
     }
 
-    private static MentorModelUnavailableException mentorModelUnavailable() {
-        return new MentorModelUnavailableException();
+    private static AgentConfigurationUnavailableException agentConfigurationUnavailable() {
+        return new AgentConfigurationUnavailableException();
     }
 
     private Workspace requireWorkspace(WorkspaceContext workspaceContext) {

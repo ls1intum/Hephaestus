@@ -1801,6 +1801,8 @@ paths:
           description: Binding updated
         "404":
           description: Config not found in this workspace
+        "409":
+          description: Config is disabled or its catalog model is unavailable
       summary: Bind (or unbind) the agent config that powers practice detection
       tags:
       - AI Settings
@@ -9597,8 +9599,8 @@ components:
           - GRANTED
         workspaceIds:
           type: array
-          description: Workspace ids to share with; required and used only when visibility
-            is GRANTED
+          description: Workspace ids to share with when visibility is GRANTED; empty
+            or omitted stages the model without workspace access
           items:
             type: integer
             format: int64

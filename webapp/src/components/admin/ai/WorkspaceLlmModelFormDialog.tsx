@@ -1,3 +1,4 @@
+import { AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
 import type {
 	CreateWorkspaceLlmModelRequest,
@@ -5,6 +6,7 @@ import type {
 	WorkspaceLlmModel,
 } from "@/api/types.gen";
 import { PriceModeEditor, type PriceModeValue } from "@/components/admin/llm/PriceModeEditor";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -222,6 +224,17 @@ export function WorkspaceLlmModelFormDialog({
 							onCheckedChange={setEnabled}
 						/>
 					</Field>
+
+					{editing?.enabled && !enabled && (
+						<Alert variant="warning">
+							<AlertTriangle aria-hidden />
+							<AlertTitle>Existing configurations will stop immediately</AlertTitle>
+							<AlertDescription>
+								Practice detection and Mentor configurations using this model cannot run until the
+								model is reactivated or replaced.
+							</AlertDescription>
+						</Alert>
+					)}
 
 					<PriceModeEditor
 						audience="workspace"

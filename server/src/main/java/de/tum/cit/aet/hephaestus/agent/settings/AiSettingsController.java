@@ -60,6 +60,11 @@ public class AiSettingsController {
         description = "Config not found in this workspace",
         content = @Content(schema = @Schema(hidden = true))
     )
+    @ApiResponse(
+        responseCode = "409",
+        description = "Config is disabled or its catalog model is unavailable",
+        content = @Content(schema = @Schema(hidden = true))
+    )
     @RequireAtLeastWorkspaceAdmin
     @Audited("AI_CONFIG_BINDING")
     public ResponseEntity<AiSettingsViewDTO> updatePracticeConfig(

@@ -63,6 +63,7 @@ describe("WorkspaceLlmConnectionFormDialog", () => {
 	it("lets a workspace admin deactivate a connection and remove its stored key", () => {
 		const onUpdate = renderDialog();
 		fireEvent.click(screen.getByRole("switch", { name: "Active" }));
+		expect(screen.getByText("All workspace models will stop immediately")).toBeTruthy();
 		fireEvent.click(screen.getByRole("checkbox", { name: /remove stored api key/i }));
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 		expect(onUpdate).toHaveBeenCalledWith(

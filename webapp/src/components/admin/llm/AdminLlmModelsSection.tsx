@@ -1,4 +1,4 @@
-import { Bot, Pencil, Plus, Trash2 } from "lucide-react";
+import { Bot, Pencil, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { LlmModel } from "@/api/types.gen";
 import {
@@ -30,30 +30,52 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { priceFieldsOf, priceLabel } from "@/lib/llmPricing";
+import type { WorkspaceMultiSelectOption } from "./WorkspaceMultiSelect";
 
 export interface AdminLlmModelsSectionProps {
 	connectionDisplayName: string;
+	connectionEnabled: boolean;
+	workspaceOptions: WorkspaceMultiSelectOption[];
 	models: LlmModel[];
 	mutatingId: number | null;
 	onAdd: () => void;
 	onEdit: (model: LlmModel) => void;
+	onManageAccess: (model: LlmModel) => void;
 	onDelete: (model: LlmModel) => void;
 }
 
-function shareLabel(model: LlmModel): string {
-	if (model.visibility === "PUBLIC") return "All workspaces";
-	return model.grantedWorkspaceIds.length === 1
-		? "1 workspace"
-		: `${model.grantedWorkspaceIds.length} workspaces`;
+function readinessLabel(model: LlmModel, connectionEnabled: boolean): string {
+	if (!model.currentPrice || model.currentPrice.pricingMode === "UNPRICED") return "Price missing";
+	if (!connectionEnabled) return "Connection off";
+	if (!model.enabled) return "Model off";
+	if (model.visibility === "GRANTED" && model.grantedWorkspaceIds.length === 0) {
+		return "No workspace access";
+	}
+	return "Ready";
 }
 
-/** Models under one instance connection (#1368) — the "Share with" column never says "grant"/"public". */
+function shareLabel(model: LlmModel, workspaces: WorkspaceMultiSelectOption[]): string {
+	if (model.visibility === "PUBLIC") return "All workspaces";
+	if (model.grantedWorkspaceIds.length === 0) return "No workspaces";
+	const firstName = workspaces.find(
+		(workspace) => workspace.id === model.grantedWorkspaceIds[0],
+	)?.displayName;
+	if (!firstName) return `${model.grantedWorkspaceIds.length} workspaces`;
+	return model.grantedWorkspaceIds.length === 1
+		? firstName
+		: `${firstName} + ${model.grantedWorkspaceIds.length - 1} more`;
+}
+
+/** Models under one instance connection (#1368), including an explicit workspace-access action. */
 export function AdminLlmModelsSection({
 	connectionDisplayName,
+	connectionEnabled,
+	workspaceOptions,
 	models,
 	mutatingId,
 	onAdd,
 	onEdit,
+	onManageAccess,
 	onDelete,
 }: AdminLlmModelsSectionProps) {
 	const [deleting, setDeleting] = useState<LlmModel | null>(null);
@@ -91,26 +113,36 @@ export function AdminLlmModelsSection({
 						<TableRow>
 							<TableHead>Model</TableHead>
 							<TableHead>Price</TableHead>
-							<TableHead>Share with</TableHead>
-							<TableHead>Active</TableHead>
+							<TableHead>Workspace access</TableHead>
+							<TableHead>Status</TableHead>
 							<TableHead className="text-right">Actions</TableHead>
 						</TableRow>
 					</TableHeader>
 					<TableBody>
 						{models.map((model) => {
 							const busy = mutatingId === model.id;
+							const status = readinessLabel(model, connectionEnabled);
 							return (
 								<TableRow key={model.id}>
 									<TableCell className="font-medium">{model.displayName}</TableCell>
 									<TableCell>{priceLabel(priceFieldsOf(model), "instance")}</TableCell>
-									<TableCell>{shareLabel(model)}</TableCell>
+									<TableCell>{shareLabel(model, workspaceOptions)}</TableCell>
 									<TableCell>
-										<Badge variant={model.enabled ? "default" : "secondary"}>
-											{model.enabled ? "Active" : "Off"}
-										</Badge>
+										<Badge variant={status === "Ready" ? "default" : "secondary"}>{status}</Badge>
 									</TableCell>
 									<TableCell className="text-right">
 										<div className="flex justify-end gap-1">
+											<Button
+												type="button"
+												variant="outline"
+												size="sm"
+												aria-label={`Manage access for ${model.displayName}`}
+												disabled={busy}
+												onClick={() => onManageAccess(model)}
+											>
+												<ShieldCheck className="size-4" aria-hidden />
+												Access
+											</Button>
 											<Button
 												type="button"
 												variant="ghost"

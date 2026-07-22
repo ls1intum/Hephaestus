@@ -76,7 +76,7 @@ public class AgentConfigService {
             config.setAllowInternet(request.allowInternet());
         }
         applyModelBinding(config, workspaceContext, request.instanceModelId(), request.workspaceModelId());
-        requireBindingWhenEnabled(config);
+        requireAvailableBindingWhenEnabled(config, workspaceId);
 
         AgentConfig saved;
         try {
@@ -130,7 +130,7 @@ public class AgentConfigService {
             config.setAllowInternet(request.allowInternet());
         }
         applyModelBinding(config, workspaceContext, request.instanceModelId(), request.workspaceModelId());
-        requireBindingWhenEnabled(config);
+        requireAvailableBindingWhenEnabled(config, workspaceContext.id());
 
         AgentConfig saved = agentConfigRepository.save(config);
         configAudit.record(
@@ -145,11 +145,26 @@ public class AgentConfigService {
         return saved;
     }
 
-    private static void requireBindingWhenEnabled(AgentConfig config) {
+    private void requireAvailableBindingWhenEnabled(AgentConfig config, Long workspaceId) {
+        if (!config.isEnabled()) return;
         if (config.isEnabled() && (config.getInstanceModel() == null) == (config.getWorkspaceModel() == null)) {
             throw new IllegalArgumentException(
                 "An enabled agent config must bind exactly one available catalog model."
             );
+        }
+        LlmModel instanceModel = config.getInstanceModel();
+        if (instanceModel != null) {
+            boolean visible =
+                instanceModel.getVisibility() == ModelVisibility.PUBLIC ||
+                llmModelWorkspaceGrantRepository.existsByIdModelIdAndIdWorkspaceId(instanceModel.getId(), workspaceId);
+            if (!instanceModel.isEnabled() || !instanceModel.getConnection().isEnabled() || !visible) {
+                throw new IllegalArgumentException("This model isn't available to this workspace.");
+            }
+            return;
+        }
+        WorkspaceLlmModel workspaceModel = config.getWorkspaceModel();
+        if (!workspaceModel.isEnabled() || !workspaceModel.getConnection().isEnabled()) {
+            throw new IllegalArgumentException("This model isn't available to this workspace.");
         }
     }
 
@@ -195,9 +210,8 @@ public class AgentConfigService {
      * {@code workspaceModelId} may be set (both non-null is a 400), and either clears the other side of
      * the pair. Leaving both ids null is a no-op and preserves the current binding.
      *
-     * <p>Bind-time validation only runs on the id actually supplied in this call, never on whatever the
-     * config already carries — re-validating an untouched binding on every unrelated field update would
-     * turn a later model/connection disable into a landmine for every config that happens to reference it.
+     * <p>An enabled config is also revalidated after every update. A revoked binding may still be saved
+     * when the same update disables the config, but it cannot remain silently enabled.
      */
     private void applyModelBinding(
         AgentConfig config,

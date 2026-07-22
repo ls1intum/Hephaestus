@@ -578,5 +578,36 @@ class AgentConfigServiceTest extends BaseUnitTest {
             assertThat(result.getInstanceModel().getId()).isEqualTo(5L);
             verify(llmModelRepository, never()).findById(any());
         }
+
+        @Test
+        void enabledConfigCannotKeepARevokedBindingDuringAnUnrelatedUpdate() {
+            AgentConfig existing = existingConfig();
+            existing.setEnabled(true);
+            existing.setInstanceModel(instanceModel(5L, ModelVisibility.GRANTED, true, true));
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
+            when(llmModelWorkspaceGrantRepository.existsByIdModelIdAndIdWorkspaceId(5L, 1L)).thenReturn(false);
+
+            var request = UpdateAgentConfigRequestDTO.builder().timeoutSeconds(900).build();
+
+            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("isn't available");
+            verify(agentConfigRepository, never()).save(any());
+        }
+
+        @Test
+        void revokedBindingCanBeSavedWhenTheSameUpdateDisablesTheConfig() {
+            AgentConfig existing = existingConfig();
+            existing.setEnabled(true);
+            existing.setInstanceModel(instanceModel(5L, ModelVisibility.GRANTED, true, true));
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
+            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            var request = UpdateAgentConfigRequestDTO.builder().enabled(false).build();
+            AgentConfig result = agentConfigService.updateConfig(workspaceContext, 10L, request);
+
+            assertThat(result.isEnabled()).isFalse();
+            verify(agentConfigRepository).save(existing);
+        }
     }
 }

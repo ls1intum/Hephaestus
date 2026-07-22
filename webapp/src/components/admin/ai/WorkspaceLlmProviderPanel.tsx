@@ -198,6 +198,22 @@ export function WorkspaceLlmProviderPanel({
 			</div>
 		);
 	}
+	if (connections.length > 0 && modelsQuery.isError) {
+		return (
+			<QueryErrorAlert
+				error={modelsQuery.error}
+				title="Could not load your provider models"
+				onRetry={() => modelsQuery.refetch()}
+			/>
+		);
+	}
+	if (connections.length > 0 && modelsQuery.isLoading) {
+		return (
+			<div className="flex h-32 items-center justify-center">
+				<Spinner className="size-6" />
+			</div>
+		);
+	}
 
 	const openCreateConnection = () => {
 		setEditingConnection(null);
