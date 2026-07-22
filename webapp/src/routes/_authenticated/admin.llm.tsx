@@ -375,7 +375,9 @@ function AdminLlmPage() {
 				editing={editingModel}
 				workspaceOptions={workspaceOptions}
 				probedModelIds={
-					probedModels?.connectionId === selectedConnection?.id ? probedModels.models : []
+					probedModels && selectedConnection && probedModels.connectionId === selectedConnection.id
+						? probedModels.models
+						: []
 				}
 				isSubmitting={isModelSaving}
 				onSave={handleSaveModel}
