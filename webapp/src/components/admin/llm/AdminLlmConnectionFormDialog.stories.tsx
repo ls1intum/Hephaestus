@@ -57,13 +57,13 @@ export const DiscoveryUnsupported: Story = {
 		await userEvent.type(await screen.findByLabelText("Base URL"), "https://example.com");
 		await userEvent.click(screen.getByRole("button", { name: /test & fetch models/i }));
 		await expect(await screen.findByText(/discovery unsupported/i)).toBeInTheDocument();
-		await expect(screen.getByRole("button", { name: /add connection/i })).toBeEnabled();
+		await expect(screen.getByRole("button", { name: /save inactive connection/i })).toBeEnabled();
 	},
 };
 
 export const ValidationError: Story = {
 	play: async () => {
-		await userEvent.click(await screen.findByRole("button", { name: /add connection/i }));
+		await userEvent.click(await screen.findByRole("button", { name: /save inactive connection/i }));
 		await expect(await screen.findByText(/display name is required/i)).toBeInTheDocument();
 	},
 };

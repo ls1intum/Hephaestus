@@ -53,7 +53,7 @@ export const ValidationError: Story = {
 	play: async () => {
 		// Dialog renders in a portal → query the document. `toBeInTheDocument` (not `toBeVisible`):
 		// the popup's enter transition can still be animating opacity when this assertion runs.
-		await userEvent.click(await screen.findByRole("button", { name: /add model/i }));
+		await userEvent.click(await screen.findByRole("button", { name: /add inactive model/i }));
 		await expect(await screen.findByText(/display name is required/i)).toBeInTheDocument();
 		await expect(await screen.findByText(/upstream model id is required/i)).toBeInTheDocument();
 	},
