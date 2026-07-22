@@ -41,10 +41,8 @@ class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceI
             "My Provider",
             "https://api.openai.com",
             "openai-completions",
-            null,
-            null,
+            LlmAuthMode.BEARER,
             "sk-workspace-secret-9999",
-            null,
             true
         );
         return webTestClient
@@ -93,17 +91,7 @@ class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceI
             .jsonPath("$.length()")
             .isEqualTo(1);
 
-        var updateRequest = new UpdateWorkspaceLlmConnectionRequestDTO(
-            "Renamed",
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null
-        );
+        var updateRequest = new UpdateWorkspaceLlmConnectionRequestDTO("Renamed", null, null, null);
         webTestClient
             .patch()
             .uri("/workspaces/{slug}/llm/connections/{id}", workspace.getWorkspaceSlug(), created.id())
@@ -150,10 +138,8 @@ class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceI
                     "Redact Me",
                     "https://api.openai.com",
                     "openai-completions",
-                    null,
-                    null,
+                    LlmAuthMode.BEARER,
                     "sk-super-secret-workspace-value",
-                    null,
                     true
                 )
             )
@@ -271,9 +257,7 @@ class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceI
             "Gated Out",
             "https://api.openai.com",
             "openai-completions",
-            null,
-            null,
-            null,
+            LlmAuthMode.BEARER,
             null,
             true
         );

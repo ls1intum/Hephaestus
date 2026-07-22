@@ -243,6 +243,15 @@ public class AgentJob {
     @Column(name = "started_at")
     private Instant startedAt;
 
+    /**
+     * Fenced boundary after preparation and immediately before sandbox/provider execution. A claimed
+     * RUNNING job may spend significant time fetching repository context before any billable work is
+     * possible; cancellation and recovery paths use this marker instead of {@link #workerId} to avoid
+     * recording that preparation time as unverifiable LLM usage.
+     */
+    @Column(name = "execution_started_at")
+    private Instant executionStartedAt;
+
     @Column(name = "completed_at")
     private Instant completedAt;
 

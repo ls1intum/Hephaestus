@@ -27,9 +27,9 @@ type Story = StoryObj<typeof meta>;
 /** Instance admin: priced model, shows the per-1M rate inputs. */
 export const InstancePriced: Story = {};
 
-/** Instance admin: free — "Free", with the required note field. */
-export const InstanceFree: Story = {
-	args: { value: { pricingMode: "FREE", note: "self-hosted, no cost" } },
+/** Instance admin: an intentional no-charge declaration, with the required note field. */
+export const InstanceNoCharge: Story = {
+	args: { value: { pricingMode: "NO_CHARGE", note: "self-hosted, no cost" } },
 };
 
 /** Instance admin: no price set yet. */
@@ -37,10 +37,12 @@ export const InstanceUnpriced: Story = {
 	args: { value: { pricingMode: "UNPRICED" } },
 };
 
-/** Workspace admin sees "No budget cost" instead of "Free" — every shared model would otherwise
- * read as free to a workspace. */
-export const WorkspaceFree: Story = {
-	args: { audience: "workspace", value: { pricingMode: "FREE", note: "self-hosted, no cost" } },
+/** Workspace admin: the provider has no metered API rate. */
+export const WorkspaceNoCharge: Story = {
+	args: {
+		audience: "workspace",
+		value: { pricingMode: "NO_CHARGE", note: "self-hosted, no cost" },
+	},
 };
 
 export const WorkspaceUnpriced: Story = {

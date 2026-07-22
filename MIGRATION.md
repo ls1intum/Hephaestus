@@ -59,25 +59,30 @@ Entries exist only for releases that need operator action. Everything else is in
 
 #### 🔴 LLM provider configuration moved from env vars to the admin console
 
-**Affected**: any deployment setting `HEPHAESTUS_WORKER_LLM_BASE_URL`, `HEPHAESTUS_WORKER_LLM_API_KEY`, or `HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED`.
+**Affected**: any deployment setting `HEPHAESTUS_WORKER_LLM_BASE_URL`, `HEPHAESTUS_WORKER_LLM_API_KEY`, `HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED`, or an `AGENT_DEFAULT_CONFIG_*` variable.
 
 **Before**: the worker pod's LLM upstream/key were passed through env vars (`HEPHAESTUS_WORKER_LLM_BASE_URL` / `HEPHAESTUS_WORKER_LLM_API_KEY`), and the LLM proxy could be toggled per pod with `HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED` (`hephaestus.sandbox.llm-proxy.enabled`).
 
-**After**: LLM providers (Anthropic, OpenAI, Azure OpenAI, and self-hosted OpenAI-compatible gateways) are registered at runtime under **Instance admin → AI models**, with per-model pricing and optional sharing with workspaces. Workspaces can also connect their own provider ("bring your own AI provider"). The LLM proxy — the only path a sandbox has to a provider key — now runs automatically wherever agent jobs execute; it has no standalone enable flag. The three env vars above are no longer read.
+**After**: OpenAI and other OpenAI-compatible endpoints are registered at runtime under **Instance admin → AI models**, with an explicit Chat Completions or Responses API contract, per-model pricing, and optional sharing with workspaces. Workspaces can also connect their own compatible endpoint. The LLM proxy — the only path a sandbox has to a provider key — now runs automatically wherever agent jobs execute; it has no standalone enable flag. The three env vars above are no longer read.
 
 **Migration**:
 
-1. Remove `HEPHAESTUS_WORKER_LLM_BASE_URL`, `HEPHAESTUS_WORKER_LLM_API_KEY`, and `HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED` from your deployment — they are silently ignored, not an error, but keeping them is misleading.
-2. Register your provider(s) under Instance admin → AI models (or have a workspace admin connect their own under the workspace's AI settings).
-3. Existing per-workspace agent configs keep working unchanged — no migration runs against them, and no immediate action is needed. At runtime, any config not yet bound to a catalog model resolves through an automatic legacy fallback using its existing provider/base URL/key. Rebind them to a catalog-bound model when convenient; the legacy fields will be removed in a future release following the usual deprecate-then-remove cycle.
+1. Remove `HEPHAESTUS_WORKER_LLM_BASE_URL`, `HEPHAESTUS_WORKER_LLM_API_KEY`,
+   `HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED`, and every `AGENT_DEFAULT_CONFIG_*` variable from your
+   deployment. They are silently ignored, not an error, but keeping them is misleading.
+2. Register your OpenAI-compatible endpoint(s) under Instance admin → AI models (or have a workspace admin connect their own under the workspace's AI settings).
+3. Rebind each legacy agent configuration to a catalog model through the admin console, then
+   re-enable it. The migration deliberately disables every enabled configuration without exactly one
+   catalog binding; it never guesses which connection, credential owner, model, or price an old row
+   should use.
 
 #### 🔴 Agent job queue moved from NATS to PostgreSQL
 
 **Affected**: any deployment setting `AGENT_NATS_ENABLED`, `HEPHAESTUS_AGENT_NATS_SERVER`, `AGENT_NATS_MAX_ACK_PENDING`, or `AGENT_NATS_FETCH_BATCH_SIZE`.
 
-**Before**: the agent job queue (practice review, mentor-triggered work) was delivered over a NATS JetStream stream (`AGENT`); a worker pulled a job id off the stream, then loaded the job from PostgreSQL to execute it.
+**Before**: the practice-review agent job queue was delivered over a NATS JetStream stream (`AGENT`); a worker pulled a job id off the stream, then loaded the job from PostgreSQL to execute it. Interactive mentor turns were and remain request-affine; they do not use `agent_job`.
 
-**After**: workers poll `agent_job` directly and claim a batch with `FOR UPDATE SKIP LOCKED` — PostgreSQL, already the source of truth for job state, is now also the delivery mechanism. `AGENT_NATS_ENABLED` is replaced by `AGENT_ENABLED` (default `false`). New optional tuning: `AGENT_POLL_INTERVAL` (default `1s`), `AGENT_CLAIM_BATCH_SIZE` (default `5`), `AGENT_MAX_RETRIES` (default `5`). NATS itself is unaffected everywhere else — it remains required for webhook ingest and SCM/Slack sync. See [ADR 0025](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0025-agent-job-queue-on-postgresql.md).
+**After**: workers poll `agent_job` directly and claim a batch with `FOR UPDATE SKIP LOCKED` — PostgreSQL, already the source of truth for job state, is now also the delivery mechanism. `AGENT_NATS_ENABLED` is replaced by `AGENT_ENABLED` (default `false`). New optional tuning: `AGENT_POLL_INTERVAL` (default `1s`), `AGENT_CLAIM_BATCH_SIZE` (default `5`), `AGENT_MAX_RETRIES` (default `5`), `AGENT_PAYLOAD_RETENTION` (default `14d`), and `AGENT_ROW_RETENTION` (default `90d`). NATS itself is unaffected everywhere else — it remains required for webhook ingest and SCM/Slack sync. See [ADR 0025](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0025-agent-job-queue-on-postgresql.md).
 
 **Migration**:
 

@@ -70,7 +70,8 @@ public class GitDiffOperations {
     /**
      * Resolve {@code [baseSha, headSha]} for a PR/MR diff. Tries, in order:
      * <ol>
-     *   <li>origin/source matches {@code headSha} → {@code [origin/target, origin/source]}.</li>
+     *   <li>Resolve the target and pinned head, then prefer their merge-base so target-only
+     *       changes never appear as phantom review changes.</li>
      *   <li>A merge commit reachable from origin/target has {@code headSha} as its second parent
      *       → {@code [firstParent, headSha]}. Handles squash-and-merge / post-merge force-push.</li>
      *   <li>Merge-base of origin/target and {@code headSha}, accepted only when it differs from

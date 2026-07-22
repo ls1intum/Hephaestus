@@ -1,7 +1,4 @@
-import type { AgentConfig, AiSettingsView } from "@/api/types.gen";
-
-// types.gen exposes this union only inline, so re-derive it here.
-export type LlmProvider = AgentConfig["llmProvider"];
+import type { AiSettingsView } from "@/api/types.gen";
 
 /** How a config is wired into a workspace's AI features. */
 export type ConfigDesignation = "practice" | "mentor" | "both";
@@ -31,9 +28,3 @@ export function deriveDesignations(
 	}
 	return map;
 }
-
-export const LLM_PROVIDER_LABELS: Record<LlmProvider, string> = {
-	ANTHROPIC: "Anthropic",
-	OPENAI: "OpenAI",
-	AZURE_OPENAI: "Azure OpenAI",
-};

@@ -115,6 +115,7 @@ class AgentJobServiceTest extends BaseUnitTest {
         enabledConfig.setEnabled(true);
         enabledConfig.setLlmProvider(LlmProvider.ANTHROPIC);
         enabledConfig.setTimeoutSeconds(600);
+        lenient().when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(enabledConfig));
 
         // Default resolver stub — submitForConfig freezes ConfigSnapshot.from(config, resolver) for
         // every enabled config in the fan-out; individual tests override where the resolved shape
@@ -125,14 +126,10 @@ class AgentJobServiceTest extends BaseUnitTest {
                 new ResolvedLlmModel(
                     "https://api.anthropic.com",
                     "anthropic-messages",
-                    "x-api-key",
-                    "",
-                    null,
                     "claude-sonnet-4",
                     null,
                     null,
                     false,
-                    null,
                     FundingSource.INSTANCE
                 )
             );

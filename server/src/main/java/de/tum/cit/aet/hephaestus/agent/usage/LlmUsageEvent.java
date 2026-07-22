@@ -11,6 +11,7 @@ import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -34,14 +35,17 @@ import org.jspecify.annotations.Nullable;
  * monthly budget cap. Never update rows — the ledger is append-only.
  *
  * <p>{@code sourceId} is a soft reference (no FK) to the originating {@code agent_job.id} or
- * {@code chat_message.id}: accounting must survive source-row deletion. It carries a unique
- * constraint so a source can never be double-billed. Workspace deletion cascades — a purged
- * tenant leaves no ledger residue.
+ * {@code chat_message.id}: accounting must survive source-row deletion. Source kind, id, and attempt
+ * form the idempotency key, so retries are billed once each without collapsing distinct provider calls.
  */
 @Entity
 @Table(
     name = "llm_usage_event",
-    indexes = { @Index(name = "idx_llm_usage_ws_time", columnList = "workspace_id, occurred_at") }
+    indexes = { @Index(name = "idx_llm_usage_ws_time", columnList = "workspace_id, occurred_at") },
+    uniqueConstraints = @UniqueConstraint(
+        name = "ux_llm_usage_event_source_attempt",
+        columnNames = { "source_type", "source_id", "source_attempt" }
+    )
 )
 @Getter
 @Setter
@@ -71,10 +75,19 @@ public class LlmUsageEvent {
     @Column(name = "job_type", nullable = false, length = 40)
     private LlmUsageJobType jobType;
 
-    /** Soft unique ref to the originating agent_job.id / chat_message.id (see class doc). */
+    /** Soft ref to the originating agent_job.id / chat_message.id (see class doc). */
     @NonNull
-    @Column(name = "source_id", nullable = false, unique = true, updatable = false)
+    @Column(name = "source_id", nullable = false, updatable = false)
     private UUID sourceId;
+
+    @NonNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "source_type", nullable = false, length = 20, updatable = false)
+    private LlmUsageSourceType sourceType;
+
+    @ColumnDefault("0")
+    @Column(name = "source_attempt", nullable = false, updatable = false)
+    private int sourceAttempt;
 
     @Nullable
     @Column(name = "model", length = 128)
@@ -157,7 +170,7 @@ public class LlmUsageEvent {
      * {@code appliedWorkspaceModelId} alone are live soft refs — if the referenced row is later
      * repriced or deleted, its CURRENT rates no longer describe what a HISTORICAL event was actually
      * charged. These five columns make every dollar falsifiable independent of the catalog's present
-     * state. Set on every PRICED event (both instance and BYO paths); left null for FREE (rate is
+     * state. Set on every PRICED event (both instance and BYO paths); left null for NO_CHARGE (rate is
      * moot — cost is definitionally $0) and UNPRICED (no rate was ever resolved).
      */
     @Nullable
@@ -175,8 +188,4 @@ public class LlmUsageEvent {
     @Nullable
     @Column(name = "applied_per_1m_cache_write_usd", precision = 18, scale = 8)
     private BigDecimal appliedPer1mCacheWriteUsd;
-
-    @Nullable
-    @Column(name = "applied_per_1m_reasoning_usd", precision = 18, scale = 8)
-    private BigDecimal appliedPer1mReasoningUsd;
 }

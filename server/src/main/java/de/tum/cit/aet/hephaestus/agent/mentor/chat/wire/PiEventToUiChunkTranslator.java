@@ -103,8 +103,11 @@ public class PiEventToUiChunkTranslator {
         // UIMessageChunks; the turn-level Finish chunk on agent_end carries the metadata to the
         // client. Capturing `stopReason` here is the authoritative source — agent_end's walk
         // through messages[] is a fallback for runners that omit message_end.
-        capturePartialUsage(event.path("message"), state);
-        String stopReason = optionalString(event.path("message"), "stopReason");
+        JsonNode message = event.path("message");
+        if (!"assistant".equals(optionalString(message, "role"))) return List.of();
+        captureModel(message, state);
+        state.completeUsage(message.path("usage"));
+        String stopReason = optionalString(message, "stopReason");
         if (stopReason != null) {
             state.observeStopReason(stopReason);
         }
@@ -219,12 +222,16 @@ public class PiEventToUiChunkTranslator {
         if (messageNode == null || messageNode.isMissingNode() || !messageNode.isObject()) {
             return;
         }
-        if (messageNode.has("model") && messageNode.get("model").isString()) {
-            state.observeModel(messageNode.get("model").asString());
-        }
+        captureModel(messageNode, state);
         JsonNode usage = messageNode.path("usage");
         if (usage.isObject()) {
             state.observeUsage(usage);
+        }
+    }
+
+    private static void captureModel(JsonNode messageNode, TranslatorState state) {
+        if (messageNode.has("model") && messageNode.get("model").isString()) {
+            state.observeModel(messageNode.get("model").asString());
         }
     }
 
@@ -283,17 +290,19 @@ public class PiEventToUiChunkTranslator {
         // stopReason (e.g. a stub runner or a Pi build that emits only message_end), fall back
         // to the authoritative value captured on `message_end.message.stopReason` via state.
         String piStopReason = null;
+        List<JsonNode> finalUsages = new ArrayList<>();
         if (event.path("messages").isArray()) {
             for (JsonNode msg : event.get("messages")) {
                 if (msg != null && msg.isObject() && "assistant".equals(optionalString(msg, "role"))) {
-                    if (!state.hasObservedUsage()) {
-                        capturePartialUsage(msg, state);
-                    }
+                    captureModel(msg, state);
+                    JsonNode usage = msg.path("usage");
+                    if (usage.isObject() && !usage.isEmpty()) finalUsages.add(usage);
                     String reason = optionalString(msg, "stopReason");
                     if (reason != null) piStopReason = reason; // last assistant wins
                 }
             }
         }
+        state.replaceCompletedUsage(finalUsages);
         if (piStopReason == null) {
             piStopReason = state.observedStopReason();
         }

@@ -1770,6 +1770,8 @@ paths:
           description: Binding updated
         "404":
           description: Config not found in this workspace
+        "409":
+          description: Config is disabled or its catalog model is unavailable
       summary: Bind (or unbind) the agent config that powers the mentor
       tags:
       - AI Settings
@@ -5486,9 +5488,6 @@ components:
         enabled:
           type: boolean
           description: Whether the agent is enabled
-        hasLlmApiKey:
-          type: boolean
-          description: Whether an LLM API key is configured
         id:
           type: integer
           format: int64
@@ -5497,24 +5496,10 @@ components:
           type: integer
           format: int64
           description: "Bound shared (instance catalog) model id, if bound to one"
-        llmBaseUrl:
-          type: string
-          description: Optional LLM base URL override
-        llmProvider:
-          type: string
-          description: LLM provider
-          enum:
-          - ANTHROPIC
-          - OPENAI
-          - AZURE_OPENAI
         maxConcurrentJobs:
           type: integer
           format: int32
           description: Maximum concurrent jobs
-        modelName:
-          type: string
-          description: LLM model name
-          example: gpt-5.4-mini
         name:
           type: string
           description: Unique name within the workspace
@@ -5534,9 +5519,7 @@ components:
       - allowInternet
       - createdAt
       - enabled
-      - hasLlmApiKey
       - id
-      - llmProvider
       - maxConcurrentJobs
       - name
       - timeoutSeconds
@@ -5557,9 +5540,9 @@ components:
           description: Name of the agent config that ran this job (from the frozen
             snapshot)
         configSnapshot:
-          description: Frozen agent config at submit time (an INSTANCE-scoped or legacy
-            connection's baseUrl is redacted to scheme://host; only a WORKSPACE-scoped
-            BYO connection's baseUrl is left intact)
+          description: Frozen agent config at submit time (an INSTANCE-scoped connection's
+            baseUrl is redacted to scheme://host; only a WORKSPACE-scoped BYO connection's
+            baseUrl is left intact)
         containerId:
           type: string
           description: Docker container ID
@@ -5612,7 +5595,7 @@ components:
             \ catalog-derived per-job cost."
         llmModel:
           type: string
-          description: "LLM model used (e.g. gpt-5.4-mini, claude-sonnet-4-5)"
+          description: "LLM model used (e.g. gpt-5.4-mini, openai/gpt-oss-120b)"
         llmModelVersion:
           type: string
           description: Model version/snapshot date (e.g. 2026-03-17)
@@ -5683,7 +5666,8 @@ components:
         mentorConfigId:
           type: integer
           format: int64
-          description: Config bound to power the mentor (null = oldest enabled config)
+          description: Config explicitly bound to power the mentor (null = mentor
+            is unconfigured)
         mentorEnabled:
           type: boolean
           description: Whether the mentor feature is enabled for this workspace
@@ -5707,6 +5691,10 @@ components:
         skipDraftsOverride:
           type: boolean
           description: Raw override; null = inheriting the fleet default
+        workspaceConnectionsAllowed:
+          type: boolean
+          description: Whether this workspace may register additional OpenAI-compatible
+            connections
       required:
       - cooldownMinutes
       - deliverToMerged
@@ -5714,6 +5702,7 @@ components:
       - practicesEnabled
       - runForAllUsers
       - skipDrafts
+      - workspaceConnectionsAllowed
     AssignRoleRequest:
       type: object
       description: Request to assign or update a user's role in a workspace
@@ -5786,13 +5775,6 @@ components:
           type: integer
           format: int64
           description: "Model id, unique within its scope"
-        modality:
-          type: string
-          description: What surface this model serves
-          enum:
-          - CHAT
-          - EMBEDDING
-          - RERANK
         per1mCacheReadUsd:
           type: number
           description: Cache-read rate per 1M tokens (USD)
@@ -5805,15 +5787,12 @@ components:
         per1mOutputUsd:
           type: number
           description: Output rate per 1M tokens (USD)
-        per1mReasoningUsd:
-          type: number
-          description: Reasoning-token rate per 1M tokens (USD)
         pricingMode:
           type: string
           description: Pricing mode
           enum:
           - PRICED
-          - FREE
+          - NO_CHARGE
           - UNPRICED
         scope:
           type: string
@@ -5828,7 +5807,6 @@ components:
       - connectionDisplayName
       - displayName
       - id
-      - modality
       - pricingMode
       - scope
       - supportsReasoning
@@ -6318,25 +6296,6 @@ components:
           format: int64
           description: Bind to a shared (instance catalog) model. Mutually exclusive
             with workspaceModelId.
-        llmApiKey:
-          type: string
-          description: LLM API key
-        llmBaseUrl:
-          type: string
-          description: "Optional LLM base URL — set for OpenAI/Anthropic-compatible\
-            \ endpoints that need routing through the hephaestus chat/completions\
-            \ provider extension (e.g. TUM GPU, on-prem gateways)"
-          example: https://gpu.example.com
-          maxLength: 512
-          minLength: 0
-        llmProvider:
-          type: string
-          description: LLM provider. Required unless instanceModelId or workspaceModelId
-            is supplied (a bound config never reads this legacy field).
-          enum:
-          - ANTHROPIC
-          - OPENAI
-          - AZURE_OPENAI
         maxConcurrentJobs:
           type: integer
           format: int32
@@ -6344,12 +6303,6 @@ components:
           example: 3
           maximum: 10
           minimum: 1
-        modelName:
-          type: string
-          description: LLM model name
-          example: gpt-5.4-mini
-          maxLength: 128
-          minLength: 0
         name:
           type: string
           description: Unique name within the workspace
@@ -6382,22 +6335,13 @@ components:
           description: Wire protocol
           example: openai-completions
           minLength: 1
-          pattern: openai-completions|anthropic-messages|azure-openai-responses|openai-responses
-        authHeaderName:
+          pattern: openai-completions|openai-responses
+        authMode:
           type: string
-          description: Auth header name; defaults from protocol
-          maxLength: 64
-          minLength: 0
-        authValuePrefix:
-          type: string
-          description: Auth value prefix; defaults from protocol
-          maxLength: 16
-          minLength: 0
-        azureApiVersion:
-          type: string
-          description: "Azure API version, if applicable"
-          maxLength: 32
-          minLength: 0
+          description: Credential shape (default BEARER)
+          enum:
+          - BEARER
+          - API_KEY
         baseUrl:
           type: string
           description: Provider base URL
@@ -6410,33 +6354,20 @@ components:
           minLength: 0
         enabled:
           type: boolean
-          description: Whether the connection is enabled (default true)
+          description: Whether the connection is enabled (default false)
         slug:
           type: string
-          description: Unique slug
-          example: openai-prod
-          minLength: 1
-          pattern: "^[a-z0-9][a-z0-9-]{0,62}$"
+          description: Optional internal slug; generated from displayName when omitted
+          maxLength: 63
+          minLength: 0
       required:
       - apiProtocol
       - baseUrl
       - displayName
-      - slug
     CreateLlmModelRequest:
       type: object
       description: Create a model on an instance LLM connection
       properties:
-        apiProtocolOverride:
-          type: string
-          description: Wire protocol override for this model; defaults to the connection's
-            protocol
-          maxLength: 40
-          minLength: 0
-        cacheControlFormat:
-          type: string
-          description: "Cache-control wire format, if applicable"
-          maxLength: 16
-          minLength: 0
         contextWindow:
           type: integer
           format: int32
@@ -6448,24 +6379,16 @@ components:
           minLength: 0
         enabled:
           type: boolean
-          description: Whether the model is active (default true)
+          description: Whether the model is active (default false)
         maxOutputTokens:
           type: integer
           format: int32
           description: Maximum output tokens
-        modality:
-          type: string
-          description: What surface this model serves (default CHAT)
-          enum:
-          - CHAT
-          - EMBEDDING
-          - RERANK
         slug:
           type: string
-          description: Unique slug within the connection
-          example: gpt-5-eu
-          minLength: 1
-          pattern: "^[a-z0-9][a-z0-9-]{0,62}$"
+          description: Optional internal slug; generated from displayName when omitted
+          maxLength: 63
+          minLength: 0
         supportsReasoning:
           type: boolean
           description: Whether the model supports a reasoning mode
@@ -6476,7 +6399,6 @@ components:
           minLength: 0
       required:
       - displayName
-      - slug
       - upstreamModelId
     CreateLoginProviderRequest:
       type: object
@@ -6653,22 +6575,13 @@ components:
           description: Wire protocol
           example: openai-completions
           minLength: 1
-          pattern: openai-completions|anthropic-messages|azure-openai-responses|openai-responses
-        authHeaderName:
+          pattern: openai-completions|openai-responses
+        authMode:
           type: string
-          description: Auth header name; defaults from protocol
-          maxLength: 64
-          minLength: 0
-        authValuePrefix:
-          type: string
-          description: Auth value prefix; defaults from protocol
-          maxLength: 16
-          minLength: 0
-        azureApiVersion:
-          type: string
-          description: "Azure API version, if applicable"
-          maxLength: 32
-          minLength: 0
+          description: Credential shape (default BEARER)
+          enum:
+          - BEARER
+          - API_KEY
         baseUrl:
           type: string
           description: Provider base URL
@@ -6681,33 +6594,20 @@ components:
           minLength: 0
         enabled:
           type: boolean
-          description: Whether the connection is active (default true)
+          description: Whether the connection is active (default false)
         slug:
           type: string
-          description: Unique slug within the workspace
-          example: openai-prod
-          minLength: 1
-          pattern: "^[a-z0-9][a-z0-9-]{0,62}$"
+          description: Optional internal slug; generated from displayName when omitted
+          maxLength: 63
+          minLength: 0
       required:
       - apiProtocol
       - baseUrl
       - displayName
-      - slug
     CreateWorkspaceLlmModelRequest:
       type: object
       description: Create a model on your AI provider
       properties:
-        apiProtocolOverride:
-          type: string
-          description: Wire protocol override for this model; defaults to the connection's
-            protocol
-          maxLength: 40
-          minLength: 0
-        cacheControlFormat:
-          type: string
-          description: "Cache-control wire format, if applicable"
-          maxLength: 16
-          minLength: 0
         contextWindow:
           type: integer
           format: int32
@@ -6719,18 +6619,11 @@ components:
           minLength: 0
         enabled:
           type: boolean
-          description: Whether the model is active (default true)
+          description: Whether the model is active (default false)
         maxOutputTokens:
           type: integer
           format: int32
           description: Maximum output tokens
-        modality:
-          type: string
-          description: What surface this model serves (default CHAT)
-          enum:
-          - CHAT
-          - EMBEDDING
-          - RERANK
         per1mCacheReadUsd:
           type: number
           description: "Cache-read rate per 1M tokens (USD), if applicable"
@@ -6745,9 +6638,6 @@ components:
           type: number
           description: Output rate per 1M tokens (USD); required when the model has
             a price
-        per1mReasoningUsd:
-          type: number
-          description: "Reasoning-token rate per 1M tokens (USD), if applicable"
         priceNote:
           type: string
           description: "Note; required when the model is free (e.g. self-hosted, no\
@@ -6759,14 +6649,13 @@ components:
           description: Pricing mode (default UNPRICED)
           enum:
           - PRICED
-          - FREE
+          - NO_CHARGE
           - UNPRICED
         slug:
           type: string
-          description: Unique slug within the workspace
-          example: gpt-5-eu
-          minLength: 1
-          pattern: "^[a-z0-9][a-z0-9-]{0,62}$"
+          description: Optional internal slug; generated from displayName when omitted
+          maxLength: 63
+          minLength: 0
         supportsReasoning:
           type: boolean
           description: Whether the model supports a reasoning mode
@@ -6777,7 +6666,6 @@ components:
           minLength: 0
       required:
       - displayName
-      - slug
       - upstreamModelId
     CreateWorkspaceRequest:
       type: object
@@ -7164,7 +7052,7 @@ components:
           type: string
           description: Comma/newline-delimited egress host allowlist; blank = allow
             any public host
-          example: "api.openai.com, api.anthropic.com"
+          example: "api.openai.com, llm-gateway.example.com"
         defaultUnpricedPolicy:
           type: string
           description: Default policy for usage reported without a price
@@ -7402,17 +7290,12 @@ components:
           type: string
           description: Wire protocol
           example: openai-completions
-        authHeaderName:
+        authMode:
           type: string
-          description: Auth header name
-          example: Authorization
-        authValuePrefix:
-          type: string
-          description: Auth value prefix
-          example: Bearer
-        azureApiVersion:
-          type: string
-          description: "Azure API version, if applicable"
+          description: Credential shape
+          enum:
+          - BEARER
+          - API_KEY
         baseUrl:
           type: string
           description: Provider base URL
@@ -7443,8 +7326,7 @@ components:
           description: Last update timestamp
       required:
       - apiProtocol
-      - authHeaderName
-      - authValuePrefix
+      - authMode
       - baseUrl
       - createdAt
       - displayName
@@ -7456,12 +7338,6 @@ components:
       type: object
       description: Instance catalog model
       properties:
-        apiProtocolOverride:
-          type: string
-          description: Wire protocol override for this model
-        cacheControlFormat:
-          type: string
-          description: "Cache-control wire format, if applicable"
         connectionDisplayName:
           type: string
           description: Owning connection's display name
@@ -7501,13 +7377,6 @@ components:
           type: integer
           format: int32
           description: Maximum output tokens
-        modality:
-          type: string
-          description: What surface this model serves
-          enum:
-          - CHAT
-          - EMBEDDING
-          - RERANK
         slug:
           type: string
           description: Unique slug within the connection
@@ -7535,7 +7404,6 @@ components:
       - enabled
       - grantedWorkspaceIds
       - id
-      - modality
       - slug
       - supportsReasoning
       - upstreamModelId
@@ -7574,15 +7442,12 @@ components:
         per1mOutputUsd:
           type: number
           description: Output rate per 1M tokens (USD)
-        per1mReasoningUsd:
-          type: number
-          description: Reasoning-token rate per 1M tokens (USD)
         pricingMode:
           type: string
           description: Pricing mode
           enum:
           - PRICED
-          - FREE
+          - NO_CHARGE
           - UNPRICED
       required:
       - currency
@@ -7679,8 +7544,8 @@ components:
           type: integer
           format: int64
           description: "LLM API calls, as reported by the runtime. Detection jobs\
-            \ report their real call count; a mentor turn reports 1 per turn regardless\
-            \ of its internal tool loop, so compare turns to turns, not to job calls."
+            \ and mentor turns both include every assistant call in an internal tool\
+            \ loop."
         unpricedEventCount:
           type: integer
           format: int64
@@ -8311,13 +8176,13 @@ components:
           type: string
           description: Wire protocol
           minLength: 1
-          pattern: openai-completions|anthropic-messages|azure-openai-responses|openai-responses
-        authHeaderName:
+          pattern: openai-completions|openai-responses
+        authMode:
           type: string
-          description: Auth header name; defaults from protocol
-        authValuePrefix:
-          type: string
-          description: Auth value prefix; defaults from protocol
+          description: Credential shape (default BEARER)
+          enum:
+          - BEARER
+          - API_KEY
         baseUrl:
           type: string
           description: Provider base URL
@@ -9549,14 +9414,6 @@ components:
         allowInternet:
           type: boolean
           description: Whether agent containers have internet access
-        clearLlmApiKey:
-          type: boolean
-          description: Set true to remove the stored API key (takes precedence over
-            llmApiKey)
-        clearModelBinding:
-          type: boolean
-          description: Set true to clear the model binding (reverts to the legacy
-            provider fields below)
         enabled:
           type: boolean
           description: Whether the agent is enabled
@@ -9565,22 +9422,6 @@ components:
           format: int64
           description: Bind to a shared (instance catalog) model. Mutually exclusive
             with workspaceModelId.
-        llmApiKey:
-          type: string
-          description: LLM API key (omit or null to keep existing key)
-        llmBaseUrl:
-          type: string
-          description: Optional LLM base URL override (omit or null to keep existing
-            value; empty string clears it)
-          maxLength: 512
-          minLength: 0
-        llmProvider:
-          type: string
-          description: LLM provider
-          enum:
-          - ANTHROPIC
-          - OPENAI
-          - AZURE_OPENAI
         maxConcurrentJobs:
           type: integer
           format: int32
@@ -9588,12 +9429,6 @@ components:
           example: 3
           maximum: 10
           minimum: 1
-        modelName:
-          type: string
-          description: LLM model name
-          example: gpt-5.4-mini
-          maxLength: 128
-          minLength: 0
         timeoutSeconds:
           type: integer
           format: int32
@@ -9680,30 +9515,6 @@ components:
         apiKey:
           type: string
           description: New API key (write-only; never returned)
-        apiProtocol:
-          type: string
-          description: Wire protocol
-          pattern: openai-completions|anthropic-messages|azure-openai-responses|openai-responses
-        authHeaderName:
-          type: string
-          description: Auth header name
-          maxLength: 64
-          minLength: 0
-        authValuePrefix:
-          type: string
-          description: Auth value prefix
-          maxLength: 16
-          minLength: 0
-        azureApiVersion:
-          type: string
-          description: Azure API version
-          maxLength: 32
-          minLength: 0
-        baseUrl:
-          type: string
-          description: Provider base URL
-          maxLength: 2048
-          minLength: 0
         clearApiKey:
           type: boolean
           description: Set true to clear the stored API key
@@ -9739,16 +9550,13 @@ components:
           type: number
           description: Output rate per 1M tokens (USD); required when the model has
             a price
-        per1mReasoningUsd:
-          type: number
-          description: "Reasoning-token rate per 1M tokens (USD), if applicable"
         pricingMode:
           type: string
-          description: PRICED shows the price itself; FREE is a deliberate no-cost
+          description: PRICED shows the price itself; NO_CHARGE is a deliberate no-cost
             declaration; UNPRICED shows "No price set"
           enum:
           - PRICED
-          - FREE
+          - NO_CHARGE
           - UNPRICED
       required:
       - pricingMode
@@ -9757,16 +9565,6 @@ components:
       description: Update a model's metadata (all fields optional; pricing and sharing
         are separate)
       properties:
-        apiProtocolOverride:
-          type: string
-          description: Wire protocol override for this model; blank clears the override
-          maxLength: 40
-          minLength: 0
-        cacheControlFormat:
-          type: string
-          description: "Cache-control wire format, if applicable; blank clears it"
-          maxLength: 16
-          minLength: 0
         contextWindow:
           type: integer
           format: int32
@@ -9783,21 +9581,9 @@ components:
           type: integer
           format: int32
           description: Maximum output tokens
-        modality:
-          type: string
-          description: What surface this model serves
-          enum:
-          - CHAT
-          - EMBEDDING
-          - RERANK
         supportsReasoning:
           type: boolean
           description: Whether the model supports a reasoning mode
-        upstreamModelId:
-          type: string
-          description: Upstream provider model id
-          maxLength: 256
-          minLength: 0
     UpdateLlmModelSharingRequest:
       type: object
       description: "Share with: all workspaces, or a selected set"
@@ -10075,30 +9861,6 @@ components:
         apiKey:
           type: string
           description: New API key (write-only; never returned)
-        apiProtocol:
-          type: string
-          description: Wire protocol
-          pattern: openai-completions|anthropic-messages|azure-openai-responses|openai-responses
-        authHeaderName:
-          type: string
-          description: Auth header name
-          maxLength: 64
-          minLength: 0
-        authValuePrefix:
-          type: string
-          description: Auth value prefix
-          maxLength: 16
-          minLength: 0
-        azureApiVersion:
-          type: string
-          description: Azure API version
-          maxLength: 32
-          minLength: 0
-        baseUrl:
-          type: string
-          description: Provider base URL
-          maxLength: 2048
-          minLength: 0
         clearApiKey:
           type: boolean
           description: Set true to clear the stored API key
@@ -10114,16 +9876,6 @@ components:
       type: object
       description: Update a model on your AI provider (all fields optional)
       properties:
-        apiProtocolOverride:
-          type: string
-          description: Wire protocol override for this model; blank clears the override
-          maxLength: 40
-          minLength: 0
-        cacheControlFormat:
-          type: string
-          description: "Cache-control wire format, if applicable; blank clears it"
-          maxLength: 16
-          minLength: 0
         contextWindow:
           type: integer
           format: int32
@@ -10140,13 +9892,6 @@ components:
           type: integer
           format: int32
           description: Maximum output tokens
-        modality:
-          type: string
-          description: What surface this model serves
-          enum:
-          - CHAT
-          - EMBEDDING
-          - RERANK
         per1mCacheReadUsd:
           type: number
           description: "Cache-read rate per 1M tokens (USD), if applicable"
@@ -10159,9 +9904,6 @@ components:
         per1mOutputUsd:
           type: number
           description: Output rate per 1M tokens (USD)
-        per1mReasoningUsd:
-          type: number
-          description: "Reasoning-token rate per 1M tokens (USD), if applicable"
         priceNote:
           type: string
           description: "Note; required when the model is free (e.g. self-hosted, no\
@@ -10174,16 +9916,11 @@ components:
             \ class docs)"
           enum:
           - PRICED
-          - FREE
+          - NO_CHARGE
           - UNPRICED
         supportsReasoning:
           type: boolean
           description: Whether the model supports a reasoning mode
-        upstreamModelId:
-          type: string
-          description: Upstream provider model id
-          maxLength: 256
-          minLength: 0
     UpdateWorkspaceNotificationsRequest:
       type: object
       description: Request to update leaderboard notification settings
@@ -10242,11 +9979,11 @@ components:
       - status
     UpdateWorkspaceTokenRequest:
       type: object
-      description: Request to update the workspace's GitHub Personal Access Token
+      description: Request to update the workspace's SCM Personal Access Token
       properties:
         personalAccessToken:
           type: string
-          description: GitHub Personal Access Token for API access
+          description: SCM Personal Access Token for API access
           minLength: 1
       required:
       - personalAccessToken
@@ -10538,17 +10275,12 @@ components:
           type: string
           description: Wire protocol
           example: openai-completions
-        authHeaderName:
+        authMode:
           type: string
-          description: Auth header name
-          example: Authorization
-        authValuePrefix:
-          type: string
-          description: Auth value prefix
-          example: Bearer
-        azureApiVersion:
-          type: string
-          description: "Azure API version, if applicable"
+          description: Credential shape
+          enum:
+          - BEARER
+          - API_KEY
         baseUrl:
           type: string
           description: Provider base URL
@@ -10579,8 +10311,7 @@ components:
           description: Last update timestamp
       required:
       - apiProtocol
-      - authHeaderName
-      - authValuePrefix
+      - authMode
       - baseUrl
       - createdAt
       - displayName
@@ -10592,12 +10323,6 @@ components:
       type: object
       description: A model on your AI provider
       properties:
-        apiProtocolOverride:
-          type: string
-          description: Wire protocol override for this model
-        cacheControlFormat:
-          type: string
-          description: "Cache-control wire format, if applicable"
         connectionDisplayName:
           type: string
           description: Owning connection's display name
@@ -10630,13 +10355,6 @@ components:
           type: integer
           format: int32
           description: Maximum output tokens
-        modality:
-          type: string
-          description: What surface this model serves
-          enum:
-          - CHAT
-          - EMBEDDING
-          - RERANK
         per1mCacheReadUsd:
           type: number
           description: Cache-read rate per 1M tokens (USD)
@@ -10649,9 +10367,6 @@ components:
         per1mOutputUsd:
           type: number
           description: Output rate per 1M tokens (USD)
-        per1mReasoningUsd:
-          type: number
-          description: Reasoning-token rate per 1M tokens (USD)
         priceNote:
           type: string
           description: Price note
@@ -10660,7 +10375,7 @@ components:
           description: Pricing mode
           enum:
           - PRICED
-          - FREE
+          - NO_CHARGE
           - UNPRICED
         slug:
           type: string
@@ -10683,7 +10398,6 @@ components:
       - displayName
       - enabled
       - id
-      - modality
       - pricingMode
       - slug
       - supportsReasoning

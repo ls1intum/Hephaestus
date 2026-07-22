@@ -33,10 +33,8 @@ class LlmConnectionAdminControllerIntegrationTest extends AbstractWorkspaceInteg
             "Test Connection",
             "https://api.openai.com",
             "openai-completions",
-            null,
-            null,
+            LlmAuthMode.BEARER,
             "sk-test-secret-1234",
-            null,
             true
         );
         return webTestClient
@@ -83,17 +81,7 @@ class LlmConnectionAdminControllerIntegrationTest extends AbstractWorkspaceInteg
             .jsonPath("$.length()")
             .isEqualTo(1);
 
-        var updateRequest = new UpdateLlmConnectionRequestDTO(
-            "Renamed Connection",
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null
-        );
+        var updateRequest = new UpdateLlmConnectionRequestDTO("Renamed Connection", null, null, null);
         webTestClient
             .patch()
             .uri("/admin/llm/connections/{id}", created.id())
@@ -142,10 +130,8 @@ class LlmConnectionAdminControllerIntegrationTest extends AbstractWorkspaceInteg
                     "Redaction Test",
                     "https://api.openai.com",
                     "openai-completions",
-                    null,
-                    null,
+                    LlmAuthMode.BEARER,
                     "sk-super-secret-value",
-                    null,
                     true
                 )
             )

@@ -24,9 +24,8 @@ record WorkspaceLlmConnectionSnapshot(
     String displayName,
     @Nullable String baseUrl,
     String apiProtocol,
-    String authHeaderName,
+    LlmAuthMode authMode,
     boolean llmApiKeySet,
-    @Nullable String azureApiVersion,
     boolean enabled
 ) implements ConfigAuditSnapshot {
     static WorkspaceLlmConnectionSnapshot of(WorkspaceLlmConnection c) {
@@ -35,9 +34,8 @@ record WorkspaceLlmConnectionSnapshot(
             c.getDisplayName(),
             credentialFreeBaseUrl(c.getBaseUrl()),
             c.getApiProtocol(),
-            c.getAuthHeaderName(),
+            c.getAuthMode(),
             c.getApiKey() != null && !c.getApiKey().isBlank(),
-            c.getAzureApiVersion(),
             c.isEnabled()
         );
     }

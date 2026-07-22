@@ -6,10 +6,36 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UUID> {
+    /** Idempotent append. A duplicate source attempt is the only write intentionally ignored. */
+    @Modifying
+    @Query(
+        value = """
+        INSERT INTO llm_usage_event (
+            id, workspace_id, job_type, source_type, source_id, source_attempt, model,
+            input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, reasoning_tokens,
+            total_calls, cost_usd, occurred_at, pricing_state, funding_source, applied_price_id,
+            applied_workspace_model_id, applied_per_1m_input_usd, applied_per_1m_output_usd,
+            applied_per_1m_cache_read_usd, applied_per_1m_cache_write_usd
+        ) VALUES (
+            :#{#event.id()}, :#{#event.workspaceId()}, :#{#event.jobType()}, :#{#event.sourceType()},
+            :#{#event.sourceId()}, :#{#event.sourceAttempt()}, :#{#event.model()},
+            :#{#event.inputTokens()}, :#{#event.outputTokens()}, :#{#event.cacheReadTokens()},
+            :#{#event.cacheWriteTokens()}, :#{#event.reasoningTokens()}, :#{#event.totalCalls()},
+            :#{#event.costUsd()}, :#{#event.occurredAt()}, :#{#event.pricingState()},
+            :#{#event.fundingSource()}, :#{#event.appliedPriceId()},
+            :#{#event.appliedWorkspaceModelId()}, :#{#event.inputRate()}, :#{#event.outputRate()},
+            :#{#event.cacheReadRate()}, :#{#event.cacheWriteRate()}
+        ) ON CONFLICT (source_type, source_id, source_attempt) DO NOTHING
+        """,
+        nativeQuery = true
+    )
+    int insertIfAbsent(@Param("event") LlmUsageInsert event);
+
     List<LlmUsageEvent> findByWorkspaceId(Long workspaceId);
 
     /**

@@ -8,7 +8,7 @@ import org.jspecify.annotations.NonNull;
 public record InstanceLlmSettingsDTO(
     @Schema(
         description = "Comma/newline-delimited egress host allowlist; blank = allow any public host",
-        example = "api.openai.com, api.anthropic.com"
+        example = "api.openai.com, llm-gateway.example.com"
     )
     String allowedEgressHosts,
     @NonNull

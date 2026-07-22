@@ -18,7 +18,7 @@ public record AgentJobDTO(
     @Schema(description = "Job output (agent results)") Object output,
     @NonNull
     @Schema(
-        description = "Frozen agent config at submit time (an INSTANCE-scoped or legacy connection's baseUrl is redacted to scheme://host; only a WORKSPACE-scoped BYO connection's baseUrl is left intact)"
+        description = "Frozen agent config at submit time (an INSTANCE-scoped connection's baseUrl is redacted to scheme://host; only a WORKSPACE-scoped BYO connection's baseUrl is left intact)"
     )
     Object configSnapshot,
     @Schema(description = "ID of the agent config that ran this job (from the frozen snapshot)") Long configId,
@@ -35,7 +35,7 @@ public record AgentJobDTO(
     @NonNull @Schema(description = "Timestamp when the job was created") Instant createdAt,
     @Schema(description = "Timestamp when the job started running") Instant startedAt,
     @Schema(description = "Timestamp when the job completed") Instant completedAt,
-    @Schema(description = "LLM model used (e.g. gpt-5.4-mini, claude-sonnet-4-5)") String llmModel,
+    @Schema(description = "LLM model used (e.g. gpt-5.4-mini, openai/gpt-oss-120b)") String llmModel,
     @Schema(description = "Model version/snapshot date (e.g. 2026-03-17)") String llmModelVersion,
     @Schema(description = "Total LLM API calls (steps) during execution") Integer llmTotalCalls,
     @Schema(description = "Total input tokens consumed") Integer llmTotalInputTokens,
@@ -90,13 +90,9 @@ public record AgentJobDTO(
      *   <li>{@code connectionScope=INSTANCE} — owned and configured by the instance admin, potentially
      *       shared across many workspaces; its URL (an internal gateway, a vendor-specific deployment
      *       path, …) is not this workspace admin's data to read.</li>
-     *   <li>{@code connectionScope=null} (legacy, pre-catalog config) — the {@code llmBaseUrl} field is
-     *       instance-config-shaped even though it lives on a per-workspace {@code AgentConfig} row: the
-     *       #1368 fix wave closed the gap where it skipped {@link
-     *       de.tum.cit.aet.hephaestus.agent.catalog.EgressPolicy} entirely on write, and the path/query
-     *       of a hand-entered gateway URL can carry the same operator-sensitive routing detail an
-     *       INSTANCE connection's does — reduced to host-only here too, uniformly, rather than trusting
-     *       that no legacy config was ever pointed at something sensitive.</li>
+     *   <li>{@code connectionScope=null} — only possible for a historical snapshot during a rolling
+     *       upgrade. It is non-routable, but its former URL is still reduced to host-only so an operator
+     *       endpoint path cannot leak while the row remains visible.</li>
      * </ul>
      *
      * <p>{@code connectionScope=WORKSPACE} (BYO) is the workspace's own configuration, so it is left

@@ -28,8 +28,12 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxIdentity;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
+import de.tum.cit.aet.hephaestus.agent.usage.AdmittedLlmModel;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetBlockReason;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
@@ -130,6 +134,9 @@ class MentorChatServiceTest extends BaseUnitTest {
     @Mock
     LlmModelResolver llmModelResolver;
 
+    @Mock
+    LlmAdmissionService llmAdmissionService;
+
     private MentorTurnLock turnLock;
     private PiEventToUiChunkTranslator translator;
     private ScheduledExecutorService scheduler;
@@ -158,7 +165,7 @@ class MentorChatServiceTest extends BaseUnitTest {
             new MentorChatExecutorConfig.MentorRunnerTimeoutScheduler(scheduler);
 
         meterRegistry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
-        MentorAgentProperties mentorProps = new MentorAgentProperties(100_000, "");
+        MentorAgentProperties mentorProps = new MentorAgentProperties(100_000);
         service = new MentorChatService(
             userRepository,
             chatThreadRepository,
@@ -176,7 +183,7 @@ class MentorChatServiceTest extends BaseUnitTest {
             schedulerBean,
             new MentorChatMetrics(meterRegistry),
             llmBudgetService,
-            llmModelResolver
+            llmAdmissionService
         );
 
         // Default resolver stub — MentorLlmConfig.fromAgentConfig routes every AgentConfig through
@@ -186,18 +193,29 @@ class MentorChatServiceTest extends BaseUnitTest {
             new ResolvedLlmModel(
                 "https://api.openai.com",
                 "openai-completions",
-                "Authorization",
-                "Bearer ",
-                null,
                 "test-model",
                 null,
                 null,
                 false,
-                null,
                 FundingSource.INSTANCE
             )
         );
         when(llmModelResolver.connectionRef(any())).thenReturn(new LlmModelResolver.ConnectionRef(null, null));
+        when(llmAdmissionService.admit(any())).thenReturn(
+            new AdmittedLlmModel(
+                new ResolvedLlmModel(
+                    "https://api.openai.com",
+                    "openai-completions",
+                    "test-model",
+                    null,
+                    null,
+                    false,
+                    FundingSource.INSTANCE
+                ),
+                new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 1L, 2L, WORKSPACE_ID),
+                new LlmPriceSnapshot(FundingSource.INSTANCE, PricingState.NO_CHARGE, 3L, null, null, null, null, null)
+            )
+        );
 
         // Default happy-path collaborator wiring; individual tests override as needed.
         User user = new User();
@@ -206,23 +224,23 @@ class MentorChatServiceTest extends BaseUnitTest {
         when(userRepository.getCurrentUserElseThrow()).thenReturn(user);
 
         AgentConfig agentConfig = new AgentConfig();
+        agentConfig.setId(99L);
         agentConfig.setEnabled(true);
         agentConfig.setLlmProvider(LlmProvider.OPENAI);
         agentConfig.setLlmApiKey("test-key");
         agentConfig.setModelName("test-model");
         agentConfig.setTimeoutSeconds(600);
-        when(agentConfigRepository.findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(eq(WORKSPACE_ID))).thenReturn(
-            Optional.of(agentConfig)
-        );
-
         Workspace ws = new Workspace();
         ws.setWorkspaceSlug("acme");
+        ws.setMentorConfigId(99L);
+        when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(ws));
+        when(agentConfigRepository.findByIdAndWorkspaceId(99L, WORKSPACE_ID)).thenReturn(Optional.of(agentConfig));
         ChatThread thread = new ChatThread();
         thread.setId(THREAD_ID);
         thread.setWorkspace(ws);
         thread.setUser(user);
         when(persistence.ensureThread(eq(WORKSPACE_ID), eq(THREAD_ID), any(), any())).thenReturn(thread);
-        when(persistence.persistInFlight(any(), any(), any(), any())).thenAnswer(inv -> {
+        when(persistence.persistInFlight(any(), any(), any(), any(), any())).thenAnswer(inv -> {
             UUID assistantId = inv.getArgument(2, UUID.class);
             return new MentorTurnPersistence.TurnPersistenceCookie(
                 THREAD_ID,
@@ -418,11 +436,11 @@ class MentorChatServiceTest extends BaseUnitTest {
         verify(agentConfigRepository, never()).findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(WORKSPACE_ID);
     }
 
-    // 1c. The deliberate asymmetry vs practice detection: a bound-but-DISABLED mentor config does NOT
-    // pause the mentor (which would block chat) — it falls back to the oldest enabled config.
+    // 1c. A bound-but-disabled mentor config fails closed. Silently choosing another config could
+    // change provider, model, and price in the middle of a conversation.
 
     @Test
-    void runTurn_fallsBackToOldestEnabled_whenBoundMentorConfigDisabled() throws Exception {
+    void runTurn_disabledBoundConfig_failsClosedBeforeSandboxAttach() throws Exception {
         Workspace boundWs = new Workspace();
         boundWs.setMentorConfigId(99L);
         when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(boundWs));
@@ -430,10 +448,13 @@ class MentorChatServiceTest extends BaseUnitTest {
         disabled.setEnabled(false);
         when(agentConfigRepository.findByIdAndWorkspaceId(99L, WORKSPACE_ID)).thenReturn(Optional.of(disabled));
 
-        scheduleHappyPathResponses(sandbox).run();
         runTurnSync();
 
-        verify(agentConfigRepository).findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(WORKSPACE_ID);
+        assertThat(String.join("\n", emitter.rawData)).contains(
+            "Hephaestus is not ready to mentor in this workspace yet. Connect a mentor model, then try again."
+        );
+        verify(agentConfigRepository, never()).findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(WORKSPACE_ID);
+        verify(interactiveSandboxService, never()).attach(any());
     }
 
     // 1d. No enabled AgentConfig for the workspace → resolveLlmConfig.orElseThrow. This is the only
@@ -442,10 +463,8 @@ class MentorChatServiceTest extends BaseUnitTest {
 
     @Test
     void runTurn_noEnabledConfig_recordsErrorAndNeverAttaches() throws Exception {
-        // Neither a bound config (findById → empty by default) nor the fallback finder yields a config.
-        when(agentConfigRepository.findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(eq(WORKSPACE_ID))).thenReturn(
-            Optional.empty()
-        );
+        Workspace unbound = new Workspace();
+        when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(unbound));
 
         runTurnSync();
 
@@ -689,7 +708,7 @@ class MentorChatServiceTest extends BaseUnitTest {
     @Test
     @DisplayName("in-flight conflict: persistence throws; conflict chunk sent; sandbox never attached")
     void runTurn_inFlightConflict_returns409() {
-        when(persistence.persistInFlight(any(), any(), any(), any())).thenThrow(
+        when(persistence.persistInFlight(any(), any(), any(), any(), any())).thenThrow(
             new TurnAlreadyInFlightException(THREAD_ID, new RuntimeException("dup"))
         );
 

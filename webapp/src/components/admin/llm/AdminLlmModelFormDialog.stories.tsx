@@ -7,11 +7,10 @@ import type { WorkspaceMultiSelectOption } from "./WorkspaceMultiSelect";
 const mockModel: LlmModel = {
 	id: 1,
 	slug: "gpt-5-eu",
-	displayName: "GPT-5 (Azure, EU)",
+	displayName: "GPT-5",
 	upstreamModelId: "gpt-5",
 	connectionId: 1,
-	connectionDisplayName: "Azure EU",
-	modality: "CHAT",
+	connectionDisplayName: "OpenAI production",
 	enabled: true,
 	supportsReasoning: true,
 	visibility: "GRANTED",

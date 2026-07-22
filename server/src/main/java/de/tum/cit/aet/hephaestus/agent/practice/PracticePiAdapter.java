@@ -34,7 +34,6 @@ public class PracticePiAdapter {
                 request.contextWindow(),
                 request.maxOutputTokens(),
                 request.supportsReasoning(),
-                request.cacheControlFormat(),
                 request.jobToken(),
                 request.allowInternet(),
                 request.timeoutSeconds(),

@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -18,7 +19,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.ColumnDefault;
-import org.jspecify.annotations.Nullable;
 
 /**
  * Instance-owned LLM provider connection: an endpoint the instance can talk to, its credential,
@@ -54,31 +54,23 @@ public class LlmConnection {
     @Column(name = "api_protocol", nullable = false, length = 40)
     private String apiProtocol;
 
-    @ColumnDefault("'Authorization'")
-    @Column(name = "auth_header_name", nullable = false, length = 64)
-    private String authHeaderName = "Authorization";
-
-    @ColumnDefault("'Bearer '")
-    @Column(name = "auth_value_prefix", nullable = false, length = 16)
-    private String authValuePrefix = "Bearer ";
+    @ColumnDefault("'BEARER'")
+    @Enumerated(jakarta.persistence.EnumType.STRING)
+    @Column(name = "auth_mode", nullable = false, length = 16, updatable = false)
+    private LlmAuthMode authMode = LlmAuthMode.BEARER;
 
     @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "api_key", columnDefinition = "TEXT")
     @ToString.Exclude
     private String apiKey;
 
-    @Nullable
-    @Column(name = "azure_api_version", length = 32)
-    private String azureApiVersion;
-
-    @ColumnDefault("true")
+    @ColumnDefault("false")
     @Column(name = "enabled", nullable = false)
-    private boolean enabled = true;
+    private boolean enabled = false;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    @Nullable
     @Column(name = "updated_at")
     private Instant updatedAt;
 

@@ -3,7 +3,11 @@ package de.tum.cit.aet.hephaestus.agent.job;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.ModelVisibility;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
@@ -50,6 +54,12 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
     private AgentConfigRepository agentConfigRepository;
 
     @Autowired
+    private LlmConnectionRepository llmConnectionRepository;
+
+    @Autowired
+    private LlmModelRepository llmModelRepository;
+
+    @Autowired
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
@@ -75,11 +85,28 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
 
         workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("submit-test"));
 
+        LlmConnection connection = new LlmConnection();
+        connection.setSlug("submit-test");
+        connection.setDisplayName("Submit test");
+        connection.setBaseUrl("https://api.openai.example/v1");
+        connection.setApiProtocol("openai-completions");
+        connection.setEnabled(true);
+        connection = llmConnectionRepository.save(connection);
+
+        LlmModel model = new LlmModel();
+        model.setConnection(connection);
+        model.setSlug("submit-model");
+        model.setDisplayName("Submit model");
+        model.setUpstreamModelId("gpt-submit-test");
+        model.setVisibility(ModelVisibility.PUBLIC);
+        model.setEnabled(true);
+        model = llmModelRepository.save(model);
+
         agentConfig = new AgentConfig();
         agentConfig.setWorkspace(workspace);
         agentConfig.setName("test-config");
         agentConfig.setEnabled(true);
-        agentConfig.setLlmProvider(LlmProvider.ANTHROPIC);
+        agentConfig.setInstanceModel(model);
         agentConfig.setTimeoutSeconds(300);
         agentConfig = agentConfigRepository.save(agentConfig);
 

@@ -104,11 +104,18 @@ public class LlmModelService {
 
     @Transactional
     public LlmModel create(Long connectionId, CreateLlmModelRequestDTO request) {
+        if (Boolean.TRUE.equals(request.enabled())) {
+            throw new IllegalArgumentException("Create the model disabled, set its price, then activate it.");
+        }
         LlmConnection connection = connectionRepository
             .findById(connectionId)
             .orElseThrow(() -> new EntityNotFoundException("LlmConnection", connectionId));
-        if (modelRepository.findByConnectionIdAndSlug(connectionId, request.slug()).isPresent()) {
-            throw new LlmModelSlugConflictException(connectionId, request.slug());
+        String slug = modelSlug(connectionId, request.slug(), request.displayName());
+        if (
+            org.springframework.util.StringUtils.hasText(request.slug()) &&
+            modelRepository.findByConnectionIdAndSlug(connectionId, slug).isPresent()
+        ) {
+            throw new LlmModelSlugConflictException(connectionId, slug);
         }
         if (modelRepository.existsByConnectionIdAndUpstreamModelId(connectionId, request.upstreamModelId())) {
             throw new LlmModelUpstreamIdConflictException(connectionId, request.upstreamModelId());
@@ -116,20 +123,18 @@ public class LlmModelService {
 
         LlmModel model = new LlmModel();
         model.setConnection(connection);
-        model.setSlug(request.slug());
+        model.setSlug(slug);
         model.setDisplayName(request.displayName());
         model.setUpstreamModelId(request.upstreamModelId());
-        model.setApiProtocolOverride(blankToNull(request.apiProtocolOverride()));
-        if (request.modality() != null) {
-            model.setModality(request.modality());
-        }
         model.setContextWindow(request.contextWindow());
         model.setMaxOutputTokens(request.maxOutputTokens());
         if (request.supportsReasoning() != null) {
             model.setSupportsReasoning(request.supportsReasoning());
         }
-        model.setCacheControlFormat(blankToNull(request.cacheControlFormat()));
         if (request.enabled() != null) {
+            if (request.enabled()) {
+                requireActivatable(model);
+            }
             model.setEnabled(request.enabled());
         }
 
@@ -148,10 +153,30 @@ public class LlmModelService {
             if (isUpstreamIdConflict(e)) {
                 throw new LlmModelUpstreamIdConflictException(connectionId, request.upstreamModelId());
             }
-            throw new LlmModelSlugConflictException(connectionId, request.slug());
+            throw new LlmModelSlugConflictException(connectionId, slug);
         }
         llmModelAudit.modelCreated(saved.getId(), saved.getConnection().getId(), saved.getSlug());
         return saved;
+    }
+
+    private String modelSlug(Long connectionId, String requested, String displayName) {
+        String base = org.springframework.util.StringUtils.hasText(requested)
+            ? requested
+            : CatalogSlug.from(displayName);
+        if (org.springframework.util.StringUtils.hasText(requested)) return base;
+        String candidate = base;
+        for (int i = 2; modelRepository.findByConnectionIdAndSlug(connectionId, candidate).isPresent(); i++) candidate =
+            CatalogSlug.suffix(base, i);
+        return candidate;
+    }
+
+    private void requireActivatable(LlmModel model) {
+        LlmModelPrice price = priceRepository.findByModelIdAndEffectiveToIsNull(model.getId()).orElse(null);
+        if (!model.getConnection().isEnabled() || price == null || price.getPricingMode() == PricingMode.UNPRICED) {
+            throw new IllegalArgumentException(
+                "Activate the connection and configure a price before activating the model."
+            );
+        }
     }
 
     @Transactional
@@ -159,30 +184,11 @@ public class LlmModelService {
         // Eager-fetches connection — the controller converts the returned entity straight to
         // LlmModelDTO after this transaction closes; see get()'s javadoc comment for why.
         LlmModel model = modelRepository
-            .findByIdWithConnection(id)
+            .findByIdForUpdate(id)
             .orElseThrow(() -> new EntityNotFoundException("LlmModel", id));
 
         if (request.displayName() != null) {
             model.setDisplayName(request.displayName());
-        }
-        if (request.upstreamModelId() != null) {
-            if (
-                !request.upstreamModelId().equals(model.getUpstreamModelId()) &&
-                modelRepository.existsByConnectionIdAndUpstreamModelIdAndIdNot(
-                    model.getConnection().getId(),
-                    request.upstreamModelId(),
-                    id
-                )
-            ) {
-                throw new LlmModelUpstreamIdConflictException(model.getConnection().getId(), request.upstreamModelId());
-            }
-            model.setUpstreamModelId(request.upstreamModelId());
-        }
-        if (request.apiProtocolOverride() != null) {
-            model.setApiProtocolOverride(blankToNull(request.apiProtocolOverride()));
-        }
-        if (request.modality() != null) {
-            model.setModality(request.modality());
         }
         if (request.contextWindow() != null) {
             model.setContextWindow(request.contextWindow());
@@ -193,11 +199,11 @@ public class LlmModelService {
         if (request.supportsReasoning() != null) {
             model.setSupportsReasoning(request.supportsReasoning());
         }
-        if (request.cacheControlFormat() != null) {
-            model.setCacheControlFormat(blankToNull(request.cacheControlFormat()));
-        }
         if (request.enabled() != null) {
             model.setEnabled(request.enabled());
+        }
+        if (model.isEnabled()) {
+            requireActivatable(model);
         }
 
         LlmModel saved;
@@ -238,9 +244,12 @@ public class LlmModelService {
     @Transactional
     public LlmModelPrice updatePrice(Long modelId, UpdateLlmModelPriceRequestDTO request) {
         LlmModel model = modelRepository
-            .findById(modelId)
+            .findByIdForUpdate(modelId)
             .orElseThrow(() -> new EntityNotFoundException("LlmModel", modelId));
         validatePriceRequest(request);
+        if (model.isEnabled() && request.pricingMode() == PricingMode.UNPRICED) {
+            throw new IllegalArgumentException("Disable the model before changing its price to UNPRICED.");
+        }
 
         Instant now = Instant.now();
         priceRepository
@@ -257,7 +266,6 @@ public class LlmModelService {
         price.setPer1mOutputUsd(request.per1mOutputUsd());
         price.setPer1mCacheReadUsd(request.per1mCacheReadUsd());
         price.setPer1mCacheWriteUsd(request.per1mCacheWriteUsd());
-        price.setPer1mReasoningUsd(request.per1mReasoningUsd());
         price.setNote(blankToNull(request.note()));
         price.setEffectiveFrom(now);
 
@@ -273,7 +281,6 @@ public class LlmModelService {
             request.per1mOutputUsd(),
             request.per1mCacheReadUsd(),
             request.per1mCacheWriteUsd(),
-            request.per1mReasoningUsd(),
             request.note()
         );
     }

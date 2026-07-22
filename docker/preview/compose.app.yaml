@@ -269,15 +269,6 @@ services:
       SANDBOX_CPUS: ${SANDBOX_CPUS:-2.0}
       # LLM providers are registered at runtime (Instance admin → AI models); the proxy reads each
       # connection's base URL/auth from the catalog per request, so no env var routes it here.
-      # A preview starts from a seeded DB with nobody to click through the admin UI, so seed a
-      # default config at boot — without a model name the Pi provider is never registered and the
-      # mentor silently has no LLM.
-      AGENT_DEFAULT_CONFIG_ENABLED: ${AGENT_DEFAULT_CONFIG_ENABLED:-false}
-      AGENT_DEFAULT_CONFIG_NAME: ${AGENT_DEFAULT_CONFIG_NAME:-Default}
-      AGENT_DEFAULT_CONFIG_PROVIDER: ${AGENT_DEFAULT_CONFIG_PROVIDER:-OPENAI}
-      AGENT_DEFAULT_CONFIG_MODEL_NAME: ${AGENT_DEFAULT_CONFIG_MODEL_NAME:-}
-      AGENT_DEFAULT_CONFIG_API_KEY: ${AGENT_DEFAULT_CONFIG_API_KEY:-}
-      AGENT_DEFAULT_CONFIG_BASE_URL: ${AGENT_DEFAULT_CONFIG_BASE_URL:-}
       MONITORING_TIMEFRAME: ${MONITORING_TIMEFRAME:-14}
       MONITORING_RUN_ON_STARTUP: ${MONITORING_RUN_ON_STARTUP:-false}
       MONITORING_SYNC_CRON: ${MONITORING_SYNC_CRON:-0 0 2 * * *}

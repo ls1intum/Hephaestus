@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.config;
 
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -16,23 +15,6 @@ public record CreateAgentConfigRequestDTO(
     @Schema(description = "Unique name within the workspace", example = "pi-pr-reviewer")
     String name,
     @Schema(description = "Whether the agent is enabled") Boolean enabled,
-    @Size(max = 128, message = "Model name must not exceed 128 characters")
-    @Schema(description = "LLM model name", example = "gpt-5.4-mini")
-    String modelName,
-    @Schema(description = "LLM API key") String llmApiKey,
-    @Size(max = 512, message = "LLM base URL must not exceed 512 characters")
-    @Schema(
-        description = "Optional LLM base URL — set for OpenAI/Anthropic-compatible endpoints " +
-            "that need routing through the hephaestus chat/completions provider extension " +
-            "(e.g. TUM GPU, on-prem gateways)",
-        example = "https://gpu.example.com"
-    )
-    String llmBaseUrl,
-    @Schema(
-        description = "LLM provider. Required unless instanceModelId or workspaceModelId is supplied " +
-            "(a bound config never reads this legacy field)."
-    )
-    LlmProvider llmProvider,
     @Min(value = 30, message = "Timeout must be at least 30 seconds")
     @Max(value = 3600, message = "Timeout must not exceed 3600 seconds")
     @Schema(description = "Job timeout in seconds", example = "600", minimum = "30", maximum = "3600")

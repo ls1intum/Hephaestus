@@ -69,6 +69,8 @@ record InteractiveSandboxRuntimeKey(
         String baseUrl,
         @Nullable FundingSource connectionScope,
         @Nullable Long connectionId,
+        @Nullable Long modelId,
+        @Nullable Long workspaceId,
         @Nullable Long legacyConfigId
     ) {
         static RoutingKey from(ProxyRouting routing) {
@@ -77,6 +79,8 @@ record InteractiveSandboxRuntimeKey(
                 routing.baseUrl(),
                 routing.connectionScope(),
                 routing.connectionId(),
+                routing.modelId(),
+                routing.workspaceId(),
                 routing.legacyConfigId()
             );
         }

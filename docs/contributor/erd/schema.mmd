@@ -60,7 +60,7 @@ erDiagram
         BOOLEAN enabled "NOT NULL"
         VARCHAR(128) model_name
         TEXT llm_api_key
-        VARCHAR(32) llm_provider "NOT NULL"
+        VARCHAR(32) llm_provider
         INTEGER timeout_seconds "NOT NULL"
         INTEGER max_concurrent_jobs "NOT NULL"
         BOOLEAN allow_internet "NOT NULL"
@@ -114,6 +114,7 @@ erDiagram
         VARCHAR(64) inputs_digest
         TIMESTAMPTZ available_at "NOT NULL"
         SMALLINT delivery_attempts "NOT NULL"
+        TIMESTAMPTZ execution_started_at
     }
 
     AuthEvent {
@@ -533,10 +534,8 @@ erDiagram
         VARCHAR(128) display_name "NOT NULL"
         VARCHAR(2048) base_url "NOT NULL"
         VARCHAR(40) api_protocol "NOT NULL"
-        VARCHAR(64) auth_header_name "NOT NULL"
-        VARCHAR(16) auth_value_prefix "NOT NULL"
+        VARCHAR(16) auth_mode "NOT NULL"
         TEXT api_key
-        VARCHAR(32) azure_api_version
         BOOLEAN enabled "NOT NULL"
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at
@@ -548,12 +547,9 @@ erDiagram
         VARCHAR(64) slug UK "NOT NULL"
         VARCHAR(128) display_name "NOT NULL"
         VARCHAR(256) upstream_model_id "NOT NULL"
-        VARCHAR(40) api_protocol_override
-        VARCHAR(16) modality "NOT NULL"
         INTEGER context_window
         INTEGER max_output_tokens
         BOOLEAN supports_reasoning "NOT NULL"
-        VARCHAR(16) cache_control_format
         VARCHAR(16) visibility "NOT NULL"
         BOOLEAN enabled "NOT NULL"
         TIMESTAMPTZ created_at "NOT NULL"
@@ -568,7 +564,6 @@ erDiagram
         NUMERIC(18,8) per_1m_output_usd
         NUMERIC(18,8) per_1m_cache_read_usd
         NUMERIC(18,8) per_1m_cache_write_usd
-        NUMERIC(18,8) per_1m_reasoning_usd
         VARCHAR(3) currency "NOT NULL"
         VARCHAR(500) note
         TIMESTAMPTZ effective_from "NOT NULL"
@@ -606,7 +601,8 @@ erDiagram
         NUMERIC(18,8) applied_per_1m_output_usd
         NUMERIC(18,8) applied_per_1m_cache_read_usd
         NUMERIC(18,8) applied_per_1m_cache_write_usd
-        NUMERIC(18,8) applied_per_1m_reasoning_usd
+        VARCHAR(20) source_type UK "NOT NULL"
+        INTEGER source_attempt UK "NOT NULL"
     }
 
     LoginProvider {
@@ -1229,10 +1225,8 @@ erDiagram
         VARCHAR(128) display_name "NOT NULL"
         VARCHAR(2048) base_url "NOT NULL"
         VARCHAR(40) api_protocol "NOT NULL"
-        VARCHAR(64) auth_header_name "NOT NULL"
-        VARCHAR(16) auth_value_prefix "NOT NULL"
+        VARCHAR(16) auth_mode "NOT NULL"
         TEXT api_key
-        VARCHAR(32) azure_api_version
         BOOLEAN enabled "NOT NULL"
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at
@@ -1245,18 +1239,14 @@ erDiagram
         VARCHAR(64) slug UK "NOT NULL"
         VARCHAR(128) display_name "NOT NULL"
         VARCHAR(256) upstream_model_id "NOT NULL"
-        VARCHAR(40) api_protocol_override
-        VARCHAR(16) modality "NOT NULL"
         INTEGER context_window
         INTEGER max_output_tokens
         BOOLEAN supports_reasoning "NOT NULL"
-        VARCHAR(16) cache_control_format
         VARCHAR(16) pricing_mode "NOT NULL"
         NUMERIC(18,8) per_1m_input_usd
         NUMERIC(18,8) per_1m_output_usd
         NUMERIC(18,8) per_1m_cache_read_usd
         NUMERIC(18,8) per_1m_cache_write_usd
-        NUMERIC(18,8) per_1m_reasoning_usd
         VARCHAR(3) currency "NOT NULL"
         VARCHAR(500) price_note
         BOOLEAN enabled "NOT NULL"

@@ -49,18 +49,8 @@ class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     private LlmModelDTO createModel(Long connectionId, String slug) {
-        var request = new CreateLlmModelRequestDTO(
-            slug,
-            "Test Model",
-            "gpt-5",
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            true
-        );
+        // Models start inactive until an explicit price declaration is supplied.
+        var request = new CreateLlmModelRequestDTO(slug, "Test Model", "gpt-5", null, null, null, false);
         return webTestClient
             .post()
             .uri("/admin/llm/connections/{connectionId}/models", connectionId)
@@ -81,7 +71,7 @@ class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         LlmModelDTO created = createModel(connection.getId(), "gpt-5-eu");
         assertThat(created).isNotNull();
         assertThat(created.slug()).isEqualTo("gpt-5-eu");
-        assertThat(created.visibility()).isEqualTo(ModelVisibility.PUBLIC);
+        assertThat(created.visibility()).isEqualTo(ModelVisibility.GRANTED);
         assertThat(created.currentPrice()).isNull();
 
         webTestClient
@@ -106,17 +96,7 @@ class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
             .jsonPath("$.length()")
             .isEqualTo(1);
 
-        var updateRequest = new UpdateLlmModelRequestDTO(
-            "Renamed Model",
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null
-        );
+        var updateRequest = new UpdateLlmModelRequestDTO("Renamed Model", null, null, null, null);
         webTestClient
             .patch()
             .uri("/admin/llm/models/{id}", created.id())

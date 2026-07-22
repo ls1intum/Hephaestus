@@ -24,7 +24,6 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
             null,
             null,
             false,
-            null,
             "job-token",
             true,
             600,
@@ -66,7 +65,6 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
                 null,
                 false,
                 null,
-                null,
                 false,
                 600,
                 PROFILE,
@@ -87,7 +85,6 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
                 null,
                 null,
                 false,
-                null,
                 "  ",
                 false,
                 600,
@@ -103,7 +100,7 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
     @Test
     void blankApiProtocolRejected() {
         assertThatThrownBy(() ->
-            new PiPlanSpec("", "gpt-5.4-mini", null, null, false, null, "job-token", false, 600, PROFILE, Map.of(), "")
+            new PiPlanSpec("", "gpt-5.4-mini", null, null, false, "job-token", false, 600, PROFILE, Map.of(), "")
         )
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("apiProtocol");
@@ -118,7 +115,6 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
                 null,
                 null,
                 false,
-                null,
                 "job-token",
                 false,
                 600,
@@ -140,7 +136,6 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
                 null,
                 null,
                 false,
-                null,
                 "job-token",
                 true,
                 PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS,
@@ -180,7 +175,6 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
                 null,
                 null,
                 false,
-                null,
                 "job-token",
                 true,
                 600,
@@ -201,7 +195,6 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
             null,
             null,
             false,
-            null,
             "job-token",
             true,
             600,
@@ -223,7 +216,6 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
                 null,
                 null,
                 false,
-                null,
                 "job-token",
                 false,
                 600,

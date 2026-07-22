@@ -1,96 +1,68 @@
 /**
- * "Provider type" dropdown (#1368 glossary) — the human-facing choice — and its mapping onto the
- * server's `apiProtocol` wire values. Responses-vs-Completions is a defaulted sub-option under
- * OpenAI, never a top-level choice (glossary: "api_protocol").
+ * Create-time presets for the two OpenAI wire APIs supported by Hephaestus.
  *
- * Shared by the instance-admin connection form and the workspace "Your AI provider" form so the two
- * cannot drift.
+ * Presets are presentation only. Persisted connections keep only their endpoint, protocol and
+ * credential shape, so the runtime stays provider-neutral and OpenAI-compatible.
  */
-export type ProviderTypeOption = "OPENAI" | "OPENAI_COMPATIBLE" | "ANTHROPIC" | "AZURE_OPENAI";
+export type ProviderPreset = "OPENAI" | "AZURE_OPENAI_V1" | "OTHER";
+export type LlmAuthMode = "BEARER" | "API_KEY";
 
-export const PROVIDER_TYPE_ORDER: readonly ProviderTypeOption[] = [
+export const PROVIDER_PRESET_ORDER: readonly ProviderPreset[] = [
 	"OPENAI",
-	"OPENAI_COMPATIBLE",
-	"ANTHROPIC",
-	"AZURE_OPENAI",
+	"AZURE_OPENAI_V1",
+	"OTHER",
 ];
 
-export const PROVIDER_TYPE_LABELS: Record<ProviderTypeOption, string> = {
+export const PROVIDER_PRESET_LABELS: Record<ProviderPreset, string> = {
 	OPENAI: "OpenAI",
-	OPENAI_COMPATIBLE: "OpenAI-compatible (vLLM, Ollama, gateways)",
-	ANTHROPIC: "Anthropic",
-	AZURE_OPENAI: "Azure OpenAI",
+	AZURE_OPENAI_V1: "Azure OpenAI v1",
+	OTHER: "Other OpenAI-compatible endpoint",
 };
 
-/**
- * Passed as `Select`'s `items` prop so the trigger can render the selected label immediately —
- * without it, Base UI Select has no label to show until the matching item has mounted once.
- */
-export const PROVIDER_TYPE_SELECT_ITEMS = PROVIDER_TYPE_ORDER.map((type) => ({
-	value: type,
-	label: PROVIDER_TYPE_LABELS[type],
+export const PROVIDER_PRESET_SELECT_ITEMS = PROVIDER_PRESET_ORDER.map((preset) => ({
+	value: preset,
+	label: PROVIDER_PRESET_LABELS[preset],
 }));
 
-/**
- * The server-side wire protocol values (see `ApiProtocolDefaults` / the `apiProtocol` bean
- * validation regex). Kept in one place so a typo can't silently produce an unvalidated string.
- */
 export const API_PROTOCOLS = {
 	OPENAI_COMPLETIONS: "openai-completions",
 	OPENAI_RESPONSES: "openai-responses",
-	ANTHROPIC_MESSAGES: "anthropic-messages",
-	AZURE_OPENAI_RESPONSES: "azure-openai-responses",
 } as const;
 
-/**
- * Default wire protocol for a provider type. OpenAI defaults to the Completions API; pass
- * `useResponsesApi` to opt into the Responses API sub-option (OpenAI only — compatible gateways
- * don't reliably speak it).
- */
-export function defaultProtocolFor(type: ProviderTypeOption, useResponsesApi = false): string {
-	switch (type) {
-		case "ANTHROPIC":
-			return API_PROTOCOLS.ANTHROPIC_MESSAGES;
-		case "AZURE_OPENAI":
-			return API_PROTOCOLS.AZURE_OPENAI_RESPONSES;
-		case "OPENAI":
-			return useResponsesApi ? API_PROTOCOLS.OPENAI_RESPONSES : API_PROTOCOLS.OPENAI_COMPLETIONS;
-		case "OPENAI_COMPATIBLE":
-			return API_PROTOCOLS.OPENAI_COMPLETIONS;
-	}
-}
-
-/**
- * Best-effort reverse mapping for prefilling the dropdown on edit. "OpenAI" and "OpenAI-compatible"
- * both default to the same wire protocol (the split is a copy nicety, not a server concept), so an
- * existing Completions-style connection always resolves back to "OpenAI" here.
- */
-export function providerTypeForProtocol(apiProtocol: string): ProviderTypeOption {
-	switch (apiProtocol) {
-		case API_PROTOCOLS.ANTHROPIC_MESSAGES:
-			return "ANTHROPIC";
-		case API_PROTOCOLS.AZURE_OPENAI_RESPONSES:
-			return "AZURE_OPENAI";
-		default:
-			return "OPENAI";
-	}
+export function defaultProtocolFor(useResponsesApi = false): string {
+	return useResponsesApi ? API_PROTOCOLS.OPENAI_RESPONSES : API_PROTOCOLS.OPENAI_COMPLETIONS;
 }
 
 export function usesResponsesApi(apiProtocol: string): boolean {
 	return apiProtocol === API_PROTOCOLS.OPENAI_RESPONSES;
 }
 
-/** Mirrors `ApiProtocolDefaults.forProtocol` server-side so the form can preview the default. */
-export function authDefaultsForProtocol(apiProtocol: string): {
-	headerName: string;
-	valuePrefix: string;
-} {
-	switch (apiProtocol) {
-		case API_PROTOCOLS.ANTHROPIC_MESSAGES:
-			return { headerName: "x-api-key", valuePrefix: "" };
-		case API_PROTOCOLS.AZURE_OPENAI_RESPONSES:
-			return { headerName: "api-key", valuePrefix: "" };
-		default:
-			return { headerName: "Authorization", valuePrefix: "Bearer " };
+export function authModeDefaultFor(preset: ProviderPreset): LlmAuthMode {
+	return preset === "AZURE_OPENAI_V1" ? "API_KEY" : "BEARER";
+}
+
+export function baseUrlDefaultFor(preset: ProviderPreset): string {
+	switch (preset) {
+		case "OPENAI":
+			return "https://api.openai.com/v1";
+		case "AZURE_OPENAI_V1":
+			return "https://RESOURCE.openai.azure.com/openai/v1";
+		case "OTHER":
+			return "";
 	}
+}
+
+export interface OpenAiConnectionIdentity {
+	apiProtocol: string;
+	baseUrl: string;
+}
+
+/** Only recognizes OpenAI itself. Azure remains a create-time convenience, not inferred domain state. */
+export function presetForConnection(connection: OpenAiConnectionIdentity): ProviderPreset {
+	try {
+		if (new URL(connection.baseUrl).hostname.toLowerCase() === "api.openai.com") return "OPENAI";
+	} catch {
+		// Invalid legacy URLs remain editable as generic OpenAI-compatible endpoints.
+	}
+	return "OTHER";
 }

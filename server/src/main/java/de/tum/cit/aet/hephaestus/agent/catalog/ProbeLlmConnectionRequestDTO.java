@@ -16,12 +16,11 @@ public record ProbeLlmConnectionRequestDTO(
     @NonNull
     @NotBlank
     @Pattern(
-        regexp = "openai-completions|anthropic-messages|azure-openai-responses|openai-responses",
-        message = "apiProtocol must be one of openai-completions, anthropic-messages, azure-openai-responses, openai-responses"
+        regexp = "openai-completions|openai-responses",
+        message = "apiProtocol must be one of openai-completions, openai-responses"
     )
     @Schema(description = "Wire protocol")
     String apiProtocol,
-    @Nullable @Schema(description = "Auth header name; defaults from protocol") String authHeaderName,
-    @Nullable @Schema(description = "Auth value prefix; defaults from protocol") String authValuePrefix,
+    @Nullable @Schema(description = "Credential shape (default BEARER)") LlmAuthMode authMode,
     @Nullable @Schema(description = "API key used only for this probe") String apiKey
 ) {}

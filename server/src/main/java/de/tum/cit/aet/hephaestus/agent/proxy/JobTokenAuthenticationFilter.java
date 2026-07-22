@@ -123,36 +123,26 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
                 snapshot.baseUrl(),
                 snapshot.connectionScope(),
                 snapshot.connectionId(),
+                snapshot.modelId(),
+                job.getWorkspace().getId(),
                 snapshot.configId()
             )
         );
     }
 
     /**
-     * Extract the proxy token from whichever auth header the sandbox's outbound request used. The
-     * wire shape depends on the connection's {@code apiProtocol} (Pi crafts the request natively for
-     * that protocol — anthropic-messages sends {@code x-api-key}, azure-openai-responses sends
-     * {@code api-key}, openai-completions sends {@code Authorization: Bearer}), which the proxy does
-     * not know until AFTER it has resolved the token — so all three shapes are checked here,
-     * independent of the token's value.
+     * Extract the proxy-scoped token from the one supported sandbox authentication shape. Provider
+     * credentials may use a custom upstream header, but the sandbox itself always authenticates to
+     * Hephaestus with {@code Authorization: Bearer}; accepting provider-key headers here would blur
+     * those two trust boundaries.
      */
     private String extractProxyToken(HttpServletRequest request) {
-        String xApiKey = request.getHeader("x-api-key");
-        if (xApiKey != null && !xApiKey.isBlank()) {
-            return xApiKey.trim();
-        }
-
         String auth = request.getHeader("Authorization");
         if (auth != null && auth.regionMatches(true, 0, BEARER_PREFIX, 0, BEARER_PREFIX.length())) {
             String bearer = auth.substring(BEARER_PREFIX.length()).trim();
             if (!bearer.isBlank()) {
                 return bearer;
             }
-        }
-
-        String azureApiKey = request.getHeader("api-key");
-        if (azureApiKey != null && !azureApiKey.isBlank()) {
-            return azureApiKey.trim();
         }
 
         return null;

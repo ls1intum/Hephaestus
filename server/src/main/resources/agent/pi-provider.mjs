@@ -64,12 +64,6 @@ export function registerHephaestusProvider(modelRegistry, config, env = process.
     if (Number.isFinite(config.maxOutputTokens)) {
         model.maxTokens = config.maxOutputTokens;
     }
-    if (config.cacheControlFormat) {
-        // Opt into cache_control markers so the large stable prefix (system prompt + the diff/context
-        // the agent reads once) is cached across turns. A no-op if the upstream ignores the markers.
-        model.compat = { cacheControlFormat: config.cacheControlFormat, supportsLongCacheRetention: true };
-    }
-
     modelRegistry.registerProvider("hephaestus", {
         name: "Hephaestus Gateway",
         baseUrl,

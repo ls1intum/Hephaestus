@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
-import type { AdminWorkspaceLlmUsage } from "@/api/types.gen";
+import type { AdminWorkspaceLlmUsage, WorkspaceLlmUsageReport } from "@/api/types.gen";
 import { AdminInstanceLlmUsageTable } from "./AdminInstanceLlmUsageTable";
 
 const rows: AdminWorkspaceLlmUsage[] = [
@@ -45,6 +45,39 @@ const rows: AdminWorkspaceLlmUsage[] = [
 	},
 ];
 
+const detailReport: WorkspaceLlmUsageReport = {
+	month: "2026-07",
+	monthlyBudgetUsd: 25,
+	pricedTotalCostUsd: 25.0142,
+	byoTotalCostUsd: 1.5,
+	verdict: "EXHAUSTED",
+	usagePaused: true,
+	unpricedEventCount: 0,
+	byJobType: [
+		{
+			jobType: "PULL_REQUEST_REVIEW",
+			pricedTotalCostUsd: 25.0142,
+			byoTotalCostUsd: 1.5,
+			unpricedEventCount: 0,
+			inputTokens: 80_000,
+			outputTokens: 12_000,
+			cacheReadTokens: 10_000,
+			cacheWriteTokens: 2_000,
+			totalCalls: 42,
+			events: 18,
+		},
+	],
+	byDay: [
+		{
+			day: new Date("2026-07-05T00:00:00.000Z"),
+			pricedTotalCostUsd: 25.0142,
+			byoTotalCostUsd: 1.5,
+			unpricedEventCount: 0,
+			events: 18,
+		},
+	],
+};
+
 /**
  * Instance-admin table of every workspace's LLM spend for one month, with per-row budget
  * cap editing raised via `onEditBudget`. Pure/presentational.
@@ -59,6 +92,11 @@ const meta = {
 		isLoading: false,
 		error: null,
 		onRetry: fn(),
+		expandedWorkspaceId: null,
+		isDetailLoading: false,
+		detailError: null,
+		onRetryDetail: fn(),
+		onToggleDetails: fn(),
 		onEditBudget: fn(),
 	},
 } satisfies Meta<typeof AdminInstanceLlmUsageTable>;
@@ -71,6 +109,14 @@ type Story = StoryObj<typeof meta>;
  * usage has no price set — a warning line, never a badge; see the #1368 glossary).
  */
 export const Default: Story = {};
+
+/** One workspace expanded to show the existing by-job and daily usage rollups. */
+export const Expanded: Story = {
+	args: {
+		expandedWorkspaceId: rows[0].workspaceId,
+		detailReport,
+	},
+};
 
 /**
  * A past month. `verdict` is computed from the workspace's *current* cap, so it can't say

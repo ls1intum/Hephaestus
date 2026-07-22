@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
-import de.tum.cit.aet.hephaestus.agent.catalog.ApiProtocolDefaults.AuthDefaults;
 import de.tum.cit.aet.hephaestus.core.WebClientConnectors;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
@@ -10,7 +9,6 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.ReactorClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
@@ -19,6 +17,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import reactor.netty.http.client.HttpClient;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * "Test &amp; fetch models" probe for LLM connections (#1368). Issues a short-timeout {@code GET
@@ -35,18 +34,24 @@ public class LlmConnectionProbeService {
 
     private static final Logger log = LoggerFactory.getLogger(LlmConnectionProbeService.class);
     private static final Duration PROBE_TIMEOUT = Duration.ofSeconds(5);
+    private static final int MAX_RESPONSE_BYTES = 1024 * 1024;
+    private static final int MAX_MODELS = 1_000;
+    private static final int MAX_MODEL_ID_LENGTH = 256;
 
     private final LlmConnectionRepository connectionRepository;
     private final EgressPolicy egressPolicy;
+    private final ObjectMapper objectMapper;
     private final RestClient restClient;
 
     LlmConnectionProbeService(
         LlmConnectionRepository connectionRepository,
         EgressPolicy egressPolicy,
+        ObjectMapper objectMapper,
         @Value("${hephaestus.llm.egress.allow-loopback:false}") boolean allowLoopback
     ) {
         this.connectionRepository = connectionRepository;
         this.egressPolicy = egressPolicy;
+        this.objectMapper = objectMapper;
         // Dedicated short-timeout client — deliberately independent of any job/proxy timeout.
         // Redirects are NEVER followed (Reactor Netty's default: no automatic redirect-following unless
         // explicitly enabled, reasserted below for clarity): only the initial URL is egress-validated,
@@ -77,23 +82,14 @@ public class LlmConnectionProbeService {
             .findById(connectionId)
             .orElseThrow(() -> new EntityNotFoundException("LlmConnection", connectionId));
         egressPolicy.validate(connection.getBaseUrl());
-        return probe(
-            connection.getBaseUrl(),
-            connection.getAuthHeaderName(),
-            connection.getAuthValuePrefix(),
-            connection.getApiKey()
-        );
+        return probe(connection.getBaseUrl(), connection.getAuthMode(), connection.getApiKey());
     }
 
     /** Probe an unsaved draft using the supplied credential (never persisted). */
     public LlmProbeResultDTO probeDraft(ProbeLlmConnectionRequestDTO request) {
         egressPolicy.validate(request.baseUrl());
-        AuthDefaults defaults = ApiProtocolDefaults.forProtocol(request.apiProtocol());
-        String headerName = StringUtils.hasText(request.authHeaderName())
-            ? request.authHeaderName()
-            : defaults.headerName();
-        String prefix = request.authValuePrefix() != null ? request.authValuePrefix() : defaults.valuePrefix();
-        return probe(request.baseUrl(), headerName, prefix, request.apiKey());
+        LlmAuthMode authMode = request.authMode() != null ? request.authMode() : LlmAuthMode.BEARER;
+        return probe(request.baseUrl(), authMode, request.apiKey());
     }
 
     /**
@@ -101,16 +97,11 @@ public class LlmConnectionProbeService {
      * and has already egress-validated {@code baseUrl} itself — reused rather than duplicated so both
      * scopes share the exact same "test & fetch models" mechanics.
      */
-    public LlmProbeResultDTO probeCredential(
-        String baseUrl,
-        String authHeaderName,
-        String authValuePrefix,
-        String apiKey
-    ) {
-        return probe(baseUrl, authHeaderName, authValuePrefix, apiKey);
+    public LlmProbeResultDTO probeCredential(String baseUrl, LlmAuthMode authMode, String apiKey) {
+        return probe(baseUrl, authMode, apiKey);
     }
 
-    private LlmProbeResultDTO probe(String baseUrl, String authHeaderName, String authValuePrefix, String apiKey) {
+    private LlmProbeResultDTO probe(String baseUrl, LlmAuthMode authMode, String apiKey) {
         String url = stripTrailingSlash(baseUrl) + "/models";
         try {
             return restClient
@@ -119,8 +110,11 @@ public class LlmConnectionProbeService {
                 .headers(headers -> {
                     headers.setAccept(List.of(MediaType.APPLICATION_JSON));
                     if (StringUtils.hasText(apiKey)) {
-                        String prefix = authValuePrefix != null ? authValuePrefix : "";
-                        headers.add(authHeaderName, prefix + apiKey);
+                        if (authMode == LlmAuthMode.API_KEY) {
+                            headers.set("api-key", apiKey);
+                        } else {
+                            headers.setBearerAuth(apiKey);
+                        }
                     }
                 })
                 .exchange((clientRequest, clientResponse) -> {
@@ -128,7 +122,11 @@ public class LlmConnectionProbeService {
                     if (!clientResponse.getStatusCode().is2xxSuccessful()) {
                         return LlmProbeResultDTO.unreachable(status, "Provider returned HTTP " + status);
                     }
-                    JsonNode body = clientResponse.bodyTo(JsonNode.class);
+                    byte[] response = clientResponse.getBody().readNBytes(MAX_RESPONSE_BYTES + 1);
+                    if (response.length > MAX_RESPONSE_BYTES) {
+                        return LlmProbeResultDTO.unreachable(status, "Provider response was too large");
+                    }
+                    JsonNode body = objectMapper.readTree(response);
                     return LlmProbeResultDTO.reachable(extractModelIds(body), status);
                 });
         } catch (Exception e) {
@@ -146,8 +144,11 @@ public class LlmConnectionProbeService {
         }
         for (JsonNode entry : body.path("data")) {
             String id = entry.path("id").asString("");
-            if (!id.isBlank()) {
+            if (!id.isBlank() && id.length() <= MAX_MODEL_ID_LENGTH) {
                 ids.add(id);
+                if (ids.size() == MAX_MODELS) {
+                    break;
+                }
             }
         }
         return ids;

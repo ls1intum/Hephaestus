@@ -34,7 +34,6 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             200000,
             8192,
             false,
-            null,
             "job-token-123",
             allowInternet,
             600,
@@ -51,7 +50,6 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             null,
             null,
             false,
-            null,
             "job-token-123",
             false,
             600,
@@ -145,7 +143,6 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 null,
                 null,
                 false,
-                null,
                 "job-token-123",
                 true,
                 600,
@@ -190,7 +187,6 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 131072,
                 4096,
                 true,
-                "anthropic",
                 "job-token-123",
                 false,
                 600,
@@ -206,7 +202,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             assertThat(root.path("contextWindow").asInt()).isEqualTo(131072);
             assertThat(root.path("maxOutputTokens").asInt()).isEqualTo(4096);
             assertThat(root.path("supportsReasoning").asBoolean()).isTrue();
-            assertThat(root.path("cacheControlFormat").asString()).isEqualTo("anthropic");
+            assertThat(root.has("cacheControlFormat")).isFalse();
             // The credential NEVER lands here — only non-secret behaviour.
             assertThat(new String(json, StandardCharsets.UTF_8)).doesNotContain("job-token-123");
         }
@@ -255,7 +251,6 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 null,
                 null,
                 false,
-                null,
                 "job-token-123",
                 false,
                 timeoutSeconds,
@@ -355,7 +350,6 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 null,
                 null,
                 false,
-                null,
                 "job-token-123",
                 true,
                 600,

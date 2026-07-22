@@ -47,7 +47,7 @@ import { deriveDesignations } from "./utils";
 import { WorkspaceLlmProviderPanel } from "./WorkspaceLlmProviderPanel";
 
 const NEW_RUNTIME = "__new__";
-const MENTOR_FANOUT = "__none__";
+const MENTOR_UNCONFIGURED = "__none__";
 
 interface AgentRuntimesPageProps {
 	workspaceSlug: string;
@@ -107,11 +107,11 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 		...createConfigMutation(),
 		onSuccess: (created) => {
 			invalidateAll();
-			toast.success("Model created");
+			toast.success("Agent configuration created");
 			setSelectedId(created.id);
 		},
 		onError: (error) => {
-			toast.error("Failed to create model", {
+			toast.error("Failed to create the agent configuration", {
 				description: error instanceof Error ? error.message : undefined,
 			});
 		},
@@ -121,10 +121,10 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 		...updateConfigMutation(),
 		onSuccess: () => {
 			invalidateAll();
-			toast.success("Model updated");
+			toast.success("Agent configuration updated");
 		},
 		onError: (error) => {
-			toast.error("Failed to update model", {
+			toast.error("Failed to update the agent configuration", {
 				description: error instanceof Error ? error.message : undefined,
 			});
 		},
@@ -134,14 +134,14 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 		...deleteConfigMutation(),
 		onSuccess: (_data, variables) => {
 			invalidateAll();
-			toast.success("Model deleted");
+			toast.success("Agent configuration deleted");
 			if (variables.path.configId === selectedId) {
 				setSelectedId(null);
 			}
 		},
 		onError: (error) => {
 			// A 409 means the config is bound to a workspace feature; surface the server message.
-			toast.error("Failed to delete model", {
+			toast.error("Failed to delete the agent configuration", {
 				description:
 					error instanceof Error
 						? error.message
@@ -180,31 +180,59 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 	const handleBindMentor = (value: string) => {
 		updateMentorConfig.mutate({
 			path: { workspaceSlug },
-			body: { configId: value === MENTOR_FANOUT ? undefined : Number(value) },
+			body: { configId: value === MENTOR_UNCONFIGURED ? undefined : Number(value) },
 		});
 	};
 
-	const isLoading = configsQuery.isLoading || aiSettingsQuery.isLoading;
-	const isError = configsQuery.isError || aiSettingsQuery.isError;
+	const isLoading =
+		configsQuery.isLoading || aiSettingsQuery.isLoading || availableModelsQuery.isLoading;
+	const isError = configsQuery.isError || aiSettingsQuery.isError || availableModelsQuery.isError;
 	const formPending = createConfig.isPending || updateConfig.isPending;
 
 	const handleRetry = () => {
 		configsQuery.refetch();
 		aiSettingsQuery.refetch();
+		availableModelsQuery.refetch();
 	};
 	const mentorEnabled = aiSettingsQuery.data?.mentorEnabled ?? false;
 	const mentorConfigId = aiSettingsQuery.data?.mentorConfigId;
+	const isAvailableMentorConfig = (config: AgentConfig) => {
+		if (!config.enabled) return false;
+		const modelId = config.instanceModelId ?? config.workspaceModelId;
+		if (modelId == null) return false;
+		const scope = config.instanceModelId != null ? "SHARED" : "WORKSPACE";
+		return availableModels.some((model) => model.scope === scope && model.id === modelId);
+	};
+	const selectableMentorConfigs = configs.filter(isAvailableMentorConfig);
+	const selectedMentorConfig = configs.find((config) => config.id === mentorConfigId);
+	const mentorBindingUnavailable =
+		mentorConfigId != null &&
+		(selectedMentorConfig == null || !isAvailableMentorConfig(selectedMentorConfig));
 	const mentorRuntimeItems = [
-		{ value: MENTOR_FANOUT, label: "Automatic (first available model)" },
-		...configs.map((config) => ({ value: String(config.id), label: config.name })),
+		{ value: MENTOR_UNCONFIGURED, label: "Not configured", disabled: false },
+		...selectableMentorConfigs.map((config) => ({
+			value: String(config.id),
+			label: config.name,
+			disabled: false,
+		})),
+		...(mentorBindingUnavailable
+			? [
+					{
+						value: String(mentorConfigId),
+						label: `${selectedMentorConfig?.name ?? `Configuration #${mentorConfigId}`} (unavailable)`,
+						disabled: true,
+					},
+				]
+			: []),
 	];
 
 	return (
 		<div className="container mx-auto max-w-6xl py-6">
 			<div className="mb-6">
-				<h1 className="text-3xl font-bold tracking-tight">Models</h1>
+				<h1 className="text-3xl font-bold tracking-tight">AI setup</h1>
 				<p className="text-muted-foreground">
-					Set up the models that power practice reviews and the mentor.
+					Choose which models power practice reviews and the mentor, or connect workspace-funded
+					providers.
 				</p>
 			</div>
 
@@ -216,8 +244,8 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 
 			<Tabs defaultValue="models">
 				<TabsList>
-					<TabsTrigger value="models">Models</TabsTrigger>
-					<TabsTrigger value="provider">Your AI provider</TabsTrigger>
+					<TabsTrigger value="models">Agent settings</TabsTrigger>
+					<TabsTrigger value="provider">Your providers</TabsTrigger>
 				</TabsList>
 
 				<TabsContent value="models" className="mt-6">
@@ -230,7 +258,7 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 									onClick={() => setSelectedId(null)}
 								>
 									<Plus className="mr-1.5 h-4 w-4" />
-									New model
+									New configuration
 								</Button>
 							</div>
 
@@ -255,9 +283,10 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 										<EmptyMedia variant="icon">
 											<Bot />
 										</EmptyMedia>
-										<EmptyTitle>No models yet</EmptyTitle>
+										<EmptyTitle>No agent configurations yet</EmptyTitle>
 										<EmptyDescription>
-											Add your first AI model with the form to start running practice reviews.
+											Choose a model for your first agent configuration to start running practice
+											reviews.
 										</EmptyDescription>
 									</EmptyHeader>
 								</Empty>
@@ -286,8 +315,8 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 									<CardContent className="space-y-2">
 										<Select
 											items={mentorRuntimeItems}
-											value={mentorConfigId != null ? String(mentorConfigId) : MENTOR_FANOUT}
-											disabled={updateMentorConfig.isPending || configs.length === 0}
+											value={mentorConfigId != null ? String(mentorConfigId) : MENTOR_UNCONFIGURED}
+											disabled={updateMentorConfig.isPending}
 											onValueChange={(value) => {
 												if (value) handleBindMentor(value);
 											}}
@@ -296,16 +325,21 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 												<SelectValue />
 											</SelectTrigger>
 											<SelectContent>
-												<SelectItem value={MENTOR_FANOUT}>
-													Automatic (first available model)
-												</SelectItem>
-												{configs.map((config) => (
-													<SelectItem key={config.id} value={String(config.id)}>
-														{config.name}
+												{mentorRuntimeItems.map((item) => (
+													<SelectItem key={item.value} value={item.value} disabled={item.disabled}>
+														{item.label}
 													</SelectItem>
 												))}
 											</SelectContent>
 										</Select>
+										{mentorBindingUnavailable && (
+											<Alert variant="destructive">
+												<AlertCircle />
+												<AlertDescription>
+													The selected configuration cannot run. Choose an available configuration.
+												</AlertDescription>
+											</Alert>
+										)}
 										<p className="text-xs text-muted-foreground">
 											The model that powers the mentor chat for this workspace.
 										</p>
@@ -317,7 +351,7 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 						<Card>
 							<CardHeader>
 								<CardTitle className="text-base">
-									{selectedConfig ? `Edit: ${selectedConfig.name}` : "New model"}
+									{selectedConfig ? `Edit: ${selectedConfig.name}` : "New agent configuration"}
 								</CardTitle>
 							</CardHeader>
 							<CardContent>
@@ -336,7 +370,10 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 				</TabsContent>
 
 				<TabsContent value="provider" className="mt-6">
-					<WorkspaceLlmProviderPanel workspaceSlug={workspaceSlug} />
+					<WorkspaceLlmProviderPanel
+						workspaceSlug={workspaceSlug}
+						workspaceConnectionsAllowed={aiSettingsQuery.data?.workspaceConnectionsAllowed ?? false}
+					/>
 				</TabsContent>
 			</Tabs>
 		</div>

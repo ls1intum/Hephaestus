@@ -44,8 +44,8 @@ import tools.jackson.databind.node.ObjectNode;
  * {@code report_finding} tool, and the result schema the runner emits — all without Docker.
  * The {@code DockerSandboxLiveTest} covers the sandbox SPI separately.
  *
- * <p>Mirrors {@code MentorLiveLlmTest} for the Pi SDK install and the {@code tum-openai}
- * extension that bends Pi's built-in {@code openai} provider toward the TUM gateway (Pi does not
+ * <p>Mirrors {@code MentorLiveLlmTest} for the Pi SDK install and the custom provider
+ * extension that bends Pi's built-in {@code openai} provider toward the configured endpoint (Pi does not
  * read {@code OPENAI_BASE_URL} natively).
  *
  * <p>Workspace staging differs from the mentor test: the practice runner hardcodes

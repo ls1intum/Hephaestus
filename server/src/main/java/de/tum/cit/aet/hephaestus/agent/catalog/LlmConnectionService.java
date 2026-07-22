@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
-import de.tum.cit.aet.hephaestus.agent.catalog.ApiProtocolDefaults.AuthDefaults;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.spi.LlmConnectionAudit;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
@@ -46,31 +45,20 @@ public class LlmConnectionService {
 
     @Transactional
     public LlmConnection create(CreateLlmConnectionRequestDTO request) {
-        if (connectionRepository.findBySlug(request.slug()).isPresent()) {
-            throw new LlmConnectionSlugConflictException(request.slug());
+        String slug = connectionSlug(request.slug(), request.displayName());
+        if (StringUtils.hasText(request.slug()) && connectionRepository.findBySlug(slug).isPresent()) {
+            throw new LlmConnectionSlugConflictException(slug);
         }
         egressPolicy.validate(request.baseUrl());
 
-        AuthDefaults defaults = ApiProtocolDefaults.forProtocol(request.apiProtocol());
-
         LlmConnection connection = new LlmConnection();
-        connection.setSlug(request.slug());
+        connection.setSlug(slug);
         connection.setDisplayName(request.displayName());
         connection.setBaseUrl(request.baseUrl().trim());
         connection.setApiProtocol(request.apiProtocol());
-        connection.setAuthHeaderName(
-            StringUtils.hasText(request.authHeaderName()) ? request.authHeaderName() : defaults.headerName()
-        );
-        connection.setAuthValuePrefix(
-            request.authValuePrefix() != null ? request.authValuePrefix() : defaults.valuePrefix()
-        );
+        connection.setAuthMode(request.authMode() != null ? request.authMode() : LlmAuthMode.BEARER);
         if (StringUtils.hasText(request.apiKey())) {
             connection.setApiKey(request.apiKey());
-        }
-        if (request.azureApiVersion() != null) {
-            connection.setAzureApiVersion(
-                request.azureApiVersion().isBlank() ? null : request.azureApiVersion().trim()
-            );
         }
         if (request.enabled() != null) {
             connection.setEnabled(request.enabled());
@@ -82,10 +70,21 @@ public class LlmConnectionService {
         } catch (DataIntegrityViolationException e) {
             // The slug fast-path above is racy; the unique constraint backstops the loser of a concurrent
             // create. Report the same 409 rather than leaking a 500.
-            throw new LlmConnectionSlugConflictException(request.slug());
+            throw new LlmConnectionSlugConflictException(slug);
         }
         llmConnectionAudit.connectionCreated(saved.getId(), saved.getSlug());
         return saved;
+    }
+
+    private String connectionSlug(String requested, String displayName) {
+        String base = StringUtils.hasText(requested) ? requested : CatalogSlug.from(displayName);
+        if (StringUtils.hasText(requested)) return base;
+        String candidate = base;
+        for (int i = 2; connectionRepository.findBySlug(candidate).isPresent(); i++) candidate = CatalogSlug.suffix(
+            base,
+            i
+        );
+        return candidate;
     }
 
     @Transactional
@@ -97,30 +96,11 @@ public class LlmConnectionService {
         if (request.displayName() != null) {
             connection.setDisplayName(request.displayName());
         }
-        if (request.baseUrl() != null) {
-            String newBaseUrl = request.baseUrl().trim();
-            egressPolicy.validate(newBaseUrl);
-            connection.setBaseUrl(newBaseUrl);
-        }
-        if (request.apiProtocol() != null) {
-            connection.setApiProtocol(request.apiProtocol());
-        }
-        if (request.authHeaderName() != null) {
-            connection.setAuthHeaderName(request.authHeaderName());
-        }
-        if (request.authValuePrefix() != null) {
-            connection.setAuthValuePrefix(request.authValuePrefix());
-        }
         // Clearing the key wins over a supplied value, mirroring AgentConfig's clearLlmApiKey semantics.
         if (Boolean.TRUE.equals(request.clearApiKey())) {
             connection.setApiKey(null);
         } else if (request.apiKey() != null) {
             connection.setApiKey(request.apiKey());
-        }
-        if (request.azureApiVersion() != null) {
-            connection.setAzureApiVersion(
-                request.azureApiVersion().isBlank() ? null : request.azureApiVersion().trim()
-            );
         }
         if (request.enabled() != null) {
             connection.setEnabled(request.enabled());

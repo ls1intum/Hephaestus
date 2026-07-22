@@ -28,7 +28,7 @@ import org.mockito.Mock;
 
 /**
  * Unit coverage for {@link MentorPiAdapter#buildSandboxSpec}: the genuinely error-prone branches the
- * orchestration-level {@code MentorChatServiceTest} stubs over — context-key validation, base-URL precedence,
+ * orchestration-level {@code MentorChatServiceTest} stubs over — context-key validation, resolved routing,
  * session-restore injection, and the always-present system prompt. {@link PiRuntimeFactory} is mocked so the
  * captured {@link PiPlanSpec} can be asserted on directly.
  */
@@ -54,16 +54,11 @@ class MentorPiAdapterTest extends BaseUnitTest {
         );
         when(runtimeFactory.build(any())).thenReturn(plan);
         proxyRegistry = new MentorProxyCredentialRegistry();
-        adapter = newAdapter("");
+        adapter = newAdapter();
     }
 
-    private MentorPiAdapter newAdapter(String propertyBaseUrl) {
-        return new MentorPiAdapter(
-            runtimeFactory,
-            new MentorAgentProperties(100000, propertyBaseUrl),
-            new AgentImageProperties("test-image:latest", null),
-            proxyRegistry
-        );
+    private MentorPiAdapter newAdapter() {
+        return new MentorPiAdapter(runtimeFactory, new AgentImageProperties("test-image:latest", null), proxyRegistry);
     }
 
     /** A legacy (pre-catalog) mentor config — connectionScope/connectionId are null. */
@@ -84,10 +79,8 @@ class MentorPiAdapterTest extends BaseUnitTest {
             false,
             null,
             null,
-            null,
             allowInternet,
-            120,
-            rawBaseUrl
+            120
         );
     }
 
@@ -128,9 +121,8 @@ class MentorPiAdapterTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("an explicit per-config base URL overrides the instance property")
-    void llmConfigBaseUrlWins() {
-        adapter = newAdapter("https://property.example");
+    @DisplayName("the resolved catalog base URL is carried into proxy routing")
+    void resolvedCatalogBaseUrlIsUsed() {
         PiPlanSpec spec = capturePlanSpec(llmConfig("https://config.example"), Map.of(), null);
         assertThat(routingFor(spec).baseUrl()).isEqualTo("https://config.example");
     }
@@ -140,14 +132,6 @@ class MentorPiAdapterTest extends BaseUnitTest {
     void blankPropertyYieldsResolverDefault() {
         PiPlanSpec spec = capturePlanSpec(llmConfig(null), Map.of(), null);
         assertThat(routingFor(spec).baseUrl()).isEqualTo("https://api.openai.com");
-    }
-
-    @Test
-    @DisplayName("a blank config base URL falls through to the instance property")
-    void blankConfigBaseUrlFallsBackToProperty() {
-        adapter = newAdapter("https://property.example");
-        PiPlanSpec spec = capturePlanSpec(llmConfig("   "), Map.of(), null);
-        assertThat(routingFor(spec).baseUrl()).isEqualTo("https://property.example");
     }
 
     @Test

@@ -17,6 +17,7 @@ import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 /**
  * CRUD for models on a workspace's own "bring your own" LLM connection (#1368), plus the
@@ -24,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
  * catalog models visible to this workspace and the workspace's own BYO models.
  *
  * <p>Every mutation is gated on {@code allow_workspace_connections}, same as
- * {@link WorkspaceLlmConnectionService}. Pricing reuses {@link LlmPriceValidation} — same PRICED/FREE/
+ * {@link WorkspaceLlmConnectionService}. Pricing reuses {@link LlmPriceValidation} — same PRICED/NO_CHARGE/
  * UNPRICED rule as the instance catalog, just applied inline instead of through a temporal history.
  * Audited on {@code config_audit_event} — see {@link WorkspaceLlmConnectionService} for why this
  * differs from the instance catalog's {@code auth_event} ledger.
@@ -71,8 +72,12 @@ public class WorkspaceLlmModelService {
         WorkspaceLlmConnection connection = connectionRepository
             .findByIdAndWorkspaceId(connectionId, workspaceId)
             .orElseThrow(() -> new EntityNotFoundException("WorkspaceLlmConnection", connectionId));
-        if (modelRepository.findByWorkspaceIdAndSlug(workspaceId, request.slug()).isPresent()) {
-            throw new LlmModelSlugConflictException(connectionId, request.slug());
+        String slug = modelSlug(workspaceId, request.slug(), request.displayName());
+        if (
+            StringUtils.hasText(request.slug()) &&
+            modelRepository.findByWorkspaceIdAndSlug(workspaceId, slug).isPresent()
+        ) {
+            throw new LlmModelSlugConflictException(connectionId, slug);
         }
         if (modelRepository.existsByConnectionIdAndUpstreamModelId(connectionId, request.upstreamModelId())) {
             throw new LlmModelUpstreamIdConflictException(connectionId, request.upstreamModelId());
@@ -85,26 +90,20 @@ public class WorkspaceLlmModelService {
             request.per1mOutputUsd(),
             request.per1mCacheReadUsd(),
             request.per1mCacheWriteUsd(),
-            request.per1mReasoningUsd(),
             request.priceNote()
         );
 
         WorkspaceLlmModel model = new WorkspaceLlmModel();
         model.setWorkspace(connection.getWorkspace());
         model.setConnection(connection);
-        model.setSlug(request.slug());
+        model.setSlug(slug);
         model.setDisplayName(request.displayName());
         model.setUpstreamModelId(request.upstreamModelId());
-        model.setApiProtocolOverride(blankToNull(request.apiProtocolOverride()));
-        if (request.modality() != null) {
-            model.setModality(request.modality());
-        }
         model.setContextWindow(request.contextWindow());
         model.setMaxOutputTokens(request.maxOutputTokens());
         if (request.supportsReasoning() != null) {
             model.setSupportsReasoning(request.supportsReasoning());
         }
-        model.setCacheControlFormat(blankToNull(request.cacheControlFormat()));
         if (request.enabled() != null) {
             model.setEnabled(request.enabled());
         }
@@ -115,9 +114,11 @@ public class WorkspaceLlmModelService {
             request.per1mOutputUsd(),
             request.per1mCacheReadUsd(),
             request.per1mCacheWriteUsd(),
-            request.per1mReasoningUsd(),
             request.priceNote()
         );
+        if (model.isEnabled()) {
+            requireActivatable(model);
+        }
 
         WorkspaceLlmModel saved;
         try {
@@ -133,7 +134,7 @@ public class WorkspaceLlmModelService {
             if (isUpstreamIdConflict(e)) {
                 throw new LlmModelUpstreamIdConflictException(connectionId, request.upstreamModelId());
             }
-            throw new LlmModelSlugConflictException(connectionId, request.slug());
+            throw new LlmModelSlugConflictException(connectionId, slug);
         }
         configAudit.record(
             ConfigAuditEntry.created(
@@ -146,37 +147,28 @@ public class WorkspaceLlmModelService {
         return saved;
     }
 
+    private String modelSlug(Long workspaceId, String requested, String displayName) {
+        String base = StringUtils.hasText(requested) ? requested : CatalogSlug.from(displayName);
+        if (StringUtils.hasText(requested)) return base;
+        String candidate = base;
+        for (int i = 2; modelRepository.findByWorkspaceIdAndSlug(workspaceId, candidate).isPresent(); i++) candidate =
+            CatalogSlug.suffix(base, i);
+        return candidate;
+    }
+
     @Transactional
     public WorkspaceLlmModel update(
         WorkspaceContext workspaceContext,
         Long id,
         UpdateWorkspaceLlmModelRequestDTO request
     ) {
-        requireByoEnabled();
-        WorkspaceLlmModel model = get(workspaceContext, id);
+        WorkspaceLlmModel model = modelRepository
+            .findByIdAndWorkspaceIdForUpdate(id, workspaceContext.id())
+            .orElseThrow(() -> new EntityNotFoundException("WorkspaceLlmModel", id));
         WorkspaceLlmModelSnapshot before = WorkspaceLlmModelSnapshot.of(model);
 
         if (request.displayName() != null) {
             model.setDisplayName(request.displayName());
-        }
-        if (request.upstreamModelId() != null) {
-            if (
-                !request.upstreamModelId().equals(model.getUpstreamModelId()) &&
-                modelRepository.existsByConnectionIdAndUpstreamModelIdAndIdNot(
-                    model.getConnection().getId(),
-                    request.upstreamModelId(),
-                    id
-                )
-            ) {
-                throw new LlmModelUpstreamIdConflictException(model.getConnection().getId(), request.upstreamModelId());
-            }
-            model.setUpstreamModelId(request.upstreamModelId());
-        }
-        if (request.apiProtocolOverride() != null) {
-            model.setApiProtocolOverride(blankToNull(request.apiProtocolOverride()));
-        }
-        if (request.modality() != null) {
-            model.setModality(request.modality());
         }
         if (request.contextWindow() != null) {
             model.setContextWindow(request.contextWindow());
@@ -186,9 +178,6 @@ public class WorkspaceLlmModelService {
         }
         if (request.supportsReasoning() != null) {
             model.setSupportsReasoning(request.supportsReasoning());
-        }
-        if (request.cacheControlFormat() != null) {
-            model.setCacheControlFormat(blankToNull(request.cacheControlFormat()));
         }
         if (request.enabled() != null) {
             model.setEnabled(request.enabled());
@@ -201,7 +190,6 @@ public class WorkspaceLlmModelService {
                 request.per1mOutputUsd(),
                 request.per1mCacheReadUsd(),
                 request.per1mCacheWriteUsd(),
-                request.per1mReasoningUsd(),
                 request.priceNote()
             );
             applyPrice(
@@ -211,9 +199,11 @@ public class WorkspaceLlmModelService {
                 request.per1mOutputUsd(),
                 request.per1mCacheReadUsd(),
                 request.per1mCacheWriteUsd(),
-                request.per1mReasoningUsd(),
                 request.priceNote()
             );
+        }
+        if (model.isEnabled()) {
+            requireActivatable(model);
         }
 
         WorkspaceLlmModel saved;
@@ -246,7 +236,6 @@ public class WorkspaceLlmModelService {
 
     @Transactional
     public void delete(WorkspaceContext workspaceContext, Long id) {
-        requireByoEnabled();
         WorkspaceLlmModel model = get(workspaceContext, id);
         if (agentConfigRepository.existsByWorkspaceModelIdAndWorkspaceId(id, workspaceContext.id())) {
             throw new LlmModelInUseException(id);
@@ -300,7 +289,6 @@ public class WorkspaceLlmModelService {
         BigDecimal per1mOutputUsd,
         BigDecimal per1mCacheReadUsd,
         BigDecimal per1mCacheWriteUsd,
-        BigDecimal per1mReasoningUsd,
         String priceNote
     ) {
         model.setPricingMode(pricingMode);
@@ -308,8 +296,15 @@ public class WorkspaceLlmModelService {
         model.setPer1mOutputUsd(per1mOutputUsd);
         model.setPer1mCacheReadUsd(per1mCacheReadUsd);
         model.setPer1mCacheWriteUsd(per1mCacheWriteUsd);
-        model.setPer1mReasoningUsd(per1mReasoningUsd);
         model.setPriceNote(blankToNull(priceNote));
+    }
+
+    private static void requireActivatable(WorkspaceLlmModel model) {
+        if (!model.getConnection().isEnabled() || model.getPricingMode() == PricingMode.UNPRICED) {
+            throw new IllegalArgumentException(
+                "Activate the connection and configure a price before activating the model."
+            );
+        }
     }
 
     private static String blankToNull(String value) {

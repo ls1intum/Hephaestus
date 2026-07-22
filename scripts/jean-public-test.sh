@@ -44,6 +44,10 @@ cd "$ROOT/server"
 set -a
 if [ -f .env ]; then source .env; fi
 set +a
+# This route is internet-exposed. Local .env files may enable E2E affordances, but a public test
+# deployment must never inherit passwordless app-admin login or the unauthenticated dev job trigger.
+export HEPHAESTUS_AUTH_DEV_LOGIN_ENABLED=false
+export HEPHAESTUS_DEV_TRIGGER_ENABLED=false
 export APPLICATION_HOST_URL="$ORIGIN"
 export HEPHAESTUS_WEBAPP_URL="$ORIGIN"
 export HEPHAESTUS_AUTH_ISSUER="$ORIGIN"
@@ -57,7 +61,7 @@ export MANAGEMENT_PORT="$MANAGEMENT_PORT"
 # restores scheme/host without folding X-Forwarded-Prefix into {baseUrl}; auth.api-base-path
 # is the single owner of the public /api prefix for OAuth init + callback URLs.
 export SERVER_FORWARD_HEADERS_STRATEGY=native
-export JAVA_TOOL_OPTIONS="\${JAVA_TOOL_OPTIONS:+\$JAVA_TOOL_OPTIONS }-Djava.net.preferIPv4Stack=true"
+export JAVA_TOOL_OPTIONS="\${JAVA_TOOL_OPTIONS:+\$JAVA_TOOL_OPTIONS }-Djava.net.preferIPv4Stack=true -Dhephaestus.auth.dev-login-enabled=false -Dhephaestus.dev.trigger-enabled=false"
 export HEPHAESTUS_SYNC_RUN_ON_STARTUP="\${HEPHAESTUS_SYNC_RUN_ON_STARTUP:-false}"
 export HEPHAESTUS_SYNC_BACKFILL_ENABLED="\${HEPHAESTUS_SYNC_BACKFILL_ENABLED:-false}"
 if [ -n "\${GITLAB_PAT:-}" ] && [ -n "\${GITLAB_GROUP_PATH:-}" ]; then
@@ -65,7 +69,7 @@ if [ -n "\${GITLAB_PAT:-}" ] && [ -n "\${GITLAB_GROUP_PATH:-}" ]; then
   export GITLAB_WORKSPACE_INIT_DEFAULT=true
   export GITLAB_WORKSPACE_CREATION="\${GITLAB_WORKSPACE_CREATION:-true}"
   export HEPHAESTUS_FEATURES_FLAGS_GITLAB_WORKSPACE_CREATION="\${HEPHAESTUS_FEATURES_FLAGS_GITLAB_WORKSPACE_CREATION:-true}"
-  export GITLAB_SERVER_URL="\${GITLAB_SERVER_URL:-https://gitlab.lrz.de}"
+  export GITLAB_SERVER_URL="\${GITLAB_SERVER_URL:?GITLAB_SERVER_URL is required for SCM seeding}"
 else
   export GITLAB_ENABLED="\${GITLAB_ENABLED:-false}"
   export GITLAB_WORKSPACE_CREATION="\${GITLAB_WORKSPACE_CREATION:-false}"
@@ -266,6 +270,8 @@ status() {
 seed_status() {
 	local script_postgres_port="$POSTGRES_PORT"
 	set -a
+	# Optional machine-local credentials, never committed.
+	# shellcheck disable=SC1091
 	if [ -f "$ROOT/server/.env" ]; then source "$ROOT/server/.env"; fi
 	set +a
 	POSTGRES_PORT="$script_postgres_port"
@@ -273,13 +279,17 @@ seed_status() {
 		echo "GitLab seed: skipped (GITLAB_PAT or GITLAB_GROUP_PATH missing)"
 		return 0
 	fi
+	if [[ ! "$GITLAB_GROUP_PATH" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+		echo "SCM seed: invalid account identifier"
+		return 1
+	fi
 	local psql_base
 	psql_base=(psql -h localhost -p "$POSTGRES_PORT" -U "${POSTGRES_USER:-root}" -d "${POSTGRES_DB:-hephaestus}" -v ON_ERROR_STOP=1 -tAc)
 	local rows monitors dupes
-	rows="$(PGCONNECT_TIMEOUT=2 PGPASSWORD="${POSTGRES_PASSWORD:-root}" "${psql_base[@]}" "select count(*) from workspace w join connection c on c.workspace_id=w.id where lower(w.account_login)=lower('${GITLAB_GROUP_PATH}') and c.kind='GITLAB' and c.state='ACTIVE';" 2>/dev/null || true)"
-	monitors="$(PGCONNECT_TIMEOUT=2 PGPASSWORD="${POSTGRES_PASSWORD:-root}" "${psql_base[@]}" "select count(*) from repository_to_monitor r join workspace w on w.id=r.workspace_id where lower(w.account_login)=lower('${GITLAB_GROUP_PATH}');" 2>/dev/null || true)"
-	dupes="$(PGCONNECT_TIMEOUT=2 PGPASSWORD="${POSTGRES_PASSWORD:-root}" "${psql_base[@]}" "select count(*) from (select lower(account_login) login from workspace group by lower(account_login) having count(*) > 1) d;" 2>/dev/null || true)"
-	echo "GitLab seed: group=${GITLAB_GROUP_PATH} activeConnections=${rows:-?} monitoredRepositories=${monitors:-?} duplicateAccountLogins=${dupes:-?}"
+	rows="$(PGCONNECT_TIMEOUT=2 PGPASSWORD="${POSTGRES_PASSWORD:-root}" "${psql_base[@]}" "select count(*) from workspace w join connection c on c.workspace_id=w.id where w.status='ACTIVE' and lower(w.account_login)=lower('${GITLAB_GROUP_PATH}') and c.kind='GITLAB' and c.state='ACTIVE';" 2>/dev/null || true)"
+	monitors="$(PGCONNECT_TIMEOUT=2 PGPASSWORD="${POSTGRES_PASSWORD:-root}" "${psql_base[@]}" "select count(*) from repository_to_monitor r join workspace w on w.id=r.workspace_id where w.status='ACTIVE' and lower(w.account_login)=lower('${GITLAB_GROUP_PATH}');" 2>/dev/null || true)"
+	dupes="$(PGCONNECT_TIMEOUT=2 PGPASSWORD="${POSTGRES_PASSWORD:-root}" "${psql_base[@]}" "select count(*) from (select lower(w.account_login), c.kind from workspace w join connection c on c.workspace_id=w.id and c.state='ACTIVE' and c.kind in ('GITHUB','GITLAB') where w.status='ACTIVE' group by lower(w.account_login),c.kind having count(distinct w.id) > 1) d;" 2>/dev/null || true)"
+	echo "SCM seed: activeConnections=${rows:-?} monitoredRepositories=${monitors:-?} duplicateScmAccounts=${dupes:-?}"
 	if [ "${rows:-0}" != "1" ] || [ "${monitors:-0}" = "0" ]; then
 		return 1
 	fi
@@ -288,6 +298,8 @@ seed_status() {
 load_seed_env() {
 	local script_postgres_port="$POSTGRES_PORT"
 	set -a
+	# Optional machine-local credentials, never committed.
+	# shellcheck disable=SC1091
 	if [ -f "$ROOT/server/.env" ]; then source "$ROOT/server/.env"; fi
 	set +a
 	POSTGRES_PORT="$script_postgres_port"
@@ -309,99 +321,32 @@ mentor_status() {
 		echo "Mentor seed: skipped (GITLAB_GROUP_PATH missing)"
 		return 0
 	fi
-	local ready
-	ready="$(psql_seed -tAc "select count(*) from workspace w join agent_config ac on ac.id=w.mentor_config_id and ac.workspace_id=w.id where lower(w.account_login)=lower('${GITLAB_GROUP_PATH}') and w.mentor_enabled=true and ac.enabled=true;" 2>/dev/null || true)"
-	echo "Mentor seed: group=${GITLAB_GROUP_PATH} ready=${ready:-?}"
-	[ "${ready:-0}" = "1" ]
-}
-
-ensure_mentor_config() {
-	load_seed_env
-	if [ -z "${GITLAB_GROUP_PATH:-}" ]; then
-		echo "Mentor seed: skipped (GITLAB_GROUP_PATH missing)"
-		return 0
-	fi
-	if mentor_status >/dev/null 2>&1; then
-		mentor_status
-		return 0
-	fi
-
-	local llm_key="${MENTOR_LLM_API_KEY:-${E2E_LLM_KEY:-}}"
-	local llm_base_url="${MENTOR_LLM_BASE_URL:-${E2E_LLM_BASE_URL:-https://staging.hephaestus.aet.cit.tum.de/logos/v1}}"
-	local llm_model="${MENTOR_LLM_MODEL:-${E2E_MODEL:-openai/gpt-oss-120b}}"
-	if [ -z "$llm_key" ]; then
-		echo "Mentor seed: missing MENTOR_LLM_API_KEY/E2E_LLM_KEY and no enabled mentor config exists" >&2
+	if [[ ! "$GITLAB_GROUP_PATH" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+		echo "Mentor seed: invalid account identifier"
 		return 1
 	fi
-
-	psql_seed \
-		-v group_path="$GITLAB_GROUP_PATH" \
-		-v config_name="${MENTOR_LLM_CONFIG_NAME:-Public test mentor}" \
-		-v model="$llm_model" \
-		-v api_key="$llm_key" \
-		-v base_url="$llm_base_url" \
-		-qtA <<'SQL' >/dev/null
-with target_workspace as (
-	select id
-	from workspace
-	where lower(account_login) = lower(:'group_path')
-	order by id
-	limit 1
-), upsert_config as (
-	insert into agent_config (
-		workspace_id,
-		name,
-		enabled,
-		model_name,
-		llm_api_key,
-		llm_provider,
-		timeout_seconds,
-		max_concurrent_jobs,
-		allow_internet,
-		created_at,
-		updated_at,
-		credential_mode,
-		model_version,
-		llm_base_url
-	)
-	select
-		target_workspace.id,
-		:'config_name',
-		true,
-		:'model',
-		:'api_key',
-		'OPENAI',
-		1200,
-		1,
-		true,
-		now(),
-		now(),
-		'API_KEY',
-		null,
-		:'base_url'
-	from target_workspace
-	on conflict (workspace_id, name) do update set
-		enabled = true,
-		model_name = excluded.model_name,
-		llm_api_key = excluded.llm_api_key,
-		llm_provider = excluded.llm_provider,
-		timeout_seconds = excluded.timeout_seconds,
-		max_concurrent_jobs = excluded.max_concurrent_jobs,
-		allow_internet = excluded.allow_internet,
-		updated_at = now(),
-		credential_mode = excluded.credential_mode,
-		model_version = excluded.model_version,
-		llm_base_url = excluded.llm_base_url
-	returning id, workspace_id
-)
-update workspace
-set mentor_config_id = upsert_config.id,
-	mentor_enabled = true,
-	updated_at = now()
-from upsert_config
-where workspace.id = upsert_config.workspace_id;
-SQL
-	mentor_status
+	local ready
+	ready="$(psql_seed -tAc "
+		select count(*)
+		from workspace w
+		join agent_config ac on ac.id=w.mentor_config_id and ac.workspace_id=w.id
+		left join llm_model im on im.id=ac.instance_model_id
+		left join llm_connection ic on ic.id=im.connection_id
+		left join workspace_llm_model wlm on wlm.id=ac.workspace_model_id and wlm.workspace_id=w.id
+		left join workspace_llm_connection wlc on wlc.id=wlm.connection_id and wlc.workspace_id=w.id
+		where w.status='ACTIVE'
+		  and lower(w.account_login)=lower('${GITLAB_GROUP_PATH}')
+		  and w.mentor_enabled=true and ac.enabled=true
+		  and ((ac.instance_model_id is not null and im.enabled=true and ic.enabled=true)
+		    or (ac.workspace_model_id is not null and wlm.enabled=true and wlc.enabled=true))
+		  and exists (
+		    select 1 from workspace_membership mem
+		    join identity_link il on il.external_actor_id=mem.user_id and il.disabled_at is null
+		    join account_feature af on af.account_id=il.account_id and af.flag='mentor_access'
+		    where mem.workspace_id=w.id
+		  );" 2>/dev/null || true)"
+	echo "Mentor seed: ready=${ready:-?}"
+	[ "${ready:-0}" = "1" ]
 }
 
 slack_signature() {
@@ -426,9 +371,17 @@ smoke() {
 	echo "Smoke testing $ORIGIN"
 	curl -fsS -o /dev/null "$ORIGIN/"
 	curl -fsS "$ORIGIN/env-config.js" | grep -q "APPLICATION_SERVER_URL: \"$ORIGIN/api\""
+	if curl -fsS "$ORIGIN/api/identity-providers" | grep -Eq '"providerType"[[:space:]]*:[[:space:]]*"DEV"'; then
+		echo "Passwordless dev login is exposed on the public route" >&2
+		return 1
+	fi
 	local code
 	code="$(curl -sS -o /dev/null -w '%{http_code}' "$ORIGIN/api/auth/me")"
 	[ "$code" = "401" ] || { echo "Expected /api/auth/me to return 401, got $code" >&2; return 1; }
+	code="$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$ORIGIN/api/api/dev/trigger-review")"
+	case "$code" in
+		2*) echo "Dev review trigger is exposed on the public route" >&2; return 1 ;;
+	esac
 
 	if github_oauth_configured; then
 		local location
@@ -448,7 +401,7 @@ smoke() {
 	fi
 
 	seed_status
-	ensure_mentor_config
+	mentor_status
 
 	local body ts sig response
 	body='{"type":"url_verification","challenge":"hephaestus-public-test-ok"}'

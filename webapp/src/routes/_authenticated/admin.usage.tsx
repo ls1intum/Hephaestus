@@ -7,6 +7,7 @@ import {
 	adminListLlmUsageOptions,
 	adminListLlmUsageQueryKey,
 	adminUpdateWorkspaceLlmBudgetMutation,
+	getLlmUsageReportOptions,
 } from "@/api/@tanstack/react-query.gen";
 import type { AdminWorkspaceLlmUsage } from "@/api/types.gen";
 import { AdminInstanceLlmUsageTable } from "@/components/admin/usage/AdminInstanceLlmUsageTable";
@@ -23,6 +24,7 @@ function AdminInstanceUsagePage() {
 	const queryClient = useQueryClient();
 	const [month, setMonth] = useState(currentMonthUtc);
 	const [editing, setEditing] = useState<AdminWorkspaceLlmUsage | null>(null);
+	const [expanded, setExpanded] = useState<AdminWorkspaceLlmUsage | null>(null);
 
 	const listQuery = useQuery({
 		...adminListLlmUsageOptions({ query: { month } }),
@@ -35,6 +37,13 @@ function AdminInstanceUsagePage() {
 		(a, b) =>
 			b.pricedTotalCostUsd - a.pricedTotalCostUsd || a.displayName.localeCompare(b.displayName),
 	);
+	const detailQuery = useQuery({
+		...getLlmUsageReportOptions({
+			path: { workspaceSlug: expanded?.workspaceSlug ?? "" },
+			query: { month },
+		}),
+		enabled: expanded != null,
+	});
 
 	const updateBudget = useMutation({
 		...adminUpdateWorkspaceLlmBudgetMutation(),
@@ -89,6 +98,16 @@ function AdminInstanceUsagePage() {
 				isLoading={listQuery.isLoading}
 				error={listQuery.error}
 				onRetry={() => listQuery.refetch()}
+				expandedWorkspaceId={expanded?.workspaceId ?? null}
+				detailReport={detailQuery.data}
+				isDetailLoading={detailQuery.isLoading}
+				detailError={detailQuery.error}
+				onRetryDetail={() => detailQuery.refetch()}
+				onToggleDetails={(workspace) =>
+					setExpanded((current) =>
+						current?.workspaceId === workspace.workspaceId ? null : workspace,
+					)
+				}
 				onEditBudget={setEditing}
 			/>
 

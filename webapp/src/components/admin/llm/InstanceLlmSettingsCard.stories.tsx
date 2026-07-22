@@ -5,7 +5,7 @@ import { InstanceLlmSettingsCard } from "./InstanceLlmSettingsCard";
 
 const mockSettings: InstanceLlmSettings = {
 	allowWorkspaceConnections: true,
-	allowedEgressHosts: "api.openai.com\napi.anthropic.com",
+	allowedEgressHosts: "api.openai.com\nllm.example.com",
 	defaultUnpricedPolicy: "WARN",
 };
 
@@ -51,7 +51,7 @@ export const EditsEnableSave: Story = {
 		const saveButton = canvas.getByRole("button", { name: /save settings/i });
 		await expect(saveButton).toBeDisabled();
 		await userEvent.click(
-			canvas.getByRole("switch", { name: /let workspaces connect their own ai provider/i }),
+			canvas.getByRole("switch", { name: /let workspaces add providers and models/i }),
 		);
 		await expect(saveButton).toBeEnabled();
 	},

@@ -49,10 +49,8 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
             "My Provider",
             "https://api.openai.com",
             "openai-completions",
-            null,
-            null,
+            LlmAuthMode.BEARER,
             "sk-workspace-secret",
-            null,
             true
         );
         return webTestClient
@@ -77,17 +75,13 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
             null,
             null,
             null,
+            true,
+            PricingMode.NO_CHARGE,
             null,
             null,
             null,
             null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null
+            "Test-owned model has no per-token charge"
         );
         return webTestClient
             .post()
@@ -162,11 +156,6 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
 
         var updateRequest = new UpdateWorkspaceLlmModelRequestDTO(
             "Renamed Model",
-            null,
-            null,
-            null,
-            null,
-            null,
             null,
             null,
             null,
@@ -329,24 +318,7 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(
-                new UpdateWorkspaceLlmModelRequestDTO(
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    false,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null
-                )
+                new UpdateWorkspaceLlmModelRequestDTO(null, null, null, null, false, null, null, null, null, null, null)
             )
             .exchange()
             .expectStatus()

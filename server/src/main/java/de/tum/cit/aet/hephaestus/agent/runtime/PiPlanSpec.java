@@ -21,7 +21,6 @@ import org.jspecify.annotations.Nullable;
  *     {@code defaultModel}.
  * @param contextWindow optional capability hint written into {@code pi-provider.json}.
  * @param maxOutputTokens optional capability hint written into {@code pi-provider.json}.
- * @param cacheControlFormat optional prompt-caching compat flag (e.g. {@code anthropic}).
  */
 public record PiPlanSpec(
     String apiProtocol,
@@ -29,7 +28,6 @@ public record PiPlanSpec(
     @Nullable Integer contextWindow,
     @Nullable Integer maxOutputTokens,
     boolean supportsReasoning,
-    @Nullable String cacheControlFormat,
     String jobToken,
     boolean allowInternet,
     int timeoutSeconds,

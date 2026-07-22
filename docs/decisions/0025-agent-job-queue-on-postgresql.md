@@ -34,7 +34,7 @@
 
 ## Context
 
-The agent job queue (practice review, mentor-triggered work) ran on a NATS JetStream stream
+The practice-review agent job queue ran on a NATS JetStream stream
 (`AGENT`) that carried nothing but job ids: a worker pulled an id off the stream, then loaded the
 actual `agent_job` row from PostgreSQL to do anything with it. The `agent_job` table was already
 the source of truth for job state, retry count, and outcome — JetStream only decided *which*
@@ -174,12 +174,13 @@ surfaced concrete gaps, closed here:
   job's marker already landed (`JobTypeHandler#findExistingDelivery` /
   `FeedbackChannel#findExistingSummary`) — closing the crash window where the comment posted but
   the id was never persisted. Implemented for GitHub (reuses the existing `GetPullRequestComments`/
-  `GetIssueComments` queries); GitLab has no equivalent reusable listing query today, so it is left
-  unsupported — a recovery retry there falls through to a normal re-post rather than half-building
-  a bespoke discussions-pagination path for this hardening slice.
+  `GetIssueComments` queries); GitLab has no equivalent reusable listing query today, so recovery
+  stays fail-closed there: an unknown lookup never auto-reposts and an administrator can retry
+  explicitly after checking the remote discussion.
 - **Queue health metrics.** `agent.queue.depth`, `agent.queue.oldest_age_seconds` (the canonical
   health signal — depth alone can't distinguish "briefly busy" from "stuck"), and
-  `agent.queue.running` are sampled every 15s by `AgentQueueHealthSampler`. `agent.job.claim.latency`
+  `agent.queue.running` are sampled every 30s by `AgentQueueHealthSampler`. A failed sample keeps the
+  last-good values and increments `agent.queue.health.sampler.failures`. `agent.job.claim.latency`
   times claim minus `available_at`; `agent.job.execution.duration` is now tagged by `jobType` and
   outcome `status` (previously untagged and only recorded on the success path). The poll loop
   sleeps `pollInterval × (0.9–1.1)` instead of a fixed interval, so replicas configured identically
@@ -266,13 +267,11 @@ noted as a documented residual:
   call's cost until that call naturally completes or times out (`responseTimeout=300s`).
 - **Migration locks on the hot queue table.** The four `#1368` hardening indexes
   (`ix_agent_job_running_config`, `ix_agent_job_queued_available`, `ix_agent_job_delivery_pending`,
-  `ix_agent_job_retention`) were created with plain `CREATE INDEX`, and `ck_agent_job_status` with a
-  plain `ADD CONSTRAINT` — both take an `ACCESS EXCLUSIVE` lock for the duration on a table the poll
-  loop hits every second. `1784636803503-41` through `-46` supersede them: `CREATE INDEX CONCURRENTLY`
-  (each in its own `runInTransaction="false"` changeset — required, since `CONCURRENTLY` cannot run
-  inside a transaction block) and the CHECK re-added `NOT VALID` then validated in a separate
-  changeset (`VALIDATE CONSTRAINT` takes `SHARE UPDATE EXCLUSIVE`, which blocks other schema changes
-  but not ordinary reads/writes).
+  `ix_agent_job_retention`) are created with `CREATE INDEX CONCURRENTLY` (each in its own
+  `runInTransaction="false"` changeset — required, since `CONCURRENTLY` cannot run inside a
+  transaction block). The status CHECK is added `NOT VALID` and validated separately (`VALIDATE
+  CONSTRAINT` takes `SHARE UPDATE EXCLUSIVE`, which blocks other schema changes but not ordinary
+  reads/writes).
 - **Retention runs on every replica, unbounded.** `AgentJobRetentionService#runRetention` now carries
   `@SchedulerLock` (ShedLock, already used elsewhere in this codebase for retention/cleanup jobs —
   see `ConfigAuditRetentionJob`), single-flighting the sweep across server-role replicas, and each

@@ -39,6 +39,7 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.net.URI;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -49,6 +50,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
@@ -169,6 +172,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
         // test keeps its original meaning. An unstubbed mock would return null here (not a boolean),
         // and null != NONE reads as "blocked" — so this default is load-bearing, not decorative.
         lenient().when(llmBudgetService.blockReason(anyLong())).thenReturn(LlmBudgetBlockReason.NONE);
+        lenient().when(jobRepository.markExecutionStarted(any(), any(), any())).thenReturn(1);
 
         // Default: transactionTemplate.execute invokes the callback
         lenient()
@@ -189,7 +193,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             .when(transactionTemplate)
             .executeWithoutResult(any());
 
-        // readOnlyTx in prepareAndExecute is built from getTransactionManager(); stub the bridge.
+        // readOnlyTx in prepareSandboxSpec is built from getTransactionManager(); stub the bridge.
         lenient().when(transactionTemplate.getTransactionManager()).thenReturn(transactionManager);
         lenient().when(transactionManager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
 
@@ -218,11 +222,12 @@ class AgentJobExecutorTest extends BaseUnitTest {
      * production). Needed since #1368's fix wave reads both unconditionally when no agent-reported
      * usage is present, to write the UNPRICED ledger fallback.
      */
-    private static AgentJob freshJob() {
+    private AgentJob freshJob() {
         AgentJob freshJob = new AgentJob();
         freshJob.prePersist();
         freshJob.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         freshJob.setWorkspace(workspaceStub());
+        freshJob.setConfigSnapshot(snapshot.toJson(objectMapper));
         return freshJob;
     }
 
@@ -449,10 +454,33 @@ class AgentJobExecutorTest extends BaseUnitTest {
             when(handler.prepareInputFiles(any())).thenReturn(Map.of("task.json", "{}".getBytes()));
             when(practiceAgent.buildSandboxSpec(any())).thenReturn(minimalSpec());
             when(jobRepository.updateProvenanceDigests(any(), any(), any())).thenReturn(0); // job row is gone
+            when(jobRepository.transitionStatus(any(), eq(AgentJobStatus.FAILED), any(), any(), any())).thenReturn(1);
 
             executor.processJob(jobId);
 
             verify(sandboxManager, never()).execute(any());
+            verify(usageRecorder, never()).recordUnverifiable(any(), any());
+            verify(usageRecorder, never()).record(any(), any());
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = { "Pinned review head is unavailable", "Review diff is empty or unavailable" })
+        void contextPreparationFailureBeforeSandboxDoesNotCreateUnpricedUsage(String failureMessage) {
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
+            when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
+            when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(jobRepository.transitionStatus(any(), eq(AgentJobStatus.FAILED), any(), any(), any())).thenReturn(1);
+
+            JobTypeHandler handler = mock(JobTypeHandler.class);
+            when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
+            when(handler.prepareInputFiles(any())).thenThrow(new IllegalStateException(failureMessage));
+
+            executor.processJob(jobId);
+
+            verify(sandboxManager, never()).execute(any());
+            verify(usageRecorder, never()).recordUnverifiable(any(), any());
+            verify(usageRecorder, never()).record(any(), any());
         }
     }
 
@@ -863,16 +891,12 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         @DisplayName(
-            "#1368 fix wave: even when the CAS transition loses the race (a concurrent user-cancel or " +
-                "worker-drain already moved the job to CANCELLED), the ledger write is still attempted — " +
-                "reaching this handler at all proves the job started executing, and a duplicate write is " +
-                "safely swallowed by the ledger's unique source_id constraint"
+            "a cancellation fence loss does not write usage outside the transaction that won the state transition"
         )
-        void cancelledAfterStart_fenceLost_stillRecordsLedgerEntry() {
+        void cancelledAfterStart_fenceLost_doesNotRecordOutsideWinningTransaction() {
             // transitionStatus returns 0 (job no longer RUNNING-and-ours — e.g. a concurrent user-cancel
-            // or worker-drain path already won the CAS). Previously this silently skipped the ledger
-            // write; now the write is attempted regardless, since only a job that reached sandbox
-            // execution ever throws SandboxCancelledException in the first place.
+            // or worker-drain path already won the CAS). That winning path owns the attempt-aware ledger
+            // write in its transaction; this losing executor must not create a detached accounting write.
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
             when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
@@ -886,27 +910,32 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             executor.processJob(jobId);
 
-            ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample = ArgumentCaptor.forClass(
-                LlmUsageRecorder.LlmUsageSample.class
-            );
-            verify(usageRecorder).recordUnverifiable(eq(99L), sample.capture());
-            assertThat(sample.getValue().sourceId()).isEqualTo(job.getId());
+            verify(usageRecorder, never()).recordUnverifiable(any(), any());
             verify(usageRecorder, never()).record(any(), any());
         }
 
         @Test
         @DisplayName(
-            "#1368 fix wave: worker-drain (cancelInFlight) records an UNPRICED ledger entry for a " +
-                "locally-running job, regardless of whether its own CAS transition wins"
+            "worker-drain records an attempt-aware UNPRICED ledger entry in the same transaction as its winning CAS"
         )
         void workerDrain_cancelInFlight_recordsAnUnpricedLedgerEntry() throws Exception {
+            job.setExecutionStartedAt(Instant.now());
             java.lang.reflect.Field localRunningJobsField = AgentJobExecutor.class.getDeclaredField("localRunningJobs");
             localRunningJobsField.setAccessible(true);
             @SuppressWarnings("unchecked")
             Set<UUID> localRunningJobs = (Set<UUID>) localRunningJobsField.get(executor);
             localRunningJobs.add(jobId);
 
-            when(jobRepository.findByIdWithWorkspace(jobId)).thenReturn(Optional.of(job));
+            when(jobRepository.findByIdWithWorkspaceForUpdate(jobId)).thenReturn(Optional.of(job));
+            when(
+                jobRepository.transitionToCancelled(
+                    eq(jobId),
+                    any(),
+                    eq("worker draining"),
+                    eq(AgentJobCancellationReason.DRAIN_GRACEFUL),
+                    eq(Set.of(AgentJobStatus.RUNNING))
+                )
+            ).thenReturn(1);
 
             executor.cancelInFlight(AgentJobCancellationReason.DRAIN_GRACEFUL);
 
@@ -916,6 +945,33 @@ class AgentJobExecutorTest extends BaseUnitTest {
             );
             verify(usageRecorder).recordUnverifiable(eq(99L), sample.capture());
             assertThat(sample.getValue().sourceId()).isEqualTo(job.getId());
+            assertThat(sample.getValue().sourceAttempt()).isEqualTo(job.getRetryCount());
+            verify(usageRecorder, never()).record(any(), any());
+        }
+
+        @Test
+        void workerDrain_whileJobIsStillPreparing_neverTouchesTheLedger() throws Exception {
+            java.lang.reflect.Field localRunningJobsField = AgentJobExecutor.class.getDeclaredField("localRunningJobs");
+            localRunningJobsField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            Set<UUID> localRunningJobs = (Set<UUID>) localRunningJobsField.get(executor);
+            localRunningJobs.add(jobId);
+
+            when(jobRepository.findByIdWithWorkspaceForUpdate(jobId)).thenReturn(Optional.of(job));
+            when(
+                jobRepository.transitionToCancelled(
+                    eq(jobId),
+                    any(),
+                    eq("worker draining"),
+                    eq(AgentJobCancellationReason.DRAIN_GRACEFUL),
+                    eq(Set.of(AgentJobStatus.RUNNING))
+                )
+            ).thenReturn(1);
+
+            executor.cancelInFlight(AgentJobCancellationReason.DRAIN_GRACEFUL);
+
+            verify(sandboxManager).cancel(jobId);
+            verify(usageRecorder, never()).recordUnverifiable(any(), any());
             verify(usageRecorder, never()).record(any(), any());
         }
 
@@ -931,7 +987,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
             setupFullExecution();
 
             AgentJob freshJob = freshJob();
-            freshJob.setConfigSnapshot(snapshot.toJson(objectMapper));
             when(jobRepository.findById(any(UUID.class))).thenReturn(Optional.of(freshJob));
             when(jobRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
             when(jobRepository.transitionStatus(any(), eq(AgentJobStatus.COMPLETED), any(), any(), any())).thenReturn(
@@ -967,7 +1022,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
             );
 
             AgentJob freshJob = freshJob();
-            freshJob.setConfigSnapshot(snapshot.toJson(objectMapper));
             when(jobRepository.findById(any(UUID.class))).thenReturn(Optional.of(freshJob));
             when(jobRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
             when(jobRepository.transitionStatus(any(), eq(AgentJobStatus.COMPLETED), any(), any(), any())).thenReturn(
@@ -1312,7 +1366,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     any()
                 )
             ).thenReturn(1);
-            when(jobRepository.findByIdWithWorkspace(jobId)).thenReturn(Optional.of(job));
+            when(jobRepository.findByIdWithWorkspaceForUpdate(jobId)).thenReturn(Optional.of(job));
 
             executor.cancelInFlight(AgentJobCancellationReason.DRAIN_GRACEFUL);
 
@@ -1362,7 +1416,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     any()
                 )
             ).thenReturn(0);
-            when(jobRepository.findByIdWithWorkspace(jobId)).thenReturn(Optional.of(job));
+            when(jobRepository.findByIdWithWorkspaceForUpdate(jobId)).thenReturn(Optional.of(job));
 
             executor.cancelInFlight(AgentJobCancellationReason.DRAIN_GRACEFUL);
 
@@ -1415,6 +1469,31 @@ class AgentJobExecutorTest extends BaseUnitTest {
             } catch (ReflectiveOperationException e) {
                 throw new RuntimeException(e);
             }
+        }
+    }
+
+    @Nested
+    @DisplayName("Execution-start fence (#1368)")
+    class ExecutionStartFence {
+
+        @Test
+        void lostFenceAfterPreparationNeverStartsSandboxOrWritesUsage() {
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
+            when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
+            when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(jobRepository.markExecutionStarted(any(), any(), any())).thenReturn(0);
+            when(jobRepository.updateProvenanceDigests(any(), any(), any())).thenReturn(1);
+            JobTypeHandler handler = mock(JobTypeHandler.class);
+            when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
+            when(handler.prepareInputFiles(any())).thenReturn(Map.of());
+            when(practiceAgent.buildSandboxSpec(any())).thenReturn(minimalSpec());
+
+            executor.processJob(jobId);
+
+            verify(sandboxManager, never()).execute(any());
+            verify(usageRecorder, never()).record(any(), any());
+            verify(usageRecorder, never()).recordUnverifiable(any(), any());
         }
     }
 

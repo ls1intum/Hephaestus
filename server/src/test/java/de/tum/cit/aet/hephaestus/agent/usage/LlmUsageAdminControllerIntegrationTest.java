@@ -49,6 +49,7 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         event.setId(UUID.randomUUID());
         event.setWorkspace(workspace);
         event.setJobType(LlmUsageJobType.PULL_REQUEST_REVIEW);
+        event.setSourceType(LlmUsageSourceType.AGENT_JOB);
         event.setSourceId(UUID.randomUUID());
         event.setCostUsd(new BigDecimal(cost));
         // Budgeted spend only counts PRICED + INSTANCE-funded rows (#1368 slice 6) — both are the

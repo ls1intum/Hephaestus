@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.catalog;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -77,7 +78,7 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
     private void byoEnabled(boolean enabled) {
         InstanceLlmSettings settings = new InstanceLlmSettings();
         settings.setAllowWorkspaceConnections(enabled);
-        when(instanceLlmSettingsService.get()).thenReturn(settings);
+        lenient().when(instanceLlmSettingsService.get()).thenReturn(settings);
     }
 
     private CreateWorkspaceLlmConnectionRequestDTO createRequest() {
@@ -86,10 +87,8 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
             "OpenAI",
             "https://api.openai.com",
             "openai-completions",
-            null,
-            null,
+            LlmAuthMode.BEARER,
             "sk-abc",
-            null,
             null
         );
     }
@@ -105,25 +104,6 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
                 AccessForbiddenException.class
             );
             verify(connectionRepository, never()).save(any());
-        }
-
-        @Test
-        void deleteIsRejectedWhenWorkspaceConnectionsAreDisabled() {
-            byoEnabled(false);
-
-            assertThatThrownBy(() -> connectionService.delete(workspaceContext, 5L)).isInstanceOf(
-                AccessForbiddenException.class
-            );
-            verify(connectionRepository, never()).delete(any());
-        }
-
-        @Test
-        void probeIsRejectedWhenWorkspaceConnectionsAreDisabled() {
-            byoEnabled(false);
-
-            assertThatThrownBy(() -> connectionService.probe(workspaceContext, 5L)).isInstanceOf(
-                AccessForbiddenException.class
-            );
         }
 
         @Test
@@ -257,13 +237,12 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
             WorkspaceLlmConnection connection = new WorkspaceLlmConnection();
             connection.setId(5L);
             connection.setBaseUrl("https://api.openai.com");
-            connection.setAuthHeaderName("Authorization");
-            connection.setAuthValuePrefix("Bearer ");
+            connection.setAuthMode(LlmAuthMode.BEARER);
             connection.setApiKey("sk-abc");
             when(connectionRepository.findByIdAndWorkspaceId(5L, 1L)).thenReturn(Optional.of(connection));
-            when(
-                probeService.probeCredential("https://api.openai.com", "Authorization", "Bearer ", "sk-abc")
-            ).thenReturn(LlmProbeResultDTO.reachable(List.of("gpt-5", "gpt-5-mini"), 200));
+            when(probeService.probeCredential("https://api.openai.com", LlmAuthMode.BEARER, "sk-abc")).thenReturn(
+                LlmProbeResultDTO.reachable(List.of("gpt-5", "gpt-5-mini"), 200)
+            );
 
             WorkspaceLlmProbeResultDTO result = connectionService.probe(workspaceContext, 5L);
 
@@ -278,7 +257,7 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
             connection.setId(5L);
             connection.setBaseUrl("https://api.openai.com");
             when(connectionRepository.findByIdAndWorkspaceId(5L, 1L)).thenReturn(Optional.of(connection));
-            when(probeService.probeCredential(any(), any(), any(), any())).thenReturn(
+            when(probeService.probeCredential(any(), any(), any())).thenReturn(
                 LlmProbeResultDTO.unreachable(503, "Provider returned HTTP 503")
             );
 

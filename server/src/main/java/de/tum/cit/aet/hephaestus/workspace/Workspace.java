@@ -262,8 +262,9 @@ public class Workspace {
     private Long practiceConfigId;
 
     /**
-     * The agent config that powers the mentor. When {@code null} or disabled, the mentor falls
-     * back to the oldest enabled config. Scalar FK for the same cycle-avoidance reason.
+     * The agent config explicitly selected for the mentor. {@code null} means the mentor is not
+     * configured; an unavailable binding fails closed and never switches models implicitly. Scalar FK
+     * for the same cycle-avoidance reason.
      */
     @Column(name = "mentor_config_id")
     private Long mentorConfigId;

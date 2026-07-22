@@ -50,14 +50,10 @@ class ConfigSnapshotTest extends BaseUnitTest {
             new ResolvedLlmModel(
                 "https://api.anthropic.com",
                 "anthropic-messages",
-                "x-api-key",
-                "",
-                null,
                 "claude-sonnet-4-20250514",
                 200000,
                 8192,
                 false,
-                null,
                 FundingSource.INSTANCE
             )
         );

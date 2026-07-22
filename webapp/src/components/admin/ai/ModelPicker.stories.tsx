@@ -7,9 +7,8 @@ const mockModels: AvailableLlmModel[] = [
 	{
 		id: 1,
 		scope: "SHARED",
-		displayName: "GPT-5 (Azure, EU)",
-		connectionDisplayName: "Azure EU",
-		modality: "CHAT",
+		displayName: "GPT-5",
+		connectionDisplayName: "OpenAI production",
 		pricingMode: "PRICED",
 		per1mInputUsd: 3,
 		per1mOutputUsd: 15,
@@ -20,8 +19,7 @@ const mockModels: AvailableLlmModel[] = [
 		scope: "SHARED",
 		displayName: "Local Llama (self-hosted)",
 		connectionDisplayName: "On-prem GPU",
-		modality: "CHAT",
-		pricingMode: "FREE",
+		pricingMode: "NO_CHARGE",
 		supportsReasoning: false,
 	},
 	{
@@ -29,7 +27,6 @@ const mockModels: AvailableLlmModel[] = [
 		scope: "WORKSPACE",
 		displayName: "My OpenAI key",
 		connectionDisplayName: "My provider",
-		modality: "CHAT",
 		pricingMode: "UNPRICED",
 		supportsReasoning: true,
 	},
@@ -76,9 +73,7 @@ export const OpensAndListsGroups: Story = {
 		await userEvent.click(canvas.getByRole("combobox"));
 		// The popup renders in a portal → query the document. `toBeInTheDocument` (not `toBeVisible`):
 		// the popup's enter transition can still be animating opacity when this assertion runs.
-		await expect(
-			await screen.findByRole("option", { name: /GPT-5 \(Azure, EU\)/ }),
-		).toBeInTheDocument();
+		await expect(await screen.findByRole("option", { name: /GPT-5/ })).toBeInTheDocument();
 		await expect(await screen.findByRole("option", { name: /My OpenAI key/ })).toBeInTheDocument();
 	},
 };

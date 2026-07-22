@@ -3,20 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.usage;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
-import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
-import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
-import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelPrice;
-import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelPriceRepository;
-import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
-import de.tum.cit.aet.hephaestus.agent.catalog.PricingMode;
-import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmConnection;
-import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmConnectionRepository;
-import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModel;
-import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobService;
-import de.tum.cit.aet.hephaestus.agent.pricing.ModelPricing;
-import de.tum.cit.aet.hephaestus.agent.pricing.ModelPricingRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -29,14 +16,9 @@ import java.util.UUID;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * Ledger write path + server-side cost derivation + budget enforcement, exercised against the
- * real database (#1368 slice 6): instance-catalog pricing, workspace BYO pricing, the legacy
- * pricing-table fallback, the recorder's failure isolation (duplicate source), the
- * budget-crossing alert counter, BYO spend exclusion from the budget, and the
- * {@code AgentJobService.submit} choke point rejecting work for an exhausted workspace.
- */
+/** Unified LLM ledger persistence and budget enforcement against the real database. */
 @Tag("integration")
 class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
@@ -59,144 +41,95 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
     private MeterRegistry meterRegistry;
 
     @Autowired
-    private ModelPricingRepository pricingRepository;
-
-    @Autowired
-    private LlmConnectionRepository llmConnectionRepository;
-
-    @Autowired
-    private LlmModelRepository llmModelRepository;
-
-    @Autowired
-    private LlmModelPriceRepository llmModelPriceRepository;
-
-    @Autowired
-    private WorkspaceLlmConnectionRepository workspaceLlmConnectionRepository;
-
-    @Autowired
-    private WorkspaceLlmModelRepository workspaceLlmModelRepository;
+    private TransactionTemplate transactionTemplate;
 
     private Workspace setupWorkspace(String slug) {
         User owner = persistUser(slug + "-owner");
         return createWorkspace(slug, "Usage " + slug, slug + "-org", AccountType.ORG, owner);
     }
 
-    private LlmUsageRecorder.LlmUsageSample sample(UUID sourceId) {
+    private LlmUsageRecorder.LlmUsageSample sample(
+        LlmUsageJobType jobType,
+        LlmUsageSourceType sourceType,
+        UUID sourceId,
+        int sourceAttempt,
+        String model,
+        long inputTokens,
+        long outputTokens,
+        LlmPriceSnapshot price
+    ) {
         return new LlmUsageRecorder.LlmUsageSample(
-            LlmUsageJobType.PULL_REQUEST_REVIEW,
+            jobType,
+            sourceType,
             sourceId,
-            "no-catalog-binding-model",
-            1000,
-            200,
-            50,
-            10,
+            sourceAttempt,
+            model,
+            inputTokens,
+            outputTokens,
             0,
-            3,
-            null,
-            null,
+            0,
+            0,
+            1,
+            price,
             Instant.now()
         );
     }
 
-    private LlmConnection instanceConnection(String slug) {
-        LlmConnection connection = new LlmConnection();
-        connection.setSlug(slug);
-        connection.setDisplayName(slug);
-        connection.setBaseUrl("https://example.test");
-        connection.setApiProtocol("openai-completions");
-        connection.setEnabled(true);
-        return llmConnectionRepository.save(connection);
-    }
-
-    private LlmModel instanceModel(LlmConnection connection, String slug, String upstreamModelId) {
-        LlmModel model = new LlmModel();
-        model.setConnection(connection);
-        model.setSlug(slug);
-        model.setDisplayName(slug);
-        model.setUpstreamModelId(upstreamModelId);
-        model.setEnabled(true);
-        return llmModelRepository.save(model);
-    }
-
-    private LlmModelPrice openInstancePrice(
-        LlmModel model,
-        PricingMode mode,
-        String perMInput,
-        String perMOutput,
-        String perMReasoning
+    private LlmUsageRecorder.LlmUsageSample agentSample(
+        UUID sourceId,
+        int sourceAttempt,
+        long inputTokens,
+        LlmPriceSnapshot price
     ) {
-        LlmModelPrice price = new LlmModelPrice();
-        price.setModel(model);
-        price.setPricingMode(mode);
-        if (mode == PricingMode.PRICED) {
-            price.setPer1mInputUsd(new BigDecimal(perMInput));
-            price.setPer1mOutputUsd(new BigDecimal(perMOutput));
-            if (perMReasoning != null) {
-                price.setPer1mReasoningUsd(new BigDecimal(perMReasoning));
-            }
-        }
-        price.setEffectiveFrom(Instant.now().minusSeconds(60));
-        return llmModelPriceRepository.save(price);
+        return sample(
+            LlmUsageJobType.PULL_REQUEST_REVIEW,
+            LlmUsageSourceType.AGENT_JOB,
+            sourceId,
+            sourceAttempt,
+            "gpt-5",
+            inputTokens,
+            0,
+            price
+        );
     }
 
-    private WorkspaceLlmConnection workspaceConnection(Workspace workspace, String slug) {
-        WorkspaceLlmConnection connection = new WorkspaceLlmConnection();
-        connection.setWorkspace(workspace);
-        connection.setSlug(slug);
-        connection.setDisplayName(slug);
-        connection.setBaseUrl("https://example.test");
-        connection.setApiProtocol("openai-completions");
-        connection.setEnabled(true);
-        return workspaceLlmConnectionRepository.save(connection);
+    private void record(Long workspaceId, LlmUsageRecorder.LlmUsageSample sample) {
+        transactionTemplate.executeWithoutResult(status -> recorder.record(workspaceId, sample));
     }
 
-    private WorkspaceLlmModel workspaceModel(
-        Workspace workspace,
-        WorkspaceLlmConnection connection,
-        String slug,
-        String upstreamModelId,
-        PricingMode mode,
-        String perMInput,
-        String perMOutput
-    ) {
-        WorkspaceLlmModel model = new WorkspaceLlmModel();
-        model.setWorkspace(workspace);
-        model.setConnection(connection);
-        model.setSlug(slug);
-        model.setDisplayName(slug);
-        model.setUpstreamModelId(upstreamModelId);
-        model.setEnabled(true);
-        model.setPricingMode(mode);
-        if (mode == PricingMode.PRICED) {
-            model.setPer1mInputUsd(new BigDecimal(perMInput));
-            model.setPer1mOutputUsd(new BigDecimal(perMOutput));
-        }
-        return workspaceLlmModelRepository.save(model);
+    private void recordUnverifiable(Long workspaceId, LlmUsageRecorder.LlmUsageSample sample) {
+        transactionTemplate.executeWithoutResult(status -> recorder.recordUnverifiable(workspaceId, sample));
+    }
+
+    private LlmPriceSnapshot pricedInstance(String perMInput, String perMOutput) {
+        return new LlmPriceSnapshot(
+            FundingSource.INSTANCE,
+            PricingState.PRICED,
+            42L,
+            null,
+            new BigDecimal(perMInput),
+            new BigDecimal(perMOutput),
+            BigDecimal.ZERO,
+            BigDecimal.ZERO
+        );
     }
 
     @Test
-    void recordAppendsOneLedgerRowPricedFromTheInstanceCatalog() {
+    void recordAppendsOneLedgerRowUsingTheAdmissionPriceSnapshot() {
         Workspace workspace = setupWorkspace("ledger-instance-priced");
-        LlmConnection connection = instanceConnection("ledger-instance-priced-conn");
-        LlmModel model = instanceModel(connection, "gpt-5", "gpt-5-upstream");
-        LlmModelPrice price = openInstancePrice(model, PricingMode.PRICED, "3.00", "9.00", "1.50");
         UUID sourceId = UUID.randomUUID();
 
-        recorder.record(
+        record(
             workspace.getId(),
-            new LlmUsageRecorder.LlmUsageSample(
+            sample(
                 LlmUsageJobType.PULL_REQUEST_REVIEW,
+                LlmUsageSourceType.AGENT_JOB,
                 sourceId,
-                "gpt-5-upstream",
+                2,
+                "gpt-5",
                 1_000_000,
                 1_000_000,
-                0,
-                0,
-                1_000_000,
-                3,
-                FundingSource.INSTANCE,
-                connection.getId(),
-                Instant.now()
+                pricedInstance("3.00", "9.00")
             )
         );
 
@@ -204,96 +137,105 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(events).hasSize(1);
         var event = events.getFirst();
         assertThat(event.getSourceId()).isEqualTo(sourceId);
-        // 1M input @ $3/1M + 1M output @ $9/1M + 1M reasoning @ $1.50/1M = 13.50
-        assertThat(event.getCostUsd()).isEqualByComparingTo("13.50");
+        assertThat(event.getSourceType()).isEqualTo(LlmUsageSourceType.AGENT_JOB);
+        assertThat(event.getSourceAttempt()).isEqualTo(2);
+        assertThat(event.getCostUsd()).isEqualByComparingTo("12.00");
         assertThat(event.getPricingState()).isEqualTo(PricingState.PRICED);
         assertThat(event.getFundingSource()).isEqualTo(FundingSource.INSTANCE);
-        assertThat(event.getAppliedPriceId()).isEqualTo(price.getId());
-        assertThat(budgetService.monthToDateCost(workspace.getId())).isEqualByComparingTo("13.50");
+        assertThat(event.getAppliedPriceId()).isEqualTo(42L);
+        assertThat(budgetService.monthToDateCost(workspace.getId())).isEqualByComparingTo("12.00");
     }
 
     @Test
-    void freeInstanceCatalogModelIsRecordedAsZeroCostAndNeverAlerts() {
+    void noChargeAdmissionIsRecordedAsZeroCostAndNeverAlerts() {
         Workspace workspace = setupWorkspace("ledger-instance-free");
         workspace.setMonthlyLlmBudgetUsd(new BigDecimal("50.00"));
         workspaceRepository.save(workspace);
-        LlmConnection connection = instanceConnection("ledger-instance-free-conn");
-        LlmModel model = instanceModel(connection, "local-llama", "local-llama-upstream");
-        openInstancePrice(model, PricingMode.FREE, null, null, null);
         double before = meterRegistry.counter("llm.budget.exhausted").count();
+        LlmPriceSnapshot noCharge = new LlmPriceSnapshot(
+            FundingSource.INSTANCE,
+            PricingState.NO_CHARGE,
+            43L,
+            null,
+            null,
+            null,
+            null,
+            null
+        );
 
-        recorder.record(
+        record(
             workspace.getId(),
-            new LlmUsageRecorder.LlmUsageSample(
+            sample(
                 LlmUsageJobType.MENTOR_TURN,
+                LlmUsageSourceType.MENTOR_TURN,
                 UUID.randomUUID(),
-                "local-llama-upstream",
+                0,
+                "local-model",
                 1000,
                 200,
-                0,
-                0,
-                0,
-                1,
-                FundingSource.INSTANCE,
-                connection.getId(),
-                Instant.now()
+                noCharge
             )
         );
 
         var event = usageRepository.findByWorkspaceId(workspace.getId()).getFirst();
-        assertThat(event.getPricingState()).isEqualTo(PricingState.FREE);
+        assertThat(event.getPricingState()).isEqualTo(PricingState.NO_CHARGE);
         assertThat(event.getCostUsd()).isEqualByComparingTo("0");
         assertThat(budgetService.monthToDateCost(workspace.getId())).isEqualByComparingTo("0");
         assertThat(budgetService.isBudgetExhausted(workspace.getId())).isFalse();
-        // A $0 event can never be the one that "crosses" a cap.
         assertThat(meterRegistry.counter("llm.budget.exhausted").count()).isEqualTo(before);
     }
 
     @Test
-    void byoWorkspaceCatalogSpendNeverCountsTowardTheInstanceBudget() {
+    void workspaceFundedSpendNeverCountsTowardTheInstanceBudget() {
         Workspace workspace = setupWorkspace("ledger-byo");
         workspace.setMonthlyLlmBudgetUsd(new BigDecimal("1.00"));
         workspaceRepository.save(workspace);
-        WorkspaceLlmConnection connection = workspaceConnection(workspace, "byo-conn");
-        workspaceModel(workspace, connection, "byo-model", "byo-upstream", PricingMode.PRICED, "100.00", "100.00");
+        LlmPriceSnapshot workspacePrice = new LlmPriceSnapshot(
+            FundingSource.WORKSPACE,
+            PricingState.PRICED,
+            null,
+            84L,
+            new BigDecimal("100.00"),
+            new BigDecimal("100.00"),
+            BigDecimal.ZERO,
+            BigDecimal.ZERO
+        );
 
-        recorder.record(
+        record(
             workspace.getId(),
-            new LlmUsageRecorder.LlmUsageSample(
+            sample(
                 LlmUsageJobType.MENTOR_TURN,
+                LlmUsageSourceType.MENTOR_TURN,
                 UUID.randomUUID(),
-                "byo-upstream",
+                0,
+                "byo-model",
                 1_000_000,
                 1_000_000,
-                0,
-                0,
-                0,
-                1,
-                FundingSource.WORKSPACE,
-                connection.getId(),
-                Instant.now()
+                workspacePrice
             )
         );
 
         var event = usageRepository.findByWorkspaceId(workspace.getId()).getFirst();
-        // 1M input @ $100/1M + 1M output @ $100/1M = 200.00 — real BYO spend, well above the $1 cap.
         assertThat(event.getCostUsd()).isEqualByComparingTo("200.00");
         assertThat(event.getFundingSource()).isEqualTo(FundingSource.WORKSPACE);
-        assertThat(event.getAppliedPriceId()).isNull();
-        // The budgeted sum only counts INSTANCE-funded spend — BYO never contributes.
+        assertThat(event.getAppliedWorkspaceModelId()).isEqualTo(84L);
         assertThat(budgetService.monthToDateCost(workspace.getId())).isEqualByComparingTo("0");
         assertThat(budgetService.isBudgetExhausted(workspace.getId())).isFalse();
     }
 
     @Test
-    void duplicateSourceIsSwallowedAndBillsOnce() {
+    void sourceAttemptIsTheIdempotencyBoundary() {
         Workspace workspace = setupWorkspace("ledger-dup");
         UUID sourceId = UUID.randomUUID();
+        LlmPriceSnapshot price = pricedInstance("1.00", "0.00");
 
-        recorder.record(workspace.getId(), sample(sourceId));
-        recorder.record(workspace.getId(), sample(sourceId));
+        record(workspace.getId(), agentSample(sourceId, 0, 1000, price));
+        record(workspace.getId(), agentSample(sourceId, 0, 1000, price));
+        record(workspace.getId(), agentSample(sourceId, 1, 1000, price));
 
-        assertThat(usageRepository.findByWorkspaceId(workspace.getId())).hasSize(1);
+        assertThat(usageRepository.findByWorkspaceId(workspace.getId()))
+            .extracting(LlmUsageEvent::getSourceAttempt)
+            .containsExactlyInAnyOrder(0, 1);
     }
 
     @Test
@@ -301,34 +243,15 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         Workspace workspace = setupWorkspace("ledger-cross");
         workspace.setMonthlyLlmBudgetUsd(new BigDecimal("1.50"));
         workspaceRepository.save(workspace);
-        LlmConnection connection = instanceConnection("ledger-cross-conn");
-        LlmModel model = instanceModel(connection, "priced", "priced-upstream");
-        openInstancePrice(model, PricingMode.PRICED, "1000000.00", "0.00", null); // $1.00 per 1000 input tokens
+        LlmPriceSnapshot price = pricedInstance("1000.00", "0.00"); // $1.00 per 1000 input tokens
         double before = meterRegistry.counter("llm.budget.exhausted").count();
 
-        recorder.record(workspace.getId(), instanceSample(connection.getId(), UUID.randomUUID(), 1000)); // $1.00, below cap
-        recorder.record(workspace.getId(), instanceSample(connection.getId(), UUID.randomUUID(), 1000)); // crosses cap
-        recorder.record(workspace.getId(), instanceSample(connection.getId(), UUID.randomUUID(), 1000)); // already over — no re-alert
+        record(workspace.getId(), agentSample(UUID.randomUUID(), 0, 1000, price));
+        record(workspace.getId(), agentSample(UUID.randomUUID(), 0, 1000, price));
+        record(workspace.getId(), agentSample(UUID.randomUUID(), 0, 1000, price));
 
         assertThat(meterRegistry.counter("llm.budget.exhausted").count()).isEqualTo(before + 1);
         assertThat(budgetService.isBudgetExhausted(workspace.getId())).isTrue();
-    }
-
-    private LlmUsageRecorder.LlmUsageSample instanceSample(Long connectionId, UUID sourceId, long inputTokens) {
-        return new LlmUsageRecorder.LlmUsageSample(
-            LlmUsageJobType.PULL_REQUEST_REVIEW,
-            sourceId,
-            "priced-upstream",
-            inputTokens,
-            0,
-            0,
-            0,
-            0,
-            1,
-            FundingSource.INSTANCE,
-            connectionId,
-            Instant.now()
-        );
     }
 
     @Test
@@ -336,10 +259,8 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         Workspace workspace = setupWorkspace("ledger-block");
         workspace.setMonthlyLlmBudgetUsd(new BigDecimal("0.50"));
         workspaceRepository.save(workspace);
-        LlmConnection connection = instanceConnection("ledger-block-conn");
-        LlmModel model = instanceModel(connection, "priced", "priced-upstream");
-        openInstancePrice(model, PricingMode.PRICED, "500000.00", "0.00", null); // $0.50 per 1000 input tokens
-        recorder.record(workspace.getId(), instanceSample(connection.getId(), UUID.randomUUID(), 1000));
+        LlmPriceSnapshot price = pricedInstance("500.00", "0.00"); // $0.50 per 1000 input tokens
+        record(workspace.getId(), agentSample(UUID.randomUUID(), 0, 1000, price));
         double blockedBefore = meterRegistry.counter("llm.budget.blocked", "surface", "agent_job").count();
 
         var job = agentJobService.submit(workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, null);
@@ -351,43 +272,37 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     @Test
-    void unpricedModelWithNoCatalogBindingIsRecordedUncostedAndCounted() {
+    void unverifiableUsageRetainsAdmissionProvenanceWithoutInventingACost() {
         Workspace workspace = setupWorkspace("ledger-uncosted");
         double uncostedBefore = meterRegistry.counter("llm.usage.uncosted").count();
 
-        recorder.record(workspace.getId(), sample(UUID.randomUUID()));
+        recordUnverifiable(workspace.getId(), agentSample(UUID.randomUUID(), 3, 0, pricedInstance("3.00", "9.00")));
 
         var event = usageRepository.findByWorkspaceId(workspace.getId()).getFirst();
         assertThat(event.getCostUsd()).isNull();
         assertThat(event.getPricingState()).isEqualTo(PricingState.UNPRICED);
-        assertThat(event.getInputTokens()).isEqualTo(1000);
+        assertThat(event.getSourceAttempt()).isEqualTo(3);
+        assertThat(event.getAppliedPriceId()).isEqualTo(42L);
         assertThat(meterRegistry.counter("llm.usage.uncosted").count()).isEqualTo(uncostedBefore + 1);
     }
 
     @Test
-    void unboundInstanceCatalogEventMakesTheVerdictUnverifiableInsteadOfBlocking() {
+    void unverifiableInstanceUsageMakesTheBudgetVerdictUnverifiable() {
         Workspace workspace = setupWorkspace("ledger-unverifiable");
         workspace.setMonthlyLlmBudgetUsd(new BigDecimal("100.00"));
         workspaceRepository.save(workspace);
-        LlmConnection connection = instanceConnection("ledger-unverifiable-conn");
-        // No LlmModel registered for this connection+upstream id combination: an instance-funded
-        // catalog binding that can't be resolved to a price.
 
-        recorder.record(
+        recordUnverifiable(
             workspace.getId(),
-            new LlmUsageRecorder.LlmUsageSample(
+            sample(
                 LlmUsageJobType.MENTOR_TURN,
+                LlmUsageSourceType.MENTOR_TURN,
                 UUID.randomUUID(),
-                "unregistered-upstream-id",
-                1000,
-                200,
+                0,
+                "gpt-5",
                 0,
                 0,
-                0,
-                1,
-                FundingSource.INSTANCE,
-                connection.getId(),
-                Instant.now()
+                pricedInstance("3.00", "9.00")
             )
         );
 
@@ -397,52 +312,14 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
             Instant.now().plusSeconds(3600)
         );
         assertThat(hasUnpriced).isTrue();
-        LlmBudgetVerdict verdict = LlmBudgetService.verdictFor(
-            budgetService.monthToDateCost(workspace.getId()),
-            hasUnpriced,
-            workspace.getMonthlyLlmBudgetUsd()
-        );
-        assertThat(verdict).isEqualTo(LlmBudgetVerdict.UNVERIFIABLE);
-        // UNVERIFIABLE never blocks submission in v1 — the workspace is not exhausted.
-        assertThat(budgetService.isBudgetExhausted(workspace.getId())).isFalse();
-    }
-
-    @Test
-    void missingCatalogBindingFallsBackToTheLegacyModelPricingTable() {
-        Workspace workspace = setupWorkspace("ledger-legacy");
-        // The suite builds its schema with ddl-auto, so the changelog's model_pricing seed is absent —
-        // register the row this test needs explicitly.
-        ModelPricing pricing = new ModelPricing();
-        pricing.setModelId("priced-model");
-        pricing.setPer1kInputUsd(new BigDecimal("0.000150"));
-        pricing.setPer1kOutputUsd(new BigDecimal("0.000600"));
-        pricing.setPer1kCacheReadUsd(BigDecimal.ZERO);
-        pricing.setPer1kCacheWriteUsd(BigDecimal.ZERO);
-        pricing.setValidFrom(Instant.now().minusSeconds(60));
-        pricingRepository.save(pricing);
-
-        recorder.record(
-            workspace.getId(),
-            new LlmUsageRecorder.LlmUsageSample(
-                LlmUsageJobType.MENTOR_TURN,
-                UUID.randomUUID(),
-                "priced-model", // 0.000150 per 1k input + 0.000600 per 1k output
-                1000,
-                1000,
-                0,
-                0,
-                0,
-                1,
-                null, // no catalog binding — legacy config
-                null,
-                Instant.now()
+        assertThat(
+            LlmBudgetService.verdictFor(
+                budgetService.monthToDateCost(workspace.getId()),
+                hasUnpriced,
+                workspace.getMonthlyLlmBudgetUsd()
             )
-        );
-
-        var event = usageRepository.findByWorkspaceId(workspace.getId()).getFirst();
-        assertThat(event.getPricingState()).isEqualTo(PricingState.PRICED);
-        assertThat(event.getFundingSource()).isEqualTo(FundingSource.INSTANCE);
-        assertThat(budgetService.monthToDateCost(workspace.getId())).isEqualByComparingTo("0.000750");
+        ).isEqualTo(LlmBudgetVerdict.UNVERIFIABLE);
+        assertThat(budgetService.isBudgetExhausted(workspace.getId())).isFalse();
     }
 
     @Test

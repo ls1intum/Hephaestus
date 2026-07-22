@@ -36,7 +36,6 @@ class PracticePiAdapterTest extends BaseUnitTest {
             null,
             null,
             false,
-            null,
             "job-token-123",
             false,
             600
@@ -105,7 +104,6 @@ class PracticePiAdapterTest extends BaseUnitTest {
             131072,
             4096,
             true,
-            "anthropic",
             "job-token-123",
             false,
             600

@@ -3,7 +3,9 @@ package de.tum.cit.aet.hephaestus.agent.config;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
 import de.tum.cit.aet.hephaestus.agent.catalog.ResolvedLlmModel;
+import de.tum.cit.aet.hephaestus.agent.usage.AdmittedLlmModel;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
@@ -19,13 +21,12 @@ import tools.jackson.databind.ObjectMapper;
  * <h2>Deliberately excluded fields (#1368 slice 5 — runtime switch-over)</h2>
  *
  * <p>Everything here is non-secret, frozen BEHAVIOUR: the wire protocol, the model id, and its
- * capability envelope. The credential itself — and any header material ({@code authHeaderName}/
- * {@code authValuePrefix}/{@code azureApiVersion}) — is deliberately NEVER frozen here.
+ * capability envelope. The credential itself — and any authentication-header material — is
+ * deliberately NEVER frozen here.
  * {@link #connectionScope}/{@link #connectionId} instead identify WHICH connection row funds the job,
  * so the LLM proxy can re-resolve the live credential at call time via
  * {@link LlmModelResolver#resolveProxyCredential}, picking up rotation/revocation immediately. A
- * legacy (pre-catalog) config carries {@code connectionScope=null}/{@code connectionId=null}; the
- * proxy then falls back to the live {@code AgentConfig.llmApiKey} via {@link #configId}.
+ * A legacy snapshot carries no connection identity and therefore fails closed at the proxy.
  *
  * <h3>{@link #baseUrl} is split: frozen here, but NOT what the proxy routes on</h3>
  *
@@ -55,12 +56,130 @@ public record ConfigSnapshot(
     @Nullable Integer contextWindow,
     @Nullable Integer maxOutputTokens,
     boolean supportsReasoning,
-    @Nullable String cacheControlFormat,
     @Nullable FundingSource connectionScope,
     @Nullable Long connectionId,
+    @Nullable Long modelId,
+    @Nullable Long workspaceId,
     int timeoutSeconds,
-    boolean allowInternet
+    boolean allowInternet,
+    @Nullable LlmPriceSnapshot priceSnapshot
 ) {
+    /** Compatibility constructor for snapshots created before admission pricing was added. */
+    public ConfigSnapshot(
+        int schemaVersion,
+        Long configId,
+        String configName,
+        String apiProtocol,
+        String baseUrl,
+        String upstreamModelId,
+        @Nullable String modelVersion,
+        @Nullable Integer contextWindow,
+        @Nullable Integer maxOutputTokens,
+        boolean supportsReasoning,
+        @Nullable FundingSource connectionScope,
+        @Nullable Long connectionId,
+        @Nullable Long modelId,
+        @Nullable Long workspaceId,
+        int timeoutSeconds,
+        boolean allowInternet
+    ) {
+        this(
+            schemaVersion,
+            configId,
+            configName,
+            apiProtocol,
+            baseUrl,
+            upstreamModelId,
+            modelVersion,
+            contextWindow,
+            maxOutputTokens,
+            supportsReasoning,
+            connectionScope,
+            connectionId,
+            modelId,
+            workspaceId,
+            timeoutSeconds,
+            allowInternet,
+            null
+        );
+    }
+
+    /** Reads source-compatible pre-removal construction sites; the obsolete cache hint is ignored. */
+    public ConfigSnapshot(
+        int schemaVersion,
+        Long configId,
+        String configName,
+        String apiProtocol,
+        String baseUrl,
+        String upstreamModelId,
+        @Nullable String modelVersion,
+        @Nullable Integer contextWindow,
+        @Nullable Integer maxOutputTokens,
+        boolean supportsReasoning,
+        @Nullable String ignoredCacheControlFormat,
+        @Nullable FundingSource connectionScope,
+        @Nullable Long connectionId,
+        int timeoutSeconds,
+        boolean allowInternet
+    ) {
+        this(
+            schemaVersion,
+            configId,
+            configName,
+            apiProtocol,
+            baseUrl,
+            upstreamModelId,
+            modelVersion,
+            contextWindow,
+            maxOutputTokens,
+            supportsReasoning,
+            connectionScope,
+            connectionId,
+            null,
+            null,
+            timeoutSeconds,
+            allowInternet,
+            null
+        );
+    }
+
+    public ConfigSnapshot(
+        int schemaVersion,
+        Long configId,
+        String configName,
+        String apiProtocol,
+        String baseUrl,
+        String upstreamModelId,
+        @Nullable String modelVersion,
+        @Nullable Integer contextWindow,
+        @Nullable Integer maxOutputTokens,
+        boolean supportsReasoning,
+        @Nullable FundingSource connectionScope,
+        @Nullable Long connectionId,
+        int timeoutSeconds,
+        boolean allowInternet
+    ) {
+        this(
+            schemaVersion,
+            configId,
+            configName,
+            apiProtocol,
+            baseUrl,
+            upstreamModelId,
+            modelVersion,
+            contextWindow,
+            maxOutputTokens,
+            supportsReasoning,
+            connectionScope,
+            connectionId,
+            null,
+            null,
+            timeoutSeconds,
+            allowInternet,
+            null
+        );
+    }
+
     /**
      * Current schema version. Bump only for breaking changes (field removal, type change,
      * semantic reinterpretation). Additive nullable fields are forward- AND backward-compatible
@@ -84,8 +203,8 @@ public record ConfigSnapshot(
     }
 
     /**
-     * Create a snapshot from a live {@link AgentConfig}, resolving its effective (instance / workspace
-     * BYO / legacy) model binding via {@link LlmModelResolver}.
+     * Create a snapshot from a live {@link AgentConfig}, resolving its instance or workspace catalog
+     * model binding via {@link LlmModelResolver}.
      */
     public static ConfigSnapshot from(AgentConfig config, LlmModelResolver resolver) {
         Objects.requireNonNull(config, "config must not be null");
@@ -103,11 +222,62 @@ public record ConfigSnapshot(
             resolved.contextWindow(),
             resolved.maxOutputTokens(),
             resolved.supportsReasoning(),
-            resolved.cacheControlFormat(),
             ref.scope(),
             ref.connectionId(),
+            ref.modelId(),
+            ref.workspaceId(),
             config.getTimeoutSeconds(),
             config.isAllowInternet()
+        );
+    }
+
+    /** Creates the authoritative snapshot used after a job passes live admission at claim time. */
+    public static ConfigSnapshot fromAdmission(AgentConfig config, AdmittedLlmModel admitted) {
+        Objects.requireNonNull(config, "config must not be null");
+        Objects.requireNonNull(admitted, "admitted must not be null");
+        ResolvedLlmModel resolved = admitted.resolved();
+        LlmModelResolver.ConnectionRef ref = admitted.connection();
+        return new ConfigSnapshot(
+            SCHEMA_VERSION,
+            config.getId(),
+            config.getName(),
+            resolved.apiProtocol(),
+            resolved.baseUrl(),
+            resolved.upstreamModelId(),
+            config.getModelVersion(),
+            resolved.contextWindow(),
+            resolved.maxOutputTokens(),
+            resolved.supportsReasoning(),
+            ref.scope(),
+            ref.connectionId(),
+            ref.modelId(),
+            ref.workspaceId(),
+            config.getTimeoutSeconds(),
+            config.isAllowInternet(),
+            admitted.price()
+        );
+    }
+
+    /** Attaches claim-time accounting while preserving all submit-time behaviour exactly. */
+    public ConfigSnapshot withPriceSnapshot(LlmPriceSnapshot price) {
+        return new ConfigSnapshot(
+            schemaVersion,
+            configId,
+            configName,
+            apiProtocol,
+            baseUrl,
+            upstreamModelId,
+            modelVersion,
+            contextWindow,
+            maxOutputTokens,
+            supportsReasoning,
+            connectionScope,
+            connectionId,
+            modelId,
+            workspaceId,
+            timeoutSeconds,
+            allowInternet,
+            price
         );
     }
 
@@ -122,8 +292,8 @@ public record ConfigSnapshot(
      * Deserialize from JSONB. Rejects snapshots from a newer schema version to prevent
      * silent data corruption during rolling deploys. Snapshots persisted before v4 (schemaVersion
      * 0-3) use the pre-catalog shape (llmProvider/credentialMode/llmBaseUrl/modelName) and are
-     * translated via {@link #fromLegacyJson} so a job already in flight during the deploy that
-     * introduced v4 keeps running.
+     * translated via {@link #fromLegacyJson} only for structural deserialization. Since it has no
+     * catalog identity, proxy credential resolution rejects it.
      */
     public static ConfigSnapshot fromJson(JsonNode node, ObjectMapper objectMapper) {
         Objects.requireNonNull(node, "node must not be null");
@@ -144,11 +314,8 @@ public record ConfigSnapshot(
 
     /**
      * Translates a pre-v4 snapshot (llmProvider/credentialMode/llmBaseUrl/modelName) into the v4
-     * shape, mirroring the same provider→(protocol, default base URL) rules
-     * {@link LlmModelResolver}'s legacy path uses, so an in-flight job dispatched before the v4
-     * deploy keeps the exact behaviour it was given at submission. {@code connectionScope}/
-     * {@code connectionId} are always null here — legacy snapshots never had a catalog binding by
-     * construction, so the proxy falls back to {@code AgentConfig.llmApiKey} via {@code configId}.
+     * shape so historical rows remain readable. {@code connectionScope}/{@code connectionId} are
+     * always null, which deliberately makes such a job non-routable at the proxy.
      */
     private static ConfigSnapshot fromLegacyJson(JsonNode node) {
         String provider = node.path("llmProvider").asString("OPENAI");
@@ -187,7 +354,6 @@ public record ConfigSnapshot(
             null,
             null,
             false,
-            null,
             null,
             null,
             timeoutSeconds,

@@ -1,13 +1,17 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
 import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationalDeliveryReconciler;
+import de.tum.cit.aet.hephaestus.agent.mentor.MentorLlmConfig;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.exception.TurnAlreadyInFlightException;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.TranslatorState;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
-import de.tum.cit.aet.hephaestus.agent.pricing.ModelPricingService;
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageJobType;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder.LlmUsageSample;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
+import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
@@ -49,7 +53,6 @@ public class MentorTurnPersistence {
     private final ChatThreadRepository chatThreadRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final WorkspaceRepository workspaceRepository;
-    private final ModelPricingService pricingService;
     private final ConversationalDeliveryReconciler conversationalDeliveryReconciler;
     private final LlmUsageRecorder usageRecorder;
 
@@ -64,7 +67,6 @@ public class MentorTurnPersistence {
         ChatThreadRepository chatThreadRepository,
         ChatMessageRepository chatMessageRepository,
         WorkspaceRepository workspaceRepository,
-        ModelPricingService pricingService,
         ConversationalDeliveryReconciler conversationalDeliveryReconciler,
         LlmUsageRecorder usageRecorder,
         PlatformTransactionManager transactionManager
@@ -72,7 +74,6 @@ public class MentorTurnPersistence {
         this.chatThreadRepository = chatThreadRepository;
         this.chatMessageRepository = chatMessageRepository;
         this.workspaceRepository = workspaceRepository;
-        this.pricingService = pricingService;
         this.conversationalDeliveryReconciler = conversationalDeliveryReconciler;
         this.usageRecorder = usageRecorder;
         this.requiresNewTx = new TransactionTemplate(transactionManager);
@@ -134,7 +135,8 @@ public class MentorTurnPersistence {
         ChatThread thread,
         String userText,
         UUID assistantMessageId,
-        @Nullable UUID userMessageId
+        @Nullable UUID userMessageId,
+        MentorLlmConfig llmConfig
     ) {
         try {
             if (userMessageId != null && chatMessageRepository.existsById(userMessageId)) {
@@ -162,10 +164,20 @@ public class MentorTurnPersistence {
             // The partial unique index `ux_chat_message_in_flight_v2` keys on the status column,
             // so a second concurrent turn for the same thread raises TurnAlreadyInFlightException.
             assistant.setStatus(ChatMessage.Status.in_flight);
-            assistant.setMetadata(NODES.objectNode());
+            assistant.setMetadata(admissionMetadata(llmConfig));
             chatMessageRepository.save(assistant);
             chatMessageRepository.flush();
-            return new TurnPersistenceCookie(thread.getId(), savedUser.getId(), assistantMessageId, Instant.now());
+            if (llmConfig.priceSnapshot() == null) {
+                throw new IllegalStateException("Mentor turn has no admitted LLM price snapshot");
+            }
+            return new TurnPersistenceCookie(
+                thread.getId(),
+                savedUser.getId(),
+                assistantMessageId,
+                Instant.now(),
+                llmConfig.upstreamModelId(),
+                llmConfig.priceSnapshot()
+            );
         } catch (DataIntegrityViolationException ex) {
             // Spring translates ANY DB integrity violation (FK, NOT NULL, CHECK) to this
             // class — only narrow to TurnAlreadyInFlightException when Hibernate confirms
@@ -178,6 +190,60 @@ public class MentorTurnPersistence {
             }
             throw ex;
         }
+    }
+
+    private static ObjectNode admissionMetadata(MentorLlmConfig config) {
+        LlmPriceSnapshot price = config.priceSnapshot();
+        if (price == null) throw new IllegalStateException("Mentor turn has no admitted LLM price snapshot");
+        ObjectNode admission = NODES.objectNode();
+        admission.put("model", config.upstreamModelId());
+        ObjectNode p = admission.putObject("price");
+        p.put("fundingSource", price.fundingSource().name());
+        p.put("pricingState", price.pricingState().name());
+        putNullable(p, "appliedPriceId", price.appliedPriceId());
+        putNullable(p, "appliedWorkspaceModelId", price.appliedWorkspaceModelId());
+        putNullable(p, "per1mInputUsd", price.per1mInputUsd());
+        putNullable(p, "per1mOutputUsd", price.per1mOutputUsd());
+        putNullable(p, "per1mCacheReadUsd", price.per1mCacheReadUsd());
+        putNullable(p, "per1mCacheWriteUsd", price.per1mCacheWriteUsd());
+        return NODES.objectNode().set("llmAdmission", admission);
+    }
+
+    private static void putNullable(ObjectNode node, String field, @Nullable Object value) {
+        if (value == null) node.putNull(field);
+        else if (value instanceof Number number) node.put(field, number.toString());
+        else node.put(field, value.toString());
+    }
+
+    /** Compatibility overload for tests and callers that do not execute an LLM turn. */
+    public TurnPersistenceCookie persistInFlight(
+        ChatThread thread,
+        String userText,
+        UUID assistantMessageId,
+        @Nullable UUID userMessageId
+    ) {
+        return persistInFlight(
+            thread,
+            userText,
+            assistantMessageId,
+            userMessageId,
+            new MentorLlmConfig(
+                0L,
+                "openai-responses",
+                "",
+                "unknown",
+                null,
+                null,
+                false,
+                FundingSource.INSTANCE,
+                null,
+                null,
+                null,
+                legacyUnpriced(),
+                false,
+                600
+            )
+        );
     }
 
     /**
@@ -216,7 +282,7 @@ public class MentorTurnPersistence {
         if (cost == null) return finish;
         UIMessageChunk.MessageMetadata existing = finish.messageMetadata();
         UIMessageChunk.MessageMetadata.Usage usage = existing != null ? existing.usage() : null;
-        String model = existing != null ? existing.model() : state.observedModel();
+        String model = existing != null ? existing.model() : state.admittedModel();
         return new UIMessageChunk.Finish(finish.finishReason(), new UIMessageChunk.MessageMetadata(model, usage, cost));
     }
 
@@ -235,29 +301,29 @@ public class MentorTurnPersistence {
     @Nullable
     private Double computeFinalCostUsd(TranslatorState state) {
         UsageBreakdown breakdown = extractUsageFromState(state);
-        if (breakdown.model() == null || (breakdown.inputTokens() <= 0 && breakdown.outputTokens() <= 0)) {
+        LlmPriceSnapshot price = state.admittedPrice();
+        if (
+            price == null ||
+            (breakdown.inputTokens() <= 0 &&
+                breakdown.outputTokens() <= 0 &&
+                breakdown.cacheReadTokens() <= 0 &&
+                breakdown.cacheWriteTokens() <= 0)
+        ) {
             return null;
         }
-        return pricingService
-            .computeCost(
-                breakdown.model(),
-                breakdown.inputTokens(),
-                breakdown.outputTokens(),
-                breakdown.cacheReadTokens(),
-                breakdown.cacheWriteTokens()
-            )
-            .map(java.math.BigDecimal::doubleValue)
-            .orElse(null);
+        var cost = price.calculateCost(
+            breakdown.inputTokens(),
+            breakdown.outputTokens(),
+            breakdown.cacheReadTokens(),
+            breakdown.cacheWriteTokens()
+        );
+        return cost != null ? cost.doubleValue() : null;
     }
 
-    /**
-     * Uses {@link TransactionTemplate} rather than {@code @Transactional} so the ledger write can
-     * run AFTER this transaction closes — see {@link #billTurn}.
-     */
+    /** Uses {@link TransactionTemplate} so the message and ledger write share an explicit new transaction. */
     public void finalise(TurnPersistenceCookie cookie, TranslatorState state, UIMessageChunk.Finish finish) {
-        PendingLedgerWrite pending = new PendingLedgerWrite();
         try {
-            requiresNewTx.executeWithoutResult(tx -> doFinalise(cookie, state, finish, pending));
+            requiresNewTx.executeWithoutResult(tx -> doFinalise(cookie, state, finish));
         } catch (OptimisticLockingFailureException stale) {
             // A concurrent writer (typically the in-flight reaper flipping the row to
             // `interrupted`) bumped the @Version after we loaded the snapshot. Their observation
@@ -270,15 +336,9 @@ public class MentorTurnPersistence {
                 cookie.assistantMessageId()
             );
         }
-        billTurn(pending);
     }
 
-    private void doFinalise(
-        TurnPersistenceCookie cookie,
-        TranslatorState state,
-        UIMessageChunk.Finish finish,
-        PendingLedgerWrite pending
-    ) {
+    private void doFinalise(TurnPersistenceCookie cookie, TranslatorState state, UIMessageChunk.Finish finish) {
         ChatMessage assistant = chatMessageRepository
             .findById(cookie.assistantMessageId())
             .orElseThrow(() -> new EntityNotFoundException("ChatMessage", cookie.assistantMessageId().toString()));
@@ -322,15 +382,11 @@ public class MentorTurnPersistence {
         }
         meta.put("durationMs", Duration.between(cookie.startedAt(), Instant.now()).toMillis());
         assistant.setMetadata(meta);
-        // Capture the ledger write BEFORE the flush: the tokens were burned regardless of who wins
-        // the version race below, so losing that race must not lose the billing. The ledger's own
-        // cost is derived server-side by LlmUsageRecorder (#1368 slice 6) — wireCostUsd is only the
-        // wire-facing estimate persisted above for the chat UI, unrelated to the ledger write.
-        pending.capture(assistant, state);
         // saveAndFlush (not save): force the optimistic-lock check NOW, inside the try/catch, instead of at the
         // REQUIRES_NEW commit boundary where an OptimisticLockingFailureException would escape uncaught and turn
         // a benign reaper race into a logged turn failure.
         chatMessageRepository.saveAndFlush(assistant);
+        billTurn(assistant, state, cookie);
 
         // close the conversational-delivery loop for any PREPARED unit the mentor raised this turn. MUST run
         // AFTER the assistant saveAndFlush above - the CONVERSATION_TURN placement's chat_message_id FK
@@ -349,82 +405,36 @@ public class MentorTurnPersistence {
      * keeps carrying the same numbers for the wire contract; the ledger row survives thread
      * deletion. Runs for finalise AND interrupt: an interrupted turn still burned tokens.
      *
-     * <p>Deliberately OUTSIDE the persistence transaction (mirroring {@code AgentJobExecutor}): the
-     * recorder opens its own {@code REQUIRES_NEW} transaction, which under an open outer one would
-     * pin a second pool connection per concurrent turn. The recorder never throws, and the ledger's
-     * {@code source_id} unique constraint makes a re-bill a no-op.
+     * <p>Written in the same transaction as the assistant message, so a completed turn and its
+     * accounting row commit atomically. The ledger's source identity makes a repeated finalisation
+     * idempotent.
      */
-    private void billTurn(PendingLedgerWrite pending) {
-        LlmUsageSample sample = pending.sample();
-        if (sample == null) {
-            return;
-        }
-        if (pending.unverifiable()) {
-            usageRecorder.recordUnverifiable(pending.workspaceId(), sample);
-        } else {
-            usageRecorder.record(pending.workspaceId(), sample);
-        }
-    }
-
-    /**
-     * Carries the ledger write out of the persistence transaction. Populated before the row flush
-     * so a lost optimistic-lock race still bills the tokens the turn actually burned.
-     */
-    private static final class PendingLedgerWrite {
-
-        @Nullable
-        private Long workspaceId;
-
-        @Nullable
-        private LlmUsageSample sample;
-
-        private boolean unverifiable;
-
-        /** No-op only when no LLM call started or the thread is detached. */
-        void capture(ChatMessage assistant, TranslatorState state) {
-            ChatThread thread = assistant.getThread();
-            if (thread == null || thread.getWorkspace() == null) {
-                return;
-            }
-            UsageBreakdown usage = extractUsageFromState(state);
-            if (usage.inputTokens() <= 0 && usage.outputTokens() <= 0) {
-                if (!state.hasLlmCallStarted()) {
-                    return;
-                }
-                unverifiable = true;
-            }
-            this.workspaceId = thread.getWorkspace().getId();
-            this.sample = new LlmUsageSample(
-                LlmUsageJobType.MENTOR_TURN,
-                assistant.getId(),
-                usage.model(),
-                usage.inputTokens(),
-                usage.outputTokens(),
-                usage.cacheReadTokens(),
-                usage.cacheWriteTokens(),
-                // Mentor turns don't yet surface reasoning-token counts on the wire (#1368 slice 6
-                // scope) — the ledger column defaults to zero for this job type until that lands.
-                0,
-                1,
-                state.connectionScope(),
-                state.connectionId(),
-                Instant.now()
-            );
-        }
-
-        @Nullable
-        LlmUsageSample sample() {
-            return sample;
-        }
-
-        @Nullable
-        Long workspaceId() {
-            return workspaceId;
-        }
-
-        boolean unverifiable() {
-            return unverifiable;
-        }
+    private void billTurn(ChatMessage assistant, TranslatorState state, TurnPersistenceCookie cookie) {
+        ChatThread thread = assistant.getThread();
+        if (thread == null || thread.getWorkspace() == null || !state.hasLlmCallStarted()) return;
+        UsageBreakdown usage = extractUsageFromState(state);
+        boolean unverifiable =
+            usage.inputTokens() <= 0 &&
+            usage.outputTokens() <= 0 &&
+            usage.cacheReadTokens() <= 0 &&
+            usage.cacheWriteTokens() <= 0;
+        LlmUsageSample sample = new LlmUsageSample(
+            LlmUsageJobType.MENTOR_TURN,
+            LlmUsageSourceType.MENTOR_TURN,
+            assistant.getId(),
+            0,
+            cookie.upstreamModelId(),
+            usage.inputTokens(),
+            usage.outputTokens(),
+            usage.cacheReadTokens(),
+            usage.cacheWriteTokens(),
+            0,
+            Math.max(1, state.observedCallCount()),
+            cookie.priceSnapshot(),
+            Instant.now()
+        );
+        if (unverifiable) usageRecorder.recordUnverifiable(thread.getWorkspace().getId(), sample);
+        else usageRecorder.record(thread.getWorkspace().getId(), sample);
     }
 
     /**
@@ -459,9 +469,8 @@ public class MentorTurnPersistence {
 
     /** Transaction shape mirrors {@link #finalise} — see that method's note on the ledger write. */
     public void interrupt(TurnPersistenceCookie cookie, TranslatorState state, Throwable cause) {
-        PendingLedgerWrite pending = new PendingLedgerWrite();
         try {
-            requiresNewTx.executeWithoutResult(tx -> doInterrupt(cookie, state, cause, pending));
+            requiresNewTx.executeWithoutResult(tx -> doInterrupt(cookie, state, cause));
         } catch (OptimisticLockingFailureException stale) {
             // Another writer (a successful finalise or reaper sweep) bumped the row's version
             // after our snapshot. Their observation wins; we don't downgrade a `completed` row to
@@ -471,15 +480,9 @@ public class MentorTurnPersistence {
                 cookie.assistantMessageId()
             );
         }
-        billTurn(pending);
     }
 
-    private void doInterrupt(
-        TurnPersistenceCookie cookie,
-        TranslatorState state,
-        Throwable cause,
-        PendingLedgerWrite pending
-    ) {
+    private void doInterrupt(TurnPersistenceCookie cookie, TranslatorState state, Throwable cause) {
         chatMessageRepository
             .findById(cookie.assistantMessageId())
             .ifPresent(assistant -> {
@@ -489,12 +492,10 @@ public class MentorTurnPersistence {
                 meta.put("error", cause.getMessage() != null ? cause.getMessage() : cause.getClass().getSimpleName());
                 meta.put("durationMs", Duration.between(cookie.startedAt(), Instant.now()).toMillis());
                 assistant.setMetadata(meta);
-                // Capture before the flush for the same reason as doFinalise: an interrupted turn
-                // still burned its tokens, and losing the version race must not lose the billing.
-                pending.capture(assistant, state);
                 // saveAndFlush (not save): surface OptimisticLockingFailureException inside the try/catch (the
                 // no-session-bytes interrupt path would otherwise defer the version check to commit, escaping it).
                 chatMessageRepository.saveAndFlush(assistant);
+                billTurn(assistant, state, cookie);
             });
 
         // If the runner shipped session_persisted before the interrupt (e.g. pi_error AFTER a
@@ -535,7 +536,7 @@ public class MentorTurnPersistence {
      * {@code AssistantMessage.usage} is canonical camelCase per pi-ai types.ts (Usage).
      */
     private static UsageBreakdown extractUsageFromState(TranslatorState state) {
-        String model = state.observedModel();
+        String model = state.admittedModel() != null ? state.admittedModel() : state.observedModel();
         JsonNode usage = state.observedUsage();
         if (usage == null) return new UsageBreakdown(model, 0, 0, 0, 0);
         return new UsageBreakdown(
@@ -557,8 +558,18 @@ public class MentorTurnPersistence {
         UUID threadId,
         UUID userMessageId,
         UUID assistantMessageId,
-        Instant startedAt
-    ) {}
+        Instant startedAt,
+        String upstreamModelId,
+        LlmPriceSnapshot priceSnapshot
+    ) {
+        public TurnPersistenceCookie(UUID threadId, UUID userMessageId, UUID assistantMessageId, Instant startedAt) {
+            this(threadId, userMessageId, assistantMessageId, startedAt, "unknown", legacyUnpriced());
+        }
+    }
+
+    private static LlmPriceSnapshot legacyUnpriced() {
+        return new LlmPriceSnapshot(FundingSource.INSTANCE, PricingState.UNPRICED, null, null, null, null, null, null);
+    }
 
     private record UsageBreakdown(
         @Nullable String model,

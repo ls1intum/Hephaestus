@@ -9,7 +9,6 @@ export interface PriceModeValue {
 	per1mOutputUsd?: number;
 	per1mCacheReadUsd?: number;
 	per1mCacheWriteUsd?: number;
-	per1mReasoningUsd?: number;
 	note?: string;
 }
 
@@ -40,16 +39,11 @@ export function PriceModeEditor({
 		onChange({ ...value, [key]: next });
 	};
 
-	const freeLabel = audience === "instance" ? "Free" : "No budget cost";
+	const noChargeLabel = "No metered API cost";
 	const unpricedLabel = audience === "instance" ? "No price set" : "Price not set";
 
 	const numberField = (
-		key:
-			| "per1mInputUsd"
-			| "per1mOutputUsd"
-			| "per1mCacheReadUsd"
-			| "per1mCacheWriteUsd"
-			| "per1mReasoningUsd",
+		key: "per1mInputUsd" | "per1mOutputUsd" | "per1mCacheReadUsd" | "per1mCacheWriteUsd",
 		label: string,
 		required: boolean,
 	) => {
@@ -93,6 +87,10 @@ export function PriceModeEditor({
 	return (
 		<Field>
 			<FieldLabel>Price</FieldLabel>
+			<FieldDescription>
+				Enter the rate billed by the provider. OpenAI-compatible usage responses report tokens, not
+				your account's dollar charge.
+			</FieldDescription>
 			<RadioGroup
 				value={value.pricingMode}
 				onValueChange={(next) => {
@@ -106,8 +104,8 @@ export function PriceModeEditor({
 					<label htmlFor={`${idPrefix}-mode-priced`}>Price per 1M tokens</label>
 				</div>
 				<div className="flex items-center gap-2 text-sm font-normal">
-					<RadioGroupItem value="FREE" id={`${idPrefix}-mode-free`} />
-					<label htmlFor={`${idPrefix}-mode-free`}>{freeLabel}</label>
+					<RadioGroupItem value="NO_CHARGE" id={`${idPrefix}-mode-no-charge`} />
+					<label htmlFor={`${idPrefix}-mode-no-charge`}>{noChargeLabel}</label>
 				</div>
 				<div className="flex items-center gap-2 text-sm font-normal">
 					<RadioGroupItem value="UNPRICED" id={`${idPrefix}-mode-unpriced`} />
@@ -121,11 +119,13 @@ export function PriceModeEditor({
 					{numberField("per1mOutputUsd", "Output (USD)", true)}
 					{numberField("per1mCacheReadUsd", "Cache read (USD)", false)}
 					{numberField("per1mCacheWriteUsd", "Cache write (USD)", false)}
-					{numberField("per1mReasoningUsd", "Reasoning (USD)", false)}
+					<FieldDescription className="sm:col-span-2">
+						Reasoning tokens are included in output tokens and are not priced a second time.
+					</FieldDescription>
 				</div>
 			)}
 
-			{value.pricingMode === "FREE" && (
+			{value.pricingMode === "NO_CHARGE" && (
 				<Field data-invalid={Boolean(errors?.note)} className="mt-3">
 					<FieldLabel htmlFor={`${idPrefix}-note`}>
 						Note
@@ -138,11 +138,13 @@ export function PriceModeEditor({
 						value={value.note ?? ""}
 						disabled={disabled}
 						onChange={(e) => set("note", e.target.value)}
-						placeholder="e.g. self-hosted, no cost"
+						placeholder="e.g. internal endpoint; infrastructure billed separately"
 						aria-required="true"
 						aria-invalid={Boolean(errors?.note)}
 					/>
-					<FieldDescription>self-hosted, no cost</FieldDescription>
+					<FieldDescription>
+						Explain why no per-token API rate applies. Infrastructure cost may still apply.
+					</FieldDescription>
 					{errors?.note && <FieldError>{errors.note}</FieldError>}
 				</Field>
 			)}

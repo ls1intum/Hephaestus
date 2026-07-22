@@ -63,15 +63,6 @@ public class LlmModel {
     private String upstreamModelId;
 
     @Nullable
-    @Column(name = "api_protocol_override", length = 40)
-    private String apiProtocolOverride;
-
-    @ColumnDefault("'CHAT'")
-    @Enumerated(EnumType.STRING)
-    @Column(name = "modality", nullable = false, length = 16)
-    private ModelModality modality = ModelModality.CHAT;
-
-    @Nullable
     @Column(name = "context_window")
     private Integer contextWindow;
 
@@ -83,18 +74,14 @@ public class LlmModel {
     @Column(name = "supports_reasoning", nullable = false)
     private boolean supportsReasoning = false;
 
-    @Nullable
-    @Column(name = "cache_control_format", length = 16)
-    private String cacheControlFormat;
-
-    @ColumnDefault("'PUBLIC'")
+    @ColumnDefault("'GRANTED'")
     @Enumerated(EnumType.STRING)
     @Column(name = "visibility", nullable = false, length = 16)
-    private ModelVisibility visibility = ModelVisibility.PUBLIC;
+    private ModelVisibility visibility = ModelVisibility.GRANTED;
 
-    @ColumnDefault("true")
+    @ColumnDefault("false")
     @Column(name = "enabled", nullable = false)
-    private boolean enabled = true;
+    private boolean enabled = false;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

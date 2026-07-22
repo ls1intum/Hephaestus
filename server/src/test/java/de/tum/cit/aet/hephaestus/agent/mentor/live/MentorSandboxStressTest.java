@@ -766,8 +766,8 @@ class MentorSandboxStressTest {
             null,
             null,
             false,
-            null,
-            "live-test-token", // never actually checked — no real proxy sits in front of this test
+            "live-test-token",
+            // never actually checked — no real proxy sits in front of this test
             true,
             300,
             new MentorRunnerProfile(),

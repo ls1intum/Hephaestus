@@ -79,4 +79,9 @@ public class GitHubScmTokenSource implements ScmTokenSource {
             .filter(u -> u != null && !u.isBlank())
             .or(() -> Optional.of(DEFAULT_GITHUB_URL));
     }
+
+    @Override
+    public Optional<String> reviewHeadRef(long pullRequestNumber) {
+        return pullRequestNumber > 0 ? Optional.of("refs/pull/" + pullRequestNumber + "/head") : Optional.empty();
+    }
 }

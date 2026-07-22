@@ -55,6 +55,10 @@ function selectionOf(config?: AgentConfig): ModelSelection | null {
 	return null;
 }
 
+function sameSelection(left: ModelSelection | null, right: ModelSelection | null): boolean {
+	return left?.scope === right?.scope && left?.id === right?.id;
+}
+
 function initialState(config?: AgentConfig): FormState {
 	return {
 		name: config?.name ?? "",
@@ -85,10 +89,8 @@ export function AgentConfigForm({
 	onCancel,
 }: AgentConfigFormProps) {
 	const isEdit = config !== undefined;
-	// A config from before the model-catalog cutover: bound to neither a shared nor a workspace model,
-	// still running on the legacy provider/model-name columns. Its old fields are read-only here — the
-	// only way forward is picking a model from the catalog, which rebinds it and drops the legacy path.
-	const isLegacy = isEdit && config.instanceModelId == null && config.workspaceModelId == null;
+	const needsModelBinding =
+		isEdit && config.instanceModelId == null && config.workspaceModelId == null;
 
 	const [form, setForm] = useState<FormState>(() => initialState(config));
 	const [errors, setErrors] = useState<Record<string, string>>({});
@@ -113,9 +115,7 @@ export function AgentConfigForm({
 				if (key && !next[key]) next[key] = issue.message;
 			}
 		}
-		// A legacy config may be saved without touching its binding (a no-op server-side); every other
-		// path — create, or editing an already-bound config — must have a model selected.
-		if (form.selection === null && !isLegacy) {
+		if (form.selection === null) {
 			next.selection = "Select a model.";
 		}
 		if (Object.keys(next).length > 0) {
@@ -124,7 +124,7 @@ export function AgentConfigForm({
 		}
 		setErrors({});
 
-		const modelBinding: Pick<UpdateAgentConfigRequest, "instanceModelId" | "workspaceModelId"> =
+		const selectedBinding: Pick<UpdateAgentConfigRequest, "instanceModelId" | "workspaceModelId"> =
 			form.selection === null
 				? {}
 				: form.selection.scope === "SHARED"
@@ -137,7 +137,7 @@ export function AgentConfigForm({
 				maxConcurrentJobs: form.maxConcurrentJobs,
 				enabled: form.enabled,
 				allowInternet: form.allowInternet,
-				...modelBinding,
+				...(!sameSelection(selectionOf(config), form.selection) ? selectedBinding : {}),
 			};
 			onUpdate(body);
 		} else {
@@ -147,7 +147,7 @@ export function AgentConfigForm({
 				maxConcurrentJobs: form.maxConcurrentJobs,
 				enabled: form.enabled,
 				allowInternet: form.allowInternet,
-				...modelBinding,
+				...selectedBinding,
 			});
 		}
 	};
@@ -178,12 +178,10 @@ export function AgentConfigForm({
 					{errors.name && <FieldError id="agent-name-error">{errors.name}</FieldError>}
 				</Field>
 
-				{isLegacy && (
+				{needsModelBinding && (
 					<Alert>
 						<AlertDescription>
-							Using legacy provider settings
-							{config?.modelName ? ` (${config.modelName})` : ""}. Pick a model below to switch to
-							the catalog.
+							This configuration has no catalog model and cannot run. Select a model before saving.
 						</AlertDescription>
 					</Alert>
 				)}
@@ -191,11 +189,9 @@ export function AgentConfigForm({
 				<Field data-invalid={Boolean(errors.selection)}>
 					<FieldLabel htmlFor="agent-model">
 						Model
-						{!isLegacy && (
-							<span className="text-destructive" aria-hidden="true">
-								{" *"}
-							</span>
-						)}
+						<span className="text-destructive" aria-hidden="true">
+							{" *"}
+						</span>
 					</FieldLabel>
 					<ModelPicker
 						id="agent-model"

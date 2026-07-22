@@ -13,11 +13,15 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
+import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
+import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -75,9 +79,8 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
         workspace.setId(1L);
         workspace.setWorkspaceSlug("test-ws");
 
-        // cancel() now runs its status-transition CAS through transactionTemplate.execute (#1368 fix
-        // wave — moved off @Transactional so the post-commit ledger write can run strictly after the
-        // status transition commits, matching AgentJobExecutor's own cancellation handling). Lenient:
+        // cancel() runs its status-transition CAS and attempt-ledger write through the same
+        // transactionTemplate.execute callback. Lenient:
         // RetryDelivery's own nested setup re-stubs the same methods for its own tests.
         lenient()
             .when(transactionTemplate.execute(any()))
@@ -101,6 +104,27 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
         job.setWorkspace(workspace);
         job.setStatus(status);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
+        ConfigSnapshot snapshot = new ConfigSnapshot(
+            ConfigSnapshot.SCHEMA_VERSION,
+            1L,
+            "test-config",
+            "openai-completions",
+            "https://api.openai.com/v1",
+            "test-model",
+            null,
+            null,
+            null,
+            false,
+            FundingSource.INSTANCE,
+            1L,
+            1L,
+            null,
+            600,
+            false
+        ).withPriceSnapshot(
+            new LlmPriceSnapshot(FundingSource.INSTANCE, PricingState.NO_CHARGE, null, null, null, null, null, null)
+        );
+        job.setConfigSnapshot(snapshot.toJson(objectMapper));
         return job;
     }
 
@@ -224,12 +248,7 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
         }
     }
 
-    /**
-     * #1368 fix wave: {@code cancel} must attempt {@link LlmUsageRecorder#recordUnverifiable} for any
-     * job that reached RUNNING (worker_id set at claim), regardless of whether THIS call's own CAS won
-     * the CANCELLED transition — a concurrent executor cancellation or worker-drain may have won it
-     * first. Never for a job cancelled before it was ever claimed.
-     */
+    /** The CAS winner records an attempt-scoped ledger row in the same transaction. */
     @Nested
     @DisplayName("Unpriced usage ledger write on user-cancel (#1368 fix wave)")
     class UnverifiableUsageLedger {
@@ -238,6 +257,7 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
         void cancellingAClaimedRunningJob_recordsAnUnpricedLedgerEntry() {
             AgentJob job = createJobWithStatus(AgentJobStatus.RUNNING);
             job.setWorkerId("worker-1");
+            job.setExecutionStartedAt(java.time.Instant.now());
             UUID jobId = job.getId();
 
             when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
@@ -245,7 +265,9 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
                 agentJobRepository.transitionStatus(eq(jobId), eq(AgentJobStatus.CANCELLED), any(), any(), any())
             ).thenReturn(1);
             AgentJob cancelledJob = createJobWithStatus(AgentJobStatus.CANCELLED);
+            cancelledJob.setId(jobId);
             cancelledJob.setWorkerId("worker-1");
+            cancelledJob.setExecutionStartedAt(job.getExecutionStartedAt());
             when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L))
                 .thenReturn(Optional.of(job))
                 .thenReturn(Optional.of(cancelledJob));
@@ -257,7 +279,44 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
             );
             verify(usageRecorder).recordUnverifiable(eq(1L), sample.capture());
             assertThat(sample.getValue().sourceId()).isEqualTo(cancelledJob.getId());
+            assertThat(sample.getValue().sourceAttempt()).isEqualTo(cancelledJob.getRetryCount());
             assertThat(sample.getValue().inputTokens()).isZero();
+        }
+
+        @Test
+        void cancellingALegacyClaimedJobWithoutAdmissionPrice_preservesCancellationAndRecordsUnpricedUsage() {
+            AgentJob job = createJobWithStatus(AgentJobStatus.RUNNING);
+            job.setWorkerId("worker-1");
+            job.setExecutionStartedAt(java.time.Instant.now());
+            ConfigSnapshot legacySnapshot = ConfigSnapshot.fromJson(
+                job.getConfigSnapshot(),
+                objectMapper
+            ).withPriceSnapshot(null);
+            job.setConfigSnapshot(legacySnapshot.toJson(objectMapper));
+            UUID jobId = job.getId();
+
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
+            when(
+                agentJobRepository.transitionStatus(eq(jobId), eq(AgentJobStatus.CANCELLED), any(), any(), any())
+            ).thenReturn(1);
+            AgentJob cancelledJob = createJobWithStatus(AgentJobStatus.CANCELLED);
+            cancelledJob.setId(jobId);
+            cancelledJob.setWorkerId("worker-1");
+            cancelledJob.setExecutionStartedAt(job.getExecutionStartedAt());
+            cancelledJob.setConfigSnapshot(legacySnapshot.toJson(objectMapper));
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L))
+                .thenReturn(Optional.of(job))
+                .thenReturn(Optional.of(cancelledJob));
+
+            AgentJob result = service.cancel(1L, jobId);
+
+            assertThat(result.getStatus()).isEqualTo(AgentJobStatus.CANCELLED);
+            ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample = ArgumentCaptor.forClass(
+                LlmUsageRecorder.LlmUsageSample.class
+            );
+            verify(usageRecorder).recordUnverifiable(eq(1L), sample.capture());
+            assertThat(sample.getValue().price().fundingSource()).isEqualTo(FundingSource.INSTANCE);
+            assertThat(sample.getValue().price().pricingState()).isEqualTo(PricingState.UNPRICED);
         }
 
         @Test
@@ -281,10 +340,31 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void idempotentCancelOfAnAlreadyCancelledStartedJob_stillAttemptsTheLedgerWrite() {
-            // Already CANCELLED by some earlier caller (executor / worker-drain / a prior cancel call),
-            // but it DID start executing — the duplicate write attempt is safe (unique source_id) and is
-            // the only backstop against that earlier caller having missed the write itself.
+        void cancellingAClaimedJobStillInPreparation_neverTouchesTheLedger() {
+            AgentJob job = createJobWithStatus(AgentJobStatus.RUNNING);
+            job.setWorkerId("worker-1");
+            UUID jobId = job.getId();
+
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
+            when(
+                agentJobRepository.transitionStatus(eq(jobId), eq(AgentJobStatus.CANCELLED), any(), any(), any())
+            ).thenReturn(1);
+            AgentJob cancelledJob = createJobWithStatus(AgentJobStatus.CANCELLED);
+            cancelledJob.setId(jobId);
+            cancelledJob.setWorkerId("worker-1");
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L))
+                .thenReturn(Optional.of(job))
+                .thenReturn(Optional.of(cancelledJob));
+
+            service.cancel(1L, jobId);
+
+            verify(usageRecorder, never()).recordUnverifiable(any(), any());
+        }
+
+        @Test
+        void idempotentCancelOfAnAlreadyCancelledStartedJob_doesNotWriteOutsideWinningTransaction() {
+            // The original transition winner owns the atomic ledger write. An idempotent read of the
+            // already-terminal row must not create a detached accounting transaction.
             AgentJob job = createJobWithStatus(AgentJobStatus.CANCELLED);
             job.setWorkerId("worker-1");
             UUID jobId = job.getId();
@@ -293,7 +373,7 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
 
             service.cancel(1L, jobId);
 
-            verify(usageRecorder).recordUnverifiable(eq(1L), any());
+            verify(usageRecorder, never()).recordUnverifiable(any(), any());
             verify(agentJobRepository, never()).transitionStatus(any(), any(), any(), any(), any());
         }
     }

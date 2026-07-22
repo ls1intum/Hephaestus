@@ -29,6 +29,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.patch.FileHeader;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.EmptyTreeIterator;
@@ -184,6 +185,12 @@ public class GitRepositoryManager {
             try {
                 if (!isRepositoryCloned(repositoryId)) {
                     cloneRepository(repoPath, cloneUrl, token);
+                } else if (!hasOrigin(repoPath, cloneUrl)) {
+                    // The checkout is a cache keyed by a database id. Database restores can reuse that
+                    // id for a different upstream repository; fetching the old origin would mix tenants'
+                    // source histories. Reclone instead of retargeting so no old objects survive.
+                    log.warn("Repository origin changed; rebuilding checkout: repoId={}", repositoryId);
+                    cloneRepository(repoPath, cloneUrl, token);
                 } else {
                     fetchRepository(repoPath, token);
                 }
@@ -193,6 +200,13 @@ public class GitRepositoryManager {
                 throw new GitOperationException("Failed to ensure repository: " + repositoryId, e);
             }
         });
+    }
+
+    private static boolean hasOrigin(Path repoPath, String cloneUrl) throws IOException {
+        try (Git git = Git.open(repoPath.toFile())) {
+            String configuredUrl = git.getRepository().getConfig().getString("remote", "origin", "url");
+            return cloneUrl.equals(configuredUrl);
+        }
     }
 
     /**
@@ -244,6 +258,44 @@ public class GitRepositoryManager {
             fetchCommand.call();
             log.debug("Successfully fetched repository: path={}", repoPath);
         }
+    }
+
+    /**
+     * Fetches a provider-owned synthetic pull/merge-request ref and verifies that it resolves to
+     * the commit pinned in the job metadata. This is required for reviews submitted from forks:
+     * those commits are intentionally absent from the target repository's normal branch refs.
+     */
+    public boolean fetchRemoteCommit(Long repositoryId, String remoteRef, String expectedSha, @Nullable String token) {
+        if (!properties.enabled()) {
+            return false;
+        }
+        if (!Repository.isValidRefName(remoteRef) || !ObjectId.isId(expectedSha)) {
+            throw new IllegalArgumentException("Invalid remote review ref or expected commit SHA");
+        }
+
+        return lockManager.withWriteLock(repositoryId, () -> {
+            Path repoPath = getRepositoryPath(repositoryId);
+            String localRef = "refs/hephaestus/reviews/" + expectedSha.toLowerCase(java.util.Locale.ROOT);
+            try (Git git = Git.open(repoPath.toFile())) {
+                var fetch = git.fetch().setRemote("origin").setRefSpecs(new RefSpec("+" + remoteRef + ":" + localRef));
+                if (token != null && !token.isBlank()) {
+                    fetch.setCredentialsProvider(new UsernamePasswordCredentialsProvider("x-access-token", token));
+                }
+                fetch.call();
+
+                ObjectId resolved = git.getRepository().resolve(localRef);
+                ObjectId expected = ObjectId.fromString(expectedSha);
+                if (!expected.equals(resolved)) {
+                    return false;
+                }
+                try (RevWalk walk = new RevWalk(git.getRepository())) {
+                    walk.parseCommit(resolved);
+                }
+                return true;
+            } catch (GitAPIException | IOException e) {
+                throw new GitOperationException("Failed to fetch remote review commit: " + repositoryId, e);
+            }
+        });
     }
 
     /**
@@ -317,9 +369,13 @@ public class GitRepositoryManager {
 
         return lockManager.withReadLock(repositoryId, () -> {
             Path repoPath = getRepositoryPath(repositoryId);
-            try (Git git = Git.open(repoPath.toFile())) {
+            try (Git git = Git.open(repoPath.toFile()); RevWalk walk = new RevWalk(git.getRepository())) {
                 ObjectId objectId = git.getRepository().resolve(sha);
-                return objectId != null;
+                if (objectId == null) {
+                    return false;
+                }
+                walk.parseCommit(objectId);
+                return true;
             } catch (IOException e) {
                 log.debug(
                     "Cannot check commit existence: repoId={}, sha={}, error={}",

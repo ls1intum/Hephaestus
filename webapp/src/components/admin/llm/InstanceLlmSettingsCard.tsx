@@ -3,8 +3,15 @@ import type { InstanceLlmSettings, UpdateInstanceLlmSettingsRequest } from "@/ap
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+
+type UnpricedPolicy = NonNullable<UpdateInstanceLlmSettingsRequest["defaultUnpricedPolicy"]>;
+
+function unpricedPolicyOf(value: string): UnpricedPolicy {
+	return value === "BLOCK" ? "BLOCK" : "WARN";
+}
 
 export interface InstanceLlmSettingsCardProps {
 	settings?: InstanceLlmSettings;
@@ -26,12 +33,14 @@ export function InstanceLlmSettingsCard({
 }: InstanceLlmSettingsCardProps) {
 	const [allowedHosts, setAllowedHosts] = useState("");
 	const [allowWorkspaceConnections, setAllowWorkspaceConnections] = useState(false);
+	const [defaultUnpricedPolicy, setDefaultUnpricedPolicy] = useState<UnpricedPolicy>("WARN");
 	const [dirty, setDirty] = useState(false);
 
 	useEffect(() => {
 		if (!settings) return;
 		setAllowedHosts(settings.allowedEgressHosts ?? "");
 		setAllowWorkspaceConnections(settings.allowWorkspaceConnections);
+		setDefaultUnpricedPolicy(unpricedPolicyOf(settings.defaultUnpricedPolicy));
 		setDirty(false);
 	}, [settings]);
 
@@ -61,7 +70,7 @@ export function InstanceLlmSettingsCard({
 							setAllowedHosts(e.target.value);
 							setDirty(true);
 						}}
-						placeholder="api.openai.com&#10;api.anthropic.com"
+						placeholder="api.openai.com&#10;llm.example.com"
 						rows={4}
 					/>
 					<FieldDescription>
@@ -72,10 +81,11 @@ export function InstanceLlmSettingsCard({
 				<Field orientation="horizontal">
 					<FieldContent>
 						<FieldLabel htmlFor="llm-settings-allow-byo">
-							Let workspaces connect their own AI provider
+							Let workspaces add providers and models
 						</FieldLabel>
 						<FieldDescription>
-							Workspaces can add their own provider connection, billed to them directly.
+							Controls new provider connections and new models. Existing providers and models remain
+							manageable and are billed to the account that owns their credential.
 						</FieldDescription>
 					</FieldContent>
 					<Switch
@@ -88,14 +98,52 @@ export function InstanceLlmSettingsCard({
 					/>
 				</Field>
 
+				<Field>
+					<FieldLabel>Usage without a known price</FieldLabel>
+					<FieldDescription>
+						Choose the instance-wide safety default when an OpenAI-compatible provider reports usage
+						that Hephaestus cannot price.
+					</FieldDescription>
+					<RadioGroup
+						value={defaultUnpricedPolicy}
+						onValueChange={(value) => {
+							if (!value) return;
+							setDefaultUnpricedPolicy(value as UnpricedPolicy);
+							setDirty(true);
+						}}
+						aria-label="Usage without a known price"
+					>
+						<div className="flex items-start gap-2 rounded-lg border p-3">
+							<RadioGroupItem value="WARN" id="llm-settings-unpriced-warn" className="mt-0.5" />
+							<label htmlFor="llm-settings-unpriced-warn" className="space-y-1 text-sm">
+								<span className="block font-medium">Warn and continue</span>
+								<span className="block text-muted-foreground">
+									Keep AI work running and mark reported spend as not fully verifiable.
+								</span>
+							</label>
+						</div>
+						<div className="flex items-start gap-2 rounded-lg border p-3">
+							<RadioGroupItem value="BLOCK" id="llm-settings-unpriced-block" className="mt-0.5" />
+							<label htmlFor="llm-settings-unpriced-block" className="space-y-1 text-sm">
+								<span className="block font-medium">Block new AI work</span>
+								<span className="block text-muted-foreground">
+									Pauses new AI work across the instance after unknown-price usage is recorded,
+									until pricing is configured.
+								</span>
+							</label>
+						</div>
+					</RadioGroup>
+				</Field>
+
 				<div className="flex justify-end">
 					<Button
 						size="sm"
 						disabled={!dirty || isSubmitting}
 						onClick={() =>
 							onSave({
-								allowedEgressHosts: allowedHosts.trim() || undefined,
+								allowedEgressHosts: allowedHosts.trim(),
 								allowWorkspaceConnections,
+								defaultUnpricedPolicy,
 							})
 						}
 					>

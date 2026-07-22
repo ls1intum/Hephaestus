@@ -9,8 +9,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
  * belongs to another model on the same connection ({@code ux_llm_model_connection_upstream} /
  * {@code ux_ws_llm_model_connection_upstream}). Mapped to HTTP 409.
  *
- * <p>Without this guard, two catalog entries could point at the same upstream id (e.g. one FREE, one
- * PRICED) and {@code LlmUsageRecorder} would nondeterministically match either one, letting a FREE
+ * <p>Without this guard, two catalog entries could point at the same upstream id (e.g. one NO_CHARGE, one
+ * PRICED) and {@code LlmUsageRecorder} would nondeterministically match either one, letting a NO_CHARGE
  * sibling silently shadow a PRICED one for billing purposes (#1368).
  */
 @ResponseStatus(HttpStatus.CONFLICT)

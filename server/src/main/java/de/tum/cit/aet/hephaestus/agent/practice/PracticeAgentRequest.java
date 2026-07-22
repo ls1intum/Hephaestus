@@ -14,7 +14,6 @@ public record PracticeAgentRequest(
     @Nullable Integer contextWindow,
     @Nullable Integer maxOutputTokens,
     boolean supportsReasoning,
-    @Nullable String cacheControlFormat,
     String jobToken,
     boolean allowInternet,
     int timeoutSeconds

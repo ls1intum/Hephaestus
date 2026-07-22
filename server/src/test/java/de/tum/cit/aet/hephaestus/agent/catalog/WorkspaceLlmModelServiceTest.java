@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.catalog;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -75,7 +76,7 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
     private void byoEnabled(boolean enabled) {
         InstanceLlmSettings settings = new InstanceLlmSettings();
         settings.setAllowWorkspaceConnections(enabled);
-        when(instanceLlmSettingsService.get()).thenReturn(settings);
+        lenient().when(instanceLlmSettingsService.get()).thenReturn(settings);
     }
 
     private WorkspaceLlmConnection connection() {
@@ -99,22 +100,26 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
         BigDecimal per1mOutputUsd
     ) {
         return new CreateWorkspaceLlmModelRequestDTO(
-            "gpt-5", // slug
-            "GPT-5", // displayName
-            "gpt-5", // upstreamModelId
-            null, // apiProtocolOverride
-            null, // modality
-            null, // contextWindow
-            null, // maxOutputTokens
-            null, // supportsReasoning
-            null, // cacheControlFormat
-            null, // enabled
+            "gpt-5",
+            // slug
+            "GPT-5",
+            // displayName
+            "gpt-5",
+            // modality
+            null,
+            // contextWindow
+            null,
+            // maxOutputTokens
+            null,
+            null,
+            // enabled
             pricingMode,
             per1mInputUsd,
             per1mOutputUsd,
-            null, // per1mCacheReadUsd
-            null, // per1mCacheWriteUsd
-            null, // per1mReasoningUsd
+            null,
+            // per1mCacheReadUsd
+            null,
+            // per1mReasoningUsd
             null // priceNote
         );
     }
@@ -130,15 +135,6 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
                 AccessForbiddenException.class
             );
             verify(modelRepository, never()).saveAndFlush(any());
-        }
-
-        @Test
-        void deleteIsRejectedWhenWorkspaceConnectionsAreDisabled() {
-            byoEnabled(false);
-
-            assertThatThrownBy(() -> modelService.delete(workspaceContext, 7L)).isInstanceOf(
-                AccessForbiddenException.class
-            );
         }
 
         @Test
@@ -218,7 +214,7 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             when(connectionRepository.findByIdAndWorkspaceId(50L, 1L)).thenReturn(Optional.of(connection()));
             when(modelRepository.findByWorkspaceIdAndSlug(1L, "gpt-5")).thenReturn(Optional.empty());
 
-            CreateWorkspaceLlmModelRequestDTO request = createRequest(PricingMode.FREE, null, null);
+            CreateWorkspaceLlmModelRequestDTO request = createRequest(PricingMode.NO_CHARGE, null, null);
 
             assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -257,25 +253,29 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             existing.setWorkspace(connection().getWorkspace());
             existing.setConnection(connection());
             existing.setPricingMode(PricingMode.UNPRICED);
-            when(modelRepository.findByIdAndWorkspaceIdWithConnection(7L, 1L)).thenReturn(Optional.of(existing));
+            when(modelRepository.findByIdAndWorkspaceIdForUpdate(7L, 1L)).thenReturn(Optional.of(existing));
             when(modelRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
             UpdateWorkspaceLlmModelRequestDTO request = new UpdateWorkspaceLlmModelRequestDTO(
-                "New name", // displayName
-                null, // upstreamModelId
-                null, // apiProtocolOverride
-                null, // modality
-                null, // contextWindow
-                null, // maxOutputTokens
-                null, // supportsReasoning
-                null, // cacheControlFormat
-                null, // enabled
-                null, // pricingMode
-                null, // per1mInputUsd
-                null, // per1mOutputUsd
-                null, // per1mCacheReadUsd
-                null, // per1mCacheWriteUsd
-                null, // per1mReasoningUsd
+                "New name",
+                // modality
+                null,
+                // contextWindow
+                null,
+                // maxOutputTokens
+                null,
+                null,
+                // enabled
+                null,
+                // pricingMode
+                null,
+                // per1mInputUsd
+                null,
+                // per1mOutputUsd
+                null,
+                // per1mCacheReadUsd
+                null,
+                // per1mCacheWriteUsd
                 null // priceNote
             );
 
@@ -316,75 +316,42 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void updateRejectsChangingToAnUpstreamIdAlreadyUsedByAnotherModelOnTheSameConnection() {
+        void updateKeepsImmutableUpstreamModelId() {
             byoEnabled(true);
             WorkspaceLlmModel existing = new WorkspaceLlmModel();
             existing.setId(7L);
             existing.setWorkspace(connection().getWorkspace());
             existing.setConnection(connection());
             existing.setUpstreamModelId("gpt-5");
-            when(modelRepository.findByIdAndWorkspaceIdWithConnection(7L, 1L)).thenReturn(Optional.of(existing));
-            when(modelRepository.existsByConnectionIdAndUpstreamModelIdAndIdNot(50L, "gpt-5-turbo", 7L)).thenReturn(
-                true
-            );
-
-            UpdateWorkspaceLlmModelRequestDTO request = new UpdateWorkspaceLlmModelRequestDTO(
-                null, // displayName
-                "gpt-5-turbo", // upstreamModelId
-                null, // apiProtocolOverride
-                null, // modality
-                null, // contextWindow
-                null, // maxOutputTokens
-                null, // supportsReasoning
-                null, // cacheControlFormat
-                null, // enabled
-                null, // pricingMode
-                null, // per1mInputUsd
-                null, // per1mOutputUsd
-                null, // per1mCacheReadUsd
-                null, // per1mCacheWriteUsd
-                null, // per1mReasoningUsd
-                null // priceNote
-            );
-
-            assertThatThrownBy(() -> modelService.update(workspaceContext, 7L, request)).isInstanceOf(
-                LlmModelUpstreamIdConflictException.class
-            );
-            verify(modelRepository, never()).saveAndFlush(any());
-        }
-
-        @Test
-        void updateAllowsKeepingTheSameUpstreamIdWithoutRecheckingUniqueness() {
-            byoEnabled(true);
-            WorkspaceLlmModel existing = new WorkspaceLlmModel();
-            existing.setId(7L);
-            existing.setWorkspace(connection().getWorkspace());
-            existing.setConnection(connection());
-            existing.setUpstreamModelId("gpt-5");
-            when(modelRepository.findByIdAndWorkspaceIdWithConnection(7L, 1L)).thenReturn(Optional.of(existing));
+            when(modelRepository.findByIdAndWorkspaceIdForUpdate(7L, 1L)).thenReturn(Optional.of(existing));
             when(modelRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
             UpdateWorkspaceLlmModelRequestDTO request = new UpdateWorkspaceLlmModelRequestDTO(
-                null, // displayName
-                "gpt-5", // upstreamModelId — unchanged
-                null, // apiProtocolOverride
-                null, // modality
-                null, // contextWindow
-                null, // maxOutputTokens
-                null, // supportsReasoning
-                null, // cacheControlFormat
-                null, // enabled
-                null, // pricingMode
-                null, // per1mInputUsd
-                null, // per1mOutputUsd
-                null, // per1mCacheReadUsd
-                null, // per1mCacheWriteUsd
-                null, // per1mReasoningUsd
+                "Renamed",
+                // modality
+                null,
+                // contextWindow
+                null,
+                // maxOutputTokens
+                null,
+                null,
+                // enabled
+                null,
+                // pricingMode
+                null,
+                // per1mInputUsd
+                null,
+                // per1mOutputUsd
+                null,
+                // per1mCacheReadUsd
+                null,
+                // per1mCacheWriteUsd
                 null // priceNote
             );
 
-            modelService.update(workspaceContext, 7L, request);
+            WorkspaceLlmModel result = modelService.update(workspaceContext, 7L, request);
 
+            assertThat(result.getUpstreamModelId()).isEqualTo("gpt-5");
             verify(modelRepository, never()).existsByConnectionIdAndUpstreamModelIdAndIdNot(any(), any(), any());
         }
 
@@ -403,44 +370,6 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             when(modelRepository.saveAndFlush(any())).thenThrow(upstreamIdConstraintViolation());
 
             assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, unpricedCreateRequest())).isInstanceOf(
-                LlmModelUpstreamIdConflictException.class
-            );
-        }
-
-        @Test
-        void updateTranslatesAFlushTimeConstraintViolationInto409() {
-            byoEnabled(true);
-            WorkspaceLlmModel existing = new WorkspaceLlmModel();
-            existing.setId(7L);
-            existing.setWorkspace(connection().getWorkspace());
-            existing.setConnection(connection());
-            existing.setUpstreamModelId("gpt-5");
-            when(modelRepository.findByIdAndWorkspaceIdWithConnection(7L, 1L)).thenReturn(Optional.of(existing));
-            when(modelRepository.existsByConnectionIdAndUpstreamModelIdAndIdNot(50L, "gpt-5-turbo", 7L)).thenReturn(
-                false
-            );
-            when(modelRepository.saveAndFlush(any())).thenThrow(upstreamIdConstraintViolation());
-
-            UpdateWorkspaceLlmModelRequestDTO request = new UpdateWorkspaceLlmModelRequestDTO(
-                null, // displayName
-                "gpt-5-turbo", // upstreamModelId
-                null, // apiProtocolOverride
-                null, // modality
-                null, // contextWindow
-                null, // maxOutputTokens
-                null, // supportsReasoning
-                null, // cacheControlFormat
-                null, // enabled
-                null, // pricingMode
-                null, // per1mInputUsd
-                null, // per1mOutputUsd
-                null, // per1mCacheReadUsd
-                null, // per1mCacheWriteUsd
-                null, // per1mReasoningUsd
-                null // priceNote
-            );
-
-            assertThatThrownBy(() -> modelService.update(workspaceContext, 7L, request)).isInstanceOf(
                 LlmModelUpstreamIdConflictException.class
             );
         }

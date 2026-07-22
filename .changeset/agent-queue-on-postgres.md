@@ -9,6 +9,6 @@ so a busy instance doesn't grow `agent_job` unbounded or need to guess at queue 
 
 **Operators:** replace `AGENT_NATS_ENABLED` with `AGENT_ENABLED` (and drop
 `HEPHAESTUS_AGENT_NATS_SERVER`, `AGENT_NATS_MAX_ACK_PENDING`, `AGENT_NATS_FETCH_BATCH_SIZE`) on
-the role that executes jobs; optional new tuning is `AGENT_POLL_INTERVAL`,
+every role that submits, executes, or recovers jobs; optional new tuning is `AGENT_POLL_INTERVAL`,
 `AGENT_CLAIM_BATCH_SIZE`, `AGENT_MAX_RETRIES`, `AGENT_PAYLOAD_RETENTION` (default `P14D`), and
 `AGENT_ROW_RETENTION` (default `P90D`). NATS is still required for webhook and sync ingest.

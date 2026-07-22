@@ -42,4 +42,11 @@ public class GitLabScmTokenSource implements ScmTokenSource {
         String url = gitLabTokenService.resolveServerUrl(scopeId);
         return (url == null || url.isBlank()) ? Optional.empty() : Optional.of(url);
     }
+
+    @Override
+    public Optional<String> reviewHeadRef(long pullRequestNumber) {
+        return pullRequestNumber > 0
+            ? Optional.of("refs/merge-requests/" + pullRequestNumber + "/head")
+            : Optional.empty();
+    }
 }

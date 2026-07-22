@@ -1,7 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.config;
 
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
-import de.tum.cit.aet.hephaestus.agent.catalog.EgressPolicy;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelWorkspaceGrantRepository;
@@ -36,7 +34,6 @@ public class AgentConfigService {
     private final LlmModelRepository llmModelRepository;
     private final WorkspaceLlmModelRepository workspaceLlmModelRepository;
     private final LlmModelWorkspaceGrantRepository llmModelWorkspaceGrantRepository;
-    private final EgressPolicy egressPolicy;
 
     @Transactional(readOnly = true)
     public List<AgentConfig> getConfigs(WorkspaceContext workspaceContext) {
@@ -66,41 +63,8 @@ public class AgentConfigService {
         AgentConfig config = new AgentConfig();
         config.setWorkspace(workspace);
         config.setName(request.name());
-        // #1368: llmProvider is only required for a legacy (unbound) config — a config that binds to
-        // a catalog model (instanceModelId/workspaceModelId) never reads it (see LlmModelResolver's
-        // precedence). Reject only when NEITHER a binding nor the legacy field is supplied; the
-        // `agent_config.llm_provider` column stays NOT NULL (deprecate-then-remove, no schema change
-        // here), so a bound-only create still needs a harmless placeholder value on the entity.
-        boolean hasModelBinding = request.instanceModelId() != null || request.workspaceModelId() != null;
-        if (request.llmProvider() == null && !hasModelBinding) {
-            throw new IllegalArgumentException(
-                "llmProvider is required unless a model binding (instanceModelId or workspaceModelId) is supplied."
-            );
-        }
-        config.setLlmProvider(request.llmProvider() != null ? request.llmProvider() : LlmProvider.OPENAI);
-
         if (request.enabled() != null) {
             config.setEnabled(request.enabled());
-        }
-        if (request.modelName() != null) {
-            config.setModelName(request.modelName());
-        }
-        if (request.llmApiKey() != null) {
-            config.setLlmApiKey(request.llmApiKey());
-        }
-        if (request.llmBaseUrl() != null) {
-            // Empty string clears the field; otherwise stores the trimmed value. The request DTO caps
-            // this at @Size(max=512), deliberately well under the entity column (length=2048) so trimming
-            // after validation can never overflow the column. The wider column is intentional headroom —
-            // narrowing it to 512 requires a changelog.
-            String trimmedBaseUrl = request.llmBaseUrl().isBlank() ? null : request.llmBaseUrl().trim();
-            // #1368 fix wave: a legacy config's llmBaseUrl is an egress target exactly like a catalog
-            // connection's — previously it skipped EgressPolicy entirely on write, letting a workspace
-            // admin park a config on a private/internal host that the proxy would then happily call.
-            if (trimmedBaseUrl != null) {
-                egressPolicy.validate(trimmedBaseUrl);
-            }
-            config.setLlmBaseUrl(trimmedBaseUrl);
         }
         if (request.timeoutSeconds() != null) {
             config.setTimeoutSeconds(request.timeoutSeconds());
@@ -111,7 +75,8 @@ public class AgentConfigService {
         if (request.allowInternet() != null) {
             config.setAllowInternet(request.allowInternet());
         }
-        applyModelBinding(config, workspaceContext, request.instanceModelId(), request.workspaceModelId(), null);
+        applyModelBinding(config, workspaceContext, request.instanceModelId(), request.workspaceModelId());
+        requireBindingWhenEnabled(config);
 
         AgentConfig saved;
         try {
@@ -152,30 +117,8 @@ public class AgentConfigService {
             .orElseThrow(() -> new EntityNotFoundException("AgentConfig", configId.toString()));
         AgentConfigSnapshot before = AgentConfigSnapshot.of(config);
 
-        if (request.llmProvider() != null) {
-            config.setLlmProvider(request.llmProvider());
-        }
         if (request.enabled() != null) {
             config.setEnabled(request.enabled());
-        }
-        if (request.modelName() != null) {
-            config.setModelName(request.modelName());
-        }
-        // Clearing the key wins over a provided value, so an accidental "clear + new key" still clears.
-        if (Boolean.TRUE.equals(request.clearLlmApiKey())) {
-            config.setLlmApiKey(null);
-        } else if (request.llmApiKey() != null) {
-            config.setLlmApiKey(request.llmApiKey());
-        }
-        if (request.llmBaseUrl() != null) {
-            // Empty string clears the field; otherwise stores the trimmed value.
-            String trimmedBaseUrl = request.llmBaseUrl().isBlank() ? null : request.llmBaseUrl().trim();
-            // #1368 fix wave: see createConfig's identical guard — a legacy config's llmBaseUrl must
-            // clear the same egress guard a catalog connection's base URL does.
-            if (trimmedBaseUrl != null) {
-                egressPolicy.validate(trimmedBaseUrl);
-            }
-            config.setLlmBaseUrl(trimmedBaseUrl);
         }
         if (request.timeoutSeconds() != null) {
             config.setTimeoutSeconds(request.timeoutSeconds());
@@ -186,13 +129,8 @@ public class AgentConfigService {
         if (request.allowInternet() != null) {
             config.setAllowInternet(request.allowInternet());
         }
-        applyModelBinding(
-            config,
-            workspaceContext,
-            request.instanceModelId(),
-            request.workspaceModelId(),
-            request.clearModelBinding()
-        );
+        applyModelBinding(config, workspaceContext, request.instanceModelId(), request.workspaceModelId());
+        requireBindingWhenEnabled(config);
 
         AgentConfig saved = agentConfigRepository.save(config);
         configAudit.record(
@@ -205,6 +143,14 @@ public class AgentConfigService {
             )
         );
         return saved;
+    }
+
+    private static void requireBindingWhenEnabled(AgentConfig config) {
+        if (config.isEnabled() && (config.getInstanceModel() == null) == (config.getWorkspaceModel() == null)) {
+            throw new IllegalArgumentException(
+                "An enabled agent config must bind exactly one available catalog model."
+            );
+        }
     }
 
     @Transactional
@@ -247,10 +193,7 @@ public class AgentConfigService {
     /**
      * Applies a model-binding write (#1368): exactly one of {@code instanceModelId} /
      * {@code workspaceModelId} may be set (both non-null is a 400), and either clears the other side of
-     * the pair. {@code clearModelBinding=true} resets both to {@code null}, reverting to the legacy
-     * provider fields. Leaving both ids null (and no clear flag) is a no-op — it preserves the config's
-     * current binding, matching this DTO's partial-update convention elsewhere; the pre-existing
-     * {@code (NULL, NULL)} state of an unmigrated config is therefore never touched by an unrelated PATCH.
+     * the pair. Leaving both ids null is a no-op and preserves the current binding.
      *
      * <p>Bind-time validation only runs on the id actually supplied in this call, never on whatever the
      * config already carries — re-validating an untouched binding on every unrelated field update would
@@ -260,14 +203,8 @@ public class AgentConfigService {
         AgentConfig config,
         WorkspaceContext workspaceContext,
         @Nullable Long instanceModelId,
-        @Nullable Long workspaceModelId,
-        @Nullable Boolean clearModelBinding
+        @Nullable Long workspaceModelId
     ) {
-        if (Boolean.TRUE.equals(clearModelBinding)) {
-            config.setInstanceModel(null);
-            config.setWorkspaceModel(null);
-            return;
-        }
         if (instanceModelId != null && workspaceModelId != null) {
             throw new IllegalArgumentException(
                 "An agent config can bind to only one model at a time — a shared model or your own " +

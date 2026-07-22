@@ -36,8 +36,8 @@ function decode(value: string): ModelSelection {
 
 /**
  * Model picker for an agent config binding (#1368) — replaces the old raw provider/base-url/API-key/
- * model-name fields. Groups by funding source per the glossary: "Shared models" (provided by the
- * organization) and "Your provider" (the workspace's own connected key). Never shows the upstream
+ * model-name fields. Groups by funding source: organization models and models billed through the
+ * workspace's own provider accounts. Never shows the upstream
  * model id or the owning connection's endpoint, only the display name and price framing.
  */
 export function ModelPicker({
@@ -49,12 +49,15 @@ export function ModelPicker({
 	invalid = false,
 	"aria-describedby": ariaDescribedBy,
 }: ModelPickerProps) {
-	const shared = availableModels.filter((m) => m.scope === "SHARED");
-	const own = availableModels.filter((m) => m.scope === "WORKSPACE");
+	const shared = availableModels.filter((model) => model.scope === "SHARED");
+	const own = availableModels.filter((model) => model.scope === "WORKSPACE");
 
 	return (
 		<Select
-			items={availableModels.map((m) => ({ value: encode(m.scope, m.id), label: m.displayName }))}
+			items={availableModels.map((model) => ({
+				value: encode(model.scope, model.id),
+				label: `${model.displayName} · ${model.connectionDisplayName}`,
+			}))}
 			value={value ? encode(value.scope, value.id) : null}
 			onValueChange={(next) => {
 				if (next) onChange(decode(next));
@@ -73,15 +76,22 @@ export function ModelPicker({
 				{shared.length > 0 && (
 					<SelectGroup>
 						<SelectLabel>
-							Shared models
+							Organization models
 							<span className="block font-normal normal-case text-muted-foreground/80">
 								provided by your organization
 							</span>
 						</SelectLabel>
 						{shared.map((model) => (
-							<SelectItem key={encode("SHARED", model.id)} value={encode("SHARED", model.id)}>
+							<SelectItem
+								key={encode("SHARED", model.id)}
+								value={encode("SHARED", model.id)}
+								aria-label={`${model.displayName} · ${model.connectionDisplayName}`}
+							>
 								<span className="flex min-w-0 flex-1 items-center justify-between gap-2">
-									<span className="truncate">{model.displayName}</span>
+									<span className="min-w-0 truncate">
+										{model.displayName}
+										<span className="text-muted-foreground"> · {model.connectionDisplayName}</span>
+									</span>
 									<span className="shrink-0 text-xs text-muted-foreground">
 										{priceLabel(model, "workspace")}
 									</span>
@@ -92,11 +102,23 @@ export function ModelPicker({
 				)}
 				{own.length > 0 && (
 					<SelectGroup>
-						<SelectLabel>Your provider</SelectLabel>
+						<SelectLabel>
+							Your providers
+							<span className="block font-normal normal-case text-muted-foreground/80">
+								billed to the account that owns the credential
+							</span>
+						</SelectLabel>
 						{own.map((model) => (
-							<SelectItem key={encode("WORKSPACE", model.id)} value={encode("WORKSPACE", model.id)}>
+							<SelectItem
+								key={encode("WORKSPACE", model.id)}
+								value={encode("WORKSPACE", model.id)}
+								aria-label={`${model.displayName} · ${model.connectionDisplayName}`}
+							>
 								<span className="flex min-w-0 flex-1 items-center justify-between gap-2">
-									<span className="truncate">{model.displayName}</span>
+									<span className="min-w-0 truncate">
+										{model.displayName}
+										<span className="text-muted-foreground"> · {model.connectionDisplayName}</span>
+									</span>
 									<span className="shrink-0 text-xs text-muted-foreground">
 										{priceLabel(model, "workspace")}
 									</span>

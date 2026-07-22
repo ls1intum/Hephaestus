@@ -10,7 +10,6 @@ const mockModel: WorkspaceLlmModel = {
 	upstreamModelId: "openai/gpt-5-mini",
 	connectionId: 1,
 	connectionDisplayName: "My OpenAI account",
-	modality: "CHAT",
 	enabled: true,
 	supportsReasoning: true,
 	contextWindow: 128_000,
@@ -46,7 +45,7 @@ export const EditModel: Story = {
 };
 
 export const FreeModel: Story = {
-	args: { editing: { ...mockModel, pricingMode: "FREE", priceNote: "self-hosted, no cost" } },
+	args: { editing: { ...mockModel, pricingMode: "NO_CHARGE", priceNote: "self-hosted, no cost" } },
 };
 
 /** Submitting without a display name or upstream id surfaces validation. */

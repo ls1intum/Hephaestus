@@ -21,11 +21,16 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxInfrastructureExceptio
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxSpec;
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetBlockReason;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUnpricedUsageBlockedException;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageJobType;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
+import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import io.micrometer.core.instrument.Counter;
@@ -54,6 +59,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -118,6 +124,7 @@ public class AgentJobExecutor {
     private final MeterRegistry meterRegistry;
     private final LlmUsageRecorder usageRecorder;
     private final LlmBudgetService llmBudgetService;
+    private final @Nullable LlmAdmissionService llmAdmissionService;
 
     private final Counter concurrencyRejected;
     private final Timer claimLatency;
@@ -150,6 +157,7 @@ public class AgentJobExecutor {
      */
     private boolean lastClaimPoolRejected;
 
+    @Autowired
     public AgentJobExecutor(
         AgentProperties agentProperties,
         AgentJobRepository jobRepository,
@@ -163,6 +171,7 @@ public class AgentJobExecutor {
         MeterRegistry meterRegistry,
         LlmUsageRecorder usageRecorder,
         LlmBudgetService llmBudgetService,
+        LlmAdmissionService llmAdmissionService,
         Optional<WorkerCapacityState> capacityState,
         Optional<WorkerProperties> workerProperties
     ) {
@@ -178,6 +187,7 @@ public class AgentJobExecutor {
         this.meterRegistry = meterRegistry;
         this.usageRecorder = usageRecorder;
         this.llmBudgetService = llmBudgetService;
+        this.llmAdmissionService = llmAdmissionService;
         this.capacityState = capacityState;
         this.workerProperties = workerProperties;
         this.workerId = workerProperties.map(WorkerProperties::resolvedWorkerId).orElse(null);
@@ -191,6 +201,42 @@ public class AgentJobExecutor {
         this.infraRetryRequeued = Counter.builder("agent.job.infra.retry.requeued")
             .description("Jobs requeued (not failed) after a classified sandbox-infrastructure failure")
             .register(meterRegistry);
+    }
+
+    /** Compatibility constructor for focused tests that do not exercise live admission. */
+    public AgentJobExecutor(
+        AgentProperties agentProperties,
+        AgentJobRepository jobRepository,
+        AgentConfigRepository configRepository,
+        JobTypeHandlerRegistry handlerRegistry,
+        PracticePiAdapter practiceAgent,
+        SandboxManager sandboxManager,
+        AsyncTaskExecutor sandboxExecutor,
+        TransactionTemplate transactionTemplate,
+        ObjectMapper objectMapper,
+        MeterRegistry meterRegistry,
+        LlmUsageRecorder usageRecorder,
+        LlmBudgetService llmBudgetService,
+        Optional<WorkerCapacityState> capacityState,
+        Optional<WorkerProperties> workerProperties
+    ) {
+        this(
+            agentProperties,
+            jobRepository,
+            configRepository,
+            handlerRegistry,
+            practiceAgent,
+            sandboxManager,
+            sandboxExecutor,
+            transactionTemplate,
+            objectMapper,
+            meterRegistry,
+            usageRecorder,
+            llmBudgetService,
+            null,
+            capacityState,
+            workerProperties
+        );
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -291,57 +337,44 @@ public class AgentJobExecutor {
      */
     public void cancelInFlight(AgentJobCancellationReason reason) {
         Set<UUID> snapshot = Set.copyOf(localRunningJobs);
-        if (snapshot.isEmpty()) {
-            return;
-        }
+        if (snapshot.isEmpty()) return;
         log.info("Draining {} in-flight job(s) owned by this worker with reason {}", snapshot.size(), reason);
-        Instant now = Instant.now();
-        String error = "worker draining";
         for (UUID jobId : snapshot) {
             try {
-                boolean requeued = false;
-                if (workerId != null) {
-                    int currentRetryCount = jobRepository.findById(jobId).map(AgentJob::getRetryCount).orElse(0);
-                    Integer updated = transactionTemplate.execute(status ->
-                        requeueOrphanWithRotation(jobId, workerId, currentRetryCount)
-                    );
-                    requeued = updated != null && updated > 0;
-                }
-                if (!requeued) {
-                    // Fence lost, retry cap already exhausted, or no worker identity — fail terminally
-                    // instead of requeuing forever.
-                    transactionTemplate.executeWithoutResult(status -> {
-                        if (workerId != null) {
-                            jobRepository.transitionToCancelledOwnedBy(
-                                jobId,
-                                now,
-                                error,
-                                reason,
-                                Set.of(AgentJobStatus.RUNNING),
-                                workerId
-                            );
-                        } else {
-                            jobRepository.transitionToCancelled(
-                                jobId,
-                                now,
-                                error,
-                                reason,
-                                Set.of(AgentJobStatus.RUNNING)
-                            );
-                        }
-                    });
-                }
-                // Stop the container either way so drain doesn't wait for the agent to finish naturally.
+                transactionTemplate.executeWithoutResult(status -> {
+                    AgentJob job = jobRepository.findByIdWithWorkspaceForUpdate(jobId).orElse(null);
+                    if (job == null) return;
+                    int updated =
+                        workerId != null ? requeueOrphanWithRotation(jobId, workerId, job.getRetryCount()) : 0;
+                    if (updated > 0) {
+                        if (job.getExecutionStartedAt() != null) recordUnverifiableUsage(job, "worker draining");
+                        return;
+                    }
+                    int cancelled =
+                        workerId != null
+                            ? jobRepository.transitionToCancelledOwnedBy(
+                                  jobId,
+                                  Instant.now(),
+                                  "worker draining",
+                                  reason,
+                                  Set.of(AgentJobStatus.RUNNING),
+                                  workerId
+                              )
+                            : jobRepository.transitionToCancelled(
+                                  jobId,
+                                  Instant.now(),
+                                  "worker draining",
+                                  reason,
+                                  Set.of(AgentJobStatus.RUNNING)
+                              );
+                    if (cancelled > 0 && job.getExecutionStartedAt() != null) {
+                        recordUnverifiableUsage(job, "worker draining");
+                    }
+                });
                 sandboxManager.cancel(jobId);
             } catch (Exception e) {
                 log.warn("Failed to drain in-flight job {}: {}", jobId, e.getClass().getSimpleName());
             }
-            // #1368 fix wave: every job in localRunningJobs is, by construction, one this worker has
-            // claimed and started executing — so it may carry real, un-costed spend regardless of
-            // whether the CAS above won (a concurrent user-cancel or the executor's own
-            // handleCancellation may already have moved it). Attempt the ledger write unconditionally;
-            // duplicates are swallowed by LlmUsageRecorder#persist's unique source_id constraint.
-            recordUnverifiableUsage(jobId, "worker draining");
         }
     }
 
@@ -604,7 +637,11 @@ public class AgentJobExecutor {
      * {@link ClaimResult} for the caller to proceed with execution.
      */
     private Optional<ClaimResult> dispatchClaimResult(UUID jobId, Object claimResult) {
-        if (claimResult == ClaimOutcome.ALREADY_CLAIMED || claimResult == ClaimOutcome.BUDGET_BLOCKED) {
+        if (
+            claimResult == ClaimOutcome.ALREADY_CLAIMED ||
+            claimResult == ClaimOutcome.BUDGET_BLOCKED ||
+            claimResult == ClaimOutcome.MODEL_UNAVAILABLE
+        ) {
             return Optional.empty();
         }
         if (claimResult == ClaimOutcome.CONCURRENCY_FULL) {
@@ -629,10 +666,22 @@ public class AgentJobExecutor {
         // branch below, including the requeued-not-failed infra-retry outcome, so the metric's status
         // tag distinguishes "requeued for retry" from a terminal FAILED.
         String metricOutcome = "unknown";
+        boolean sandboxExecutionStarted = false;
         try {
             log.info("Executing agent job: jobId={}, jobType={}", jobId, job.getJobType());
 
-            SandboxResult result = prepareAndExecute(jobId, job, claim.snapshot);
+            SandboxSpec sandboxSpec = prepareSandboxSpec(jobId, job, claim.snapshot);
+            // From this boundary onward provider usage may exist even when execute() throws before
+            // returning a result. Persist it so cancellation/recovery on another process can make the
+            // same accounting distinction. A lost fence means the job was cancelled or requeued while
+            // preparation ran; do not start its sandbox.
+            if (!markExecutionStarted(jobId)) {
+                metricOutcome = "OWNERSHIP_LOST";
+                log.info("Skipped sandbox start after execution fence was lost: jobId={}", jobId);
+                return;
+            }
+            sandboxExecutionStarted = true;
+            SandboxResult result = sandboxManager.execute(sandboxSpec);
             AgentResult agentResult = practiceAgent.parseResult(result);
 
             JobTypeHandler handler = handlerRegistry.getHandler(job.getJobType());
@@ -641,10 +690,15 @@ public class AgentJobExecutor {
 
             log.info("Agent job completed: jobId={}, duration={}", jobId, Duration.between(startTime, Instant.now()));
         } catch (SandboxCancelledException e) {
-            handleCancellation(jobId);
+            handleCancellation(jobId, job);
             metricOutcome = AgentJobStatus.CANCELLED.name();
+        } catch (TerminalPersistenceException e) {
+            // Provider work already completed. Leave RUNNING for the zombie sweeper to terminalize
+            // and account as UNPRICED; never execute the provider a second time.
+            log.error("Terminal job persistence failed after provider completion: jobId={}", jobId, e);
+            metricOutcome = "PERSISTENCE_FAILED";
         } catch (Exception e) {
-            metricOutcome = handleExecutionFailure(jobId, job, e);
+            metricOutcome = handleExecutionFailure(jobId, job, e, sandboxExecutionStarted);
         } finally {
             recordExecutionDuration(job.getJobType(), metricOutcome, Duration.between(startTime, Instant.now()));
             releaseCapacity();
@@ -652,6 +706,13 @@ public class AgentJobExecutor {
             MDC.remove(MDC_JOB_ID);
             MDC.remove(MDC_JOB_TYPE);
         }
+    }
+
+    private boolean markExecutionStarted(UUID jobId) {
+        Integer updated = transactionTemplate.execute(status ->
+            jobRepository.markExecutionStarted(jobId, workerId, Instant.now())
+        );
+        return updated != null && updated == 1;
     }
 
     /**
@@ -670,12 +731,8 @@ public class AgentJobExecutor {
             .record(duration);
     }
 
-    /**
-     * Prepare sandbox inputs (handler files + adapter spec) and execute in sandbox.
-     *
-     * @return the sandbox execution result
-     */
-    private SandboxResult prepareAndExecute(UUID jobId, AgentJob job, ConfigSnapshot snapshot) {
+    /** Prepare the complete sandbox specification without starting provider execution. */
+    private SandboxSpec prepareSandboxSpec(UUID jobId, AgentJob job, ConfigSnapshot snapshot) {
         JobTypeHandler handler = handlerRegistry.getHandler(job.getJobType());
 
         // Wrap in a read-only transaction so prepareInputFiles/buildPrompt can
@@ -703,7 +760,6 @@ public class AgentJobExecutor {
             snapshot.contextWindow(),
             snapshot.maxOutputTokens(),
             snapshot.supportsReasoning(),
-            snapshot.cacheControlFormat(),
             job.getJobToken(),
             snapshot.allowInternet(),
             snapshot.timeoutSeconds()
@@ -718,7 +774,7 @@ public class AgentJobExecutor {
             snapshot
         );
         persistProvenanceDigests(jobId, agentSpec.promptDigest(), sandboxSpec.inputFiles());
-        return sandboxManager.execute(sandboxSpec);
+        return sandboxSpec;
     }
 
     /**
@@ -791,67 +847,47 @@ public class AgentJobExecutor {
     }
 
     /** Handle a job cancelled during sandbox execution. */
-    private void handleCancellation(UUID jobId) {
-        transactionTemplate.executeWithoutResult(status ->
-            transitionTerminal(jobId, AgentJobStatus.CANCELLED, Instant.now(), "Cancelled during execution")
-        );
-        log.info("Agent job cancelled: jobId={}", jobId);
-        // #1368 fix wave: reaching this handler at all means the job HAD started executing (claimed,
-        // RUNNING) — SandboxCancelledException is only thrown from mid-execution, never from the claim
-        // phase — so there may be real, un-costed spend behind it. Record it as UNPRICED (outside the
-        // transition transaction, matching LlmUsageRecorder's after-commit contract) unconditionally,
-        // regardless of whether OUR transition above actually won the CAS: a concurrent user-cancel
-        // (AgentJobLifecycleService.cancel) or worker-drain (cancelInFlight) may have already moved the
-        // job to CANCELLED first, and previously that made this write silently never happen. The
-        // ledger's unique source_id constraint makes a duplicate attempt safe (first write wins,
-        // swallowed by LlmUsageRecorder#persist) — so recording unconditionally here is strictly safer
-        // than gating on a race this handler cannot reliably observe.
-        recordUnverifiableUsage(jobId, "cancelled during execution");
-    }
-
-    /**
-     * Append an UNPRICED ledger row for a job that started executing (claimed, RUNNING) but ended
-     * with no verifiable usage — see {@link LlmUsageRecorder#recordUnverifiable}. Best-effort:
-     * re-reads the job row for workspace + frozen catalog-binding provenance; a lookup miss just
-     * skips the ledger write (the job's terminal status is unaffected either way).
-     */
-    private void recordUnverifiableUsage(UUID jobId, String reason) {
-        jobRepository
-            .findByIdWithWorkspace(jobId)
-            .ifPresentOrElse(
-                job -> {
-                    ConfigSnapshot snap = parseSnapshotQuietly(job);
-                    LlmUsageRecorder.LlmUsageSample sample = new LlmUsageRecorder.LlmUsageSample(
-                        LlmUsageJobType.from(job.getJobType()),
-                        job.getId(),
-                        snap != null ? snap.upstreamModelId() : null,
-                        0L,
-                        0L,
-                        0L,
-                        0L,
-                        0L,
-                        0,
-                        snap != null ? snap.connectionScope() : null,
-                        snap != null ? snap.connectionId() : null,
-                        Instant.now()
-                    );
-                    usageRecorder.recordUnverifiable(job.getWorkspace().getId(), sample);
-                    log.info("Recorded UNPRICED usage ledger entry ({}): jobId={}", reason, jobId);
-                },
-                () -> log.warn("Could not record unverifiable usage — job row missing: jobId={}", jobId)
+    private void handleCancellation(UUID jobId, AgentJob job) {
+        transactionTemplate.executeWithoutResult(status -> {
+            int updated = transitionTerminal(
+                jobId,
+                AgentJobStatus.CANCELLED,
+                Instant.now(),
+                "Cancelled during execution"
             );
+            if (updated > 0) recordUnverifiableUsage(job, "cancelled during execution");
+        });
+        log.info("Agent job cancelled: jobId={}", jobId);
     }
 
-    /** Best-effort {@link ConfigSnapshot} parse; a malformed/missing snapshot just yields no provenance. */
+    /** Append an attempt-scoped UNPRICED row inside the job transition/requeue transaction. */
+    private void recordUnverifiableUsage(AgentJob job, String reason) {
+        ConfigSnapshot snapshot = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
+        LlmPriceSnapshot price = admittedPrice(snapshot);
+        LlmUsageRecorder.LlmUsageSample sample = new LlmUsageRecorder.LlmUsageSample(
+            LlmUsageJobType.from(job.getJobType()),
+            LlmUsageSourceType.AGENT_JOB,
+            job.getId(),
+            job.getRetryCount(),
+            snapshot.upstreamModelId(),
+            0L,
+            0L,
+            0L,
+            0L,
+            0L,
+            0,
+            price,
+            Instant.now()
+        );
+        usageRecorder.recordUnverifiable(job.getWorkspace().getId(), sample);
+        log.info("Recorded UNPRICED usage ledger entry ({}): jobId={}", reason, job.getId());
+    }
+
     private @Nullable ConfigSnapshot parseSnapshotQuietly(AgentJob job) {
-        var snapshotNode = job.getConfigSnapshot();
-        if (snapshotNode == null) {
-            return null;
-        }
         try {
-            return ConfigSnapshot.fromJson(snapshotNode, objectMapper);
+            return ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
         } catch (Exception e) {
-            log.warn("Could not deserialise config snapshot for usage ledger provenance: {}", e.getMessage());
+            log.warn("Could not deserialise config snapshot: {}", e.getMessage());
             return null;
         }
     }
@@ -862,8 +898,7 @@ public class AgentJobExecutor {
      * <p>Everything used to become {@link AgentJobStatus#FAILED} unconditionally, so a transient
      * sandbox-infrastructure blip (Docker daemon unreachable, image pull failed, network partition to
      * the registry) burned the job's whole retry budget on a failure that had nothing to do with the
-     * job itself. Now: only {@link SandboxException} (and its documented contract — "wraps docker-java
-     * exceptions and other infrastructure errors", see its javadoc) or a bare {@link IOException} —
+     * job itself. Now: only {@link SandboxInfrastructureException} or a bare {@link IOException} —
      * i.e. errors PROVABLY caused by sandbox/container/network infrastructure rather than the agent's
      * own run — are treated as retryable: the job is requeued via the same worker-fenced CAS orphan
      * recovery uses ({@link AgentJobRepository#requeueOrphan}, with a backoff-computed {@code
@@ -880,11 +915,13 @@ public class AgentJobExecutor {
      * burning real time and (if it gets far enough to spend) budget; under-classifying only costs one
      * job's retry budget on what's usually a self-healing blip, and is the safe direction to err in.
      *
+     * @param sandboxExecutionStarted whether sandbox/provider execution may have started; only then
+     *     can an unverifiable usage event be truthful
      * @return the outcome to record on {@code agent.job.execution.duration}'s {@code status} tag:
      *     {@code "REQUEUED"} when this classified-as-infra failure was successfully requeued for
      *     retry, or the terminal status name ({@code "FAILED"}) otherwise
      */
-    private String handleExecutionFailure(UUID jobId, AgentJob job, Exception e) {
+    private String handleExecutionFailure(UUID jobId, AgentJob job, Exception e, boolean sandboxExecutionStarted) {
         if (e instanceof InterruptedException) {
             Thread.currentThread().interrupt();
         }
@@ -894,9 +931,13 @@ public class AgentJobExecutor {
 
         if (workerId != null && isRetryableInfraFailure(e)) {
             int currentRetryCount = job.getRetryCount();
-            Integer updated = transactionTemplate.execute(status ->
-                requeueOrphanWithRotation(jobId, workerId, currentRetryCount)
-            );
+            Integer updated = transactionTemplate.execute(status -> {
+                int rows = requeueOrphanWithRotation(jobId, workerId, currentRetryCount);
+                if (rows > 0 && sandboxExecutionStarted) {
+                    recordUnverifiableUsage(job, "infra-failure retry (attempt " + (currentRetryCount + 1) + ")");
+                }
+                return rows;
+            });
             if (updated != null && updated > 0) {
                 infraRetryRequeued.increment();
                 log.warn(
@@ -905,16 +946,6 @@ public class AgentJobExecutor {
                     currentRetryCount + 1,
                     errorMessage
                 );
-                // #1368 fix wave, finding #8: this attempt already started executing (claimed, RUNNING;
-                // isRetryableInfraFailure only classifies failures that can occur after sandbox start) and
-                // may carry real, un-costed LLM spend — the retry about to happen buys ANOTHER run with no
-                // ledger row of its own. Without this, N retries of the same job could each spend against
-                // the LLM with only the FINAL attempt's usage (if any) ever recorded, silently undercounting
-                // budget consumption by up to N-1 runs' worth. Recorded unconditionally (whether or not any
-                // spend actually happened this attempt) — the ledger's unique source_id constraint makes a
-                // duplicate/spurious UNPRICED row safe, and erring toward "recorded but maybe unnecessary" is
-                // the conservative direction here (matches recordUnverifiableUsage's other call sites).
-                recordUnverifiableUsage(jobId, "infra-failure retry (attempt " + (currentRetryCount + 1) + ")");
                 return "REQUEUED";
             }
             log.warn(
@@ -923,9 +954,10 @@ public class AgentJobExecutor {
             );
         }
 
-        transactionTemplate.executeWithoutResult(status ->
-            transitionTerminal(jobId, AgentJobStatus.FAILED, Instant.now(), errorMessage)
-        );
+        transactionTemplate.executeWithoutResult(status -> {
+            int updated = transitionTerminal(jobId, AgentJobStatus.FAILED, Instant.now(), errorMessage);
+            if (updated > 0 && sandboxExecutionStarted) recordUnverifiableUsage(job, "execution failure");
+        });
         return AgentJobStatus.FAILED.name();
     }
 
@@ -975,6 +1007,7 @@ public class AgentJobExecutor {
         ALREADY_CLAIMED,
         CONCURRENCY_FULL,
         BUDGET_BLOCKED,
+        MODEL_UNAVAILABLE,
     }
 
     private record ClaimResult(AgentJob job, ConfigSnapshot snapshot) {}
@@ -1026,30 +1059,58 @@ public class AgentJobExecutor {
                 return ClaimOutcome.BUDGET_BLOCKED;
             }
 
-            // Concurrency gate: lock config row, check running count
-            if (job.getConfig() != null) {
-                Optional<AgentConfig> configOpt = configRepository.findByIdForUpdate(job.getConfig().getId());
-                if (configOpt.isPresent()) {
-                    AgentConfig config = configOpt.get();
-                    long runningCount = jobRepository.countByConfigIdAndStatusIn(
-                        config.getId(),
-                        Set.of(AgentJobStatus.RUNNING)
-                    );
-                    if (runningCount >= config.getMaxConcurrentJobs()) {
-                        concurrencyRejected.increment();
-                        log.info(
-                            "Concurrency limit reached: jobId={}, configId={}, running={}, max={}",
-                            jobId,
-                            config.getId(),
-                            runningCount,
-                            config.getMaxConcurrentJobs()
-                        );
-                        return ClaimOutcome.CONCURRENCY_FULL;
+            // Lock and live-revalidate the exact catalog binding immediately before RUNNING. Submit-time
+            // behaviour stays frozen; only availability/grants and the price are refreshed, and a changed
+            // binding is refused rather than silently switching the queued job to another model.
+            AgentConfig config =
+                job.getConfig() != null
+                    ? configRepository.findByIdForUpdate(job.getConfig().getId()).orElse(null)
+                    : null;
+            if (config == null) {
+                return refuseUnavailableModel(job);
+            }
+            ConfigSnapshot snapshot;
+            try {
+                ConfigSnapshot submitted = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
+                if (llmAdmissionService != null) {
+                    var admitted = llmAdmissionService.admit(config);
+                    var ref = admitted.connection();
+                    if (
+                        submitted.connectionScope() != ref.scope() ||
+                        !java.util.Objects.equals(submitted.connectionId(), ref.connectionId()) ||
+                        !java.util.Objects.equals(submitted.modelId(), ref.modelId()) ||
+                        !java.util.Objects.equals(submitted.workspaceId(), ref.workspaceId()) ||
+                        !java.util.Objects.equals(submitted.upstreamModelId(), admitted.resolved().upstreamModelId())
+                    ) {
+                        return refuseUnavailableModel(job);
                     }
+                    snapshot = submitted.withPriceSnapshot(admitted.price());
+                } else {
+                    snapshot = submitted;
+                }
+            } catch (IllegalStateException e) {
+                return refuseUnavailableModel(job);
+            }
+
+            // Concurrency gate: the config row is already locked above.
+            {
+                long runningCount = jobRepository.countByConfigIdAndStatusIn(
+                    config.getId(),
+                    Set.of(AgentJobStatus.RUNNING)
+                );
+                if (runningCount >= config.getMaxConcurrentJobs()) {
+                    concurrencyRejected.increment();
+                    log.info(
+                        "Concurrency limit reached: jobId={}, configId={}, running={}, max={}",
+                        jobId,
+                        config.getId(),
+                        runningCount,
+                        config.getMaxConcurrentJobs()
+                    );
+                    return ClaimOutcome.CONCURRENCY_FULL;
                 }
             }
 
-            ConfigSnapshot snapshot = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
             Instant claimedAt = Instant.now();
             // Claim latency (#1368 hardening): time between eligibility and claim — the canonical
             // queue-health signal (judoscale) alongside agent.queue.oldest_age_seconds. availableAt is
@@ -1059,7 +1120,9 @@ public class AgentJobExecutor {
             }
             job.setStatus(AgentJobStatus.RUNNING);
             job.setStartedAt(claimedAt);
+            job.setExecutionStartedAt(null);
             job.setWorkerId(workerId); // owner for cancel routing, orphan recovery, and terminal-write fencing (#1138)
+            job.setConfigSnapshot(snapshot.toJson(objectMapper));
             jobRepository.save(job);
 
             // Track locally so drain / hub-initiated cancels target only this worker's jobs, and so
@@ -1068,6 +1131,18 @@ public class AgentJobExecutor {
             capacityState.ifPresent(WorkerCapacityState::claimReview);
             return new ClaimResult(job, snapshot);
         });
+    }
+
+    private ClaimOutcome refuseUnavailableModel(AgentJob job) {
+        String message = "Configured model is unavailable.";
+        job.setStatus(AgentJobStatus.CANCELLED);
+        job.setCompletedAt(Instant.now());
+        job.setErrorMessage(message);
+        job.setCancellationReason(AgentJobCancellationReason.MODEL_UNAVAILABLE);
+        jobRepository.save(job);
+        meterRegistry.counter("agent.job.model.refused").increment();
+        log.info("Refusing claim — configured model unavailable: jobId={}", job.getId());
+        return ClaimOutcome.MODEL_UNAVAILABLE;
     }
 
     /** Release the review-capacity slot on any terminal transition (success/failure/cancel/timeout). */
@@ -1180,154 +1255,120 @@ public class AgentJobExecutor {
             default -> null;
         };
 
-        // Captured inside the terminal-write transaction, appended to the LLM usage ledger only
-        // after it commits — so a lost fence race (updated == 0) never bills, and the recorder's
-        // own REQUIRES_NEW transaction doesn't hold a second pool connection under this one.
-        AtomicReference<Long> ledgerWorkspaceId = new AtomicReference<>();
-        AtomicReference<LlmUsageRecorder.LlmUsageSample> ledgerSample = new AtomicReference<>();
-        // #1368 fix wave: true when ledgerSample must be written via recordUnverifiable (forced
-        // UNPRICED) rather than record (normal catalog price resolution) — see the else-branch below.
-        AtomicBoolean ledgerUnverifiable = new AtomicBoolean(false);
+        RuntimeException lastFailure = null;
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            try {
+                return persistTerminalStateOnce(jobId, agentResult, sandboxResult, terminalStatus, errorMessage);
+            } catch (RuntimeException e) {
+                lastFailure = e;
+                log.warn("Terminal persistence attempt {}/3 failed for jobId={}: {}", attempt, jobId, e.getMessage());
+            }
+        }
+        throw new TerminalPersistenceException(lastFailure);
+    }
 
+    private boolean persistTerminalStateOnce(
+        UUID jobId,
+        AgentResult agentResult,
+        SandboxResult sandboxResult,
+        AgentJobStatus terminalStatus,
+        @Nullable String errorMessage
+    ) {
         Boolean persisted = transactionTemplate.execute(status -> {
             int updated = transitionTerminal(jobId, terminalStatus, Instant.now(), errorMessage);
-
             if (updated == 0) {
-                // No longer RUNNING-and-ours: cancelled during execution, or orphan-requeued to a
-                // sibling (fence). Skip output persist so we don't clobber the new owner's run.
                 log.info("Job no longer owned/RUNNING, skipping output persist: jobId={}", jobId);
                 return false;
             }
 
-            AgentJob freshJob = jobRepository.findById(jobId).orElse(null);
-            if (freshJob != null) {
-                freshJob.setOutput(objectMapper.valueToTree(agentResult.output()));
-                freshJob.setExitCode(sandboxResult.exitCode());
-                // Persist container logs for introspection (truncate to limit to avoid bloat)
-                if (sandboxResult.logs() != null && !sandboxResult.logs().isBlank()) {
-                    String logs = sandboxResult.logs();
-                    freshJob.setContainerLogs(
-                        logs.length() > MAX_CONTAINER_LOGS_CHARS
-                            ? logs.substring(logs.length() - MAX_CONTAINER_LOGS_CHARS)
-                            : logs
-                    );
-                }
-                if (terminalStatus == AgentJobStatus.COMPLETED) {
-                    // Mark delivery as PENDING so crash recovery can distinguish
-                    // "delivery not attempted yet" from "no delivery needed"
-                    freshJob.setDeliveryStatus(DeliveryStatus.PENDING);
-                }
-                // Primary: agent-reported usage (from the Pi runner's usage.json)
-                var agentUsage = agentResult.usage();
-                ConfigSnapshot snap = parseSnapshotQuietly(freshJob);
-                if (agentUsage != null && agentUsage.totalCalls() > 0) {
-                    freshJob.setLlmTotalCalls(agentUsage.totalCalls());
-                    freshJob.setLlmTotalInputTokens(agentUsage.inputTokens());
-                    freshJob.setLlmTotalOutputTokens(agentUsage.outputTokens());
-                    freshJob.setLlmTotalReasoningTokens(agentUsage.reasoningTokens());
-                    freshJob.setLlmCacheReadTokens(agentUsage.cacheReadTokens());
-                    freshJob.setLlmCacheWriteTokens(agentUsage.cacheWriteTokens());
-                    // llmCostUsd deliberately left unset (#1368 slice 6): pi-provider.mjs registers zero
-                    // SDK-local rates only because Pi requires the cost object shape, so agentUsage.costUsd()
-                    // is a structural constant (always 0.0), never a real measurement. Writing it would make
-                    // this diagnostic column silently lie ("$0.00" reads as "free", not "not measured"). The
-                    // authoritative, catalog-derived cost lives on the llm_usage_event ledger row below.
-                    // Use typed snapshot so a future field rename fails compile rather than writing null.
-                    String model = agentUsage.model();
-                    if ((model == null || model.isBlank()) && snap != null) {
-                        model = snap.upstreamModelId();
-                    }
-                    freshJob.setLlmModel(model);
-                    if (snap != null) {
-                        freshJob.setLlmModelVersion(snap.modelVersion());
-                    }
-                    ledgerWorkspaceId.set(freshJob.getWorkspace().getId());
-                    // Cost is derived server-side by LlmUsageRecorder from the frozen catalog binding
-                    // (#1368 slice 6) — the connectionScope/connectionId below identify WHICH binding,
-                    // mirroring what ConfigSnapshot froze at dispatch time. Both null (a legacy,
-                    // pre-catalog config) falls back to the recorder's ModelPricingService path.
-                    ledgerSample.set(
-                        new LlmUsageRecorder.LlmUsageSample(
-                            LlmUsageJobType.from(freshJob.getJobType()),
-                            freshJob.getId(),
-                            model,
-                            nullToZero(agentUsage.inputTokens()),
-                            nullToZero(agentUsage.outputTokens()),
-                            nullToZero(agentUsage.cacheReadTokens()),
-                            nullToZero(agentUsage.cacheWriteTokens()),
-                            nullToZero(agentUsage.reasoningTokens()),
-                            agentUsage.totalCalls(),
-                            snap != null ? snap.connectionScope() : null,
-                            snap != null ? snap.connectionId() : null,
-                            Instant.now()
-                        )
-                    );
-                    if (
-                        nullToZero(agentUsage.inputTokens()) == 0L &&
-                        nullToZero(agentUsage.outputTokens()) == 0L &&
-                        nullToZero(agentUsage.cacheReadTokens()) == 0L &&
-                        nullToZero(agentUsage.cacheWriteTokens()) == 0L &&
-                        nullToZero(agentUsage.reasoningTokens()) == 0L
-                    ) {
-                        // Some OpenAI-compatible gateways report that a call occurred but omit
-                        // every token counter. Pricing that as confirmed $0 would make the budget
-                        // lie; preserve the call count but force the ledger row to UNPRICED.
-                        ledgerUnverifiable.set(true);
-                    }
-                    log.info(
-                        "LLM usage (agent-reported): model={}, calls={}, in={}, out={}, reasoning={}, jobId={}",
-                        model,
-                        agentUsage.totalCalls(),
-                        agentUsage.inputTokens(),
-                        agentUsage.outputTokens(),
-                        agentUsage.reasoningTokens(),
-                        jobId
-                    );
-                } else {
-                    // #1368 fix wave: the job DID start executing (past claim+RUNNING) but produced no
-                    // parseable usage — a missing or malformed usage.json. Recording nothing here would
-                    // make this month's spend silently look fully accounted for; record an UNPRICED
-                    // ledger entry instead so the budget verdict turns UNVERIFIABLE rather than staying
-                    // falsely green. Never resolves a price — see LlmUsageRecorder#recordUnverifiable.
-                    ledgerWorkspaceId.set(freshJob.getWorkspace().getId());
-                    ledgerUnverifiable.set(true);
-                    ledgerSample.set(
-                        new LlmUsageRecorder.LlmUsageSample(
-                            LlmUsageJobType.from(freshJob.getJobType()),
-                            freshJob.getId(),
-                            snap != null ? snap.upstreamModelId() : null,
-                            0L,
-                            0L,
-                            0L,
-                            0L,
-                            0L,
-                            0,
-                            snap != null ? snap.connectionScope() : null,
-                            snap != null ? snap.connectionId() : null,
-                            Instant.now()
-                        )
-                    );
-                    log.info(
-                        "LLM usage unresolved (missing/malformed usage.json) — recording UNPRICED to keep budget " +
-                            "verification visible: jobId={}, terminalStatus={}",
-                        jobId,
-                        terminalStatus
-                    );
-                }
-                jobRepository.saveAndFlush(freshJob);
+            AgentJob freshJob = jobRepository.findById(jobId).orElseThrow();
+            ConfigSnapshot snapshot = ConfigSnapshot.fromJson(freshJob.getConfigSnapshot(), objectMapper);
+            LlmPriceSnapshot price = admittedPrice(snapshot);
+
+            freshJob.setOutput(objectMapper.valueToTree(agentResult.output()));
+            freshJob.setExitCode(sandboxResult.exitCode());
+            if (sandboxResult.logs() != null && !sandboxResult.logs().isBlank()) {
+                String logs = sandboxResult.logs();
+                freshJob.setContainerLogs(
+                    logs.length() > MAX_CONTAINER_LOGS_CHARS
+                        ? logs.substring(logs.length() - MAX_CONTAINER_LOGS_CHARS)
+                        : logs
+                );
+            }
+            if (terminalStatus == AgentJobStatus.COMPLETED) {
+                freshJob.setDeliveryStatus(DeliveryStatus.PENDING);
+            }
+
+            var usage = agentResult.usage();
+            boolean unverifiable = usage == null || usage.totalCalls() <= 0;
+            long inputTokens = usage != null ? nullToZero(usage.inputTokens()) : 0L;
+            long outputTokens = usage != null ? nullToZero(usage.outputTokens()) : 0L;
+            long cacheReadTokens = usage != null ? nullToZero(usage.cacheReadTokens()) : 0L;
+            long cacheWriteTokens = usage != null ? nullToZero(usage.cacheWriteTokens()) : 0L;
+            long reasoningTokens = usage != null ? nullToZero(usage.reasoningTokens()) : 0L;
+            int totalCalls = usage != null ? usage.totalCalls() : 0;
+            if (
+                totalCalls > 0 &&
+                inputTokens == 0L &&
+                outputTokens == 0L &&
+                cacheReadTokens == 0L &&
+                cacheWriteTokens == 0L &&
+                reasoningTokens == 0L
+            ) {
+                unverifiable = true;
+            }
+
+            if (usage != null && usage.totalCalls() > 0) {
+                freshJob.setLlmTotalCalls(usage.totalCalls());
+                freshJob.setLlmTotalInputTokens(usage.inputTokens());
+                freshJob.setLlmTotalOutputTokens(usage.outputTokens());
+                freshJob.setLlmTotalReasoningTokens(usage.reasoningTokens());
+                freshJob.setLlmCacheReadTokens(usage.cacheReadTokens());
+                freshJob.setLlmCacheWriteTokens(usage.cacheWriteTokens());
+            }
+            // Provider output is telemetry only. The admitted snapshot is authoritative identity.
+            freshJob.setLlmModel(snapshot.upstreamModelId());
+            freshJob.setLlmModelVersion(snapshot.modelVersion());
+            jobRepository.saveAndFlush(freshJob);
+
+            LlmUsageRecorder.LlmUsageSample sample = new LlmUsageRecorder.LlmUsageSample(
+                LlmUsageJobType.from(freshJob.getJobType()),
+                LlmUsageSourceType.AGENT_JOB,
+                freshJob.getId(),
+                freshJob.getRetryCount(),
+                snapshot.upstreamModelId(),
+                inputTokens,
+                outputTokens,
+                cacheReadTokens,
+                cacheWriteTokens,
+                reasoningTokens,
+                totalCalls,
+                price,
+                Instant.now()
+            );
+            if (unverifiable) {
+                usageRecorder.recordUnverifiable(freshJob.getWorkspace().getId(), sample);
+            } else {
+                usageRecorder.record(freshJob.getWorkspace().getId(), sample);
             }
             return true;
         });
+        return Boolean.TRUE.equals(persisted);
+    }
 
-        boolean won = Boolean.TRUE.equals(persisted);
-        if (won && ledgerSample.get() != null) {
-            if (ledgerUnverifiable.get()) {
-                usageRecorder.recordUnverifiable(ledgerWorkspaceId.get(), ledgerSample.get());
-            } else {
-                usageRecorder.record(ledgerWorkspaceId.get(), ledgerSample.get());
-            }
+    private static final class TerminalPersistenceException extends RuntimeException {
+
+        private TerminalPersistenceException(Throwable cause) {
+            super("Could not durably persist terminal job result and usage", cause);
         }
-        return won;
+    }
+
+    private LlmPriceSnapshot admittedPrice(ConfigSnapshot snapshot) {
+        if (snapshot.priceSnapshot() != null) return snapshot.priceSnapshot();
+        if (llmAdmissionService != null) {
+            throw new IllegalStateException("Started job has no admitted LLM price snapshot");
+        }
+        return new LlmPriceSnapshot(FundingSource.INSTANCE, PricingState.UNPRICED, null, null, null, null, null, null);
     }
 
     private static long nullToZero(@Nullable Integer value) {

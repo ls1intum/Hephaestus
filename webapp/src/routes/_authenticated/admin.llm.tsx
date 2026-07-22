@@ -16,6 +16,7 @@ import {
 	adminListLlmModelsQueryKey,
 	adminListWorkspacesOptions,
 	adminProbeLlmConnectionDraftMutation,
+	adminProbeLlmConnectionMutation,
 	adminUpdateLlmConnectionMutation,
 	adminUpdateLlmModelMutation,
 	adminUpdateLlmModelPriceMutation,
@@ -24,22 +25,22 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import type {
 	CreateLlmConnectionRequest,
-	CreateLlmModelRequest,
 	LlmConnection,
 	LlmModel,
 	UpdateInstanceLlmSettingsRequest,
 	UpdateLlmConnectionRequest,
-	UpdateLlmModelRequest,
 } from "@/api/types.gen";
 import { AdminLlmConnectionFormDialog } from "@/components/admin/llm/AdminLlmConnectionFormDialog";
 import { AdminLlmConnectionsTable } from "@/components/admin/llm/AdminLlmConnectionsTable";
-import {
-	AdminLlmModelFormDialog,
-	type AdminLlmModelSaveBody,
-} from "@/components/admin/llm/AdminLlmModelFormDialog";
+import { AdminLlmModelFormDialog } from "@/components/admin/llm/AdminLlmModelFormDialog";
 import { AdminLlmModelsSection } from "@/components/admin/llm/AdminLlmModelsSection";
 import { InstanceLlmSettingsCard } from "@/components/admin/llm/InstanceLlmSettingsCard";
 import { Button } from "@/components/ui/button";
+import {
+	type AdminLlmModelSaveBody,
+	AdminLlmModelSaveError,
+	saveAdminLlmModelSafely,
+} from "@/lib/adminLlmModelSave";
 import { problemDetailOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute("/_authenticated/admin/llm")({
@@ -122,6 +123,7 @@ function AdminLlmPage() {
 	});
 
 	const probeDraft = useMutation({ ...adminProbeLlmConnectionDraftMutation() });
+	const probeSaved = useMutation({ ...adminProbeLlmConnectionMutation() });
 
 	const createModel = useMutation({ ...adminCreateLlmModelMutation() });
 	const updateModel = useMutation({ ...adminUpdateLlmModelMutation() });
@@ -155,30 +157,32 @@ function AdminLlmPage() {
 	const handleSaveModel = async (body: AdminLlmModelSaveBody) => {
 		if (!selectedConnection) return;
 		try {
-			if (editingModel) {
-				await Promise.all([
-					updateModel.mutateAsync({
-						path: { id: editingModel.id },
-						body: body.metadata as UpdateLlmModelRequest,
-					}),
-					updatePrice.mutateAsync({ path: { id: editingModel.id }, body: body.price }),
-					updateSharing.mutateAsync({ path: { id: editingModel.id }, body: body.sharing }),
-				]);
-			} else {
-				const created = await createModel.mutateAsync({
-					path: { connectionId: selectedConnection.id },
-					body: body.metadata as CreateLlmModelRequest,
-				});
-				await Promise.all([
-					updatePrice.mutateAsync({ path: { id: created.id }, body: body.price }),
-					updateSharing.mutateAsync({ path: { id: created.id }, body: body.sharing }),
-				]);
-			}
+			await saveAdminLlmModelSafely({
+				connectionId: selectedConnection.id,
+				editing: editingModel,
+				body,
+				operations: {
+					create: (connectionId, metadata) =>
+						createModel.mutateAsync({ path: { connectionId }, body: metadata }),
+					updateMetadata: (id, metadata) =>
+						updateModel.mutateAsync({ path: { id }, body: metadata }),
+					updatePrice: (id, price) => updatePrice.mutateAsync({ path: { id }, body: price }),
+					updateSharing: (id, sharing) =>
+						updateSharing.mutateAsync({ path: { id }, body: sharing }),
+				},
+			});
 			invalidateModels();
 			setModelDialogOpen(false);
 			toast.success(editingModel ? "Model updated" : "Model added");
 		} catch (error) {
-			toast.error(problemDetailOf(error, "Could not save the model"));
+			invalidateModels();
+			if (error instanceof AdminLlmModelSaveError && error.modelId != null) {
+				toast.error("Model saved inactive, but setup is incomplete", {
+					description: "Review the model and save again before activating it.",
+				});
+			} else {
+				toast.error(problemDetailOf(error, "Could not save the model"));
+			}
 		}
 	};
 
@@ -191,8 +195,8 @@ function AdminLlmPage() {
 						<h1 className="text-2xl font-semibold">AI models</h1>
 					</div>
 					<p className="max-w-2xl text-sm text-muted-foreground">
-						Connect LLM providers and share models with workspaces. Workspace admins never see the
-						endpoint or key behind a shared model — only its name and price.
+						Connect OpenAI-compatible endpoints and share models with workspaces. Workspace admins
+						never see the endpoint or key behind a shared model — only its name and price.
 					</p>
 				</div>
 				<Button
@@ -271,10 +275,20 @@ function AdminLlmPage() {
 					setMutatingConnectionId(id);
 					updateConnection.mutate({ path: { id }, body });
 				}}
-				isProbing={probeDraft.isPending}
+				isProbing={probeDraft.isPending || probeSaved.isPending}
 				onProbe={(request, callbacks) => {
 					probeDraft.mutate(
 						{ body: request },
+						{
+							onSuccess: callbacks.onSuccess,
+							onError: (error) =>
+								callbacks.onError(problemDetailOf(error, "the provider didn't answer.")),
+						},
+					);
+				}}
+				onProbeSaved={(id, callbacks) => {
+					probeSaved.mutate(
+						{ path: { id } },
 						{
 							onSuccess: callbacks.onSuccess,
 							onError: (error) =>

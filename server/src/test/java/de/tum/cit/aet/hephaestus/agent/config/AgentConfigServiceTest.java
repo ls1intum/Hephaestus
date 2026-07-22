@@ -4,13 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
-import de.tum.cit.aet.hephaestus.agent.catalog.EgressPolicy;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
@@ -63,9 +61,6 @@ class AgentConfigServiceTest extends BaseUnitTest {
 
     @Mock
     private LlmModelWorkspaceGrantRepository llmModelWorkspaceGrantRepository;
-
-    @Mock
-    private EgressPolicy egressPolicy;
 
     @InjectMocks
     private AgentConfigService agentConfigService;
@@ -136,10 +131,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
 
             var request = CreateAgentConfigRequestDTO.builder()
                 .name("my-agent")
-                .enabled(true)
-                .modelName("claude-sonnet-4-20250514")
-                .llmApiKey("sk-abc")
-                .llmProvider(LlmProvider.ANTHROPIC)
+                .enabled(false)
                 .timeoutSeconds(300)
                 .maxConcurrentJobs(2)
                 .allowInternet(true)
@@ -149,9 +141,10 @@ class AgentConfigServiceTest extends BaseUnitTest {
 
             assertThat(result.getWorkspace()).isEqualTo(workspace);
             assertThat(result.getName()).isEqualTo("my-agent");
-            assertThat(result.isEnabled()).isTrue();
-            assertThat(result.getModelName()).isEqualTo("claude-sonnet-4-20250514");
-            assertThat(result.getLlmApiKey()).isEqualTo("sk-abc");
+            assertThat(result.isEnabled()).isFalse();
+            assertThat(result.getModelName()).isNull();
+            assertThat(result.getLlmApiKey()).isNull();
+            assertThat(result.getLlmProvider()).isNull();
             assertThat(result.getTimeoutSeconds()).isEqualTo(300);
             assertThat(result.getMaxConcurrentJobs()).isEqualTo(2);
             assertThat(result.isAllowInternet()).isTrue();
@@ -161,11 +154,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
         void shouldRejectDuplicateName() {
             when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "my-agent")).thenReturn(true);
 
-            var request = CreateAgentConfigRequestDTO.builder()
-                .name("my-agent")
-                .enabled(true)
-                .llmProvider(LlmProvider.ANTHROPIC)
-                .build();
+            var request = CreateAgentConfigRequestDTO.builder().name("my-agent").enabled(false).build();
 
             assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request))
                 .isInstanceOf(AgentConfigNameConflictException.class)
@@ -182,77 +171,24 @@ class AgentConfigServiceTest extends BaseUnitTest {
                 new DataIntegrityViolationException("uk_agent_config_workspace_name")
             );
 
-            var request = CreateAgentConfigRequestDTO.builder()
-                .name("my-agent")
-                .enabled(true)
-                .llmProvider(LlmProvider.ANTHROPIC)
-                .build();
+            var request = CreateAgentConfigRequestDTO.builder().name("my-agent").enabled(false).build();
 
             assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request))
                 .isInstanceOf(AgentConfigNameConflictException.class)
                 .hasMessageContaining("my-agent");
         }
 
-        /**
-         * #1368 fix wave: a legacy {@code llmBaseUrl} previously skipped {@link EgressPolicy} entirely
-         * on write — a workspace admin could park a config on a private/internal host that the LLM proxy
-         * would then happily call live.
-         */
         @Test
-        void shouldValidateLegacyBaseUrlThroughEgressPolicy() {
+        void shouldRejectEnabledConfigWithoutCatalogBinding() {
             when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "my-agent")).thenReturn(false);
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            var request = CreateAgentConfigRequestDTO.builder()
-                .name("my-agent")
-                .enabled(true)
-                .llmProvider(LlmProvider.OPENAI)
-                .llmBaseUrl("https://gateway.example.com/v1")
-                .build();
+            var request = CreateAgentConfigRequestDTO.builder().name("my-agent").enabled(true).build();
 
-            agentConfigService.createConfig(workspaceContext, request);
-
-            verify(egressPolicy).validate("https://gateway.example.com/v1");
-        }
-
-        @Test
-        void shouldRejectLegacyBaseUrlThatFailsEgressPolicy() {
-            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "my-agent")).thenReturn(false);
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            doThrow(new IllegalArgumentException("Provider host must be a public HTTPS URL"))
-                .when(egressPolicy)
-                .validate("http://169.254.169.254/v1");
-
-            var request = CreateAgentConfigRequestDTO.builder()
-                .name("my-agent")
-                .enabled(true)
-                .llmProvider(LlmProvider.OPENAI)
-                .llmBaseUrl("http://169.254.169.254/v1")
-                .build();
-
-            assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request)).isInstanceOf(
-                IllegalArgumentException.class
-            );
+            assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("bind exactly one");
             verify(agentConfigRepository, never()).save(any());
-        }
-
-        @Test
-        void shouldNotValidateWhenLegacyBaseUrlIsBlank() {
-            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "my-agent")).thenReturn(false);
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-            var request = CreateAgentConfigRequestDTO.builder()
-                .name("my-agent")
-                .enabled(true)
-                .llmProvider(LlmProvider.OPENAI)
-                .llmBaseUrl("")
-                .build();
-
-            agentConfigService.createConfig(workspaceContext, request);
-
-            verify(egressPolicy, never()).validate(any());
         }
     }
 
@@ -270,73 +206,13 @@ class AgentConfigServiceTest extends BaseUnitTest {
             when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
             when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            var request = UpdateAgentConfigRequestDTO.builder()
-                .modelName("gpt-4o")
-                .llmProvider(LlmProvider.OPENAI)
-                .timeoutSeconds(120)
-                .build();
+            var request = UpdateAgentConfigRequestDTO.builder().timeoutSeconds(120).build();
 
             AgentConfig result = agentConfigService.updateConfig(workspaceContext, 10L, request);
 
             assertThat(result.getId()).isEqualTo(10L);
             assertThat(result.getLlmApiKey()).isEqualTo("sk-existing-secret");
             assertThat(result.getTimeoutSeconds()).isEqualTo(120);
-        }
-
-        @Test
-        void shouldValidateLegacyBaseUrlThroughEgressPolicyOnUpdate() {
-            AgentConfig existing = new AgentConfig();
-            existing.setId(10L);
-            existing.setWorkspace(workspace);
-            existing.setLlmProvider(LlmProvider.ANTHROPIC);
-
-            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
-            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-            var request = UpdateAgentConfigRequestDTO.builder().llmBaseUrl("https://gateway.example.com/v1").build();
-
-            agentConfigService.updateConfig(workspaceContext, 10L, request);
-
-            verify(egressPolicy).validate("https://gateway.example.com/v1");
-        }
-
-        @Test
-        void shouldRejectLegacyBaseUrlThatFailsEgressPolicyOnUpdate() {
-            AgentConfig existing = new AgentConfig();
-            existing.setId(10L);
-            existing.setWorkspace(workspace);
-            existing.setLlmProvider(LlmProvider.ANTHROPIC);
-
-            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
-            doThrow(new IllegalArgumentException("Provider host must be a public HTTPS URL"))
-                .when(egressPolicy)
-                .validate("http://10.0.0.5/v1");
-
-            var request = UpdateAgentConfigRequestDTO.builder().llmBaseUrl("http://10.0.0.5/v1").build();
-
-            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request)).isInstanceOf(
-                IllegalArgumentException.class
-            );
-            verify(agentConfigRepository, never()).save(any());
-        }
-
-        @Test
-        void shouldClearApiKeyWhenClearFlagSet() {
-            AgentConfig existing = new AgentConfig();
-            existing.setId(10L);
-            existing.setWorkspace(workspace);
-            existing.setLlmProvider(LlmProvider.ANTHROPIC);
-            existing.setLlmApiKey("sk-existing-secret");
-
-            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
-            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-            // clearLlmApiKey wins over any provided key.
-            var request = UpdateAgentConfigRequestDTO.builder().llmApiKey("sk-ignored").clearLlmApiKey(true).build();
-
-            AgentConfig result = agentConfigService.updateConfig(workspaceContext, 10L, request);
-
-            assertThat(result.getLlmApiKey()).isNull();
         }
 
         @Test
@@ -348,6 +224,21 @@ class AgentConfigServiceTest extends BaseUnitTest {
             assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 999L, request)).isInstanceOf(
                 EntityNotFoundException.class
             );
+        }
+
+        @Test
+        void shouldRejectEnablingUnboundConfig() {
+            AgentConfig existing = new AgentConfig();
+            existing.setId(10L);
+            existing.setWorkspace(workspace);
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
+
+            var request = UpdateAgentConfigRequestDTO.builder().enabled(true).build();
+
+            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("bind exactly one");
+            verify(agentConfigRepository, never()).save(any());
         }
     }
 
@@ -467,14 +358,14 @@ class AgentConfigServiceTest extends BaseUnitTest {
             config.setWorkspace(workspace);
             config.setName("primary");
             config.setLlmProvider(LlmProvider.OPENAI);
-            config.setModelName("old-model");
+            config.setTimeoutSeconds(600);
             when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(7L, 1L)).thenReturn(Optional.of(config));
             when(agentConfigRepository.save(any(AgentConfig.class))).thenAnswer(i -> i.getArgument(0));
 
             agentConfigService.updateConfig(
                 workspaceContext,
                 7L,
-                UpdateAgentConfigRequestDTO.builder().modelName("new-model").build()
+                UpdateAgentConfigRequestDTO.builder().timeoutSeconds(900).build()
             );
 
             ArgumentCaptor<ConfigAuditEntry> captor = ArgumentCaptor.forClass(ConfigAuditEntry.class);
@@ -482,8 +373,8 @@ class AgentConfigServiceTest extends BaseUnitTest {
             ConfigAuditEntry entry = captor.getValue();
             assertThat(entry.entityType()).isEqualTo(ConfigAuditEntityType.AGENT_CONFIG);
             assertThat(entry.entityId()).isEqualTo("7");
-            assertThat(String.valueOf(entry.before())).contains("old-model");
-            assertThat(String.valueOf(entry.after())).contains("new-model");
+            assertThat(String.valueOf(entry.before())).contains("timeoutSeconds=600");
+            assertThat(String.valueOf(entry.after())).contains("timeoutSeconds=900");
         }
     }
 
@@ -674,27 +565,13 @@ class AgentConfigServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void clearModelBindingResetsBothSides() {
-            AgentConfig existing = existingConfig();
-            existing.setInstanceModel(instanceModel(5L, ModelVisibility.PUBLIC, true, true));
-            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
-            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-            var request = UpdateAgentConfigRequestDTO.builder().clearModelBinding(true).build();
-            AgentConfig result = agentConfigService.updateConfig(workspaceContext, 10L, request);
-
-            assertThat(result.getInstanceModel()).isNull();
-            assertThat(result.getWorkspaceModel()).isNull();
-        }
-
-        @Test
         void leavingBothIdsAbsentPreservesTheExistingBinding() {
             AgentConfig existing = existingConfig();
             existing.setInstanceModel(instanceModel(5L, ModelVisibility.PUBLIC, true, true));
             when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
             when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            var request = UpdateAgentConfigRequestDTO.builder().modelName("unrelated-change").build();
+            var request = UpdateAgentConfigRequestDTO.builder().timeoutSeconds(900).build();
             AgentConfig result = agentConfigService.updateConfig(workspaceContext, 10L, request);
 
             assertThat(result.getInstanceModel()).isNotNull();

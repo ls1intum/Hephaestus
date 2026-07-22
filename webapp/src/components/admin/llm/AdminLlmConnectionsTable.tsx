@@ -33,7 +33,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { PROVIDER_TYPE_LABELS, providerTypeForProtocol } from "@/lib/llmProviderType";
+import { PROVIDER_PRESET_LABELS, presetForConnection } from "@/lib/llmProviderType";
 
 export interface AdminLlmConnectionsTableProps {
 	connections: LlmConnection[];
@@ -92,7 +92,7 @@ export function AdminLlmConnectionsTable({
 				<TableHeader>
 					<TableRow>
 						<TableHead>Connection</TableHead>
-						<TableHead>Provider type</TableHead>
+						<TableHead>API</TableHead>
 						<TableHead>Models</TableHead>
 						<TableHead>Active</TableHead>
 						<TableHead className="text-right">Actions</TableHead>
@@ -139,7 +139,7 @@ export function AdminLlmConnectionsTable({
 				<TableHeader>
 					<TableRow>
 						<TableHead>Connection</TableHead>
-						<TableHead>Provider type</TableHead>
+						<TableHead>API</TableHead>
 						<TableHead>Models</TableHead>
 						<TableHead>Active</TableHead>
 						<TableHead className="text-right">Actions</TableHead>
@@ -152,8 +152,6 @@ export function AdminLlmConnectionsTable({
 							<TableRow
 								key={connection.id}
 								data-state={selectedId === connection.id ? "selected" : undefined}
-								className="cursor-pointer"
-								onClick={() => onSelect(connection)}
 							>
 								<TableCell>
 									<div className="font-medium">{connection.displayName}</div>
@@ -161,11 +159,11 @@ export function AdminLlmConnectionsTable({
 								</TableCell>
 								<TableCell>
 									<Badge variant="secondary">
-										{PROVIDER_TYPE_LABELS[providerTypeForProtocol(connection.apiProtocol)]}
+										{PROVIDER_PRESET_LABELS[presetForConnection(connection)]}
 									</Badge>
 								</TableCell>
 								<TableCell className="tabular-nums">{modelCounts[connection.id] ?? 0}</TableCell>
-								<TableCell onClick={(e) => e.stopPropagation()}>
+								<TableCell>
 									<div className="flex items-center gap-2">
 										<Switch
 											checked={connection.enabled}
@@ -177,8 +175,18 @@ export function AdminLlmConnectionsTable({
 										{busy && <Spinner className="size-3.5 text-muted-foreground" />}
 									</div>
 								</TableCell>
-								<TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+								<TableCell className="text-right">
 									<div className="flex justify-end gap-1">
+										<Button
+											type="button"
+											variant="outline"
+											size="sm"
+											disabled={busy}
+											aria-label={`Manage models for ${connection.displayName}`}
+											onClick={() => onSelect(connection)}
+										>
+											Manage models
+										</Button>
 										<Button
 											type="button"
 											variant="ghost"

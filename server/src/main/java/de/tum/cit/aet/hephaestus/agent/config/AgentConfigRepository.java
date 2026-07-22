@@ -47,7 +47,7 @@ public interface AgentConfigRepository extends JpaRepository<AgentConfig, Long> 
 
     boolean existsByWorkspaceIdAndEnabledTrue(Long workspaceId);
 
-    /** Deterministic default enabled config (oldest wins) — the mentor fallback when unbound. */
+    /** Deterministic oldest enabled config for callers that explicitly need one. */
     @EntityGraph(attributePaths = { "instanceModel.connection", "workspaceModel.connection" })
     Optional<AgentConfig> findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(Long workspaceId);
 

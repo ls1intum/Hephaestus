@@ -1,7 +1,7 @@
 import type { LlmModel } from "@/api/types.gen";
 import { formatCostUsd } from "@/components/admin/ai/jobUtils";
 
-export type PricingMode = "PRICED" | "FREE" | "UNPRICED";
+export type PricingMode = "PRICED" | "NO_CHARGE" | "UNPRICED";
 
 export interface PriceFields {
 	pricingMode: PricingMode;
@@ -18,13 +18,12 @@ export function priceFieldsOf(model: Pick<LlmModel, "currentPrice">): PriceField
 
 /**
  * The #1368 glossary's price framing — the *only* place this word choice may live. Never render the
- * words "Priced" / "Unpriced" / "Unverifiable"; PRICED always shows the number itself, and FREE/UNPRICED
- * read differently depending on who's looking (an instance admin owns the price; a workspace admin only
- * ever sees the outcome).
+ * words "Priced" / "Unpriced" / "Unverifiable"; PRICED always shows the number itself, and
+ * NO_CHARGE/UNPRICED read differently depending on who's looking.
  */
 export function priceLabel(model: PriceFields, audience: "instance" | "workspace"): string {
-	if (model.pricingMode === "FREE") {
-		return audience === "instance" ? "Free" : "No budget cost";
+	if (model.pricingMode === "NO_CHARGE") {
+		return "No metered API cost";
 	}
 	if (model.pricingMode === "UNPRICED" || model.per1mInputUsd == null) {
 		return audience === "instance" ? "No price set" : "Price not set";

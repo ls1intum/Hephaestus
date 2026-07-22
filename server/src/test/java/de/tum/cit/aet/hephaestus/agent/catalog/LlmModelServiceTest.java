@@ -69,10 +69,11 @@ class LlmModelServiceTest extends BaseUnitTest {
         model.setConnection(connection);
         // Not every test looks up model 7 (e.g. the unknown-id 404 case) — lenient so those aren't
         // flagged as unnecessary stubbing. Both finders are stubbed: updatePrice() still uses the plain
-        // findById, while get()/update()/updateSharing() use the eager-fetch variant (#1368 fix — the
-        // admin controller reads connection.displayName after the transaction closes).
+        // findById, while get()/updateSharing() use the eager-fetch variant and activation/repricing use
+        // the write-locked variant.
         lenient().when(modelRepository.findById(7L)).thenReturn(Optional.of(model));
         lenient().when(modelRepository.findByIdWithConnection(7L)).thenReturn(Optional.of(model));
+        lenient().when(modelRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(model));
     }
 
     private void stubModelSavePassthrough() {
@@ -226,7 +227,7 @@ class LlmModelServiceTest extends BaseUnitTest {
         @Test
         void freeModeRequiresANote() {
             UpdateLlmModelPriceRequestDTO request = new UpdateLlmModelPriceRequestDTO(
-                PricingMode.FREE,
+                PricingMode.NO_CHARGE,
                 null,
                 null,
                 null,
@@ -246,7 +247,7 @@ class LlmModelServiceTest extends BaseUnitTest {
             when(priceRepository.findByModelIdAndEffectiveToIsNull(7L)).thenReturn(Optional.empty());
             when(priceRepository.save(any(LlmModelPrice.class))).thenAnswer(invocation -> invocation.getArgument(0));
             UpdateLlmModelPriceRequestDTO request = new UpdateLlmModelPriceRequestDTO(
-                PricingMode.FREE,
+                PricingMode.NO_CHARGE,
                 null,
                 null,
                 null,
@@ -257,7 +258,7 @@ class LlmModelServiceTest extends BaseUnitTest {
 
             LlmModelPrice result = modelService.updatePrice(7L, request);
 
-            assertThat(result.getPricingMode()).isEqualTo(PricingMode.FREE);
+            assertThat(result.getPricingMode()).isEqualTo(PricingMode.NO_CHARGE);
             assertThat(result.getNote()).isEqualTo("Self-hosted, internally funded");
         }
 
@@ -280,8 +281,28 @@ class LlmModelServiceTest extends BaseUnitTest {
         }
 
         @Test
+        void enabledModelCannotBeRepricedToUnpricedAndExistingPriceStaysOpen() {
+            model.setEnabled(true);
+            UpdateLlmModelPriceRequestDTO request = new UpdateLlmModelPriceRequestDTO(
+                PricingMode.UNPRICED,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+            );
+
+            assertThatThrownBy(() -> modelService.updatePrice(7L, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Disable the model");
+
+            verifyNoInteractions(priceRepository);
+        }
+
+        @Test
         void unknownModelRaisesNotFound() {
-            when(modelRepository.findById(404L)).thenReturn(Optional.empty());
+            when(modelRepository.findByIdForUpdate(404L)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> modelService.updatePrice(404L, pricedRequest("1.00", "2.00"))).isInstanceOf(
                 EntityNotFoundException.class
@@ -378,18 +399,20 @@ class LlmModelServiceTest extends BaseUnitTest {
     class UpstreamIdConflict {
 
         private CreateLlmModelRequestDTO createRequest(String upstreamModelId) {
-            return new CreateLlmModelRequestDTO(
-                "gpt-5-eu",
-                "GPT-5 EU",
-                upstreamModelId,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
+            return new CreateLlmModelRequestDTO("gpt-5-eu", "GPT-5 EU", upstreamModelId, null, null, null, null);
+        }
+
+        @Test
+        void metadataUpdateRevalidatesAnEnabledModel() {
+            model.setEnabled(true);
+            model.getConnection().setEnabled(true);
+            when(priceRepository.findByModelIdAndEffectiveToIsNull(7L)).thenReturn(Optional.empty());
+            UpdateLlmModelRequestDTO request = new UpdateLlmModelRequestDTO("Renamed", null, null, null, null);
+
+            assertThatThrownBy(() -> modelService.update(7L, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("configure a price");
+            verify(modelRepository, never()).saveAndFlush(any());
         }
 
         @Test
@@ -421,46 +444,13 @@ class LlmModelServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void updateRejectsChangingToAnUpstreamIdAlreadyUsedByAnotherModelOnTheSameConnection() {
-            when(modelRepository.existsByConnectionIdAndUpstreamModelIdAndIdNot(3L, "gpt-5-turbo", 7L)).thenReturn(
-                true
-            );
-
-            UpdateLlmModelRequestDTO request = new UpdateLlmModelRequestDTO(
-                null,
-                "gpt-5-turbo",
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
-
-            assertThatThrownBy(() -> modelService.update(7L, request)).isInstanceOf(
-                LlmModelUpstreamIdConflictException.class
-            );
-            verify(modelRepository, never()).saveAndFlush(any());
-        }
-
-        @Test
-        void updateAllowsKeepingTheSameUpstreamIdWithoutRecheckingUniqueness() {
+        void updateKeepsImmutableUpstreamModelId() {
             stubModelSavePassthrough();
-            UpdateLlmModelRequestDTO request = new UpdateLlmModelRequestDTO(
-                null,
-                "gpt-5", // same as the fixture's current upstreamModelId
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
+            UpdateLlmModelRequestDTO request = new UpdateLlmModelRequestDTO("Renamed", null, null, null, null);
 
-            modelService.update(7L, request);
+            LlmModel result = modelService.update(7L, request);
 
+            assertThat(result.getUpstreamModelId()).isEqualTo("gpt-5");
             verify(modelRepository, never()).existsByConnectionIdAndUpstreamModelIdAndIdNot(any(), any(), any());
         }
 
@@ -484,30 +474,6 @@ class LlmModelServiceTest extends BaseUnitTest {
             when(modelRepository.saveAndFlush(any(LlmModel.class))).thenThrow(upstreamIdConstraintViolation());
 
             assertThatThrownBy(() -> modelService.create(3L, createRequest("gpt-5"))).isInstanceOf(
-                LlmModelUpstreamIdConflictException.class
-            );
-        }
-
-        @Test
-        void updateTranslatesAFlushTimeConstraintViolationInto409() {
-            when(modelRepository.existsByConnectionIdAndUpstreamModelIdAndIdNot(3L, "gpt-5-turbo", 7L)).thenReturn(
-                false
-            );
-            when(modelRepository.saveAndFlush(any(LlmModel.class))).thenThrow(upstreamIdConstraintViolation());
-
-            UpdateLlmModelRequestDTO request = new UpdateLlmModelRequestDTO(
-                null,
-                "gpt-5-turbo",
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
-
-            assertThatThrownBy(() -> modelService.update(7L, request)).isInstanceOf(
                 LlmModelUpstreamIdConflictException.class
             );
         }

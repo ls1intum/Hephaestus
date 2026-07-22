@@ -13,5 +13,5 @@ Workspace administrators get a matching view for their own workspace under Admin
 "Usage": total spend for the month, a breakdown by day and by kind of work (pull-request reviews,
 issue reviews, conversation reviews, and mentor conversations), and their current cap, which they can
 see but not raise. Mentor conversations are included in these totals for the first time. Where a
-model has no price on record, the affected calls are counted separately and flagged, so it is clear
-when a total is understated rather than silently wrong.
+started attempt has no trustworthy usage counters or legacy price snapshot, it is counted separately
+and flagged, so it is clear when a total is understated rather than silently wrong.

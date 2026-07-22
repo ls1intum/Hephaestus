@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -10,6 +11,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -93,6 +95,16 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     @WorkspaceAgnostic("ID-based reload; job ID from workspace-scoped claim context")
     @Query("SELECT j FROM AgentJob j LEFT JOIN FETCH j.workspace WHERE j.id = :id")
     Optional<AgentJob> findByIdWithWorkspace(@Param("id") UUID id);
+
+    /**
+     * Recovery-side accounting read. The row lock makes the execution-start marker and the following
+     * status transition one decision: a concurrent execution-start CAS either commits before this
+     * read or waits and then loses because the job is no longer RUNNING.
+     */
+    @WorkspaceAgnostic("ID-based locked recovery read; caller performs a fenced status transition")
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT j FROM AgentJob j LEFT JOIN FETCH j.workspace WHERE j.id = :id")
+    Optional<AgentJob> findByIdWithWorkspaceForUpdate(@Param("id") UUID id);
 
     /**
      * Conditional terminal status transition. Returns number of rows affected (0 or 1).
@@ -182,6 +194,16 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         @Param("fromStatuses") Collection<AgentJobStatus> fromStatuses,
         @Param("workerId") String workerId
     );
+
+    /** Persist the accounting boundary immediately before sandbox/provider execution. */
+    @WorkspaceAgnostic("ID-based execution-start fence; job ID + owner from worker-local execution context")
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        "UPDATE AgentJob j SET j.executionStartedAt = :now " +
+            "WHERE j.id = :id AND j.status = 'RUNNING' AND j.executionStartedAt IS NULL " +
+            "AND ((:workerId IS NULL AND j.workerId IS NULL) OR j.workerId = :workerId)"
+    )
+    int markExecutionStarted(@Param("id") UUID id, @Param("workerId") String workerId, @Param("now") Instant now);
 
     /**
      * Persist the run-provenance digests. Written before the sandbox starts, so even a failed or cancelled run
@@ -302,7 +324,8 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
         "UPDATE AgentJob j SET j.status = 'QUEUED', j.workerId = null, " +
-            "j.startedAt = null, j.retryCount = j.retryCount + 1, j.availableAt = :availableAt, " +
+            "j.startedAt = null, j.executionStartedAt = null, " +
+            "j.retryCount = j.retryCount + 1, j.availableAt = :availableAt, " +
             "j.jobToken = :newJobToken, j.jobTokenHash = :newJobTokenHash " +
             "WHERE j.id = :id AND j.status = 'RUNNING' AND j.workerId = :workerId AND j.retryCount < :maxRetries"
     )
@@ -341,7 +364,8 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         // reclaimable" without a second write (and without a JPQL CURRENT_TIMESTAMP, which Hibernate 7
         // resolves to java.sql.Timestamp and refuses to assign to this Instant-typed column). No token
         // rotation either: no sandbox was ever handed this token.
-        "UPDATE AgentJob j SET j.status = 'QUEUED', j.workerId = null, j.startedAt = null " +
+        "UPDATE AgentJob j SET j.status = 'QUEUED', j.workerId = null, j.startedAt = null, " +
+            "j.executionStartedAt = null " +
             "WHERE j.id = :id AND j.status = 'RUNNING' AND (:workerId IS NULL OR j.workerId = :workerId)"
     )
     int requeueRejectedClaim(@Param("id") UUID id, @Param("workerId") String workerId);

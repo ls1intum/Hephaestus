@@ -160,7 +160,7 @@ Use one of these composite annotations on the test class (or method) rather than
 
 | Annotation | Gate | Use for |
 | --- | --- | --- |
-| `@LiveLlmTest` | `HEPHAESTUS_LIVE_LLM_API_KEY` | Tests that drive a real LLM. Defaults to the TUM AET ASE gateway running `openai/gpt-oss-120b`; override with `HEPHAESTUS_LIVE_LLM_BASE_URL` / `HEPHAESTUS_LIVE_LLM_MODEL`. Read via `LiveLlmCredentials.fromEnv()`. |
+| `@LiveLlmTest` | `HEPHAESTUS_LIVE_LLM_API_KEY` | Tests that drive a real OpenAI-compatible endpoint. Set `HEPHAESTUS_LIVE_LLM_BASE_URL`, `HEPHAESTUS_LIVE_LLM_API_KEY`, and `HEPHAESTUS_LIVE_LLM_MODEL` explicitly. Read via `LiveLlmCredentials.fromEnv()`. |
 | `@LiveGitHubTest` | `GH_APP_INSTALLATION_ID` | Tests that hit github.com via the installed GitHub App. `BaseGitHubLiveIntegrationTest` runs an extra runtime check on private-key material. |
 | `@LiveGitLabTest` | `HEPHAESTUS_LIVE_GITLAB_TOKEN` | Reserved for GitLab-side replay/live-sync tests. |
 | `@LiveDockerTest` | none — runtime probe in `@BeforeAll` | Tests that need a Docker daemon. Combine with `@LiveLlmTest` when the sandbox payload also needs LLM credentials. |

@@ -47,7 +47,7 @@ import tools.jackson.databind.node.ObjectNode;
  *   <li>Ensures the Pi SDK is installed under {@code target/pi-sdk/node_modules} (idempotent;
  *       the install marker survives across test runs and parallel JVMs use a directory lock).</li>
  *   <li>Spawns {@code pi-mentor-runner.mjs} directly with {@code node} — no Docker — and points
- *       it at the TUM AET ASE OpenAI-compatible gateway via {@code OPENAI_BASE_URL} +
+ *       it at a real OpenAI-compatible endpoint via {@code OPENAI_BASE_URL} +
  *       {@code OPENAI_API_KEY}.</li>
  *   <li>Drives the JSON-RPC protocol the same way {@code MentorRunnerClient} drives it in prod
  *       (hello → open_thread → prompt) and translates every emitted event through the real
@@ -70,7 +70,7 @@ class MentorLiveLlmTest {
     /** Pi SDK version pinned in pi-mentor-runner.mjs. Bump in lockstep with the runner. */
     private static final String PI_SDK_VERSION = "0.74.0";
 
-    /** Per-test wall-clock cap — mentor turns against gpt-oss-120b complete in 5-30s on the TUM box. */
+    /** Per-test wall-clock cap for a real remote model. */
     private static final Duration TURN_TIMEOUT = Duration.ofSeconds(90);
 
     /** Project-relative location of the SDK install. Build output, never vendored. Gitignored. */
@@ -279,7 +279,7 @@ class MentorLiveLlmTest {
             "What number did I ask you to remember? Reply with only the digits."
         );
         System.out.printf("[multi-turn] turn 2 (%d chars): %s%n", t2Text.length(), trim(t2Text, 200));
-        // gpt-oss-120b is well-behaved on this prompt; accept "42" or the spelled-out form.
+        // Accept either the numeric or spelled-out form so the assertion is model-agnostic.
         String t2Lower = t2Text.toLowerCase();
         assertThat(t2Lower)
             .as(
@@ -600,8 +600,8 @@ class MentorLiveLlmTest {
             null,
             null,
             false,
-            null,
-            "live-test-token", // never actually checked — no real proxy sits in front of this test
+            "live-test-token",
+            // never actually checked — no real proxy sits in front of this test
             true,
             300,
             new MentorRunnerProfile(),

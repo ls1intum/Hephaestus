@@ -1,8 +1,10 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
+import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -51,6 +53,17 @@ public interface WorkspaceLlmModelRepository extends JpaRepository<WorkspaceLlmM
         "SELECT m FROM WorkspaceLlmModel m JOIN FETCH m.connection WHERE m.id = :id AND m.workspace.id = :workspaceId"
     )
     Optional<WorkspaceLlmModel> findByIdAndWorkspaceIdWithConnection(
+        @Param("id") Long id,
+        @Param("workspaceId") Long workspaceId
+    );
+
+    /** Serializes the workspace model's combined activation and price replacement. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+        "SELECT m FROM WorkspaceLlmModel m JOIN FETCH m.connection " +
+            "WHERE m.id = :id AND m.workspace.id = :workspaceId"
+    )
+    Optional<WorkspaceLlmModel> findByIdAndWorkspaceIdForUpdate(
         @Param("id") Long id,
         @Param("workspaceId") Long workspaceId
     );

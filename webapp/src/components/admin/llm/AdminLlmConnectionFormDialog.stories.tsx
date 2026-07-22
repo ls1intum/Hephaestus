@@ -5,12 +5,11 @@ import { AdminLlmConnectionFormDialog } from "./AdminLlmConnectionFormDialog";
 
 const mockConnection: LlmConnection = {
 	id: 1,
-	slug: "azure-eu",
-	displayName: "Azure EU",
-	apiProtocol: "azure-openai-responses",
-	authHeaderName: "api-key",
-	authValuePrefix: "",
-	baseUrl: "https://azure-eu.example.com/openai",
+	slug: "openai-production",
+	displayName: "OpenAI production",
+	authMode: "BEARER",
+	apiProtocol: "openai-responses",
+	baseUrl: "https://openai-production.example.com/openai",
 	enabled: true,
 	hasApiKey: true,
 	apiKeyLast4: "ab12",

@@ -262,17 +262,10 @@
             the BYO enable flag, and the default unpriced-usage policy.
           • agent_config demoted to a binding: it now points at EITHER an instance model OR a workspace
             model (a CHECK enforces at most one). The legacy llm_* columns are retained this release
-            (deprecate-then-remove); unbound configs are NOT backfilled into a catalog connection —
-            LlmModelResolver.legacy() carries them with the same per-provider defaults (base URL, auth
-            header, protocol) a backfill would have used, funded INSTANCE, so nothing breaks. A prior
-            version of this migration auto-created a per-config workspace BYO connection and bound it;
-            that was reverted (#1368 correctness fix) because it silently defaulted every legacy
-            Anthropic/self-hosted config's base URL to https://api.openai.com when llm_base_url was
-            blank, and it flipped funding_source to WORKSPACE for pre-existing spend, exempting it from
-            the very instance budget cap this release ships. Operators migrate to a catalog-bound model
-            at their own pace; the legacy fallback is correct and tested (LlmProxyIntegrationTest,
-            LlmUsageLedgerIntegrationTest).
-          • llm_usage_event gains pricing_state (PRICED|FREE|UNPRICED — "unknown" stops being a silent
+            (deprecate-then-remove), but runtime resolution is catalog-only. Unbound legacy configs are
+            disabled rather than guessed or silently attached to the wrong endpoint/funding source;
+            operators explicitly bind and re-enable them after configuring the catalog.
+          • llm_usage_event gains pricing_state (PRICED|NO_CHARGE|UNPRICED — "unknown" stops being a silent
             $0), reasoning_tokens, funding_source (INSTANCE|WORKSPACE), and applied_price_id provenance.
           • workspace gains monthly_llm_budget_usd, a workspace-owned cap over its INSTANCE-funded spend
             only (a workspace's own BYO spend never counts toward it — see LlmUsageRecorder's class doc);
@@ -304,15 +297,11 @@
             <column name="display_name" type="VARCHAR(128)"><constraints nullable="false"/></column>
             <column name="base_url" type="VARCHAR(2048)"><constraints nullable="false"/></column>
             <column name="api_protocol" type="VARCHAR(40)"><constraints nullable="false"/></column>
-            <column name="auth_header_name" type="VARCHAR(64)" defaultValue="Authorization">
-                <constraints nullable="false"/>
-            </column>
-            <column name="auth_value_prefix" type="VARCHAR(16)" defaultValue="Bearer ">
+            <column name="auth_mode" type="VARCHAR(16)" defaultValue="BEARER">
                 <constraints nullable="false"/>
             </column>
             <column name="api_key" type="TEXT"/>
-            <column name="azure_api_version" type="VARCHAR(32)"/>
-            <column name="enabled" type="BOOLEAN" defaultValueBoolean="true">
+            <column name="enabled" type="BOOLEAN" defaultValueBoolean="false">
                 <constraints nullable="false"/>
             </column>
             <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
@@ -322,7 +311,9 @@
              host executes the job); the API key never enters the sandbox. One path, no toggle. -->
         <sql splitStatements="false"><![CDATA[
             ALTER TABLE llm_connection ADD CONSTRAINT ck_llm_connection_api_protocol
-                CHECK (api_protocol IN ('openai-completions','openai-responses','azure-openai-responses','anthropic-messages'));
+                CHECK (api_protocol IN ('openai-completions','openai-responses'));
+            ALTER TABLE llm_connection ADD CONSTRAINT ck_llm_connection_auth_mode
+                CHECK (auth_mode IN ('BEARER','API_KEY'));
         ]]></sql>
         <rollback><dropTable tableName="llm_connection"/></rollback>
     </changeSet>
@@ -341,16 +332,13 @@
             <column name="slug" type="VARCHAR(64)"><constraints nullable="false"/></column>
             <column name="display_name" type="VARCHAR(128)"><constraints nullable="false"/></column>
             <column name="upstream_model_id" type="VARCHAR(256)"><constraints nullable="false"/></column>
-            <column name="api_protocol_override" type="VARCHAR(40)"/>
-            <column name="modality" type="VARCHAR(16)" defaultValue="CHAT"><constraints nullable="false"/></column>
             <column name="context_window" type="INTEGER"/>
             <column name="max_output_tokens" type="INTEGER"/>
             <column name="supports_reasoning" type="BOOLEAN" defaultValueBoolean="false">
                 <constraints nullable="false"/>
             </column>
-            <column name="cache_control_format" type="VARCHAR(16)"/>
-            <column name="visibility" type="VARCHAR(16)" defaultValue="PUBLIC"><constraints nullable="false"/></column>
-            <column name="enabled" type="BOOLEAN" defaultValueBoolean="true"><constraints nullable="false"/></column>
+            <column name="visibility" type="VARCHAR(16)" defaultValue="GRANTED"><constraints nullable="false"/></column>
+            <column name="enabled" type="BOOLEAN" defaultValueBoolean="false"><constraints nullable="false"/></column>
             <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
             <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
         </createTable>
@@ -363,13 +351,8 @@
             <column name="connection_id"/>
         </createIndex>
         <sql splitStatements="false"><![CDATA[
-            ALTER TABLE llm_model ADD CONSTRAINT ck_llm_model_modality
-                CHECK (modality IN ('CHAT','EMBEDDING','RERANK'));
             ALTER TABLE llm_model ADD CONSTRAINT ck_llm_model_visibility
                 CHECK (visibility IN ('PUBLIC','GRANTED'));
-            ALTER TABLE llm_model ADD CONSTRAINT ck_llm_model_api_protocol_override
-                CHECK (api_protocol_override IS NULL OR api_protocol_override IN
-                    ('openai-completions','openai-responses','azure-openai-responses','anthropic-messages'));
         ]]></sql>
         <rollback><dropTable tableName="llm_model"/></rollback>
     </changeSet>
@@ -394,7 +377,6 @@
             <column name="per_1m_output_usd" type="NUMERIC(18,8)"/>
             <column name="per_1m_cache_read_usd" type="NUMERIC(18,8)"/>
             <column name="per_1m_cache_write_usd" type="NUMERIC(18,8)"/>
-            <column name="per_1m_reasoning_usd" type="NUMERIC(18,8)"/>
             <column name="currency" type="VARCHAR(3)" defaultValue="USD"><constraints nullable="false"/></column>
             <column name="note" type="VARCHAR(500)"/>
             <column name="effective_from" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
@@ -415,7 +397,23 @@
              one, so the partial unique index is the backstop against a double-open race. -->
         <sql splitStatements="false"><![CDATA[
             ALTER TABLE llm_model_price ADD CONSTRAINT ck_llm_model_price_mode
-                CHECK (pricing_mode IN ('PRICED','FREE','UNPRICED'));
+                CHECK (pricing_mode IN ('PRICED','NO_CHARGE','UNPRICED'));
+            ALTER TABLE llm_model_price ADD CONSTRAINT ck_llm_model_price_shape CHECK (
+                (pricing_mode = 'PRICED'
+                    AND per_1m_input_usd IS NOT NULL AND per_1m_input_usd >= 0
+                    AND per_1m_output_usd IS NOT NULL AND per_1m_output_usd >= 0
+                    AND (per_1m_cache_read_usd IS NULL OR per_1m_cache_read_usd >= 0)
+                    AND (per_1m_cache_write_usd IS NULL OR per_1m_cache_write_usd >= 0)
+                    AND GREATEST(per_1m_input_usd, per_1m_output_usd,
+                                 COALESCE(per_1m_cache_read_usd, 0), COALESCE(per_1m_cache_write_usd, 0)) > 0)
+                OR (pricing_mode = 'NO_CHARGE'
+                    AND note IS NOT NULL AND btrim(note) <> ''
+                    AND per_1m_input_usd IS NULL AND per_1m_output_usd IS NULL
+                    AND per_1m_cache_read_usd IS NULL AND per_1m_cache_write_usd IS NULL)
+                OR (pricing_mode = 'UNPRICED'
+                    AND per_1m_input_usd IS NULL AND per_1m_output_usd IS NULL
+                    AND per_1m_cache_read_usd IS NULL AND per_1m_cache_write_usd IS NULL)
+            );
             ALTER TABLE llm_model_price ADD CONSTRAINT ck_llm_model_price_window
                 CHECK (effective_to IS NULL OR effective_to > effective_from);
             CREATE UNIQUE INDEX ux_llm_model_price_open ON llm_model_price (model_id) WHERE effective_to IS NULL;
@@ -470,15 +468,11 @@
             <column name="display_name" type="VARCHAR(128)"><constraints nullable="false"/></column>
             <column name="base_url" type="VARCHAR(2048)"><constraints nullable="false"/></column>
             <column name="api_protocol" type="VARCHAR(40)"><constraints nullable="false"/></column>
-            <column name="auth_header_name" type="VARCHAR(64)" defaultValue="Authorization">
-                <constraints nullable="false"/>
-            </column>
-            <column name="auth_value_prefix" type="VARCHAR(16)" defaultValue="Bearer ">
+            <column name="auth_mode" type="VARCHAR(16)" defaultValue="BEARER">
                 <constraints nullable="false"/>
             </column>
             <column name="api_key" type="TEXT"/>
-            <column name="azure_api_version" type="VARCHAR(32)"/>
-            <column name="enabled" type="BOOLEAN" defaultValueBoolean="true"><constraints nullable="false"/></column>
+            <column name="enabled" type="BOOLEAN" defaultValueBoolean="false"><constraints nullable="false"/></column>
             <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
             <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
         </createTable>
@@ -494,7 +488,9 @@
             constraintName="ux_ws_llm_connection_id_ws"/>
         <sql splitStatements="false"><![CDATA[
             ALTER TABLE workspace_llm_connection ADD CONSTRAINT ck_ws_llm_connection_api_protocol
-                CHECK (api_protocol IN ('openai-completions','openai-responses','azure-openai-responses','anthropic-messages'));
+                CHECK (api_protocol IN ('openai-completions','openai-responses'));
+            ALTER TABLE workspace_llm_connection ADD CONSTRAINT ck_ws_llm_connection_auth_mode
+                CHECK (auth_mode IN ('BEARER','API_KEY'));
         ]]></sql>
         <rollback><dropTable tableName="workspace_llm_connection"/></rollback>
     </changeSet>
@@ -517,21 +513,17 @@
             <column name="slug" type="VARCHAR(64)"><constraints nullable="false"/></column>
             <column name="display_name" type="VARCHAR(128)"><constraints nullable="false"/></column>
             <column name="upstream_model_id" type="VARCHAR(256)"><constraints nullable="false"/></column>
-            <column name="api_protocol_override" type="VARCHAR(40)"/>
-            <column name="modality" type="VARCHAR(16)" defaultValue="CHAT"><constraints nullable="false"/></column>
             <column name="context_window" type="INTEGER"/>
             <column name="max_output_tokens" type="INTEGER"/>
             <column name="supports_reasoning" type="BOOLEAN" defaultValueBoolean="false"><constraints nullable="false"/></column>
-            <column name="cache_control_format" type="VARCHAR(16)"/>
             <column name="pricing_mode" type="VARCHAR(16)" defaultValue="UNPRICED"><constraints nullable="false"/></column>
             <column name="per_1m_input_usd" type="NUMERIC(18,8)"/>
             <column name="per_1m_output_usd" type="NUMERIC(18,8)"/>
             <column name="per_1m_cache_read_usd" type="NUMERIC(18,8)"/>
             <column name="per_1m_cache_write_usd" type="NUMERIC(18,8)"/>
-            <column name="per_1m_reasoning_usd" type="NUMERIC(18,8)"/>
             <column name="currency" type="VARCHAR(3)" defaultValue="USD"><constraints nullable="false"/></column>
             <column name="price_note" type="VARCHAR(500)"/>
-            <column name="enabled" type="BOOLEAN" defaultValueBoolean="true"><constraints nullable="false"/></column>
+            <column name="enabled" type="BOOLEAN" defaultValueBoolean="false"><constraints nullable="false"/></column>
             <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
             <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
         </createTable>
@@ -557,13 +549,24 @@
             <column name="connection_id"/>
         </createIndex>
         <sql splitStatements="false"><![CDATA[
-            ALTER TABLE workspace_llm_model ADD CONSTRAINT ck_ws_llm_model_modality
-                CHECK (modality IN ('CHAT','EMBEDDING','RERANK'));
             ALTER TABLE workspace_llm_model ADD CONSTRAINT ck_ws_llm_model_pricing_mode
-                CHECK (pricing_mode IN ('PRICED','FREE','UNPRICED'));
-            ALTER TABLE workspace_llm_model ADD CONSTRAINT ck_ws_llm_model_api_protocol_override
-                CHECK (api_protocol_override IS NULL OR api_protocol_override IN
-                    ('openai-completions','openai-responses','azure-openai-responses','anthropic-messages'));
+                CHECK (pricing_mode IN ('PRICED','NO_CHARGE','UNPRICED'));
+            ALTER TABLE workspace_llm_model ADD CONSTRAINT ck_ws_llm_model_price_shape CHECK (
+                (pricing_mode = 'PRICED'
+                    AND per_1m_input_usd IS NOT NULL AND per_1m_input_usd >= 0
+                    AND per_1m_output_usd IS NOT NULL AND per_1m_output_usd >= 0
+                    AND (per_1m_cache_read_usd IS NULL OR per_1m_cache_read_usd >= 0)
+                    AND (per_1m_cache_write_usd IS NULL OR per_1m_cache_write_usd >= 0)
+                    AND GREATEST(per_1m_input_usd, per_1m_output_usd,
+                                 COALESCE(per_1m_cache_read_usd, 0), COALESCE(per_1m_cache_write_usd, 0)) > 0)
+                OR (pricing_mode = 'NO_CHARGE'
+                    AND price_note IS NOT NULL AND btrim(price_note) <> ''
+                    AND per_1m_input_usd IS NULL AND per_1m_output_usd IS NULL
+                    AND per_1m_cache_read_usd IS NULL AND per_1m_cache_write_usd IS NULL)
+                OR (pricing_mode = 'UNPRICED'
+                    AND per_1m_input_usd IS NULL AND per_1m_output_usd IS NULL
+                    AND per_1m_cache_read_usd IS NULL AND per_1m_cache_write_usd IS NULL)
+            );
         ]]></sql>
         <rollback><dropTable tableName="workspace_llm_model"/></rollback>
     </changeSet>
@@ -628,7 +631,7 @@
 
     <!-- 9. Ledger: pricing_state tri-state (the blind-cap fix), reasoning_tokens, funding_source,
          applied_price_id provenance. Backfill: a resolved cost -> PRICED; NULL cost -> UNPRICED
-         (FREE cannot be inferred retroactively). Existing rows are all INSTANCE-funded. -->
+         (NO_CHARGE cannot be inferred retroactively). Existing rows are all INSTANCE-funded. -->
     <changeSet id="1784636803503-23" author="hephaestus">
         <preConditions onFail="MARK_RAN" onFailMessage="llm_usage_event.pricing_state already exists">
             <not><columnExists tableName="llm_usage_event" columnName="pricing_state"/></not>
@@ -642,15 +645,15 @@
         </addColumn>
         <sql splitStatements="false"><![CDATA[
             ALTER TABLE llm_usage_event ADD CONSTRAINT ck_llm_usage_event_pricing_state
-                CHECK (pricing_state IN ('PRICED','FREE','UNPRICED'));
+                CHECK (pricing_state IN ('PRICED','NO_CHARGE','UNPRICED'));
             ALTER TABLE llm_usage_event ADD CONSTRAINT ck_llm_usage_event_funding_source
                 CHECK (funding_source IN ('INSTANCE','WORKSPACE'));
             -- Classify migrated history conservatively. A positive cost is genuinely PRICED. A zero cost
-            -- with NO tokens burned is a genuine no-op -> FREE. A zero cost WITH burned tokens is the
+            -- with NO tokens burned is a genuine no-op -> NO_CHARGE. A zero cost WITH burned tokens is the
             -- "runtime didn't price it" trap (see LlmUsageRecorder) and a NULL cost is unknown: both stay
             -- UNPRICED (the default) so they surface as unverifiable rather than silently counting as $0.
             UPDATE llm_usage_event SET pricing_state = 'PRICED' WHERE cost_usd > 0;
-            UPDATE llm_usage_event SET pricing_state = 'FREE'
+            UPDATE llm_usage_event SET pricing_state = 'NO_CHARGE'
                 WHERE cost_usd = 0
                   AND (input_tokens + output_tokens + cache_read_tokens + cache_write_tokens) = 0;
         ]]></sql>
@@ -662,14 +665,8 @@
         </rollback>
     </changeSet>
 
-    <!-- Changeset -11 (backfill every agent_config into an auto-created per-workspace BYO connection +
-         model, then bind it) was REMOVED (#1368 correctness fix). It defaulted a blank llm_base_url to
-         https://api.openai.com regardless of provider — sending a legacy Anthropic/self-hosted config's
-         key to the wrong host — and it re-labelled all pre-existing spend funding_source=WORKSPACE,
-         exempting every existing workspace from the instance budget cap this release ships. Legacy
-         configs are intentionally left unbound; LlmModelResolver.legacy() resolves them with the correct
-         per-provider defaults and FundingSource.INSTANCE, unchanged from pre-#1368 behaviour. Do not
-         reuse id -11 for an unrelated change — ids in this file are append-only history. -->
+    <!-- Changeset -11 (unsafe automatic provider backfill) was removed. Existing configs are handled
+         conservatively by -50: only explicit catalog bindings may run. Do not reuse id -11. -->
 
     <!-- 12. Ledger provenance completion (#1368 slice 6): applied_price_id alone (changeset 9) is a
          live soft ref into llm_model_price — if that row is later superseded, the id still resolves
@@ -690,7 +687,6 @@
             <column name="applied_per_1m_output_usd" type="NUMERIC(18,8)"/>
             <column name="applied_per_1m_cache_read_usd" type="NUMERIC(18,8)"/>
             <column name="applied_per_1m_cache_write_usd" type="NUMERIC(18,8)"/>
-            <column name="applied_per_1m_reasoning_usd" type="NUMERIC(18,8)"/>
         </addColumn>
         <rollback>
             <dropColumn tableName="llm_usage_event" columnName="applied_workspace_model_id"/>
@@ -698,7 +694,6 @@
             <dropColumn tableName="llm_usage_event" columnName="applied_per_1m_output_usd"/>
             <dropColumn tableName="llm_usage_event" columnName="applied_per_1m_cache_read_usd"/>
             <dropColumn tableName="llm_usage_event" columnName="applied_per_1m_cache_write_usd"/>
-            <dropColumn tableName="llm_usage_event" columnName="applied_per_1m_reasoning_usd"/>
         </rollback>
     </changeSet>
 
@@ -837,33 +832,18 @@
         head-of-line-starvation gap) adds a correlated per-config RUNNING count, which needs its own
         supporting index.
     -->
-    <changeSet id="1784636803503-30" author="hephaestus">
-        <preConditions onFail="MARK_RAN" onFailMessage="ix_agent_job_queued_created already exists">
-            <not><indexExists indexName="ix_agent_job_queued_created"/></not>
-        </preConditions>
-        <comment>Oldest-first QUEUED poll candidates (#1368 fix wave)</comment>
-        <sql>
-            CREATE INDEX ix_agent_job_queued_created
-                ON agent_job (created_at ASC, id)
-                WHERE status = 'QUEUED';
-        </sql>
-        <rollback>
-            <sql>DROP INDEX IF EXISTS ix_agent_job_queued_created;</sql>
-        </rollback>
-    </changeSet>
-
-    <changeSet id="1784636803503-31" author="hephaestus">
+    <changeSet id="1784636803503-31" author="hephaestus" runInTransaction="false">
         <preConditions onFail="MARK_RAN" onFailMessage="ix_agent_job_running_config already exists">
             <not><indexExists indexName="ix_agent_job_running_config"/></not>
         </preConditions>
         <comment>Per-config RUNNING count for the poll query's concurrency-cap fairness predicate (#1368 fix wave)</comment>
         <sql>
-            CREATE INDEX ix_agent_job_running_config
+            CREATE INDEX CONCURRENTLY ix_agent_job_running_config
                 ON agent_job (config_id)
                 WHERE status = 'RUNNING';
         </sql>
         <rollback>
-            <sql>DROP INDEX IF EXISTS ix_agent_job_running_config;</sql>
+            <sql>DROP INDEX CONCURRENTLY IF EXISTS ix_agent_job_running_config;</sql>
         </rollback>
     </changeSet>
 
@@ -887,24 +867,18 @@
         </rollback>
     </changeSet>
 
-    <changeSet id="1784636803503-33" author="hephaestus">
+    <changeSet id="1784636803503-33" author="hephaestus" runInTransaction="false">
         <preConditions onFail="MARK_RAN" onFailMessage="ix_agent_job_queued_available already exists">
             <not><indexExists indexName="ix_agent_job_queued_available"/></not>
         </preConditions>
-        <comment>Replace the queued-oldest-first index with one ordered on available_at, the new claim-eligibility predicate (#1368 hardening; both indexes are branch-local, so drop+create lands in one changeset)</comment>
+        <comment>Index queued jobs by their claim-eligibility time without blocking queue traffic (#1368 hardening)</comment>
         <sql>
-            DROP INDEX IF EXISTS ix_agent_job_queued_created;
-            CREATE INDEX ix_agent_job_queued_available
+            CREATE INDEX CONCURRENTLY ix_agent_job_queued_available
                 ON agent_job (available_at, id)
                 WHERE status = 'QUEUED';
         </sql>
         <rollback>
-            <sql>
-                DROP INDEX IF EXISTS ix_agent_job_queued_available;
-                CREATE INDEX ix_agent_job_queued_created
-                    ON agent_job (created_at ASC, id)
-                    WHERE status = 'QUEUED';
-            </sql>
+            <sql>DROP INDEX CONCURRENTLY IF EXISTS ix_agent_job_queued_available;</sql>
         </rollback>
     </changeSet>
 
@@ -917,7 +891,7 @@
         <comment>CHECK the six documented AgentJobStatus values at the storage layer (#1368 hardening)</comment>
         <sql splitStatements="false"><![CDATA[
             ALTER TABLE agent_job ADD CONSTRAINT ck_agent_job_status
-                CHECK (status IN ('QUEUED','RUNNING','COMPLETED','FAILED','TIMED_OUT','CANCELLED'));
+                CHECK (status IN ('QUEUED','RUNNING','COMPLETED','FAILED','TIMED_OUT','CANCELLED')) NOT VALID;
         ]]></sql>
         <rollback>
             <sql>ALTER TABLE agent_job DROP CONSTRAINT IF EXISTS ck_agent_job_status;</sql>
@@ -940,12 +914,8 @@
     </changeSet>
 
     <changeSet id="1784636803503-36" author="hephaestus">
-        <preConditions onFail="MARK_RAN" onFailMessage="agent_job autovacuum options already tuned">
-            <sqlCheck expectedResult="0">
-                SELECT count(*) FROM pg_class WHERE relname = 'agent_job'
-                  AND reloptions IS NOT NULL
-                  AND array_to_string(reloptions, ',') LIKE '%autovacuum_vacuum_scale_factor%'
-            </sqlCheck>
+        <preConditions onFail="MARK_RAN" onFailMessage="agent_job table is absent">
+            <tableExists tableName="agent_job"/>
         </preConditions>
         <comment>Oban's documented autovacuum recommendation, adapted: a high-churn queue table needs vacuum triggered by absolute row-change count, not the default 20% scale factor (#1368 hardening — pressure-test verdict Tier 1 #1)</comment>
         <sql>
@@ -957,12 +927,8 @@
     </changeSet>
 
     <changeSet id="1784636803503-37" author="hephaestus">
-        <preConditions onFail="MARK_RAN" onFailMessage="worker_registry autovacuum options already tuned">
-            <sqlCheck expectedResult="0">
-                SELECT count(*) FROM pg_class WHERE relname = 'worker_registry'
-                  AND reloptions IS NOT NULL
-                  AND array_to_string(reloptions, ',') LIKE '%autovacuum_vacuum_scale_factor%'
-            </sqlCheck>
+        <preConditions onFail="MARK_RAN" onFailMessage="worker_registry table is absent">
+            <tableExists tableName="worker_registry"/>
         </preConditions>
         <comment>Same autovacuum tuning for worker_registry — small table, heartbeat-rate UPDATEs (#1368 hardening)</comment>
         <sql>
@@ -973,42 +939,31 @@
         </rollback>
     </changeSet>
 
-    <changeSet id="1784636803503-38" author="hephaestus">
+    <changeSet id="1784636803503-38" author="hephaestus" runInTransaction="false">
         <preConditions onFail="MARK_RAN" onFailMessage="ix_agent_job_delivery_pending already exists">
             <not><indexExists indexName="ix_agent_job_delivery_pending"/></not>
         </preConditions>
         <comment>Support AgentJobZombieSweeper#recoverStuckDeliveries' stuck-PENDING-delivery scan (#1368 hardening)</comment>
         <sql>
-            CREATE INDEX ix_agent_job_delivery_pending
+            CREATE INDEX CONCURRENTLY ix_agent_job_delivery_pending
                 ON agent_job (completed_at)
                 WHERE status = 'COMPLETED' AND delivery_status = 'PENDING';
         </sql>
-        <rollback>
-            <sql>DROP INDEX IF EXISTS ix_agent_job_delivery_pending;</sql>
-        </rollback>
+        <rollback><sql>DROP INDEX CONCURRENTLY IF EXISTS ix_agent_job_delivery_pending;</sql></rollback>
     </changeSet>
 
-    <changeSet id="1784636803503-39" author="hephaestus">
+    <changeSet id="1784636803503-39" author="hephaestus" runInTransaction="false">
         <preConditions onFail="MARK_RAN" onFailMessage="ix_agent_job_retention already exists">
             <not><indexExists indexName="ix_agent_job_retention"/></not>
         </preConditions>
         <comment>Support AgentJobRetentionService's terminal-row batch scans (strip + delete) (#1368 hardening)</comment>
         <sql>
-            CREATE INDEX ix_agent_job_retention
+            CREATE INDEX CONCURRENTLY ix_agent_job_retention
                 ON agent_job (completed_at)
                 WHERE status IN ('COMPLETED','FAILED','TIMED_OUT','CANCELLED');
         </sql>
-        <rollback>
-            <sql>DROP INDEX IF EXISTS ix_agent_job_retention;</sql>
-        </rollback>
+        <rollback><sql>DROP INDEX CONCURRENTLY IF EXISTS ix_agent_job_retention;</sql></rollback>
     </changeSet>
-
-    <!--
-        #1368 fix wave (adversarial review of the hardening above, docs/decisions/0025's amendment).
-        Branch-local — this whole file is unreleased, so these are corrective changesets appended after
-        -39 rather than edits to -30/-31/-33/-34/-38/-39 themselves, per the append-only discipline this
-        project holds changelogs to even pre-merge.
-    -->
 
     <!--
         BLOCKER finding #1: feedback.agent_job_id (1781092589259-32) carries ON DELETE CASCADE, which
@@ -1042,117 +997,6 @@
         </rollback>
     </changeSet>
 
-    <!--
-        Finding #10: -30/-31/-33/-38/-39 created their indexes with plain CREATE INDEX, which takes an
-        ACCESS EXCLUSIVE lock on agent_job for the build's duration — a table the poll loop hits every
-        second. CONCURRENTLY avoids that lock (at the cost of two table scans and not running inside a
-        transaction — hence runInTransaction="false" on each of these). Each DROP+CREATE pair targets the
-        SAME index name so no application code (repository @Query comments, this file's own later
-        comments) needs to change.
-    -->
-    <changeSet id="1784636803503-41" author="hephaestus" runInTransaction="false">
-        <comment>Rebuild ix_agent_job_running_config with CREATE INDEX CONCURRENTLY (#1368 fix wave, finding #10)</comment>
-        <sql>DROP INDEX CONCURRENTLY IF EXISTS ix_agent_job_running_config;</sql>
-        <sql>
-            CREATE INDEX CONCURRENTLY ix_agent_job_running_config
-                ON agent_job (config_id)
-                WHERE status = 'RUNNING';
-        </sql>
-        <rollback>
-            <sql>DROP INDEX CONCURRENTLY IF EXISTS ix_agent_job_running_config;</sql>
-            <sql>
-                CREATE INDEX CONCURRENTLY ix_agent_job_running_config
-                    ON agent_job (config_id)
-                    WHERE status = 'RUNNING';
-            </sql>
-        </rollback>
-    </changeSet>
-
-    <changeSet id="1784636803503-42" author="hephaestus" runInTransaction="false">
-        <comment>Rebuild ix_agent_job_queued_available with CREATE INDEX CONCURRENTLY (#1368 fix wave, finding #10)</comment>
-        <sql>DROP INDEX CONCURRENTLY IF EXISTS ix_agent_job_queued_available;</sql>
-        <sql>
-            CREATE INDEX CONCURRENTLY ix_agent_job_queued_available
-                ON agent_job (available_at, id)
-                WHERE status = 'QUEUED';
-        </sql>
-        <rollback>
-            <sql>DROP INDEX CONCURRENTLY IF EXISTS ix_agent_job_queued_available;</sql>
-            <sql>
-                CREATE INDEX CONCURRENTLY ix_agent_job_queued_available
-                    ON agent_job (available_at, id)
-                    WHERE status = 'QUEUED';
-            </sql>
-        </rollback>
-    </changeSet>
-
-    <changeSet id="1784636803503-43" author="hephaestus" runInTransaction="false">
-        <comment>Rebuild ix_agent_job_delivery_pending with CREATE INDEX CONCURRENTLY (#1368 fix wave, finding #10)</comment>
-        <sql>DROP INDEX CONCURRENTLY IF EXISTS ix_agent_job_delivery_pending;</sql>
-        <sql>
-            CREATE INDEX CONCURRENTLY ix_agent_job_delivery_pending
-                ON agent_job (completed_at)
-                WHERE status = 'COMPLETED' AND delivery_status = 'PENDING';
-        </sql>
-        <rollback>
-            <sql>DROP INDEX CONCURRENTLY IF EXISTS ix_agent_job_delivery_pending;</sql>
-            <sql>
-                CREATE INDEX CONCURRENTLY ix_agent_job_delivery_pending
-                    ON agent_job (completed_at)
-                    WHERE status = 'COMPLETED' AND delivery_status = 'PENDING';
-            </sql>
-        </rollback>
-    </changeSet>
-
-    <changeSet id="1784636803503-44" author="hephaestus" runInTransaction="false">
-        <comment>Rebuild ix_agent_job_retention with CREATE INDEX CONCURRENTLY (#1368 fix wave, finding #10)</comment>
-        <sql>DROP INDEX CONCURRENTLY IF EXISTS ix_agent_job_retention;</sql>
-        <sql>
-            CREATE INDEX CONCURRENTLY ix_agent_job_retention
-                ON agent_job (completed_at)
-                WHERE status IN ('COMPLETED','FAILED','TIMED_OUT','CANCELLED');
-        </sql>
-        <rollback>
-            <sql>DROP INDEX CONCURRENTLY IF EXISTS ix_agent_job_retention;</sql>
-            <sql>
-                CREATE INDEX CONCURRENTLY ix_agent_job_retention
-                    ON agent_job (completed_at)
-                    WHERE status IN ('COMPLETED','FAILED','TIMED_OUT','CANCELLED');
-            </sql>
-        </rollback>
-    </changeSet>
-
-    <!--
-        Finding #10 (CHECK half): -34's ck_agent_job_status was added with a plain ADD CONSTRAINT, which
-        validates every existing row under the SAME ACCESS EXCLUSIVE lock as the DDL. NOT VALID skips that
-        scan (metadata-only, near-instant); VALIDATE CONSTRAINT in a separate changeset then does the scan
-        under SHARE UPDATE EXCLUSIVE, which blocks other schema changes but NOT ordinary reads/writes —
-        the poll loop and executor keep running normally while it validates.
-    -->
-    <changeSet id="1784636803503-45" author="hephaestus">
-        <preConditions onFail="MARK_RAN" onFailMessage="ck_agent_job_status already re-added NOT VALID">
-            <sqlCheck expectedResult="1">
-                SELECT count(*) FROM pg_constraint WHERE conname = 'ck_agent_job_status' AND convalidated
-            </sqlCheck>
-        </preConditions>
-        <comment>Re-add ck_agent_job_status as NOT VALID — the scan is deferred to -46 (#1368 fix wave, finding #10)</comment>
-        <sql splitStatements="false"><![CDATA[
-            ALTER TABLE agent_job DROP CONSTRAINT IF EXISTS ck_agent_job_status;
-            ALTER TABLE agent_job ADD CONSTRAINT ck_agent_job_status
-                CHECK (status IN ('QUEUED','RUNNING','COMPLETED','FAILED','TIMED_OUT','CANCELLED')) NOT VALID;
-        ]]></sql>
-        <rollback>
-            <!-- Restores exactly what -34 originally left in place (a validated constraint) rather than
-                 just removing the constraint outright, so a rollback of -45 alone (without also rolling
-                 back -34, which Liquibase's bookkeeping still shows as applied) leaves the DB coherent. -->
-            <sql splitStatements="false"><![CDATA[
-                ALTER TABLE agent_job DROP CONSTRAINT IF EXISTS ck_agent_job_status;
-                ALTER TABLE agent_job ADD CONSTRAINT ck_agent_job_status
-                    CHECK (status IN ('QUEUED','RUNNING','COMPLETED','FAILED','TIMED_OUT','CANCELLED'));
-            ]]></sql>
-        </rollback>
-    </changeSet>
-
     <changeSet id="1784636803503-46" author="hephaestus">
         <preConditions onFail="MARK_RAN" onFailMessage="ck_agent_job_status already validated">
             <sqlCheck expectedResult="1">
@@ -1164,30 +1008,114 @@
         <rollback/>
     </changeSet>
 
-    <!--
-        Finding #14: -36/-37's preconditions only checked whether ANY autovacuum_vacuum_scale_factor
-        option was present, not this release's specific value — a stale or partially-applied option would
-        silently skip the changeset. ALTER TABLE ... SET (...) is idempotent (re-setting the same options
-        is a cheap metadata-only no-op), so these corrective changesets just reapply it unconditionally
-        instead of trying to precondition-match an exact prior state.
-    -->
-    <changeSet id="1784636803503-47" author="hephaestus">
-        <comment>Idempotently (re-)apply agent_job's autovacuum tuning, unconditionally (#1368 fix wave, finding #14)</comment>
-        <sql>
-            ALTER TABLE agent_job SET (autovacuum_vacuum_scale_factor = 0, autovacuum_vacuum_threshold = 500);
-        </sql>
+    <changeSet id="1784636803503-50" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="Enabled agent configs already require one catalog binding">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'ck_agent_config_enabled_binding'
+            </sqlCheck>
+        </preConditions>
+        <comment>Fail closed: disable unbound legacy configs and require one catalog model for enabled configs (#1368)</comment>
+        <sql splitStatements="false"><![CDATA[
+            UPDATE agent_config
+                SET enabled = false
+                WHERE enabled
+                  AND ((instance_model_id IS NULL) = (workspace_model_id IS NULL));
+
+            ALTER TABLE agent_config DROP CONSTRAINT ck_agent_config_single_binding;
+            ALTER TABLE agent_config ADD CONSTRAINT ck_agent_config_enabled_binding CHECK (
+                NOT (instance_model_id IS NOT NULL AND workspace_model_id IS NOT NULL)
+                AND (
+                    NOT enabled
+                    OR ((instance_model_id IS NOT NULL) <> (workspace_model_id IS NOT NULL))
+                )
+            );
+        ]]></sql>
         <rollback>
-            <sql>ALTER TABLE agent_job RESET (autovacuum_vacuum_scale_factor, autovacuum_vacuum_threshold);</sql>
+            <sql splitStatements="false"><![CDATA[
+                ALTER TABLE agent_config DROP CONSTRAINT ck_agent_config_enabled_binding;
+                ALTER TABLE agent_config ADD CONSTRAINT ck_agent_config_single_binding
+                    CHECK (NOT (instance_model_id IS NOT NULL AND workspace_model_id IS NOT NULL));
+            ]]></sql>
         </rollback>
     </changeSet>
 
-    <changeSet id="1784636803503-48" author="hephaestus">
-        <comment>Idempotently (re-)apply worker_registry's autovacuum tuning, unconditionally (#1368 fix wave, finding #14)</comment>
+    <changeSet id="1784636803503-52" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="Attempt-aware durable LLM accounting already applied">
+            <not>
+                <and>
+                    <columnExists tableName="llm_usage_event" columnName="source_type"/>
+                    <columnExists tableName="llm_usage_event" columnName="source_attempt"/>
+                    <sqlCheck expectedResult="3">
+                        SELECT count(*) FROM pg_constraint WHERE conname IN (
+                            'ck_llm_usage_event_source_type',
+                            'ck_llm_usage_event_source_attempt',
+                            'ux_llm_usage_event_source_attempt'
+                        )
+                    </sqlCheck>
+                </and>
+            </not>
+        </preConditions>
+        <comment>Make each provider attempt idempotently billable (#1368)</comment>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE llm_usage_event ADD COLUMN source_type VARCHAR(20) NOT NULL DEFAULT 'AGENT_JOB';
+            ALTER TABLE llm_usage_event ADD COLUMN source_attempt INTEGER NOT NULL DEFAULT 0;
+            UPDATE llm_usage_event SET source_type = 'MENTOR_TURN' WHERE job_type = 'MENTOR_TURN';
+            ALTER TABLE llm_usage_event ALTER COLUMN source_type DROP DEFAULT;
+            ALTER TABLE llm_usage_event DROP CONSTRAINT ux_llm_usage_event_source;
+            ALTER TABLE llm_usage_event ADD CONSTRAINT ck_llm_usage_event_source_type
+                CHECK (source_type IN ('AGENT_JOB','MENTOR_TURN'));
+            ALTER TABLE llm_usage_event ADD CONSTRAINT ck_llm_usage_event_source_attempt
+                CHECK (source_attempt >= 0);
+            ALTER TABLE llm_usage_event ADD CONSTRAINT ux_llm_usage_event_source_attempt
+                UNIQUE (source_type, source_id, source_attempt);
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                ALTER TABLE llm_usage_event DROP CONSTRAINT ux_llm_usage_event_source_attempt;
+                ALTER TABLE llm_usage_event DROP CONSTRAINT ck_llm_usage_event_source_attempt;
+                ALTER TABLE llm_usage_event DROP CONSTRAINT ck_llm_usage_event_source_type;
+                DO $$ BEGIN
+                    IF EXISTS (SELECT 1 FROM llm_usage_event GROUP BY source_id HAVING count(*) > 1) THEN
+                        RAISE EXCEPTION 'Cannot roll back attempt-aware LLM ledger without deleting accounting rows';
+                    END IF;
+                END $$;
+                ALTER TABLE llm_usage_event DROP COLUMN source_attempt;
+                ALTER TABLE llm_usage_event DROP COLUMN source_type;
+                ALTER TABLE llm_usage_event ADD CONSTRAINT ux_llm_usage_event_source UNIQUE (source_id);
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1784636803503-53" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="Legacy agent provider discriminator already optional">
+            <sqlCheck expectedResult="NO">
+                SELECT is_nullable FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'agent_config' AND column_name = 'llm_provider'
+            </sqlCheck>
+        </preConditions>
+        <comment>Stop fabricating a provider enum now that catalog bindings own OpenAI-compatible routing (#1368)</comment>
+        <dropNotNullConstraint tableName="agent_config" columnName="llm_provider" columnDataType="VARCHAR(32)"/>
+        <rollback>
+            <sql>UPDATE agent_config SET llm_provider = 'OPENAI' WHERE llm_provider IS NULL</sql>
+            <addNotNullConstraint tableName="agent_config" columnName="llm_provider" columnDataType="VARCHAR(32)"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1784636803503-54" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="Agent execution-start accounting boundary already exists">
+            <not><columnExists tableName="agent_job" columnName="execution_started_at"/></not>
+        </preConditions>
+        <comment>Distinguish claimed preparation from provider-capable execution for reliable accounting (#1368)</comment>
+        <addColumn tableName="agent_job">
+            <column name="execution_started_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </addColumn>
         <sql>
-            ALTER TABLE worker_registry SET (autovacuum_vacuum_scale_factor = 0, autovacuum_vacuum_threshold = 100);
+            UPDATE agent_job SET execution_started_at = started_at
+            WHERE status = 'RUNNING' AND started_at IS NOT NULL
         </sql>
         <rollback>
-            <sql>ALTER TABLE worker_registry RESET (autovacuum_vacuum_scale_factor, autovacuum_vacuum_threshold);</sql>
+            <dropColumn tableName="agent_job" columnName="execution_started_at"/>
         </rollback>
     </changeSet>
 

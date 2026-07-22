@@ -70,6 +70,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         event.setId(UUID.randomUUID());
         event.setWorkspace(workspace);
         event.setJobType(type);
+        event.setSourceType(sourceType(type));
         event.setSourceId(UUID.randomUUID());
         event.setModel("claude-sonnet-5");
         event.setInputTokens(100);
@@ -90,6 +91,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         event.setId(UUID.randomUUID());
         event.setWorkspace(workspace);
         event.setJobType(type);
+        event.setSourceType(sourceType(type));
         event.setSourceId(UUID.randomUUID());
         event.setModel("byo-model");
         event.setCostUsd(new BigDecimal(cost));
@@ -104,6 +106,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         event.setId(UUID.randomUUID());
         event.setWorkspace(workspace);
         event.setJobType(type);
+        event.setSourceType(sourceType(type));
         event.setSourceId(UUID.randomUUID());
         event.setModel("no-price-model");
         event.setCostUsd(null);
@@ -111,6 +114,10 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         event.setFundingSource(FundingSource.INSTANCE);
         event.setOccurredAt(month.atDay(day).atStartOfDay(ZoneOffset.UTC).toInstant().plusSeconds(3600));
         usageRepository.save(event);
+    }
+
+    private LlmUsageSourceType sourceType(LlmUsageJobType type) {
+        return type == LlmUsageJobType.MENTOR_TURN ? LlmUsageSourceType.MENTOR_TURN : LlmUsageSourceType.AGENT_JOB;
     }
 
     @Test
@@ -309,6 +316,67 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             .exchange()
             .expectStatus()
             .isBadRequest();
+    }
+
+    @Test
+    @WithAdminUser
+    void instanceAdminCanReadAWorkspaceReportWithoutMembership() {
+        Workspace workspace = createWorkspace(
+            "usage-instance-admin",
+            "Usage instance admin",
+            "usage-instance-admin-org",
+            AccountType.ORG,
+            persistUser("usage-instance-admin-owner")
+        );
+        seedEvent(workspace, LlmUsageJobType.MENTOR_TURN, "1.25", CURRENT, 1);
+
+        webTestClient
+            .get()
+            .uri("/workspaces/{slug}/llm-usage", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$.pricedTotalCostUsd")
+            .isEqualTo(1.25);
+    }
+
+    @Test
+    @WithMentorUser
+    void workspaceAdminCannotReadAnotherWorkspacesReport() {
+        User admin = persistUser("mentor");
+        Workspace ownWorkspace = createWorkspace(
+            "usage-own-admin",
+            "Usage own admin",
+            "usage-own-admin-org",
+            AccountType.ORG,
+            admin
+        );
+        ensureWorkspaceMembership(ownWorkspace, admin, WorkspaceMembership.WorkspaceRole.ADMIN);
+        Workspace otherWorkspace = createWorkspace(
+            "usage-other-admin",
+            "Usage other admin",
+            "usage-other-admin-org",
+            AccountType.ORG,
+            persistUser("usage-other-admin-owner")
+        );
+
+        webTestClient
+            .get()
+            .uri("/workspaces/{slug}/llm-usage", otherWorkspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isForbidden();
+
+        webTestClient
+            .get()
+            .uri("/workspaces/{slug}/llm-usage", ownWorkspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk();
     }
 
     @Test

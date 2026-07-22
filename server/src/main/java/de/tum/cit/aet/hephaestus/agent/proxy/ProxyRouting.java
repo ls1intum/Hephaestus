@@ -19,5 +19,18 @@ public record ProxyRouting(
     String baseUrl,
     @Nullable FundingSource connectionScope,
     @Nullable Long connectionId,
+    @Nullable Long modelId,
+    @Nullable Long workspaceId,
     @Nullable Long legacyConfigId
-) {}
+) {
+    public ProxyRouting(
+        String principalDescription,
+        String apiProtocol,
+        String baseUrl,
+        @Nullable FundingSource connectionScope,
+        @Nullable Long connectionId,
+        @Nullable Long legacyConfigId
+    ) {
+        this(principalDescription, apiProtocol, baseUrl, connectionScope, connectionId, null, null, legacyConfigId);
+    }
+}

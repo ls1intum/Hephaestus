@@ -1,9 +1,11 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -43,6 +45,11 @@ public interface LlmModelRepository extends JpaRepository<LlmModel, Long> {
      */
     @Query("SELECT m FROM LlmModel m JOIN FETCH m.connection WHERE m.id = :id")
     Optional<LlmModel> findByIdWithConnection(@Param("id") Long id);
+
+    /** Serializes activation and repricing so an enabled model can never end a race unpriced. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT m FROM LlmModel m JOIN FETCH m.connection WHERE m.id = :id")
+    Optional<LlmModel> findByIdForUpdate(@Param("id") Long id);
 
     /**
      * Available-models projection: instance models usable by a given workspace — active, on an active

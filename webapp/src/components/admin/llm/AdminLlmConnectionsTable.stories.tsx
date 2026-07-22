@@ -6,12 +6,11 @@ import { AdminLlmConnectionsTable } from "./AdminLlmConnectionsTable";
 const mockConnections: LlmConnection[] = [
 	{
 		id: 1,
-		slug: "azure-eu",
-		displayName: "Azure EU",
-		apiProtocol: "azure-openai-responses",
-		authHeaderName: "api-key",
-		authValuePrefix: "",
-		baseUrl: "https://azure-eu.example.com/openai",
+		slug: "openai-production",
+		displayName: "OpenAI production",
+		authMode: "BEARER",
+		apiProtocol: "openai-responses",
+		baseUrl: "https://openai-production.example.com/openai",
 		enabled: true,
 		hasApiKey: true,
 		apiKeyLast4: "ab12",
@@ -21,9 +20,8 @@ const mockConnections: LlmConnection[] = [
 		id: 2,
 		slug: "on-prem-gpu",
 		displayName: "On-prem GPU (vLLM)",
+		authMode: "BEARER",
 		apiProtocol: "openai-completions",
-		authHeaderName: "Authorization",
-		authValuePrefix: "Bearer ",
 		baseUrl: "https://gpu.internal.example.com/v1",
 		enabled: false,
 		hasApiKey: false,
@@ -74,7 +72,7 @@ export const Empty: Story = {
 export const DeleteConfirm: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await userEvent.click(canvas.getByRole("button", { name: /delete azure eu/i }));
+		await userEvent.click(canvas.getByRole("button", { name: /delete openai production/i }));
 		const dialog = await screen.findByRole("alertdialog");
 		await expect(within(dialog).getByText(/still on it/i)).toBeInTheDocument();
 	},

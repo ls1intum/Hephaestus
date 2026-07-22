@@ -65,9 +65,8 @@ public final class LlmUsageDTOs {
         @NonNull Long cacheReadTokens,
         @NonNull Long cacheWriteTokens,
         @NonNull @Schema(
-            description = "LLM API calls, as reported by the runtime. Detection jobs report their real call " +
-                "count; a mentor turn reports 1 per turn regardless of its internal tool loop, so compare turns " +
-                "to turns, not to job calls."
+            description = "LLM API calls, as reported by the runtime. Detection jobs and mentor turns both " +
+                "include every assistant call in an internal tool loop."
         ) Long totalCalls,
         @NonNull @Schema(description = "Ledger events (jobs / mentor turns)") Long events
     ) {}

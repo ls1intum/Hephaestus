@@ -1,4 +1,3 @@
-import { ChevronDown } from "lucide-react";
 import { useEffect, useState } from "react";
 import type {
 	CreateLlmConnectionRequest,
@@ -10,7 +9,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
 	Dialog,
 	DialogContent,
@@ -36,17 +34,17 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
-	authDefaultsForProtocol,
+	authModeDefaultFor,
+	baseUrlDefaultFor,
 	defaultProtocolFor,
-	PROVIDER_TYPE_LABELS,
-	PROVIDER_TYPE_ORDER,
-	PROVIDER_TYPE_SELECT_ITEMS,
-	type ProviderTypeOption,
-	providerTypeForProtocol,
+	type LlmAuthMode,
+	PROVIDER_PRESET_LABELS,
+	PROVIDER_PRESET_ORDER,
+	PROVIDER_PRESET_SELECT_ITEMS,
+	type ProviderPreset,
+	presetForConnection,
 	usesResponsesApi,
 } from "@/lib/llmProviderType";
-
-const SLUG_PATTERN = /^[a-z][a-z0-9-]{1,62}$/;
 
 export interface AdminLlmConnectionFormDialogProps {
 	open: boolean;
@@ -55,26 +53,24 @@ export interface AdminLlmConnectionFormDialogProps {
 	isSubmitting: boolean;
 	onCreate: (body: CreateLlmConnectionRequest) => void;
 	onUpdate: (id: number, body: UpdateLlmConnectionRequest) => void;
-	/** Probes the in-progress draft (works before the connection is saved). */
 	onProbe: (
 		request: {
 			apiProtocol: string;
 			baseUrl: string;
 			apiKey?: string;
-			authHeaderName?: string;
-			authValuePrefix?: string;
+			authMode?: LlmAuthMode;
 		},
 		callbacks: { onSuccess: (result: LlmProbeResult) => void; onError: (message: string) => void },
 	) => void;
+	onProbeSaved?: (
+		id: number,
+		callbacks: { onSuccess: (result: LlmProbeResult) => void; onError: (message: string) => void },
+	) => void;
 	isProbing: boolean;
-	/** Lifts a successful probe's model ids so the model-creation flow can offer them. */
 	onProbed?: (models: string[]) => void;
 }
 
-/**
- * Create/edit an instance LLM provider connection (#1368). "Test & fetch models" never gates saving —
- * a provider that can't be introspected can still be connected and its models entered by hand.
- */
+/** Create or update an instance OpenAI-compatible connection. */
 export function AdminLlmConnectionFormDialog({
 	open,
 	onOpenChange,
@@ -83,56 +79,44 @@ export function AdminLlmConnectionFormDialog({
 	onCreate,
 	onUpdate,
 	onProbe,
+	onProbeSaved,
 	isProbing,
 	onProbed,
 }: AdminLlmConnectionFormDialogProps) {
 	const isEdit = editing !== null;
 	const [displayName, setDisplayName] = useState("");
-	const [slug, setSlug] = useState("");
 	const [baseUrl, setBaseUrl] = useState("");
-	const [providerType, setProviderType] = useState<ProviderTypeOption>("OPENAI");
+	const [preset, setPreset] = useState<ProviderPreset>("OPENAI");
 	const [useResponsesApi, setUseResponsesApi] = useState(false);
+	const [authMode, setAuthMode] = useState<LlmAuthMode>("BEARER");
 	const [apiKey, setApiKey] = useState("");
-	const [advancedOpen, setAdvancedOpen] = useState(false);
-	const [authHeaderName, setAuthHeaderName] = useState("");
-	const [authValuePrefix, setAuthValuePrefix] = useState("");
-	const [enabled, setEnabled] = useState(true);
+	const [clearApiKey, setClearApiKey] = useState(false);
+	const [enabled, setEnabled] = useState(false);
 	const [probeResult, setProbeResult] = useState<LlmProbeResult | null>(null);
 	const [probeError, setProbeError] = useState<string | null>(null);
-	const [errors, setErrors] = useState<{ displayName?: string; slug?: string; baseUrl?: string }>(
-		{},
-	);
+	const [errors, setErrors] = useState<{ displayName?: string; baseUrl?: string }>({});
 
 	useEffect(() => {
 		if (!open) return;
 		setDisplayName(editing?.displayName ?? "");
-		setSlug(editing?.slug ?? "");
-		setBaseUrl(editing?.baseUrl ?? "");
-		const type = editing ? providerTypeForProtocol(editing.apiProtocol) : "OPENAI";
-		setProviderType(type);
+		setBaseUrl(editing?.baseUrl ?? baseUrlDefaultFor("OPENAI"));
+		setPreset(editing ? presetForConnection(editing) : "OPENAI");
 		setUseResponsesApi(editing ? usesResponsesApi(editing.apiProtocol) : false);
+		setAuthMode(editing?.authMode ?? "BEARER");
 		setApiKey("");
-		setAuthHeaderName(editing?.authHeaderName ?? "");
-		setAuthValuePrefix(editing?.authValuePrefix ?? "");
-		setAdvancedOpen(false);
-		setEnabled(editing?.enabled ?? true);
+		setClearApiKey(false);
+		setEnabled(editing?.enabled ?? false);
 		setProbeResult(null);
 		setProbeError(null);
 		setErrors({});
 	}, [open, editing]);
 
-	const apiProtocol = defaultProtocolFor(providerType, useResponsesApi);
-	const authDefaults = authDefaultsForProtocol(apiProtocol);
+	const apiProtocol = defaultProtocolFor(useResponsesApi);
 
 	const validate = (): boolean => {
 		const next: typeof errors = {};
 		if (!displayName.trim()) next.displayName = "A display name is required.";
-		if (!isEdit) {
-			if (!SLUG_PATTERN.test(slug.trim())) {
-				next.slug = "Lowercase letters, digits and hyphens; must start with a letter.";
-			}
-			if (!baseUrl.trim()) next.baseUrl = "A base URL is required.";
-		}
+		if (!isEdit && !baseUrl.trim()) next.baseUrl = "A base URL is required.";
 		setErrors(next);
 		return Object.keys(next).length === 0;
 	};
@@ -140,21 +124,25 @@ export function AdminLlmConnectionFormDialog({
 	const handleTest = () => {
 		setProbeResult(null);
 		setProbeError(null);
+		const callbacks = {
+			onSuccess: (result: LlmProbeResult) => {
+				setProbeResult(result);
+				if (result.reachable) onProbed?.(result.models);
+			},
+			onError: setProbeError,
+		};
+		if (editing) {
+			onProbeSaved?.(editing.id, callbacks);
+			return;
+		}
 		onProbe(
 			{
 				apiProtocol,
 				baseUrl: baseUrl.trim(),
 				apiKey: apiKey.trim() || undefined,
-				authHeaderName: authHeaderName.trim() || undefined,
-				authValuePrefix: authValuePrefix.trim() || undefined,
+				authMode,
 			},
-			{
-				onSuccess: (result) => {
-					setProbeResult(result);
-					if (result.reachable) onProbed?.(result.models);
-				},
-				onError: (message) => setProbeError(message),
-			},
+			callbacks,
 		);
 	};
 
@@ -162,29 +150,21 @@ export function AdminLlmConnectionFormDialog({
 		event.preventDefault();
 		if (!validate()) return;
 
-		if (isEdit && editing) {
-			const body: UpdateLlmConnectionRequest = {
-				displayName: displayName.trim(),
-				baseUrl: baseUrl.trim() || undefined,
-				apiProtocol,
-				authHeaderName: authHeaderName.trim() || undefined,
-				authValuePrefix: authValuePrefix.trim() || undefined,
-				enabled,
-			};
+		if (editing) {
+			const body: UpdateLlmConnectionRequest = { displayName: displayName.trim(), enabled };
 			if (apiKey.trim()) body.apiKey = apiKey.trim();
+			if (clearApiKey) body.clearApiKey = true;
 			onUpdate(editing.id, body);
 			return;
 		}
 
 		onCreate({
 			displayName: displayName.trim(),
-			slug: slug.trim(),
 			baseUrl: baseUrl.trim(),
 			apiProtocol,
+			authMode,
 			apiKey: apiKey.trim() || undefined,
-			authHeaderName: authHeaderName.trim() || undefined,
-			authValuePrefix: authValuePrefix.trim() || undefined,
-			enabled,
+			enabled: false,
 		});
 	};
 
@@ -195,7 +175,8 @@ export function AdminLlmConnectionFormDialog({
 					<DialogHeader>
 						<DialogTitle>{isEdit ? "Edit connection" : "Add connection"}</DialogTitle>
 						<DialogDescription>
-							An LLM provider connection. Models added under it can be shared with workspaces.
+							Connect an endpoint that implements an OpenAI API. Models are added and priced after
+							the connection is saved.
 						</DialogDescription>
 					</DialogHeader>
 
@@ -204,50 +185,40 @@ export function AdminLlmConnectionFormDialog({
 						<Input
 							id="llm-conn-display-name"
 							value={displayName}
-							onChange={(e) => setDisplayName(e.target.value)}
-							placeholder="e.g. Azure EU"
+							onChange={(event) => setDisplayName(event.target.value)}
+							placeholder="e.g. Production OpenAI"
 							aria-invalid={Boolean(errors.displayName)}
 						/>
 						{errors.displayName && <FieldError>{errors.displayName}</FieldError>}
 					</Field>
 
 					{!isEdit && (
-						<Field data-invalid={Boolean(errors.slug)}>
-							<FieldLabel htmlFor="llm-conn-slug">Slug</FieldLabel>
-							<Input
-								id="llm-conn-slug"
-								value={slug}
-								onChange={(e) => setSlug(e.target.value)}
-								placeholder="azure-eu"
-								autoComplete="off"
-								aria-invalid={Boolean(errors.slug)}
-							/>
-							<FieldDescription>Immutable once created.</FieldDescription>
-							{errors.slug && <FieldError>{errors.slug}</FieldError>}
-						</Field>
-					)}
-
-					<Field>
-						<FieldLabel htmlFor="llm-conn-provider-type">Provider type</FieldLabel>
-						<Select
-							items={PROVIDER_TYPE_SELECT_ITEMS}
-							value={providerType}
-							onValueChange={(v) => {
-								if (v) setProviderType(v as ProviderTypeOption);
-							}}
-						>
-							<SelectTrigger id="llm-conn-provider-type" className="w-full">
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								{PROVIDER_TYPE_ORDER.map((type) => (
-									<SelectItem key={type} value={type}>
-										{PROVIDER_TYPE_LABELS[type]}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-						{providerType === "OPENAI" && (
+						<Field>
+							<FieldLabel htmlFor="llm-conn-provider-preset">Endpoint preset</FieldLabel>
+							<Select
+								items={PROVIDER_PRESET_SELECT_ITEMS}
+								value={preset}
+								onValueChange={(value) => {
+									if (!value) return;
+									const next = value as ProviderPreset;
+									if (!baseUrl || baseUrl === baseUrlDefaultFor(preset)) {
+										setBaseUrl(baseUrlDefaultFor(next));
+									}
+									setAuthMode(authModeDefaultFor(next));
+									setPreset(next);
+								}}
+							>
+								<SelectTrigger id="llm-conn-provider-preset" className="w-full">
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									{PROVIDER_PRESET_ORDER.map((item) => (
+										<SelectItem key={item} value={item}>
+											{PROVIDER_PRESET_LABELS[item]}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
 							<div className="mt-2 flex items-center gap-2 text-sm font-normal text-muted-foreground">
 								<Checkbox
 									id="llm-conn-responses-api"
@@ -255,11 +226,17 @@ export function AdminLlmConnectionFormDialog({
 									onCheckedChange={(checked) => setUseResponsesApi(checked === true)}
 								/>
 								<label htmlFor="llm-conn-responses-api">
-									Use the Responses API instead of Completions
+									Use the Responses API instead of Chat Completions
 								</label>
 							</div>
-						)}
-					</Field>
+							{preset === "AZURE_OPENAI_V1" && (
+								<FieldDescription>
+									Replace RESOURCE below with your Azure resource name. The v1 API does not need an
+									api-version parameter.
+								</FieldDescription>
+							)}
+						</Field>
+					)}
 
 					<Field data-invalid={Boolean(errors.baseUrl)}>
 						<FieldLabel htmlFor="llm-conn-base-url">Base URL</FieldLabel>
@@ -267,12 +244,41 @@ export function AdminLlmConnectionFormDialog({
 							id="llm-conn-base-url"
 							type="url"
 							value={baseUrl}
-							onChange={(e) => setBaseUrl(e.target.value)}
+							onChange={(event) => setBaseUrl(event.target.value)}
+							disabled={isEdit}
 							placeholder="https://api.openai.com/v1"
 							aria-invalid={Boolean(errors.baseUrl)}
 						/>
+						{isEdit && (
+							<FieldDescription>
+								Endpoint, API shape, and authentication are immutable. Add a connection to change
+								them.
+							</FieldDescription>
+						)}
 						{errors.baseUrl && <FieldError>{errors.baseUrl}</FieldError>}
 					</Field>
+
+					{!isEdit && preset === "OTHER" && (
+						<Field>
+							<FieldLabel htmlFor="llm-conn-auth-mode">Authentication</FieldLabel>
+							<Select
+								items={[
+									{ value: "BEARER", label: "Bearer token" },
+									{ value: "API_KEY", label: "api-key header" },
+								]}
+								value={authMode}
+								onValueChange={(value) => value && setAuthMode(value as LlmAuthMode)}
+							>
+								<SelectTrigger id="llm-conn-auth-mode" className="w-full">
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="BEARER">Bearer token</SelectItem>
+									<SelectItem value="API_KEY">api-key header</SelectItem>
+								</SelectContent>
+							</Select>
+						</Field>
+					)}
 
 					<Field>
 						<FieldLabel htmlFor="llm-conn-api-key">API key</FieldLabel>
@@ -280,7 +286,8 @@ export function AdminLlmConnectionFormDialog({
 							id="llm-conn-api-key"
 							type="password"
 							value={apiKey}
-							onChange={(e) => setApiKey(e.target.value)}
+							onChange={(event) => setApiKey(event.target.value)}
+							disabled={clearApiKey}
 							placeholder={
 								editing?.hasApiKey
 									? `Configured · ends in ····${editing.apiKeyLast4 ?? "····"}`
@@ -291,51 +298,36 @@ export function AdminLlmConnectionFormDialog({
 						<FieldDescription>
 							{editing?.hasApiKey ? "Leave blank to keep the current key." : "Stored encrypted."}
 						</FieldDescription>
+						{editing?.hasApiKey && (
+							<div className="flex items-center gap-2 text-sm text-muted-foreground">
+								<Checkbox
+									id="llm-conn-clear-api-key"
+									checked={clearApiKey}
+									onCheckedChange={(checked) => {
+										setClearApiKey(checked === true);
+										if (checked === true) setApiKey("");
+									}}
+								/>
+								<label htmlFor="llm-conn-clear-api-key">Remove stored API key</label>
+							</div>
+						)}
 					</Field>
-
-					<Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
-						<CollapsibleTrigger
-							render={
-								<Button type="button" variant="ghost" size="sm" className="gap-1 px-0">
-									<ChevronDown
-										className={`size-4 transition-transform ${advancedOpen ? "rotate-180" : ""}`}
-										aria-hidden
-									/>
-									Advanced
-								</Button>
-							}
-						/>
-						<CollapsibleContent className="space-y-4 pt-2">
-							<Field>
-								<FieldLabel htmlFor="llm-conn-auth-header">Auth header name</FieldLabel>
-								<Input
-									id="llm-conn-auth-header"
-									value={authHeaderName}
-									onChange={(e) => setAuthHeaderName(e.target.value)}
-									placeholder={authDefaults.headerName}
-								/>
-								<FieldDescription>
-									Defaults to “{authDefaults.headerName}” for this provider type.
-								</FieldDescription>
-							</Field>
-							<Field>
-								<FieldLabel htmlFor="llm-conn-auth-prefix">Auth value prefix</FieldLabel>
-								<Input
-									id="llm-conn-auth-prefix"
-									value={authValuePrefix}
-									onChange={(e) => setAuthValuePrefix(e.target.value)}
-									placeholder={authDefaults.valuePrefix || "(none)"}
-								/>
-							</Field>
-						</CollapsibleContent>
-					</Collapsible>
 
 					<Field orientation="horizontal">
 						<FieldContent>
 							<FieldLabel htmlFor="llm-conn-enabled">Active</FieldLabel>
-							<FieldDescription>Off — existing settings stop working</FieldDescription>
+							<FieldDescription>
+								{isEdit
+									? "Turn off to stop new requests using this connection."
+									: "New connections start inactive. Save and test this connection, add a priced model, then activate both."}
+							</FieldDescription>
 						</FieldContent>
-						<Switch id="llm-conn-enabled" checked={enabled} onCheckedChange={setEnabled} />
+						<Switch
+							id="llm-conn-enabled"
+							checked={enabled}
+							disabled={!isEdit}
+							onCheckedChange={setEnabled}
+						/>
 					</Field>
 
 					<div className="space-y-2">
@@ -346,7 +338,7 @@ export function AdminLlmConnectionFormDialog({
 							disabled={isProbing || !baseUrl.trim()}
 							onClick={handleTest}
 						>
-							{isProbing ? "Testing…" : "Test & fetch models"}
+							{isProbing ? "Testing…" : isEdit ? "Test saved connection" : "Test & fetch models"}
 						</Button>
 						{probeResult?.reachable && (
 							<Alert variant="success">
@@ -369,15 +361,15 @@ export function AdminLlmConnectionFormDialog({
 							<Alert variant="warning">
 								<AlertDescription>
 									Discovery unsupported — {probeResult.message ?? "the provider didn't answer."} You
-									can still save this connection and add models by hand.
+									can still save the connection and enter a model id.
 								</AlertDescription>
 							</Alert>
 						)}
 						{probeError && (
 							<Alert variant="warning">
 								<AlertDescription>
-									Discovery unsupported — {probeError} You can still save this connection and add
-									models by hand.
+									Discovery unsupported — {probeError} You can still save the connection and enter a
+									model id.
 								</AlertDescription>
 							</Alert>
 						)}
@@ -388,7 +380,7 @@ export function AdminLlmConnectionFormDialog({
 							Cancel
 						</Button>
 						<Button type="submit" disabled={isSubmitting}>
-							{isEdit ? "Save changes" : "Add connection"}
+							{isEdit ? "Save changes" : "Save inactive connection"}
 						</Button>
 					</DialogFooter>
 				</form>

@@ -152,7 +152,7 @@ public class PiRuntimeFactory {
      * via the shared {@code pi-provider.mjs} helper) registers directly on the ModelRegistry before
      * {@code createAgentSession}, sidestepping the Pi 0.74.x race where findInitialModel runs ahead
      * of extension loading. {@code defaultModel} is the verbatim upstream model id — gateway-routed
-     * deployments (e.g. TUM GPU expects {@code openai/gpt-oss-120b} as the wire id) and Pi's
+     * deployments (for example, a gateway-qualified model id) and Pi's
      * exact-match lookup against {@code modelRegistry.find} see the same string.
      */
     public byte[] buildPiSettingsJson(String upstreamModelId) {
@@ -190,9 +190,6 @@ public class PiRuntimeFactory {
         }
         if (spec.maxOutputTokens() != null) {
             provider.put("maxOutputTokens", spec.maxOutputTokens());
-        }
-        if (spec.cacheControlFormat() != null && !spec.cacheControlFormat().isBlank()) {
-            provider.put("cacheControlFormat", spec.cacheControlFormat());
         }
         try {
             return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(provider);

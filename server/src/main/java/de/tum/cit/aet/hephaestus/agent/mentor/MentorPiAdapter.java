@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.mentor;
 
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MentorContextKeys;
 import de.tum.cit.aet.hephaestus.agent.proxy.MentorProxyCredentialRegistry;
+import de.tum.cit.aet.hephaestus.agent.proxy.MentorProxyCredentialRegistry.Route;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentImageProperties;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiPlanSpec;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiRuntimeFactory;
@@ -35,7 +36,6 @@ public class MentorPiAdapter {
     private static final MentorRunnerProfile PROFILE = new MentorRunnerProfile();
 
     private final PiRuntimeFactory runtimeFactory;
-    private final MentorAgentProperties mentorProperties;
     private final AgentImageProperties imageProperties;
     private final MentorProxyCredentialRegistry proxyCredentialRegistry;
 
@@ -63,20 +63,7 @@ public class MentorPiAdapter {
             extraInputs.put(SESSIONS_DIR_PREFIX + sessionRestore.threadId() + ".jsonl", sessionRestore.bytes());
         }
 
-        // Legacy-only global override (#1368 slice 5 — flagged as a residual separate config source,
-        // see MentorAgentProperties javadoc): preserves the pre-catalog precedence — an explicit
-        // per-config llmBaseUrl wins, else the instance-wide hephaestus.mentor.agent.base-url property,
-        // else the resolver's hardcoded provider default. A catalog-bound config (connectionScope !=
-        // null) always uses its connection's own base URL and ignores both.
         String baseUrl = llmConfig.baseUrl();
-        boolean legacyWithoutExplicitOverride =
-            llmConfig.connectionScope() == null &&
-            (llmConfig.rawLegacyBaseUrl() == null || llmConfig.rawLegacyBaseUrl().isBlank());
-        if (
-            legacyWithoutExplicitOverride && mentorProperties.baseUrl() != null && !mentorProperties.baseUrl().isBlank()
-        ) {
-            baseUrl = mentorProperties.baseUrl();
-        }
 
         // The config API floor (@Min(30) on AgentConfig timeoutSeconds) sits below PiPlanSpec's runtime
         // floor (must exceed TIMEOUT_BUFFER_SECONDS=60), so a legitimately persisted 30-60s config would
@@ -92,11 +79,15 @@ public class MentorPiAdapter {
         UUID sessionId = UUID.randomUUID();
         String proxyToken = proxyCredentialRegistry.mint(
             sessionId,
-            llmConfig.apiProtocol(),
-            baseUrl,
-            llmConfig.connectionScope(),
-            llmConfig.connectionId(),
-            llmConfig.connectionScope() == null ? llmConfig.configId() : null
+            new Route(
+                llmConfig.apiProtocol(),
+                baseUrl,
+                llmConfig.connectionScope(),
+                llmConfig.connectionId(),
+                llmConfig.modelId(),
+                llmConfig.workspaceId(),
+                llmConfig.connectionScope() == null ? llmConfig.configId() : null
+            )
         );
 
         PiPlanSpec planSpec = new PiPlanSpec(
@@ -105,7 +96,6 @@ public class MentorPiAdapter {
             llmConfig.contextWindow(),
             llmConfig.maxOutputTokens(),
             llmConfig.supportsReasoning(),
-            llmConfig.cacheControlFormat(),
             proxyToken,
             llmConfig.allowInternet(),
             timeoutSeconds,

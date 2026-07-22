@@ -39,7 +39,7 @@ export interface NavAdminProps {
 }
 
 // "Practices" nests as a collapsible sub-tree because it owns several surfaces (the catalog, review
-// settings, and the run log). "Models" is a separate item, shared with the mentor, rather than living
+// settings, and the run log). "AI setup" is a separate item, shared with the mentor, rather than living
 // under Practices. Individual practices are not sidebar entries — there are dozens; the catalog is
 // their home and each drills down to its own detail page.
 export function NavAdmin({
@@ -271,11 +271,11 @@ export function NavAdmin({
 				{modelsVisible && (
 					<SidebarMenuItem>
 						<SidebarMenuButton
-							tooltip="Models"
+							tooltip="AI setup"
 							render={<Link to="/w/$workspaceSlug/admin/models" params={{ workspaceSlug }} />}
 						>
 							<Bot />
-							<span>Models</span>
+							<span>AI setup</span>
 						</SidebarMenuButton>
 					</SidebarMenuItem>
 				)}

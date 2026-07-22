@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.agent.config;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
@@ -113,12 +112,11 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
     }
 
     private AgentConfigDTO createConfig(Workspace workspace, String name) {
+        WorkspaceLlmModel model = seedWorkspaceModel(workspace);
         var request = CreateAgentConfigRequestDTO.builder()
             .name(name)
             .enabled(true)
-            .modelName("claude-sonnet-4-20250514")
-            .llmApiKey("sk-test-secret-key-123")
-            .llmProvider(LlmProvider.ANTHROPIC)
+            .workspaceModelId(model.getId())
             .timeoutSeconds(300)
             .maxConcurrentJobs(2)
             .allowInternet(false)
@@ -164,9 +162,7 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
         assertThat(created).isNotNull();
         assertThat(created.name()).isEqualTo("my-agent");
-        assertThat(created.llmProvider()).isEqualTo(LlmProvider.ANTHROPIC);
-        assertThat(created.modelName()).isEqualTo("claude-sonnet-4-20250514");
-        assertThat(created.hasLlmApiKey()).isTrue();
+        assertThat(created.workspaceModelId()).isNotNull();
         assertThat(created.timeoutSeconds()).isEqualTo(300);
         assertThat(created.maxConcurrentJobs()).isEqualTo(2);
         assertThat(created.allowInternet()).isFalse();
@@ -218,11 +214,7 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
         createConfig(workspace, "duplicate-name");
 
-        var duplicateRequest = CreateAgentConfigRequestDTO.builder()
-            .name("duplicate-name")
-            .enabled(true)
-            .llmProvider(LlmProvider.OPENAI)
-            .build();
+        var duplicateRequest = CreateAgentConfigRequestDTO.builder().name("duplicate-name").enabled(true).build();
 
         ProblemDetail problem = webTestClient
             .post()
@@ -243,14 +235,11 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
     @Test
     @WithAdminUser
-    void patchUpdatesExistingConfigAndPreservesApiKey() {
+    void patchUpdatesExistingConfigAndPreservesBinding() {
         Workspace workspace = setupWorkspace();
         AgentConfigDTO created = createConfig(workspace, "update-test");
 
-        // Update — omit llmApiKey (null = keep existing)
         var updateRequest = UpdateAgentConfigRequestDTO.builder()
-            .modelName("gpt-4o")
-            .llmProvider(LlmProvider.OPENAI)
             .timeoutSeconds(120)
             .maxConcurrentJobs(1)
             .allowInternet(true)
@@ -271,9 +260,7 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
         assertThat(updated).isNotNull();
         assertThat(updated.name()).isEqualTo("update-test"); // name unchanged
-        assertThat(updated.llmProvider()).isEqualTo(LlmProvider.OPENAI);
-        assertThat(updated.modelName()).isEqualTo("gpt-4o");
-        assertThat(updated.hasLlmApiKey()).isTrue(); // preserved from create
+        assertThat(updated.workspaceModelId()).isEqualTo(created.workspaceModelId());
         assertThat(updated.timeoutSeconds()).isEqualTo(120);
         assertThat(updated.maxConcurrentJobs()).isEqualTo(1);
         assertThat(updated.allowInternet()).isTrue();
@@ -356,11 +343,10 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
     @Test
     @WithAdminUser
-    void postWithMissingRequiredFieldsReturns400() {
+    void postWithOnlyANameCreatesADisabledDraft() {
         Workspace workspace = setupWorkspace();
 
-        // Neither llmProvider nor a model binding (instanceModelId/workspaceModelId) — #1368 relaxed
-        // llmProvider to optional at the DTO level, but the service still requires ONE of the two.
+        // Binding is required only when enabled, so an admin can create a draft before choosing a model.
         var request = Map.of("name", "incomplete-config");
 
         webTestClient
@@ -371,7 +357,14 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             .bodyValue(request)
             .exchange()
             .expectStatus()
-            .isBadRequest();
+            .isCreated()
+            .expectBody()
+            .jsonPath("$.enabled")
+            .isEqualTo(false)
+            .jsonPath("$.instanceModelId")
+            .doesNotExist()
+            .jsonPath("$.workspaceModelId")
+            .doesNotExist();
     }
 
     @Test
@@ -379,11 +372,7 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
     void postWithBlankNameReturns400() {
         Workspace workspace = setupWorkspace();
 
-        var request = CreateAgentConfigRequestDTO.builder()
-            .name("")
-            .enabled(true)
-            .llmProvider(LlmProvider.ANTHROPIC)
-            .build();
+        var request = CreateAgentConfigRequestDTO.builder().name("").enabled(true).build();
 
         webTestClient
             .post()
@@ -404,7 +393,6 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         var request = CreateAgentConfigRequestDTO.builder()
             .name("bad-timeout")
             .enabled(true)
-            .llmProvider(LlmProvider.ANTHROPIC)
             .timeoutSeconds(5) // below minimum of 30
             .build();
 
@@ -423,11 +411,12 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
     @WithAdminUser
     void postReturnsLocationHeader() {
         Workspace workspace = setupWorkspace();
+        WorkspaceLlmModel model = seedWorkspaceModel(workspace);
 
         var request = CreateAgentConfigRequestDTO.builder()
             .name("location-test")
             .enabled(true)
-            .llmProvider(LlmProvider.ANTHROPIC)
+            .workspaceModelId(model.getId())
             .build();
 
         webTestClient
@@ -458,14 +447,14 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
     @Test
     @WithAdminUser
-    void apiKeyNeverExposedInResponse() {
+    void legacyProviderFieldsAreAbsentFromResponse() {
         Workspace workspace = setupWorkspace();
+        WorkspaceLlmModel model = seedWorkspaceModel(workspace);
 
         var request = CreateAgentConfigRequestDTO.builder()
             .name("secret-test")
             .enabled(true)
-            .llmApiKey("sk-super-secret-key")
-            .llmProvider(LlmProvider.ANTHROPIC)
+            .workspaceModelId(model.getId())
             .build();
 
         String responseBody = webTestClient
@@ -482,9 +471,7 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             .getResponseBody();
 
         assertThat(responseBody).isNotNull();
-        assertThat(responseBody).doesNotContain("sk-super-secret-key");
-        assertThat(responseBody).doesNotContain("llmApiKey");
-        assertThat(responseBody).contains("hasLlmApiKey");
+        assertThat(responseBody).doesNotContain("llmApiKey", "hasLlmApiKey", "llmProvider", "modelName", "llmBaseUrl");
     }
 
     // --- Model-binding create path (#1368: llmProvider relaxed to optional when a binding is given) ---
@@ -517,9 +504,6 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         assertThat(created).isNotNull();
         assertThat(created.instanceModelId()).isEqualTo(model.getId());
         assertThat(created.workspaceModelId()).isNull();
-        // llmProvider is @NonNull on the DTO even for a bound config — the service fills a harmless
-        // placeholder on the entity (the NOT NULL legacy column), never read by a bound config.
-        assertThat(created.llmProvider()).isNotNull();
     }
 
     @Test

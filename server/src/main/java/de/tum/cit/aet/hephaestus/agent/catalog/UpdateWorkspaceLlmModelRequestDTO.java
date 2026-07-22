@@ -18,19 +18,9 @@ import org.jspecify.annotations.Nullable;
 @Schema(description = "Update a model on your AI provider (all fields optional)")
 public record UpdateWorkspaceLlmModelRequestDTO(
     @Nullable @Size(max = 128) @Schema(description = "Human-readable name") String displayName,
-    @Nullable @Size(max = 256) @Schema(description = "Upstream provider model id") String upstreamModelId,
-    @Nullable
-    @Size(max = 40)
-    @Schema(description = "Wire protocol override for this model; blank clears the override")
-    String apiProtocolOverride,
-    @Nullable @Schema(description = "What surface this model serves") ModelModality modality,
     @Nullable @PositiveOrZero @Schema(description = "Context window in tokens") Integer contextWindow,
     @Nullable @PositiveOrZero @Schema(description = "Maximum output tokens") Integer maxOutputTokens,
     @Nullable @Schema(description = "Whether the model supports a reasoning mode") Boolean supportsReasoning,
-    @Nullable
-    @Size(max = 16)
-    @Schema(description = "Cache-control wire format, if applicable; blank clears it")
-    String cacheControlFormat,
     @Nullable @Schema(description = "Active toggle") Boolean enabled,
     @Nullable
     @Schema(description = "Pricing mode; when given, replaces the price wholesale (see class docs)")
@@ -41,9 +31,6 @@ public record UpdateWorkspaceLlmModelRequestDTO(
     @Nullable
     @Schema(description = "Cache-write rate per 1M tokens (USD), if applicable")
     BigDecimal per1mCacheWriteUsd,
-    @Nullable
-    @Schema(description = "Reasoning-token rate per 1M tokens (USD), if applicable")
-    BigDecimal per1mReasoningUsd,
     @Nullable
     @Size(max = 500)
     @Schema(description = "Note; required when the model is free (e.g. self-hosted, no cost)")

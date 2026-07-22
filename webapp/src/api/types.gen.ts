@@ -174,7 +174,7 @@ export type LlmUsageByJobType = {
      */
     pricedTotalCostUsd: number;
     /**
-     * LLM API calls, as reported by the runtime. Detection jobs report their real call count; a mentor turn reports 1 per turn regardless of its internal tool loop, so compare turns to turns, not to job calls.
+     * LLM API calls, as reported by the runtime. Detection jobs and mentor turns both include every assistant call in an internal tool loop.
      */
     totalCalls: number;
     /**
@@ -226,14 +226,6 @@ export type WorkspaceLlmProbeResult = {
  */
 export type WorkspaceLlmModel = {
     /**
-     * Wire protocol override for this model
-     */
-    apiProtocolOverride?: string;
-    /**
-     * Cache-control wire format, if applicable
-     */
-    cacheControlFormat?: string;
-    /**
      * Owning connection's display name
      */
     connectionDisplayName: string;
@@ -270,10 +262,6 @@ export type WorkspaceLlmModel = {
      */
     maxOutputTokens?: number;
     /**
-     * What surface this model serves
-     */
-    modality: 'CHAT' | 'EMBEDDING' | 'RERANK';
-    /**
      * Cache-read rate per 1M tokens (USD)
      */
     per1mCacheReadUsd?: number;
@@ -290,17 +278,13 @@ export type WorkspaceLlmModel = {
      */
     per1mOutputUsd?: number;
     /**
-     * Reasoning-token rate per 1M tokens (USD)
-     */
-    per1mReasoningUsd?: number;
-    /**
      * Price note
      */
     priceNote?: string;
     /**
      * Pricing mode
      */
-    pricingMode: 'PRICED' | 'FREE' | 'UNPRICED';
+    pricingMode: 'PRICED' | 'NO_CHARGE' | 'UNPRICED';
     /**
      * Unique slug within the workspace
      */
@@ -332,17 +316,9 @@ export type WorkspaceLlmConnection = {
      */
     apiProtocol: string;
     /**
-     * Auth header name
+     * Credential shape
      */
-    authHeaderName: string;
-    /**
-     * Auth value prefix
-     */
-    authValuePrefix: string;
-    /**
-     * Azure API version, if applicable
-     */
-    azureApiVersion?: string;
+    authMode: 'BEARER' | 'API_KEY';
     /**
      * Provider base URL
      */
@@ -658,11 +634,11 @@ export type UserInfo = {
 };
 
 /**
- * Request to update the workspace's GitHub Personal Access Token
+ * Request to update the workspace's SCM Personal Access Token
  */
 export type UpdateWorkspaceTokenRequest = {
     /**
-     * GitHub Personal Access Token for API access
+     * SCM Personal Access Token for API access
      */
     personalAccessToken: string;
 };
@@ -724,14 +700,6 @@ export type UpdateWorkspaceNotificationsRequest = {
  */
 export type UpdateWorkspaceLlmModelRequest = {
     /**
-     * Wire protocol override for this model; blank clears the override
-     */
-    apiProtocolOverride?: string;
-    /**
-     * Cache-control wire format, if applicable; blank clears it
-     */
-    cacheControlFormat?: string;
-    /**
      * Context window in tokens
      */
     contextWindow?: number;
@@ -747,10 +715,6 @@ export type UpdateWorkspaceLlmModelRequest = {
      * Maximum output tokens
      */
     maxOutputTokens?: number;
-    /**
-     * What surface this model serves
-     */
-    modality?: 'CHAT' | 'EMBEDDING' | 'RERANK';
     /**
      * Cache-read rate per 1M tokens (USD), if applicable
      */
@@ -768,25 +732,17 @@ export type UpdateWorkspaceLlmModelRequest = {
      */
     per1mOutputUsd?: number;
     /**
-     * Reasoning-token rate per 1M tokens (USD), if applicable
-     */
-    per1mReasoningUsd?: number;
-    /**
      * Note; required when the model is free (e.g. self-hosted, no cost)
      */
     priceNote?: string;
     /**
      * Pricing mode; when given, replaces the price wholesale (see class docs)
      */
-    pricingMode?: 'PRICED' | 'FREE' | 'UNPRICED';
+    pricingMode?: 'PRICED' | 'NO_CHARGE' | 'UNPRICED';
     /**
      * Whether the model supports a reasoning mode
      */
     supportsReasoning?: boolean;
-    /**
-     * Upstream provider model id
-     */
-    upstreamModelId?: string;
 };
 
 /**
@@ -797,26 +753,6 @@ export type UpdateWorkspaceLlmConnectionRequest = {
      * New API key (write-only; never returned)
      */
     apiKey?: string;
-    /**
-     * Wire protocol
-     */
-    apiProtocol?: string;
-    /**
-     * Auth header name
-     */
-    authHeaderName?: string;
-    /**
-     * Auth value prefix
-     */
-    authValuePrefix?: string;
-    /**
-     * Azure API version
-     */
-    azureApiVersion?: string;
-    /**
-     * Provider base URL
-     */
-    baseUrl?: string;
     /**
      * Set true to clear the stored API key
      */
@@ -1062,14 +998,6 @@ export type UpdateLlmModelSharingRequest = {
  */
 export type UpdateLlmModelRequest = {
     /**
-     * Wire protocol override for this model; blank clears the override
-     */
-    apiProtocolOverride?: string;
-    /**
-     * Cache-control wire format, if applicable; blank clears it
-     */
-    cacheControlFormat?: string;
-    /**
      * Context window in tokens
      */
     contextWindow?: number;
@@ -1086,17 +1014,9 @@ export type UpdateLlmModelRequest = {
      */
     maxOutputTokens?: number;
     /**
-     * What surface this model serves
-     */
-    modality?: 'CHAT' | 'EMBEDDING' | 'RERANK';
-    /**
      * Whether the model supports a reasoning mode
      */
     supportsReasoning?: boolean;
-    /**
-     * Upstream provider model id
-     */
-    upstreamModelId?: string;
 };
 
 /**
@@ -1124,13 +1044,9 @@ export type UpdateLlmModelPriceRequest = {
      */
     per1mOutputUsd?: number;
     /**
-     * Reasoning-token rate per 1M tokens (USD), if applicable
+     * PRICED shows the price itself; NO_CHARGE is a deliberate no-cost declaration; UNPRICED shows "No price set"
      */
-    per1mReasoningUsd?: number;
-    /**
-     * PRICED shows the price itself; FREE is a deliberate no-cost declaration; UNPRICED shows "No price set"
-     */
-    pricingMode: 'PRICED' | 'FREE' | 'UNPRICED';
+    pricingMode: 'PRICED' | 'NO_CHARGE' | 'UNPRICED';
 };
 
 /**
@@ -1141,26 +1057,6 @@ export type UpdateLlmConnectionRequest = {
      * New API key (write-only; never returned)
      */
     apiKey?: string;
-    /**
-     * Wire protocol
-     */
-    apiProtocol?: string;
-    /**
-     * Auth header name
-     */
-    authHeaderName?: string;
-    /**
-     * Auth value prefix
-     */
-    authValuePrefix?: string;
-    /**
-     * Azure API version
-     */
-    azureApiVersion?: string;
-    /**
-     * Provider base URL
-     */
-    baseUrl?: string;
     /**
      * Set true to clear the stored API key
      */
@@ -1242,14 +1138,6 @@ export type UpdateAgentConfigRequest = {
      */
     allowInternet?: boolean;
     /**
-     * Set true to remove the stored API key (takes precedence over llmApiKey)
-     */
-    clearLlmApiKey?: boolean;
-    /**
-     * Set true to clear the model binding (reverts to the legacy provider fields below)
-     */
-    clearModelBinding?: boolean;
-    /**
      * Whether the agent is enabled
      */
     enabled?: boolean;
@@ -1258,25 +1146,9 @@ export type UpdateAgentConfigRequest = {
      */
     instanceModelId?: number;
     /**
-     * LLM API key (omit or null to keep existing key)
-     */
-    llmApiKey?: string;
-    /**
-     * Optional LLM base URL override (omit or null to keep existing value; empty string clears it)
-     */
-    llmBaseUrl?: string;
-    /**
-     * LLM provider
-     */
-    llmProvider?: 'ANTHROPIC' | 'OPENAI' | 'AZURE_OPENAI';
-    /**
      * Maximum concurrent jobs
      */
     maxConcurrentJobs?: number;
-    /**
-     * LLM model name
-     */
-    modelName?: string;
     /**
      * Job timeout in seconds
      */
@@ -2255,13 +2127,9 @@ export type ProbeLlmConnectionRequest = {
      */
     apiProtocol: string;
     /**
-     * Auth header name; defaults from protocol
+     * Credential shape (default BEARER)
      */
-    authHeaderName?: string;
-    /**
-     * Auth value prefix; defaults from protocol
-     */
-    authValuePrefix?: string;
+    authMode?: 'BEARER' | 'API_KEY';
     /**
      * Provider base URL
      */
@@ -2596,7 +2464,7 @@ export type AgentJob = {
      */
     configName?: string;
     /**
-     * Frozen agent config at submit time (an INSTANCE-scoped or legacy connection's baseUrl is redacted to scheme://host; only a WORKSPACE-scoped BYO connection's baseUrl is left intact)
+     * Frozen agent config at submit time (an INSTANCE-scoped connection's baseUrl is redacted to scheme://host; only a WORKSPACE-scoped BYO connection's baseUrl is left intact)
      */
     configSnapshot: unknown;
     /**
@@ -2644,7 +2512,7 @@ export type AgentJob = {
      */
     llmCostUsd?: number;
     /**
-     * LLM model used (e.g. gpt-5.4-mini, claude-sonnet-4-5)
+     * LLM model used (e.g. gpt-5.4-mini, openai/gpt-oss-120b)
      */
     llmModel?: string;
     /**
@@ -2961,27 +2829,15 @@ export type LlmModelPrice = {
      */
     per1mOutputUsd?: number;
     /**
-     * Reasoning-token rate per 1M tokens (USD)
-     */
-    per1mReasoningUsd?: number;
-    /**
      * Pricing mode
      */
-    pricingMode: 'PRICED' | 'FREE' | 'UNPRICED';
+    pricingMode: 'PRICED' | 'NO_CHARGE' | 'UNPRICED';
 };
 
 /**
  * Instance catalog model
  */
 export type LlmModel = {
-    /**
-     * Wire protocol override for this model
-     */
-    apiProtocolOverride?: string;
-    /**
-     * Cache-control wire format, if applicable
-     */
-    cacheControlFormat?: string;
     /**
      * Owning connection's display name
      */
@@ -3023,10 +2879,6 @@ export type LlmModel = {
      */
     maxOutputTokens?: number;
     /**
-     * What surface this model serves
-     */
-    modality: 'CHAT' | 'EMBEDDING' | 'RERANK';
-    /**
      * Unique slug within the connection
      */
     slug: string;
@@ -3061,17 +2913,9 @@ export type LlmConnection = {
      */
     apiProtocol: string;
     /**
-     * Auth header name
+     * Credential shape
      */
-    authHeaderName: string;
-    /**
-     * Auth value prefix
-     */
-    authValuePrefix: string;
-    /**
-     * Azure API version, if applicable
-     */
-    azureApiVersion?: string;
+    authMode: 'BEARER' | 'API_KEY';
     /**
      * Provider base URL
      */
@@ -3564,14 +3408,6 @@ export type CreateWorkspaceRequest = {
  */
 export type CreateWorkspaceLlmModelRequest = {
     /**
-     * Wire protocol override for this model; defaults to the connection's protocol
-     */
-    apiProtocolOverride?: string;
-    /**
-     * Cache-control wire format, if applicable
-     */
-    cacheControlFormat?: string;
-    /**
      * Context window in tokens
      */
     contextWindow?: number;
@@ -3580,17 +3416,13 @@ export type CreateWorkspaceLlmModelRequest = {
      */
     displayName: string;
     /**
-     * Whether the model is active (default true)
+     * Whether the model is active (default false)
      */
     enabled?: boolean;
     /**
      * Maximum output tokens
      */
     maxOutputTokens?: number;
-    /**
-     * What surface this model serves (default CHAT)
-     */
-    modality?: 'CHAT' | 'EMBEDDING' | 'RERANK';
     /**
      * Cache-read rate per 1M tokens (USD), if applicable
      */
@@ -3608,21 +3440,17 @@ export type CreateWorkspaceLlmModelRequest = {
      */
     per1mOutputUsd?: number;
     /**
-     * Reasoning-token rate per 1M tokens (USD), if applicable
-     */
-    per1mReasoningUsd?: number;
-    /**
      * Note; required when the model is free (e.g. self-hosted, no cost)
      */
     priceNote?: string;
     /**
      * Pricing mode (default UNPRICED)
      */
-    pricingMode?: 'PRICED' | 'FREE' | 'UNPRICED';
+    pricingMode?: 'PRICED' | 'NO_CHARGE' | 'UNPRICED';
     /**
-     * Unique slug within the workspace
+     * Optional internal slug; generated from displayName when omitted
      */
-    slug: string;
+    slug?: string;
     /**
      * Whether the model supports a reasoning mode
      */
@@ -3646,17 +3474,9 @@ export type CreateWorkspaceLlmConnectionRequest = {
      */
     apiProtocol: string;
     /**
-     * Auth header name; defaults from protocol
+     * Credential shape (default BEARER)
      */
-    authHeaderName?: string;
-    /**
-     * Auth value prefix; defaults from protocol
-     */
-    authValuePrefix?: string;
-    /**
-     * Azure API version, if applicable
-     */
-    azureApiVersion?: string;
+    authMode?: 'BEARER' | 'API_KEY';
     /**
      * Provider base URL
      */
@@ -3666,13 +3486,13 @@ export type CreateWorkspaceLlmConnectionRequest = {
      */
     displayName: string;
     /**
-     * Whether the connection is active (default true)
+     * Whether the connection is active (default false)
      */
     enabled?: boolean;
     /**
-     * Unique slug within the workspace
+     * Optional internal slug; generated from displayName when omitted
      */
-    slug: string;
+    slug?: string;
 };
 
 /**
@@ -3787,14 +3607,6 @@ export type CreateLoginProviderRequest = {
  */
 export type CreateLlmModelRequest = {
     /**
-     * Wire protocol override for this model; defaults to the connection's protocol
-     */
-    apiProtocolOverride?: string;
-    /**
-     * Cache-control wire format, if applicable
-     */
-    cacheControlFormat?: string;
-    /**
      * Context window in tokens
      */
     contextWindow?: number;
@@ -3803,7 +3615,7 @@ export type CreateLlmModelRequest = {
      */
     displayName: string;
     /**
-     * Whether the model is active (default true)
+     * Whether the model is active (default false)
      */
     enabled?: boolean;
     /**
@@ -3811,13 +3623,9 @@ export type CreateLlmModelRequest = {
      */
     maxOutputTokens?: number;
     /**
-     * What surface this model serves (default CHAT)
+     * Optional internal slug; generated from displayName when omitted
      */
-    modality?: 'CHAT' | 'EMBEDDING' | 'RERANK';
-    /**
-     * Unique slug within the connection
-     */
-    slug: string;
+    slug?: string;
     /**
      * Whether the model supports a reasoning mode
      */
@@ -3841,17 +3649,9 @@ export type CreateLlmConnectionRequest = {
      */
     apiProtocol: string;
     /**
-     * Auth header name; defaults from protocol
+     * Credential shape (default BEARER)
      */
-    authHeaderName?: string;
-    /**
-     * Auth value prefix; defaults from protocol
-     */
-    authValuePrefix?: string;
-    /**
-     * Azure API version, if applicable
-     */
-    azureApiVersion?: string;
+    authMode?: 'BEARER' | 'API_KEY';
     /**
      * Provider base URL
      */
@@ -3861,13 +3661,13 @@ export type CreateLlmConnectionRequest = {
      */
     displayName: string;
     /**
-     * Whether the connection is enabled (default true)
+     * Whether the connection is enabled (default false)
      */
     enabled?: boolean;
     /**
-     * Unique slug
+     * Optional internal slug; generated from displayName when omitted
      */
-    slug: string;
+    slug?: string;
 };
 
 /**
@@ -3887,25 +3687,9 @@ export type CreateAgentConfigRequest = {
      */
     instanceModelId?: number;
     /**
-     * LLM API key
-     */
-    llmApiKey?: string;
-    /**
-     * Optional LLM base URL — set for OpenAI/Anthropic-compatible endpoints that need routing through the hephaestus chat/completions provider extension (e.g. TUM GPU, on-prem gateways)
-     */
-    llmBaseUrl?: string;
-    /**
-     * LLM provider. Required unless instanceModelId or workspaceModelId is supplied (a bound config never reads this legacy field).
-     */
-    llmProvider?: 'ANTHROPIC' | 'OPENAI' | 'AZURE_OPENAI';
-    /**
      * Maximum concurrent jobs
      */
     maxConcurrentJobs?: number;
-    /**
-     * LLM model name
-     */
-    modelName?: string;
     /**
      * Unique name within the workspace
      */
@@ -4191,10 +3975,6 @@ export type AvailableLlmModel = {
      */
     id: number;
     /**
-     * What surface this model serves
-     */
-    modality: 'CHAT' | 'EMBEDDING' | 'RERANK';
-    /**
      * Cache-read rate per 1M tokens (USD)
      */
     per1mCacheReadUsd?: number;
@@ -4211,13 +3991,9 @@ export type AvailableLlmModel = {
      */
     per1mOutputUsd?: number;
     /**
-     * Reasoning-token rate per 1M tokens (USD)
-     */
-    per1mReasoningUsd?: number;
-    /**
      * Pricing mode
      */
-    pricingMode: 'PRICED' | 'FREE' | 'UNPRICED';
+    pricingMode: 'PRICED' | 'NO_CHARGE' | 'UNPRICED';
     /**
      * SHARED (instance catalog) or WORKSPACE (your own provider)
      */
@@ -4263,7 +4039,7 @@ export type AiSettingsView = {
      */
     deliverToMergedOverride?: boolean;
     /**
-     * Config bound to power the mentor (null = oldest enabled config)
+     * Config explicitly bound to power the mentor (null = mentor is unconfigured)
      */
     mentorConfigId?: number;
     /**
@@ -4294,6 +4070,10 @@ export type AiSettingsView = {
      * Raw override; null = inheriting the fleet default
      */
     skipDraftsOverride?: boolean;
+    /**
+     * Whether this workspace may register additional OpenAI-compatible connections
+     */
+    workspaceConnectionsAllowed: boolean;
 };
 
 /**
@@ -4313,10 +4093,6 @@ export type AgentConfig = {
      */
     enabled: boolean;
     /**
-     * Whether an LLM API key is configured
-     */
-    hasLlmApiKey: boolean;
-    /**
      * Configuration ID
      */
     id: number;
@@ -4325,21 +4101,9 @@ export type AgentConfig = {
      */
     instanceModelId?: number;
     /**
-     * Optional LLM base URL override
-     */
-    llmBaseUrl?: string;
-    /**
-     * LLM provider
-     */
-    llmProvider: 'ANTHROPIC' | 'OPENAI' | 'AZURE_OPENAI';
-    /**
      * Maximum concurrent jobs
      */
     maxConcurrentJobs: number;
-    /**
-     * LLM model name
-     */
-    modelName?: string;
     /**
      * Unique name within the workspace
      */
@@ -5882,6 +5646,10 @@ export type UpdateMentorConfigErrors = {
      * Config not found in this workspace
      */
     404: unknown;
+    /**
+     * Config is disabled or its catalog model is unavailable
+     */
+    409: unknown;
 };
 
 export type UpdateMentorConfigResponses = {

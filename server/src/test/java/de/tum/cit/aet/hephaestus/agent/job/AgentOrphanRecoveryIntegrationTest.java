@@ -3,6 +3,20 @@ package de.tum.cit.aet.hephaestus.agent.job;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelPrice;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelPriceRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.ModelVisibility;
+import de.tum.cit.aet.hephaestus.agent.catalog.PricingMode;
+import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
+import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -69,17 +83,61 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
+    private AgentConfigRepository agentConfigRepository;
+
+    @Autowired
+    private LlmConnectionRepository connectionRepository;
+
+    @Autowired
+    private LlmModelRepository modelRepository;
+
+    @Autowired
+    private LlmModelPriceRepository priceRepository;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
     @Autowired
     private TransactionTemplate transactionTemplate;
 
     private Workspace workspace;
+    private AgentConfig agentConfig;
 
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
         workspace = workspaceRepository.save(TestEntities.activeWorkspace("orphan-recovery-ws"));
+
+        LlmConnection connection = new LlmConnection();
+        connection.setSlug("orphan-recovery");
+        connection.setDisplayName("Orphan recovery provider");
+        connection.setBaseUrl("https://api.openai.com/v1");
+        connection.setApiProtocol("openai-completions");
+        connection.setEnabled(true);
+        connection = connectionRepository.save(connection);
+
+        LlmModel model = new LlmModel();
+        model.setConnection(connection);
+        model.setSlug("orphan-recovery-model");
+        model.setDisplayName("Orphan recovery model");
+        model.setUpstreamModelId("test-model");
+        model.setVisibility(ModelVisibility.PUBLIC);
+        model.setEnabled(true);
+        model = modelRepository.save(model);
+
+        LlmModelPrice price = new LlmModelPrice();
+        price.setModel(model);
+        price.setPricingMode(PricingMode.NO_CHARGE);
+        price.setNote("Integration-test model has no per-token charge");
+        price.setEffectiveFrom(Instant.now().minusSeconds(60));
+        priceRepository.save(price);
+
+        agentConfig = new AgentConfig();
+        agentConfig.setWorkspace(workspace);
+        agentConfig.setName("orphan-recovery-config");
+        agentConfig.setEnabled(true);
+        agentConfig.setInstanceModel(model);
+        agentConfig = agentConfigRepository.save(agentConfig);
     }
 
     @Test
@@ -270,9 +328,42 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     private UUID runningJobOwnedBy(String workerId, Instant startedAt, int retryCount) {
         AgentJob job = new AgentJob();
         job.setWorkspace(workspace);
+        job.setConfig(agentConfig);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         job.setStatus(AgentJobStatus.RUNNING);
-        job.setConfigSnapshot(objectMapper.createObjectNode());
+        job.setConfigSnapshot(
+            new ConfigSnapshot(
+                ConfigSnapshot.SCHEMA_VERSION,
+                agentConfig.getId(),
+                "orphan-recovery-config",
+                "openai-completions",
+                "https://api.openai.com/v1",
+                "test-model",
+                null,
+                null,
+                null,
+                false,
+                FundingSource.INSTANCE,
+                agentConfig.getInstanceModel().getConnection().getId(),
+                agentConfig.getInstanceModel().getId(),
+                workspace.getId(),
+                600,
+                false
+            )
+                .withPriceSnapshot(
+                    new LlmPriceSnapshot(
+                        FundingSource.INSTANCE,
+                        PricingState.NO_CHARGE,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null
+                    )
+                )
+                .toJson(objectMapper)
+        );
         job.setWorkerId(workerId);
         job.setStartedAt(startedAt);
         job.setRetryCount(retryCount);

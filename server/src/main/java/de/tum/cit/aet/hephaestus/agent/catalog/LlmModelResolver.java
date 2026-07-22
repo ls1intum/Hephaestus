@@ -1,8 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
@@ -14,63 +12,79 @@ import org.springframework.transaction.annotation.Transactional;
  * collapsing the two catalog scopes (instance vs workspace BYO) behind one shape. The credential is
  * resolved separately and live (never frozen) via {@link #resolveCredential}.
  *
- * <p>Precedence: an instance-model binding, else a workspace-model binding, else the legacy
- * {@code AgentConfig.llm*} columns mapped through the old {@link LlmProvider} vocabulary — so configs
- * created before the catalog cut over keep working until they are rebound (deprecate-then-remove).
+ * <p>Only catalog bindings are executable. Legacy {@code AgentConfig.llm*} columns remain in the schema
+ * during deprecation but are deliberately never read at runtime.
  */
 @Service
 @RequiredArgsConstructor
 public class LlmModelResolver {
 
-    private static final String AZURE_API_VERSION = "2025-04-01-preview";
-    private static final String AZURE_PROTOCOL = "azure-openai-responses";
-    private static final String ANTHROPIC_PROTOCOL = "anthropic-messages";
-
     private final LlmConnectionRepository llmConnectionRepository;
     private final WorkspaceLlmConnectionRepository workspaceLlmConnectionRepository;
-    private final AgentConfigRepository agentConfigRepository;
+    private final LlmModelRepository llmModelRepository;
+    private final WorkspaceLlmModelRepository workspaceLlmModelRepository;
+    private final LlmModelWorkspaceGrantRepository grantRepository;
 
-    /** The effective, non-secret runtime shape for a config's bound (or legacy) model. */
+    /** The effective, non-secret runtime shape for a config's bound model. */
     @Transactional(readOnly = true)
     public ResolvedLlmModel resolve(AgentConfig config) {
         LlmModel instance = config.getInstanceModel();
         if (instance != null) {
             LlmConnection c = instance.getConnection();
+            requireUsableInstanceModel(instance, config.getWorkspace().getId());
             return new ResolvedLlmModel(
                 c.getBaseUrl(),
-                effectiveProtocol(instance.getApiProtocolOverride(), c.getApiProtocol()),
-                c.getAuthHeaderName(),
-                c.getAuthValuePrefix(),
-                c.getAzureApiVersion(),
+                c.getApiProtocol(),
                 instance.getUpstreamModelId(),
                 instance.getContextWindow(),
                 instance.getMaxOutputTokens(),
                 instance.isSupportsReasoning(),
-                instance.getCacheControlFormat(),
                 FundingSource.INSTANCE
             );
         }
         WorkspaceLlmModel byo = config.getWorkspaceModel();
         if (byo != null) {
             WorkspaceLlmConnection c = byo.getConnection();
+            if (
+                !byo.isEnabled() ||
+                !c.isEnabled() ||
+                !isSupportedProtocol(c.getApiProtocol()) ||
+                !byo.getWorkspace().getId().equals(config.getWorkspace().getId())
+            ) {
+                throw unavailable();
+            }
             return new ResolvedLlmModel(
                 c.getBaseUrl(),
-                effectiveProtocol(byo.getApiProtocolOverride(), c.getApiProtocol()),
-                c.getAuthHeaderName(),
-                c.getAuthValuePrefix(),
-                c.getAzureApiVersion(),
+                c.getApiProtocol(),
                 byo.getUpstreamModelId(),
                 byo.getContextWindow(),
                 byo.getMaxOutputTokens(),
                 byo.isSupportsReasoning(),
-                byo.getCacheControlFormat(),
                 FundingSource.WORKSPACE
             );
         }
-        return legacy(config);
+        throw new IllegalStateException("The agent config must bind an available OpenAI-compatible model");
     }
 
-    /** The live API key for a config's bound (or legacy) connection. Never frozen into a snapshot. */
+    private void requireUsableInstanceModel(LlmModel model, Long workspaceId) {
+        boolean visible =
+            model.getVisibility() == ModelVisibility.PUBLIC ||
+            grantRepository.existsByIdModelIdAndIdWorkspaceId(model.getId(), workspaceId);
+        if (
+            !model.isEnabled() ||
+            !model.getConnection().isEnabled() ||
+            !isSupportedProtocol(model.getConnection().getApiProtocol()) ||
+            !visible
+        ) {
+            throw unavailable();
+        }
+    }
+
+    private static IllegalStateException unavailable() {
+        return new IllegalStateException("The configured OpenAI-compatible model is not available");
+    }
+
+    /** The live API key for a config's bound connection. Never frozen into a snapshot. */
     @Transactional(readOnly = true)
     public @Nullable String resolveCredential(AgentConfig config) {
         LlmModel instance = config.getInstanceModel();
@@ -81,18 +95,27 @@ public class LlmModelResolver {
         if (byo != null) {
             return byo.getConnection().getApiKey();
         }
-        return config.getLlmApiKey();
+        return null;
     }
 
     /**
      * Identifies WHICH connection row funds a config's binding, without exposing any credential
      * material (#1368 slice 5). Frozen into {@link de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot}
      * so the proxy can re-resolve the live credential for an in-flight job without re-reading the
-     * config's (possibly since-changed) current binding. Both components {@code null} means "legacy
-     * config, no catalog binding" — {@link #resolveProxyCredential} then falls back to
-     * {@code AgentConfig.llmApiKey}.
+     * config's (possibly since-changed) current binding. Both components {@code null} represent an
+     * unusable legacy snapshot.
      */
-    public record ConnectionRef(@Nullable FundingSource scope, @Nullable Long connectionId) {}
+    public record ConnectionRef(
+        @Nullable FundingSource scope,
+        @Nullable Long connectionId,
+        @Nullable Long modelId,
+        @Nullable Long workspaceId
+    ) {
+        /** Backward-compatible shape for legacy snapshots and callers without a catalog model reference. */
+        public ConnectionRef(@Nullable FundingSource scope, @Nullable Long connectionId) {
+            this(scope, connectionId, null, null);
+        }
+    }
 
     /**
      * The live routing + credential material the proxy injects — resolved TOGETHER from the live
@@ -105,9 +128,9 @@ public class LlmModelResolver {
      */
     public record ProxyCredential(
         String baseUrl,
-        String authHeaderName,
-        String authValuePrefix,
-        @Nullable String azureApiVersion,
+        String apiProtocol,
+        LlmAuthMode authMode,
+        String upstreamModelId,
         @Nullable String apiKey
     ) {}
 
@@ -116,11 +139,21 @@ public class LlmModelResolver {
     public ConnectionRef connectionRef(AgentConfig config) {
         LlmModel instance = config.getInstanceModel();
         if (instance != null) {
-            return new ConnectionRef(FundingSource.INSTANCE, instance.getConnection().getId());
+            return new ConnectionRef(
+                FundingSource.INSTANCE,
+                instance.getConnection().getId(),
+                instance.getId(),
+                config.getWorkspace().getId()
+            );
         }
         WorkspaceLlmModel byo = config.getWorkspaceModel();
         if (byo != null) {
-            return new ConnectionRef(FundingSource.WORKSPACE, byo.getConnection().getId());
+            return new ConnectionRef(
+                FundingSource.WORKSPACE,
+                byo.getConnection().getId(),
+                byo.getId(),
+                config.getWorkspace().getId()
+            );
         }
         return new ConnectionRef(null, null);
     }
@@ -133,13 +166,12 @@ public class LlmModelResolver {
      * at dispatch. The base URL is deliberately re-read here rather than taken from the snapshot: if it
      * came from the snapshot while the credential is re-resolved live, a connection repointed to a new
      * host after dispatch would send the NEW (rotated) key to the OLD (stale, frozen) host — routing and
-     * credential must come from the same live row. Returns empty when the connection (or its legacy
-     * config) no longer exists or has been disabled.
+     * credential must come from the same live row. Returns empty when the model or connection is
+     * unavailable. The legacy parameters remain only so already-persisted job snapshots deserialize;
+     * they are never used for routing or credentials.
      *
-     * @param legacyConfigId used only when {@code ref} carries no scope/connection (pre-catalog config)
-     * @param legacyApiProtocol the snapshot's frozen api protocol, used to derive the legacy auth-header
-     *     shape and default host (mirrors {@link #legacy(AgentConfig)} — a pre-catalog config has no
-     *     connection row to read header conventions from)
+     * @param legacyConfigId ignored legacy snapshot field
+     * @param legacyApiProtocol ignored legacy snapshot field
      */
     @Transactional(readOnly = true)
     public @Nullable ProxyCredential resolveProxyCredential(
@@ -148,135 +180,84 @@ public class LlmModelResolver {
         @Nullable String legacyApiProtocol
     ) {
         if (ref.scope() == FundingSource.INSTANCE && ref.connectionId() != null) {
+            if (!isUsableInstanceModel(ref)) {
+                return null;
+            }
+            LlmModel model = llmModelRepository.findById(ref.modelId()).orElse(null);
+            if (model == null) return null;
             return llmConnectionRepository
                 .findById(ref.connectionId())
                 .filter(LlmConnection::isEnabled)
+                .filter(c -> isSupportedProtocol(c.getApiProtocol()))
                 .map(c ->
                     new ProxyCredential(
                         c.getBaseUrl(),
-                        c.getAuthHeaderName(),
-                        c.getAuthValuePrefix(),
-                        c.getAzureApiVersion(),
+                        c.getApiProtocol(),
+                        c.getAuthMode(),
+                        model.getUpstreamModelId(),
                         blankToNull(c.getApiKey())
                     )
                 )
                 .orElse(null);
         }
         if (ref.scope() == FundingSource.WORKSPACE && ref.connectionId() != null) {
+            if (!isUsableWorkspaceModel(ref)) {
+                return null;
+            }
+            WorkspaceLlmModel model = workspaceLlmModelRepository
+                .findByIdAndWorkspaceId(ref.modelId(), ref.workspaceId())
+                .orElse(null);
+            if (model == null) return null;
             return workspaceLlmConnectionRepository
                 .findById(ref.connectionId())
                 .filter(WorkspaceLlmConnection::isEnabled)
+                .filter(c -> isSupportedProtocol(c.getApiProtocol()))
                 .map(c ->
                     new ProxyCredential(
                         c.getBaseUrl(),
-                        c.getAuthHeaderName(),
-                        c.getAuthValuePrefix(),
-                        c.getAzureApiVersion(),
+                        c.getApiProtocol(),
+                        c.getAuthMode(),
+                        model.getUpstreamModelId(),
                         blankToNull(c.getApiKey())
                     )
                 )
                 .orElse(null);
         }
-        if (legacyConfigId == null) {
-            return null;
+        return null;
+    }
+
+    private boolean isUsableInstanceModel(ConnectionRef ref) {
+        if (ref.modelId() == null || ref.workspaceId() == null) {
+            return false;
         }
-        return agentConfigRepository
-            .findById(legacyConfigId)
-            .filter(c -> c.getLlmApiKey() != null && !c.getLlmApiKey().isBlank())
-            .map(c -> {
-                var defaults = ApiProtocolDefaults.forProtocol(legacyApiProtocol != null ? legacyApiProtocol : "");
-                String azureVersion = AZURE_PROTOCOL.equals(legacyApiProtocol) ? AZURE_API_VERSION : null;
-                String liveBaseUrl =
-                    c.getLlmBaseUrl() != null && !c.getLlmBaseUrl().isBlank()
-                        ? c.getLlmBaseUrl()
-                        : legacyDefaultBaseUrl(legacyApiProtocol);
-                return new ProxyCredential(
-                    liveBaseUrl,
-                    defaults.headerName(),
-                    defaults.valuePrefix(),
-                    azureVersion,
-                    c.getLlmApiKey()
-                );
-            })
-            .orElse(null);
+        return llmModelRepository
+            .findById(ref.modelId())
+            .filter(LlmModel::isEnabled)
+            .filter(model -> model.getConnection().getId().equals(ref.connectionId()))
+            .filter(
+                model ->
+                    model.getVisibility() == ModelVisibility.PUBLIC ||
+                    grantRepository.existsByIdModelIdAndIdWorkspaceId(model.getId(), ref.workspaceId())
+            )
+            .isPresent();
+    }
+
+    private boolean isUsableWorkspaceModel(ConnectionRef ref) {
+        if (ref.modelId() == null || ref.workspaceId() == null) {
+            return false;
+        }
+        return workspaceLlmModelRepository
+            .findByIdAndWorkspaceId(ref.modelId(), ref.workspaceId())
+            .filter(WorkspaceLlmModel::isEnabled)
+            .filter(model -> model.getConnection().getId().equals(ref.connectionId()))
+            .isPresent();
     }
 
     private static @Nullable String blankToNull(@Nullable String value) {
         return value != null && !value.isBlank() ? value : null;
     }
 
-    /**
-     * Same provider/protocol → default-host mapping {@link #legacy(AgentConfig)} and
-     * {@link de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot#fromLegacyJson} use, keyed here by
-     * the snapshot's frozen {@code apiProtocol} string (all that {@link #resolveProxyCredential} has for
-     * a pre-catalog config — it deliberately re-reads the config's LIVE {@code llmBaseUrl}, falling back
-     * to this default only when that live column is itself blank).
-     */
-    private static String legacyDefaultBaseUrl(@Nullable String apiProtocol) {
-        if (ANTHROPIC_PROTOCOL.equals(apiProtocol)) {
-            return "https://api.anthropic.com";
-        }
-        if (AZURE_PROTOCOL.equals(apiProtocol)) {
-            return "";
-        }
-        return "https://api.openai.com";
-    }
-
-    private static String effectiveProtocol(@Nullable String override, String connectionProtocol) {
-        return override != null && !override.isBlank() ? override : connectionProtocol;
-    }
-
-    /**
-     * Map a pre-catalog {@link AgentConfig} onto a {@link ResolvedLlmModel} using the same
-     * provider→(protocol, auth header, upstream URL) rules a one-time migration used to backfill early
-     * catalog rows (since removed — the catalog is now created directly by instance/workspace admins).
-     * This runtime fallback is what actually keeps a legacy config working: any config not yet rebound
-     * to an instance or workspace model resolves through here instead.
-     */
-    private ResolvedLlmModel legacy(AgentConfig config) {
-        LlmProvider provider = config.getLlmProvider();
-        String apiProtocol;
-        String authHeaderName;
-        String authValuePrefix;
-        String azureApiVersion = null;
-        String defaultBaseUrl;
-        switch (provider) {
-            case ANTHROPIC -> {
-                apiProtocol = "anthropic-messages";
-                authHeaderName = "x-api-key";
-                authValuePrefix = "";
-                defaultBaseUrl = "https://api.anthropic.com";
-            }
-            case AZURE_OPENAI -> {
-                apiProtocol = "azure-openai-responses";
-                authHeaderName = "api-key";
-                authValuePrefix = "";
-                azureApiVersion = AZURE_API_VERSION;
-                defaultBaseUrl = "";
-            }
-            default -> {
-                apiProtocol = "openai-completions";
-                authHeaderName = "Authorization";
-                authValuePrefix = "Bearer ";
-                defaultBaseUrl = "https://api.openai.com";
-            }
-        }
-        String baseUrl =
-            config.getLlmBaseUrl() != null && !config.getLlmBaseUrl().isBlank()
-                ? config.getLlmBaseUrl()
-                : defaultBaseUrl;
-        return new ResolvedLlmModel(
-            baseUrl,
-            apiProtocol,
-            authHeaderName,
-            authValuePrefix,
-            azureApiVersion,
-            config.getModelName() != null ? config.getModelName() : "",
-            null,
-            null,
-            false,
-            null,
-            FundingSource.INSTANCE
-        );
+    private static boolean isSupportedProtocol(@Nullable String apiProtocol) {
+        return "openai-completions".equals(apiProtocol) || "openai-responses".equals(apiProtocol);
     }
 }

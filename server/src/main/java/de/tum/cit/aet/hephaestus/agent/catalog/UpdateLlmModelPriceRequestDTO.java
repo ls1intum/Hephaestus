@@ -20,7 +20,7 @@ public record UpdateLlmModelPriceRequestDTO(
     @NonNull
     @NotNull
     @Schema(
-        description = "PRICED shows the price itself; FREE is a deliberate no-cost declaration; UNPRICED shows \"No price set\""
+        description = "PRICED shows the price itself; NO_CHARGE is a deliberate no-cost declaration; UNPRICED shows \"No price set\""
     )
     PricingMode pricingMode,
     @Nullable
@@ -34,10 +34,20 @@ public record UpdateLlmModelPriceRequestDTO(
     @Schema(description = "Cache-write rate per 1M tokens (USD), if applicable")
     BigDecimal per1mCacheWriteUsd,
     @Nullable
-    @Schema(description = "Reasoning-token rate per 1M tokens (USD), if applicable")
-    BigDecimal per1mReasoningUsd,
-    @Nullable
     @Size(max = 500)
     @Schema(description = "Note; required when the model is free (e.g. self-hosted, no cost)")
     String note
-) {}
+) {
+    /** Source-compatible constructor for tests/callers compiled against the removed overlapping reasoning rate. */
+    public UpdateLlmModelPriceRequestDTO(
+        PricingMode pricingMode,
+        BigDecimal input,
+        BigDecimal output,
+        BigDecimal cacheRead,
+        BigDecimal cacheWrite,
+        BigDecimal ignoredReasoning,
+        String note
+    ) {
+        this(pricingMode, input, output, cacheRead, cacheWrite, note);
+    }
+}

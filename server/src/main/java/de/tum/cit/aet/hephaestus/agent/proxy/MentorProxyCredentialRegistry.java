@@ -43,12 +43,25 @@ public class MentorProxyCredentialRegistry {
     private final Map<String, Entry> byTokenHash = new ConcurrentHashMap<>();
     private final Map<UUID, String> tokenHashBySession = new ConcurrentHashMap<>();
 
+    /** Non-secret catalog route granted to one mentor sandbox. */
+    public record Route(
+        String apiProtocol,
+        String baseUrl,
+        @Nullable FundingSource connectionScope,
+        @Nullable Long connectionId,
+        @Nullable Long modelId,
+        @Nullable Long workspaceId,
+        @Nullable Long legacyConfigId
+    ) {}
+
     /** Routing + expiry for a minted mentor proxy token. */
     private record Entry(
         String apiProtocol,
         String baseUrl,
         @Nullable FundingSource connectionScope,
         @Nullable Long connectionId,
+        @Nullable Long modelId,
+        @Nullable Long workspaceId,
         @Nullable Long legacyConfigId,
         Instant expiresAt
     ) {}
@@ -59,6 +72,28 @@ public class MentorProxyCredentialRegistry {
      * @param sessionId the sandbox's {@code InteractiveSandboxSpec#sessionId} — the correlation key
      *     {@link #revoke(UUID)} uses to find this token again at sandbox teardown
      */
+    public String mint(UUID sessionId, Route route) {
+        byte[] bytes = new byte[32]; // 256 bits — same shape as AgentJob's job token
+        SECURE_RANDOM.nextBytes(bytes);
+        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        String hash = AgentJob.computeTokenHash(token);
+        byTokenHash.put(
+            hash,
+            new Entry(
+                route.apiProtocol(),
+                route.baseUrl(),
+                route.connectionScope(),
+                route.connectionId(),
+                route.modelId(),
+                route.workspaceId(),
+                route.legacyConfigId(),
+                Instant.now().plus(TTL)
+            )
+        );
+        tokenHashBySession.put(sessionId, hash);
+        return token;
+    }
+
     public String mint(
         UUID sessionId,
         String apiProtocol,
@@ -67,16 +102,10 @@ public class MentorProxyCredentialRegistry {
         @Nullable Long connectionId,
         @Nullable Long legacyConfigId
     ) {
-        byte[] bytes = new byte[32]; // 256 bits — same shape as AgentJob's job token
-        SECURE_RANDOM.nextBytes(bytes);
-        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-        String hash = AgentJob.computeTokenHash(token);
-        byTokenHash.put(
-            hash,
-            new Entry(apiProtocol, baseUrl, connectionScope, connectionId, legacyConfigId, Instant.now().plus(TTL))
+        return mint(
+            sessionId,
+            new Route(apiProtocol, baseUrl, connectionScope, connectionId, null, null, legacyConfigId)
         );
-        tokenHashBySession.put(sessionId, hash);
-        return token;
     }
 
     /** Validate a bearer token, evicting it if expired. Empty when unknown or expired. */
@@ -97,6 +126,8 @@ public class MentorProxyCredentialRegistry {
                 entry.baseUrl(),
                 entry.connectionScope(),
                 entry.connectionId(),
+                entry.modelId(),
+                entry.workspaceId(),
                 entry.legacyConfigId()
             )
         );

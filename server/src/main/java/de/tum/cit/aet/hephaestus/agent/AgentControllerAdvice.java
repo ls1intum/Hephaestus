@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.config.AgentConfigBoundException;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigHasActiveJobsException;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigNameConflictException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStateConflictException;
+import de.tum.cit.aet.hephaestus.agent.settings.MentorModelUnavailableException;
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import java.util.Optional;
 import org.springframework.core.Ordered;
@@ -39,6 +40,11 @@ public class AgentControllerAdvice {
     @ExceptionHandler(AgentJobStateConflictException.class)
     ProblemDetail handleAgentJobStateConflict(AgentJobStateConflictException exception) {
         return problem(HttpStatus.CONFLICT, "Agent job state conflict", exception.getMessage());
+    }
+
+    @ExceptionHandler(MentorModelUnavailableException.class)
+    ProblemDetail handleMentorModelUnavailable(MentorModelUnavailableException exception) {
+        return problem(HttpStatus.CONFLICT, "Mentor model unavailable", exception.getMessage());
     }
 
     private ProblemDetail problem(HttpStatus status, String title, String detail) {

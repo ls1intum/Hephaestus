@@ -222,21 +222,23 @@ Filters don't delete data – they just skip sync operations. Workspace and orga
 
 Practice detection and the mentor need at least one enabled model. Providers are registered at
 runtime — either an instance-wide catalog entry (Instance admin → AI models) or a workspace's own
-"bring your own AI provider" connection — never via env var. For local development, seed one
-automatically at startup so a fresh boot is ready without clicking through the UI:
+"bring your own AI provider" connection. Configure it through the same admin UI/API used in
+production; there is deliberately no second env-var catalog or startup seeder that can drift from
+the stored configuration. New connections and models start inactive. Test the connection, declare
+its price (or explicitly mark it as having no metered API cost), then activate it and bind it to an
+agent configuration.
 
-```bash
-# server/.env
-AGENT_DEFAULT_CONFIG_ENABLED=true
-AGENT_DEFAULT_CONFIG_PROVIDER=OPENAI          # or ANTHROPIC, AZURE_OPENAI
-AGENT_DEFAULT_CONFIG_MODEL_NAME=gpt-5.4-mini  # optional; blank = provider default
-AGENT_DEFAULT_CONFIG_API_KEY=sk-...           # required when enabled
-AGENT_DEFAULT_CONFIG_BASE_URL=                # optional OpenAI-compatible endpoint override
-```
+For an automated local end-to-end setup, use `scripts/e2e-setup.sh`. It creates the connection,
+model, and agent binding through the application API and keeps provider credentials out of source
+control and command-line history by reading them from `E2E_*` environment variables.
 
-The seeder runs once the default workspace exists, is idempotent (skips if a model of the same name is already present), and stores the key encrypted. Models always use the in-app LLM proxy: the key is injected by the proxy and never reaches the sandbox. The proxy resolves the upstream per model from the seeded connection — there's no separate proxy-wide upstream env var.
+Models always use the in-app LLM proxy: the upstream key is injected by the proxy and never reaches
+the sandbox.
 
-Provider base URLs are validated by an SSRF egress guard (`EgressPolicy`) that, in production, refuses anything but a public HTTPS host — a plain-HTTP `localhost`/`127.0.0.1`/`::1` target is rejected outright. To point a connection or legacy config at a local gateway (e.g. Ollama, or a mock provider you're running on your own machine) during development, set:
+Provider base URLs are validated by an SSRF egress guard (`EgressPolicy`) that, in production,
+refuses anything but a public HTTPS host — a plain-HTTP `localhost`/`127.0.0.1`/`::1` target is
+rejected outright. To point a connection at a local OpenAI-compatible gateway during development,
+set:
 
 ```yaml
 # server/.env or application-local.yml

@@ -44,10 +44,8 @@ class LlmConnectionServiceTest extends BaseUnitTest {
             "OpenAI",
             "https://api.openai.com",
             "openai-completions",
-            null,
-            null,
+            LlmAuthMode.BEARER,
             "sk-abc",
-            null,
             null
         );
     }
@@ -80,6 +78,26 @@ class LlmConnectionServiceTest extends BaseUnitTest {
 
             verify(connectionRepository, never()).save(any());
             verifyNoInteractions(llmConnectionAudit);
+        }
+
+        @Test
+        void generatesCollisionSafeSlugWhenSlugIsOmitted() {
+            CreateLlmConnectionRequestDTO request = new CreateLlmConnectionRequestDTO(
+                null,
+                "OpenAI",
+                "https://api.openai.com",
+                "openai-completions",
+                LlmAuthMode.BEARER,
+                null,
+                null
+            );
+            when(connectionRepository.findBySlug("openai")).thenReturn(Optional.of(new LlmConnection()));
+            when(connectionRepository.findBySlug("openai-2")).thenReturn(Optional.empty());
+            when(connectionRepository.save(any(LlmConnection.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            LlmConnection result = connectionService.create(request);
+
+            assertThat(result.getSlug()).isEqualTo("openai-2");
         }
     }
 
@@ -134,17 +152,7 @@ class LlmConnectionServiceTest extends BaseUnitTest {
             when(connectionRepository.findById(5L)).thenReturn(Optional.of(connection));
             when(connectionRepository.save(any(LlmConnection.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            UpdateLlmConnectionRequestDTO request = new UpdateLlmConnectionRequestDTO(
-                "New name",
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
+            UpdateLlmConnectionRequestDTO request = new UpdateLlmConnectionRequestDTO("New name", null, null, null);
 
             connectionService.update(5L, request);
 

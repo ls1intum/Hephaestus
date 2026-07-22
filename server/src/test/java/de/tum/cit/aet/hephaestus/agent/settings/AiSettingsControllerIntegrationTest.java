@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.settings;
 
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigDTO;
 import de.tum.cit.aet.hephaestus.agent.config.CreateAgentConfigRequestDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -36,10 +35,7 @@ class AiSettingsControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
     private AgentConfigDTO createConfig(Workspace workspace, String name) {
         var request = CreateAgentConfigRequestDTO.builder()
             .name(name)
-            .enabled(true)
-            .modelName("claude-sonnet-4-20250514")
-            .llmApiKey("sk-test-secret-key-123")
-            .llmProvider(LlmProvider.ANTHROPIC)
+            .enabled(false)
             .timeoutSeconds(300)
             .maxConcurrentJobs(2)
             .allowInternet(false)
@@ -105,6 +101,26 @@ class AiSettingsControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
             .exchange()
             .expectStatus()
             .isNotFound();
+    }
+
+    @Test
+    @WithAdminUser
+    void rejectsBindingDisabledConfigToMentorWith409() {
+        Workspace workspace = setupWorkspace("ai-disabled-mentor");
+        AgentConfigDTO config = createConfig(workspace, "disabled");
+
+        webTestClient
+            .put()
+            .uri("/workspaces/{slug}/ai-settings/mentor-config", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(Map.of("configId", config.id()))
+            .exchange()
+            .expectStatus()
+            .isEqualTo(HttpStatus.CONFLICT)
+            .expectBody()
+            .jsonPath("$.detail")
+            .isEqualTo("The configured mentor model is not available.");
     }
 
     @Test

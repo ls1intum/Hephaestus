@@ -714,7 +714,7 @@ async function handleShutdown(id) {
 // Max characters of context surfaced to the LLM per fetch_context call. Context JSONs
 // occasionally balloon (e.g. `findings.json` for a heavy reviewer); without a cap, a single
 // tool call can blow the model's context window. 200 K chars ≈ 50 K tokens at ~4 chars/token —
-// comfortably below gpt-oss-120b's 128 K window. Counted in JS string length (UTF-16 code
+// comfortably below the configured model's context window. Counted in JS string length (UTF-16 code
 // units), not bytes; context JSONs are ASCII-dominant so the variance is small.
 const FETCH_CONTEXT_MAX_CHARS = 200_000;
 

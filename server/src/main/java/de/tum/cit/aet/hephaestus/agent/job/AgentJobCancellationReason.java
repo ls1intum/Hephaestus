@@ -16,4 +16,6 @@ public enum AgentJobCancellationReason {
      * time this pre-queued job reached the front of the queue. Refused before it ever ran.
      */
     BUDGET_EXHAUSTED,
+    /** The config's catalog binding was revoked or changed before this queued job was claimed. */
+    MODEL_UNAVAILABLE,
 }

@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Optional;
@@ -65,7 +66,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         void shouldRejectNonPrivateIp() throws Exception {
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("8.8.8.8");
-            request.addHeader("x-api-key", VALID_TOKEN);
+            request.addHeader("Authorization", "Bearer " + VALID_TOKEN);
             var response = new MockHttpServletResponse();
 
             filter.doFilterInternal(request, response, filterChain);
@@ -145,21 +146,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldExtractFromXApiKey() throws Exception {
-            var job = createRunningJob();
-            when(
-                agentJobRepository.findByJobTokenHashAndStatus(eq(VALID_TOKEN_HASH), eq(AgentJobStatus.RUNNING))
-            ).thenReturn(Optional.of(job));
-
-            // Capture authentication during filter chain execution (before finally clears it)
-            var authCapture = new AtomicReference<Authentication>();
-            doAnswer(invocation -> {
-                authCapture.set(SecurityContextHolder.getContext().getAuthentication());
-                return null;
-            })
-                .when(filterChain)
-                .doFilter(any(), any());
-
+        void shouldRejectXApiKeyProviderHeader() throws Exception {
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
             request.addHeader("x-api-key", VALID_TOKEN);
@@ -167,11 +154,8 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
             filter.doFilterInternal(request, response, filterChain);
 
-            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
-            verify(filterChain).doFilter(any(), any());
-            assertThat(authCapture.get()).isInstanceOf(JobTokenAuthentication.class);
-            // Verify context is cleaned up after filter chain completes
-            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
+            verify(filterChain, never()).doFilter(any(), any());
         }
 
         @Test
@@ -205,20 +189,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldExtractFromAzureApiKey() throws Exception {
-            var job = createRunningJob();
-            when(
-                agentJobRepository.findByJobTokenHashAndStatus(eq(VALID_TOKEN_HASH), eq(AgentJobStatus.RUNNING))
-            ).thenReturn(Optional.of(job));
-
-            var authCapture = new AtomicReference<Authentication>();
-            doAnswer(invocation -> {
-                authCapture.set(SecurityContextHolder.getContext().getAuthentication());
-                return null;
-            })
-                .when(filterChain)
-                .doFilter(any(), any());
-
+        void shouldRejectApiKeyProviderHeader() throws Exception {
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
             request.addHeader("api-key", VALID_TOKEN);
@@ -226,19 +197,15 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
             filter.doFilterInternal(request, response, filterChain);
 
-            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
-            verify(filterChain).doFilter(any(), any());
-            assertThat(authCapture.get()).isInstanceOf(JobTokenAuthentication.class);
-            ProxyRouting routing = (ProxyRouting) ((JobTokenAuthentication) authCapture.get()).getPrincipal();
-            assertThat(routing.principalDescription()).isEqualTo("job:" + job.getId());
-            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
+            verify(filterChain, never()).doFilter(any(), any());
         }
 
         @Test
         void shouldReturn401ForMalformedToken() throws Exception {
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
-            request.addHeader("x-api-key", "not a valid base64!!!");
+            request.addHeader("Authorization", "Bearer not a valid base64!!!");
             var response = new MockHttpServletResponse();
 
             filter.doFilterInternal(request, response, filterChain);
@@ -254,7 +221,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
-            request.addHeader("x-api-key", VALID_TOKEN);
+            request.addHeader("Authorization", "Bearer " + VALID_TOKEN);
             var response = new MockHttpServletResponse();
 
             filter.doFilterInternal(request, response, filterChain);
@@ -275,7 +242,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
-            request.addHeader("x-api-key", VALID_TOKEN);
+            request.addHeader("Authorization", "Bearer " + VALID_TOKEN);
             var response = new MockHttpServletResponse();
 
             filter.doFilterInternal(request, response, filterChain);
@@ -288,7 +255,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         void shouldReturn401ForWhitespaceOnlyToken() throws Exception {
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
-            request.addHeader("x-api-key", "   ");
+            request.addHeader("Authorization", "Bearer    ");
             var response = new MockHttpServletResponse();
 
             filter.doFilterInternal(request, response, filterChain);
@@ -329,7 +296,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldPreferXApiKeyOverBearer() throws Exception {
+        void shouldIgnoreProviderKeyWhenBearerIsPresent() throws Exception {
             var job = createRunningJob();
             when(
                 agentJobRepository.findByJobTokenHashAndStatus(eq(VALID_TOKEN_HASH), eq(AgentJobStatus.RUNNING))
@@ -337,13 +304,12 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
-            request.addHeader("x-api-key", VALID_TOKEN);
-            request.addHeader("Authorization", "Bearer some-other-token");
+            request.addHeader("x-api-key", "provider-key-must-be-ignored");
+            request.addHeader("Authorization", "Bearer " + VALID_TOKEN);
             var response = new MockHttpServletResponse();
 
             filter.doFilterInternal(request, response, filterChain);
 
-            // Should authenticate with x-api-key token (VALID_TOKEN), not the Bearer token
             assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
             verify(filterChain).doFilter(any(), any());
         }
@@ -362,7 +328,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
-            request.addHeader("x-api-key", VALID_TOKEN);
+            request.addHeader("Authorization", "Bearer " + VALID_TOKEN);
             var response = new MockHttpServletResponse();
 
             try {
@@ -378,7 +344,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         void shouldRejectTokenWithPadding() throws Exception {
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
-            request.addHeader("x-api-key", "dGVzdA==");
+            request.addHeader("Authorization", "Bearer dGVzdA==");
             var response = new MockHttpServletResponse();
 
             filter.doFilterInternal(request, response, filterChain);
@@ -391,7 +357,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("8.8.8.8"); // Public IP
             request.addHeader("X-Forwarded-For", "10.0.0.2"); // Spoofed private IP
-            request.addHeader("x-api-key", VALID_TOKEN);
+            request.addHeader("Authorization", "Bearer " + VALID_TOKEN);
             var response = new MockHttpServletResponse();
 
             filter.doFilterInternal(request, response, filterChain);
@@ -449,7 +415,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
-            request.addHeader("x-api-key", VALID_TOKEN); // never minted anywhere
+            request.addHeader("Authorization", "Bearer " + VALID_TOKEN); // never minted anywhere
             var response = new MockHttpServletResponse();
 
             filter.doFilterInternal(request, response, filterChain);
@@ -466,9 +432,9 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             ConfigSnapshot.SCHEMA_VERSION,
             42L,
             "test-config",
-            "anthropic-messages",
-            "https://api.anthropic.com",
-            "claude-sonnet-4",
+            "openai-completions",
+            "https://api.openai.com/v1",
+            "gpt-5-mini",
             null,
             null,
             null,
@@ -481,6 +447,9 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         );
         job.setConfigSnapshot(snapshot.toJson(objectMapper));
         job.setId(java.util.UUID.randomUUID());
+        Workspace workspace = new Workspace();
+        workspace.setId(7L);
+        job.setWorkspace(workspace);
         return job;
     }
 }

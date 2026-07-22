@@ -5,6 +5,7 @@ import type {
 	WorkspaceLlmConnection,
 } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
 	Dialog,
 	DialogContent,
@@ -13,7 +14,13 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
+import {
+	Field,
+	FieldContent,
+	FieldDescription,
+	FieldError,
+	FieldLabel,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
 	Select,
@@ -22,16 +29,19 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
+	authModeDefaultFor,
+	baseUrlDefaultFor,
 	defaultProtocolFor,
-	PROVIDER_TYPE_LABELS,
-	PROVIDER_TYPE_ORDER,
-	PROVIDER_TYPE_SELECT_ITEMS,
-	type ProviderTypeOption,
-	providerTypeForProtocol,
+	type LlmAuthMode,
+	PROVIDER_PRESET_LABELS,
+	PROVIDER_PRESET_ORDER,
+	PROVIDER_PRESET_SELECT_ITEMS,
+	type ProviderPreset,
+	presetForConnection,
+	usesResponsesApi,
 } from "@/lib/llmProviderType";
-
-const SLUG_PATTERN = /^[a-z][a-z0-9-]{1,62}$/;
 
 export interface WorkspaceLlmConnectionFormDialogProps {
 	open: boolean;
@@ -42,10 +52,7 @@ export interface WorkspaceLlmConnectionFormDialogProps {
 	onUpdate: (id: number, body: UpdateWorkspaceLlmConnectionRequest) => void;
 }
 
-/**
- * Connect/edit your own AI provider (#1368 glossary copy moment #1): the key is stored encrypted and
- * used only in this workspace, billed directly to whoever owns it — never a shared provider.
- */
+/** Create or update a workspace-owned OpenAI-compatible connection. */
 export function WorkspaceLlmConnectionFormDialog({
 	open,
 	onOpenChange,
@@ -56,161 +63,182 @@ export function WorkspaceLlmConnectionFormDialog({
 }: WorkspaceLlmConnectionFormDialogProps) {
 	const isEdit = editing !== null;
 	const [displayName, setDisplayName] = useState("");
-	const [slug, setSlug] = useState("");
 	const [baseUrl, setBaseUrl] = useState("");
-	const [providerType, setProviderType] = useState<ProviderTypeOption>("OPENAI");
+	const [preset, setPreset] = useState<ProviderPreset>("OPENAI");
+	const [useResponsesApi, setUseResponsesApi] = useState(false);
+	const [authMode, setAuthMode] = useState<LlmAuthMode>("BEARER");
 	const [apiKey, setApiKey] = useState("");
-	const [errors, setErrors] = useState<{
-		displayName?: string;
-		slug?: string;
-		baseUrl?: string;
-		apiKey?: string;
-	}>({});
+	const [clearApiKey, setClearApiKey] = useState(false);
+	const [enabled, setEnabled] = useState(false);
+	const [errors, setErrors] = useState<{ displayName?: string; baseUrl?: string }>({});
 
 	useEffect(() => {
 		if (!open) return;
 		setDisplayName(editing?.displayName ?? "");
-		setSlug(editing?.slug ?? "");
-		setBaseUrl(editing?.baseUrl ?? "");
-		setProviderType(editing ? providerTypeForProtocol(editing.apiProtocol) : "OPENAI");
+		setBaseUrl(editing?.baseUrl ?? baseUrlDefaultFor("OPENAI"));
+		setPreset(editing ? presetForConnection(editing) : "OPENAI");
+		setUseResponsesApi(editing ? usesResponsesApi(editing.apiProtocol) : false);
+		setAuthMode(editing?.authMode ?? "BEARER");
 		setApiKey("");
+		setClearApiKey(false);
+		setEnabled(editing?.enabled ?? false);
 		setErrors({});
 	}, [open, editing]);
 
+	const apiProtocol = defaultProtocolFor(useResponsesApi);
+
 	const validate = (): boolean => {
 		const next: typeof errors = {};
-		if (!displayName.trim()) {
-			next.displayName = "A display name is required.";
-		}
-		if (!isEdit) {
-			if (!SLUG_PATTERN.test(slug.trim())) {
-				next.slug = "Lowercase letters, digits and hyphens; must start with a letter.";
-			}
-			if (!baseUrl.trim()) {
-				next.baseUrl = "A base URL is required.";
-			}
-		}
+		if (!displayName.trim()) next.displayName = "A display name is required.";
+		if (!isEdit && !baseUrl.trim()) next.baseUrl = "A base URL is required.";
 		setErrors(next);
 		return Object.keys(next).length === 0;
 	};
-
 	const handleSubmit = (event: React.FormEvent) => {
 		event.preventDefault();
 		if (!validate()) return;
 
-		if (isEdit && editing) {
+		if (editing) {
 			const body: UpdateWorkspaceLlmConnectionRequest = {
 				displayName: displayName.trim(),
-				baseUrl: baseUrl.trim() || undefined,
-				apiProtocol: defaultProtocolFor(providerType),
+				enabled,
 			};
-			if (apiKey.trim()) {
-				body.apiKey = apiKey.trim();
-			}
+			if (apiKey.trim()) body.apiKey = apiKey.trim();
+			if (clearApiKey) body.clearApiKey = true;
 			onUpdate(editing.id, body);
 			return;
 		}
 
 		onCreate({
 			displayName: displayName.trim(),
-			slug: slug.trim(),
 			baseUrl: baseUrl.trim(),
-			apiProtocol: defaultProtocolFor(providerType),
+			apiProtocol,
+			authMode,
 			apiKey: apiKey.trim() || undefined,
-			enabled: true,
+			enabled: false,
 		});
 	};
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="sm:max-w-lg">
-				{/* noValidate: this form validates itself so every rejection surfaces through `FieldError`,
-				    rather than blocking submit silently via the browser's native constraint validation. */}
 				<form onSubmit={handleSubmit} className="space-y-4" noValidate>
 					<DialogHeader>
-						<DialogTitle>
-							{isEdit ? "Edit your AI provider" : "Connect your own AI provider"}
-						</DialogTitle>
+						<DialogTitle>{isEdit ? "Edit connection" : "Add connection"}</DialogTitle>
 						<DialogDescription>
-							Shared models are set up and paid for by your organization. You can also connect your
-							own AI provider with your own API key — it's used only in this workspace and billed
-							directly to you.
+							Connect an endpoint that implements an OpenAI API. Models are added and priced after
+							the connection is saved.
 						</DialogDescription>
 					</DialogHeader>
 
 					<Field data-invalid={Boolean(errors.displayName)}>
-						<FieldLabel htmlFor="wllm-display-name">Display name</FieldLabel>
+						<FieldLabel htmlFor="llm-conn-display-name">Display name</FieldLabel>
 						<Input
-							id="wllm-display-name"
+							id="llm-conn-display-name"
 							value={displayName}
-							onChange={(e) => setDisplayName(e.target.value)}
-							placeholder="e.g. My OpenAI account"
-							required
+							onChange={(event) => setDisplayName(event.target.value)}
+							placeholder="e.g. Production OpenAI"
 							aria-invalid={Boolean(errors.displayName)}
 						/>
 						{errors.displayName && <FieldError>{errors.displayName}</FieldError>}
 					</Field>
 
 					{!isEdit && (
-						<Field data-invalid={Boolean(errors.slug)}>
-							<FieldLabel htmlFor="wllm-slug">Slug</FieldLabel>
-							<Input
-								id="wllm-slug"
-								value={slug}
-								onChange={(e) => setSlug(e.target.value)}
-								placeholder="my-openai"
-								required
-								autoComplete="off"
-								aria-invalid={Boolean(errors.slug)}
-							/>
-							<FieldDescription>Immutable once created.</FieldDescription>
-							{errors.slug && <FieldError>{errors.slug}</FieldError>}
+						<Field>
+							<FieldLabel htmlFor="llm-conn-provider-preset">Endpoint preset</FieldLabel>
+							<Select
+								items={PROVIDER_PRESET_SELECT_ITEMS}
+								value={preset}
+								onValueChange={(value) => {
+									if (!value) return;
+									const next = value as ProviderPreset;
+									if (!baseUrl || baseUrl === baseUrlDefaultFor(preset)) {
+										setBaseUrl(baseUrlDefaultFor(next));
+									}
+									setAuthMode(authModeDefaultFor(next));
+									setPreset(next);
+								}}
+							>
+								<SelectTrigger id="llm-conn-provider-preset" className="w-full">
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									{PROVIDER_PRESET_ORDER.map((item) => (
+										<SelectItem key={item} value={item}>
+											{PROVIDER_PRESET_LABELS[item]}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+							<div className="mt-2 flex items-center gap-2 text-sm font-normal text-muted-foreground">
+								<Checkbox
+									id="llm-conn-responses-api"
+									checked={useResponsesApi}
+									onCheckedChange={(checked) => setUseResponsesApi(checked === true)}
+								/>
+								<label htmlFor="llm-conn-responses-api">
+									Use the Responses API instead of Chat Completions
+								</label>
+							</div>
+							{preset === "AZURE_OPENAI_V1" && (
+								<FieldDescription>
+									Replace RESOURCE below with your Azure resource name. The v1 API does not need an
+									api-version parameter.
+								</FieldDescription>
+							)}
+						</Field>
+					)}
+
+					<Field data-invalid={Boolean(errors.baseUrl)}>
+						<FieldLabel htmlFor="llm-conn-base-url">Base URL</FieldLabel>
+						<Input
+							id="llm-conn-base-url"
+							type="url"
+							value={baseUrl}
+							onChange={(event) => setBaseUrl(event.target.value)}
+							disabled={isEdit}
+							placeholder="https://api.openai.com/v1"
+							aria-invalid={Boolean(errors.baseUrl)}
+						/>
+						{isEdit && (
+							<FieldDescription>
+								Endpoint, API shape, and authentication are immutable. Add a connection to change
+								them.
+							</FieldDescription>
+						)}
+						{errors.baseUrl && <FieldError>{errors.baseUrl}</FieldError>}
+					</Field>
+
+					{!isEdit && preset === "OTHER" && (
+						<Field>
+							<FieldLabel htmlFor="llm-conn-auth-mode">Authentication</FieldLabel>
+							<Select
+								items={[
+									{ value: "BEARER", label: "Bearer token" },
+									{ value: "API_KEY", label: "api-key header" },
+								]}
+								value={authMode}
+								onValueChange={(value) => value && setAuthMode(value as LlmAuthMode)}
+							>
+								<SelectTrigger id="llm-conn-auth-mode" className="w-full">
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="BEARER">Bearer token</SelectItem>
+									<SelectItem value="API_KEY">api-key header</SelectItem>
+								</SelectContent>
+							</Select>
 						</Field>
 					)}
 
 					<Field>
-						<FieldLabel htmlFor="wllm-provider-type">Provider type</FieldLabel>
-						<Select
-							items={PROVIDER_TYPE_SELECT_ITEMS}
-							value={providerType}
-							onValueChange={(v) => {
-								if (v) setProviderType(v as ProviderTypeOption);
-							}}
-						>
-							<SelectTrigger id="wllm-provider-type" className="w-full">
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								{PROVIDER_TYPE_ORDER.map((type) => (
-									<SelectItem key={type} value={type}>
-										{PROVIDER_TYPE_LABELS[type]}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-					</Field>
-
-					<Field data-invalid={Boolean(errors.baseUrl)}>
-						<FieldLabel htmlFor="wllm-base-url">Base URL</FieldLabel>
+						<FieldLabel htmlFor="llm-conn-api-key">API key</FieldLabel>
 						<Input
-							id="wllm-base-url"
-							type="url"
-							value={baseUrl}
-							onChange={(e) => setBaseUrl(e.target.value)}
-							placeholder="https://api.openai.com/v1"
-							required={!isEdit}
-							aria-invalid={Boolean(errors.baseUrl)}
-						/>
-						{errors.baseUrl && <FieldError>{errors.baseUrl}</FieldError>}
-					</Field>
-
-					<Field data-invalid={Boolean(errors.apiKey)}>
-						<FieldLabel htmlFor="wllm-api-key">API key</FieldLabel>
-						<Input
-							id="wllm-api-key"
+							id="llm-conn-api-key"
 							type="password"
 							value={apiKey}
-							onChange={(e) => setApiKey(e.target.value)}
+							onChange={(event) => setApiKey(event.target.value)}
+							disabled={clearApiKey}
 							placeholder={
 								editing?.hasApiKey
 									? `Configured · ends in ····${editing.apiKeyLast4 ?? "····"}`
@@ -219,19 +247,45 @@ export function WorkspaceLlmConnectionFormDialog({
 							autoComplete="off"
 						/>
 						<FieldDescription>
-							{editing?.hasApiKey
-								? "Leave blank to keep the current key."
-								: "Stored encrypted; never shown again after saving."}
+							{editing?.hasApiKey ? "Leave blank to keep the current key." : "Stored encrypted."}
 						</FieldDescription>
-						{errors.apiKey && <FieldError>{errors.apiKey}</FieldError>}
+						{editing?.hasApiKey && (
+							<div className="flex items-center gap-2 text-sm text-muted-foreground">
+								<Checkbox
+									id="llm-conn-clear-api-key"
+									checked={clearApiKey}
+									onCheckedChange={(checked) => {
+										setClearApiKey(checked === true);
+										if (checked === true) setApiKey("");
+									}}
+								/>
+								<label htmlFor="llm-conn-clear-api-key">Remove stored API key</label>
+							</div>
+						)}
 					</Field>
 
+					<Field orientation="horizontal">
+						<FieldContent>
+							<FieldLabel htmlFor="llm-conn-enabled">Active</FieldLabel>
+							<FieldDescription>
+								{isEdit
+									? "Turn off to stop new requests using this connection."
+									: "New connections start inactive. Save and test this connection, add a priced model, then activate both."}
+							</FieldDescription>
+						</FieldContent>
+						<Switch
+							id="llm-conn-enabled"
+							checked={enabled}
+							disabled={!isEdit}
+							onCheckedChange={setEnabled}
+						/>
+					</Field>
 					<DialogFooter>
 						<Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
 							Cancel
 						</Button>
 						<Button type="submit" disabled={isSubmitting}>
-							{isEdit ? "Save changes" : "Connect"}
+							{isEdit ? "Save changes" : "Connect inactive provider"}
 						</Button>
 					</DialogFooter>
 				</form>

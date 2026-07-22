@@ -5,8 +5,12 @@ import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageJobType;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
+import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerJobCancelDispatcher;
 import java.time.Instant;
@@ -161,12 +165,6 @@ public class AgentJobLifecycleService {
             }
         }
 
-        // #1368 fix wave: a job that reached RUNNING (worker_id set at claim) may carry real, un-costed
-        // spend regardless of which caller actually won the CANCELLED transition — the executor's own
-        // handleCancellation, worker-drain, or this method on a concurrent/idempotent call. Attempted
-        // unconditionally (no-op for a job that never started); a duplicate write is safely swallowed
-        // by the ledger's unique source_id constraint (first write wins).
-        recordUnverifiableUsageIfStarted(workspaceId, outcome.job());
         return outcome.job();
     }
 
@@ -228,34 +226,47 @@ public class AgentJobLifecycleService {
         AgentJob fresh = agentJobRepository
             .findByIdAndWorkspaceId(jobId, workspaceId)
             .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()));
+        recordUnverifiableUsageIfStarted(workspaceId, fresh);
         return new CancelOutcome(fresh, true);
     }
 
     /**
      * Append an UNPRICED ledger row for a job this call just cancelled (or found already cancelled)
-     * that had started executing — signalled by {@code worker_id} being set, which happens in the SAME
-     * commit as the QUEUED→RUNNING claim transition, so it is a reliable "did this job ever run" flag
-     * independent of which caller won the CANCELLED race. No-op for a job cancelled before it was ever
-     * claimed. Mirrors {@code AgentJobExecutor#recordUnverifiableUsage} — see that method's doc for why
-     * the sample carries zeroed token counts and {@code PricingState.UNPRICED}.
+     * that crossed the persisted execution boundary. A non-null {@code worker_id} proves only that a
+     * worker claimed the row; repository/context preparation before {@code execution_started_at} cannot
+     * incur provider usage and must not make the workspace's month unverifiable.
      */
     private void recordUnverifiableUsageIfStarted(Long workspaceId, AgentJob job) {
-        if (job.getWorkerId() == null) {
+        if (job.getExecutionStartedAt() == null) {
             return;
         }
-        ConfigSnapshot snap = parseSnapshotQuietly(job);
+        ConfigSnapshot snap = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
+        LlmPriceSnapshot price =
+            snap.priceSnapshot() != null
+                ? snap.priceSnapshot()
+                : new LlmPriceSnapshot(
+                      FundingSource.INSTANCE,
+                      PricingState.UNPRICED,
+                      null,
+                      null,
+                      null,
+                      null,
+                      null,
+                      null
+                  );
         LlmUsageRecorder.LlmUsageSample sample = new LlmUsageRecorder.LlmUsageSample(
             LlmUsageJobType.from(job.getJobType()),
+            LlmUsageSourceType.AGENT_JOB,
             job.getId(),
-            snap != null ? snap.upstreamModelId() : null,
+            job.getRetryCount(),
+            snap.upstreamModelId(),
             0L,
             0L,
             0L,
             0L,
             0L,
             0,
-            snap != null ? snap.connectionScope() : null,
-            snap != null ? snap.connectionId() : null,
+            price,
             Instant.now()
         );
         usageRecorder.recordUnverifiable(workspaceId, sample);
@@ -395,19 +406,5 @@ public class AgentJobLifecycleService {
             );
         }
         return won;
-    }
-
-    /** Best-effort {@link ConfigSnapshot} parse; a malformed/missing snapshot just yields no provenance. */
-    private @Nullable ConfigSnapshot parseSnapshotQuietly(AgentJob job) {
-        var snapshotNode = job.getConfigSnapshot();
-        if (snapshotNode == null) {
-            return null;
-        }
-        try {
-            return ConfigSnapshot.fromJson(snapshotNode, objectMapper);
-        } catch (Exception e) {
-            log.warn("Could not deserialise config snapshot for usage ledger provenance: {}", e.getMessage());
-            return null;
-        }
     }
 }

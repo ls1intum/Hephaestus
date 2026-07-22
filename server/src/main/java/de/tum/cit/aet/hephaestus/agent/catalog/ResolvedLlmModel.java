@@ -19,13 +19,9 @@ import org.jspecify.annotations.Nullable;
 public record ResolvedLlmModel(
     String baseUrl,
     String apiProtocol,
-    String authHeaderName,
-    String authValuePrefix,
-    @Nullable String azureApiVersion,
     String upstreamModelId,
     @Nullable Integer contextWindow,
     @Nullable Integer maxOutputTokens,
     boolean supportsReasoning,
-    @Nullable String cacheControlFormat,
     FundingSource fundingSource
 ) {}

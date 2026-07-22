@@ -66,10 +66,6 @@ public class LlmModelPrice {
     @Column(name = "per_1m_cache_write_usd", precision = 18, scale = 8)
     private BigDecimal per1mCacheWriteUsd;
 
-    @Nullable
-    @Column(name = "per_1m_reasoning_usd", precision = 18, scale = 8)
-    private BigDecimal per1mReasoningUsd;
-
     @ColumnDefault("'USD'")
     @Column(name = "currency", nullable = false, length = 3)
     private String currency = "USD";

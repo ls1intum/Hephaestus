@@ -1,25 +1,16 @@
 import { Progress as ProgressRoot } from "@base-ui/react/progress";
 import { CircleAlert, CircleDollarSign, TriangleAlert } from "lucide-react";
 import type { WorkspaceLlmUsageReport } from "@/api/types.gen";
-import { formatCostUsd, formatTokens } from "@/components/admin/ai/jobUtils";
-import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
+import { formatCostUsd } from "@/components/admin/ai/jobUtils";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Progress, ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-	Table,
-	TableBody,
-	TableCaption,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@/components/ui/table";
+import { LlmUsageByDayTable, LlmUsageByJobTypeTable } from "./LlmUsageBreakdownTables";
 import { MonthNavigator } from "./MonthNavigator";
-import { formatMonthLabel, formatUsageDay, JOB_TYPE_LABELS } from "./usageUtils";
+import { formatMonthLabel } from "./usageUtils";
 
 export interface AdminLlmUsagePageProps {
 	/** ISO `yyyy-MM` month currently shown. */
@@ -35,11 +26,6 @@ export interface AdminLlmUsagePageProps {
 	onPrevMonth: () => void;
 	onNextMonth: () => void;
 }
-
-type ByJobTypeRows = WorkspaceLlmUsageReport["byJobType"];
-
-/** One entry per by-job-type header column. */
-const JOB_TYPE_SKELETON_COLUMNS = ["w-32", "w-16", "w-20", "w-16", "w-12", "w-12"];
 
 /**
  * Workspace-admin view of one month of LLM spend: summary stat cards, an over-budget banner for
@@ -59,19 +45,22 @@ export function AdminLlmUsagePage({
 	const budget = report?.monthlyBudgetUsd;
 	// The confirmed (priced) spend — the figure the budget cap compares against. When some usage this
 	// month has no price on record, it's a floor, not the full total (see `unpricedEventCount` below).
-	const spend = report?.pricedTotalCostUsd ?? 0;
+	const instanceFundedSpend = report?.pricedTotalCostUsd ?? 0;
 	// A $0 cap is a supported state ("paused immediately"), so it reads as 100% used — only an
 	// absent cap has no percentage to show.
 	const budgetUsedPercent =
-		budget != null ? (budget > 0 ? (spend / budget) * 100 : 100) : undefined;
+		budget != null ? (budget > 0 ? (instanceFundedSpend / budget) * 100 : 100) : undefined;
 	const hasUsage =
-		report != null && (report.byJobType.length > 0 || report.byDay.length > 0 || spend > 0);
-	const maxDayCost = Math.max(...(report?.byDay.map((d) => d.pricedTotalCostUsd) ?? []), 0);
+		report != null &&
+		(report.byJobType.length > 0 ||
+			report.byDay.length > 0 ||
+			instanceFundedSpend > 0 ||
+			report.byoTotalCostUsd > 0);
 	const unpricedEventCount = report?.unpricedEventCount ?? 0;
 	const overBudget = report?.verdict === "EXHAUSTED";
 
 	return (
-		<div className="mx-auto w-full max-w-4xl space-y-6 py-6">
+		<div className="mx-auto w-full max-w-6xl space-y-6 py-6">
 			<div className="flex flex-wrap items-center justify-between gap-4">
 				<header className="space-y-1">
 					<div className="flex items-center gap-2">
@@ -111,7 +100,7 @@ export function AdminLlmUsagePage({
 							<CardTitle>By job type</CardTitle>
 						</CardHeader>
 						<CardContent>
-							<ByJobTypeTable />
+							<LlmUsageByJobTypeTable />
 						</CardContent>
 					</Card>
 				</>
@@ -133,14 +122,15 @@ export function AdminLlmUsagePage({
 						// the "at least $X" formulation is the fix — no new vocabulary, direction of error obvious.
 						<Alert variant="warning">
 							<CircleAlert aria-hidden />
-							<AlertTitle>Spent this month: at least {formatCostUsd(spend)}</AlertTitle>
-							<AlertDescription>
-								Some usage has no price set, so the real total may be higher. (
+							<AlertTitle>
 								{unpricedEventCount === 1
-									? "1 call"
-									: `${unpricedEventCount.toLocaleString()} calls`}{" "}
-								this month ran on a model with no price on record.) Ask an instance admin to add
-								pricing for the model.
+									? "1 call is not included in the spend totals"
+									: `${unpricedEventCount.toLocaleString()} calls are not included in the spend totals`}
+							</AlertTitle>
+							<AlertDescription>
+								Some usage has no price set, so the real totals may be higher. For a workspace-owned
+								model, add its price in Models. For a shared model, ask an instance admin to add
+								pricing.
 							</AlertDescription>
 						</Alert>
 					)}
@@ -149,12 +139,10 @@ export function AdminLlmUsagePage({
 						<Card>
 							<CardHeader>
 								<CardDescription>
-									{isCurrentMonth ? "Month-to-date spend" : "Month spend"}
+									{isCurrentMonth ? "Month-to-date instance-funded spend" : "Instance-funded spend"}
 								</CardDescription>
 								<CardTitle className="text-2xl tabular-nums">
-									{unpricedEventCount > 0
-										? `at least ${formatCostUsd(spend)}`
-										: formatCostUsd(spend)}
+									{formatCostUsd(instanceFundedSpend)}
 								</CardTitle>
 							</CardHeader>
 						</Card>
@@ -187,7 +175,7 @@ export function AdminLlmUsagePage({
 						// (#1368 glossary rule #2).
 						<Card>
 							<CardHeader>
-								<CardDescription>Your provider</CardDescription>
+								<CardDescription>Workspace-owned spend</CardDescription>
 								<CardTitle className="text-2xl tabular-nums">
 									{formatCostUsd(report.byoTotalCostUsd)}
 								</CardTitle>
@@ -215,7 +203,7 @@ export function AdminLlmUsagePage({
 									<CardTitle>By job type</CardTitle>
 								</CardHeader>
 								<CardContent>
-									<ByJobTypeTable rows={report.byJobType} />
+									<LlmUsageByJobTypeTable rows={report.byJobType} />
 								</CardContent>
 							</Card>
 
@@ -229,32 +217,7 @@ export function AdminLlmUsagePage({
 											No daily breakdown for this month.
 										</p>
 									) : (
-										<ul className="space-y-1.5">
-											{report.byDay.map((day) => {
-												const label = formatUsageDay(day.day);
-												return (
-													<li key={String(day.day)} className="flex items-center gap-3 text-sm">
-														<span className="w-14 shrink-0 text-muted-foreground">{label}</span>
-														<Progress
-															className="flex-1"
-															value={
-																maxDayCost > 0 ? (day.pricedTotalCostUsd / maxDayCost) * 100 : 0
-															}
-															aria-label={`Spend on ${label}`}
-															getAriaValueText={() =>
-																`${formatCostUsd(day.pricedTotalCostUsd)} of ${formatCostUsd(maxDayCost)} on the busiest day`
-															}
-														/>
-														<span className="w-20 shrink-0 text-right tabular-nums">
-															{formatCostUsd(day.pricedTotalCostUsd)}
-														</span>
-														<span className="w-20 shrink-0 text-right tabular-nums text-muted-foreground">
-															{day.events.toLocaleString()} {day.events === 1 ? "event" : "events"}
-														</span>
-													</li>
-												);
-											})}
-										</ul>
+										<LlmUsageByDayTable rows={report.byDay} />
 									)}
 								</CardContent>
 							</Card>
@@ -301,65 +264,5 @@ function BudgetProgress({ percent, overBudget }: BudgetProgressProps) {
 			aria-label="Budget used"
 			getAriaValueText={() => valueText}
 		/>
-	);
-}
-
-interface ByJobTypeTableProps {
-	/** Omit while the report is still loading — the header mounts and the body is skeletoned. */
-	rows?: ByJobTypeRows;
-}
-
-/** Per-job-type cost and token breakdown, sharing one header between loading and loaded states. */
-function ByJobTypeTable({ rows }: ByJobTypeTableProps) {
-	return (
-		<Table containerClassName="rounded-md border">
-			<TableCaption className="sr-only">AI spend by job type</TableCaption>
-			<TableHeader>
-				<TableRow>
-					<TableHead scope="col">Job type</TableHead>
-					<TableHead scope="col" className="text-right">
-						Cost
-					</TableHead>
-					<TableHead scope="col" className="text-right">
-						Input tokens
-					</TableHead>
-					<TableHead scope="col" className="text-right">
-						Output tokens
-					</TableHead>
-					<TableHead scope="col" className="text-right">
-						Calls
-					</TableHead>
-					<TableHead scope="col" className="text-right">
-						Events
-					</TableHead>
-				</TableRow>
-			</TableHeader>
-			{rows == null ? (
-				<TableRowsSkeleton columns={JOB_TYPE_SKELETON_COLUMNS} rows={3} />
-			) : (
-				<TableBody>
-					{rows.map((row) => (
-						<TableRow key={row.jobType}>
-							<TableCell className="font-medium">{JOB_TYPE_LABELS[row.jobType]}</TableCell>
-							<TableCell className="text-right tabular-nums">
-								{formatCostUsd(row.pricedTotalCostUsd)}
-							</TableCell>
-							<TableCell className="text-right tabular-nums">
-								{formatTokens(row.inputTokens)}
-							</TableCell>
-							<TableCell className="text-right tabular-nums">
-								{formatTokens(row.outputTokens)}
-							</TableCell>
-							<TableCell className="text-right tabular-nums">
-								{row.totalCalls.toLocaleString()}
-							</TableCell>
-							<TableCell className="text-right tabular-nums">
-								{row.events.toLocaleString()}
-							</TableCell>
-						</TableRow>
-					))}
-				</TableBody>
-			)}
-		</Table>
 	);
 }

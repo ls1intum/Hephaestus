@@ -205,7 +205,7 @@ public class AgentJobService {
 
         AgentJob firstJob = null;
         for (AgentConfig config : configs) {
-            AgentJob job = submitForConfig(workspace, config, jobType, submission);
+            AgentJob job = submitForConfig(workspace, config.getId(), jobType, submission);
             if (job != null && firstJob == null) {
                 firstJob = job;
             }
@@ -220,10 +220,8 @@ public class AgentJobService {
      * (bound-but-disabled = <strong>paused, returns empty</strong>); otherwise fan out to all enabled
      * configs. The bound id is loaded via the workspace-scoped finder for tenancy safety.
      *
-     * <p>Note the deliberate asymmetry with the mentor ({@code MentorChatService.resolveLlmConfig}): a
-     * disabled <em>practice</em> binding PAUSES detection (it is opt-in automation — silence is the safe
-     * outcome), whereas a disabled <em>mentor</em> binding FALLS BACK to the oldest enabled config (the
-     * mentor must stay answerable to a user who is mid-conversation).
+     * <p>The mentor likewise fails closed when its explicit binding is unavailable. It never switches
+     * models implicitly because that could change provider, model, and price mid-conversation.
      */
     private List<AgentConfig> resolvePracticeConfigs(Workspace workspace) {
         Long boundConfigId = workspace.getPracticeConfigId();
@@ -243,13 +241,25 @@ public class AgentJobService {
 
     private @Nullable AgentJob submitForConfig(
         Workspace workspace,
-        AgentConfig config,
+        Long configId,
         AgentJobType jobType,
         JobSubmission submission
     ) {
-        String configScopedKey = submission.idempotencyKey() + ":config:" + config.getId();
+        String configScopedKey = submission.idempotencyKey() + ":config:" + configId;
 
         return transactionTemplate.execute(status -> {
+            // The discovery query above intentionally runs outside a transaction so each config can
+            // fail independently. Re-fetch the config and its catalog binding in this transaction;
+            // starting a transaction does not reattach the detached discovery entity, and resolving
+            // its lazy model here would otherwise fail in production.
+            AgentConfig config = agentConfigRepository
+                .findByIdAndWorkspaceId(configId, workspace.getId())
+                .filter(AgentConfig::isEnabled)
+                .orElse(null);
+            if (config == null) {
+                return null; // deleted, disabled, or moved since discovery
+            }
+
             // Idempotency check — application-level (partial unique index is safety net)
             Optional<AgentJob> existing = agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(
                 workspace.getId(),
@@ -319,7 +329,7 @@ public class AgentJobService {
             }
 
             // The credential is NEVER frozen onto the job (#1368 slice 5 — ONE credential path,
-            // resolved live by the proxy from the config snapshot's connection reference / configId on
+            // resolved live by the proxy from the config snapshot's catalog connection reference on
             // every call). AgentJob.llmApiKey is retained on the entity only for backward-compatible
             // column shape; nothing writes or reads it anymore.
 

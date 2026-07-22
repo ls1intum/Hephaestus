@@ -456,15 +456,6 @@ hephaestus:
         # output to NULL past this age; row-retention deletes the whole terminal row past this age.
         payload-retention: ${AGENT_PAYLOAD_RETENTION:P14D}
         row-retention: ${AGENT_ROW_RETENTION:P90D}
-        # Dev convenience: seed one workspace model at startup (off by default). See docker/.env.example.
-        default-config:
-            enabled: ${AGENT_DEFAULT_CONFIG_ENABLED:false}
-            name: ${AGENT_DEFAULT_CONFIG_NAME:Default model}
-            provider: ${AGENT_DEFAULT_CONFIG_PROVIDER:ANTHROPIC}
-            model-name: ${AGENT_DEFAULT_CONFIG_MODEL_NAME:}
-            api-key: ${AGENT_DEFAULT_CONFIG_API_KEY:}
-            base-url: ${AGENT_DEFAULT_CONFIG_BASE_URL:}
-
     # ═══════════════════════════════════════════════════════════════════════════
     # WEBHOOK CONFIGURATION
     # ═══════════════════════════════════════════════════════════════════════════

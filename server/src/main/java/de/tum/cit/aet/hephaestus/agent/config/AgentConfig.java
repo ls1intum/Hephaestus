@@ -33,8 +33,8 @@ import lombok.ToString;
  * Workspace-scoped configuration for the Pi practice-detection agent.
  *
  * <p>A workspace may have multiple {@code AgentConfig} instances, each identified by a unique
- * {@code name} within the workspace. This entity stores the LLM provider/credentials
- * (encrypted at rest), and resource limits for container execution.
+ * {@code name} within the workspace. Provider routing and credentials live in the selected catalog
+ * model; this entity only binds that model to execution limits.
  *
  * @see AgentConfigService for CRUD operations
  */
@@ -81,18 +81,15 @@ public class AgentConfig {
     @ToString.Exclude
     private String llmApiKey;
 
-    /**
-     * Optional base URL override for OpenAI/Anthropic-style endpoints (e.g. TUM GPU,
-     * Azure OpenAI gateway, OSS-compatible proxies). When set in {@code API_KEY} mode,
-     * the Pi runtime registers a custom {@code hephaestus} provider extension that uses
-     * the chat/completions surface — needed for providers that don't speak the Responses API.
-     */
+    /** Deprecated compatibility value; OpenAI-compatible routing now comes from the catalog binding. */
     @Column(name = "llm_base_url", length = 2048)
     @ToString.Exclude
     private String llmBaseUrl;
 
+    // Deprecated compatibility column retained until a later release can remove it safely.
+    // New catalog-bound configs leave it null; runtime code must never branch on it.
     @Enumerated(EnumType.STRING)
-    @Column(name = "llm_provider", nullable = false, length = 32)
+    @Column(name = "llm_provider", length = 32)
     private LlmProvider llmProvider;
 
     // Kept as a read-only mapping until the deprecated DB column can be removed in a later release.

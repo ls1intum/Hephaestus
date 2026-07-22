@@ -1,5 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.settings;
 
+import de.tum.cit.aet.hephaestus.agent.catalog.InstanceLlmSettingsService;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
+import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
@@ -37,6 +40,8 @@ public class AiSettingsService {
     private final AgentConfigRepository agentConfigRepository;
     private final PracticeReviewProperties reviewProperties;
     private final ConfigAuditPort configAudit;
+    private final InstanceLlmSettingsService instanceLlmSettingsService;
+    private final LlmModelResolver llmModelResolver;
 
     public AiSettingsViewDTO getSettings(WorkspaceContext workspaceContext) {
         return toView(requireWorkspace(workspaceContext));
@@ -55,7 +60,7 @@ public class AiSettingsService {
     public AiSettingsViewDTO bindMentorConfig(WorkspaceContext workspaceContext, @Nullable Long configId) {
         Workspace workspace = requireWorkspaceForUpdate(workspaceContext);
         AgentBindingSnapshot before = new AgentBindingSnapshot(workspace.getMentorConfigId());
-        workspace.setMentorConfigId(validateConfigId(workspaceContext.id(), configId));
+        workspace.setMentorConfigId(validateMentorConfigId(workspaceContext.id(), configId));
         auditBinding(workspaceContext, MENTOR_CONFIG_BINDING, before, workspace.getMentorConfigId());
         return toView(workspaceRepository.save(workspace));
     }
@@ -114,6 +119,31 @@ public class AiSettingsService {
         return configId;
     }
 
+    /** Mentor is interactive and must never silently switch models, so only executable bindings are accepted. */
+    private @Nullable Long validateMentorConfigId(Long workspaceId, @Nullable Long configId) {
+        if (configId == null) {
+            return null;
+        }
+        AgentConfig config = agentConfigRepository
+            .findByIdAndWorkspaceId(configId, workspaceId)
+            .orElseThrow(() -> new EntityNotFoundException("AgentConfig", configId.toString()));
+        if (!config.isEnabled()) {
+            throw mentorModelUnavailable();
+        }
+        try {
+            if (llmModelResolver.resolve(config) == null) {
+                throw mentorModelUnavailable();
+            }
+        } catch (IllegalStateException ignored) {
+            throw mentorModelUnavailable();
+        }
+        return configId;
+    }
+
+    private static MentorModelUnavailableException mentorModelUnavailable() {
+        return new MentorModelUnavailableException();
+    }
+
     private Workspace requireWorkspace(WorkspaceContext workspaceContext) {
         return workspaceRepository
             .findById(workspaceContext.id())
@@ -146,7 +176,8 @@ public class AiSettingsService {
             s.getDeliverToMerged(),
             s.getCooldownMinutes(),
             f.getPracticesEnabled(),
-            f.getMentorEnabled()
+            f.getMentorEnabled(),
+            instanceLlmSettingsService.get().isAllowWorkspaceConnections()
         );
     }
 }
