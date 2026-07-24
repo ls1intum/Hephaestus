@@ -22,10 +22,13 @@ class DefaultMentorReadinessQuery implements MentorReadinessQuery {
         this.llmModelResolver = llmModelResolver;
     }
 
+    // Non-transactional on purpose (resolve() signals revocation with an exception, which would mark a
+    // shared transaction rollback-only), so the binding must arrive with its model + connection already
+    // fetched — a lazy association resolved after the session closed throws instead of answering.
     @Override
     public boolean isReady(long workspaceId) {
         return agentBindingRepository
-            .findByWorkspaceIdAndPurpose(workspaceId, AgentPurpose.MENTOR)
+            .findByWorkspaceIdAndPurposeWithModels(workspaceId, AgentPurpose.MENTOR)
             .filter(WorkspaceAgentBinding::isEnabled)
             .map(this::hasAvailableCatalogModel)
             .orElse(false);

@@ -30,7 +30,9 @@ class DefaultMentorReadinessQueryTest extends BaseUnitTest {
 
     @Test
     void shouldNotReportReadyWhenMentorIsUnconfigured() {
-        when(agentBindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.MENTOR)).thenReturn(Optional.empty());
+        when(agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.MENTOR)).thenReturn(
+            Optional.empty()
+        );
         assertThat(query.isReady(1L)).isFalse();
     }
 
@@ -40,7 +42,7 @@ class DefaultMentorReadinessQueryTest extends BaseUnitTest {
         binding.setId(10L);
         binding.setPurpose(AgentPurpose.MENTOR);
         binding.setEnabled(true);
-        when(agentBindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.MENTOR)).thenReturn(
+        when(agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.MENTOR)).thenReturn(
             Optional.of(binding)
         );
         when(llmModelResolver.resolve(binding)).thenThrow(new IllegalStateException("unavailable"));
@@ -54,7 +56,7 @@ class DefaultMentorReadinessQueryTest extends BaseUnitTest {
         disabled.setId(10L);
         disabled.setPurpose(AgentPurpose.MENTOR);
         disabled.setEnabled(false);
-        when(agentBindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.MENTOR)).thenReturn(
+        when(agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.MENTOR)).thenReturn(
             Optional.of(disabled)
         );
 

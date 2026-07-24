@@ -23,10 +23,12 @@ public class AgentConfigCheckerAdapter implements AgentConfigChecker {
 
     @Override
     // Keep this boundary non-transactional: resolve() reports revocation with an exception. Catching that
-    // exception inside a shared transaction would still mark the transaction rollback-only.
+    // exception inside a shared transaction would still mark the transaction rollback-only. That is why
+    // the lookup fetches the model + connection graph eagerly — resolving a lazily-loaded binding after
+    // the session closed would throw LazyInitializationException instead of answering the question.
     public boolean hasRunnablePractice(Long workspaceId) {
         return bindingRepository
-            .findByWorkspaceIdAndPurpose(workspaceId, AgentPurpose.PRACTICE_DETECTION)
+            .findByWorkspaceIdAndPurposeWithModels(workspaceId, AgentPurpose.PRACTICE_DETECTION)
             .filter(WorkspaceAgentBinding::isEnabled)
             .map(this::isModelAvailable)
             .orElse(false);

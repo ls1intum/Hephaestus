@@ -12,6 +12,26 @@ public interface WorkspaceAgentBindingRepository extends JpaRepository<Workspace
 
     Optional<WorkspaceAgentBinding> findByWorkspaceIdAndPurpose(Long workspaceId, AgentPurpose purpose);
 
+    /**
+     * The binding with its catalog model AND that model's connection already fetched, for callers that
+     * run OUTSIDE a transaction. Both model associations are {@code LAZY}, and resolving a binding
+     * walks model → connection, so a plain lookup followed by {@code LlmModelResolver.resolve} throws
+     * {@code LazyInitializationException} once the session closes with the row. Fetching the whole
+     * graph in one query lets the readiness check stay non-transactional (which it must: resolve()
+     * signals revocation with an exception, and catching that inside a shared transaction would still
+     * mark it rollback-only).
+     */
+    @Query(
+        "SELECT b FROM WorkspaceAgentBinding b " +
+            "LEFT JOIN FETCH b.instanceModel im LEFT JOIN FETCH im.connection " +
+            "LEFT JOIN FETCH b.workspaceModel wm LEFT JOIN FETCH wm.connection " +
+            "WHERE b.workspace.id = :workspaceId AND b.purpose = :purpose"
+    )
+    Optional<WorkspaceAgentBinding> findByWorkspaceIdAndPurposeWithModels(
+        @Param("workspaceId") Long workspaceId,
+        @Param("purpose") AgentPurpose purpose
+    );
+
     /** Row-lock the binding for admission's re-resolve/re-price, mirroring the model row lock order. */
     @Query("SELECT b FROM WorkspaceAgentBinding b WHERE b.workspace.id = :workspaceId AND b.purpose = :purpose")
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)

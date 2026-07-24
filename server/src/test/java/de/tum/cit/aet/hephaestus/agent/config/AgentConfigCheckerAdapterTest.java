@@ -35,7 +35,7 @@ class AgentConfigCheckerAdapterTest extends BaseUnitTest {
 
     @Test
     void unboundPracticeIsNotRunnable() {
-        when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+        when(bindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
             Optional.empty()
         );
         assertThat(checker.hasRunnablePractice(1L)).isFalse();
@@ -43,7 +43,7 @@ class AgentConfigCheckerAdapterTest extends BaseUnitTest {
 
     @Test
     void disabledBindingIsNotRunnable() {
-        when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+        when(bindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
             Optional.of(binding(false))
         );
         assertThat(checker.hasRunnablePractice(1L)).isFalse();
@@ -52,7 +52,7 @@ class AgentConfigCheckerAdapterTest extends BaseUnitTest {
     @Test
     void enabledBindingWithRevokedModelIsNotRunnable() {
         WorkspaceAgentBinding b = binding(true);
-        when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+        when(bindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
             Optional.of(b)
         );
         when(resolver.resolve(b)).thenThrow(new IllegalStateException("unavailable"));
@@ -62,7 +62,7 @@ class AgentConfigCheckerAdapterTest extends BaseUnitTest {
     @Test
     void enabledBindingWithAvailableModelIsRunnable() {
         WorkspaceAgentBinding b = binding(true);
-        when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+        when(bindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
             Optional.of(b)
         );
         when(resolver.resolve(b)).thenReturn(org.mockito.Mockito.mock(ResolvedLlmModel.class));
