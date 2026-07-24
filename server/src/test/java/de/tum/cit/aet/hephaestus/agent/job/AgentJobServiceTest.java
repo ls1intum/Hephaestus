@@ -108,6 +108,8 @@ class AgentJobServiceTest extends BaseUnitTest {
         workspace = new Workspace();
         workspace.setId(1L);
         workspace.setWorkspaceSlug("test-ws");
+        // Detection runs exactly the bound practice config (no fan-out, #1368).
+        workspace.setPracticeConfigId(10L);
 
         enabledConfig = new AgentConfig();
         enabledConfig.setId(10L);
@@ -164,11 +166,9 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldReturnEmptyWhenNoEnabledConfig() {
-            AgentConfig disabledConfig = new AgentConfig();
-            disabledConfig.setEnabled(false);
+        void shouldReturnEmptyWhenBoundConfigIsDisabled() {
+            enabledConfig.setEnabled(false); // bound-but-disabled = detection paused
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(disabledConfig));
 
             Optional<AgentJob> result = service.submit(
                 1L,
@@ -181,9 +181,9 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldReturnEmptyWhenNoConfigs() {
+        void shouldReturnEmptyWhenPracticeIsUnbound() {
+            workspace.setPracticeConfigId(null); // unbound = detection off, never fans out
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of());
 
             Optional<AgentJob> result = service.submit(
                 1L,
@@ -192,6 +192,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             );
 
             assertThat(result).isEmpty();
+            verify(agentJobRepository, never()).saveAndFlush(any());
         }
 
         @Test
@@ -264,16 +265,11 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldSkipRevokedConfigWithoutBlockingHealthyFanOut() {
-            AgentConfig revoked = new AgentConfig();
-            revoked.setId(11L);
-            revoked.setWorkspace(workspace);
-            revoked.setName("revoked");
-            revoked.setEnabled(true);
+        void shouldSubmitNothingWhenBoundConfigModelIsRevoked() {
+            // The bound config resolves to a since-revoked model: ConfigSnapshot.from throws, so no job
+            // is created (detection is paused for this workspace until the model is restored).
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(revoked, enabledConfig));
-            when(agentConfigRepository.findByIdAndWorkspaceId(11L, 1L)).thenReturn(Optional.of(revoked));
-            when(llmModelResolver.resolve(revoked)).thenThrow(new IllegalStateException("model unavailable"));
+            when(llmModelResolver.resolve(enabledConfig)).thenThrow(new IllegalStateException("model unavailable"));
 
             JobTypeHandler handler = mock(JobTypeHandler.class);
             when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
@@ -281,7 +277,6 @@ class AgentJobServiceTest extends BaseUnitTest {
             when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any())).thenReturn(
                 Optional.empty()
             );
-            when(agentJobRepository.saveAndFlush(any(AgentJob.class))).thenAnswer(inv -> inv.getArgument(0));
 
             Optional<AgentJob> result = service.submit(
                 1L,
@@ -289,14 +284,12 @@ class AgentJobServiceTest extends BaseUnitTest {
                 mock(JobSubmissionRequest.class)
             );
 
-            assertThat(result).isPresent();
-            verify(agentJobRepository).saveAndFlush(argThat(job -> job.getConfig().getId().equals(10L)));
-            verify(agentJobRepository, never()).saveAndFlush(argThat(job -> job.getConfig().getId().equals(11L)));
+            assertThat(result).isEmpty();
+            verify(agentJobRepository, never()).saveAndFlush(any());
         }
 
         @Test
         void shouldReturnExistingJobOnIdempotencyMatch() {
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(enabledConfig));
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             JobTypeHandler handler = mock(JobTypeHandler.class);
@@ -326,7 +319,6 @@ class AgentJobServiceTest extends BaseUnitTest {
 
         @Test
         void shouldCreateJobQueued() {
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(enabledConfig));
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             JobTypeHandler handler = mock(JobTypeHandler.class);
@@ -367,7 +359,6 @@ class AgentJobServiceTest extends BaseUnitTest {
         void neverCopiesTheCredentialOntoTheJob() {
             enabledConfig.setLlmApiKey("sk-test-key");
 
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(enabledConfig));
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             JobTypeHandler handler = mock(JobTypeHandler.class);
@@ -395,7 +386,6 @@ class AgentJobServiceTest extends BaseUnitTest {
 
         @Test
         void shouldReturnEmptyOnDataIntegrityViolation() {
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(enabledConfig));
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             JobTypeHandler handler = mock(JobTypeHandler.class);
@@ -427,11 +417,7 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldPickFirstEnabledConfig() {
-            AgentConfig disabled = new AgentConfig();
-            disabled.setEnabled(false);
-
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(disabled, enabledConfig));
+        void shouldRunTheBoundConfig() {
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             JobTypeHandler handler = mock(JobTypeHandler.class);
@@ -461,7 +447,6 @@ class AgentJobServiceTest extends BaseUnitTest {
         void shouldSkipSubmissionWhenCooldownActive() {
             // Default workspace inherits the property cooldownMinutes=15, so the cooldown branch runs. A
             // recent job for the same (PR, phase)/config → submission is skipped (no new job persisted).
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(enabledConfig));
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             JobTypeHandler handler = mock(JobTypeHandler.class);
@@ -488,7 +473,6 @@ class AgentJobServiceTest extends BaseUnitTest {
         @Test
         void shouldCreateJobWhenCooldownElapsed() {
             // Cooldown lookup returns empty (no recent job within the window) → the job is created.
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(enabledConfig));
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             JobTypeHandler handler = mock(JobTypeHandler.class);
@@ -519,7 +503,6 @@ class AgentJobServiceTest extends BaseUnitTest {
             // A repo name with a LIKE single-char wildcard ('_') must be escaped, or the cooldown prefix
             // would spuriously match unrelated keys (e.g. "my_org" matching "myXorg"). Capture the prefix
             // passed to the LIKE query (ESCAPE '\') and assert the '_' is backslash-escaped.
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(enabledConfig));
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             ObjectNode metadata = objectMapper.createObjectNode();
@@ -618,8 +601,8 @@ class AgentJobServiceTest extends BaseUnitTest {
                     TransactionCallback<?> callback = inv.getArgument(0);
                     return callback.doInTransaction(mock(TransactionStatus.class));
                 });
+            workspace.setPracticeConfigId(null); // unbound → no job
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of());
 
             String result = service.submitPrepared(
                 1L,

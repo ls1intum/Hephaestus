@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.agent.config;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
 import de.tum.cit.aet.hephaestus.practices.spi.AgentConfigChecker;
-import java.util.stream.Stream;
 import org.springframework.stereotype.Component;
 
 /**
@@ -23,14 +22,15 @@ public class AgentConfigCheckerAdapter implements AgentConfigChecker {
     // Keep this boundary non-transactional: resolve() reports revocation with an exception. Catching that
     // exception inside a shared transaction would still mark the transaction rollback-only.
     public boolean hasRunnablePracticeConfig(Long workspaceId, Long boundConfigId) {
-        Stream<AgentConfig> candidates;
         if (boundConfigId == null) {
-            candidates = agentConfigRepository.findByWorkspaceId(workspaceId).stream();
-        } else {
-            // Bound: only that specific config runs; never fall back to another configuration.
-            candidates = agentConfigRepository.findByIdAndWorkspaceId(boundConfigId, workspaceId).stream();
+            return false; // unbound = detection off; no implicit fan-out to every enabled config (#1368)
         }
-        return candidates.filter(AgentConfig::isEnabled).anyMatch(this::isModelAvailable);
+        // Bound: only that specific config runs; never fall back to another configuration.
+        return agentConfigRepository
+            .findByIdAndWorkspaceId(boundConfigId, workspaceId)
+            .stream()
+            .filter(AgentConfig::isEnabled)
+            .anyMatch(this::isModelAvailable);
     }
 
     private boolean isModelAvailable(AgentConfig config) {

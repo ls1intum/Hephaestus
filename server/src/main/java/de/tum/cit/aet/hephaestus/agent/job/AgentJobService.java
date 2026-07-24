@@ -215,28 +215,25 @@ public class AgentJobService {
     }
 
     /**
-     * Resolve the configs to submit for practice detection. If the workspace has an explicit
-     * {@code practiceConfigId} binding, return only that config when it exists and is enabled
-     * (bound-but-disabled = <strong>paused, returns empty</strong>); otherwise fan out to all enabled
-     * configs. The bound id is loaded via the workspace-scoped finder for tenancy safety.
+     * Resolve the config to submit for practice detection: exactly the workspace's explicit
+     * {@code practiceConfigId} binding, when it exists and is enabled. No binding, or a
+     * bound-but-disabled config, means detection is <strong>off</strong> (returns empty) — there is
+     * no implicit fan-out to every enabled config, which would submit N jobs (N× cost, N× feedback)
+     * per event (#1368). The bound id is loaded via the workspace-scoped finder for tenancy safety.
      *
-     * <p>The mentor likewise fails closed when its explicit binding is unavailable. It never switches
-     * models implicitly because that could change provider, model, and price mid-conversation.
+     * <p>The mentor likewise fails closed when its explicit binding is unavailable. Neither purpose
+     * switches models implicitly, because that could change provider, model, and price unexpectedly.
      */
     private List<AgentConfig> resolvePracticeConfigs(Workspace workspace) {
         Long boundConfigId = workspace.getPracticeConfigId();
-        if (boundConfigId != null) {
-            return agentConfigRepository
-                .findByIdAndWorkspaceId(boundConfigId, workspace.getId())
-                .filter(AgentConfig::isEnabled)
-                .map(List::of)
-                .orElseGet(List::of);
+        if (boundConfigId == null) {
+            return List.of();
         }
         return agentConfigRepository
-            .findByWorkspaceId(workspace.getId())
-            .stream()
+            .findByIdAndWorkspaceId(boundConfigId, workspace.getId())
             .filter(AgentConfig::isEnabled)
-            .toList();
+            .map(List::of)
+            .orElseGet(List::of);
     }
 
     private @Nullable AgentJob submitForConfig(

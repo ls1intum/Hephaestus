@@ -6,7 +6,6 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
 import de.tum.cit.aet.hephaestus.agent.catalog.ResolvedLlmModel;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,14 +36,18 @@ class AgentConfigCheckerAdapterTest extends BaseUnitTest {
     }
 
     @Test
-    void fanOutRemainsRunnableWhenAtLeastOneConfigHasAnAvailableModel() {
-        AgentConfig revoked = enabledConfig(7L);
-        AgentConfig available = enabledConfig(8L);
-        when(repository.findByWorkspaceId(1L)).thenReturn(List.of(revoked, available));
-        when(resolver.resolve(revoked)).thenThrow(new IllegalStateException("unavailable"));
-        when(resolver.resolve(available)).thenReturn(org.mockito.Mockito.mock(ResolvedLlmModel.class));
+    void unboundPracticeIsNotRunnable() {
+        // Unbound = detection off: no implicit fan-out to every enabled config (#1368).
+        assertThat(checker.hasRunnablePracticeConfig(1L, null)).isFalse();
+    }
 
-        assertThat(checker.hasRunnablePracticeConfig(1L, null)).isTrue();
+    @Test
+    void boundConfigIsRunnableWhenItsModelIsAvailable() {
+        AgentConfig config = enabledConfig(8L);
+        when(repository.findByIdAndWorkspaceId(8L, 1L)).thenReturn(Optional.of(config));
+        when(resolver.resolve(config)).thenReturn(org.mockito.Mockito.mock(ResolvedLlmModel.class));
+
+        assertThat(checker.hasRunnablePracticeConfig(1L, 8L)).isTrue();
     }
 
     private static AgentConfig enabledConfig(Long id) {
