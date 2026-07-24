@@ -193,12 +193,29 @@ Practice review is not enabled by a single flag. The following settings must be 
 | `PRACTICE_REVIEW_DELIVER_TO_MERGED` | Allows delivery after merge |
 | `PRACTICE_REVIEW_COOLDOWN_MINUTES` | Minimum delay between repeated reviews of the same PR/MR |
 | `PRACTICE_REVIEW_APP_BASE_URL` | Footer link in review comments |
-| `AGENT_NATS_ENABLED` | Enables the agent job queue and executor |
+| `AGENT_ENABLED` | Enables the PostgreSQL-backed agent job queue and executor |
 | `GIT_CHECKOUT_ENABLED` | Enables local repo checkout and bind-mount into agent containers |
-| `NATS_ENABLED` | Enables webhook-driven sync consumption |
+| `NATS_ENABLED` | Enables webhook-driven sync consumption (unrelated to the agent job queue) |
 | `NATS_DURABLE_CONSUMER_NAME` | Durable consumer name for sync processing |
 
-The Docker sandbox itself is activated by the **worker runtime role** (`hephaestus.runtime.worker.enabled`, default `true` in the monolith and in the dedicated `application-worker` pod), not by a flag. `AGENT_NATS_ENABLED`, `GIT_CHECKOUT_ENABLED`, and `NATS_ENABLED` must be `true` together for practice review — anything else is a half-configured deployment.
+The Docker sandbox itself is activated by the **worker runtime role** (`hephaestus.runtime.worker.enabled`), not by `AGENT_ENABLED`. Keep that capability and Docker access on the application server because interactive mentor sandboxes are request-affine and run there; a dedicated `application-worker` adds capacity for queued practice reviews. When `AGENT_ENABLED` is also true, any worker-capable replica may claim those PostgreSQL jobs. `AGENT_ENABLED` and `GIT_CHECKOUT_ENABLED` must be `true` together for practice review — anything else is a half-configured deployment. `NATS_ENABLED` still gates webhook-driven sync consumption and must stay on for that, but it is no longer part of the practice-review bundle.
+
+### Agent queue health & retention
+
+The agent job queue (`agent_job`, polled by `AgentJobExecutor`) exposes its own health signals — wire an alert off these rather than guessing from application logs:
+
+- **`agent.queue.depth`** — QUEUED jobs currently eligible to run (`available_at <= now()`).
+- **`agent.queue.oldest_age_seconds`** — age of the oldest eligible QUEUED job; `0` when the queue is empty. This is the signal to alert on, not depth alone: a briefly busy queue and a stuck one can both show non-zero depth, but only a stuck queue shows a climbing age.
+- **`agent.queue.running`** — jobs currently RUNNING fleet-wide.
+- **`agent.queue.health.sampler.failures`** — failed queue-health samples; gauges keep their last-good values instead of reporting a false empty queue.
+- **`agent.job.claim.latency`** — time between a job becoming eligible and being claimed.
+- **`agent.job.execution.duration`** — tagged by `jobType` and outcome `status` (`COMPLETED`, `FAILED`, `TIMED_OUT`, `CANCELLED`, `REQUEUED`).
+- **`agent.job.delivery.recovered`** — stuck `PENDING` deliveries (executor crashed mid-delivery) successfully re-attempted by the recovery sweep.
+- **`agent.job.retention.stripped`** / **`agent.job.retention.deleted`** — terminal rows whose heavy payload columns were nulled out, and rows deleted outright, by the retention sweep below.
+
+The queue-health gauges are sampled every 30s; timers and counters are recorded inline. None run on a request path.
+
+**Retention:** terminal `agent_job` rows are pruned automatically so the table doesn't grow unbounded on a busy instance. `AGENT_PAYLOAD_RETENTION` (default `P14D`) strips `container_logs`/`output` to `NULL` past that age; `AGENT_ROW_RETENTION` (default `P90D`, must be `>= AGENT_PAYLOAD_RETENTION`) deletes the row outright past that age. Both accept an ISO-8601 duration. The defaults are deliberately generous — tighten them only if storage pressure demands it, since a stripped-but-present row is still useful for a "how many jobs ran" count even after its diagnostic payload is gone.
 
 ### Rollout tiers
 
@@ -207,24 +224,58 @@ Use the same variables differently across environments:
 | Environment | Intended scope |
 | --- | --- |
 | Preview | Limited by default. Keep GitLab login, GitLab workspaces, sandbox, git checkout, and agent job execution disabled unless preview is explicitly being used as rollout validation. |
-| Staging | Uses the production compose files, but should still be a controlled rollout. Start by enabling GitLab login and GitLab workspace creation first. Only enable `AGENT_NATS_ENABLED`, `GIT_CHECKOUT_ENABLED`, and `NATS_ENABLED` when staging is intentionally validating practice review execution. |
+| Staging | Uses the production compose files, but should still be a controlled rollout. Start by enabling GitLab login and GitLab workspace creation first. Only enable `AGENT_ENABLED` and `GIT_CHECKOUT_ENABLED` when staging is intentionally validating practice review execution. |
 | Production | Full rollout only after staging has validated the exact same bundle. |
 
 Staging and production both use the production compose files. The difference should come from the `.env` values, not from a different compose topology.
 
 ### AI model configuration
 
-The mentor (Pi agent run in-process) and the sandboxed practice-review proxy both flow through the application server's LLM proxy routes. There is no separate intelligence service to configure.
+The mentor's interactive sandbox uses the application-server replica's LLM proxy; a queued practice review uses the proxy beside the worker that claimed it. That proxy is the only path a sandbox has to a provider key, which is never injected directly. There is no separate intelligence service to configure, and there are no LLM env vars to set.
 
-For Azure-backed practice review in the application server:
+OpenAI and other OpenAI-compatible endpoints, including Azure OpenAI v1 and self-hosted gateways such
+as vLLM, are registered at runtime rather than through `.env`. Each connection declares the exact
+API it implements: **Chat Completions** or **Responses**. Azure is a create-form preset, not a second
+runtime protocol: use its `/openai/v1/` base URL and **API key** authentication.
 
-| Variable | Purpose |
-| --- | --- |
-| `LLM_PROXY_AZURE_OPENAI_URL` | Azure OpenAI resource URL used by the dedicated Azure proxy route |
-| `LLM_PROXY_AZURE_OPENAI_AUTH_HEADER` | Usually `api-key` |
-| `LLM_PROXY_AZURE_OPENAI_USE_BEARER` | Usually `false` for Azure OpenAI |
+The intended administration flow is deliberately small:
 
-The generic `LLM_PROXY_OPENAI_*` settings only affect the OpenAI-compatible proxy route. The sandboxed Pi agent uses the dedicated Azure route when configured for Azure OpenAI.
+1. An instance admin creates a disabled connection, tests it, then adds the exact upstream model IDs
+   available through it.
+2. The admin declares each model's current per-million-token price, or explicitly marks it **No
+   metered API cost**. Provider responses contain token usage, not portable dollar prices, so
+   Hephaestus never guesses or silently treats an unknown price as zero.
+3. The admin enables the connection and model, then either makes the shared model public or grants it
+   to selected workspaces.
+4. A workspace admin selects an available model for each agent configuration. If the instance admin
+   permits bring-your-own connections, the workspace admin may instead create and price a
+   workspace-owned connection and model through the same staged flow.
+
+Connection routing identity (base URL, wire API, and authentication mode) and a model's upstream ID
+are immutable. To change either, create a replacement, test it, rebind configurations, then disable
+the old entry. Display names, credentials, prices, grants, and enabled state remain editable.
+
+The proxy resolves the upstream base URL, auth header, and key per model from whichever connection it is bound to, so nothing needs to be pinned at the process level. On a split-pod deployment the worker pod resolves providers from the same catalog as the app pod — no LLM credential passthrough between pods. Warm mentor sandboxes are reused only while their complete non-secret runtime identity still matches; changing the bound model/route, image, prompt/runtime files, or limits replaces the sandbox before the next prompt. Per-turn context is refreshed inside a compatible warm sandbox rather than forcing a restart.
+
+#### Workspace budgets and alerting
+
+Every workspace has an optional monthly LLM budget, set by an instance admin under **Instance admin → LLM Usage → Set budget** (per-workspace, per calendar month, UTC). Clearing the field removes the cap (**No cap** — uncapped, the default); setting it to exactly `0` pauses the workspace immediately, which is the supported way to hard-stop a workspace mid-month. The cap protects instance-funded spend, so its total includes shared models only. Workspace-owned usage is reported separately because it is paid through the workspace's own provider account. Once the instance cap is exhausted, however, all new LLM work for the workspace is paused so the workspace has one predictable operational state.
+
+Once the month's confirmed spend reaches the cap, the workspace's budget verdict flips to **EXHAUSTED**. New agent jobs are refused at submission, queued jobs are checked again immediately before claim, and mentor turns are refused before starting a sandbox. Practice detection and the mentor both go silent at that point; nothing crashes or errors visibly to the end user. Work resumes automatically at the next UTC calendar month, or immediately if an instance admin raises or clears the cap. A workspace admin sees the pause explained on their workspace's **AI usage** page and, so it isn't only visible on that one screen, on the **Models** tab too.
+
+Some started attempts may not return trustworthy usage counters, and migrated legacy attempts may not have an admission price snapshot. While such usage exists, the workspace's reported monthly total renders as "at least $X" — a floor, not the confirmed total — and the verdict reads **UNVERIFIABLE** instead of **WITHIN** (**EXHAUSTED** still takes priority). New models cannot be enabled until an administrator declares either a price or **No metered API cost**; the latter counts as confirmed $0 spend, not unpriced.
+
+The instance-wide **Unpriced usage policy** decides how an UNVERIFIABLE month affects new work.
+**Warn** keeps work running while clearly reporting a cost floor. **Block** pauses new practice
+reviews and mentor turns for affected workspaces until the usage is reconciled or the next UTC month
+begins. Warn is the default so an accounting anomaly cannot unexpectedly take every affected
+workspace offline; choose Block when fail-closed cost control matters more than availability.
+
+**Alerting hook:** there is no built-in push notification when a workspace crosses its cap — wire your own alert off the Micrometer counters the budget service already emits: `llm.budget.exhausted` (incremented once per usage event whose confirmed contribution pushes a capped workspace's month-to-date spend across the cap) and `llm.budget.blocked` (tagged by admission surface, including `agent_job` and `mentor`). Each EXHAUSTED transition also logs a WARN, visible in Sentry if configured.
+
+Reasoning tokens are retained as telemetry when the compatible endpoint reports them. They are not
+priced separately: OpenAI-compatible usage includes reasoning tokens in billable output tokens, so a
+second reasoning rate would double-count the same work.
 
 **Webhook secret:** Set `WEBHOOK_SECRET` to the secret configured on your GitHub and GitLab webhooks. Prefer SHA-256 (`X-Hub-Signature-256`) and generate with `openssl rand -hex 32` (base64 also works).
 
@@ -261,7 +312,7 @@ The sync scheduler fetches recent GitHub activity (issues, PRs, reviews) for mon
    - Designate the first super-admin **before first boot** via the allowlist `HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS=<provider>:@<username>` (e.g. `github:@octocat`), or use the one-time break-glass `HEPHAESTUS_AUTH_BOOTSTRAP_TOKEN` — both are idempotent and lockout-safe (see the `docs/runbooks/auth-cutover.md` runbook → *First instance admin*). They promote on login; subsequent admins are managed from `/admin/users`. Hand-editing `account.app_role = 'APP_ADMIN'` in SQL is a last-resort fallback only.
    - Verify that the super admin user can access workspace admin endpoints for workspaces where they have membership (they are automatically elevated to workspace ADMIN level for those workspaces).
    - Trigger a test webhook from GitHub or GitLab to validate the ingest pipeline.
-   - Verify that `GITLAB_ENABLED`, `GITLAB_WORKSPACE_CREATION`, `AGENT_NATS_ENABLED`, `GIT_CHECKOUT_ENABLED`, and `NATS_ENABLED` are all present in the deployed environment before testing GitLab practice review.
+   - Verify that `GITLAB_ENABLED`, `GITLAB_WORKSPACE_CREATION`, `AGENT_ENABLED`, `GIT_CHECKOUT_ENABLED`, and `NATS_ENABLED` (needed for sync/webhook ingest, not the agent job queue) are all present in the deployed environment before testing GitLab practice review.
    - Open `/imprint` and `/privacy`. If the red "not configured" banner is shown, configure a [legal profile or overrides](./legal-pages) **before** opening the deployment to end users — serving the built-in disclaimer is a § 5 DDG / Art. 13 GDPR violation.
 
 ## Global admin privileges
@@ -280,7 +331,7 @@ This allows platform administrators to troubleshoot and manage workspaces where 
 - Monitor services with the central Prometheus/Loki stack; ensure trace IDs appear in logs.
 - Schedule regular backups for PostgreSQL (it now holds auth state — accounts, identity links, sessions — in addition to application data).
 - Review weekly leaderboard Slack posts to ensure the automation is active.
-- Preview deployments do not currently represent the full GitLab practice-review rollout unless they are explicitly wired with the same GitLab IdP, sandbox, git checkout, and agent NATS settings.
+- Preview deployments do not currently represent the full GitLab practice-review rollout unless they are explicitly wired with the same GitLab IdP, sandbox, git checkout, and agent job queue settings.
 
 ## Support
 

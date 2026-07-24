@@ -1,6 +1,11 @@
 package de.tum.cit.aet.hephaestus.agent.config;
 
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelWorkspaceGrantRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.ModelVisibility;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModel;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
@@ -13,6 +18,7 @@ import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +31,10 @@ public class AgentConfigService {
     private final AgentJobRepository agentJobRepository;
     private final WorkspaceRepository workspaceRepository;
     private final ConfigAuditPort configAudit;
+    private final LlmModelRepository llmModelRepository;
+    private final WorkspaceLlmModelRepository workspaceLlmModelRepository;
+    private final LlmModelWorkspaceGrantRepository llmModelWorkspaceGrantRepository;
+    private final AgentBindingService agentBindingService;
 
     @Transactional(readOnly = true)
     public List<AgentConfig> getConfigs(WorkspaceContext workspaceContext) {
@@ -54,23 +64,8 @@ public class AgentConfigService {
         AgentConfig config = new AgentConfig();
         config.setWorkspace(workspace);
         config.setName(request.name());
-        config.setLlmProvider(request.llmProvider());
-
         if (request.enabled() != null) {
             config.setEnabled(request.enabled());
-        }
-        if (request.modelName() != null) {
-            config.setModelName(request.modelName());
-        }
-        if (request.llmApiKey() != null) {
-            config.setLlmApiKey(request.llmApiKey());
-        }
-        if (request.llmBaseUrl() != null) {
-            // Empty string clears the field; otherwise stores the trimmed value. The request DTO caps
-            // this at @Size(max=512), deliberately well under the entity column (length=2048) so trimming
-            // after validation can never overflow the column. The wider column is intentional headroom —
-            // narrowing it to 512 requires a changelog.
-            config.setLlmBaseUrl(request.llmBaseUrl().isBlank() ? null : request.llmBaseUrl().trim());
         }
         if (request.timeoutSeconds() != null) {
             config.setTimeoutSeconds(request.timeoutSeconds());
@@ -81,11 +76,8 @@ public class AgentConfigService {
         if (request.allowInternet() != null) {
             config.setAllowInternet(request.allowInternet());
         }
-        if (request.credentialMode() != null) {
-            config.setCredentialMode(request.credentialMode());
-        }
-
-        validateCredentialMode(config);
+        applyModelBinding(config, workspaceContext, request.instanceModelId(), request.workspaceModelId());
+        requireAvailableBindingWhenEnabled(config, workspaceId);
 
         AgentConfig saved;
         try {
@@ -126,24 +118,8 @@ public class AgentConfigService {
             .orElseThrow(() -> new EntityNotFoundException("AgentConfig", configId.toString()));
         AgentConfigSnapshot before = AgentConfigSnapshot.of(config);
 
-        if (request.llmProvider() != null) {
-            config.setLlmProvider(request.llmProvider());
-        }
         if (request.enabled() != null) {
             config.setEnabled(request.enabled());
-        }
-        if (request.modelName() != null) {
-            config.setModelName(request.modelName());
-        }
-        // Clearing the key wins over a provided value, so an accidental "clear + new key" still clears.
-        if (Boolean.TRUE.equals(request.clearLlmApiKey())) {
-            config.setLlmApiKey(null);
-        } else if (request.llmApiKey() != null) {
-            config.setLlmApiKey(request.llmApiKey());
-        }
-        if (request.llmBaseUrl() != null) {
-            // Empty string clears the field; otherwise stores the trimmed value.
-            config.setLlmBaseUrl(request.llmBaseUrl().isBlank() ? null : request.llmBaseUrl().trim());
         }
         if (request.timeoutSeconds() != null) {
             config.setTimeoutSeconds(request.timeoutSeconds());
@@ -154,13 +130,13 @@ public class AgentConfigService {
         if (request.allowInternet() != null) {
             config.setAllowInternet(request.allowInternet());
         }
-        if (request.credentialMode() != null) {
-            config.setCredentialMode(request.credentialMode());
-        }
-
-        validateCredentialMode(config);
+        applyModelBinding(config, workspaceContext, request.instanceModelId(), request.workspaceModelId());
+        requireAvailableBindingWhenEnabled(config, workspaceContext.id());
 
         AgentConfig saved = agentConfigRepository.save(config);
+        // Mirror the effective model + limits into any binding currently pointed at this config, so a
+        // model/limit/enabled edit propagates to the runtime source of truth (#1368).
+        agentBindingService.syncPurposesBoundTo(saved.getWorkspace(), saved.getId());
         configAudit.record(
             ConfigAuditEntry.updated(
                 ConfigAuditEntityType.AGENT_CONFIG,
@@ -171,6 +147,29 @@ public class AgentConfigService {
             )
         );
         return saved;
+    }
+
+    private void requireAvailableBindingWhenEnabled(AgentConfig config, Long workspaceId) {
+        if (!config.isEnabled()) return;
+        if (config.isEnabled() && (config.getInstanceModel() == null) == (config.getWorkspaceModel() == null)) {
+            throw new IllegalArgumentException(
+                "An enabled agent config must bind exactly one available catalog model."
+            );
+        }
+        LlmModel instanceModel = config.getInstanceModel();
+        if (instanceModel != null) {
+            boolean visible =
+                instanceModel.getVisibility() == ModelVisibility.PUBLIC ||
+                llmModelWorkspaceGrantRepository.existsByIdModelIdAndIdWorkspaceId(instanceModel.getId(), workspaceId);
+            if (!instanceModel.isEnabled() || !instanceModel.getConnection().isEnabled() || !visible) {
+                throw new IllegalArgumentException("This model isn't available to this workspace.");
+            }
+            return;
+        }
+        WorkspaceLlmModel workspaceModel = config.getWorkspaceModel();
+        if (!workspaceModel.isEnabled() || !workspaceModel.getConnection().isEnabled()) {
+            throw new IllegalArgumentException("This model isn't available to this workspace.");
+        }
     }
 
     @Transactional
@@ -211,22 +210,49 @@ public class AgentConfigService {
     }
 
     /**
-     * Validates the direct credential mode (API_KEY): it requires internet access AND a stored
-     * credential, since the container reaches the provider directly. Runs on both create and update;
-     * on update the merged config still carries the existing key, so a kept key passes.
+     * Applies a model-binding write (#1368): exactly one of {@code instanceModelId} /
+     * {@code workspaceModelId} may be set (both non-null is a 400), and either clears the other side of
+     * the pair. Leaving both ids null is a no-op and preserves the current binding.
+     *
+     * <p>An enabled config is also revalidated after every update. A revoked binding may still be saved
+     * when the same update disables the config, but it cannot remain silently enabled.
      */
-    private void validateCredentialMode(AgentConfig config) {
-        if (config.getCredentialMode() == CredentialMode.PROXY) {
-            return;
+    private void applyModelBinding(
+        AgentConfig config,
+        WorkspaceContext workspaceContext,
+        @Nullable Long instanceModelId,
+        @Nullable Long workspaceModelId
+    ) {
+        if (instanceModelId != null && workspaceModelId != null) {
+            throw new IllegalArgumentException(
+                "An agent config can bind to only one model at a time — a shared model or your own " +
+                    "provider's model, not both."
+            );
         }
-        if (!config.isAllowInternet()) {
-            throw AgentConfigCredentialModeException.requiresInternet(config.getCredentialMode());
-        }
-        // Only an ENABLED runtime must carry a usable key — a disabled one never runs, so a keyless
-        // config can still be renamed or left parked (and, importantly, an already-keyless config can be
-        // disabled) without being forced to supply a key first.
-        if (config.isEnabled() && (config.getLlmApiKey() == null || config.getLlmApiKey().isBlank())) {
-            throw AgentConfigCredentialModeException.missingCredential(config.getCredentialMode());
+        if (instanceModelId != null) {
+            LlmModel model = llmModelRepository
+                .findById(instanceModelId)
+                .orElseThrow(() -> new EntityNotFoundException("LlmModel", instanceModelId));
+            boolean visible =
+                model.getVisibility() == ModelVisibility.PUBLIC ||
+                llmModelWorkspaceGrantRepository.existsByIdModelIdAndIdWorkspaceId(
+                    model.getId(),
+                    workspaceContext.id()
+                );
+            if (!model.isEnabled() || !model.getConnection().isEnabled() || !visible) {
+                throw new IllegalArgumentException("This model isn't available to this workspace.");
+            }
+            config.setInstanceModel(model);
+            config.setWorkspaceModel(null);
+        } else if (workspaceModelId != null) {
+            WorkspaceLlmModel model = workspaceLlmModelRepository
+                .findByIdAndWorkspaceId(workspaceModelId, workspaceContext.id())
+                .orElseThrow(() -> new EntityNotFoundException("WorkspaceLlmModel", workspaceModelId));
+            if (!model.isEnabled() || !model.getConnection().isEnabled()) {
+                throw new IllegalArgumentException("This model isn't available to this workspace.");
+            }
+            config.setWorkspaceModel(model);
+            config.setInstanceModel(null);
         }
     }
 }

@@ -8,8 +8,15 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelWorkspaceGrantRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.ModelVisibility;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmConnection;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModel;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
@@ -46,6 +53,18 @@ class AgentConfigServiceTest extends BaseUnitTest {
     @Mock
     private ConfigAuditPort configAudit;
 
+    @Mock
+    private LlmModelRepository llmModelRepository;
+
+    @Mock
+    private WorkspaceLlmModelRepository workspaceLlmModelRepository;
+
+    @Mock
+    private LlmModelWorkspaceGrantRepository llmModelWorkspaceGrantRepository;
+
+    @Mock
+    private AgentBindingService agentBindingService;
+
     @InjectMocks
     private AgentConfigService agentConfigService;
 
@@ -67,185 +86,6 @@ class AgentConfigServiceTest extends BaseUnitTest {
             false,
             Set.of()
         );
-    }
-
-    @Nested
-    class CredentialModeValidation {
-
-        @Test
-        void shouldRejectApiKeyWithoutInternet() {
-            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "test")).thenReturn(false);
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-
-            var request = CreateAgentConfigRequestDTO.builder()
-                .name("test")
-                .enabled(true)
-                .llmApiKey("sk-key")
-                .llmProvider(LlmProvider.ANTHROPIC)
-                .allowInternet(false)
-                .credentialMode(CredentialMode.API_KEY)
-                .build();
-
-            assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request))
-                .isInstanceOf(AgentConfigCredentialModeException.class)
-                .hasMessageContaining("API_KEY")
-                .hasMessageContaining("internet");
-        }
-
-        @Test
-        void shouldAcceptApiKeyWithInternet() {
-            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "test")).thenReturn(false);
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-            var request = CreateAgentConfigRequestDTO.builder()
-                .name("test")
-                .enabled(true)
-                .llmApiKey("sk-key")
-                .llmProvider(LlmProvider.ANTHROPIC)
-                .allowInternet(true)
-                .credentialMode(CredentialMode.API_KEY)
-                .build();
-
-            AgentConfig result = agentConfigService.createConfig(workspaceContext, request);
-            assertThat(result.getCredentialMode()).isEqualTo(CredentialMode.API_KEY);
-            assertThat(result.isAllowInternet()).isTrue();
-        }
-
-        @Test
-        void shouldAcceptDisabledApiKeyWithoutCredential() {
-            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "test")).thenReturn(false);
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-            // A disabled runtime never runs, so it can be saved/parked without a key (and, importantly, a
-            // pre-existing keyless API_KEY config can be disabled) — only an ENABLED runtime is forced to
-            // carry one.
-            var request = CreateAgentConfigRequestDTO.builder()
-                .name("test")
-                .enabled(false)
-                .llmProvider(LlmProvider.ANTHROPIC)
-                .allowInternet(true)
-                .credentialMode(CredentialMode.API_KEY)
-                .build();
-
-            AgentConfig result = agentConfigService.createConfig(workspaceContext, request);
-            assertThat(result.isEnabled()).isFalse();
-        }
-
-        @Test
-        void shouldRejectDirectModeWithoutCredential() {
-            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "test")).thenReturn(false);
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-
-            var request = CreateAgentConfigRequestDTO.builder()
-                .name("test")
-                .enabled(true)
-                .llmProvider(LlmProvider.ANTHROPIC)
-                .allowInternet(true)
-                .credentialMode(CredentialMode.API_KEY)
-                .build();
-
-            assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request))
-                .isInstanceOf(AgentConfigCredentialModeException.class)
-                .hasMessageContaining("API key");
-        }
-
-        @Test
-        void shouldAcceptProxyWithoutInternet() {
-            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "test")).thenReturn(false);
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-            var request = CreateAgentConfigRequestDTO.builder()
-                .name("test")
-                .enabled(true)
-                .llmProvider(LlmProvider.ANTHROPIC)
-                .allowInternet(false)
-                .credentialMode(CredentialMode.PROXY)
-                .build();
-
-            AgentConfig result = agentConfigService.createConfig(workspaceContext, request);
-            assertThat(result.getCredentialMode()).isEqualTo(CredentialMode.PROXY);
-            assertThat(result.isAllowInternet()).isFalse();
-        }
-
-        @Test
-        void shouldDefaultToProxy() {
-            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "test")).thenReturn(false);
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-            var request = CreateAgentConfigRequestDTO.builder()
-                .name("test")
-                .enabled(true)
-                .llmProvider(LlmProvider.ANTHROPIC)
-                .build();
-
-            AgentConfig result = agentConfigService.createConfig(workspaceContext, request);
-            assertThat(result.getCredentialMode()).isEqualTo(CredentialMode.PROXY);
-        }
-
-        @Test
-        void shouldRejectSwitchingToApiKeyWhenInternetDisabled() {
-            // Switching PROXY→API_KEY on a config whose internet is still off hits the requiresInternet
-            // branch (allowInternet=false is checked before the credential branch).
-            AgentConfig existing = new AgentConfig();
-            existing.setId(10L);
-            existing.setWorkspace(workspace);
-            existing.setLlmProvider(LlmProvider.ANTHROPIC);
-            existing.setAllowInternet(false);
-            existing.setCredentialMode(CredentialMode.PROXY);
-
-            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
-
-            var request = UpdateAgentConfigRequestDTO.builder().credentialMode(CredentialMode.API_KEY).build();
-
-            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request))
-                .isInstanceOf(AgentConfigCredentialModeException.class)
-                .hasMessageContaining("API_KEY")
-                .hasMessageContaining("internet");
-        }
-
-        @Test
-        void shouldRejectSwitchingToApiKeyWithInternetButNoCredential() {
-            // The genuine PROXY→API_KEY transition where internet IS allowed: now the credential branch
-            // fires because the enabled config carries no key.
-            AgentConfig existing = new AgentConfig();
-            existing.setId(10L);
-            existing.setWorkspace(workspace);
-            existing.setLlmProvider(LlmProvider.ANTHROPIC);
-            existing.setEnabled(true);
-            existing.setAllowInternet(true);
-            existing.setCredentialMode(CredentialMode.PROXY);
-
-            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
-
-            var request = UpdateAgentConfigRequestDTO.builder().credentialMode(CredentialMode.API_KEY).build();
-
-            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request))
-                .isInstanceOf(AgentConfigCredentialModeException.class)
-                .hasMessageContaining("API_KEY")
-                .hasMessageContaining("API key");
-        }
-
-        @Test
-        void shouldRejectDisablingInternetOnApiKeyConfig() {
-            AgentConfig existing = new AgentConfig();
-            existing.setId(10L);
-            existing.setWorkspace(workspace);
-            existing.setLlmProvider(LlmProvider.ANTHROPIC);
-            existing.setAllowInternet(true);
-            existing.setCredentialMode(CredentialMode.API_KEY);
-
-            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
-
-            var request = UpdateAgentConfigRequestDTO.builder().allowInternet(false).build();
-
-            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request))
-                .isInstanceOf(AgentConfigCredentialModeException.class)
-                .hasMessageContaining("internet");
-        }
     }
 
     @Nested
@@ -294,10 +134,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
 
             var request = CreateAgentConfigRequestDTO.builder()
                 .name("my-agent")
-                .enabled(true)
-                .modelName("claude-sonnet-4-20250514")
-                .llmApiKey("sk-abc")
-                .llmProvider(LlmProvider.ANTHROPIC)
+                .enabled(false)
                 .timeoutSeconds(300)
                 .maxConcurrentJobs(2)
                 .allowInternet(true)
@@ -307,9 +144,10 @@ class AgentConfigServiceTest extends BaseUnitTest {
 
             assertThat(result.getWorkspace()).isEqualTo(workspace);
             assertThat(result.getName()).isEqualTo("my-agent");
-            assertThat(result.isEnabled()).isTrue();
-            assertThat(result.getModelName()).isEqualTo("claude-sonnet-4-20250514");
-            assertThat(result.getLlmApiKey()).isEqualTo("sk-abc");
+            assertThat(result.isEnabled()).isFalse();
+            assertThat(result.getModelName()).isNull();
+            assertThat(result.getLlmApiKey()).isNull();
+            assertThat(result.getLlmProvider()).isNull();
             assertThat(result.getTimeoutSeconds()).isEqualTo(300);
             assertThat(result.getMaxConcurrentJobs()).isEqualTo(2);
             assertThat(result.isAllowInternet()).isTrue();
@@ -319,11 +157,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
         void shouldRejectDuplicateName() {
             when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "my-agent")).thenReturn(true);
 
-            var request = CreateAgentConfigRequestDTO.builder()
-                .name("my-agent")
-                .enabled(true)
-                .llmProvider(LlmProvider.ANTHROPIC)
-                .build();
+            var request = CreateAgentConfigRequestDTO.builder().name("my-agent").enabled(false).build();
 
             assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request))
                 .isInstanceOf(AgentConfigNameConflictException.class)
@@ -340,15 +174,24 @@ class AgentConfigServiceTest extends BaseUnitTest {
                 new DataIntegrityViolationException("uk_agent_config_workspace_name")
             );
 
-            var request = CreateAgentConfigRequestDTO.builder()
-                .name("my-agent")
-                .enabled(true)
-                .llmProvider(LlmProvider.ANTHROPIC)
-                .build();
+            var request = CreateAgentConfigRequestDTO.builder().name("my-agent").enabled(false).build();
 
             assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request))
                 .isInstanceOf(AgentConfigNameConflictException.class)
                 .hasMessageContaining("my-agent");
+        }
+
+        @Test
+        void shouldRejectEnabledConfigWithoutCatalogBinding() {
+            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "my-agent")).thenReturn(false);
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+
+            var request = CreateAgentConfigRequestDTO.builder().name("my-agent").enabled(true).build();
+
+            assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("bind exactly one");
+            verify(agentConfigRepository, never()).save(any());
         }
     }
 
@@ -366,36 +209,13 @@ class AgentConfigServiceTest extends BaseUnitTest {
             when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
             when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            var request = UpdateAgentConfigRequestDTO.builder()
-                .modelName("gpt-4o")
-                .llmProvider(LlmProvider.OPENAI)
-                .timeoutSeconds(120)
-                .build();
+            var request = UpdateAgentConfigRequestDTO.builder().timeoutSeconds(120).build();
 
             AgentConfig result = agentConfigService.updateConfig(workspaceContext, 10L, request);
 
             assertThat(result.getId()).isEqualTo(10L);
             assertThat(result.getLlmApiKey()).isEqualTo("sk-existing-secret");
             assertThat(result.getTimeoutSeconds()).isEqualTo(120);
-        }
-
-        @Test
-        void shouldClearApiKeyWhenClearFlagSet() {
-            AgentConfig existing = new AgentConfig();
-            existing.setId(10L);
-            existing.setWorkspace(workspace);
-            existing.setLlmProvider(LlmProvider.ANTHROPIC);
-            existing.setLlmApiKey("sk-existing-secret");
-
-            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
-            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-            // clearLlmApiKey wins over any provided key.
-            var request = UpdateAgentConfigRequestDTO.builder().llmApiKey("sk-ignored").clearLlmApiKey(true).build();
-
-            AgentConfig result = agentConfigService.updateConfig(workspaceContext, 10L, request);
-
-            assertThat(result.getLlmApiKey()).isNull();
         }
 
         @Test
@@ -407,6 +227,21 @@ class AgentConfigServiceTest extends BaseUnitTest {
             assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 999L, request)).isInstanceOf(
                 EntityNotFoundException.class
             );
+        }
+
+        @Test
+        void shouldRejectEnablingUnboundConfig() {
+            AgentConfig existing = new AgentConfig();
+            existing.setId(10L);
+            existing.setWorkspace(workspace);
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
+
+            var request = UpdateAgentConfigRequestDTO.builder().enabled(true).build();
+
+            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("bind exactly one");
+            verify(agentConfigRepository, never()).save(any());
         }
     }
 
@@ -526,14 +361,14 @@ class AgentConfigServiceTest extends BaseUnitTest {
             config.setWorkspace(workspace);
             config.setName("primary");
             config.setLlmProvider(LlmProvider.OPENAI);
-            config.setModelName("old-model");
+            config.setTimeoutSeconds(600);
             when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(7L, 1L)).thenReturn(Optional.of(config));
             when(agentConfigRepository.save(any(AgentConfig.class))).thenAnswer(i -> i.getArgument(0));
 
             agentConfigService.updateConfig(
                 workspaceContext,
                 7L,
-                UpdateAgentConfigRequestDTO.builder().modelName("new-model").build()
+                UpdateAgentConfigRequestDTO.builder().timeoutSeconds(900).build()
             );
 
             ArgumentCaptor<ConfigAuditEntry> captor = ArgumentCaptor.forClass(ConfigAuditEntry.class);
@@ -541,8 +376,241 @@ class AgentConfigServiceTest extends BaseUnitTest {
             ConfigAuditEntry entry = captor.getValue();
             assertThat(entry.entityType()).isEqualTo(ConfigAuditEntityType.AGENT_CONFIG);
             assertThat(entry.entityId()).isEqualTo("7");
-            assertThat(String.valueOf(entry.before())).contains("old-model");
-            assertThat(String.valueOf(entry.after())).contains("new-model");
+            assertThat(String.valueOf(entry.before())).contains("timeoutSeconds=600");
+            assertThat(String.valueOf(entry.after())).contains("timeoutSeconds=900");
+        }
+    }
+
+    @Nested
+    class ModelBinding {
+
+        private AgentConfig existingConfig() {
+            AgentConfig config = new AgentConfig();
+            config.setId(10L);
+            config.setWorkspace(workspace);
+            config.setLlmProvider(LlmProvider.ANTHROPIC);
+            return config;
+        }
+
+        private LlmModel instanceModel(
+            Long id,
+            ModelVisibility visibility,
+            boolean modelEnabled,
+            boolean connectionEnabled
+        ) {
+            LlmConnection connection = new LlmConnection();
+            connection.setId(100L);
+            connection.setEnabled(connectionEnabled);
+            LlmModel model = new LlmModel();
+            model.setId(id);
+            model.setConnection(connection);
+            model.setVisibility(visibility);
+            model.setEnabled(modelEnabled);
+            return model;
+        }
+
+        private WorkspaceLlmModel workspaceModel(Long id, boolean modelEnabled, boolean connectionEnabled) {
+            WorkspaceLlmConnection connection = new WorkspaceLlmConnection();
+            connection.setId(200L);
+            connection.setEnabled(connectionEnabled);
+            WorkspaceLlmModel model = new WorkspaceLlmModel();
+            model.setId(id);
+            model.setConnection(connection);
+            model.setEnabled(modelEnabled);
+            return model;
+        }
+
+        @Test
+        void settingBothInstanceAndWorkspaceModelIsRejected() {
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(
+                Optional.of(existingConfig())
+            );
+
+            var request = UpdateAgentConfigRequestDTO.builder().instanceModelId(5L).workspaceModelId(6L).build();
+
+            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("only one model");
+            verify(agentConfigRepository, never()).save(any());
+        }
+
+        @Test
+        void bindingAPublicEnabledInstanceModelSucceedsAndClearsAnyWorkspaceModel() {
+            AgentConfig existing = existingConfig();
+            existing.setWorkspaceModel(workspaceModel(6L, true, true));
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
+            when(llmModelRepository.findById(5L)).thenReturn(
+                Optional.of(instanceModel(5L, ModelVisibility.PUBLIC, true, true))
+            );
+            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            var request = UpdateAgentConfigRequestDTO.builder().instanceModelId(5L).build();
+            AgentConfig result = agentConfigService.updateConfig(workspaceContext, 10L, request);
+
+            assertThat(result.getInstanceModel()).isNotNull();
+            assertThat(result.getInstanceModel().getId()).isEqualTo(5L);
+            assertThat(result.getWorkspaceModel()).isNull();
+        }
+
+        @Test
+        void bindingAGrantedInstanceModelWithoutAGrantIsRejected() {
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(
+                Optional.of(existingConfig())
+            );
+            when(llmModelRepository.findById(5L)).thenReturn(
+                Optional.of(instanceModel(5L, ModelVisibility.GRANTED, true, true))
+            );
+            when(llmModelWorkspaceGrantRepository.existsByIdModelIdAndIdWorkspaceId(5L, 1L)).thenReturn(false);
+
+            var request = UpdateAgentConfigRequestDTO.builder().instanceModelId(5L).build();
+
+            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("isn't available");
+            verify(agentConfigRepository, never()).save(any());
+        }
+
+        @Test
+        void bindingAGrantedInstanceModelWithAGrantSucceeds() {
+            AgentConfig existing = existingConfig();
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
+            when(llmModelRepository.findById(5L)).thenReturn(
+                Optional.of(instanceModel(5L, ModelVisibility.GRANTED, true, true))
+            );
+            when(llmModelWorkspaceGrantRepository.existsByIdModelIdAndIdWorkspaceId(5L, 1L)).thenReturn(true);
+            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            var request = UpdateAgentConfigRequestDTO.builder().instanceModelId(5L).build();
+            AgentConfig result = agentConfigService.updateConfig(workspaceContext, 10L, request);
+
+            assertThat(result.getInstanceModel().getId()).isEqualTo(5L);
+        }
+
+        @Test
+        void bindingADisabledInstanceModelIsRejected() {
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(
+                Optional.of(existingConfig())
+            );
+            when(llmModelRepository.findById(5L)).thenReturn(
+                Optional.of(instanceModel(5L, ModelVisibility.PUBLIC, false, true))
+            );
+
+            var request = UpdateAgentConfigRequestDTO.builder().instanceModelId(5L).build();
+
+            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("isn't available");
+        }
+
+        @Test
+        void bindingAnInstanceModelWhoseConnectionIsDisabledIsRejected() {
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(
+                Optional.of(existingConfig())
+            );
+            when(llmModelRepository.findById(5L)).thenReturn(
+                Optional.of(instanceModel(5L, ModelVisibility.PUBLIC, true, false))
+            );
+
+            var request = UpdateAgentConfigRequestDTO.builder().instanceModelId(5L).build();
+
+            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("isn't available");
+        }
+
+        @Test
+        void bindingAnEnabledWorkspaceModelSucceedsAndClearsAnyInstanceModel() {
+            AgentConfig existing = existingConfig();
+            existing.setInstanceModel(instanceModel(5L, ModelVisibility.PUBLIC, true, true));
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
+            when(workspaceLlmModelRepository.findByIdAndWorkspaceId(6L, 1L)).thenReturn(
+                Optional.of(workspaceModel(6L, true, true))
+            );
+            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            var request = UpdateAgentConfigRequestDTO.builder().workspaceModelId(6L).build();
+            AgentConfig result = agentConfigService.updateConfig(workspaceContext, 10L, request);
+
+            assertThat(result.getWorkspaceModel().getId()).isEqualTo(6L);
+            assertThat(result.getInstanceModel()).isNull();
+        }
+
+        @Test
+        void bindingAWorkspaceModelFromAnotherWorkspaceIsRejected() {
+            // The tenancy-scoped lookup itself enforces this (composite FK also guards it server-side);
+            // this proves the service surfaces a clean 404, not a 500, for a foreign/nonexistent id.
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(
+                Optional.of(existingConfig())
+            );
+            when(workspaceLlmModelRepository.findByIdAndWorkspaceId(6L, 1L)).thenReturn(Optional.empty());
+
+            var request = UpdateAgentConfigRequestDTO.builder().workspaceModelId(6L).build();
+
+            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request)).isInstanceOf(
+                EntityNotFoundException.class
+            );
+        }
+
+        @Test
+        void bindingADisabledWorkspaceModelIsRejected() {
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(
+                Optional.of(existingConfig())
+            );
+            when(workspaceLlmModelRepository.findByIdAndWorkspaceId(6L, 1L)).thenReturn(
+                Optional.of(workspaceModel(6L, false, true))
+            );
+
+            var request = UpdateAgentConfigRequestDTO.builder().workspaceModelId(6L).build();
+
+            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("isn't available");
+        }
+
+        @Test
+        void leavingBothIdsAbsentPreservesTheExistingBinding() {
+            AgentConfig existing = existingConfig();
+            existing.setInstanceModel(instanceModel(5L, ModelVisibility.PUBLIC, true, true));
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
+            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            var request = UpdateAgentConfigRequestDTO.builder().timeoutSeconds(900).build();
+            AgentConfig result = agentConfigService.updateConfig(workspaceContext, 10L, request);
+
+            assertThat(result.getInstanceModel()).isNotNull();
+            assertThat(result.getInstanceModel().getId()).isEqualTo(5L);
+            verify(llmModelRepository, never()).findById(any());
+        }
+
+        @Test
+        void enabledConfigCannotKeepARevokedBindingDuringAnUnrelatedUpdate() {
+            AgentConfig existing = existingConfig();
+            existing.setEnabled(true);
+            existing.setInstanceModel(instanceModel(5L, ModelVisibility.GRANTED, true, true));
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
+            when(llmModelWorkspaceGrantRepository.existsByIdModelIdAndIdWorkspaceId(5L, 1L)).thenReturn(false);
+
+            var request = UpdateAgentConfigRequestDTO.builder().timeoutSeconds(900).build();
+
+            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("isn't available");
+            verify(agentConfigRepository, never()).save(any());
+        }
+
+        @Test
+        void revokedBindingCanBeSavedWhenTheSameUpdateDisablesTheConfig() {
+            AgentConfig existing = existingConfig();
+            existing.setEnabled(true);
+            existing.setInstanceModel(instanceModel(5L, ModelVisibility.GRANTED, true, true));
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
+            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            var request = UpdateAgentConfigRequestDTO.builder().enabled(false).build();
+            AgentConfig result = agentConfigService.updateConfig(workspaceContext, 10L, request);
+
+            assertThat(result.isEnabled()).isFalse();
+            verify(agentConfigRepository).save(existing);
         }
     }
 }

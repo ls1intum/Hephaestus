@@ -1,6 +1,9 @@
 package de.tum.cit.aet.hephaestus.agent.settings;
 
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmConnection;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmConnectionRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModel;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigDTO;
 import de.tum.cit.aet.hephaestus.agent.config.CreateAgentConfigRequestDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -26,6 +29,12 @@ class AiSettingsControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
     @Autowired
     private WebTestClient webTestClient;
 
+    @Autowired
+    private WorkspaceLlmConnectionRepository workspaceLlmConnectionRepository;
+
+    @Autowired
+    private WorkspaceLlmModelRepository workspaceLlmModelRepository;
+
     private Workspace setupWorkspace(String slug) {
         User owner = persistUser(slug + "-owner");
         Workspace workspace = createWorkspace(slug, "AI Workspace", slug + "-org", AccountType.ORG, owner);
@@ -36,13 +45,51 @@ class AiSettingsControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
     private AgentConfigDTO createConfig(Workspace workspace, String name) {
         var request = CreateAgentConfigRequestDTO.builder()
             .name(name)
-            .enabled(true)
-            .modelName("claude-sonnet-4-20250514")
-            .llmApiKey("sk-test-secret-key-123")
-            .llmProvider(LlmProvider.ANTHROPIC)
+            .enabled(false)
             .timeoutSeconds(300)
             .maxConcurrentJobs(2)
             .allowInternet(false)
+            .build();
+        return webTestClient
+            .post()
+            .uri("/workspaces/{slug}/agent-configs", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(request)
+            .exchange()
+            .expectStatus()
+            .isCreated()
+            .expectBody(AgentConfigDTO.class)
+            .returnResult()
+            .getResponseBody();
+    }
+
+    private AgentConfigDTO createExecutableConfig(Workspace workspace, String name) {
+        WorkspaceLlmConnection connection = new WorkspaceLlmConnection();
+        connection.setWorkspace(workspace);
+        connection.setSlug("connection-" + name);
+        connection.setDisplayName("Test connection");
+        connection.setBaseUrl("https://api.openai.com");
+        connection.setApiProtocol("openai-completions");
+        connection.setEnabled(true);
+        connection = workspaceLlmConnectionRepository.save(connection);
+
+        WorkspaceLlmModel model = new WorkspaceLlmModel();
+        model.setWorkspace(workspace);
+        model.setConnection(connection);
+        model.setSlug("model-" + name);
+        model.setDisplayName("Test model");
+        model.setUpstreamModelId("gpt-5");
+        model.setEnabled(true);
+        model = workspaceLlmModelRepository.save(model);
+
+        var request = CreateAgentConfigRequestDTO.builder()
+            .name(name)
+            .enabled(true)
+            .timeoutSeconds(300)
+            .maxConcurrentJobs(2)
+            .allowInternet(false)
+            .workspaceModelId(model.getId())
             .build();
         return webTestClient
             .post()
@@ -62,7 +109,7 @@ class AiSettingsControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
     @WithAdminUser
     void bindsPracticeConfigAndReflectsItInTheAggregateRead() {
         Workspace workspace = setupWorkspace("ai-bind");
-        AgentConfigDTO config = createConfig(workspace, "reviewer");
+        AgentConfigDTO config = createExecutableConfig(workspace, "reviewer");
 
         webTestClient
             .put()
@@ -105,6 +152,26 @@ class AiSettingsControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
             .exchange()
             .expectStatus()
             .isNotFound();
+    }
+
+    @Test
+    @WithAdminUser
+    void rejectsBindingDisabledConfigToMentorWith409() {
+        Workspace workspace = setupWorkspace("ai-disabled-mentor");
+        AgentConfigDTO config = createConfig(workspace, "disabled");
+
+        webTestClient
+            .put()
+            .uri("/workspaces/{slug}/ai-settings/mentor-config", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(Map.of("configId", config.id()))
+            .exchange()
+            .expectStatus()
+            .isEqualTo(HttpStatus.CONFLICT)
+            .expectBody()
+            .jsonPath("$.detail")
+            .isEqualTo("The selected agent configuration is disabled or its model is not available.");
     }
 
     @Test
@@ -165,7 +232,7 @@ class AiSettingsControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
     @WithAdminUser
     void rejectsDeletingABoundConfigWith409() {
         Workspace workspace = setupWorkspace("ai-delete");
-        AgentConfigDTO config = createConfig(workspace, "bound");
+        AgentConfigDTO config = createExecutableConfig(workspace, "bound");
 
         webTestClient
             .put()

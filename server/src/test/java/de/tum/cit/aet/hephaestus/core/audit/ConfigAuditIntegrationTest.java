@@ -129,7 +129,7 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Test
     @WithAdminUser
-    void agentConfigCreateIsAuditedWithoutTheApiKey() {
+    void agentConfigCreateAuditsOnlySupportedNonSecretSettings() {
         Workspace workspace = setupWorkspace("audit-cfg");
 
         createConfig(workspace, "primary");
@@ -141,7 +141,9 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
             .findFirst()
             .orElseThrow();
         assertThat(row.getOldValue()).isNull();
-        assertThat(row.getNewValue()).contains("\"llmApiKeySet\":true").doesNotContain("sk-test-secret-key-123");
+        assertThat(row.getNewValue())
+            .contains("\"name\":\"primary\"")
+            .doesNotContain("llmApiKey", "llmProvider", "llmBaseUrl");
     }
 
     @Test
@@ -453,10 +455,7 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
             .bodyValue(
                 CreateAgentConfigRequestDTO.builder()
                     .name(name)
-                    .enabled(true)
-                    .modelName("claude-sonnet-4-20250514")
-                    .llmApiKey("sk-test-secret-key-123")
-                    .llmProvider(LlmProvider.ANTHROPIC)
+                    .enabled(false)
                     .timeoutSeconds(300)
                     .maxConcurrentJobs(2)
                     .allowInternet(false)

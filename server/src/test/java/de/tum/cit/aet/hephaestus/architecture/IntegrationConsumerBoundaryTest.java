@@ -61,9 +61,9 @@ class IntegrationConsumerBoundaryTest extends HephaestusArchitectureTest {
 
     /**
      * The agent runtime role must not link against the integration consumer fleet. Consumer
-     * beans are server-role-only; agents communicate via the agent NATS pull consumer
-     * ({@code hephaestus.agent.nats.*}), a separate connection from
-     * {@code hephaestus.sync.nats.*}. Mixing the two would break role isolation.
+     * beans are server-role-only; the agent job queue (#1368) is the {@code agent_job} Postgres
+     * table, polled by {@code AgentJobExecutor} — no NATS connection of its own at all. Mixing the
+     * two would break role isolation.
      */
     @Test
     void agentDoesNotDependOnIntegrationConsumer() {
@@ -74,9 +74,30 @@ class IntegrationConsumerBoundaryTest extends HephaestusArchitectureTest {
             .dependOnClassesThat()
             .resideInAPackage("de.tum.cit.aet.hephaestus.integration.core.consumer..")
             .because(
-                "agent runtime role uses its own NATS connection (hephaestus.agent.nats.*); " +
-                    "depending on integration.consumer would mix bean clusters across roles and " +
-                    "break the runtime-role isolation locked by RuntimeRoleBoundaryTest"
+                "the agent job queue (#1368) is Postgres-backed, not NATS-backed; depending on " +
+                    "integration.consumer would mix bean clusters across roles and break the " +
+                    "runtime-role isolation locked by RuntimeRoleBoundaryTest"
+            )
+            .check(classes);
+    }
+
+    /**
+     * Strengthened boundary (#1368 NATS→Postgres cutover): the agent runtime role must not link
+     * against jnats AT ALL anymore — not even its own connection. The queue is the {@code agent_job}
+     * table; delivery is poll-based. A jnats import anywhere under {@code agent/} would mean the
+     * cutover regressed (e.g. a stray NATS-based feature re-added without going through the queue).
+     */
+    @Test
+    void agentDoesNotDependOnJnats() {
+        noClasses()
+            .that()
+            .resideInAPackage("de.tum.cit.aet.hephaestus.agent..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAPackage("io.nats..")
+            .because(
+                "the agent job queue (#1368) is Postgres-backed (agent_job table, polled by " +
+                    "AgentJobExecutor) — the agent package must have zero io.nats dependency"
             )
             .check(classes);
     }

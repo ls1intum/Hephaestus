@@ -42,6 +42,15 @@ export const EVENT_TYPE_LABELS: Record<AuthEventType, string> = {
 	EXPORT_REQUESTED: "Data export requested",
 	APP_ROLE_CHANGED: "Instance role changed",
 	RESEARCH_CONSENT_REVOKED: "Research consent revoked",
+	LLM_CONNECTION_CREATED: "Provider connected",
+	LLM_CONNECTION_UPDATED: "Provider updated",
+	LLM_CONNECTION_DELETED: "Provider removed",
+	LLM_MODEL_CREATED: "Model added",
+	LLM_MODEL_UPDATED: "Model updated",
+	LLM_MODEL_DELETED: "Model removed",
+	LLM_MODEL_PRICE_CHANGED: "Model price changed",
+	LLM_MODEL_SHARING_CHANGED: "Model sharing changed",
+	LLM_SETTINGS_CHANGED: "AI settings changed",
 };
 
 /** Falls back to a humanized enum name so an event type added server-side still reads sensibly. */

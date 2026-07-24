@@ -37,4 +37,10 @@ public interface ScmTokenSource {
      * active connection of this kind exists for the scope.
      */
     Optional<String> serverUrl(long scopeId);
+
+    /**
+     * Provider-owned remote ref that exposes the immutable review head through the target
+     * repository, including for contributions submitted from forks.
+     */
+    Optional<String> reviewHeadRef(long pullRequestNumber);
 }

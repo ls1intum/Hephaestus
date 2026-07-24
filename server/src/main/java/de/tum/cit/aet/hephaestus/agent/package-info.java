@@ -13,7 +13,7 @@
  *   <li>{@code agent.proxy} — worker-side LLM proxy (credential-scoped per-job)</li>
  *   <li>{@code agent.config} — the {@code AgentConfig} aggregate (model + credentials) and its seeder</li>
  *   <li>{@code agent.settings} — per-workspace agent/model bindings &amp; review policy (AI-settings API)</li>
- *   <li>{@code agent.pricing} — per-model token pricing for run cost accounting</li>
+ *   <li>{@code agent.usage} — the LLM usage ledger, admission-frozen pricing, and monthly budget cap</li>
  *   <li>{@code agent.task} — sealed Task envelope shared with sandbox containers</li>
  * </ul>
  *

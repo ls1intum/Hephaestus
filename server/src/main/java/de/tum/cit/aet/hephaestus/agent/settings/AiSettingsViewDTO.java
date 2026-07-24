@@ -18,7 +18,8 @@ import org.jspecify.annotations.NonNull;
 public record AiSettingsViewDTO(
     @Schema(description = "Config bound to power practice detection (null = fan-out to all enabled configs)")
     Long practiceConfigId,
-    @Schema(description = "Config bound to power the mentor (null = oldest enabled config)") Long mentorConfigId,
+    @Schema(description = "Config explicitly bound to power the mentor (null = mentor is unconfigured)")
+    Long mentorConfigId,
     @NonNull @Schema(description = "Effective: run practice review for all developers") Boolean runForAllUsers,
     @NonNull @Schema(description = "Effective: skip draft PRs/MRs") Boolean skipDrafts,
     @NonNull @Schema(description = "Effective: deliver feedback to merged PRs/MRs") Boolean deliverToMerged,
@@ -32,5 +33,8 @@ public record AiSettingsViewDTO(
     @NonNull
     @Schema(description = "Whether the practices feature is enabled for this workspace")
     Boolean practicesEnabled,
-    @NonNull @Schema(description = "Whether the mentor feature is enabled for this workspace") Boolean mentorEnabled
+    @NonNull @Schema(description = "Whether the mentor feature is enabled for this workspace") Boolean mentorEnabled,
+    @NonNull
+    @Schema(description = "Whether this workspace may register additional OpenAI-compatible connections")
+    Boolean workspaceConnectionsAllowed
 ) {}

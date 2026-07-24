@@ -3,8 +3,11 @@ package de.tum.cit.aet.hephaestus.agent.job;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.ModelVisibility;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
@@ -25,21 +28,18 @@ import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.event.ApplicationEvents;
-import org.springframework.test.context.event.RecordApplicationEvents;
 import tools.jackson.databind.ObjectMapper;
 
 /**
  * Integration test for {@link AgentJobService#submit} exercising real PostgreSQL
- * idempotency (partial unique index), config snapshot capture, and event publication.
+ * idempotency (partial unique index) and config snapshot capture. #1368 NATS→Postgres cutover:
+ * the QUEUED insert IS the enqueue — there is no separate publish event to assert on anymore.
  */
-@RecordApplicationEvents
 class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -52,6 +52,12 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private AgentConfigRepository agentConfigRepository;
+
+    @Autowired
+    private LlmConnectionRepository llmConnectionRepository;
+
+    @Autowired
+    private LlmModelRepository llmModelRepository;
 
     @Autowired
     private WorkspaceRepository workspaceRepository;
@@ -68,9 +74,6 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
-    private ApplicationEvents applicationEvents;
-
     private Workspace workspace;
     private AgentConfig agentConfig;
     private Long prId;
@@ -82,12 +85,28 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
 
         workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("submit-test"));
 
+        LlmConnection connection = new LlmConnection();
+        connection.setSlug("submit-test");
+        connection.setDisplayName("Submit test");
+        connection.setBaseUrl("https://api.openai.example/v1");
+        connection.setApiProtocol("openai-completions");
+        connection.setEnabled(true);
+        connection = llmConnectionRepository.save(connection);
+
+        LlmModel model = new LlmModel();
+        model.setConnection(connection);
+        model.setSlug("submit-model");
+        model.setDisplayName("Submit model");
+        model.setUpstreamModelId("gpt-submit-test");
+        model.setVisibility(ModelVisibility.PUBLIC);
+        model.setEnabled(true);
+        model = llmModelRepository.save(model);
+
         agentConfig = new AgentConfig();
         agentConfig.setWorkspace(workspace);
         agentConfig.setName("test-config");
         agentConfig.setEnabled(true);
-        agentConfig.setLlmProvider(LlmProvider.ANTHROPIC);
-        agentConfig.setCredentialMode(CredentialMode.PROXY);
+        agentConfig.setInstanceModel(model);
         agentConfig.setTimeoutSeconds(300);
         agentConfig = agentConfigRepository.save(agentConfig);
 
@@ -203,23 +222,6 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             // Verify persisted in DB
             AgentJob fromDb = agentJobRepository.findById(job.getId()).orElseThrow();
             assertThat(fromDb.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
-        }
-
-        @Test
-        void publishesAgentJobCreatedEvent() {
-            var request = createRequest("event123");
-
-            Optional<AgentJob> result = agentJobService.submit(
-                workspace.getId(),
-                AgentJobType.PULL_REQUEST_REVIEW,
-                request
-            );
-
-            assertThat(result).isPresent();
-            List<AgentJobCreatedEvent> events = applicationEvents.stream(AgentJobCreatedEvent.class).toList();
-            assertThat(events).hasSize(1);
-            assertThat(events.get(0).jobId()).isEqualTo(result.get().getId());
-            assertThat(events.get(0).workspaceId()).isEqualTo(workspace.getId());
         }
     }
 

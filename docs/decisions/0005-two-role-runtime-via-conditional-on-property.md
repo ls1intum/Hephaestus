@@ -81,3 +81,32 @@ The revisit trigger has fired. `RuntimeRole.WEBHOOK_PROPERTY` is now wired (thir
 time. `ServerSchedulingConfig`, `NatsConsumerService`, and `WorkspaceStartupListener` are gated
 by `SERVER_PROPERTY` so they do not duplicate-run on the dedicated `webhook-server` pod. See
 **ADR 0008**.
+
+## Update — 2026-07-20 (issue #1368)
+
+The `hephaestus.sandbox.llm-proxy.enabled` capability flag referenced in the Decision section
+above no longer exists — see **ADR 0006**'s 2026-07-20 amendment. The proxy's gate is now derived
+from the same job-execution capability expression `AgentJobExecutor` wires on
+(`hephaestus.agent.nats.enabled AND hephaestus.runtime.worker.enabled`), not a standalone
+property.
+
+## Update — 2026-07-21 (issue #1368)
+
+The "agent NATS pull consumer" named in the Context section, and `hephaestus.agent.nats.enabled`
+in the 2026-07-20 update above, no longer exist. The agent job queue moved off NATS JetStream onto
+PostgreSQL — each worker replica polls `agent_job` and claims a batch with
+`FOR UPDATE SKIP LOCKED` instead of pulling ids off a stream — see **ADR 0025**. The job-execution
+capability expression `AgentJobExecutor` and the LLM proxy key off is now
+`hephaestus.agent.enabled AND hephaestus.runtime.worker.enabled`: same shape, the left-hand
+property renamed. This ADR's "server ↔ worker" boundary and the `hephaestus.runtime.worker.enabled`
+gate it establishes are unaffected — only what feeds work to the worker changed. NATS remains
+required for webhook ingest (ADR 0008) and SCM/Slack sync, which this change does not touch.
+
+## Update — 2026-07-22 (issue #1368)
+
+Interactive mentor sandboxes run on the application-server replica serving the user's SSE request;
+they are worker/sandbox capability, but not queued agent jobs. The LLM proxy therefore follows
+`hephaestus.runtime.worker.enabled` alone, while `AgentJobExecutor` retains the two-part
+`hephaestus.agent.enabled AND hephaestus.runtime.worker.enabled` gate. This lets operators disable
+practice reviews without disabling mentor and makes the split topology explicit: application-server
+keeps local Docker capability for mentor; dedicated workers claim queued practice jobs.

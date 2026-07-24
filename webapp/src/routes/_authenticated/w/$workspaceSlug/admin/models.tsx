@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { AgentRuntimesPage } from "@/components/admin/ai/AgentRuntimesPage";
+import { AgentBindingsPage } from "@/components/admin/ai/AgentBindingsPage";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
@@ -14,5 +14,5 @@ function ModelsContainer() {
 		return <NoWorkspace />;
 	}
 
-	return <AgentRuntimesPage workspaceSlug={workspaceSlug ?? ""} />;
+	return <AgentBindingsPage workspaceSlug={workspaceSlug ?? ""} />;
 }

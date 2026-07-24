@@ -9,10 +9,11 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
+import de.tum.cit.aet.hephaestus.agent.catalog.ResolvedLlmModel;
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorAgentProperties;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorPiAdapter;
@@ -27,6 +28,12 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxIdentity;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
+import de.tum.cit.aet.hephaestus.agent.usage.AdmittedLlmModel;
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetBlockReason;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
@@ -104,7 +111,7 @@ class MentorChatServiceTest extends BaseUnitTest {
     ChatThreadRepository chatThreadRepository;
 
     @Mock
-    AgentConfigRepository agentConfigRepository;
+    WorkspaceAgentBindingRepository agentBindingRepository;
 
     @Mock
     WorkspaceRepository workspaceRepository;
@@ -120,6 +127,15 @@ class MentorChatServiceTest extends BaseUnitTest {
 
     @Mock
     MentorTurnPersistence persistence;
+
+    @Mock
+    de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService llmBudgetService;
+
+    @Mock
+    LlmModelResolver llmModelResolver;
+
+    @Mock
+    LlmAdmissionService llmAdmissionService;
 
     private MentorTurnLock turnLock;
     private PiEventToUiChunkTranslator translator;
@@ -149,11 +165,11 @@ class MentorChatServiceTest extends BaseUnitTest {
             new MentorChatExecutorConfig.MentorRunnerTimeoutScheduler(scheduler);
 
         meterRegistry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
-        MentorAgentProperties mentorProps = new MentorAgentProperties(100_000, "");
+        MentorAgentProperties mentorProps = new MentorAgentProperties(100_000);
         service = new MentorChatService(
             userRepository,
             chatThreadRepository,
-            agentConfigRepository,
+            agentBindingRepository,
             workspaceRepository,
             mentorProps,
             workspaceContextBuilder,
@@ -165,7 +181,40 @@ class MentorChatServiceTest extends BaseUnitTest {
             mapper,
             turnExecutorBean,
             schedulerBean,
-            new MentorChatMetrics(meterRegistry)
+            new MentorChatMetrics(meterRegistry),
+            llmBudgetService,
+            llmAdmissionService
+        );
+
+        // Default resolver stub — MentorLlmConfig.fromAgentConfig routes every AgentConfig through
+        // this; individual tests override where the resolved shape matters. Class-level
+        // Strictness.LENIENT (see @MockitoSettings above) covers any test that never resolves a config.
+        when(llmModelResolver.resolve(any())).thenReturn(
+            new ResolvedLlmModel(
+                "https://api.openai.com",
+                "openai-completions",
+                "test-model",
+                null,
+                null,
+                false,
+                FundingSource.INSTANCE
+            )
+        );
+        when(llmModelResolver.connectionRef(any())).thenReturn(new LlmModelResolver.ConnectionRef(null, null));
+        when(llmAdmissionService.admit(any(WorkspaceAgentBinding.class))).thenReturn(
+            new AdmittedLlmModel(
+                new ResolvedLlmModel(
+                    "https://api.openai.com",
+                    "openai-completions",
+                    "test-model",
+                    null,
+                    null,
+                    false,
+                    FundingSource.INSTANCE
+                ),
+                new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 1L, 2L, WORKSPACE_ID),
+                new LlmPriceSnapshot(FundingSource.INSTANCE, PricingState.NO_CHARGE, 3L, null, null, null, null, null)
+            )
         );
 
         // Default happy-path collaborator wiring; individual tests override as needed.
@@ -174,25 +223,23 @@ class MentorChatServiceTest extends BaseUnitTest {
         user.setLogin("octo");
         when(userRepository.getCurrentUserElseThrow()).thenReturn(user);
 
-        AgentConfig agentConfig = new AgentConfig();
-        agentConfig.setEnabled(true);
-        agentConfig.setLlmProvider(LlmProvider.OPENAI);
-        agentConfig.setCredentialMode(CredentialMode.API_KEY);
-        agentConfig.setLlmApiKey("test-key");
-        agentConfig.setModelName("test-model");
-        agentConfig.setTimeoutSeconds(600);
-        when(agentConfigRepository.findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(eq(WORKSPACE_ID))).thenReturn(
-            Optional.of(agentConfig)
-        );
-
+        WorkspaceAgentBinding mentorBinding = new WorkspaceAgentBinding();
+        mentorBinding.setId(99L);
+        mentorBinding.setPurpose(AgentPurpose.MENTOR);
+        mentorBinding.setEnabled(true);
+        mentorBinding.setTimeoutSeconds(600);
         Workspace ws = new Workspace();
         ws.setWorkspaceSlug("acme");
+        when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(ws));
+        when(agentBindingRepository.findByWorkspaceIdAndPurpose(WORKSPACE_ID, AgentPurpose.MENTOR)).thenReturn(
+            Optional.of(mentorBinding)
+        );
         ChatThread thread = new ChatThread();
         thread.setId(THREAD_ID);
         thread.setWorkspace(ws);
         thread.setUser(user);
         when(persistence.ensureThread(eq(WORKSPACE_ID), eq(THREAD_ID), any(), any())).thenReturn(thread);
-        when(persistence.persistInFlight(any(), any(), any(), any())).thenAnswer(inv -> {
+        when(persistence.persistInFlight(any(), any(), any(), any(), any())).thenAnswer(inv -> {
             UUID assistantId = inv.getArgument(2, UUID.class);
             return new MentorTurnPersistence.TurnPersistenceCookie(
                 THREAD_ID,
@@ -371,40 +418,43 @@ class MentorChatServiceTest extends BaseUnitTest {
     @Test
     void runTurn_prefersBoundEnabledMentorConfig_overFallback() throws Exception {
         Workspace boundWs = new Workspace();
-        boundWs.setMentorConfigId(99L);
         when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(boundWs));
-        AgentConfig boundConfig = new AgentConfig();
-        boundConfig.setEnabled(true);
-        boundConfig.setLlmProvider(LlmProvider.OPENAI);
-        boundConfig.setCredentialMode(CredentialMode.API_KEY);
-        boundConfig.setLlmApiKey("bound-key");
-        boundConfig.setModelName("bound-model");
-        boundConfig.setTimeoutSeconds(600);
-        when(agentConfigRepository.findByIdAndWorkspaceId(99L, WORKSPACE_ID)).thenReturn(Optional.of(boundConfig));
+        WorkspaceAgentBinding boundBinding = new WorkspaceAgentBinding();
+        boundBinding.setId(99L);
+        boundBinding.setPurpose(AgentPurpose.MENTOR);
+        boundBinding.setEnabled(true);
+        boundBinding.setTimeoutSeconds(600);
+        when(agentBindingRepository.findByWorkspaceIdAndPurpose(WORKSPACE_ID, AgentPurpose.MENTOR)).thenReturn(
+            Optional.of(boundBinding)
+        );
 
         scheduleHappyPathResponses(sandbox).run();
         runTurnSync();
 
-        verify(agentConfigRepository).findByIdAndWorkspaceId(99L, WORKSPACE_ID);
-        verify(agentConfigRepository, never()).findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(WORKSPACE_ID);
+        verify(agentBindingRepository).findByWorkspaceIdAndPurpose(WORKSPACE_ID, AgentPurpose.MENTOR);
     }
 
-    // 1c. The deliberate asymmetry vs practice detection: a bound-but-DISABLED mentor config does NOT
-    // pause the mentor (which would block chat) — it falls back to the oldest enabled config.
+    // 1c. A bound-but-disabled mentor config fails closed. Silently choosing another config could
+    // change provider, model, and price in the middle of a conversation.
 
     @Test
-    void runTurn_fallsBackToOldestEnabled_whenBoundMentorConfigDisabled() throws Exception {
+    void runTurn_disabledBoundConfig_failsClosedBeforeSandboxAttach() throws Exception {
         Workspace boundWs = new Workspace();
-        boundWs.setMentorConfigId(99L);
         when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(boundWs));
-        AgentConfig disabled = new AgentConfig();
+        WorkspaceAgentBinding disabled = new WorkspaceAgentBinding();
+        disabled.setId(99L);
+        disabled.setPurpose(AgentPurpose.MENTOR);
         disabled.setEnabled(false);
-        when(agentConfigRepository.findByIdAndWorkspaceId(99L, WORKSPACE_ID)).thenReturn(Optional.of(disabled));
+        when(agentBindingRepository.findByWorkspaceIdAndPurpose(WORKSPACE_ID, AgentPurpose.MENTOR)).thenReturn(
+            Optional.of(disabled)
+        );
 
-        scheduleHappyPathResponses(sandbox).run();
         runTurnSync();
 
-        verify(agentConfigRepository).findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(WORKSPACE_ID);
+        assertThat(String.join("\n", emitter.rawData)).contains(
+            "Hephaestus is not ready to mentor in this workspace yet. Connect a mentor model, then try again."
+        );
+        verify(interactiveSandboxService, never()).attach(any());
     }
 
     // 1d. No enabled AgentConfig for the workspace → resolveLlmConfig.orElseThrow. This is the only
@@ -413,8 +463,7 @@ class MentorChatServiceTest extends BaseUnitTest {
 
     @Test
     void runTurn_noEnabledConfig_recordsErrorAndNeverAttaches() throws Exception {
-        // Neither a bound config (findById → empty by default) nor the fallback finder yields a config.
-        when(agentConfigRepository.findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(eq(WORKSPACE_ID))).thenReturn(
+        when(agentBindingRepository.findByWorkspaceIdAndPurpose(WORKSPACE_ID, AgentPurpose.MENTOR)).thenReturn(
             Optional.empty()
         );
 
@@ -438,6 +487,60 @@ class MentorChatServiceTest extends BaseUnitTest {
         // Lock released cleanly and the ERROR outcome recorded.
         assertThat(turnLock.activeKeys()).isZero();
         assertOutcomeRecorded(MentorChatMetrics.Outcome.ERROR);
+    }
+
+    // 1e. Monthly LLM budget gate (#1368, extended by the #1368 fix wave): both blocking reasons
+    // must refuse the turn BEFORE anything persists, with their own user-facing message.
+
+    @Test
+    void runTurn_budgetExhausted_blocksBeforePersistingWithBudgetMessage() throws Exception {
+        when(llmBudgetService.blockReason(WORKSPACE_ID)).thenReturn(LlmBudgetBlockReason.EXHAUSTED);
+
+        runTurnSync();
+
+        assertThat(emitter.recordedTypes()).contains("error");
+        assertThat(String.join("\n", emitter.rawData))
+            .contains("The monthly AI budget for this workspace is used up")
+            .doesNotContain("Some usage in this workspace has no price set");
+        verify(persistence, never()).persistInFlight(any(), any(), any(), any());
+        try {
+            verify(interactiveSandboxService, never()).attach(any());
+        } catch (InteractiveSandboxException e) {
+            throw new AssertionError(e);
+        }
+        assertOutcomeRecorded(MentorChatMetrics.Outcome.ERROR);
+        assertThat(meterRegistry.find("llm.budget.blocked").tag("surface", "mentor").counter().count()).isEqualTo(1d);
+    }
+
+    @Test
+    void runTurn_unpricedUsageBlockedByInstancePolicy_blocksBeforePersistingWithDistinctMessage() throws Exception {
+        when(llmBudgetService.blockReason(WORKSPACE_ID)).thenReturn(LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED);
+
+        runTurnSync();
+
+        assertThat(emitter.recordedTypes()).contains("error");
+        assertThat(String.join("\n", emitter.rawData))
+            .contains("Some usage in this workspace has no price set, so spending can't be verified.")
+            .doesNotContain("monthly AI budget");
+        verify(persistence, never()).persistInFlight(any(), any(), any(), any());
+        try {
+            verify(interactiveSandboxService, never()).attach(any());
+        } catch (InteractiveSandboxException e) {
+            throw new AssertionError(e);
+        }
+        assertOutcomeRecorded(MentorChatMetrics.Outcome.ERROR);
+        assertThat(meterRegistry.find("llm.budget.blocked").tag("surface", "mentor").counter().count()).isEqualTo(1d);
+    }
+
+    @Test
+    void runTurn_budgetNotBlocked_proceedsNormally() throws Exception {
+        when(llmBudgetService.blockReason(WORKSPACE_ID)).thenReturn(LlmBudgetBlockReason.NONE);
+        scheduleHappyPathResponses(sandbox).run();
+
+        runTurnSync();
+
+        assertThat(emitter.recordedTypes()).doesNotContain("error");
+        assertOutcomeRecorded(MentorChatMetrics.Outcome.SUCCESS);
     }
 
     @Test
@@ -606,7 +709,7 @@ class MentorChatServiceTest extends BaseUnitTest {
     @Test
     @DisplayName("in-flight conflict: persistence throws; conflict chunk sent; sandbox never attached")
     void runTurn_inFlightConflict_returns409() {
-        when(persistence.persistInFlight(any(), any(), any(), any())).thenThrow(
+        when(persistence.persistInFlight(any(), any(), any(), any(), any())).thenThrow(
             new TurnAlreadyInFlightException(THREAD_ID, new RuntimeException("dup"))
         );
 

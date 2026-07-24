@@ -32,9 +32,8 @@ hephaestus:
         nats:
             enabled: true
 
-    sandbox:
-        llm-proxy:
-            enabled: false
+    # The LLM proxy follows the worker/sandbox capability. runtime.worker.enabled=false above keeps
+    # it off this pod; no separate flag is needed.
 
 logging:
     level:

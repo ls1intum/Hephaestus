@@ -3,9 +3,13 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.feedback;
 import static de.tum.cit.aet.hephaestus.integration.scm.github.feedback.GithubPrNodeIdResolver.GRAPHQL_TIMEOUT;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.ExistingSummaryLookup;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssueComment;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssueCommentConnection;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPageInfo;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -167,6 +171,119 @@ public class GithubFeedbackChannel implements FeedbackChannel {
         log.info("Edited GitHub comment in place: workspaceId={}, commentId={}", scopeId, commentNodeId);
         return UpdateOutcome.edited(new SummaryHandle(commentNodeId));
     }
+
+    /**
+     * Dedup lookup (#1368 hardening — delivery-recovery crash window; tri-state result and pagination
+     * added #1368 fix wave, finding #6): scans this PR/issue's comments, page by page up to {@link
+     * #EXISTING_SUMMARY_SEARCH_PAGE_BUDGET} pages, for one whose body contains {@code marker}. Reuses the
+     * same {@code GetPullRequestComments} / {@code GetIssueComments} queries {@code
+     * GitHubIssueCommentSyncService} uses for sync — no new GraphQL surface.
+     *
+     * <p>{@code newest-created-first} is NOT how GitHub orders this connection — it is creation-order
+     * ascending — so there is no way to bias the scan toward where a JUST-posted marker is most likely to
+     * be. Instead: a match found on ANY scanned page is {@code FOUND}; running out of pages with {@code
+     * hasNextPage=false} (every comment was seen) is a confirmed {@code ABSENT}; hitting the page budget
+     * while {@code hasNextPage} is still {@code true} (more comments exist beyond what was scanned) is
+     * {@code UNKNOWN} — NOT {@code ABSENT}, because a marker could still be sitting unscanned past the
+     * budget. Any transport/GraphQL error or rate-limit-critical guard is {@code UNKNOWN} for the same
+     * reason: neither confirms absence, so the caller must not treat either as a green light to post.
+     */
+    @Override
+    public ExistingSummaryLookup findExistingSummary(FeedbackTarget target, String marker) {
+        if (marker == null || marker.isBlank()) {
+            return ExistingSummaryLookup.unknown();
+        }
+        long scopeId = target.ref().workspaceId();
+        if (gitHubProvider.isRateLimitCritical(scopeId)) {
+            return ExistingSummaryLookup.unknown();
+        }
+        String subject = target.subjectExternalId();
+        String documentName;
+        String owner;
+        String name;
+        int number;
+        String commentsPath;
+        if (isIssueSubject(subject)) {
+            IssueCoordinates issue = parseIssueSubjectExternalId(subject);
+            documentName = "GetIssueComments";
+            owner = issue.owner();
+            name = issue.name();
+            number = issue.number();
+            commentsPath = "repository.issue.comments";
+        } else {
+            PrCoordinates pr = parseSubjectExternalId(subject);
+            documentName = "GetPullRequestComments";
+            owner = pr.owner();
+            name = pr.name();
+            number = pr.number();
+            commentsPath = "repository.pullRequest.comments";
+        }
+
+        String cursor = null;
+        for (int page = 0; page < EXISTING_SUMMARY_SEARCH_PAGE_BUDGET; page++) {
+            try {
+                ClientGraphQlResponse response = gitHubProvider
+                    .forScope(scopeId)
+                    .documentName(documentName)
+                    .variable("owner", owner)
+                    .variable("name", name)
+                    .variable("number", number)
+                    .variable("first", EXISTING_SUMMARY_SEARCH_PAGE_SIZE)
+                    .variable("after", cursor)
+                    .execute()
+                    .block(GRAPHQL_TIMEOUT);
+                if (response == null || (response.getErrors() != null && !response.getErrors().isEmpty())) {
+                    return ExistingSummaryLookup.unknown();
+                }
+                gitHubProvider.trackRateLimit(scopeId, response);
+
+                GHIssueCommentConnection connection = response
+                    .field(commentsPath)
+                    .toEntity(GHIssueCommentConnection.class);
+                if (connection == null) {
+                    return ExistingSummaryLookup.unknown();
+                }
+                if (connection.getNodes() != null) {
+                    for (GHIssueComment node : connection.getNodes()) {
+                        if (node.getBody() != null && node.getBody().contains(marker) && node.getId() != null) {
+                            return ExistingSummaryLookup.found(new SummaryHandle(node.getId()));
+                        }
+                    }
+                }
+
+                GHPageInfo pageInfo = connection.getPageInfo();
+                boolean hasNextPage = pageInfo != null && pageInfo.getHasNextPage();
+                if (!hasNextPage) {
+                    return ExistingSummaryLookup.absent(); // every comment was scanned — confirmed absent
+                }
+                cursor = pageInfo.getEndCursor();
+                if (cursor == null || cursor.isBlank()) {
+                    // hasNextPage=true but no cursor to continue with — cannot confirm absence past here.
+                    return ExistingSummaryLookup.unknown();
+                }
+            } catch (RuntimeException e) {
+                log.debug(
+                    "Existing-summary dedup lookup failed (treated as unknown, not absent): scopeId={}, error={}",
+                    scopeId,
+                    e.getMessage()
+                );
+                return ExistingSummaryLookup.unknown();
+            }
+        }
+        // Page budget exhausted with more comments still unscanned — cannot confirm absence.
+        return ExistingSummaryLookup.unknown();
+    }
+
+    /** Page size per request for {@link #findExistingSummary}'s marker scan. */
+    private static final int EXISTING_SUMMARY_SEARCH_PAGE_SIZE = 100;
+
+    /**
+     * Bounded page budget for {@link #findExistingSummary} (#1368 fix wave, finding #6): 3 pages of
+     * {@link #EXISTING_SUMMARY_SEARCH_PAGE_SIZE} (300 comments) covers the overwhelming majority of
+     * PRs/issues this bot comments on without an unbounded scan; beyond that, {@code UNKNOWN} is the
+     * correct (conservative) answer rather than guessing absence.
+     */
+    private static final int EXISTING_SUMMARY_SEARCH_PAGE_BUDGET = 3;
 
     /** Conservative NOT_FOUND heuristic: GitHub signals a deleted comment via a free-text top-level error. */
     static boolean looksGone(List<String> errors) {

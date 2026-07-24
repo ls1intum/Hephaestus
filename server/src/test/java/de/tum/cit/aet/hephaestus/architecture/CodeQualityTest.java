@@ -500,7 +500,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "SlackScopeConsumerReconciler", // same reason as OutlineWebhookRegistrar: IntegrationNatsConsumer is optional (nats/server-role gated); the Slack lifecycle reconciler must not require the bean
                 "SyncPushService", // Qualified NATS connection is optional when sync push is disabled or under specs
                 "GitlabConnectionSyncStateProvider", // Rate-limit tracker is conditional with the GitLab runtime beans
-                "OutlineConnectionSyncStateProvider" // Rate-limit tracker (OutlineRateLimitTracker) is @ConditionalOnProperty(outline.enabled) — same optional-bean break as the GitLab provider
+                "OutlineConnectionSyncStateProvider", // Rate-limit tracker (OutlineRateLimitTracker) is @ConditionalOnProperty(outline.enabled) — same optional-bean break as the GitLab provider
+                "InstanceLlmSettingsService" // LlmSettingsAudit's sole impl is @ConditionalOnServerRole, but this service is also consumed by the ungated Workspace{Llm}Service pair (BYO gate check) which load on every runtime role
             );
 
             ArchCondition<JavaField> beInKnownClass = new ArchCondition<>("be in a known cycle-breaking class") {

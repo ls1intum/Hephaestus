@@ -87,12 +87,17 @@ public class PiResultParser {
             Integer cacheWriteTokens = usageNode.has("cacheWriteTokens")
                 ? usageNode.path("cacheWriteTokens").asInt(0)
                 : null;
+            // Populated from the responses-path shape's `output_tokens_details.reasoning_tokens` when the
+            // upstream model reports it; absent for chat/completions-only models (#1368 slice 5).
+            Integer reasoningTokens = usageNode.has("reasoningTokens")
+                ? usageNode.path("reasoningTokens").asInt(0)
+                : null;
             Double costUsd = usageNode.has("costUsd") ? usageNode.path("costUsd").asDouble(0.0) : null;
             return new AgentResult.LlmUsage(
                 model,
                 inputTokens,
                 outputTokens,
-                null,
+                reasoningTokens,
                 cacheReadTokens,
                 cacheWriteTokens,
                 costUsd,

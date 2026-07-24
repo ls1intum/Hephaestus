@@ -3,20 +3,22 @@ package de.tum.cit.aet.hephaestus.agent.proxy;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmAuthMode;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.ModelVisibility;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
-import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import java.io.IOException;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import mockwebserver3.MockResponse;
 import mockwebserver3.MockWebServer;
@@ -24,577 +26,241 @@ import mockwebserver3.RecordedRequest;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
+/** Real HTTP proof of the proxy's narrow OpenAI-compatible trust boundary. */
 class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
-    private static MockWebServer mockUpstream;
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static MockWebServer upstream;
 
     @Autowired
     private WebTestClient webTestClient;
 
     @Autowired
-    private AgentJobRepository agentJobRepository;
+    private AgentJobRepository jobRepository;
 
     @Autowired
-    private AgentConfigRepository agentConfigRepository;
+    private AgentConfigRepository configRepository;
 
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    @Autowired
+    private LlmConnectionRepository connectionRepository;
+
+    @Autowired
+    private LlmModelRepository modelRepository;
 
     private Workspace workspace;
 
     @BeforeAll
-    static void startMockUpstream() throws java.io.IOException {
-        mockUpstream = new MockWebServer();
-        mockUpstream.start();
+    static void startUpstream() throws Exception {
+        upstream = new MockWebServer();
+        upstream.start();
     }
 
     @AfterAll
-    static void stopMockUpstream() throws java.io.IOException {
-        mockUpstream.close();
+    static void stopUpstream() throws Exception {
+        upstream.close();
     }
 
     @DynamicPropertySource
-    static void configureLlmProxy(DynamicPropertyRegistry registry) {
-        registry.add("hephaestus.llm-proxy.anthropic-upstream-url", () ->
-            mockUpstream.url("/").toString().replaceAll("/$", "")
-        );
-        registry.add("hephaestus.llm-proxy.openai-upstream-url", () ->
-            mockUpstream.url("/").toString().replaceAll("/$", "")
-        );
+    static void properties(DynamicPropertyRegistry registry) {
+        registry.add("hephaestus.agent.enabled", () -> "true");
+        registry.add("hephaestus.agent.poll-interval", () -> "1h");
+        registry.add("hephaestus.runtime.worker.enabled", () -> "true");
+        registry.add("hephaestus.runtime.webhook.enabled", () -> "false");
+        registry.add("hephaestus.sandbox.docker-host", () -> "unix:///nonexistent/llm-proxy-test.sock");
+        registry.add("hephaestus.agent.image.pull-policy", () -> "NEVER");
+        registry.add("hephaestus.llm.egress.allow-loopback", () -> "true");
     }
 
     @BeforeEach
-    void setUpWorkspace() {
+    void setUp() throws Exception {
         User owner = persistUser("proxy-owner");
         workspace = createWorkspace("proxy-ws", "Proxy Workspace", "proxy-org", AccountType.ORG, owner);
-        ensureAdminMembership(workspace);
+        while (upstream.takeRequest(0, TimeUnit.MILLISECONDS) != null) {
+            // Drain requests from prior tests.
+        }
     }
 
-    private AgentJob createRunningJobWithApiKey(String apiKey) {
+    @Test
+    void shouldRequireProxyBearerToken() {
+        webTestClient
+            .post()
+            .uri("/internal/llm/chat/completions")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue("{}")
+            .exchange()
+            .expectStatus()
+            .isUnauthorized();
+    }
+
+    @Test
+    void shouldForwardChatCompletionsWithCatalogModelAndBearerCredential() throws Exception {
+        upstream.enqueue(jsonResponse("{\"id\":\"chatcmpl-test\"}"));
+        AgentJob job = runningJob("openai-completions", LlmAuthMode.BEARER, "catalog-chat-model", true);
+
+        webTestClient
+            .post()
+            .uri("/internal/llm/chat/completions")
+            .header("Authorization", "Bearer " + job.getJobToken())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue("{\"model\":\"caller-model\",\"service_tier\":\"priority\",\"messages\":[]}")
+            .exchange()
+            .expectStatus()
+            .isOk();
+
+        RecordedRequest request = upstream.takeRequest(5, TimeUnit.SECONDS);
+        assertThat(request).isNotNull();
+        assertThat(request.getMethod()).isEqualTo("POST");
+        assertThat(request.getTarget()).isEqualTo("/v1/chat/completions");
+        assertThat(request.getHeaders().get("Authorization")).isEqualTo("Bearer upstream-secret");
+        assertThat(request.getBody().utf8()).contains("\"model\":\"catalog-chat-model\"");
+        assertThat(request.getBody().utf8()).doesNotContain("caller-model").doesNotContain("service_tier");
+    }
+
+    @Test
+    void shouldForwardResponsesWithRawApiKeyCredential() throws Exception {
+        upstream.enqueue(jsonResponse("{\"id\":\"response-test\"}"));
+        AgentJob job = runningJob("openai-responses", LlmAuthMode.API_KEY, "catalog-response-model", true);
+
+        webTestClient
+            .post()
+            .uri("/internal/llm/responses")
+            .header("Authorization", "Bearer " + job.getJobToken())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue("{\"model\":\"caller-model\",\"input\":\"hello\"}")
+            .exchange()
+            .expectStatus()
+            .isOk();
+
+        RecordedRequest request = upstream.takeRequest(5, TimeUnit.SECONDS);
+        assertThat(request).isNotNull();
+        assertThat(request.getTarget()).isEqualTo("/v1/responses");
+        assertThat(request.getHeaders().get("api-key")).isEqualTo("upstream-secret");
+        assertThat(request.getHeaders().get("Authorization")).isNull();
+        assertThat(request.getBody().utf8()).contains("\"model\":\"catalog-response-model\"");
+    }
+
+    @Test
+    void shouldRejectQueryAndWrongPathWithoutCallingUpstream() {
+        AgentJob job = runningJob("openai-completions", LlmAuthMode.BEARER, "model", true);
+        int requestsBefore = upstream.getRequestCount();
+
+        webTestClient
+            .post()
+            .uri("/internal/llm/chat/completions?api-version=unsafe")
+            .header("Authorization", "Bearer " + job.getJobToken())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue("{}")
+            .exchange()
+            .expectStatus()
+            .isBadRequest();
+        webTestClient
+            .post()
+            .uri("/internal/llm/responses")
+            .header("Authorization", "Bearer " + job.getJobToken())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue("{}")
+            .exchange()
+            .expectStatus()
+            .isNotFound();
+
+        assertThat(upstream.getRequestCount()).isEqualTo(requestsBefore);
+    }
+
+    @Test
+    void shouldRejectHostedProviderToolsWithoutCallingUpstream() {
+        AgentJob job = runningJob("openai-responses", LlmAuthMode.BEARER, "model", true);
+        int requestsBefore = upstream.getRequestCount();
+
+        webTestClient
+            .post()
+            .uri("/internal/llm/responses")
+            .header("Authorization", "Bearer " + job.getJobToken())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue("{\"tools\":[{\"type\":\"web_search_preview\"}]}")
+            .exchange()
+            .expectStatus()
+            .isBadRequest();
+
+        assertThat(upstream.getRequestCount()).isEqualTo(requestsBefore);
+    }
+
+    @Test
+    void shouldFailClosedWhenCatalogModelIsDisabled() {
+        AgentJob job = runningJob("openai-completions", LlmAuthMode.BEARER, "model", false);
+        int requestsBefore = upstream.getRequestCount();
+
+        webTestClient
+            .post()
+            .uri("/internal/llm/chat/completions")
+            .header("Authorization", "Bearer " + job.getJobToken())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue("{}")
+            .exchange()
+            .expectStatus()
+            .isEqualTo(502);
+
+        assertThat(upstream.getRequestCount()).isEqualTo(requestsBefore);
+    }
+
+    private AgentJob runningJob(String protocol, LlmAuthMode authMode, String upstreamModelId, boolean modelEnabled) {
+        LlmConnection connection = new LlmConnection();
+        connection.setSlug("connection-" + System.nanoTime());
+        connection.setDisplayName("Test connection");
+        connection.setBaseUrl(upstream.url("/v1").toString().replaceAll("/$", ""));
+        connection.setApiProtocol(protocol);
+        connection.setAuthMode(authMode);
+        connection.setApiKey("upstream-secret");
+        connection.setEnabled(true);
+        connection = connectionRepository.save(connection);
+
+        LlmModel model = new LlmModel();
+        model.setConnection(connection);
+        model.setSlug("model-" + System.nanoTime());
+        model.setDisplayName("Test model");
+        model.setUpstreamModelId(upstreamModelId);
+        model.setVisibility(ModelVisibility.PUBLIC);
+        model.setEnabled(modelEnabled);
+        model = modelRepository.save(model);
+
         AgentConfig config = new AgentConfig();
         config.setWorkspace(workspace);
-        config.setName("test-config-" + System.nanoTime());
-        config.setLlmProvider(LlmProvider.ANTHROPIC);
-        config = agentConfigRepository.save(config);
+        config.setName("config-" + System.nanoTime());
+        config = configRepository.save(config);
+
+        ObjectNode snapshot = OBJECT_MAPPER.createObjectNode();
+        snapshot.put("schemaVersion", ConfigSnapshot.SCHEMA_VERSION);
+        snapshot.put("configId", config.getId());
+        snapshot.put("configName", config.getName());
+        snapshot.put("apiProtocol", protocol);
+        snapshot.put("baseUrl", connection.getBaseUrl());
+        snapshot.put("upstreamModelId", upstreamModelId);
+        snapshot.put("supportsReasoning", false);
+        snapshot.put("connectionScope", "INSTANCE");
+        snapshot.put("connectionId", connection.getId());
+        snapshot.put("modelId", model.getId());
+        snapshot.put("workspaceId", workspace.getId());
+        snapshot.put("timeoutSeconds", 600);
+        snapshot.put("allowInternet", false);
 
         AgentJob job = new AgentJob();
         job.setWorkspace(workspace);
         job.setConfig(config);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         job.setStatus(AgentJobStatus.RUNNING);
-        job.setLlmApiKey(apiKey);
-        job.setConfigSnapshot(
-            OBJECT_MAPPER.valueToTree(Map.of("agent_type", "CLAUDE_CODE", "model", "claude-sonnet-4-20250514"))
-        );
-        return agentJobRepository.save(job);
+        job.setConfigSnapshot(snapshot);
+        return jobRepository.save(job);
     }
 
-    /** Drain any queued requests from prior tests so takeRequest() is accurate. */
-    private void drainMockUpstream() {
-        try {
-            while (mockUpstream.takeRequest(0, TimeUnit.MILLISECONDS) != null) {
-                // keep draining until queue is empty (returns null)
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    @Nested
-    class SecurityIsolation {
-
-        @Test
-        void shouldRejectNoAuth() {
-            webTestClient
-                .post()
-                .uri("/internal/llm/anthropic/v1/messages")
-                .bodyValue("{}")
-                .exchange()
-                .expectStatus()
-                .isUnauthorized();
-        }
-
-        @Test
-        @WithAdminUser
-        void shouldRejectJwtOnInternalEndpoints() {
-            webTestClient
-                .post()
-                .uri("/internal/llm/anthropic/v1/messages")
-                .headers(TestAuthUtils.withCurrentUser())
-                .bodyValue("{}")
-                .exchange()
-                .expectStatus()
-                .isUnauthorized();
-        }
-
-        @Test
-        void shouldRejectNonRunningJobToken() {
-            AgentConfig config = new AgentConfig();
-            config.setWorkspace(workspace);
-            config.setName("completed-config");
-            config.setLlmProvider(LlmProvider.ANTHROPIC);
-            config = agentConfigRepository.save(config);
-
-            AgentJob job = new AgentJob();
-            job.setWorkspace(workspace);
-            job.setConfig(config);
-            job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-            job.setStatus(AgentJobStatus.COMPLETED);
-            job.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("agent_type", "CLAUDE_CODE")));
-            job = agentJobRepository.save(job);
-
-            webTestClient
-                .post()
-                .uri("/internal/llm/anthropic/v1/messages")
-                .header("x-api-key", job.getJobToken())
-                .bodyValue("{}")
-                .exchange()
-                .expectStatus()
-                .isUnauthorized();
-        }
-
-        @Test
-        void shouldRejectQueuedJobToken() {
-            AgentConfig config = new AgentConfig();
-            config.setWorkspace(workspace);
-            config.setName("queued-config");
-            config.setLlmProvider(LlmProvider.ANTHROPIC);
-            config = agentConfigRepository.save(config);
-
-            AgentJob job = new AgentJob();
-            job.setWorkspace(workspace);
-            job.setConfig(config);
-            job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-            job.setStatus(AgentJobStatus.QUEUED);
-            job.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("agent_type", "CLAUDE_CODE")));
-            job = agentJobRepository.save(job);
-
-            webTestClient
-                .post()
-                .uri("/internal/llm/anthropic/v1/messages")
-                .header("x-api-key", job.getJobToken())
-                .bodyValue("{}")
-                .exchange()
-                .expectStatus()
-                .isUnauthorized();
-        }
-
-        @Test
-        void shouldRejectFailedJobToken() {
-            AgentConfig config = new AgentConfig();
-            config.setWorkspace(workspace);
-            config.setName("failed-config");
-            config.setLlmProvider(LlmProvider.ANTHROPIC);
-            config = agentConfigRepository.save(config);
-
-            AgentJob job = new AgentJob();
-            job.setWorkspace(workspace);
-            job.setConfig(config);
-            job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-            job.setStatus(AgentJobStatus.FAILED);
-            job.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("agent_type", "CLAUDE_CODE")));
-            job = agentJobRepository.save(job);
-
-            webTestClient
-                .post()
-                .uri("/internal/llm/anthropic/v1/messages")
-                .header("x-api-key", job.getJobToken())
-                .bodyValue("{}")
-                .exchange()
-                .expectStatus()
-                .isUnauthorized();
-        }
-
-        @Test
-        void shouldRejectFabricatedToken() {
-            String fakeToken = "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY";
-
-            webTestClient
-                .post()
-                .uri("/internal/llm/anthropic/v1/messages")
-                .header("x-api-key", fakeToken)
-                .bodyValue("{}")
-                .exchange()
-                .expectStatus()
-                .isUnauthorized();
-        }
-
-        @Test
-        void shouldRejectEmptyApiKeyHeader() {
-            webTestClient
-                .post()
-                .uri("/internal/llm/anthropic/v1/messages")
-                .header("x-api-key", "")
-                .bodyValue("{}")
-                .exchange()
-                .expectStatus()
-                .isUnauthorized();
-        }
-
-        @Test
-        void shouldRejectMalformedToken() {
-            webTestClient
-                .post()
-                .uri("/internal/llm/anthropic/v1/messages")
-                .header("x-api-key", "invalid token with spaces!!!")
-                .bodyValue("{}")
-                .exchange()
-                .expectStatus()
-                .isUnauthorized();
-        }
-    }
-
-    @Nested
-    class ProxyForwarding {
-
-        @BeforeEach
-        void setUp() {
-            drainMockUpstream();
-        }
-
-        @Test
-        void shouldForwardAnthropicWithRealApiKey() throws Exception {
-            mockUpstream.enqueue(
-                new MockResponse.Builder()
-                    .code(200)
-                    .addHeader("Content-Type", "application/json")
-                    .body("{\"id\":\"msg_test\",\"content\":[]}")
-                    .build()
-            );
-
-            AgentJob job = createRunningJobWithApiKey("sk-ant-real-key-123");
-
-            webTestClient
-                .post()
-                .uri("/internal/llm/anthropic/v1/messages")
-                .header("x-api-key", job.getJobToken())
-                .header("Content-Type", "application/json")
-                .bodyValue("{\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":1}")
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .json("{\"id\":\"msg_test\",\"content\":[]}");
-
-            RecordedRequest upstream = mockUpstream.takeRequest(5, TimeUnit.SECONDS);
-            assertThat(upstream).isNotNull();
-            assertThat(upstream.getTarget()).isEqualTo("/v1/messages");
-            // Real API key injected — NOT the job token
-            assertThat(upstream.getHeaders().get("x-api-key")).isEqualTo("sk-ant-real-key-123");
-            assertThat(upstream.getHeaders().get("x-api-key")).isNotEqualTo(job.getJobToken());
-            // No Bearer auth for Anthropic
-            assertThat(upstream.getHeaders().get("Authorization")).isNull();
-            // Body forwarded intact
-            assertThat(upstream.getBody().utf8()).contains("claude-sonnet-4-20250514");
-        }
-
-        @Test
-        void shouldForwardOpenAIWithBearerAuth() throws Exception {
-            mockUpstream.enqueue(
-                new MockResponse.Builder()
-                    .code(200)
-                    .addHeader("Content-Type", "application/json")
-                    .body("{\"id\":\"chatcmpl-test\",\"choices\":[]}")
-                    .build()
-            );
-
-            AgentJob job = createRunningJobWithApiKey("sk-openai-real-key-456");
-
-            webTestClient
-                .post()
-                .uri("/internal/llm/openai/v1/chat/completions")
-                .header("Authorization", "Bearer " + job.getJobToken())
-                .header("Content-Type", "application/json")
-                .bodyValue("{\"model\":\"gpt-4\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}")
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .json("{\"id\":\"chatcmpl-test\",\"choices\":[]}");
-
-            RecordedRequest upstream = mockUpstream.takeRequest(5, TimeUnit.SECONDS);
-            assertThat(upstream).isNotNull();
-            assertThat(upstream.getTarget()).isEqualTo("/v1/chat/completions");
-            // Real API key injected with Bearer prefix
-            assertThat(upstream.getHeaders().get("Authorization")).isEqualTo("Bearer sk-openai-real-key-456");
-            // Job token must NOT appear in upstream headers
-            assertThat(upstream.getHeaders().get("Authorization")).doesNotContain(job.getJobToken());
-            // No x-api-key for OpenAI
-            assertThat(upstream.getHeaders().get("x-api-key")).isNull();
-        }
-
-        @Test
-        void shouldAuthenticateViaApiKeyForAzure() throws Exception {
-            mockUpstream.enqueue(
-                new MockResponse.Builder()
-                    .code(200)
-                    .addHeader("Content-Type", "application/json")
-                    .body("{\"id\":\"chatcmpl-azure\"}")
-                    .build()
-            );
-
-            AgentJob job = createRunningJobWithApiKey("sk-azure-real-key");
-
-            webTestClient
-                .post()
-                .uri("/internal/llm/openai/v1/chat/completions")
-                .header("api-key", job.getJobToken())
-                .header("Content-Type", "application/json")
-                .bodyValue("{\"model\":\"gpt-4\"}")
-                .exchange()
-                .expectStatus()
-                .isOk();
-
-            RecordedRequest upstream = mockUpstream.takeRequest(5, TimeUnit.SECONDS);
-            assertThat(upstream).isNotNull();
-            // Real API key injected, NOT the job token
-            assertThat(upstream.getHeaders().get("Authorization")).isEqualTo("Bearer sk-azure-real-key");
-            assertThat(upstream.getHeaders().get("api-key")).isNull();
-        }
-
-        @Test
-        void shouldSupportGetMethod() throws Exception {
-            mockUpstream.enqueue(
-                new MockResponse.Builder()
-                    .code(200)
-                    .addHeader("Content-Type", "application/json")
-                    .body("{\"data\":[{\"id\":\"gpt-4\"}]}")
-                    .build()
-            );
-
-            AgentJob job = createRunningJobWithApiKey("sk-list-key");
-
-            webTestClient
-                .get()
-                .uri("/internal/llm/openai/v1/models")
-                .header("Authorization", "Bearer " + job.getJobToken())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .json("{\"data\":[{\"id\":\"gpt-4\"}]}");
-
-            RecordedRequest upstream = mockUpstream.takeRequest(5, TimeUnit.SECONDS);
-            assertThat(upstream).isNotNull();
-            assertThat(upstream.getMethod()).isEqualTo("GET");
-            assertThat(upstream.getTarget()).isEqualTo("/v1/models");
-            assertThat(upstream.getHeaders().get("Authorization")).isEqualTo("Bearer sk-list-key");
-        }
-
-        @Test
-        void shouldReturn404ForUnknownProvider() {
-            AgentJob job = createRunningJobWithApiKey("sk-test-key");
-
-            webTestClient
-                .post()
-                .uri("/internal/llm/unknownprovider/v1/messages")
-                .header("x-api-key", job.getJobToken())
-                .bodyValue("{}")
-                .exchange()
-                .expectStatus()
-                .isNotFound();
-        }
-
-        @Test
-        void shouldStreamSseResponse() throws Exception {
-            String ssePayload = "data: {\"id\":\"msg_stream\"}\n\ndata: [DONE]\n\n";
-            mockUpstream.enqueue(
-                new MockResponse.Builder()
-                    .code(200)
-                    .addHeader("Content-Type", "text/event-stream")
-                    .body(ssePayload)
-                    .build()
-            );
-
-            AgentJob job = createRunningJobWithApiKey("sk-ant-sse-key");
-
-            // SSE body content is verified by ProxyStreamingUtilsTest.
-            // WebTestClient cannot capture bytes written directly to HttpServletResponse
-            // (the controller bypasses Spring MVC for SSE streaming and returns null),
-            // so we verify status, content-type, and upstream auth header injection here.
-            webTestClient
-                .post()
-                .uri("/internal/llm/anthropic/v1/messages")
-                .header("x-api-key", job.getJobToken())
-                .header("Content-Type", "application/json")
-                .bodyValue("{\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":1,\"stream\":true}")
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectHeader()
-                .contentTypeCompatibleWith("text/event-stream");
-
-            RecordedRequest upstream = mockUpstream.takeRequest(5, TimeUnit.SECONDS);
-            assertThat(upstream).isNotNull();
-            assertThat(upstream.getHeaders().get("x-api-key")).isEqualTo("sk-ant-sse-key");
-        }
-
-        @Test
-        void shouldForwardQueryParameters() throws Exception {
-            mockUpstream.enqueue(
-                new MockResponse.Builder()
-                    .code(200)
-                    .addHeader("Content-Type", "application/json")
-                    .body("{\"data\":[]}")
-                    .build()
-            );
-
-            AgentJob job = createRunningJobWithApiKey("sk-query-key");
-
-            webTestClient
-                .get()
-                .uri("/internal/llm/openai/v1/models?limit=10&order=desc")
-                .header("Authorization", "Bearer " + job.getJobToken())
-                .exchange()
-                .expectStatus()
-                .isOk();
-
-            RecordedRequest upstream = mockUpstream.takeRequest(5, TimeUnit.SECONDS);
-            assertThat(upstream).isNotNull();
-            assertThat(upstream.getTarget()).contains("limit=10");
-            assertThat(upstream.getTarget()).contains("order=desc");
-        }
-
-        @Test
-        void shouldForwardUpstreamErrors() throws Exception {
-            mockUpstream.enqueue(new MockResponse.Builder().code(429).body("{\"error\":\"rate_limited\"}").build());
-
-            AgentJob job = createRunningJobWithApiKey("sk-test-key");
-
-            webTestClient
-                .post()
-                .uri("/internal/llm/anthropic/v1/messages")
-                .header("x-api-key", job.getJobToken())
-                .header("Content-Type", "application/json")
-                .bodyValue("{\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":1}")
-                .exchange()
-                .expectStatus()
-                .isEqualTo(429)
-                .expectBody()
-                .json("{\"error\":\"rate_limited\"}");
-        }
-    }
-
-    @Nested
-    class InputValidation {
-
-        @BeforeEach
-        void setUp() {
-            drainMockUpstream();
-        }
-
-        @Test
-        void shouldRejectPathTraversal() {
-            int requestsBefore = mockUpstream.getRequestCount();
-
-            AgentJob job = createRunningJobWithApiKey("sk-test-key");
-
-            webTestClient
-                .post()
-                .uri("/internal/llm/anthropic/v1/../../../admin")
-                .header("x-api-key", job.getJobToken())
-                .bodyValue("{}")
-                .exchange()
-                .expectStatus()
-                .value(status ->
-                    assertThat(status)
-                        .as(
-                            "Path traversal should be rejected: 400 (our check), 404 (not found), or 401 (servlet normalizes path out of /internal/llm/** to main auth chain)"
-                        )
-                        .isIn(400, 401, 404)
-                );
-
-            // Nothing should have been forwarded to the upstream
-            assertThat(mockUpstream.getRequestCount())
-                .as("Path traversal must NOT reach the upstream")
-                .isEqualTo(requestsBefore);
-        }
-    }
-
-    @Nested
-    class TokenHashIntegrity {
-
-        @Test
-        void shouldPersistTokenHash() {
-            AgentJob job = createRunningJobWithApiKey("sk-test");
-
-            AgentJob loaded = agentJobRepository.findById(job.getId()).orElseThrow();
-            assertThat(loaded.getJobTokenHash()).isNotNull();
-            assertThat(loaded.getJobTokenHash()).hasSize(64); // SHA-256 hex
-            assertThat(loaded.getJobTokenHash()).isEqualTo(AgentJob.computeTokenHash(loaded.getJobToken()));
-        }
-
-        @Test
-        void shouldLookUpByTokenHash() {
-            AgentJob job = createRunningJobWithApiKey("sk-test");
-
-            String hash = AgentJob.computeTokenHash(job.getJobToken());
-            var found = agentJobRepository.findByJobTokenHashAndStatus(hash, AgentJobStatus.RUNNING);
-            assertThat(found).isPresent();
-            assertThat(found.get().getId()).isEqualTo(job.getId());
-        }
-
-        @Test
-        void shouldNotFindJobWithWrongStatus() {
-            AgentJob job = createRunningJobWithApiKey("sk-test");
-
-            String hash = AgentJob.computeTokenHash(job.getJobToken());
-            var found = agentJobRepository.findByJobTokenHashAndStatus(hash, AgentJobStatus.COMPLETED);
-            assertThat(found).isEmpty();
-        }
-
-        @Test
-        void jobTokenShouldBeUnique() {
-            AgentJob job1 = createRunningJobWithApiKey("sk-test-1");
-            AgentJob job2 = createRunningJobWithApiKey("sk-test-2");
-
-            assertThat(job1.getJobToken()).isNotEqualTo(job2.getJobToken());
-            assertThat(job1.getJobTokenHash()).isNotEqualTo(job2.getJobTokenHash());
-        }
-
-        @Test
-        void jobTokenShouldBe43Chars() {
-            AgentJob job = createRunningJobWithApiKey("sk-test");
-
-            assertThat(job.getJobToken()).hasSize(43);
-            assertThat(job.getJobToken()).matches("[A-Za-z0-9_-]+");
-        }
-
-        @Test
-        void computeTokenHashShouldBeDeterministic() {
-            String token = "test-token-abc";
-            String hash1 = AgentJob.computeTokenHash(token);
-            String hash2 = AgentJob.computeTokenHash(token);
-
-            assertThat(hash1).isEqualTo(hash2);
-            assertThat(hash1).hasSize(64);
-            assertThat(hash1).matches("[0-9a-f]+");
-        }
-    }
-
-    @Nested
-    class CrossChainSecurity {
-
-        @Test
-        @WithAdminUser
-        void jobTokenShouldNotAccessMainApi() {
-            AgentJob job = createRunningJobWithApiKey("sk-test");
-
-            // Job token should NOT work for workspace endpoints (different security chain)
-            webTestClient
-                .get()
-                .uri("/workspaces/" + workspace.getWorkspaceSlug() + "/admin/members")
-                .header("x-api-key", job.getJobToken())
-                .exchange()
-                .expectStatus()
-                .isUnauthorized();
-        }
+    private static MockResponse jsonResponse(String body) {
+        return new MockResponse.Builder().code(200).addHeader("Content-Type", "application/json").body(body).build();
     }
 }

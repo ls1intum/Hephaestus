@@ -1,5 +1,13 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Building2, ChevronLeft, KeyRound, ScrollText, Users } from "lucide-react";
+import {
+	BrainCircuit,
+	Building2,
+	ChevronLeft,
+	CircleDollarSign,
+	KeyRound,
+	ScrollText,
+	Users,
+} from "lucide-react";
 import {
 	SidebarGroup,
 	SidebarGroupLabel,
@@ -18,6 +26,18 @@ import {
 const ADMIN_SECTIONS = [
 	{ to: "/admin/users", label: "Users", icon: Users, tooltip: "Manage accounts" },
 	{ to: "/admin/workspaces", label: "Workspaces", icon: Building2, tooltip: "All workspaces" },
+	{
+		to: "/admin/llm",
+		label: "AI models",
+		icon: BrainCircuit,
+		tooltip: "Providers and shared models",
+	},
+	{
+		to: "/admin/usage",
+		label: "LLM Usage",
+		icon: CircleDollarSign,
+		tooltip: "AI spend and budget caps",
+	},
 	{
 		to: "/admin/login-providers",
 		label: "Login providers",

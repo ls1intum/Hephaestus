@@ -68,4 +68,10 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
         nativeQuery = true
     )
     int reapStaleInFlight(@Param("cutoff") Instant cutoff);
+
+    @Query(
+        "SELECT m FROM ChatMessage m JOIN FETCH m.thread t JOIN FETCH t.workspace " +
+            "WHERE m.status = de.tum.cit.aet.hephaestus.mentor.ChatMessage.Status.in_flight AND m.createdAt < :cutoff"
+    )
+    List<ChatMessage> findStaleInFlightForAccounting(@Param("cutoff") Instant cutoff);
 }

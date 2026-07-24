@@ -1,7 +1,9 @@
 package de.tum.cit.aet.hephaestus.agent.config;
 
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
+import de.tum.cit.aet.hephaestus.agent.catalog.ModelBindingSource;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModel;
 import de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
@@ -21,6 +23,7 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
+import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -31,8 +34,8 @@ import lombok.ToString;
  * Workspace-scoped configuration for the Pi practice-detection agent.
  *
  * <p>A workspace may have multiple {@code AgentConfig} instances, each identified by a unique
- * {@code name} within the workspace. This entity stores the LLM provider/credentials
- * (encrypted at rest), and resource limits for container execution.
+ * {@code name} within the workspace. Provider routing and credentials live in the selected catalog
+ * model; this entity only binds that model to execution limits.
  *
  * @see AgentConfigService for CRUD operations
  */
@@ -49,7 +52,7 @@ import lombok.ToString;
 @NoArgsConstructor
 @ToString
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class AgentConfig {
+public class AgentConfig implements ModelBindingSource {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -79,22 +82,24 @@ public class AgentConfig {
     @ToString.Exclude
     private String llmApiKey;
 
-    /**
-     * Optional base URL override for OpenAI/Anthropic-style endpoints (e.g. TUM GPU,
-     * Azure OpenAI gateway, OSS-compatible proxies). When set in {@code API_KEY} mode,
-     * the Pi runtime registers a custom {@code hephaestus} provider extension that uses
-     * the chat/completions surface — needed for providers that don't speak the Responses API.
-     */
+    /** Deprecated compatibility value; OpenAI-compatible routing now comes from the catalog binding. */
     @Column(name = "llm_base_url", length = 2048)
+    @ToString.Exclude
     private String llmBaseUrl;
 
+    // Deprecated compatibility column retained until a later release can remove it safely.
+    // New catalog-bound configs leave it null; runtime code must never branch on it.
     @Enumerated(EnumType.STRING)
-    @Column(name = "llm_provider", nullable = false, length = 32)
+    @Column(name = "llm_provider", length = 32)
     private LlmProvider llmProvider;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "credential_mode", nullable = false, length = 16)
-    private CredentialMode credentialMode = CredentialMode.PROXY;
+    // Kept as a read-only mapping until the deprecated DB column can be removed in a later release.
+    // Runtime code must not branch on it: the proxy is now the only credential path.
+    @Column(name = "credential_mode", nullable = false, length = 16, updatable = false)
+    @Getter(AccessLevel.NONE)
+    @Setter(AccessLevel.NONE)
+    @ToString.Exclude
+    private String legacyCredentialMode = "PROXY";
 
     @Column(name = "timeout_seconds", nullable = false)
     private int timeoutSeconds = 600;
@@ -104,6 +109,21 @@ public class AgentConfig {
 
     @Column(name = "allow_internet", nullable = false)
     private boolean allowInternet = false;
+
+    /**
+     * Instance-catalog model this config binds to (#1368). At most one of {@code instanceModel} /
+     * {@code workspaceModel} is set (a DB CHECK enforces it); both null tolerated for legacy rows.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "instance_model_id", foreignKey = @ForeignKey(name = "fk_agent_config_instance_model"))
+    @ToString.Exclude
+    private LlmModel instanceModel;
+
+    /** Workspace BYO model this config binds to (#1368). Mutually exclusive with {@code instanceModel}. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "workspace_model_id", foreignKey = @ForeignKey(name = "fk_agent_config_workspace_model"))
+    @ToString.Exclude
+    private WorkspaceLlmModel workspaceModel;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

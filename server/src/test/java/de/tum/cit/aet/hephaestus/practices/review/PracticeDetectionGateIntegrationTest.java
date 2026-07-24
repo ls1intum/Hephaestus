@@ -6,8 +6,11 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmConnection;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmConnectionRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModel;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
@@ -64,6 +67,12 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
     private AgentConfigRepository agentConfigRepository;
 
     @Autowired
+    private WorkspaceLlmConnectionRepository workspaceLlmConnectionRepository;
+
+    @Autowired
+    private WorkspaceLlmModelRepository workspaceLlmModelRepository;
+
+    @Autowired
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
@@ -85,6 +94,7 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
     private UserRoleChecker userRoleChecker;
 
     private Workspace workspace;
+    private WorkspaceLlmModel workspaceModel;
     private Repository repo;
     private IdentityProvider provider;
     private User assignee;
@@ -99,13 +109,31 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
         workspace.getFeatures().setPracticesEnabled(true);
         workspace = workspaceRepository.save(workspace);
 
-        // Agent config (enabled)
+        WorkspaceLlmConnection connection = new WorkspaceLlmConnection();
+        connection.setWorkspace(workspace);
+        connection.setSlug("gate-connection");
+        connection.setDisplayName("Gate connection");
+        connection.setBaseUrl("https://api.openai.com");
+        connection.setApiProtocol("openai-completions");
+        connection.setEnabled(true);
+        connection = workspaceLlmConnectionRepository.save(connection);
+
+        workspaceModel = new WorkspaceLlmModel();
+        workspaceModel.setWorkspace(workspace);
+        workspaceModel.setConnection(connection);
+        workspaceModel.setSlug("gate-model");
+        workspaceModel.setDisplayName("Gate model");
+        workspaceModel.setUpstreamModelId("gpt-5");
+        workspaceModel.setEnabled(true);
+        workspaceModel = workspaceLlmModelRepository.save(workspaceModel);
+
+        // Enabled config backed by a live catalog model.
         AgentConfig config = new AgentConfig();
         config.setWorkspace(workspace);
         config.setName("gate-config");
         config.setEnabled(true);
         config.setLlmProvider(LlmProvider.ANTHROPIC);
-        config.setCredentialMode(CredentialMode.PROXY);
+        config.setWorkspaceModel(workspaceModel);
         config.setTimeoutSeconds(300);
         agentConfigRepository.save(config);
 
@@ -263,6 +291,19 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             // No runnable practice config → gate skips before detection.
+            assertThat(((GateDecision.Skip) decision).reason()).contains("no runnable practice config");
+        }
+
+        @Test
+        void skipsUnavailableModelWithoutPoisoningTheReadTransaction() {
+            workspaceModel.setEnabled(false);
+            workspaceLlmModelRepository.saveAndFlush(workspaceModel);
+            createPractice("unavailable-model", "Unavailable model", List.of("PullRequestCreated"), true);
+            PullRequest pr = createPullRequest(false, Set.of(), Set.of(assignee));
+
+            GateDecision decision = gate.evaluate(pr, "PullRequestCreated", TriggerMode.AUTO);
+
+            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) decision).reason()).contains("no runnable practice config");
         }
 

@@ -32,6 +32,23 @@ import org.springframework.stereotype.Component;
  *
  * <p>Gated on {@code hephaestus.integration.gitlab.enabled=true} to track
  * {@link GitLabGraphQlClientProvider}.
+ *
+ * <p><b>{@link #findExistingSummary} is intentionally NOT overridden</b> (#1368 hardening — delivery-recovery
+ * dedup): unlike GitHub, this codebase has no existing "list MR notes with body" query wired to a
+ * reusable Java call site ({@code GetMergeRequestDiscussions.graphql} exists for sync but returns a
+ * nested discussions→notes shape with its own resolver/response mapping, not a drop-in reuse the way
+ * GitHub's {@code GetPullRequestComments}/{@code GetIssueComments} were for {@link
+ * de.tum.cit.aet.hephaestus.integration.scm.github.feedback.GithubFeedbackChannel}). Building and wiring
+ * that mapping is a bigger lift than this hardening slice's scope.
+ *
+ * <p>The SPI default is {@code UNKNOWN}, not "proceed and post" (#1368 fix wave, finding #6 — the
+ * default flipped from an {@code Optional}-based "unsupported ≈ absent" to a tri-state {@code
+ * ExistingSummaryLookup}; see {@link de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel
+ * #findExistingSummary}'s javadoc). Concretely: a GitLab delivery-recovery retry NEVER auto-reposts —
+ * every stuck-PENDING GitLab delivery is retried (attempt-counted) without confirmation, and once the
+ * attempt cap is exhausted it is marked FAILED for a human to resolve via the operator-facing retry
+ * endpoint, rather than risking a silent duplicate note. This is the safe direction to be wrong in for a
+ * provider with no confirm-absence query available.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)

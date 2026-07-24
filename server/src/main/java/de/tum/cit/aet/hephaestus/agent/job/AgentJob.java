@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectClass;
@@ -33,6 +34,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
@@ -51,7 +53,9 @@ import tools.jackson.databind.JsonNode;
  *   <li>{@link #jobToken} is a 256-bit SecureRandom token encrypted at rest, used for LLM proxy
  *       authentication. It is never exposed in API responses, logs, or NATS messages.</li>
  *   <li>{@link #configSnapshot} freezes the agent config at submit time so in-flight jobs
- *       are not affected by config changes.</li>
+ *       are not affected by config changes. Excluded from {@code toString()}; the API-facing
+ *       {@code AgentJobDTO} additionally redacts an INSTANCE-scoped connection's base URL down to
+ *       {@code scheme://host} before returning it to a workspace admin.</li>
  * </ul>
  */
 @Entity
@@ -81,6 +85,15 @@ public class AgentJob {
     @JoinColumn(name = "config_id", foreignKey = @ForeignKey(name = "fk_agent_job_config"))
     @ToString.Exclude
     private AgentConfig config;
+
+    /**
+     * Which per-purpose {@link WorkspaceAgentBinding} this job runs on (#1368). The executor admits
+     * the workspace's binding for this purpose at claim time; the frozen {@code configSnapshot} still
+     * carries the model routing. Replaces the {@code config} reference for execution.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "purpose", length = 32)
+    private AgentPurpose purpose;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "job_type", nullable = false, length = 50)
@@ -122,8 +135,14 @@ public class AgentJob {
     @Column(name = "output", columnDefinition = "jsonb")
     private JsonNode output;
 
+    /**
+     * Frozen agent config, including the connection's base URL (see {@code ConfigSnapshot}'s Javadoc
+     * for why the LLM proxy does NOT route on this field). Excluded from {@code toString()} — a stray
+     * {@code log.info("{}", job)} must not spill provider host/URL detail into application logs.
+     */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "config_snapshot", columnDefinition = "jsonb", nullable = false)
+    @ToString.Exclude
     private JsonNode configSnapshot;
 
     @JsonIgnore
@@ -182,6 +201,28 @@ public class AgentJob {
     private int retryCount = 0;
 
     /**
+     * When this job becomes eligible for a poll-loop claim (#1368 hardening). Defaults to submit time
+     * (immediately eligible); a requeue after an infra failure, orphan recovery, or worker drain pushes
+     * this into the future by {@link AgentJobBackoff#compute}, so a crash-looping job backs off instead
+     * of instantly re-competing for a claim. {@link AgentJobRepository#findQueuedIdsOldestFirst} filters
+     * and orders on this column (backed by {@code ix_agent_job_queued_available}).
+     */
+    @Column(name = "available_at", nullable = false)
+    private Instant availableAt;
+
+    /**
+     * Bounded attempt counter for the delivery-recovery sweep ({@link AgentJobZombieSweeper}): a job
+     * stuck at {@link DeliveryStatus#PENDING} (the executor crashed between marking PENDING and finishing
+     * delivery) is retried up to a small cap before being marked {@link DeliveryStatus#FAILED}
+     * terminally. Distinct from {@link #retryCount}, which counts EXECUTION retries, not delivery
+     * retries — a job can be COMPLETED (no more execution retries possible) while still needing several
+     * delivery attempts.
+     */
+    @ColumnDefault("0")
+    @Column(name = "delivery_attempts", nullable = false)
+    private short deliveryAttempts = 0;
+
+    /**
      * Worker that owns this job while {@link #status} is {@link AgentJobStatus#RUNNING} (#1138).
      * Soft reference to {@code worker_registry.worker_id} (no FK: a finished job must survive its
      * worker row being reaped). Set on claim; routes cancels to the owner, detects jobs orphaned by a
@@ -211,6 +252,15 @@ public class AgentJob {
 
     @Column(name = "started_at")
     private Instant startedAt;
+
+    /**
+     * Fenced boundary after preparation and immediately before sandbox/provider execution. A claimed
+     * RUNNING job may spend significant time fetching repository context before any billable work is
+     * possible; cancellation and recovery paths use this marker instead of {@link #workerId} to avoid
+     * recording that preparation time as unverifiable LLM usage.
+     */
+    @Column(name = "execution_started_at")
+    private Instant executionStartedAt;
 
     @Column(name = "completed_at")
     private Instant completedAt;
@@ -262,9 +312,19 @@ public class AgentJob {
         if (this.createdAt == null) {
             this.createdAt = Instant.now();
         }
+        if (this.availableAt == null) {
+            this.availableAt = this.createdAt;
+        }
     }
 
-    private static String generateJobToken() {
+    /**
+     * Generate a fresh 256-bit job token. Public (#1368 hardening) so a requeue path can mint a
+     * replacement without going through {@code prePersist} — see {@link AgentJobRepository#requeueOrphan},
+     * which rotates the token on every orphan/drain requeue so a zombie sandbox that is still alive
+     * (network-partitioned, not actually dead) cannot keep authenticating against the LLM proxy once a
+     * sibling worker has re-claimed the same job row.
+     */
+    public static String generateJobToken() {
         byte[] bytes = new byte[32]; // 256 bits
         SECURE_RANDOM.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);

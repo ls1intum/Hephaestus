@@ -1,7 +1,17 @@
 # ADR 0009: Worker runtime substrate + WSS-over-443 control channel
 
-**Status:** Accepted
+**Status:** Accepted (amended 2026-07-21 — drain requeues instead of cancelling, #1368 fix wave)
 **Date:** 2026-05-21
+
+> **Amendment (2026-07-21):** `AgentJobExecutor#cancelInFlight` (referenced in the Drain row below)
+> originally wrote a terminal `CANCELLED` for every in-flight job on drain, contradicting the
+> operator docs (`docs/admin/runtime-roles.mdx`), which always described drain as jobs "returning to
+> the queue... bounded by `AGENT_MAX_RETRIES`". It now attempts a worker-fenced requeue
+> (`RUNNING → QUEUED`, retry-capped — the same CAS `AgentJobZombieSweeper` uses for orphan recovery)
+> first, for both `DRAIN_GRACEFUL` and the `timeout=0` `DRAIN_IMMEDIATE` case; only a job that has
+> already exhausted its retry budget, or lost the fence to a concurrent user-cancel, falls back to a
+> worker-fenced terminal cancel. `agent_job.cancellation_reason` is still populated on that fallback
+> path (unchanged: `DRAIN_GRACEFUL` / `DRAIN_IMMEDIATE` / `USER` / `TIMEOUT`).
 
 ## Context
 

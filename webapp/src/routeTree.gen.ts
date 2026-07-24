@@ -25,7 +25,9 @@ import { Route as WWorkspaceSlugLoginRouteImport } from './routes/w/$workspaceSl
 import { Route as AuthenticatedMentorMentor_accessRouteImport } from './routes/_authenticated/mentor/_mentor_access'
 import { Route as AuthenticatedAdminWorkspacesRouteImport } from './routes/_authenticated/admin.workspaces'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
+import { Route as AuthenticatedAdminUsageRouteImport } from './routes/_authenticated/admin.usage'
 import { Route as AuthenticatedAdminLoginProvidersRouteImport } from './routes/_authenticated/admin.login-providers'
+import { Route as AuthenticatedAdminLlmRouteImport } from './routes/_authenticated/admin.llm'
 import { Route as AuthenticatedAdminAuditRouteImport } from './routes/_authenticated/admin.audit'
 import { Route as AuthenticatedWorkspacesNewIndexRouteImport } from './routes/_authenticated/workspaces/new/index'
 import { Route as AuthenticatedWWorkspaceSlugIndexRouteImport } from './routes/_authenticated/w/$workspaceSlug/index'
@@ -37,6 +39,7 @@ import { Route as AuthenticatedWWorkspaceSlugAdminRouteRouteImport } from './rou
 import { Route as AuthenticatedWWorkspaceSlugTeamsIndexRouteImport } from './routes/_authenticated/w/$workspaceSlug/teams/index'
 import { Route as AuthenticatedWWorkspaceSlugMentorIndexRouteImport } from './routes/_authenticated/w/$workspaceSlug/mentor/index'
 import { Route as AuthenticatedWWorkspaceSlugMentorThreadIdRouteImport } from './routes/_authenticated/w/$workspaceSlug/mentor/$threadId'
+import { Route as AuthenticatedWWorkspaceSlugAdminUsageRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/usage'
 import { Route as AuthenticatedWWorkspaceSlugAdminTeamsRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/teams'
 import { Route as AuthenticatedWWorkspaceSlugAdminSettingsRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/settings'
 import { Route as AuthenticatedWWorkspaceSlugAdminPracticesRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices'
@@ -142,12 +145,22 @@ const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
+const AuthenticatedAdminUsageRoute = AuthenticatedAdminUsageRouteImport.update({
+  id: '/usage',
+  path: '/usage',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
 const AuthenticatedAdminLoginProvidersRoute =
   AuthenticatedAdminLoginProvidersRouteImport.update({
     id: '/login-providers',
     path: '/login-providers',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminLlmRoute = AuthenticatedAdminLlmRouteImport.update({
+  id: '/llm',
+  path: '/llm',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
 const AuthenticatedAdminAuditRoute = AuthenticatedAdminAuditRouteImport.update({
   id: '/audit',
   path: '/audit',
@@ -212,6 +225,12 @@ const AuthenticatedWWorkspaceSlugMentorThreadIdRoute =
     id: '/$threadId',
     path: '/$threadId',
     getParentRoute: () => AuthenticatedWWorkspaceSlugMentorRoute,
+  } as any)
+const AuthenticatedWWorkspaceSlugAdminUsageRoute =
+  AuthenticatedWWorkspaceSlugAdminUsageRouteImport.update({
+    id: '/usage',
+    path: '/usage',
+    getParentRoute: () => AuthenticatedWWorkspaceSlugAdminRouteRoute,
   } as any)
 const AuthenticatedWWorkspaceSlugAdminTeamsRoute =
   AuthenticatedWWorkspaceSlugAdminTeamsRouteImport.update({
@@ -359,7 +378,9 @@ export interface FileRoutesByFullPath {
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/error': typeof AuthErrorRoute
   '/admin/audit': typeof AuthenticatedAdminAuditRoute
+  '/admin/llm': typeof AuthenticatedAdminLlmRoute
   '/admin/login-providers': typeof AuthenticatedAdminLoginProvidersRoute
+  '/admin/usage': typeof AuthenticatedAdminUsageRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/workspaces': typeof AuthenticatedAdminWorkspacesRoute
   '/mentor': typeof AuthenticatedMentorMentor_accessRoute
@@ -380,6 +401,7 @@ export interface FileRoutesByFullPath {
   '/w/$workspaceSlug/admin/practices': typeof AuthenticatedWWorkspaceSlugAdminPracticesRouteWithChildren
   '/w/$workspaceSlug/admin/settings': typeof AuthenticatedWWorkspaceSlugAdminSettingsRoute
   '/w/$workspaceSlug/admin/teams': typeof AuthenticatedWWorkspaceSlugAdminTeamsRoute
+  '/w/$workspaceSlug/admin/usage': typeof AuthenticatedWWorkspaceSlugAdminUsageRoute
   '/w/$workspaceSlug/mentor/$threadId': typeof AuthenticatedWWorkspaceSlugMentorThreadIdRoute
   '/w/$workspaceSlug/mentor/': typeof AuthenticatedWWorkspaceSlugMentorIndexRoute
   '/w/$workspaceSlug/teams/': typeof AuthenticatedWWorkspaceSlugTeamsIndexRoute
@@ -410,7 +432,9 @@ export interface FileRoutesByTo {
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/error': typeof AuthErrorRoute
   '/admin/audit': typeof AuthenticatedAdminAuditRoute
+  '/admin/llm': typeof AuthenticatedAdminLlmRoute
   '/admin/login-providers': typeof AuthenticatedAdminLoginProvidersRoute
+  '/admin/usage': typeof AuthenticatedAdminUsageRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/workspaces': typeof AuthenticatedAdminWorkspacesRoute
   '/mentor': typeof AuthenticatedMentorMentor_accessRoute
@@ -428,6 +452,7 @@ export interface FileRoutesByTo {
   '/w/$workspaceSlug/admin/models': typeof AuthenticatedWWorkspaceSlugAdminModelsRoute
   '/w/$workspaceSlug/admin/settings': typeof AuthenticatedWWorkspaceSlugAdminSettingsRoute
   '/w/$workspaceSlug/admin/teams': typeof AuthenticatedWWorkspaceSlugAdminTeamsRoute
+  '/w/$workspaceSlug/admin/usage': typeof AuthenticatedWWorkspaceSlugAdminUsageRoute
   '/w/$workspaceSlug/mentor/$threadId': typeof AuthenticatedWWorkspaceSlugMentorThreadIdRoute
   '/w/$workspaceSlug/mentor': typeof AuthenticatedWWorkspaceSlugMentorIndexRoute
   '/w/$workspaceSlug/teams': typeof AuthenticatedWWorkspaceSlugTeamsIndexRoute
@@ -460,7 +485,9 @@ export interface FileRoutesById {
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/error': typeof AuthErrorRoute
   '/_authenticated/admin/audit': typeof AuthenticatedAdminAuditRoute
+  '/_authenticated/admin/llm': typeof AuthenticatedAdminLlmRoute
   '/_authenticated/admin/login-providers': typeof AuthenticatedAdminLoginProvidersRoute
+  '/_authenticated/admin/usage': typeof AuthenticatedAdminUsageRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/admin/workspaces': typeof AuthenticatedAdminWorkspacesRoute
   '/_authenticated/mentor/_mentor_access': typeof AuthenticatedMentorMentor_accessRoute
@@ -481,6 +508,7 @@ export interface FileRoutesById {
   '/_authenticated/w/$workspaceSlug/admin/practices': typeof AuthenticatedWWorkspaceSlugAdminPracticesRouteWithChildren
   '/_authenticated/w/$workspaceSlug/admin/settings': typeof AuthenticatedWWorkspaceSlugAdminSettingsRoute
   '/_authenticated/w/$workspaceSlug/admin/teams': typeof AuthenticatedWWorkspaceSlugAdminTeamsRoute
+  '/_authenticated/w/$workspaceSlug/admin/usage': typeof AuthenticatedWWorkspaceSlugAdminUsageRoute
   '/_authenticated/w/$workspaceSlug/mentor/$threadId': typeof AuthenticatedWWorkspaceSlugMentorThreadIdRoute
   '/_authenticated/w/$workspaceSlug/mentor/': typeof AuthenticatedWWorkspaceSlugMentorIndexRoute
   '/_authenticated/w/$workspaceSlug/teams/': typeof AuthenticatedWWorkspaceSlugTeamsIndexRoute
@@ -513,7 +541,9 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/auth/error'
     | '/admin/audit'
+    | '/admin/llm'
     | '/admin/login-providers'
+    | '/admin/usage'
     | '/admin/users'
     | '/admin/workspaces'
     | '/mentor'
@@ -534,6 +564,7 @@ export interface FileRouteTypes {
     | '/w/$workspaceSlug/admin/practices'
     | '/w/$workspaceSlug/admin/settings'
     | '/w/$workspaceSlug/admin/teams'
+    | '/w/$workspaceSlug/admin/usage'
     | '/w/$workspaceSlug/mentor/$threadId'
     | '/w/$workspaceSlug/mentor/'
     | '/w/$workspaceSlug/teams/'
@@ -564,7 +595,9 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/auth/error'
     | '/admin/audit'
+    | '/admin/llm'
     | '/admin/login-providers'
+    | '/admin/usage'
     | '/admin/users'
     | '/admin/workspaces'
     | '/mentor'
@@ -582,6 +615,7 @@ export interface FileRouteTypes {
     | '/w/$workspaceSlug/admin/models'
     | '/w/$workspaceSlug/admin/settings'
     | '/w/$workspaceSlug/admin/teams'
+    | '/w/$workspaceSlug/admin/usage'
     | '/w/$workspaceSlug/mentor/$threadId'
     | '/w/$workspaceSlug/mentor'
     | '/w/$workspaceSlug/teams'
@@ -613,7 +647,9 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/auth/error'
     | '/_authenticated/admin/audit'
+    | '/_authenticated/admin/llm'
     | '/_authenticated/admin/login-providers'
+    | '/_authenticated/admin/usage'
     | '/_authenticated/admin/users'
     | '/_authenticated/admin/workspaces'
     | '/_authenticated/mentor/_mentor_access'
@@ -634,6 +670,7 @@ export interface FileRouteTypes {
     | '/_authenticated/w/$workspaceSlug/admin/practices'
     | '/_authenticated/w/$workspaceSlug/admin/settings'
     | '/_authenticated/w/$workspaceSlug/admin/teams'
+    | '/_authenticated/w/$workspaceSlug/admin/usage'
     | '/_authenticated/w/$workspaceSlug/mentor/$threadId'
     | '/_authenticated/w/$workspaceSlug/mentor/'
     | '/_authenticated/w/$workspaceSlug/teams/'
@@ -779,11 +816,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminUsersRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/usage': {
+      id: '/_authenticated/admin/usage'
+      path: '/usage'
+      fullPath: '/admin/usage'
+      preLoaderRoute: typeof AuthenticatedAdminUsageRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/login-providers': {
       id: '/_authenticated/admin/login-providers'
       path: '/login-providers'
       fullPath: '/admin/login-providers'
       preLoaderRoute: typeof AuthenticatedAdminLoginProvidersRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/llm': {
+      id: '/_authenticated/admin/llm'
+      path: '/llm'
+      fullPath: '/admin/llm'
+      preLoaderRoute: typeof AuthenticatedAdminLlmRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
     '/_authenticated/admin/audit': {
@@ -862,6 +913,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/w/$workspaceSlug/mentor/$threadId'
       preLoaderRoute: typeof AuthenticatedWWorkspaceSlugMentorThreadIdRouteImport
       parentRoute: typeof AuthenticatedWWorkspaceSlugMentorRoute
+    }
+    '/_authenticated/w/$workspaceSlug/admin/usage': {
+      id: '/_authenticated/w/$workspaceSlug/admin/usage'
+      path: '/usage'
+      fullPath: '/w/$workspaceSlug/admin/usage'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminUsageRouteImport
+      parentRoute: typeof AuthenticatedWWorkspaceSlugAdminRouteRoute
     }
     '/_authenticated/w/$workspaceSlug/admin/teams': {
       id: '/_authenticated/w/$workspaceSlug/admin/teams'
@@ -1022,14 +1080,18 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminAuditRoute: typeof AuthenticatedAdminAuditRoute
+  AuthenticatedAdminLlmRoute: typeof AuthenticatedAdminLlmRoute
   AuthenticatedAdminLoginProvidersRoute: typeof AuthenticatedAdminLoginProvidersRoute
+  AuthenticatedAdminUsageRoute: typeof AuthenticatedAdminUsageRoute
   AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
   AuthenticatedAdminWorkspacesRoute: typeof AuthenticatedAdminWorkspacesRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminAuditRoute: AuthenticatedAdminAuditRoute,
+  AuthenticatedAdminLlmRoute: AuthenticatedAdminLlmRoute,
   AuthenticatedAdminLoginProvidersRoute: AuthenticatedAdminLoginProvidersRoute,
+  AuthenticatedAdminUsageRoute: AuthenticatedAdminUsageRoute,
   AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
   AuthenticatedAdminWorkspacesRoute: AuthenticatedAdminWorkspacesRoute,
 }
@@ -1098,6 +1160,7 @@ interface AuthenticatedWWorkspaceSlugAdminRouteRouteChildren {
   AuthenticatedWWorkspaceSlugAdminPracticesRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesRouteWithChildren
   AuthenticatedWWorkspaceSlugAdminSettingsRoute: typeof AuthenticatedWWorkspaceSlugAdminSettingsRoute
   AuthenticatedWWorkspaceSlugAdminTeamsRoute: typeof AuthenticatedWWorkspaceSlugAdminTeamsRoute
+  AuthenticatedWWorkspaceSlugAdminUsageRoute: typeof AuthenticatedWWorkspaceSlugAdminUsageRoute
   AuthenticatedWWorkspaceSlugAdminAiAgentsRoute: typeof AuthenticatedWWorkspaceSlugAdminAiAgentsRoute
   AuthenticatedWWorkspaceSlugAdminAiPracticeDetectionRoute: typeof AuthenticatedWWorkspaceSlugAdminAiPracticeDetectionRoute
 }
@@ -1122,6 +1185,8 @@ const AuthenticatedWWorkspaceSlugAdminRouteRouteChildren: AuthenticatedWWorkspac
       AuthenticatedWWorkspaceSlugAdminSettingsRoute,
     AuthenticatedWWorkspaceSlugAdminTeamsRoute:
       AuthenticatedWWorkspaceSlugAdminTeamsRoute,
+    AuthenticatedWWorkspaceSlugAdminUsageRoute:
+      AuthenticatedWWorkspaceSlugAdminUsageRoute,
     AuthenticatedWWorkspaceSlugAdminAiAgentsRoute:
       AuthenticatedWWorkspaceSlugAdminAiAgentsRoute,
     AuthenticatedWWorkspaceSlugAdminAiPracticeDetectionRoute:

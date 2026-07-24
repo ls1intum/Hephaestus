@@ -19,7 +19,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 
 class SandboxReconcilerTest extends BaseUnitTest {
@@ -48,36 +47,27 @@ class SandboxReconcilerTest extends BaseUnitTest {
     class StartupReconciliation {
 
         @Test
-        void shouldMarkOrphanedJobsAsFailed() {
+        void missingLocalContainerNeverChangesRunningJobState() {
             UUID jobId = UUID.randomUUID();
-            AgentJob orphanedJob = new AgentJob();
-            orphanedJob.setId(jobId);
-            orphanedJob.setStatus(AgentJobStatus.RUNNING);
-            // containerId intentionally NOT set — matches real-world behavior where
-            // DockerSandboxAdapter.execute() never persists it to the entity.
+            AgentJob runningJob = new AgentJob();
+            runningJob.setId(jobId);
+            runningJob.setStatus(AgentJobStatus.RUNNING);
 
-            when(jobRepository.findByStatus(AgentJobStatus.RUNNING)).thenReturn(List.of(orphanedJob));
             when(containerManager.listManagedContainers()).thenReturn(List.of()); // No containers running
-            // After marking jobs, startup also runs Docker cleanup
-            when(jobRepository.findByStatusIn(any())).thenReturn(List.of());
+            when(jobRepository.findByStatusIn(any())).thenReturn(List.of(runningJob));
             when(networkManager.listOrphanedNetworks()).thenReturn(List.of());
 
             reconciler.onStartup();
 
-            ArgumentCaptor<AgentJob> captor = ArgumentCaptor.forClass(AgentJob.class);
-            verify(jobRepository).save(captor.capture());
-            AgentJob saved = captor.getValue();
-            assertThat(saved.getStatus()).isEqualTo(AgentJobStatus.FAILED);
-            assertThat(saved.getErrorMessage()).contains("Orphaned");
-            assertThat(saved.getCompletedAt()).isNotNull();
-            assertThat(meterRegistry.counter("sandbox.reconciler.orphaned", "resource", "job").count()).isEqualTo(1.0);
+            assertThat(runningJob.getStatus()).isEqualTo(AgentJobStatus.RUNNING);
+            verify(jobRepository, never()).save(any());
+            verify(jobRepository, never()).findByStatus(AgentJobStatus.RUNNING);
         }
 
         @Test
         void shouldCleanupDockerResourcesDuringStartup() {
             UUID orphanedJobId = UUID.randomUUID();
 
-            when(jobRepository.findByStatus(AgentJobStatus.RUNNING)).thenReturn(List.of());
             // No RUNNING jobs, but orphaned Docker resources exist from a previous crash
             when(jobRepository.findByStatusIn(any())).thenReturn(List.of());
             when(containerManager.listManagedContainers()).thenReturn(
@@ -108,7 +98,6 @@ class SandboxReconcilerTest extends BaseUnitTest {
             activeJob.setStatus(AgentJobStatus.RUNNING);
             // containerId NOT set — label-based matching should still find the container
 
-            when(jobRepository.findByStatus(AgentJobStatus.RUNNING)).thenReturn(List.of(activeJob));
             when(containerManager.listManagedContainers()).thenReturn(
                 List.of(
                     new DockerOperations.ContainerInfo(
@@ -129,8 +118,7 @@ class SandboxReconcilerTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldDoNothingWithNoRunningJobs() {
-            when(jobRepository.findByStatus(AgentJobStatus.RUNNING)).thenReturn(List.of());
+        void shouldDoNothingWithNoManagedResources() {
             // Startup always runs Docker resource cleanup
             when(jobRepository.findByStatusIn(any())).thenReturn(List.of());
             when(containerManager.listManagedContainers()).thenReturn(List.of());

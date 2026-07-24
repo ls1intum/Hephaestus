@@ -14,10 +14,15 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { type ConfigDesignation, LLM_PROVIDER_LABELS } from "./utils";
+import type { ConfigDesignation } from "./utils";
 
 interface AgentConfigCardProps {
 	config: AgentConfig;
+	/**
+	 * The bound model's display name, resolved by the parent from the available-models list. Never the
+	 * raw upstream model id or a shared model's owning connection.
+	 */
+	modelLabel?: string;
 	/** How this config is wired into workspace AI features. */
 	designation?: ConfigDesignation;
 	/** Whether this card's config is the one currently open in the form. */
@@ -29,6 +34,7 @@ interface AgentConfigCardProps {
 
 export function AgentConfigCard({
 	config,
+	modelLabel,
 	designation,
 	selected = false,
 	isDeleting = false,
@@ -36,7 +42,6 @@ export function AgentConfigCard({
 	onDelete,
 }: AgentConfigCardProps) {
 	const [confirmOpen, setConfirmOpen] = useState(false);
-
 	return (
 		<Card className={selected ? "border-primary" : config.enabled ? "" : "opacity-70"}>
 			<CardHeader>
@@ -44,8 +49,7 @@ export function AgentConfigCard({
 					<div className="min-w-0 flex-1">
 						<CardTitle className="text-base">{config.name}</CardTitle>
 						<p className="mt-0.5 text-xs text-muted-foreground">
-							{LLM_PROVIDER_LABELS[config.llmProvider]}
-							{config.modelName ? ` · ${config.modelName}` : ""}
+							{modelLabel ?? "Model binding unavailable"}
 						</p>
 					</div>
 					<div className="flex shrink-0 items-center gap-2">
@@ -77,12 +81,12 @@ export function AgentConfigCard({
 					<div className="flex flex-wrap gap-1.5">
 						{(designation === "practice" || designation === "both") && (
 							<Badge variant="secondary" className="text-xs">
-								Powers practice detection
+								Practice detection
 							</Badge>
 						)}
 						{(designation === "mentor" || designation === "both") && (
 							<Badge variant="secondary" className="text-xs">
-								Powers mentor
+								Mentor
 							</Badge>
 						)}
 					</div>
@@ -94,8 +98,8 @@ export function AgentConfigCard({
 					<AlertDialogHeader>
 						<AlertDialogTitle>Delete &ldquo;{config.name}&rdquo;?</AlertDialogTitle>
 						<AlertDialogDescription>
-							This permanently removes this model. A model bound to practice detection or the mentor
-							can't be deleted until you unbind it.
+							This permanently removes this agent configuration. A configuration bound to practice
+							detection or the mentor can't be deleted until you unbind it.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
@@ -108,7 +112,7 @@ export function AgentConfigCard({
 								setConfirmOpen(false);
 							}}
 						>
-							{isDeleting ? "Deleting…" : "Delete model"}
+							{isDeleting ? "Deleting…" : "Delete configuration"}
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>

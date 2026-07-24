@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.context.providers.GitDiffOperations;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
@@ -501,6 +502,20 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         feedbackService.deliverFeedback(job, delivery, deliveredKeys ->
             DeliveryComposer.recomposeMrNote(deliverable, WorkArtifact.PULL_REQUEST, whyBySlug, deliveredKeys)
         );
+    }
+
+    /**
+     * Delivery-recovery dedup lookup (#1368 hardening) — see {@link JobTypeHandler#findExistingDelivery}.
+     * PR-review delivery is the ADR 0021 re-review pipeline (summary + inline notes + ledger), which is
+     * NOT reproduced here; this only guards the narrower "did a summary comment carrying this exact job's
+     * marker already land" question, so a delivery-recovery retry after a crash does not blindly re-post
+     * a duplicate summary. Inline diff notes are reconciled (cleared-then-posted) on every delivery
+     * attempt regardless, so a recovery retry that DOES fall through to a normal {@link #deliver} is safe
+     * there even without a matching dedup check.
+     */
+    @Override
+    public ExistingDeliveryLookup findExistingDelivery(AgentJob job) {
+        return feedbackService.findExistingDeliveryCommentId(job);
     }
 
     // Delivery-phase diff helpers (delegate to GitDiffOperations)

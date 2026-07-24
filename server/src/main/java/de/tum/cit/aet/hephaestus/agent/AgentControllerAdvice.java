@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.agent;
 
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigBoundException;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigCredentialModeException;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigHasActiveJobsException;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigNameConflictException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStateConflictException;
+import de.tum.cit.aet.hephaestus.agent.settings.AgentConfigurationUnavailableException;
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import java.util.Optional;
 import org.springframework.core.Ordered;
@@ -37,14 +37,14 @@ public class AgentControllerAdvice {
         return problem(HttpStatus.CONFLICT, "Agent config is bound", exception.getMessage());
     }
 
-    @ExceptionHandler(AgentConfigCredentialModeException.class)
-    ProblemDetail handleAgentConfigCredentialMode(AgentConfigCredentialModeException exception) {
-        return problem(HttpStatus.BAD_REQUEST, "Invalid credential mode", exception.getMessage());
-    }
-
     @ExceptionHandler(AgentJobStateConflictException.class)
     ProblemDetail handleAgentJobStateConflict(AgentJobStateConflictException exception) {
         return problem(HttpStatus.CONFLICT, "Agent job state conflict", exception.getMessage());
+    }
+
+    @ExceptionHandler(AgentConfigurationUnavailableException.class)
+    ProblemDetail handleAgentConfigurationUnavailable(AgentConfigurationUnavailableException exception) {
+        return problem(HttpStatus.CONFLICT, "Agent configuration unavailable", exception.getMessage());
     }
 
     private ProblemDetail problem(HttpStatus status, String title, String detail) {

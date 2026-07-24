@@ -17,6 +17,7 @@
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
+import { loadProviderConfig, registerHephaestusProvider } from "./pi-provider.mjs";
 
 // Pi SDK is loaded lazily so the protocol layer (framing, JSON-RPC dispatch, fetch_context
 // callback plumbing) can be exercised in test environments without an LLM proxy. Set
@@ -276,34 +277,20 @@ async function ensureRuntime() {
 
         // Same race workaround as pi-runner.mjs: register the hephaestus provider directly on
         // the ModelRegistry before createAgentSession. Reused across cwd switches; providers are
-        // cwd-independent. PROTOCOL_ONLY mode's stub SDK exposes neither class.
+        // cwd-independent. PROTOCOL_ONLY mode's stub SDK exposes neither class. Config comes from the
+        // server-written pi-provider.json via the shared pi-provider.mjs helper (#1368 slice 5) — kept
+        // byte-identical with pi-runner.mjs's registration so the two runners cannot drift.
         let sharedAuthStorage;
         let sharedModelRegistry;
         if (typeof AuthStorage?.create === "function" && typeof ModelRegistry?.create === "function") {
             sharedAuthStorage = AuthStorage.create();
             sharedModelRegistry = ModelRegistry.create(sharedAuthStorage);
-            const hephaestusBaseUrl = process.env.PI_HEPHAESTUS_BASE_URL;
-            const hephaestusModel = process.env.PI_HEPHAESTUS_MODEL;
-            if (hephaestusBaseUrl && hephaestusModel) {
-                sharedModelRegistry.registerProvider("hephaestus", {
-                    name: "Hephaestus Gateway",
-                    baseUrl: hephaestusBaseUrl,
-                    apiKey: "PI_HEPHAESTUS_API_KEY",
-                    authHeader: true,
-                    api: "openai-completions",
-                    models: [
-                        {
-                            id: hephaestusModel,
-                            name: hephaestusModel,
-                            reasoning: false,
-                            input: ["text"],
-                            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-                            contextWindow: 131072,
-                            maxTokens: 4096,
-                        },
-                    ],
-                });
-                log(`registered hephaestus provider: baseUrl=${hephaestusBaseUrl} model=${hephaestusModel}`);
+            const providerConfig = loadProviderConfig(CWD);
+            const registered = registerHephaestusProvider(sharedModelRegistry, providerConfig);
+            if (registered) {
+                log(`registered hephaestus provider: apiProtocol=${providerConfig.apiProtocol} model=${providerConfig.modelId}`);
+            } else {
+                log("hephaestus provider NOT registered — missing pi-provider.json or proxy env vars");
             }
         }
 
@@ -727,7 +714,7 @@ async function handleShutdown(id) {
 // Max characters of context surfaced to the LLM per fetch_context call. Context JSONs
 // occasionally balloon (e.g. `findings.json` for a heavy reviewer); without a cap, a single
 // tool call can blow the model's context window. 200 K chars ≈ 50 K tokens at ~4 chars/token —
-// comfortably below gpt-oss-120b's 128 K window. Counted in JS string length (UTF-16 code
+// comfortably below the configured model's context window. Counted in JS string length (UTF-16 code
 // units), not bytes; context JSONs are ASCII-dominant so the variance is small.
 const FETCH_CONTEXT_MAX_CHARS = 200_000;
 

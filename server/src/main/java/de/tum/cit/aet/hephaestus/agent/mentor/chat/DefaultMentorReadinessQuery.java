@@ -1,39 +1,41 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.workspace.spi.WorkspaceSummaryQuery;
 import org.springframework.stereotype.Service;
 
 @Service
-@WorkspaceAgnostic("Slack App Home resolves a workspace from Slack team_id before checking mentor config readiness")
+@WorkspaceAgnostic("Slack App Home resolves a workspace from Slack team_id before checking mentor readiness")
 class DefaultMentorReadinessQuery implements MentorReadinessQuery {
 
-    private final WorkspaceSummaryQuery workspaceSummaryQuery;
-    private final AgentConfigRepository agentConfigRepository;
+    private final WorkspaceAgentBindingRepository agentBindingRepository;
+    private final LlmModelResolver llmModelResolver;
 
     DefaultMentorReadinessQuery(
-        WorkspaceSummaryQuery workspaceSummaryQuery,
-        AgentConfigRepository agentConfigRepository
+        WorkspaceAgentBindingRepository agentBindingRepository,
+        LlmModelResolver llmModelResolver
     ) {
-        this.workspaceSummaryQuery = workspaceSummaryQuery;
-        this.agentConfigRepository = agentConfigRepository;
+        this.agentBindingRepository = agentBindingRepository;
+        this.llmModelResolver = llmModelResolver;
     }
 
     @Override
     public boolean isReady(long workspaceId) {
-        return workspaceSummaryQuery
-            .findById(workspaceId)
-            .map(workspace -> {
-                Long mentorConfigId = workspace.mentorConfigId();
-                if (mentorConfigId != null) {
-                    return agentConfigRepository
-                        .findByIdAndWorkspaceId(mentorConfigId, workspaceId)
-                        .map(config -> config.isEnabled())
-                        .orElse(false);
-                }
-                return agentConfigRepository.findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(workspaceId).isPresent();
-            })
+        return agentBindingRepository
+            .findByWorkspaceIdAndPurpose(workspaceId, AgentPurpose.MENTOR)
+            .filter(WorkspaceAgentBinding::isEnabled)
+            .map(this::hasAvailableCatalogModel)
             .orElse(false);
+    }
+
+    private boolean hasAvailableCatalogModel(WorkspaceAgentBinding binding) {
+        try {
+            return llmModelResolver.resolve(binding) != null;
+        } catch (IllegalStateException ignored) {
+            return false;
+        }
     }
 }

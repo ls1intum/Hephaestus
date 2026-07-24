@@ -1,14 +1,11 @@
-import type { AgentConfig, AgentJob, AiSettingsView } from "@/api/types.gen";
+import type { AgentConfig, AgentJob, AiSettingsView, AvailableLlmModel } from "@/api/types.gen";
 
 export const mockConfigProxy: AgentConfig = {
 	id: 1,
 	name: "Default reviewer",
-	llmProvider: "ANTHROPIC",
-	modelName: "claude-sonnet-4-5",
-	credentialMode: "PROXY",
+	instanceModelId: 1,
 	allowInternet: false,
 	enabled: true,
-	hasLlmApiKey: false,
 	maxConcurrentJobs: 2,
 	timeoutSeconds: 600,
 	createdAt: new Date("2026-04-01T10:00:00Z"),
@@ -18,13 +15,9 @@ export const mockConfigProxy: AgentConfig = {
 export const mockConfigApiKey: AgentConfig = {
 	id: 2,
 	name: "GPU gateway (OpenAI)",
-	llmProvider: "OPENAI",
-	modelName: "gpt-oss-120b",
-	llmBaseUrl: "https://gpu.example.edu/api",
-	credentialMode: "API_KEY",
+	workspaceModelId: 10,
 	allowInternet: true,
 	enabled: true,
-	hasLlmApiKey: true,
 	maxConcurrentJobs: 1,
 	timeoutSeconds: 1200,
 	createdAt: new Date("2026-04-10T10:00:00Z"),
@@ -32,23 +25,72 @@ export const mockConfigApiKey: AgentConfig = {
 
 export const mockConfigDisabled: AgentConfig = {
 	id: 3,
-	name: "Legacy model",
-	llmProvider: "AZURE_OPENAI",
-	modelName: "gpt-4o",
-	credentialMode: "API_KEY",
+	name: "Disabled model",
+	instanceModelId: 2,
 	allowInternet: true,
 	enabled: false,
-	hasLlmApiKey: true,
 	maxConcurrentJobs: 1,
 	timeoutSeconds: 300,
 	createdAt: new Date("2026-03-01T10:00:00Z"),
 };
 
+export const mockConfigBoundShared: AgentConfig = {
+	id: 4,
+	name: "Shared GPT-5",
+	allowInternet: false,
+	enabled: true,
+	instanceModelId: 1,
+	maxConcurrentJobs: 2,
+	timeoutSeconds: 600,
+	createdAt: new Date("2026-06-01T10:00:00Z"),
+};
+
+export const mockConfigBoundOwn: AgentConfig = {
+	id: 5,
+	name: "My own key",
+	allowInternet: true,
+	enabled: true,
+	workspaceModelId: 10,
+	maxConcurrentJobs: 1,
+	timeoutSeconds: 900,
+	createdAt: new Date("2026-06-01T10:00:00Z"),
+};
+
 export const mockConfigs: AgentConfig[] = [mockConfigProxy, mockConfigApiKey, mockConfigDisabled];
+
+export const mockAvailableModels: AvailableLlmModel[] = [
+	{
+		id: 1,
+		scope: "SHARED",
+		displayName: "GPT-5",
+		connectionDisplayName: "OpenAI production",
+		pricingMode: "PRICED",
+		per1mInputUsd: 3,
+		per1mOutputUsd: 15,
+		supportsReasoning: true,
+	},
+	{
+		id: 2,
+		scope: "SHARED",
+		displayName: "Local Llama (self-hosted)",
+		connectionDisplayName: "On-prem GPU",
+		pricingMode: "NO_CHARGE",
+		supportsReasoning: false,
+	},
+	{
+		id: 10,
+		scope: "WORKSPACE",
+		displayName: "My OpenAI key",
+		connectionDisplayName: "My provider",
+		pricingMode: "UNPRICED",
+		supportsReasoning: true,
+	},
+];
 
 export const mockAiSettings: AiSettingsView = {
 	practicesEnabled: true,
 	mentorEnabled: true,
+	workspaceConnectionsAllowed: true,
 	practiceConfigId: 1,
 	mentorConfigId: 2,
 	cooldownMinutes: 30,
@@ -68,11 +110,11 @@ export const mockJobCompleted: AgentJob = {
 	status: "COMPLETED",
 	configId: 1,
 	configName: "Default reviewer",
-	configSnapshot: { name: "Default reviewer", llmProvider: "ANTHROPIC" },
+	configSnapshot: { name: "Default reviewer", llmProvider: "OPENAI" },
 	createdAt: new Date("2026-05-20T10:00:00Z"),
 	completedAt: new Date("2026-05-20T10:05:00Z"),
 	deliveryStatus: "DELIVERED",
-	llmModel: "claude-sonnet-4-5",
+	llmModel: "openai/gpt-oss-120b",
 	llmTotalInputTokens: 24_000,
 	llmTotalOutputTokens: 914,
 	llmTotalReasoningTokens: 120,
@@ -104,7 +146,7 @@ export const mockJobFailedDelivery: AgentJob = {
 	completedAt: new Date("2026-05-20T09:05:00Z"),
 	deliveryStatus: "FAILED",
 	errorMessage: "GitLab API returned 403 when posting the MR note.",
-	llmModel: "claude-sonnet-4-5",
+	llmModel: "openai/gpt-oss-120b",
 	llmTotalInputTokens: 31_000,
 	llmTotalOutputTokens: 1_200,
 	llmCostUsd: 0.18,

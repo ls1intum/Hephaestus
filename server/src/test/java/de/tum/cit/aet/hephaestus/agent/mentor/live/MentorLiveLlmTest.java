@@ -3,8 +3,6 @@ package de.tum.cit.aet.hephaestus.agent.mentor.live;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorRunnerProfile;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.PiEventToUiChunkTranslator;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.TranslatorState;
@@ -49,7 +47,7 @@ import tools.jackson.databind.node.ObjectNode;
  *   <li>Ensures the Pi SDK is installed under {@code target/pi-sdk/node_modules} (idempotent;
  *       the install marker survives across test runs and parallel JVMs use a directory lock).</li>
  *   <li>Spawns {@code pi-mentor-runner.mjs} directly with {@code node} — no Docker — and points
- *       it at the TUM AET ASE OpenAI-compatible gateway via {@code OPENAI_BASE_URL} +
+ *       it at a real OpenAI-compatible endpoint via {@code OPENAI_BASE_URL} +
  *       {@code OPENAI_API_KEY}.</li>
  *   <li>Drives the JSON-RPC protocol the same way {@code MentorRunnerClient} drives it in prod
  *       (hello → open_thread → prompt) and translates every emitted event through the real
@@ -72,7 +70,7 @@ class MentorLiveLlmTest {
     /** Pi SDK version pinned in pi-mentor-runner.mjs. Bump in lockstep with the runner. */
     private static final String PI_SDK_VERSION = "0.74.0";
 
-    /** Per-test wall-clock cap — mentor turns against gpt-oss-120b complete in 5-30s on the TUM box. */
+    /** Per-test wall-clock cap for a real remote model. */
     private static final Duration TURN_TIMEOUT = Duration.ofSeconds(90);
 
     /** Project-relative location of the SDK install. Build output, never vendored. Gitignored. */
@@ -281,7 +279,7 @@ class MentorLiveLlmTest {
             "What number did I ask you to remember? Reply with only the digits."
         );
         System.out.printf("[multi-turn] turn 2 (%d chars): %s%n", t2Text.length(), trim(t2Text, 200));
-        // gpt-oss-120b is well-behaved on this prompt; accept "42" or the spelled-out form.
+        // Accept either the numeric or spelled-out form so the assertion is model-agnostic.
         String t2Lower = t2Text.toLowerCase();
         assertThat(t2Lower)
             .as(
@@ -580,6 +578,9 @@ class MentorLiveLlmTest {
         Path sdkNodeModules = SDK_DIR.resolve("node_modules");
         Files.createSymbolicLink(nodeModulesLink, sdkNodeModules);
         Files.copy(RUNNER, tmp.resolve("pi-mentor-runner.mjs"));
+        for (String sidecar : new MentorRunnerProfile().sidecarScripts()) {
+            Files.copy(Path.of("src", "main", "resources", "agent", sidecar), tmp.resolve(sidecar));
+        }
 
         // System prompt the runner loads from /workspace/agent/mentor/system.md. Keep it minimal —
         // the live LLM doesn't need the full production prompt to prove the round-trip works.
@@ -591,22 +592,23 @@ class MentorLiveLlmTest {
         );
 
         // Use the REAL production PiRuntimeFactory paths so this test fails the moment the
-        // factory regresses (e.g. a provider refactor breaking the env-var contract).
+        // factory regresses (e.g. a provider refactor breaking the pi-provider.json contract).
         PiRuntimeFactory factory = new PiRuntimeFactory(MAPPER);
         PiPlanSpec spec = new PiPlanSpec(
-            LlmProvider.OPENAI,
-            CredentialMode.API_KEY,
-            creds.apiKey(),
+            "openai-completions",
             creds.model(),
-            creds.baseUrl(),
             null,
+            null,
+            false,
+            "live-test-token",
+            // never actually checked — no real proxy sits in front of this test
             true,
             300,
             new MentorRunnerProfile(),
             Map.of(),
             ""
         );
-        byte[] settingsBytes = factory.buildPiSettingsJson(spec.provider(), spec.modelName(), true);
+        byte[] settingsBytes = factory.buildPiSettingsJson(spec.upstreamModelId());
 
         // Pi loads its on-disk settings from `~/.pi/settings.json`; redirect with env vars so we
         // never touch the user's real ~/.pi.
@@ -614,9 +616,23 @@ class MentorLiveLlmTest {
         Files.createDirectories(piHome);
         Files.write(piHome.resolve("settings.json"), settingsBytes);
 
+        // pi-provider.json — the single non-secret provider spec both runners read via the shared
+        // pi-provider.mjs helper. Written at the workspace root (mirrors PiRuntimeFactory.build()).
+        byte[] providerConfigBytes = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(
+            java.util.Map.of(
+                "apiProtocol",
+                spec.apiProtocol(),
+                "modelId",
+                spec.upstreamModelId(),
+                "supportsReasoning",
+                false
+            )
+        );
+        Files.write(tmp.resolve("pi-provider.json"), providerConfigBytes);
+
         // No extension file is written: pi-mentor-runner.mjs registers the hephaestus provider
-        // directly on the ModelRegistry before createAgentSession (mirrors pi-runner.mjs). The
-        // PI_HEPHAESTUS_* env vars seeded from LiveLlmCredentials drive that registration.
+        // directly on the ModelRegistry before createAgentSession (mirrors pi-runner.mjs), driven by
+        // pi-provider.json + the LLM_PROXY_URL/LLM_PROXY_TOKEN env vars set in spawnRunner.
 
         return tmp;
     }
@@ -625,12 +641,14 @@ class MentorLiveLlmTest {
         ProcessBuilder pb = new ProcessBuilder();
         Map<String, String> env = pb.environment();
         env.putAll(creds.asProcessEnv()); // OPENAI_API_KEY + OPENAI_BASE_URL (legacy back-compat)
-        // The production hephaestus-provider extension reads these env vars; mirror what
-        // LlmProxyAuthShell would set in API_KEY mode with a non-blank baseUrl. Without them the
-        // extension throws "needs PI_HEPHAESTUS_BASE_URL" at session start and this test fails loud.
-        env.put("PI_HEPHAESTUS_BASE_URL", creds.baseUrl());
-        env.put("PI_HEPHAESTUS_API_KEY", creds.apiKey());
-        env.put("PI_HEPHAESTUS_MODEL", creds.model());
+        // #1368 slice 5: the runner reads LLM_PROXY_URL / LLM_PROXY_TOKEN — the same env vars the
+        // sandbox adapter sets in production (via NetworkPolicy). There is no real proxy in front of
+        // this live test, so we point LLM_PROXY_URL directly at the upstream gateway and LLM_PROXY_TOKEN
+        // at the real credential; the runner cannot tell the difference. Without these the hephaestus
+        // provider registration in pi-provider.mjs no-ops and this test fails loud downstream (no model
+        // resolves).
+        env.put("LLM_PROXY_URL", creds.baseUrl());
+        env.put("LLM_PROXY_TOKEN", creds.apiKey());
         // Pi looks for settings under PI_CODING_AGENT_DIR; pin it inside our temp dir so the
         // runtime never touches the user's real ~/.pi.
         env.put("PI_CODING_AGENT_DIR", workspace.resolve(".pi-home").toString());

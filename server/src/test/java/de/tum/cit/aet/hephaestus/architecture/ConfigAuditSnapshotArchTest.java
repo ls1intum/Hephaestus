@@ -38,7 +38,10 @@ class ConfigAuditSnapshotArchTest extends HephaestusArchitectureTest {
         // enum: PROXY | API_KEY — how credentials are supplied, not what they are
         "credentialMode",
         // boolean: whether a workspace SCM token is present, never the token itself
-        "tokenSet"
+        "tokenSet",
+        // Integer: the model's max *output tokens* capability (an LLM sizing parameter), not a
+        // credential — "token" here means the language-model unit, unrelated to auth tokens
+        "maxOutputTokens"
     );
 
     @Test

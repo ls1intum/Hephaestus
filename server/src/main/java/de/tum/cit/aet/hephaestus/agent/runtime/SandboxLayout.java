@@ -100,6 +100,19 @@ public final class SandboxLayout {
     /** Workspace-relative filename of the runner script copied from the classpath. */
     public static final String RUNNER_SCRIPT_FILENAME = ".run-pi.mjs";
 
+    /**
+     * Workspace-relative filename of the shared LLM-provider spec (#1368 slice 5): a single JSON file
+     * the server writes from the job's {@code ConfigSnapshot} — wire protocol, the PROXY url the
+     * sandbox must call, the upstream model id, and its capability envelope. Both
+     * {@code pi-runner.mjs} and {@code pi-mentor-runner.mjs} read it through the shared
+     * {@code pi-provider.mjs} registration helper (see {@code PROVIDER_HELPER_FILENAME}) so the two
+     * runners can never drift on how they register the "hephaestus" Pi provider.
+     */
+    public static final String PROVIDER_CONFIG_FILENAME = "pi-provider.json";
+
+    /** Workspace-relative filename of the shared provider-registration ES module both runners import. */
+    public static final String PROVIDER_HELPER_FILENAME = "pi-provider.mjs";
+
     /** Workspace-relative filename of the orchestrator instructions loaded into Pi at runtime. */
     public static final String ORCHESTRATOR_FILENAME = "AGENTS.md";
 

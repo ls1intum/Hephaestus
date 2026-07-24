@@ -7,14 +7,11 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
-import java.time.Instant;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -25,11 +22,11 @@ import org.springframework.scheduling.annotation.Scheduled;
 /**
  * Detects and cleans up orphaned sandbox resources.
  *
- * <p>Two triggers:
+ * <p>Two triggers clean resources owned by this worker's Docker daemon:
  *
  * <ol>
- *   <li><b>Startup</b> ({@link ApplicationReadyEvent}): RUNNING jobs with no matching container are
- *       marked FAILED. Handles crash recovery.
+ *   <li><b>Startup</b> ({@link ApplicationReadyEvent}): resources left by a previous worker process
+ *       are cleaned immediately.
  *   <li><b>Periodic</b> ({@link Scheduled}): orphaned containers and networks are cleaned up on a
  *       configurable interval.
  * </ol>
@@ -46,7 +43,6 @@ public class SandboxReconciler {
     private final AgentJobRepository jobRepository;
     private final SandboxContainerManager containerManager;
     private final SandboxNetworkManager networkManager;
-    private final Counter orphanedJobs;
     private final Counter orphanedContainers;
     private final Counter orphanedNetworks;
     private final Timer reconciliationDuration;
@@ -60,10 +56,6 @@ public class SandboxReconciler {
         this.jobRepository = jobRepository;
         this.containerManager = containerManager;
         this.networkManager = networkManager;
-        this.orphanedJobs = Counter.builder("sandbox.reconciler.orphaned")
-            .tag("resource", "job")
-            .description("Orphaned jobs marked as FAILED")
-            .register(meterRegistry);
         this.orphanedContainers = Counter.builder("sandbox.reconciler.orphaned")
             .tag("resource", "container")
             .description("Orphaned containers removed")
@@ -77,12 +69,7 @@ public class SandboxReconciler {
             .register(meterRegistry);
     }
 
-    /**
-     * On startup: mark orphaned RUNNING jobs as FAILED.
-     *
-     * <p>Each job is saved independently (via Spring Data's default transactional save) so a failure
-     * on one job does not roll back others.
-     */
+    /** On startup, clean only resources on this worker's Docker daemon. */
     @EventListener(ApplicationReadyEvent.class)
     public void onStartup() {
         MDC.put(MDC_RECONCILER_TYPE, "startup");
@@ -95,58 +82,7 @@ public class SandboxReconciler {
 
     private void doStartup() {
         log.info("Sandbox reconciler: startup check");
-
-        try {
-            markOrphanedJobsFailed();
-        } catch (Exception e) {
-            log.error("Startup job reconciliation failed: {}", e.getMessage());
-        }
         cleanupOrphanedDockerResources();
-    }
-
-    /** Mark RUNNING jobs with no matching container as FAILED. */
-    private void markOrphanedJobsFailed() {
-        List<AgentJob> runningJobs = jobRepository.findByStatus(AgentJobStatus.RUNNING);
-        if (runningJobs.isEmpty()) {
-            log.info("No orphaned running jobs found");
-            return;
-        }
-
-        // Build set of job IDs that have a live container (matched via label).
-        // Uses the same label-based approach as periodic reconciliation for consistency.
-        // This is robust even if AgentJob.containerId was never persisted by the caller.
-        Set<UUID> jobIdsWithActiveContainers = containerManager
-            .listManagedContainers()
-            .stream()
-            .map(c -> c.labels().get(SandboxLabels.JOB_ID))
-            .filter(Objects::nonNull)
-            .flatMap(idStr -> {
-                try {
-                    return Stream.of(UUID.fromString(idStr));
-                } catch (IllegalArgumentException e) {
-                    return Stream.empty();
-                }
-            })
-            .collect(Collectors.toSet());
-
-        int orphanedCount = 0;
-        for (AgentJob job : runningJobs) {
-            if (!jobIdsWithActiveContainers.contains(job.getId())) {
-                try {
-                    job.setStatus(AgentJobStatus.FAILED);
-                    job.setErrorMessage("Orphaned after server restart — container missing");
-                    job.setCompletedAt(Instant.now());
-                    jobRepository.save(job);
-                    orphanedCount++;
-                    orphanedJobs.increment();
-                    log.warn("Marked orphaned job as FAILED: jobId={}", job.getId());
-                } catch (Exception e) {
-                    log.error("Failed to mark orphaned job as FAILED: jobId={}, error={}", job.getId(), e.getMessage());
-                }
-            }
-        }
-
-        log.info("Startup reconciliation complete: {} orphaned jobs marked FAILED", orphanedCount);
     }
 
     /** Clean up Docker resources left from previous runs — don't wait for periodic sweep. */

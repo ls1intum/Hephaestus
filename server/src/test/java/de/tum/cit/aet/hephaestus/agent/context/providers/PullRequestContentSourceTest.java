@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.context.providers;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -10,6 +11,8 @@ import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ScmTokenSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -58,12 +61,16 @@ class PullRequestContentSourceTest extends BaseUnitTest {
     @Mock
     private ConnectionService connectionService;
 
+    @Mock
+    private ScmTokenSource scmTokenSource;
+
     private static final Long WORKSPACE_ID = 99L;
 
     private PullRequestContentSource provider;
 
     @BeforeEach
     void setUp() {
+        lenient().when(scmTokenSource.kind()).thenReturn(IntegrationKind.GITLAB);
         provider = new PullRequestContentSource(
             objectMapper,
             gitRepositoryManager,
@@ -72,7 +79,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             developerHistoryProvider,
             gitDiffOperations,
             connectionService,
-            List.of()
+            List.of(scmTokenSource)
         );
     }
 
@@ -108,6 +115,23 @@ class PullRequestContentSourceTest extends BaseUnitTest {
         lenient()
             .when(gitRepositoryManager.getRepositoryPath(123L))
             .thenReturn(Path.of("/tmp/hephaestus-git-repos/123"));
+        lenient().when(gitRepositoryManager.commitExists(123L, "abc123def456")).thenReturn(true);
+        lenient()
+            .when(
+                gitDiffOperations.resolveDiffRange(
+                    Path.of("/tmp/hephaestus-git-repos/123"),
+                    "main",
+                    "feature/auth-fix",
+                    "abc123def456"
+                )
+            )
+            .thenReturn(new String[] { "main", "abc123def456" });
+        lenient()
+            .when(gitDiffOperations.diff(Path.of("/tmp/hephaestus-git-repos/123"), "main", "abc123def456"))
+            .thenReturn("diff --git a/a.txt b/a.txt\n@@ -0,0 +1 @@\n+content\n");
+        lenient()
+            .when(gitDiffOperations.diffStat(Path.of("/tmp/hephaestus-git-repos/123"), "main", "abc123def456"))
+            .thenReturn(" a.txt | 1\n");
     }
 
     @Nested
@@ -382,6 +406,23 @@ class PullRequestContentSourceTest extends BaseUnitTest {
         }
 
         @Test
+        void missingPinnedHead_abortsBeforeSandboxLaunch() {
+            stubGit();
+            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
+            lenient()
+                .when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L))
+                .thenReturn(List.of());
+            when(gitRepositoryManager.commitExists(123L, "abc123def456")).thenReturn(false);
+            when(
+                gitDiffOperations.resolveDiffRange(Path.of(repoPath), "main", "feature/auth-fix", "abc123def456")
+            ).thenReturn(null);
+
+            assertThatThrownBy(() -> provider.contribute(request(sampleMetadata()), new LinkedHashMap<>()))
+                .isInstanceOf(JobPreparationException.class)
+                .hasMessageContaining("pinned head commit is unavailable");
+        }
+
+        @Test
         void realDiff_writesAnnotatedPatchAndSummary() throws Exception {
             stubGit();
             when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
@@ -402,6 +443,34 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             assertThat(files).containsKey("inputs/context/diff_summary.md");
             String patch = new String(files.get("inputs/context/diff.patch"), StandardCharsets.UTF_8);
             assertThat(patch).contains("[L2] +added");
+        }
+
+        @Test
+        void fetchesProviderReviewRefForForkHead() {
+            stubGit();
+            when(connectionService.findActiveProviderKind(WORKSPACE_ID)).thenReturn(
+                Optional.of(IntegrationKind.GITLAB)
+            );
+            when(scmTokenSource.serverUrl(WORKSPACE_ID)).thenReturn(Optional.of("https://scm.example"));
+            when(scmTokenSource.accessToken(WORKSPACE_ID)).thenReturn(Optional.of("token"));
+            when(scmTokenSource.reviewHeadRef(42)).thenReturn(Optional.of("refs/merge-requests/42/head"));
+            when(
+                gitRepositoryManager.fetchRemoteCommit(123L, "refs/merge-requests/42/head", "abc123def456", "token")
+            ).thenReturn(true);
+            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
+            lenient()
+                .when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L))
+                .thenReturn(List.of());
+
+            provider.contribute(request(sampleMetadata()), new LinkedHashMap<>());
+
+            verify(gitRepositoryManager).ensureRepository(123L, "https://scm.example/owner/repo.git", "token");
+            verify(gitRepositoryManager).fetchRemoteCommit(
+                123L,
+                "refs/merge-requests/42/head",
+                "abc123def456",
+                "token"
+            );
         }
     }
 

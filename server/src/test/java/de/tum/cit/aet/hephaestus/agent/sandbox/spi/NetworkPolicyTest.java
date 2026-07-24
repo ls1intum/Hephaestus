@@ -10,36 +10,36 @@ class NetworkPolicyTest extends BaseUnitTest {
 
     @Test
     void nullAndBlankUrlsArePermitted() {
-        assertThat(new NetworkPolicy(false, null, null, null)).isNotNull();
-        assertThat(new NetworkPolicy(false, "", null, null)).isNotNull();
-        assertThat(new NetworkPolicy(false, "   ", null, null)).isNotNull();
+        assertThat(new NetworkPolicy(false, null, null)).isNotNull();
+        assertThat(new NetworkPolicy(false, "", null)).isNotNull();
+        assertThat(new NetworkPolicy(false, "   ", null)).isNotNull();
     }
 
     @Test
     void httpAndHttpsAreAccepted() {
-        assertThat(new NetworkPolicy(true, "http://localhost:8080", "tok", "anthropic")).isNotNull();
-        assertThat(new NetworkPolicy(true, "https://proxy.example/internal", "tok", "openai")).isNotNull();
+        assertThat(new NetworkPolicy(true, "http://localhost:8080", "tok")).isNotNull();
+        assertThat(new NetworkPolicy(true, "https://proxy.example/internal", "tok")).isNotNull();
     }
 
     @Test
     void relativeUrlRejected() {
-        assertThatThrownBy(() -> new NetworkPolicy(true, "/internal/llm", null, null))
+        assertThatThrownBy(() -> new NetworkPolicy(true, "/internal/llm", null))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("must be absolute");
     }
 
     @Test
     void nonHttpSchemeRejected() {
-        assertThatThrownBy(() -> new NetworkPolicy(true, "ftp://x.example", null, null))
+        assertThatThrownBy(() -> new NetworkPolicy(true, "ftp://x.example", null))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("http or https");
-        assertThatThrownBy(() -> new NetworkPolicy(true, "file:///etc/passwd", null, null))
+        assertThatThrownBy(() -> new NetworkPolicy(true, "file:///etc/passwd", null))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("http or https");
     }
 
     @Test
     void schemeCheckIsCaseInsensitive() {
-        assertThat(new NetworkPolicy(false, "HTTPS://proxy.example", "tok", "p")).isNotNull();
+        assertThat(new NetworkPolicy(false, "HTTPS://proxy.example", "tok")).isNotNull();
     }
 }

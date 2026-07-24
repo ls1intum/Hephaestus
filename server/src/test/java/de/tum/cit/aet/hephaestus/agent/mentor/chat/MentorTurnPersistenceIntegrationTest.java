@@ -3,9 +3,15 @@ package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.tum.cit.aet.hephaestus.agent.mentor.MentorLlmConfig;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.exception.TurnAlreadyInFlightException;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.TranslatorState;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageEventRepository;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
+import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -20,6 +26,9 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -36,6 +45,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
@@ -74,7 +85,16 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     private ChatMessageRepository chatMessageRepository;
 
     @Autowired
+    private LlmUsageEventRepository usageEventRepository;
+
+    @Autowired
+    private LlmUsageRecorder usageRecorder;
+
+    @Autowired
     private DataSource dataSource;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     private Workspace workspace;
     private User user;
@@ -452,6 +472,107 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void interrupt_afterLlmCallStarted_writesUnverifiableLedgerEventWhenUsageIsMissing() {
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
+        UUID assistantId = UUID.randomUUID();
+        MentorTurnPersistence.TurnPersistenceCookie cookie = persistence.persistInFlight(
+            thread,
+            "hello",
+            assistantId,
+            null
+        );
+        TranslatorState state = new TranslatorState(assistantId);
+        state.markLlmCallStarted();
+
+        persistence.interrupt(cookie, state, new IllegalStateException("upstream disconnected"));
+
+        var event = usageEventRepository
+            .findAll()
+            .stream()
+            .filter(row -> row.getSourceId().equals(assistantId))
+            .findFirst();
+        assertThat(event).isPresent();
+        assertThat(event.orElseThrow().getPricingState()).isEqualTo(PricingState.UNPRICED);
+        assertThat(event.orElseThrow().getCostUsd()).isNull();
+    }
+
+    @Test
+    void finalise_cacheOnlyUsage_writesPricedLedgerEvent() {
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
+        UUID assistantId = UUID.randomUUID();
+        LlmPriceSnapshot price = new LlmPriceSnapshot(
+            FundingSource.INSTANCE,
+            PricingState.PRICED,
+            12L,
+            null,
+            new BigDecimal("10"),
+            new BigDecimal("20"),
+            new BigDecimal("2"),
+            new BigDecimal("3")
+        );
+        MentorLlmConfig config = new MentorLlmConfig(
+            1L,
+            "openai-responses",
+            "https://api.openai.com/v1",
+            "test-model",
+            null,
+            null,
+            false,
+            FundingSource.INSTANCE,
+            1L,
+            1L,
+            null,
+            price,
+            false,
+            600
+        );
+        MentorTurnPersistence.TurnPersistenceCookie cookie = persistence.persistInFlight(
+            thread,
+            "hello",
+            assistantId,
+            null,
+            config
+        );
+        TranslatorState state = new TranslatorState(assistantId);
+        state.markLlmCallStarted();
+        ObjectNode usage = NODES.objectNode();
+        usage.put("input", 0).put("output", 0).put("cacheRead", 500_000).put("cacheWrite", 0);
+        state.observeUsage(usage);
+
+        persistence.finalise(cookie, state, new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, null));
+
+        var event = usageEventRepository
+            .findAll()
+            .stream()
+            .filter(row -> row.getSourceId().equals(assistantId))
+            .findFirst()
+            .orElseThrow();
+        assertThat(event.getPricingState()).isEqualTo(PricingState.PRICED);
+        assertThat(event.getCacheReadTokens()).isEqualTo(500_000);
+        assertThat(event.getCostUsd()).isEqualByComparingTo("1.000000");
+    }
+
+    @Test
+    void interrupt_beforeLlmCallStarted_doesNotInventAUsageEvent() {
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
+        UUID assistantId = UUID.randomUUID();
+        MentorTurnPersistence.TurnPersistenceCookie cookie = persistence.persistInFlight(
+            thread,
+            "hello",
+            assistantId,
+            null
+        );
+
+        persistence.interrupt(
+            cookie,
+            new TranslatorState(assistantId),
+            new IllegalStateException("sandbox attach failed")
+        );
+
+        assertThat(usageEventRepository.findAll()).noneMatch(row -> row.getSourceId().equals(assistantId));
+    }
+
+    @Test
     void optimisticLocking_staleSnapshotSaveFails() {
         // Root-cause protection against the reaper-vs-late-finalise data corruption: a
         // writer that loaded the entity at version=N can no longer overwrite a row the
@@ -506,6 +627,58 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         ChatMessage reaped = chatMessageRepository.findById(assistantId).orElseThrow();
         assertThat(reaped.getStatus()).isEqualTo(ChatMessage.Status.interrupted);
         assertThat(reaped.getMetadata().path("error").asString()).isEqualTo("server restart");
+    }
+
+    @Test
+    void accountingReaper_neverSelectsLegitimateTurnsAndAccountsTrulyStaleTurnOnce() throws Exception {
+        UUID tenMinuteTurn = persistInFlightTurn("ten-minute-turn");
+        UUID maxDurationTurn = persistInFlightTurn("max-duration-turn");
+        UUID staleTurn = persistInFlightTurn("stale-turn");
+        Instant now = Instant.now();
+        setCreatedAt(tenMinuteTurn, now.minus(Duration.ofMinutes(10)));
+        setCreatedAt(maxDurationTurn, now.minus(Duration.ofMinutes(60)));
+        setCreatedAt(staleTurn, now.minus(Duration.ofMinutes(80)));
+
+        MentorInFlightReaper reaper = new MentorInFlightReaper(
+            chatMessageRepository,
+            usageRecorder,
+            Duration.ofMinutes(10)
+        );
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        transaction.executeWithoutResult(ignored -> reaper.reap());
+        transaction.executeWithoutResult(ignored -> reaper.reap());
+
+        assertThat(reaper.window()).isEqualTo(Duration.ofMinutes(70));
+        assertThat(chatMessageRepository.findById(tenMinuteTurn).orElseThrow().getStatus()).isEqualTo(
+            ChatMessage.Status.in_flight
+        );
+        assertThat(chatMessageRepository.findById(maxDurationTurn).orElseThrow().getStatus()).isEqualTo(
+            ChatMessage.Status.in_flight
+        );
+        assertThat(chatMessageRepository.findById(staleTurn).orElseThrow().getStatus()).isEqualTo(
+            ChatMessage.Status.interrupted
+        );
+        assertThat(usageEventRepository.findAll())
+            .filteredOn(row -> row.getSourceId().equals(staleTurn))
+            .hasSize(1);
+    }
+
+    private UUID persistInFlightTurn(String prompt) {
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, prompt);
+        UUID assistantId = UUID.randomUUID();
+        persistence.persistInFlight(thread, prompt, assistantId, null);
+        return assistantId;
+    }
+
+    private void setCreatedAt(UUID messageId, Instant createdAt) throws Exception {
+        try (
+            var connection = dataSource.getConnection();
+            var statement = connection.prepareStatement("UPDATE chat_message SET created_at = ? WHERE id = ?")
+        ) {
+            statement.setTimestamp(1, Timestamp.from(createdAt));
+            statement.setObject(2, messageId);
+            assertThat(statement.executeUpdate()).isEqualTo(1);
+        }
     }
 
     @Test

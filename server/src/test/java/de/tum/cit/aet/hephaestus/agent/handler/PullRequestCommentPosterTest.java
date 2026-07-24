@@ -318,7 +318,7 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
         void shouldIncludeHtmlCommentMarker() {
             AgentJob job = createTestJob(IntegrationKind.GITHUB);
             String result = PullRequestCommentPoster.formatComment("Review body", null, job);
-            assertThat(result).contains("<!-- hephaestus-agent-feedback:" + job.getId() + " -->");
+            assertThat(result).contains("<!-- hephaestus:practice-review:" + job.getId() + " -->");
         }
 
         @Test

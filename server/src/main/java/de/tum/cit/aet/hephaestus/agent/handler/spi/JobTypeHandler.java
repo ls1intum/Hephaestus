@@ -68,6 +68,34 @@ public interface JobTypeHandler {
     }
 
     /**
+     * Best-effort dedup check for delivery recovery (#1368 hardening): has a delivery for THIS job
+     * already landed at the provider, even though {@code deliveryCommentId} was never persisted? This
+     * covers the crash window between {@link #deliver} actually posting a comment and the caller
+     * persisting its id — without this check, a delivery-recovery retry (see
+     * {@code AgentJobZombieSweeper#recoverStuckDeliveries}) would blindly call {@link #deliver} again and
+     * post a duplicate.
+     *
+     * <p><b>Tri-state, not {@code Optional} (#1368 fix wave, finding #6).</b> The caller ({@code
+     * AgentJobLifecycleService#recoverStuckDelivery}) treats the three outcomes very differently: {@link
+     * ExistingDeliveryLookup.Kind#FOUND} records the found comment id as delivered WITHOUT re-posting;
+     * {@link ExistingDeliveryLookup.Kind#ABSENT} proceeds to a normal {@link #deliver} attempt (confirmed
+     * safe to post); {@link ExistingDeliveryLookup.Kind#UNKNOWN} does NEITHER — it leaves the delivery
+     * {@code PENDING} for a later recovery pass rather than guessing, since guessing wrong in the "post"
+     * direction risks a duplicate on exactly the crash-recovery path this exists to protect. Collapsing
+     * these into an {@code Optional} (as before this fix) made "could not determine" indistinguishable
+     * from "confirmed absent" — every lookup failure silently fell through to re-posting.
+     *
+     * <p>Default {@code UNKNOWN} — a handler whose delivery channel supports searching for the embedded
+     * job marker overrides this with a real {@code FOUND}/{@code ABSENT}/{@code UNKNOWN} answer; one that
+     * can't (or doesn't post externally at all, e.g. conversation review) leaves the default, and the
+     * caller never auto-reposts for it — only ever records a confirmed match or exhausts the recovery
+     * attempt cap.
+     */
+    default ExistingDeliveryLookup findExistingDelivery(AgentJob job) {
+        return ExistingDeliveryLookup.unknown();
+    }
+
+    /**
      * Provide host volume mounts for the sandbox container.
      *
      * <p>Returns a map of host paths to container paths. All mounts are read-only

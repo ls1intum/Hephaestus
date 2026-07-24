@@ -235,8 +235,8 @@ hephaestus:
     #   server  — WIRED. Gates ServerSchedulingConfig (@EnableScheduling),
     #     IntegrationNatsConsumer (the unified NATS pull consumer), and WorkspaceStartupListener.
     #     Setting false silences all @Scheduled methods and prevents workspace bootstrap.
-    #   worker  — WIRED. Gates DockerSandboxConfiguration + AgentNatsConsumerConfig.
-    #     Setting false removes the Docker sandbox runtime + agent NATS pull consumer.
+    #   worker  — WIRED. Gates DockerSandboxConfiguration + the poll-based AgentJobExecutor.
+    #     Setting false removes the Docker sandbox runtime + the agent job poller.
     #   webhook — WIRED. Gates the integration.webhook receiver (controllers, HMAC
     #     verifier, JetStream publisher, stream bootstrap, health, lifecycle).
     #     The webhook-server production container deploys with server=false + worker=false
@@ -410,25 +410,9 @@ hephaestus:
         project-id: ${POSTHOG_PROJECT_ID:}
         personal-api-key: ${POSTHOG_PERSONAL_API_KEY:}
 
-    # LLM proxy upstream URLs. Override for Azure OpenAI, WireMock, or other API-compatible
-    # endpoints. Docker sandbox deployment requirements are documented on SandboxProperties.
-    llm-proxy:
-        anthropic-upstream-url: ${LLM_PROXY_ANTHROPIC_URL:https://api.anthropic.com}
-        openai-upstream-url: ${LLM_PROXY_OPENAI_URL:https://api.openai.com}
-        # For Azure OpenAI, set openai-auth-header=api-key and openai-use-bearer-prefix=false
-        openai-auth-header: ${LLM_PROXY_OPENAI_AUTH_HEADER:Authorization}
-        openai-use-bearer-prefix: ${LLM_PROXY_OPENAI_USE_BEARER:true}
-        # Dedicated Azure OpenAI route used by the sandboxed Pi agent
-        azure-openai-upstream-url: ${LLM_PROXY_AZURE_OPENAI_URL:}
-        azure-openai-auth-header: ${LLM_PROXY_AZURE_OPENAI_AUTH_HEADER:api-key}
-        azure-openai-use-bearer-prefix: ${LLM_PROXY_AZURE_OPENAI_USE_BEARER:false}
-
     sandbox:
-        # Capability flag (not a role): worker-internal LLM proxy controller. Stays on
-        # the coordinator by default (BYO trust model — see ADR 0006). Future managed-mode
-        # workers opt in by setting this on the worker pod and false on the server pod.
-        llm-proxy:
-            enabled: ${HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED:true}
+        # The LLM proxy controller/security chain follows the worker/sandbox capability. It serves
+        # both queued jobs and interactive mentor sandboxes, so AGENT_ENABLED must not gate it.
         docker-host: ${SANDBOX_DOCKER_HOST:unix:///var/run/docker.sock}
         tls-verify: ${SANDBOX_TLS_VERIFY:false}
         max-concurrent-containers: ${SANDBOX_MAX_CONCURRENT:5}
@@ -450,36 +434,28 @@ hephaestus:
     # Dev-only actuator for manually triggering PR reviews (never enable in production).
     # Layered safety: (1) this flag, (2) not in endpoint exposure list, (3) Spring Security auth.
     dev:
-        trigger-enabled: false
+        trigger-enabled: ${HEPHAESTUS_DEV_TRIGGER_ENABLED:false}
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # AGENT JOB NATS CONFIGURATION
+    # AGENT JOB QUEUE (PostgreSQL-backed, #1368 NATS→Postgres cutover)
     # ═══════════════════════════════════════════════════════════════════════════
-    # NATS stream and consumer for agent job execution pipeline.
-    # Disabled by default — requires a reachable NATS server.
+    # The queue IS the agent_job table — a QUEUED insert is the enqueue. AgentJobExecutor polls
+    # for QUEUED rows on a fixed interval instead of a NATS push consumer. Disabled by default.
     agent:
-        nats:
-            enabled: ${AGENT_NATS_ENABLED:false}
-            server: ${NATS_SERVER:nats://localhost:4222}
-            stream-name: AGENT
-            consumer-name: hephaestus-agent-executor
-            # Must exceed max container timeout (1hr) + buffer
-            ack-wait: 70m
-            max-deliver: 5
-            # Cluster-wide unacked bound across all worker replicas. Set ≈ replicas × per-worker
-            # concurrency; the per-replica pull is capped by fetch-batch-size so no replica starves siblings.
-            max-ack-pending: ${AGENT_NATS_MAX_ACK_PENDING:16}
-            fetch-batch-size: ${AGENT_NATS_FETCH_BATCH_SIZE:5}
-            heartbeat-interval: 25s
-        # Dev convenience: seed one workspace model at startup (off by default). See docker/.env.example.
-        default-config:
-            enabled: ${AGENT_DEFAULT_CONFIG_ENABLED:false}
-            name: ${AGENT_DEFAULT_CONFIG_NAME:Default model}
-            provider: ${AGENT_DEFAULT_CONFIG_PROVIDER:ANTHROPIC}
-            model-name: ${AGENT_DEFAULT_CONFIG_MODEL_NAME:}
-            api-key: ${AGENT_DEFAULT_CONFIG_API_KEY:}
-            base-url: ${AGENT_DEFAULT_CONFIG_BASE_URL:}
-
+        enabled: ${AGENT_ENABLED:false}
+        # How long the poll loop sleeps when there is nothing to claim.
+        poll-interval: ${AGENT_POLL_INTERVAL:1s}
+        # Max candidate QUEUED jobs considered per poll iteration; bounded by this worker's own
+        # free local capacity so one poll never over-claims.
+        claim-batch-size: ${AGENT_CLAIM_BATCH_SIZE:5}
+        # Max orphan-requeue attempts before a RUNNING job whose owning worker was lost is failed
+        # instead of requeued again. Authoritative budget lives on agent_job.retry_count.
+        max-retries: ${AGENT_MAX_RETRIES:5}
+        heartbeat-interval: 25s
+        # Retention (#1368 hardening): AgentJobRetentionService. payload-retention strips container_logs/
+        # output to NULL past this age; row-retention deletes the whole terminal row past this age.
+        payload-retention: ${AGENT_PAYLOAD_RETENTION:P14D}
+        row-retention: ${AGENT_ROW_RETENTION:P90D}
     # ═══════════════════════════════════════════════════════════════════════════
     # WEBHOOK CONFIGURATION
     # ═══════════════════════════════════════════════════════════════════════════

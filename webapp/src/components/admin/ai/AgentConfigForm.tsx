@@ -2,9 +2,11 @@ import { useState } from "react";
 import { z } from "zod";
 import type {
 	AgentConfig,
+	AvailableLlmModel,
 	CreateAgentConfigRequest,
 	UpdateAgentConfigRequest,
 } from "@/api/types.gen";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
 	Field,
@@ -15,32 +17,12 @@ import {
 	FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
-import { CredentialField } from "./CredentialField";
-import { LLM_PROVIDER_LABELS, type LlmProvider } from "./utils";
+import { ModelPicker, type ModelSelection } from "./ModelPicker";
 
-const PROVIDERS: LlmProvider[] = ["ANTHROPIC", "OPENAI", "AZURE_OPENAI"];
-const PROVIDER_ITEMS = PROVIDERS.map((p) => ({ value: p, label: LLM_PROVIDER_LABELS[p] }));
-
-const MODEL_PLACEHOLDER: Record<LlmProvider, string> = {
-	ANTHROPIC: "e.g. claude-sonnet-4-5",
-	OPENAI: "e.g. gpt-5.4-mini",
-	AZURE_OPENAI: "e.g. gpt-5.4-mini (deployment name)",
-};
-
-// Workspace models always authenticate as "API key over the in-app proxy" — see CredentialField + ADR 0006.
 const agentConfigSchema = z.object({
 	name: z.string().trim().min(1, "Name is required").max(120, "Name is too long"),
-	modelName: z.string().trim().max(200).optional(),
-	llmProvider: z.enum(["ANTHROPIC", "OPENAI", "AZURE_OPENAI"]),
 	timeoutSeconds: z
 		.number()
 		.int("Must be a whole number")
@@ -56,30 +38,42 @@ const agentConfigSchema = z.object({
 
 interface FormState {
 	name: string;
-	llmProvider: LlmProvider;
-	modelName: string;
 	timeoutSeconds: number;
 	maxConcurrentJobs: number;
 	enabled: boolean;
-	llmApiKey: string;
-	clearLlmApiKey: boolean;
+	allowInternet: boolean;
+	selection: ModelSelection | null;
+}
+
+function selectionOf(config?: AgentConfig): ModelSelection | null {
+	if (config?.instanceModelId != null) {
+		return { scope: "SHARED", id: config.instanceModelId };
+	}
+	if (config?.workspaceModelId != null) {
+		return { scope: "WORKSPACE", id: config.workspaceModelId };
+	}
+	return null;
+}
+
+function sameSelection(left: ModelSelection | null, right: ModelSelection | null): boolean {
+	return left?.scope === right?.scope && left?.id === right?.id;
 }
 
 function initialState(config?: AgentConfig): FormState {
 	return {
 		name: config?.name ?? "",
-		llmProvider: config?.llmProvider ?? "ANTHROPIC",
-		modelName: config?.modelName ?? "",
 		timeoutSeconds: config?.timeoutSeconds ?? 600,
 		maxConcurrentJobs: config?.maxConcurrentJobs ?? 1,
 		enabled: config?.enabled ?? true,
-		llmApiKey: "",
-		clearLlmApiKey: false,
+		allowInternet: config?.allowInternet ?? false,
+		selection: selectionOf(config),
 	};
 }
 
 export interface AgentConfigFormProps {
 	config?: AgentConfig;
+	/** Models this workspace may bind to — shared (instance catalog) and its own provider's. */
+	availableModels: AvailableLlmModel[];
 	isPending: boolean;
 	onCreate: (body: CreateAgentConfigRequest) => void;
 	onUpdate: (body: UpdateAgentConfigRequest) => void;
@@ -88,12 +82,20 @@ export interface AgentConfigFormProps {
 
 export function AgentConfigForm({
 	config,
+	availableModels,
 	isPending,
 	onCreate,
 	onUpdate,
 	onCancel,
 }: AgentConfigFormProps) {
 	const isEdit = config !== undefined;
+	const needsModelBinding =
+		isEdit && config.instanceModelId == null && config.workspaceModelId == null;
+	const noAvailableModels = availableModels.length === 0;
+	const isSelectionAvailable = (selection: ModelSelection | null) =>
+		selection != null &&
+		availableModels.some((model) => model.scope === selection.scope && model.id === selection.id);
+
 	const [form, setForm] = useState<FormState>(() => initialState(config));
 	const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -105,57 +107,53 @@ export function AgentConfigForm({
 		e.preventDefault();
 		const parsed = agentConfigSchema.safeParse({
 			name: form.name,
-			modelName: form.modelName,
-			llmProvider: form.llmProvider,
 			timeoutSeconds: form.timeoutSeconds,
 			maxConcurrentJobs: form.maxConcurrentJobs,
 			enabled: form.enabled,
 		});
 
+		const next: Record<string, string> = {};
 		if (!parsed.success) {
-			const next: Record<string, string> = {};
 			for (const issue of parsed.error.issues) {
 				const key = String(issue.path[0] ?? "");
 				if (key && !next[key]) next[key] = issue.message;
 			}
-			setErrors(next);
-			return;
 		}
-
-		// The proxy needs a key to inject, so one is required on create. On edit a blank field keeps the
-		// stored key (the value is never sent back to the browser).
-		if (!isEdit && form.llmApiKey.trim().length === 0) {
-			setErrors({ llmApiKey: "An API key is required." });
+		if (form.selection === null) {
+			next.selection = "Select a model.";
+		} else if (form.enabled && !isSelectionAvailable(form.selection)) {
+			next.selection = "Select an available model, or turn off this configuration.";
+		}
+		if (Object.keys(next).length > 0) {
+			setErrors(next);
 			return;
 		}
 		setErrors({});
 
-		const hasKeyInput = form.llmApiKey.trim().length > 0;
+		const selectedBinding: Pick<UpdateAgentConfigRequest, "instanceModelId" | "workspaceModelId"> =
+			form.selection === null
+				? {}
+				: form.selection.scope === "SHARED"
+					? { instanceModelId: form.selection.id }
+					: { workspaceModelId: form.selection.id };
 
 		if (isEdit) {
-			// The update endpoint cannot rename a config (no `name` field).
 			const body: UpdateAgentConfigRequest = {
-				llmProvider: form.llmProvider,
-				modelName: form.modelName.trim() || undefined,
 				timeoutSeconds: form.timeoutSeconds,
 				maxConcurrentJobs: form.maxConcurrentJobs,
 				enabled: form.enabled,
+				allowInternet: form.allowInternet,
+				...(!sameSelection(selectionOf(config), form.selection) ? selectedBinding : {}),
 			};
-			if (form.clearLlmApiKey) {
-				body.clearLlmApiKey = true;
-			} else if (hasKeyInput) {
-				body.llmApiKey = form.llmApiKey.trim();
-			}
 			onUpdate(body);
 		} else {
 			onCreate({
 				name: form.name.trim(),
-				llmProvider: form.llmProvider,
-				modelName: form.modelName.trim() || undefined,
 				timeoutSeconds: form.timeoutSeconds,
 				maxConcurrentJobs: form.maxConcurrentJobs,
 				enabled: form.enabled,
-				llmApiKey: form.llmApiKey.trim(),
+				allowInternet: form.allowInternet,
+				...selectedBinding,
 			});
 		}
 	};
@@ -186,72 +184,56 @@ export function AgentConfigForm({
 					{errors.name && <FieldError id="agent-name-error">{errors.name}</FieldError>}
 				</Field>
 
-				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-					<Field>
-						<FieldLabel htmlFor="agent-provider">Provider</FieldLabel>
-						<Select
-							items={PROVIDER_ITEMS}
-							value={form.llmProvider}
-							disabled={isPending}
-							onValueChange={(value) => {
-								if (value) set("llmProvider", value as LlmProvider);
-							}}
-						>
-							<SelectTrigger id="agent-provider">
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								{PROVIDERS.map((p) => (
-									<SelectItem key={p} value={p}>
-										{LLM_PROVIDER_LABELS[p]}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-					</Field>
-
-					<Field>
-						<FieldLabel htmlFor="agent-model">
-							Model name <span className="font-normal text-muted-foreground">(optional)</span>
-						</FieldLabel>
-						<Input
-							id="agent-model"
-							value={form.modelName}
-							onChange={(e) => set("modelName", e.target.value)}
-							disabled={isPending}
-							placeholder={MODEL_PLACEHOLDER[form.llmProvider]}
-						/>
-					</Field>
-				</div>
-
-				<CredentialField
-					hasStoredKey={config?.hasLlmApiKey ?? false}
-					required={!isEdit}
-					value={form.llmApiKey}
-					error={errors.llmApiKey}
-					onChange={(value) => set("llmApiKey", value)}
-					onClear={
-						isEdit
-							? () => setForm((prev) => ({ ...prev, clearLlmApiKey: true, llmApiKey: "" }))
-							: undefined
-					}
-					disabled={isPending || form.clearLlmApiKey}
-				/>
-
-				{form.clearLlmApiKey && (
-					<p className="text-sm text-muted-foreground">
-						The stored key will be removed when you save.{" "}
-						<Button
-							type="button"
-							variant="link"
-							size="sm"
-							className="h-auto p-0"
-							onClick={() => set("clearLlmApiKey", false)}
-						>
-							Undo
-						</Button>
-					</p>
+				{needsModelBinding && (
+					<Alert>
+						<AlertDescription>
+							This configuration has no catalog model and cannot run. Select a model before saving.
+						</AlertDescription>
+					</Alert>
 				)}
+
+				{isEdit &&
+					form.enabled &&
+					form.selection !== null &&
+					!isSelectionAvailable(form.selection) && (
+						<Alert variant="destructive">
+							<AlertDescription>
+								<strong className="text-foreground block">Current model is unavailable.</strong>
+								Choose an available model, or turn off this configuration before saving.
+							</AlertDescription>
+						</Alert>
+					)}
+
+				{noAvailableModels && (
+					<Alert>
+						<AlertDescription>
+							<strong className="text-foreground block">
+								No models are available to this workspace.
+							</strong>
+							Ask an instance admin to grant access to a shared model, or use Workspace providers if
+							that option is enabled.
+						</AlertDescription>
+					</Alert>
+				)}
+
+				<Field data-invalid={Boolean(errors.selection)}>
+					<FieldLabel htmlFor="agent-model">
+						Model
+						<span className="text-destructive" aria-hidden="true">
+							{" *"}
+						</span>
+					</FieldLabel>
+					<ModelPicker
+						id="agent-model"
+						availableModels={availableModels}
+						value={form.selection}
+						onChange={(selection) => set("selection", selection)}
+						disabled={isPending || noAvailableModels}
+						invalid={Boolean(errors.selection)}
+						aria-describedby={errors.selection ? "agent-model-error" : undefined}
+					/>
+					{errors.selection && <FieldError id="agent-model-error">{errors.selection}</FieldError>}
+				</Field>
 
 				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 					<Field data-invalid={Boolean(errors.timeoutSeconds)}>
@@ -293,9 +275,24 @@ export function AgentConfigForm({
 
 				<Field orientation="horizontal">
 					<FieldContent>
+						<FieldLabel htmlFor="agent-internet">Internet access</FieldLabel>
+						<FieldDescription>
+							Allow the agent's sandbox to reach the public internet.
+						</FieldDescription>
+					</FieldContent>
+					<Switch
+						id="agent-internet"
+						checked={form.allowInternet}
+						disabled={isPending}
+						onCheckedChange={(checked) => set("allowInternet", checked)}
+					/>
+				</Field>
+
+				<Field orientation="horizontal">
+					<FieldContent>
 						<FieldLabel htmlFor="agent-enabled">Enabled</FieldLabel>
 						<FieldDescription>
-							Disabled models are skipped when running all models.
+							Disabled configurations cannot run or power workspace features.
 						</FieldDescription>
 					</FieldContent>
 					<Switch
@@ -313,7 +310,7 @@ export function AgentConfigForm({
 						Cancel
 					</Button>
 				)}
-				<Button type="submit" disabled={isPending}>
+				<Button type="submit" disabled={isPending || (!isEdit && noAvailableModels)}>
 					{isPending ? (
 						<>
 							<Spinner className="mr-2 h-4 w-4" />
@@ -322,7 +319,7 @@ export function AgentConfigForm({
 					) : isEdit ? (
 						"Save changes"
 					) : (
-						"Create model"
+						"Create configuration"
 					)}
 				</Button>
 			</div>

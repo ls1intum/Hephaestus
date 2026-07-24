@@ -3,6 +3,7 @@ import {
 	BookUser,
 	Bot,
 	ChevronRight,
+	CircleDollarSign,
 	ClipboardCheck,
 	LayoutGridIcon,
 	ListChecks,
@@ -38,17 +39,15 @@ export interface NavAdminProps {
 }
 
 // "Practices" nests as a collapsible sub-tree because it owns several surfaces (the catalog, review
-// settings, and the run log). "Models" is a separate item, shared with the mentor, rather than living
+// settings, and the run log). "AI setup" is a separate item, shared with the mentor, rather than living
 // under Practices. Individual practices are not sidebar entries — there are dozens; the catalog is
 // their home and each drills down to its own detail page.
 export function NavAdmin({
 	workspaceSlug,
 	achievementsEnabled = true,
 	practicesEnabled = true,
-	mentorEnabled = false,
 	scmProviderType = "GITHUB",
 }: NavAdminProps) {
-	const modelsVisible = practicesEnabled || mentorEnabled;
 	const matchRoute = useMatchRoute();
 
 	const onSettings = Boolean(
@@ -267,17 +266,26 @@ export function NavAdmin({
 						</SidebarMenuSub>
 					</CollapsibleContent>
 				</Collapsible>
-				{modelsVisible && (
-					<SidebarMenuItem>
-						<SidebarMenuButton
-							tooltip="Models"
-							render={<Link to="/w/$workspaceSlug/admin/models" params={{ workspaceSlug }} />}
-						>
-							<Bot />
-							<span>Models</span>
-						</SidebarMenuButton>
-					</SidebarMenuItem>
-				)}
+				{/* Provider credentials and model bindings still need maintenance while consuming features are
+				    off, and admins should be able to configure them before enabling a feature. */}
+				<SidebarMenuItem>
+					<SidebarMenuButton
+						tooltip="AI setup"
+						render={<Link to="/w/$workspaceSlug/admin/models" params={{ workspaceSlug }} />}
+					>
+						<Bot />
+						<span>AI setup</span>
+					</SidebarMenuButton>
+				</SidebarMenuItem>
+				<SidebarMenuItem>
+					<SidebarMenuButton
+						tooltip="AI usage"
+						render={<Link to="/w/$workspaceSlug/admin/usage" params={{ workspaceSlug }} />}
+					>
+						<CircleDollarSign />
+						<span>Usage</span>
+					</SidebarMenuButton>
+				</SidebarMenuItem>
 				{/* Deliberately not feature-gated: a change history must stay reachable after a feature is
 				    turned off, since the record of past changes still exists. */}
 				<SidebarMenuItem>

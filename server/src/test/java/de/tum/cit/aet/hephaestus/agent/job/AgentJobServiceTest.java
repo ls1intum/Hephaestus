@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -14,15 +15,16 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
+import de.tum.cit.aet.hephaestus.agent.catalog.ResolvedLlmModel;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
-import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -39,11 +41,11 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
@@ -72,13 +74,13 @@ class AgentJobServiceTest extends BaseUnitTest {
     private JobTypeHandlerRegistry handlerRegistry;
 
     @Mock
-    private ApplicationEventPublisher eventPublisher;
-
-    @Mock
     private TransactionTemplate transactionTemplate;
 
     @Mock
-    private SandboxManager sandboxManager;
+    private de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService llmBudgetService;
+
+    @Mock
+    private LlmModelResolver llmModelResolver;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -97,16 +99,17 @@ class AgentJobServiceTest extends BaseUnitTest {
             connectionService,
             handlerRegistry,
             objectMapper,
-            eventPublisher,
             transactionTemplate,
             new PracticeReviewProperties(false, true, false, "", 15, false, false),
-            sandboxManager,
-            Optional.empty()
+            llmBudgetService,
+            llmModelResolver
         );
 
         workspace = new Workspace();
         workspace.setId(1L);
         workspace.setWorkspaceSlug("test-ws");
+        // Detection runs exactly the bound practice config (no fan-out, #1368).
+        workspace.setPracticeConfigId(10L);
 
         enabledConfig = new AgentConfig();
         enabledConfig.setId(10L);
@@ -114,8 +117,28 @@ class AgentJobServiceTest extends BaseUnitTest {
         enabledConfig.setName("test-config");
         enabledConfig.setEnabled(true);
         enabledConfig.setLlmProvider(LlmProvider.ANTHROPIC);
-        enabledConfig.setCredentialMode(CredentialMode.PROXY);
         enabledConfig.setTimeoutSeconds(600);
+        lenient().when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(enabledConfig));
+
+        // Default resolver stub — submitForConfig freezes ConfigSnapshot.from(config, resolver) for
+        // every enabled config in the fan-out; individual tests override where the resolved shape
+        // matters.
+        lenient()
+            .when(llmModelResolver.resolve(any()))
+            .thenReturn(
+                new ResolvedLlmModel(
+                    "https://api.anthropic.com",
+                    "anthropic-messages",
+                    "claude-sonnet-4",
+                    null,
+                    null,
+                    false,
+                    FundingSource.INSTANCE
+                )
+            );
+        lenient()
+            .when(llmModelResolver.connectionRef(any()))
+            .thenReturn(new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 99L));
     }
 
     private JobSubmission createSubmission() {
@@ -143,11 +166,9 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldReturnEmptyWhenNoEnabledConfig() {
-            AgentConfig disabledConfig = new AgentConfig();
-            disabledConfig.setEnabled(false);
+        void shouldReturnEmptyWhenBoundConfigIsDisabled() {
+            enabledConfig.setEnabled(false); // bound-but-disabled = detection paused
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(disabledConfig));
 
             Optional<AgentJob> result = service.submit(
                 1L,
@@ -160,9 +181,9 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldReturnEmptyWhenNoConfigs() {
+        void shouldReturnEmptyWhenPracticeIsUnbound() {
+            workspace.setPracticeConfigId(null); // unbound = detection off, never fans out
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of());
 
             Optional<AgentJob> result = service.submit(
                 1L,
@@ -171,6 +192,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             );
 
             assertThat(result).isEmpty();
+            verify(agentJobRepository, never()).saveAndFlush(any());
         }
 
         @Test
@@ -243,8 +265,31 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
+        void shouldSubmitNothingWhenBoundConfigModelIsRevoked() {
+            // The bound config resolves to a since-revoked model: ConfigSnapshot.from throws, so no job
+            // is created (detection is paused for this workspace until the model is restored).
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+            when(llmModelResolver.resolve(enabledConfig)).thenThrow(new IllegalStateException("model unavailable"));
+
+            JobTypeHandler handler = mock(JobTypeHandler.class);
+            when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
+            when(handler.createSubmission(any())).thenReturn(createSubmission());
+            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any())).thenReturn(
+                Optional.empty()
+            );
+
+            Optional<AgentJob> result = service.submit(
+                1L,
+                AgentJobType.PULL_REQUEST_REVIEW,
+                mock(JobSubmissionRequest.class)
+            );
+
+            assertThat(result).isEmpty();
+            verify(agentJobRepository, never()).saveAndFlush(any());
+        }
+
+        @Test
         void shouldReturnExistingJobOnIdempotencyMatch() {
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(enabledConfig));
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             JobTypeHandler handler = mock(JobTypeHandler.class);
@@ -273,8 +318,7 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldCreateJobAndPublishEvent() {
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(enabledConfig));
+        void shouldCreateJobQueued() {
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             JobTypeHandler handler = mock(JobTypeHandler.class);
@@ -305,20 +349,16 @@ class AgentJobServiceTest extends BaseUnitTest {
             assertThat(job.getJobType()).isEqualTo(AgentJobType.PULL_REQUEST_REVIEW);
             assertThat(job.getIdempotencyKey()).isEqualTo("pr_review:owner/repo:42:authoring:abc123:config:10");
             assertThat(job.getConfigSnapshot()).isNotNull();
-
-            // Verify event published
-            ArgumentCaptor<AgentJobCreatedEvent> eventCaptor = ArgumentCaptor.forClass(AgentJobCreatedEvent.class);
-            verify(eventPublisher).publishEvent(eventCaptor.capture());
-            assertThat(eventCaptor.getValue().workspaceId()).isEqualTo(1L);
+            // #1368 NATS→Postgres cutover: the QUEUED insert IS the enqueue — AgentJobExecutor's poll
+            // loop discovers it directly from the agent_job table, no publish event to verify anymore.
+            assertThat(job.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
         }
 
         @Test
-        void shouldCopyLlmApiKeyForApiKeyMode() {
-            enabledConfig.setCredentialMode(CredentialMode.API_KEY);
+        @DisplayName("the credential is NEVER frozen onto the job (#1368 slice 5 — ONE credential path, resolved live)")
+        void neverCopiesTheCredentialOntoTheJob() {
             enabledConfig.setLlmApiKey("sk-test-key");
-            enabledConfig.setAllowInternet(true);
 
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(enabledConfig));
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             JobTypeHandler handler = mock(JobTypeHandler.class);
@@ -341,43 +381,11 @@ class AgentJobServiceTest extends BaseUnitTest {
             );
 
             assertThat(result).isPresent();
-            assertThat(result.get().getLlmApiKey()).isEqualTo("sk-test-key");
-        }
-
-        @Test
-        void shouldCopyLlmApiKeyForProxyMode() {
-            enabledConfig.setCredentialMode(CredentialMode.PROXY);
-            enabledConfig.setLlmApiKey("sk-proxy-key");
-
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(enabledConfig));
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-
-            JobTypeHandler handler = mock(JobTypeHandler.class);
-            when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
-            when(handler.createSubmission(any())).thenReturn(createSubmission());
-
-            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any())).thenReturn(
-                Optional.empty()
-            );
-            when(agentJobRepository.saveAndFlush(any())).thenAnswer(inv -> {
-                AgentJob j = inv.getArgument(0);
-                j.prePersist();
-                return j;
-            });
-
-            Optional<AgentJob> result = service.submit(
-                1L,
-                AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class)
-            );
-
-            assertThat(result).isPresent();
-            assertThat(result.get().getLlmApiKey()).isEqualTo("sk-proxy-key");
+            assertThat(result.get().getLlmApiKey()).isNull();
         }
 
         @Test
         void shouldReturnEmptyOnDataIntegrityViolation() {
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(enabledConfig));
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             JobTypeHandler handler = mock(JobTypeHandler.class);
@@ -406,15 +414,10 @@ class AgentJobServiceTest extends BaseUnitTest {
             );
 
             assertThat(result).isEmpty();
-            verify(eventPublisher, never()).publishEvent(any());
         }
 
         @Test
-        void shouldPickFirstEnabledConfig() {
-            AgentConfig disabled = new AgentConfig();
-            disabled.setEnabled(false);
-
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(disabled, enabledConfig));
+        void shouldRunTheBoundConfig() {
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             JobTypeHandler handler = mock(JobTypeHandler.class);
@@ -444,7 +447,6 @@ class AgentJobServiceTest extends BaseUnitTest {
         void shouldSkipSubmissionWhenCooldownActive() {
             // Default workspace inherits the property cooldownMinutes=15, so the cooldown branch runs. A
             // recent job for the same (PR, phase)/config → submission is skipped (no new job persisted).
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(enabledConfig));
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             JobTypeHandler handler = mock(JobTypeHandler.class);
@@ -466,13 +468,11 @@ class AgentJobServiceTest extends BaseUnitTest {
 
             assertThat(result).isEmpty();
             verify(agentJobRepository, never()).saveAndFlush(any());
-            verify(eventPublisher, never()).publishEvent(any());
         }
 
         @Test
         void shouldCreateJobWhenCooldownElapsed() {
             // Cooldown lookup returns empty (no recent job within the window) → the job is created.
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(enabledConfig));
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             JobTypeHandler handler = mock(JobTypeHandler.class);
@@ -503,7 +503,6 @@ class AgentJobServiceTest extends BaseUnitTest {
             // A repo name with a LIKE single-char wildcard ('_') must be escaped, or the cooldown prefix
             // would spuriously match unrelated keys (e.g. "my_org" matching "myXorg"). Capture the prefix
             // passed to the LIKE query (ESCAPE '\') and assert the '_' is backslash-escaped.
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(enabledConfig));
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             ObjectNode metadata = objectMapper.createObjectNode();
@@ -527,242 +526,6 @@ class AgentJobServiceTest extends BaseUnitTest {
             verify(agentJobRepository).findRecentJobByKeyPrefix(eq(1L), prefix.capture(), any());
             // Phase preserved, freshness stripped, both LIKE metacharacters escaped, config scope appended.
             assertThat(prefix.getValue()).isEqualTo("pr\\_review:my\\_org/my\\%repo:42:authoring:%:config:10");
-        }
-    }
-
-    @Nested
-    class Cancel {
-
-        private AgentJob createJobWithStatus(AgentJobStatus status) {
-            AgentJob job = new AgentJob();
-            job.prePersist();
-            job.setWorkspace(workspace);
-            job.setStatus(status);
-            job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-            return job;
-        }
-
-        @Test
-        void shouldCancelQueuedJob() {
-            AgentJob job = createJobWithStatus(AgentJobStatus.QUEUED);
-            UUID jobId = job.getId();
-
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
-            when(
-                agentJobRepository.transitionStatus(eq(jobId), eq(AgentJobStatus.CANCELLED), any(), any(), any())
-            ).thenReturn(1);
-
-            AgentJob cancelledJob = createJobWithStatus(AgentJobStatus.CANCELLED);
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L))
-                .thenReturn(Optional.of(job))
-                .thenReturn(Optional.of(cancelledJob));
-
-            AgentJob result = service.cancel(1L, jobId);
-
-            assertThat(result.getStatus()).isEqualTo(AgentJobStatus.CANCELLED);
-        }
-
-        @Test
-        void shouldCancelRunningJobAndCallSandbox() {
-            AgentJob job = createJobWithStatus(AgentJobStatus.RUNNING);
-            UUID jobId = job.getId();
-
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
-            when(
-                agentJobRepository.transitionStatus(eq(jobId), eq(AgentJobStatus.CANCELLED), any(), any(), any())
-            ).thenReturn(1);
-
-            AgentJob cancelledJob = createJobWithStatus(AgentJobStatus.CANCELLED);
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L))
-                .thenReturn(Optional.of(job))
-                .thenReturn(Optional.of(cancelledJob));
-
-            service.cancel(1L, jobId);
-
-            verify(sandboxManager).cancel(jobId);
-        }
-
-        @Test
-        void shouldBeIdempotentForCancelledJob() {
-            AgentJob job = createJobWithStatus(AgentJobStatus.CANCELLED);
-            UUID jobId = job.getId();
-
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
-
-            AgentJob result = service.cancel(1L, jobId);
-
-            assertThat(result.getStatus()).isEqualTo(AgentJobStatus.CANCELLED);
-            verify(agentJobRepository, never()).transitionStatus(any(), any(), any(), any(), any());
-        }
-
-        @Test
-        void shouldThrow409ForCompletedJob() {
-            AgentJob job = createJobWithStatus(AgentJobStatus.COMPLETED);
-            UUID jobId = job.getId();
-
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
-
-            assertThatThrownBy(() -> service.cancel(1L, jobId))
-                .isInstanceOf(AgentJobStateConflictException.class)
-                .hasMessageContaining("COMPLETED");
-        }
-
-        @Test
-        void shouldThrow409ForFailedJob() {
-            AgentJob job = createJobWithStatus(AgentJobStatus.FAILED);
-            UUID jobId = job.getId();
-
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
-
-            assertThatThrownBy(() -> service.cancel(1L, jobId))
-                .isInstanceOf(AgentJobStateConflictException.class)
-                .hasMessageContaining("FAILED");
-        }
-
-        @Test
-        void shouldThrow409ForTimedOutJob() {
-            AgentJob job = createJobWithStatus(AgentJobStatus.TIMED_OUT);
-            UUID jobId = job.getId();
-
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
-
-            assertThatThrownBy(() -> service.cancel(1L, jobId)).isInstanceOf(AgentJobStateConflictException.class);
-        }
-
-        @Test
-        void shouldThrow404ForNonExistentJob() {
-            UUID jobId = UUID.randomUUID();
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.empty());
-
-            assertThatThrownBy(() -> service.cancel(1L, jobId)).isInstanceOf(EntityNotFoundException.class);
-        }
-
-        @Test
-        void shouldThrow409WhenExecutorWinsRace() {
-            AgentJob job = createJobWithStatus(AgentJobStatus.RUNNING);
-            UUID jobId = job.getId();
-
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
-            // Executor already transitioned to COMPLETED
-            when(agentJobRepository.transitionStatus(any(), any(), any(), any(), any())).thenReturn(0);
-
-            AgentJob completedJob = createJobWithStatus(AgentJobStatus.COMPLETED);
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L))
-                .thenReturn(Optional.of(job))
-                .thenReturn(Optional.of(completedJob));
-
-            assertThatThrownBy(() -> service.cancel(1L, jobId))
-                .isInstanceOf(AgentJobStateConflictException.class)
-                .hasMessageContaining("COMPLETED");
-
-            verify(sandboxManager, never()).cancel(any());
-        }
-    }
-
-    @Nested
-    class RetryDelivery {
-
-        private static final Long WORKSPACE_ID = 1L;
-
-        private AgentJob completedJob;
-        private UUID jobId;
-        private JobTypeHandler handler;
-
-        @BeforeEach
-        @SuppressWarnings("unchecked")
-        void setUpRetryDelivery() {
-            // Make transactionTemplate.execute() actually invoke the callback
-            when(transactionTemplate.execute(any())).thenAnswer(inv -> {
-                TransactionCallback<?> callback = inv.getArgument(0);
-                return callback.doInTransaction(mock(TransactionStatus.class));
-            });
-
-            // Make transactionTemplate.executeWithoutResult() invoke the consumer (lenient:
-            // not all tests reach the delivery path that calls executeWithoutResult)
-            lenient()
-                .doAnswer(inv -> {
-                    Consumer<TransactionStatus> action = inv.getArgument(0);
-                    action.accept(mock(TransactionStatus.class));
-                    return null;
-                })
-                .when(transactionTemplate)
-                .executeWithoutResult(any());
-
-            completedJob = new AgentJob();
-            completedJob.prePersist();
-            completedJob.setWorkspace(workspace);
-            completedJob.setStatus(AgentJobStatus.COMPLETED);
-            completedJob.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-
-            jobId = completedJob.getId();
-
-            handler = mock(JobTypeHandler.class);
-            // Lenient: not all tests reach the delivery path that calls getHandler
-            lenient().when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
-        }
-
-        @Test
-        void shouldThrow404WhenJobNotFound() {
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, WORKSPACE_ID)).thenReturn(Optional.empty());
-
-            assertThatThrownBy(() -> service.retryDelivery(WORKSPACE_ID, jobId))
-                .isInstanceOf(EntityNotFoundException.class)
-                .hasMessageContaining("AgentJob");
-        }
-
-        @Test
-        void shouldThrow409WhenCasTransitionReturnsZero() {
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, WORKSPACE_ID)).thenReturn(Optional.of(completedJob));
-            when(agentJobRepository.transitionDeliveryStatus(eq(jobId), eq(DeliveryStatus.PENDING), any())).thenReturn(
-                0
-            );
-
-            assertThatThrownBy(() -> service.retryDelivery(WORKSPACE_ID, jobId))
-                .isInstanceOf(AgentJobStateConflictException.class)
-                .hasMessageContaining("delivery status FAILED");
-
-            verify(handler, never()).deliver(any());
-        }
-
-        @Test
-        void shouldDeliverAndUpdateStatusOnSuccess() {
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, WORKSPACE_ID)).thenReturn(Optional.of(completedJob));
-            when(agentJobRepository.transitionDeliveryStatus(eq(jobId), eq(DeliveryStatus.PENDING), any())).thenReturn(
-                1
-            );
-            when(agentJobRepository.findById(jobId)).thenReturn(Optional.of(completedJob));
-
-            AgentJob result = service.retryDelivery(WORKSPACE_ID, jobId);
-
-            verify(handler).deliver(completedJob);
-            verify(agentJobRepository).updateDeliveryStatus(
-                eq(jobId),
-                eq(DeliveryStatus.DELIVERED),
-                eq(completedJob.getDeliveryCommentId())
-            );
-            assertThat(result.getId()).isEqualTo(jobId);
-        }
-
-        @Test
-        void shouldRevertToFailedOnDeliveryException() {
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, WORKSPACE_ID)).thenReturn(Optional.of(completedJob));
-            when(agentJobRepository.transitionDeliveryStatus(eq(jobId), eq(DeliveryStatus.PENDING), any())).thenReturn(
-                1
-            );
-            when(agentJobRepository.findById(jobId)).thenReturn(Optional.of(completedJob));
-
-            doThrow(new RuntimeException("GitHub API rate limited")).when(handler).deliver(completedJob);
-
-            assertThatThrownBy(() -> service.retryDelivery(WORKSPACE_ID, jobId))
-                .isInstanceOf(AgentJobStateConflictException.class)
-                .hasMessageContaining("Delivery retry failed")
-                .hasMessageContaining("GitHub API rate limited");
-
-            verify(agentJobRepository).updateDeliveryStatus(
-                eq(jobId),
-                eq(DeliveryStatus.FAILED),
-                eq(completedJob.getDeliveryCommentId())
-            );
         }
     }
 
@@ -838,8 +601,8 @@ class AgentJobServiceTest extends BaseUnitTest {
                     TransactionCallback<?> callback = inv.getArgument(0);
                     return callback.doInTransaction(mock(TransactionStatus.class));
                 });
+            workspace.setPracticeConfigId(null); // unbound → no job
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of());
 
             String result = service.submitPrepared(
                 1L,

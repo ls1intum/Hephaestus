@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.mentor;
 
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MentorContextKeys;
+import de.tum.cit.aet.hephaestus.agent.proxy.MentorProxyCredentialRegistry;
+import de.tum.cit.aet.hephaestus.agent.proxy.MentorProxyCredentialRegistry.Route;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentImageProperties;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiPlanSpec;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiRuntimeFactory;
@@ -34,8 +36,8 @@ public class MentorPiAdapter {
     private static final MentorRunnerProfile PROFILE = new MentorRunnerProfile();
 
     private final PiRuntimeFactory runtimeFactory;
-    private final MentorAgentProperties mentorProperties;
     private final AgentImageProperties imageProperties;
+    private final MentorProxyCredentialRegistry proxyCredentialRegistry;
 
     /**
      * Build the interactive sandbox spec for a mentor chat session. Sandbox is keyed by
@@ -61,14 +63,7 @@ public class MentorPiAdapter {
             extraInputs.put(SESSIONS_DIR_PREFIX + sessionRestore.threadId() + ".jsonl", sessionRestore.bytes());
         }
 
-        // Honor the bound mentor config's base URL first (per-workspace LLM gateway, e.g. a TUM GPU
-        // endpoint that activates the hephaestus provider); fall back to the global mentor property.
-        String baseUrl;
-        if (llmConfig.llmBaseUrl() != null && !llmConfig.llmBaseUrl().isBlank()) {
-            baseUrl = llmConfig.llmBaseUrl();
-        } else {
-            baseUrl = mentorProperties.baseUrl().isBlank() ? null : mentorProperties.baseUrl();
-        }
+        String baseUrl = llmConfig.baseUrl();
 
         // The config API floor (@Min(30) on AgentConfig timeoutSeconds) sits below PiPlanSpec's runtime
         // floor (must exceed TIMEOUT_BUFFER_SECONDS=60), so a legitimately persisted 30-60s config would
@@ -76,14 +71,33 @@ public class MentorPiAdapter {
         // minimum buildable budget so any valid config always yields a mentor sandbox.
         int timeoutSeconds = Math.max(llmConfig.timeoutSeconds(), PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS + 1);
 
+        // ONE credential path (#1368 slice 5): the mentor's interactive sandbox is not an AgentJob row,
+        // so it gets an equivalent proxy-scoped token from the in-memory mentor registry rather than a
+        // DB-backed job token. sessionId is generated here (rather than left to the InteractiveSandboxSpec
+        // constructor) so it can also key the mint — DockerInteractiveSandboxAdapter revokes this token by
+        // that same sessionId from its dispose path. See MentorProxyCredentialRegistry's javadoc.
+        UUID sessionId = UUID.randomUUID();
+        String proxyToken = proxyCredentialRegistry.mint(
+            sessionId,
+            new Route(
+                llmConfig.apiProtocol(),
+                baseUrl,
+                llmConfig.connectionScope(),
+                llmConfig.connectionId(),
+                llmConfig.modelId(),
+                llmConfig.workspaceId(),
+                llmConfig.connectionScope() == null ? llmConfig.configId() : null
+            )
+        );
+
         PiPlanSpec planSpec = new PiPlanSpec(
-            llmConfig.llmProvider(),
-            llmConfig.credentialMode(),
-            llmConfig.llmApiKey(),
-            llmConfig.modelName(),
-            baseUrl,
-            null,
-            true,
+            llmConfig.apiProtocol(),
+            llmConfig.upstreamModelId(),
+            llmConfig.contextWindow(),
+            llmConfig.maxOutputTokens(),
+            llmConfig.supportsReasoning(),
+            proxyToken,
+            llmConfig.allowInternet(),
             timeoutSeconds,
             PROFILE,
             extraInputs,
@@ -93,7 +107,7 @@ public class MentorPiAdapter {
         PiPlan plan = runtimeFactory.build(planSpec);
 
         return new InteractiveSandboxSpec(
-            UUID.randomUUID(),
+            sessionId,
             Long.toString(request.developerId()),
             Long.toString(request.workspaceId()),
             imageProperties.reference(),

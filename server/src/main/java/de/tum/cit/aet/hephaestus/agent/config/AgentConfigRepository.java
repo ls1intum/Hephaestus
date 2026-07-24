@@ -5,6 +5,7 @@ import jakarta.persistence.LockModeType;
 import jakarta.persistence.QueryHint;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -14,8 +15,10 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface AgentConfigRepository extends JpaRepository<AgentConfig, Long> {
+    @EntityGraph(attributePaths = { "instanceModel.connection", "workspaceModel.connection" })
     List<AgentConfig> findByWorkspaceId(Long workspaceId);
 
+    @EntityGraph(attributePaths = { "instanceModel.connection", "workspaceModel.connection" })
     Optional<AgentConfig> findByIdAndWorkspaceId(Long id, Long workspaceId);
 
     boolean existsByWorkspaceIdAndName(Long workspaceId, String name);
@@ -45,6 +48,19 @@ public interface AgentConfigRepository extends JpaRepository<AgentConfig, Long> 
 
     boolean existsByWorkspaceIdAndEnabledTrue(Long workspaceId);
 
-    /** Deterministic default enabled config (oldest wins) — the mentor fallback when unbound. */
+    /** Deterministic oldest enabled config for callers that explicitly need one. */
+    @EntityGraph(attributePaths = { "instanceModel.connection", "workspaceModel.connection" })
     Optional<AgentConfig> findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(Long workspaceId);
+
+    /** Whether any config still binds the given instance-catalog model (#1368) — guards model deletion. */
+    boolean existsByInstanceModelId(Long instanceModelId);
+
+    /**
+     * Whether any config in {@code workspaceId} still binds the given workspace (BYO) model (#1368) —
+     * guards {@code WorkspaceLlmModelService#delete}. Workspace-scoped (unlike
+     * {@link #existsByInstanceModelId}, which checks a global model across every tenant): a workspace's
+     * own model can only ever be bound within that same workspace, so the predicate is both a tenancy
+     * requirement and a correctness one.
+     */
+    boolean existsByWorkspaceModelIdAndWorkspaceId(Long workspaceModelId, Long workspaceId);
 }

@@ -104,9 +104,24 @@ class WorkerRegistryOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     void requeueOrphanIsCasIdempotent() {
         UUID id = runningJob("w-stale", Instant.now().minus(Duration.ofMinutes(5)));
 
-        // requeueOrphan is @Modifying — wrap in a tx, as the sweeper does.
-        int firstWin = transactionTemplate.execute(s -> jobRepository.requeueOrphan(id));
-        int secondWin = transactionTemplate.execute(s -> jobRepository.requeueOrphan(id));
+        // requeueOrphan is @Modifying — wrap in a tx, as the sweeper does. Fenced on worker_id (#1368
+        // fix wave) — "w-stale" is the row's actual owner both times, so the fence itself doesn't
+        // block the second call; status alone (no longer RUNNING after the first win) does.
+        String newToken = AgentJob.generateJobToken();
+        int firstWin = transactionTemplate.execute(s ->
+            jobRepository.requeueOrphan(id, "w-stale", 5, Instant.now(), newToken, AgentJob.computeTokenHash(newToken))
+        );
+        String secondToken = AgentJob.generateJobToken();
+        int secondWin = transactionTemplate.execute(s ->
+            jobRepository.requeueOrphan(
+                id,
+                "w-stale",
+                5,
+                Instant.now(),
+                secondToken,
+                AgentJob.computeTokenHash(secondToken)
+            )
+        );
         assertThat(firstWin).isEqualTo(1);
         assertThat(secondWin).isEqualTo(0); // already QUEUED — lost the race
 

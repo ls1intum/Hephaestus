@@ -2,8 +2,6 @@ package de.tum.cit.aet.hephaestus.agent.practice;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentImageProperties;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiResultParser;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiRuntimeFactory;
@@ -33,11 +31,11 @@ class PracticePiAdapterTest extends BaseUnitTest {
 
     private PracticeAgentRequest proxyRequest() {
         return new PracticeAgentRequest(
-            LlmProvider.AZURE_OPENAI,
-            CredentialMode.PROXY,
+            "azure-openai-responses",
+            "gpt-5.4-mini",
             null,
             null,
-            null,
+            false,
             "job-token-123",
             false,
             600
@@ -99,16 +97,13 @@ class PracticePiAdapterTest extends BaseUnitTest {
     }
 
     @Test
-    void proxyWithBaseUrlBuildsWithoutThrowing() {
-        // Regression: PROXY is the DEFAULT credentialMode and a baseUrl is independently settable, so a valid
-        // persisted config legitimately reaches the adapter as PROXY + non-null baseUrl. This must build a
-        // spec (PiPlanSpec normalises the shadowed baseUrl to null), not throw on every job.
+    void buildsWithCapabilityFields() {
         PracticeAgentRequest request = new PracticeAgentRequest(
-            LlmProvider.OPENAI,
-            CredentialMode.PROXY,
-            null,
+            "openai-completions",
             "gpt-oss-120b",
-            "https://gpu.example.com/v1",
+            131072,
+            4096,
+            true,
             "job-token-123",
             false,
             600

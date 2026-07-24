@@ -1,7 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MentorContextKeys;
@@ -20,6 +21,11 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.AttachedSandbox;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetBlockReason;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetExhaustedException;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUnpricedUsageBlockedException;
 import de.tum.cit.aet.hephaestus.core.security.CurrentScmIdentityHolder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
@@ -65,7 +71,7 @@ public class MentorChatService implements MentorTurnRunner {
 
     private final UserRepository userRepository;
     private final ChatThreadRepository chatThreadRepository;
-    private final AgentConfigRepository agentConfigRepository;
+    private final WorkspaceAgentBindingRepository agentBindingRepository;
     private final WorkspaceRepository workspaceRepository;
     private final MentorAgentProperties mentorAgentProperties;
     private final WorkspaceContextBuilder workspaceContextBuilder;
@@ -82,6 +88,8 @@ public class MentorChatService implements MentorTurnRunner {
     private final MentorChatExecutorConfig.MentorTurnExecutor turnExecutor;
     private final MentorChatExecutorConfig.MentorRunnerTimeoutScheduler runnerTimeoutScheduler;
     private final MentorChatMetrics metrics;
+    private final LlmBudgetService llmBudgetService;
+    private final LlmAdmissionService llmAdmissionService;
 
     /**
      * Submit a turn to the virtual-thread executor and return. {@code clientHolder} lets the
@@ -219,6 +227,23 @@ public class MentorChatService implements MentorTurnRunner {
         MentorChannel channel,
         AtomicReference<MentorRunnerClient> clientHolder
     ) {
+        // Monthly budget cap (#1368, extended by the #1368 fix wave): transport-neutral gate
+        // covering web SSE and Slack turns. Checked before ANYTHING persists so a blocked turn
+        // leaves no user message or in-flight assistant row behind. Surfaces as a user-facing
+        // error chunk via userFacingError. blockReason folds in defaultUnpricedPolicy=BLOCK, so an
+        // UNVERIFIABLE month blocks exactly like EXHAUSTED when the instance opted into it.
+        LlmBudgetBlockReason blockReason = llmBudgetService.blockReason(request.workspaceId());
+        if (blockReason == LlmBudgetBlockReason.EXHAUSTED) {
+            metrics.recordBudgetBlocked();
+            throw new LlmBudgetExhaustedException(request.workspaceId());
+        }
+        if (blockReason == LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED) {
+            metrics.recordBudgetBlocked();
+            throw new LlmUnpricedUsageBlockedException(request.workspaceId());
+        }
+        // Admission precedes every thread/message/session read or write. A revoked binding leaves no
+        // partial mentor turn and never warms/attaches a sandbox.
+        MentorLlmConfig llmConfig = resolveLlmConfig(request.workspaceId());
         User user = userRepository.getCurrentUserElseThrow();
         ChatThread thread = persistence.ensureThread(
             request.workspaceId(),
@@ -226,7 +251,6 @@ public class MentorChatService implements MentorTurnRunner {
             user,
             request.userMessage()
         );
-        MentorLlmConfig llmConfig = resolveLlmConfig(request.workspaceId());
         Optional<byte[]> priorSessionBytes = chatThreadRepository.findSessionJsonl(thread.getId());
 
         UUID assistantMessageId = UUID.randomUUID();
@@ -234,9 +258,15 @@ public class MentorChatService implements MentorTurnRunner {
             thread,
             request.userMessage(),
             assistantMessageId,
-            request.clientUserMessageId()
+            request.clientUserMessageId(),
+            llmConfig
         );
         TranslatorState state = new TranslatorState(assistantMessageId);
+        // Freeze the catalog binding onto the turn state so MentorTurnPersistence's ledger write
+        // resolves the SAME price the runner actually used (#1368 slice 6) — mirrors ConfigSnapshot
+        // doing the same for detection jobs.
+        state.bindConnection(llmConfig.connectionScope(), llmConfig.connectionId());
+        state.bindAdmission(llmConfig.upstreamModelId(), llmConfig.priceSnapshot());
 
         AttachedSandbox sandbox = null;
         MentorRunnerClient client = null;
@@ -328,13 +358,16 @@ public class MentorChatService implements MentorTurnRunner {
                     client = runner.client();
                     client.openThread(request.threadId()).get(10, TimeUnit.SECONDS);
                 }
-                client
-                    .prompt(request.threadId(), MentorTurnPromptFactory.forRunner(request, contextInputs))
-                    .whenComplete((result, ex) -> {
-                        if (ex != null && !turnComplete.isDone()) {
-                            turnComplete.completeExceptionally(ex);
-                        }
-                    });
+                var prompt = client.prompt(
+                    request.threadId(),
+                    MentorTurnPromptFactory.forRunner(request, contextInputs)
+                );
+                state.markLlmCallStarted();
+                prompt.whenComplete((result, ex) -> {
+                    if (ex != null && !turnComplete.isDone()) {
+                        turnComplete.completeExceptionally(ex);
+                    }
+                });
 
                 turnComplete.get(MentorRunnerClient.DEFAULT_PROMPT_TIMEOUT.toMillis() + 30_000, TimeUnit.MILLISECONDS);
             }
@@ -635,6 +668,12 @@ public class MentorChatService implements MentorTurnRunner {
      * Raw message stays in the WARN log for ops.
      */
     private static String userFacingError(Throwable e) {
+        if (e instanceof LlmBudgetExhaustedException budget) {
+            return budget.getMessage();
+        }
+        if (e instanceof LlmUnpricedUsageBlockedException unpriced) {
+            return unpriced.getMessage();
+        }
         if (e instanceof MentorRunnerException) {
             return "The mentor hit an unexpected error. Please try again.";
         }
@@ -655,7 +694,11 @@ public class MentorChatService implements MentorTurnRunner {
     }
 
     private static boolean isMissingMentorConfig(@Nullable String message) {
-        return message != null && message.startsWith("No enabled AgentConfig for workspace ");
+        return (
+            message != null &&
+            (message.startsWith("No mentor model is configured for workspace ") ||
+                message.equals("The configured mentor model is not available"))
+        );
     }
 
     private Map<String, byte[]> buildMentorContext(MentorTurnRequest request, User user, UUID currentUserMessageId) {
@@ -670,34 +713,22 @@ public class MentorChatService implements MentorTurnRunner {
     }
 
     /**
-     * Resolve the LLM config the mentor should use. Prefers the workspace's explicitly bound
-     * {@code mentor_config_id}; if it is unset, foreign, or disabled, falls back to the oldest
-     * enabled config (id-ordered, so the fallback is deterministic).
-     *
-     * <p>Deliberate asymmetry with practice detection ({@code AgentJobService.resolvePracticeConfigs}):
-     * a disabled <em>mentor</em> binding FALLS BACK (the mentor must stay answerable mid-conversation),
-     * whereas a disabled <em>practice</em> binding PAUSES detection (opt-in automation — silence is safe).
+     * Resolve exactly the workspace's explicit mentor binding. Missing, foreign, disabled, or revoked
+     * bindings fail closed; silently switching to another enabled config would change provider, model,
+     * and price in the middle of a conversation.
      *
      * <p>The bound id is always loaded via the workspace-scoped finder — never a bare
      * {@code findById} — because prod tenancy enforcement is advisory ({@code log}), so the
      * scoped query is the only real cross-tenant guard.
      */
     private MentorLlmConfig resolveLlmConfig(long workspaceId) {
-        Long boundConfigId = workspaceRepository.findById(workspaceId).map(Workspace::getMentorConfigId).orElse(null);
-        if (boundConfigId != null) {
-            Optional<AgentConfig> bound = agentConfigRepository.findByIdAndWorkspaceId(boundConfigId, workspaceId);
-            if (bound.isPresent() && bound.get().isEnabled()) {
-                return MentorLlmConfig.fromAgentConfig(bound.get());
-            }
+        WorkspaceAgentBinding binding = agentBindingRepository
+            .findByWorkspaceIdAndPurpose(workspaceId, AgentPurpose.MENTOR)
+            .orElseThrow(() -> new IllegalStateException("No mentor model is configured for workspace " + workspaceId));
+        if (!binding.isEnabled()) {
+            throw new IllegalStateException("The configured mentor model is not available");
         }
-        return agentConfigRepository
-            .findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(workspaceId)
-            .map(MentorLlmConfig::fromAgentConfig)
-            .orElseThrow(() ->
-                new IllegalStateException(
-                    "No enabled AgentConfig for workspace " + workspaceId + " — mentor cannot run a turn"
-                )
-            );
+        return MentorLlmConfig.fromAdmission(binding, llmAdmissionService.admit(binding));
     }
 
     private JsonNode handleFetchContext(MentorRunnerClient.FetchContextRequest req, Map<String, byte[]> contextInputs) {

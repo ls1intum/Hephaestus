@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.core;
 
+import io.netty.resolver.AddressResolverGroup;
 import io.netty.resolver.DefaultAddressResolverGroup;
+import java.net.InetSocketAddress;
 import org.springframework.http.client.reactive.ClientHttpConnector;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import reactor.netty.http.client.HttpClient;
@@ -22,5 +24,21 @@ public final class WebClientConnectors {
      */
     public static ClientHttpConnector ssrfGuarded() {
         return new ReactorClientHttpConnector(HttpClient.create().resolver(SsrfGuardedResolverGroup.INSTANCE));
+    }
+
+    /**
+     * Like {@link #ssrfGuarded()} but, when {@code allowLoopback} is {@code true}, exempts a RESOLVED
+     * loopback address from the block — for outbound calls whose upstream policy layer has already
+     * decided loopback is an acceptable dev/e2e target (see {@code EgressPolicy#allowLoopback}). Every
+     * other private/reserved range stays blocked either way, so DNS rebinding to a non-loopback
+     * private address is closed regardless of the flag.
+     */
+    public static ClientHttpConnector ssrfGuarded(boolean allowLoopback) {
+        return new ReactorClientHttpConnector(HttpClient.create().resolver(resolverGroup(allowLoopback)));
+    }
+
+    /** The raw Netty resolver group backing {@link #ssrfGuarded(boolean)} — for callers that build their own {@code HttpClient}. */
+    public static AddressResolverGroup<InetSocketAddress> resolverGroup(boolean allowLoopback) {
+        return allowLoopback ? SsrfGuardedResolverGroup.LOOPBACK_EXEMPT_INSTANCE : SsrfGuardedResolverGroup.INSTANCE;
     }
 }

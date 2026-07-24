@@ -13,6 +13,7 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.UnknownHostException;
 import java.util.List;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -90,6 +91,58 @@ class SsrfGuardedResolverGroupTest extends BaseUnitTest {
         assertThat(
             SsrfGuardedResolverGroup.blockedReason(new InetSocketAddress(InetAddress.getByName("1.1.1.1"), 1))
         ).isNull();
+    }
+
+    /**
+     * #1368 fix wave: the loopback-exempt variant (used by the LLM proxy/probe when
+     * {@code hephaestus.llm.egress.allow-loopback=true}) lets a resolved loopback address through but
+     * still blocks every other private/reserved range — a rebind to a non-loopback private address must
+     * not be laundered through the exemption.
+     */
+    @Nested
+    class LoopbackExemption {
+
+        @Test
+        void allowsLoopbackWhenExemptionEnabled() throws Exception {
+            InetSocketAddress loopback = new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 1);
+            assertThat(SsrfGuardedResolverGroup.blockedReason(loopback, true)).isNull();
+        }
+
+        @Test
+        void stillBlocksNonLoopbackPrivateAddressesWhenExemptionEnabled() throws Exception {
+            InetSocketAddress rfc1918 = new InetSocketAddress(InetAddress.getByName("10.0.0.9"), 1);
+            assertThat(SsrfGuardedResolverGroup.blockedReason(rfc1918, true)).isNotNull();
+        }
+
+        @Test
+        void resolverPassesLoopbackThroughWhenGuardedResolverIsExempt() throws Exception {
+            InetSocketAddress fixed = new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 443);
+            SsrfGuardedResolverGroup.GuardedResolver resolver = new SsrfGuardedResolverGroup.GuardedResolver(
+                EXEC,
+                new StubResolver(fixed),
+                true
+            );
+
+            Future<InetSocketAddress> result = resolver.resolve(UNRESOLVED);
+
+            assertThat(result.isSuccess()).isTrue();
+            assertThat(result.getNow().getAddress().getHostAddress()).isEqualTo("127.0.0.1");
+        }
+
+        @Test
+        void resolverStillBlocksLoopbackWhenNotExempt() throws Exception {
+            InetSocketAddress fixed = new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 443);
+            SsrfGuardedResolverGroup.GuardedResolver resolver = new SsrfGuardedResolverGroup.GuardedResolver(
+                EXEC,
+                new StubResolver(fixed),
+                false
+            );
+
+            Future<InetSocketAddress> result = resolver.resolve(UNRESOLVED);
+
+            assertThat(result.isSuccess()).isFalse();
+            assertThat(result.cause()).isInstanceOf(UnknownHostException.class);
+        }
     }
 
     /** Delegate resolver that always succeeds with one fixed, already-resolved address. */

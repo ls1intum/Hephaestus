@@ -29,11 +29,11 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * cost for PR-only workspaces (no matching practices → skip before any agent-config / role work).
  *
  * <p>Same transaction + async contract as the PR listener ({@code @Async},
- * {@code @TransactionalEventListener(AFTER_COMMIT)}, {@code REQUIRES_NEW}). Only active when the NATS
- * submitter is available.
+ * {@code @TransactionalEventListener(AFTER_COMMIT)}, {@code REQUIRES_NEW}). Only active when the
+ * agent job queue is enabled.
  */
 @Component
-@ConditionalOnProperty(prefix = "hephaestus.agent.nats", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(prefix = "hephaestus.agent", name = "enabled", havingValue = "true")
 public class IssueAgentJobEventListener {
 
     private static final Logger log = LoggerFactory.getLogger(IssueAgentJobEventListener.class);

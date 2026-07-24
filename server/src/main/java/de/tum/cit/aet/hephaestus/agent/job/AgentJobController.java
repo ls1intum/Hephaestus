@@ -32,6 +32,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 public class AgentJobController {
 
     private final AgentJobService agentJobService;
+    private final AgentJobLifecycleService agentJobLifecycleService;
 
     @GetMapping
     @Operation(summary = "List agent jobs for a workspace")
@@ -87,7 +88,7 @@ public class AgentJobController {
     @RequireAtLeastWorkspaceAdmin
     @AuditExempt(reason = "job control, not configuration; job state is its own record")
     public ResponseEntity<AgentJobDTO> cancelJob(WorkspaceContext workspaceContext, @PathVariable UUID jobId) {
-        AgentJob job = agentJobService.cancel(workspaceContext.id(), jobId);
+        AgentJob job = agentJobLifecycleService.cancel(workspaceContext.id(), jobId);
         return ResponseEntity.ok(AgentJobDTO.from(job));
     }
 
@@ -107,7 +108,7 @@ public class AgentJobController {
     @RequireAtLeastWorkspaceAdmin
     @AuditExempt(reason = "job control, not configuration; job state is its own record")
     public ResponseEntity<AgentJobDTO> retryDelivery(WorkspaceContext workspaceContext, @PathVariable UUID jobId) {
-        AgentJob job = agentJobService.retryDelivery(workspaceContext.id(), jobId);
+        AgentJob job = agentJobLifecycleService.retryDelivery(workspaceContext.id(), jobId);
         return ResponseEntity.ok(AgentJobDTO.from(job));
     }
 }

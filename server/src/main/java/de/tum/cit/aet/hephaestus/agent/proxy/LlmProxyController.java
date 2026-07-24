@@ -1,7 +1,9 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.agent.catalog.EgressPolicy;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmAuthMode;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.proxy.ProxyStreamingUtils;
 import de.tum.cit.aet.hephaestus.core.proxy.ProxyStreamingUtils.UpstreamResult;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
@@ -12,19 +14,17 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.net.URI;
 import java.time.Duration;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -36,240 +36,170 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Transparent LLM proxy controller for agent containers.
- *
- * <p>Proxies LLM API calls from sandboxed agent containers to upstream providers,
- * replacing the job token with the real API key. Each provider format is a dumb pipe
- * with zero format translation — the agent talks its native protocol.
- *
- * <p><b>Endpoint mapping:</b>
- * <pre>
- * /internal/llm/anthropic/**  → api.anthropic.com/**   (injects x-api-key)
- * /internal/llm/openai/**     → api.openai.com/**      (injects Authorization: Bearer)
- * </pre>
- *
- * <p>Authentication is handled by {@link JobTokenAuthenticationFilter} which validates
- * the job token and sets a {@link JobTokenAuthentication} on the security context.
+ * Credential-injecting proxy for the two OpenAI-compatible API surfaces used by agent sandboxes.
+ * The authenticated token chooses a catalog model; callers cannot choose an upstream host, path,
+ * protocol, credential header, or model id.
  */
 @RestController
 @Hidden
 @RequestMapping("/internal/llm")
 @PreAuthorize("isAuthenticated()")
-@ConditionalOnProperty(name = RuntimeRole.SANDBOX_LLM_PROXY_PROPERTY, havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = RuntimeRole.WORKER_PROPERTY, havingValue = "true", matchIfMissing = true)
 class LlmProxyController {
 
     private static final Logger log = LoggerFactory.getLogger(LlmProxyController.class);
-
-    private static final String PROXY_PATH_PREFIX = "/internal/llm/";
-
-    /** Timeout for blocking on the upstream Mono — slightly above the WebClient responseTimeout. */
     private static final Duration BLOCK_TIMEOUT = Duration.ofSeconds(310);
-
-    /** Maximum request body size (4 MB). LLM APIs typically accept large prompts with code context. */
     private static final int MAX_REQUEST_BODY_SIZE = 4 * 1024 * 1024;
+    private static final String COMPLETIONS_PROTOCOL = "openai-completions";
+    private static final String RESPONSES_PROTOCOL = "openai-responses";
+    private static final String COMPLETIONS_PROXY_PATH = "/internal/llm/chat/completions";
+    private static final String RESPONSES_PROXY_PATH = "/internal/llm/responses";
 
-    /**
-     * Parameters rejected by Azure OpenAI that standard OpenAI accepts.
-     * Azure returns 400 "Unknown parameter" for these. Stripped when upstream is Azure.
-     */
-    private static final Set<String> AZURE_UNSUPPORTED_PARAMS = Set.of("reasoningSummary");
-
-    /**
-     * Parameters that Azure OpenAI requires to be renamed.
-     * Key = original name (from client SDK), Value = Azure-compatible name.
-     */
-    private static final Map<String, String> AZURE_PARAM_RENAMES = Map.of("max_tokens", "max_completion_tokens");
-
-    private final WebClient llmProxyWebClient;
-    private final Map<LlmProvider, ProviderProxyConfig> providerConfigs;
+    private final WebClient webClient;
+    private final LlmModelResolver resolver;
+    private final EgressPolicy egressPolicy;
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
+    private final ProxyBudgetGate budgetGate;
+    private final ProxyUsageAccumulator usageAccumulator;
 
     LlmProxyController(
         WebClient llmProxyWebClient,
-        LlmProxyProperties properties,
+        LlmModelResolver llmModelResolver,
+        EgressPolicy egressPolicy,
         ObjectMapper objectMapper,
-        MeterRegistry meterRegistry
+        MeterRegistry meterRegistry,
+        ProxyBudgetGate budgetGate,
+        ProxyUsageAccumulator usageAccumulator
     ) {
-        this.llmProxyWebClient = llmProxyWebClient;
+        this.webClient = llmProxyWebClient;
+        this.resolver = llmModelResolver;
+        this.egressPolicy = egressPolicy;
         this.objectMapper = objectMapper;
-        this.providerConfigs = Map.of(
-            LlmProvider.ANTHROPIC,
-            ProviderProxyConfig.forProvider(LlmProvider.ANTHROPIC, properties),
-            LlmProvider.OPENAI,
-            ProviderProxyConfig.forProvider(LlmProvider.OPENAI, properties),
-            LlmProvider.AZURE_OPENAI,
-            ProviderProxyConfig.forProvider(LlmProvider.AZURE_OPENAI, properties)
-        );
         this.meterRegistry = meterRegistry;
+        this.budgetGate = budgetGate;
+        this.usageAccumulator = usageAccumulator;
     }
 
-    /**
-     * Catch-all proxy endpoint. The {@code provider} path variable determines which
-     * upstream to forward to. Regex constraint ensures only known providers match.
-     */
-    @RequestMapping("/{provider:anthropic|openai|azure_openai}/**")
+    @PostMapping({ "/chat/completions", "/responses" })
+    @WorkspaceAgnostic("Authenticated sandbox token carries and constrains the workspace route")
     public ResponseEntity<?> proxy(
-        @PathVariable String provider,
         HttpServletRequest request,
         HttpServletResponse response,
         @RequestHeader HttpHeaders incomingHeaders,
         @RequestBody(required = false) byte[] body
     ) {
-        LlmProvider llmProvider = LlmProvider.valueOf(provider.toUpperCase(Locale.ROOT));
-        ProviderProxyConfig config = providerConfigs.get(llmProvider);
-        AgentJob job = getAuthenticatedJob();
+        ProxyRouting routing = authenticatedRouting();
+        ResponseEntity<String> rejected = validateSafeSurface(request, routing, body);
+        if (rejected != null) return rejected;
 
-        MDC.put("proxy.jobId", job.getId().toString());
-        MDC.put("proxy.provider", provider);
-        Timer.Sample timerSample = Timer.start();
+        MDC.put("proxy.principal", routing.principalDescription());
+        MDC.put("proxy.apiProtocol", routing.apiProtocol());
+        Timer.Sample timer = Timer.start();
         try {
-            ResponseEntity<?> result = doProxy(
-                provider,
-                llmProvider,
-                config,
-                job,
-                request,
-                response,
-                incomingHeaders,
-                body
-            );
-            int status = result != null ? result.getStatusCode().value() : response.getStatus();
-            log.info(
-                "LLM proxy: job={} provider={} method={} path={} status={}",
-                job.getId(),
-                provider,
-                request.getMethod(),
-                request.getRequestURI(),
-                status
-            );
-            return result;
+            return forward(routing, response, incomingHeaders, body);
         } finally {
-            timerSample.stop(
+            timer.stop(
                 Timer.builder("llm.proxy.duration")
                     .description("LLM proxy request duration")
-                    .tag("provider", llmProvider.name())
+                    .tag("apiProtocol", routing.apiProtocol())
                     .register(meterRegistry)
             );
-            MDC.remove("proxy.jobId");
-            MDC.remove("proxy.provider");
+            MDC.remove("proxy.principal");
+            MDC.remove("proxy.apiProtocol");
         }
     }
 
-    private ResponseEntity<?> doProxy(
-        String provider,
-        LlmProvider llmProvider,
-        ProviderProxyConfig config,
-        AgentJob job,
-        HttpServletRequest request,
+    private ResponseEntity<?> forward(
+        ProxyRouting routing,
         HttpServletResponse response,
         HttpHeaders incomingHeaders,
         byte[] body
     ) {
-        String apiKey = job.getLlmApiKey();
-        if (apiKey == null || apiKey.isBlank()) {
-            log.warn("Job {} has no LLM API key configured", job.getId());
-            incrementErrors(llmProvider);
-            return ResponseEntity.status(502).body("No API key configured for this job");
+        // In-flight budget backstop (#1368): once a workspace has crossed its monthly cap, refuse
+        // NEW upstream calls before resolving any credential or hitting the network. Bounds a
+        // runaway that started after exhaustion; never interrupts a call already streaming. Reads a
+        // short-TTL cached verdict so this is not a per-call month-window SUM.
+        if (budgetGate.isBlocked(routing.workspaceId())) {
+            meterRegistry.counter("llm.proxy.budget.blocked", "apiProtocol", routing.apiProtocol()).increment();
+            return ResponseEntity.status(429).body("Workspace AI budget reached; new calls are paused.");
         }
 
-        // Reject oversized request bodies (defense against memory pressure)
-        if (body != null && body.length > MAX_REQUEST_BODY_SIZE) {
-            log.warn("Request body too large ({} bytes) from job {}", body.length, job.getId());
-            return ResponseEntity.status(413).body("Request body too large");
+        LlmModelResolver.ProxyCredential credential = resolver.resolveProxyCredential(
+            new LlmModelResolver.ConnectionRef(
+                routing.connectionScope(),
+                routing.connectionId(),
+                routing.modelId(),
+                routing.workspaceId()
+            ),
+            routing.legacyConfigId(),
+            routing.apiProtocol()
+        );
+        if (credential == null) {
+            incrementErrors(routing.apiProtocol());
+            return ResponseEntity.status(502).body("The configured model is not available");
+        }
+        if (!routing.apiProtocol().equals(credential.apiProtocol())) {
+            incrementErrors(routing.apiProtocol());
+            return ResponseEntity.status(502).body("The configured model protocol changed");
         }
 
-        // Build upstream URL: strip proxy prefix, forward rest as-is.
-        String fullPath = request.getRequestURI();
-        String providerPrefix = PROXY_PATH_PREFIX + provider;
-        if (!fullPath.startsWith(providerPrefix)) {
-            return ResponseEntity.badRequest().body("Invalid path");
-        }
-        String subPath = fullPath.substring(providerPrefix.length());
-
-        // Reject path traversal: literal, single-encoded, double-encoded, and backslash forms
-        String subPathLower = subPath.toLowerCase(Locale.ROOT);
-        if (
-            subPath.contains("..") ||
-            subPath.contains("\\") ||
-            subPathLower.contains("%2e") ||
-            subPathLower.contains("%252e")
-        ) {
-            return ResponseEntity.badRequest().body("Invalid path");
+        try {
+            egressPolicy.validate(credential.baseUrl());
+        } catch (IllegalArgumentException e) {
+            incrementErrors(routing.apiProtocol());
+            return ResponseEntity.status(502).body("Upstream target not permitted");
         }
 
-        String incomingQuery = request.getQueryString();
-        String upstreamUrl = buildUpstreamUrl(config.upstreamBaseUrl(), subPath, incomingQuery);
+        byte[] outgoingBody = prepareBody(
+            body,
+            credential.upstreamModelId(),
+            COMPLETIONS_PROTOCOL.equals(routing.apiProtocol())
+        );
+        if (outgoingBody == null) return ResponseEntity.badRequest().body("Request body must be a JSON object");
 
-        // SSRF defense: verify constructed URL still points at expected upstream host and scheme
         URI upstreamUri;
         try {
-            upstreamUri = URI.create(upstreamUrl);
+            upstreamUri = buildUpstreamUri(credential.baseUrl(), routing.apiProtocol());
         } catch (IllegalArgumentException e) {
-            log.warn("Malformed upstream URL for provider {}: {}", provider, e.getMessage());
-            return ResponseEntity.badRequest().body("Invalid request path");
+            incrementErrors(routing.apiProtocol());
+            return ResponseEntity.status(502).body("Invalid upstream configuration");
         }
-        URI expectedBase = URI.create(config.upstreamBaseUrl());
-        if (
-            upstreamUri.getUserInfo() != null ||
-            !upstreamUri.getHost().equals(expectedBase.getHost()) ||
-            !upstreamUri.getScheme().equals(expectedBase.getScheme())
-        ) {
-            log.warn(
-                "SSRF attempt: constructed '{}://{}' != expected '{}://{}'",
-                upstreamUri.getScheme(),
-                upstreamUri.getHost(),
-                expectedBase.getScheme(),
-                expectedBase.getHost()
-            );
-            return ResponseEntity.badRequest().body("Invalid upstream target");
-        }
-
-        HttpHeaders outHeaders = buildUpstreamHeaders(incomingHeaders, config, apiKey);
-
-        // Sanitize body for Azure OpenAI compatibility (strip unsupported params)
-        byte[] sanitizedBody = sanitizeBodyForAzure(llmProvider, config, body);
-
-        log.debug("Proxying {} {} for job {}", request.getMethod(), upstreamUrl, job.getId());
 
         UpstreamResult upstream;
         try {
-            var baseSpec = llmProxyWebClient
-                .method(HttpMethod.valueOf(request.getMethod()))
+            upstream = webClient
+                .method(HttpMethod.POST)
                 .uri(upstreamUri)
-                .headers(h -> {
-                    h.clear();
-                    h.addAll(outHeaders);
-                });
-
-            // Only attach body for methods that typically carry one (avoids Content-Length: 0 on GET)
-            WebClient.RequestHeadersSpec<?> readySpec = (sanitizedBody != null && sanitizedBody.length > 0)
-                ? baseSpec.bodyValue(sanitizedBody)
-                : baseSpec;
-
-            upstream = readySpec.exchangeToMono(ProxyStreamingUtils::consumeResponse).block(BLOCK_TIMEOUT);
+                .headers(headers -> {
+                    headers.clear();
+                    headers.addAll(buildUpstreamHeaders(incomingHeaders, credential));
+                })
+                .bodyValue(outgoingBody)
+                .exchangeToMono(ProxyStreamingUtils::consumeResponse)
+                .block(BLOCK_TIMEOUT);
         } catch (WebClientRequestException e) {
-            log.warn("Upstream unreachable for provider {}: {}", provider, e.getMessage());
-            incrementErrors(llmProvider);
+            log.warn(
+                "LLM upstream unreachable for principal {}: reason={}",
+                routing.principalDescription(),
+                e.getClass().getSimpleName()
+            );
+            incrementErrors(routing.apiProtocol());
             return ResponseEntity.status(502).body("Upstream provider unreachable");
         } catch (Exception e) {
-            log.warn("Upstream request failed for provider {}: {}", provider, e.getMessage());
-            incrementErrors(llmProvider);
+            log.warn(
+                "LLM upstream request failed for principal {}: reason={}",
+                routing.principalDescription(),
+                e.getClass().getSimpleName()
+            );
+            incrementErrors(routing.apiProtocol());
             return ResponseEntity.status(502).body("Upstream request failed");
         }
 
         if (upstream == null) {
-            incrementErrors(llmProvider);
+            incrementErrors(routing.apiProtocol());
             return ResponseEntity.status(502).body("Upstream provider unavailable");
         }
-
-        log.debug(
-            "Upstream responded {} (SSE={}) for job {}",
-            upstream.status(),
-            upstream.sseBody() != null,
-            job.getId()
-        );
-
         if (upstream.sseBody() != null) {
             ProxyStreamingUtils.streamSseToResponse(
                 upstream.sseBody(),
@@ -277,110 +207,135 @@ class LlmProxyController {
                 response,
                 upstream.status()
             );
-            return null; // Response already committed
-        } else {
-            return ResponseEntity.status(upstream.status()).headers(upstream.headers()).body(upstream.body());
+            return null;
+        }
+        // Crash-safe accounting (#1368): attribute this non-streaming call's tokens to the job now,
+        // so a job that dies before its terminal write still bills the calls it actually made.
+        // Detection runs non-streaming; the mentor route streams and has a null sourceId, so it is
+        // metered per turn at completion instead. Best-effort — never affects the returned response.
+        if (
+            routing.sourceId() != null && upstream.body() != null && upstream.status() >= 200 && upstream.status() < 300
+        ) {
+            try {
+                usageAccumulator.accumulate(
+                    routing.sourceId(),
+                    objectMapper.readTree(upstream.body()),
+                    RESPONSES_PROTOCOL.equals(routing.apiProtocol())
+                );
+            } catch (Exception e) {
+                log.debug("Could not parse upstream usage for job {}: {}", routing.sourceId(), e.getMessage());
+            }
+        }
+        return ResponseEntity.status(upstream.status()).headers(upstream.headers()).body(upstream.body());
+    }
+
+    private ResponseEntity<String> validateSafeSurface(HttpServletRequest request, ProxyRouting routing, byte[] body) {
+        if (!"POST".equals(request.getMethod())) return ResponseEntity.status(405).body("Method not allowed");
+        if (request.getQueryString() != null) return ResponseEntity.badRequest().body(
+            "Query parameters are not allowed"
+        );
+
+        String expectedPath = switch (routing.apiProtocol()) {
+            case COMPLETIONS_PROTOCOL -> COMPLETIONS_PROXY_PATH;
+            case RESPONSES_PROTOCOL -> RESPONSES_PROXY_PATH;
+            default -> null;
+        };
+        if (expectedPath == null || !expectedPath.equals(request.getRequestURI())) {
+            return ResponseEntity.status(404).body("Not found");
+        }
+        if (body == null || body.length == 0) return ResponseEntity.badRequest().body("Request body is required");
+        if (body.length > MAX_REQUEST_BODY_SIZE) return ResponseEntity.status(413).body("Request body too large");
+        try {
+            if (!objectMapper.readTree(body).isObject()) {
+                return ResponseEntity.badRequest().body("Request body must be a JSON object");
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Request body must be valid JSON");
+        }
+        return null;
+    }
+
+    byte[] prepareBody(byte[] body, String upstreamModelId, boolean includeStreamingUsage) {
+        if (body == null || body.length == 0) return null;
+        try {
+            JsonNode tree = objectMapper.readTree(body);
+            if (!tree.isObject()) return null;
+            ObjectNode object = (ObjectNode) tree;
+            if (
+                usesProviderHostedTool(object.get("tools")) ||
+                object.has("web_search_options") ||
+                object.has("audio") ||
+                !isTextOnlyModality(object.get("modalities"))
+            ) return null;
+            object.put("model", upstreamModelId);
+            object.remove("service_tier");
+            if (includeStreamingUsage && object.path("stream").asBoolean(false)) {
+                JsonNode existing = object.get("stream_options");
+                ObjectNode options =
+                    existing != null && existing.isObject()
+                        ? (ObjectNode) existing
+                        : object.putObject("stream_options");
+                options.put("include_usage", true);
+            }
+            return objectMapper.writeValueAsBytes(object);
+        } catch (Exception e) {
+            return null;
         }
     }
 
-    // Package-private for testability — credential isolation is a critical security invariant.
-    HttpHeaders buildUpstreamHeaders(HttpHeaders incomingHeaders, ProviderProxyConfig config, String apiKey) {
-        HttpHeaders out = ProxyStreamingUtils.filterHopByHopHeaders(incomingHeaders);
-        out.remove(HttpHeaders.HOST);
-        out.set(HttpHeaders.ACCEPT_ENCODING, "identity");
-
-        // Remove all incoming auth headers (they contain the job token)
-        out.remove("x-api-key");
-        out.remove("api-key");
-        out.remove(HttpHeaders.AUTHORIZATION);
-
-        // Inject the real API key in the provider's expected format
-        out.set(config.authHeaderName(), config.formatAuthValue(apiKey));
-
-        return out;
+    private static boolean usesProviderHostedTool(JsonNode tools) {
+        if (tools == null) return false;
+        if (!tools.isArray()) return true;
+        for (JsonNode tool : tools) {
+            String type = tool.path("type").asString("");
+            if (!"function".equals(type) && !"custom".equals(type)) return true;
+        }
+        return false;
     }
 
-    private void incrementErrors(LlmProvider provider) {
-        meterRegistry.counter("llm.proxy.errors", "provider", provider.name()).increment();
+    private static boolean isTextOnlyModality(JsonNode modalities) {
+        return (
+            modalities == null ||
+            (modalities.isArray() && modalities.size() == 1 && "text".equals(modalities.get(0).asString()))
+        );
     }
 
-    private AgentJob getAuthenticatedJob() {
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth instanceof JobTokenAuthentication jta) {
-            return jta.getPrincipal();
+    HttpHeaders buildUpstreamHeaders(HttpHeaders incomingHeaders, LlmModelResolver.ProxyCredential credential) {
+        HttpHeaders outgoing = new HttpHeaders();
+        outgoing.setContentType(MediaType.APPLICATION_JSON);
+        if (incomingHeaders.getFirst(HttpHeaders.ACCEPT) != null) {
+            outgoing.set(HttpHeaders.ACCEPT, incomingHeaders.getFirst(HttpHeaders.ACCEPT));
+        }
+        outgoing.set(HttpHeaders.ACCEPT_ENCODING, "identity");
+
+        if (credential.apiKey() != null && !credential.apiKey().isBlank()) {
+            if (credential.authMode() == LlmAuthMode.API_KEY) {
+                outgoing.set("api-key", credential.apiKey());
+            } else {
+                outgoing.setBearerAuth(credential.apiKey());
+            }
+        }
+        return outgoing;
+    }
+
+    static URI buildUpstreamUri(String baseUrl, String apiProtocol) {
+        String suffix = switch (apiProtocol) {
+            case COMPLETIONS_PROTOCOL -> "/chat/completions";
+            case RESPONSES_PROTOCOL -> "/responses";
+            default -> throw new IllegalArgumentException("Unsupported API protocol");
+        };
+        return URI.create(baseUrl.strip().replaceAll("/+$", "") + suffix);
+    }
+
+    private ProxyRouting authenticatedRouting() {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication instanceof JobTokenAuthentication tokenAuthentication) {
+            return tokenAuthentication.getPrincipal();
         }
         throw new IllegalStateException("Expected JobTokenAuthentication on security context");
     }
 
-    /**
-     * Strip parameters that Azure OpenAI rejects but standard OpenAI accepts.
-     * No-op when provider is not Azure OpenAI or body is not JSON.
-     */
-    byte[] sanitizeBodyForAzure(LlmProvider provider, ProviderProxyConfig config, byte[] body) {
-        if (body == null || body.length == 0) {
-            return body;
-        }
-        if (provider != LlmProvider.AZURE_OPENAI && !config.upstreamBaseUrl().contains("openai.azure.com")) {
-            return body;
-        }
-
-        try {
-            JsonNode tree = objectMapper.readTree(body);
-            if (!tree.isObject()) {
-                return body;
-            }
-            ObjectNode obj = (ObjectNode) tree;
-            boolean modified = false;
-
-            // Strip unsupported parameters
-            for (String param : AZURE_UNSUPPORTED_PARAMS) {
-                if (obj.has(param)) {
-                    obj.remove(param);
-                    modified = true;
-                }
-            }
-
-            // Rename parameters
-            for (var entry : AZURE_PARAM_RENAMES.entrySet()) {
-                JsonNode value = obj.remove(entry.getKey());
-                if (value != null) {
-                    obj.set(entry.getValue(), value);
-                    modified = true;
-                }
-            }
-
-            return modified ? objectMapper.writeValueAsBytes(obj) : body;
-        } catch (Exception e) {
-            log.debug("Failed to parse body for Azure sanitization: {}", e.getMessage());
-            return body;
-        }
-    }
-
-    /**
-     * Build the full upstream URL, merging any query params already in the base URL
-     * (e.g. Azure's {@code ?api-version=...}) with the incoming request's query string.
-     */
-    static String buildUpstreamUrl(String baseUrl, String subPath, String incomingQuery) {
-        String basePath;
-        String baseQuery;
-        int q = baseUrl.indexOf('?');
-        if (q >= 0) {
-            basePath = baseUrl.substring(0, q);
-            baseQuery = baseUrl.substring(q + 1);
-        } else {
-            basePath = baseUrl;
-            baseQuery = null;
-        }
-
-        var url = new StringBuilder(basePath).append(subPath);
-        if (baseQuery != null || incomingQuery != null) {
-            url.append('?');
-            if (baseQuery != null) {
-                url.append(baseQuery);
-                if (incomingQuery != null) url.append('&');
-            }
-            if (incomingQuery != null) url.append(incomingQuery);
-        }
-        return url.toString();
+    private void incrementErrors(String apiProtocol) {
+        meterRegistry.counter("llm.proxy.errors", "apiProtocol", apiProtocol).increment();
     }
 }

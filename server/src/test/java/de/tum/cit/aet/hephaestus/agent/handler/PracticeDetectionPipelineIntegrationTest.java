@@ -9,7 +9,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
@@ -123,7 +122,6 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         config.setName("pipeline-config");
         config.setEnabled(true);
         config.setLlmProvider(LlmProvider.ANTHROPIC);
-        config.setCredentialMode(CredentialMode.PROXY);
         config.setTimeoutSeconds(300);
         config = agentConfigRepository.save(config);
 

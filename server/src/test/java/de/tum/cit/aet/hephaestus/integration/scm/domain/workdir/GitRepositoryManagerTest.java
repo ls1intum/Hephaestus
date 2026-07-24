@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -166,6 +167,84 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 assertThat(result).isEqualTo(storagePath.resolve("sources").resolve("scm").resolve("1"));
                 List<GitRepositoryManager.CommitInfo> commits = manager.walkCommits(1L, null, newSha);
                 assertThat(commits).hasSize(2);
+            }
+        }
+
+        @Test
+        void shouldRecloneWhenRepositoryIdPointsToDifferentOrigin() throws Exception {
+            manager = createManager(true);
+            try (Git sourceGit = createSourceRepo()) {
+                String oldHead = sourceGit.log().call().iterator().next().getName();
+                manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
+
+                Path replacementPath = tempDir.resolve("replacement-repo");
+                Files.createDirectories(replacementPath);
+                String replacementHead;
+                try (Git replacement = Git.init().setDirectory(replacementPath.toFile()).call()) {
+                    Files.writeString(replacementPath.resolve("replacement.txt"), "replacement\n");
+                    replacement.add().addFilepattern("replacement.txt").call();
+                    replacementHead = replacement
+                        .commit()
+                        .setMessage("Replacement repository")
+                        .setAuthor(new PersonIdent("Test Author", "author@test.com"))
+                        .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
+                        .call()
+                        .getName();
+                }
+
+                Path result = manager.ensureRepository(1L, replacementPath.toUri().toString(), null);
+
+                assertThat(manager.commitExists(1L, replacementHead)).isTrue();
+                assertThat(manager.commitExists(1L, oldHead)).isFalse();
+                try (Git clone = Git.open(result.toFile())) {
+                    assertThat(clone.getRepository().getConfig().getString("remote", "origin", "url")).isEqualTo(
+                        replacementPath.toUri().toString()
+                    );
+                }
+            }
+        }
+    }
+
+    @Nested
+    class CommitExists {
+
+        @Test
+        void shouldReturnFalseWhenValidObjectIdIsAbsent() throws Exception {
+            manager = createManager(true);
+            try (Git ignored = createSourceRepo()) {
+                manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
+
+                assertThat(manager.commitExists(1L, "0000000000000000000000000000000000000001")).isFalse();
+            }
+        }
+    }
+
+    @Nested
+    class FetchRemoteCommit {
+
+        @Test
+        void shouldFetchSyntheticReviewRefAndVerifyPinnedCommit() throws Exception {
+            manager = createManager(true);
+            try (Git source = createSourceRepo()) {
+                manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
+
+                Files.writeString(sourceRepoPath.resolve("review.txt"), "review\n");
+                source.add().addFilepattern("review.txt").call();
+                String reviewHead = source
+                    .commit()
+                    .setMessage("Review head")
+                    .setAuthor(new PersonIdent("Test Author", "author@test.com"))
+                    .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
+                    .call()
+                    .getName();
+                var update = source.getRepository().updateRef("refs/merge-requests/7/head");
+                update.setNewObjectId(ObjectId.fromString(reviewHead));
+                update.update();
+
+                assertThat(manager.commitExists(1L, reviewHead)).isFalse();
+
+                assertThat(manager.fetchRemoteCommit(1L, "refs/merge-requests/7/head", reviewHead, null)).isTrue();
+                assertThat(manager.commitExists(1L, reviewHead)).isTrue();
             }
         }
     }
