@@ -1,9 +1,10 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeAgentRequest;
@@ -117,7 +118,7 @@ public class AgentJobExecutor {
 
     private final AgentProperties agentProperties;
     private final AgentJobRepository jobRepository;
-    private final AgentConfigRepository configRepository;
+    private final WorkspaceAgentBindingRepository bindingRepository;
     private final JobTypeHandlerRegistry handlerRegistry;
     private final PracticePiAdapter practiceAgent;
     private final SandboxManager sandboxManager;
@@ -164,7 +165,7 @@ public class AgentJobExecutor {
     public AgentJobExecutor(
         AgentProperties agentProperties,
         AgentJobRepository jobRepository,
-        AgentConfigRepository configRepository,
+        WorkspaceAgentBindingRepository bindingRepository,
         JobTypeHandlerRegistry handlerRegistry,
         PracticePiAdapter practiceAgent,
         SandboxManager sandboxManager,
@@ -180,7 +181,7 @@ public class AgentJobExecutor {
     ) {
         this.agentProperties = agentProperties;
         this.jobRepository = jobRepository;
-        this.configRepository = configRepository;
+        this.bindingRepository = bindingRepository;
         this.handlerRegistry = handlerRegistry;
         this.practiceAgent = practiceAgent;
         this.sandboxManager = sandboxManager;
@@ -210,7 +211,7 @@ public class AgentJobExecutor {
     public AgentJobExecutor(
         AgentProperties agentProperties,
         AgentJobRepository jobRepository,
-        AgentConfigRepository configRepository,
+        WorkspaceAgentBindingRepository bindingRepository,
         JobTypeHandlerRegistry handlerRegistry,
         PracticePiAdapter practiceAgent,
         SandboxManager sandboxManager,
@@ -226,7 +227,7 @@ public class AgentJobExecutor {
         this(
             agentProperties,
             jobRepository,
-            configRepository,
+            bindingRepository,
             handlerRegistry,
             practiceAgent,
             sandboxManager,
@@ -1112,18 +1113,22 @@ public class AgentJobExecutor {
             // Lock and live-revalidate the exact catalog binding immediately before RUNNING. Submit-time
             // behaviour stays frozen; only availability/grants and the price are refreshed, and a changed
             // binding is refused rather than silently switching the queued job to another model.
-            AgentConfig config =
-                job.getConfig() != null
-                    ? configRepository.findByIdForUpdate(job.getConfig().getId()).orElse(null)
-                    : null;
-            if (config == null) {
+            AgentPurpose purpose = job.getPurpose();
+            WorkspaceAgentBinding binding =
+                purpose == null
+                    ? null
+                    : bindingRepository
+                          .findByWorkspaceIdAndPurpose(job.getWorkspace().getId(), purpose)
+                          .filter(WorkspaceAgentBinding::isEnabled)
+                          .orElse(null);
+            if (binding == null) {
                 return refuseUnavailableModel(job);
             }
             ConfigSnapshot snapshot;
             try {
                 ConfigSnapshot submitted = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
                 if (llmAdmissionService != null) {
-                    var admitted = llmAdmissionService.admit(config);
+                    var admitted = llmAdmissionService.admit(binding);
                     var ref = admitted.connection();
                     if (
                         submitted.connectionScope() != ref.scope() ||
@@ -1142,20 +1147,23 @@ public class AgentJobExecutor {
                 return refuseUnavailableModel(job);
             }
 
-            // Concurrency gate: the config row is already locked above.
+            // Concurrency gate: at most maxConcurrentJobs RUNNING for this workspace + purpose. Admission
+            // above holds the binding row lock (joined into this transaction), so the count is stable.
             {
-                long runningCount = jobRepository.countByConfigIdAndStatusIn(
-                    config.getId(),
+                long runningCount = jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
+                    job.getWorkspace().getId(),
+                    purpose,
                     Set.of(AgentJobStatus.RUNNING)
                 );
-                if (runningCount >= config.getMaxConcurrentJobs()) {
+                if (runningCount >= binding.getMaxConcurrentJobs()) {
                     concurrencyRejected.increment();
                     log.info(
-                        "Concurrency limit reached: jobId={}, configId={}, running={}, max={}",
+                        "Concurrency limit reached: jobId={}, workspaceId={}, purpose={}, running={}, max={}",
                         jobId,
-                        config.getId(),
+                        job.getWorkspace().getId(),
+                        purpose,
                         runningCount,
-                        config.getMaxConcurrentJobs()
+                        binding.getMaxConcurrentJobs()
                     );
                     return ClaimOutcome.CONCURRENCY_FULL;
                 }

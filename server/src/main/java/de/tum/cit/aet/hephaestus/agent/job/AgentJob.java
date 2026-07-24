@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectClass;
@@ -84,6 +85,15 @@ public class AgentJob {
     @JoinColumn(name = "config_id", foreignKey = @ForeignKey(name = "fk_agent_job_config"))
     @ToString.Exclude
     private AgentConfig config;
+
+    /**
+     * Which per-purpose {@link WorkspaceAgentBinding} this job runs on (#1368). The executor admits
+     * the workspace's binding for this purpose at claim time; the frozen {@code configSnapshot} still
+     * carries the model routing. Replaces the {@code config} reference for execution.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "purpose", length = 32)
+    private AgentPurpose purpose;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "job_type", nullable = false, length = 50)

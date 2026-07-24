@@ -1273,4 +1273,22 @@
         </rollback>
     </changeSet>
 
+    <changeSet id="1784636803503-59" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="agent_job.purpose already exists">
+            <not><columnExists tableName="agent_job" columnName="purpose"/></not>
+        </preConditions>
+        <comment>
+            Which per-purpose binding a job runs on (#1368). Every agent_job is practice detection
+            (mentor turns do not use this table), so backfill all existing rows to PRACTICE_DETECTION;
+            the executor admits the workspace binding for this purpose at claim time.
+        </comment>
+        <addColumn tableName="agent_job">
+            <column name="purpose" type="VARCHAR(32)"/>
+        </addColumn>
+        <sql>UPDATE agent_job SET purpose = 'PRACTICE_DETECTION' WHERE purpose IS NULL</sql>
+        <rollback>
+            <dropColumn tableName="agent_job" columnName="purpose"/>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

@@ -36,6 +36,13 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
 
     long countByConfigIdAndStatusIn(Long configId, Collection<AgentJobStatus> statuses);
 
+    /** Concurrency count for a workspace's per-purpose binding (#1368). */
+    long countByWorkspaceIdAndPurposeAndStatusIn(
+        Long workspaceId,
+        de.tum.cit.aet.hephaestus.agent.config.AgentPurpose purpose,
+        Collection<AgentJobStatus> statuses
+    );
+
     List<AgentJob> findByStatus(AgentJobStatus status);
 
     List<AgentJob> findByStatusIn(Collection<AgentJobStatus> statuses);

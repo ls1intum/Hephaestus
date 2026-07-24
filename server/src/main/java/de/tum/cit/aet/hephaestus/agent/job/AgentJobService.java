@@ -301,6 +301,7 @@ public class AgentJobService {
             AgentJob job = new AgentJob();
             job.setWorkspace(workspace);
             job.setConfig(config);
+            job.setPurpose(de.tum.cit.aet.hephaestus.agent.config.AgentPurpose.PRACTICE_DETECTION);
             job.setJobType(jobType);
             // Explicit subject discriminator drives downstream dispatch (e.g. DiffNotePoster
             // short-circuits when subjectClass != PULL_REQUEST).
