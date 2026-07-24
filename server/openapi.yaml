@@ -1509,7 +1509,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateAgentBindingRequest"
+              $ref: "#/components/schemas/AgentBindingUpsertRequest"
         required: true
       responses:
         "200":
@@ -5594,6 +5594,34 @@ components:
       - enabled
       - purpose
       - ready
+    AgentBindingUpsertRequest:
+      type: object
+      description: Bind a model and execution limits to an agent purpose
+      properties:
+        allowInternet:
+          type: boolean
+          description: Whether the sandbox may reach the public internet
+        enabled:
+          type: boolean
+          description: Whether this purpose is active (paused when false)
+        instanceModelId:
+          type: integer
+          format: int64
+          description: Shared (instance-catalog) model id to run this purpose on
+        maxConcurrentJobs:
+          type: integer
+          format: int32
+          description: Maximum concurrent runs for this purpose
+          minimum: 1
+        timeoutSeconds:
+          type: integer
+          format: int32
+          description: Per-run timeout in seconds
+          minimum: 30
+        workspaceModelId:
+          type: integer
+          format: int64
+          description: Workspace-owned (BYO) model id to run this purpose on
     AgentConfig:
       type: object
       description: Agent configuration for a workspace (API key redacted)

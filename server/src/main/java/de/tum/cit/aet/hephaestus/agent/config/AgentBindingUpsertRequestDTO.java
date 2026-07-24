@@ -10,7 +10,7 @@ import org.jspecify.annotations.Nullable;
  * enabled flag keep their current value when omitted.
  */
 @Schema(description = "Bind a model and execution limits to an agent purpose")
-public record UpdateAgentBindingRequestDTO(
+public record AgentBindingUpsertRequestDTO(
     @Nullable @Schema(description = "Shared (instance-catalog) model id to run this purpose on") Long instanceModelId,
     @Nullable @Schema(description = "Workspace-owned (BYO) model id to run this purpose on") Long workspaceModelId,
     @Nullable @Min(30) @Schema(description = "Per-run timeout in seconds") Integer timeoutSeconds,

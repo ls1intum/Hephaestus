@@ -65,7 +65,7 @@ public class AgentBindingController {
     public ResponseEntity<AgentBindingDTO> upsertBinding(
         WorkspaceContext workspaceContext,
         @PathVariable AgentPurpose purpose,
-        @Valid @RequestBody UpdateAgentBindingRequestDTO request
+        @Valid @RequestBody AgentBindingUpsertRequestDTO request
     ) {
         WorkspaceAgentBinding binding = agentBindingService.upsertBinding(workspaceContext, purpose, request);
         return ResponseEntity.ok(AgentBindingDTO.from(binding, agentBindingService.isReady(binding)));

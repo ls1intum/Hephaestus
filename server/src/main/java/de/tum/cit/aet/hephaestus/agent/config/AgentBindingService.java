@@ -68,7 +68,7 @@ public class AgentBindingService {
     public WorkspaceAgentBinding upsertBinding(
         WorkspaceContext workspaceContext,
         AgentPurpose purpose,
-        UpdateAgentBindingRequestDTO request
+        AgentBindingUpsertRequestDTO request
     ) {
         Long workspaceId = workspaceContext.id();
         Workspace workspace = workspaceRepository

@@ -4115,6 +4115,36 @@ export type AgentConfig = {
 };
 
 /**
+ * Bind a model and execution limits to an agent purpose
+ */
+export type AgentBindingUpsertRequest = {
+    /**
+     * Whether the sandbox may reach the public internet
+     */
+    allowInternet?: boolean;
+    /**
+     * Whether this purpose is active (paused when false)
+     */
+    enabled?: boolean;
+    /**
+     * Shared (instance-catalog) model id to run this purpose on
+     */
+    instanceModelId?: number;
+    /**
+     * Maximum concurrent runs for this purpose
+     */
+    maxConcurrentJobs?: number;
+    /**
+     * Per-run timeout in seconds
+     */
+    timeoutSeconds?: number;
+    /**
+     * Workspace-owned (BYO) model id to run this purpose on
+     */
+    workspaceModelId?: number;
+};
+
+/**
  * A workspace's agent binding for one purpose
  */
 export type AgentBinding = {
@@ -5394,7 +5424,7 @@ export type DeleteBindingResponses = {
 export type DeleteBindingResponse = DeleteBindingResponses[keyof DeleteBindingResponses];
 
 export type UpsertBindingData = {
-    body: UpdateAgentBindingRequest;
+    body: AgentBindingUpsertRequest;
     path: {
         /**
          * Workspace slug
