@@ -11,7 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.core.auth.spi.LlmModelAudit;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -47,7 +47,7 @@ class LlmModelServiceTest extends BaseUnitTest {
     private WorkspaceRepository workspaceRepository;
 
     @Mock
-    private AgentConfigRepository agentConfigRepository;
+    private WorkspaceAgentBindingRepository agentBindingRepository;
 
     @Mock
     private LlmModelAudit llmModelAudit;
@@ -505,7 +505,7 @@ class LlmModelServiceTest extends BaseUnitTest {
 
         @Test
         void deletingAModelStillBoundToAnAgentConfigIsRejected() {
-            when(agentConfigRepository.existsByInstanceModelId(7L)).thenReturn(true);
+            when(agentBindingRepository.existsByInstanceModelId(7L)).thenReturn(true);
 
             assertThatThrownBy(() -> modelService.delete(7L)).isInstanceOf(LlmModelInUseException.class);
             verify(modelRepository, never()).delete(any());
@@ -513,7 +513,7 @@ class LlmModelServiceTest extends BaseUnitTest {
 
         @Test
         void deletingAnUnboundModelSucceeds() {
-            when(agentConfigRepository.existsByInstanceModelId(7L)).thenReturn(false);
+            when(agentBindingRepository.existsByInstanceModelId(7L)).thenReturn(false);
 
             modelService.delete(7L);
 
@@ -523,7 +523,7 @@ class LlmModelServiceTest extends BaseUnitTest {
 
         @Test
         void deletingAModelDoesNotAuditWhenTheGuardRejectsIt() {
-            when(agentConfigRepository.existsByInstanceModelId(7L)).thenReturn(true);
+            when(agentBindingRepository.existsByInstanceModelId(7L)).thenReturn(true);
 
             assertThatThrownBy(() -> modelService.delete(7L)).isInstanceOf(LlmModelInUseException.class);
 

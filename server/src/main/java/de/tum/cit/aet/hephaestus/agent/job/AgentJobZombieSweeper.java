@@ -260,6 +260,12 @@ public class AgentJobZombieSweeper {
                 Integer requeued = transactionTemplate.execute(s -> {
                     AgentJob job = jobRepository.findByIdWithWorkspaceForUpdate(orphan.getJobId()).orElse(null);
                     if (job == null) return 0;
+                    // Snapshot the token counts BEFORE requeuing: requeueOrphan zeroes the row's
+                    // accumulators atomically, so a post-requeue re-read would bill zero.
+                    AgentJobLlmUsage counts =
+                        job.getExecutionStartedAt() != null
+                            ? jobRepository.findLlmUsageById(job.getId()).orElse(null)
+                            : null;
                     int rows = jobRepository.requeueOrphan(
                         orphan.getJobId(),
                         orphan.getWorkerId(),
@@ -268,7 +274,7 @@ public class AgentJobZombieSweeper {
                         newToken,
                         newTokenHash
                     );
-                    if (rows > 0) recordUnverifiableUsage(job);
+                    if (rows > 0) recordUnverifiableUsage(job, counts);
                     return rows;
                 });
                 if (requeued != null && requeued > 0) {
@@ -370,6 +376,18 @@ public class AgentJobZombieSweeper {
     }
 
     private void recordUnverifiableUsage(AgentJob job) {
+        recordUnverifiableUsage(
+            job,
+            job.getExecutionStartedAt() != null ? jobRepository.findLlmUsageById(job.getId()).orElse(null) : null
+        );
+    }
+
+    /**
+     * Bill a reaped orphan from token counts the caller captured itself. The {@code counts} MUST be
+     * read BEFORE any requeue of this job — {@link AgentJobRepository#requeueOrphan} atomically zeroes
+     * the row's accumulators, so a post-requeue re-read would drop the reaped attempt's spend.
+     */
+    private void recordUnverifiableUsage(AgentJob job, @Nullable AgentJobLlmUsage counts) {
         if (usageRecorder == null || job.getExecutionStartedAt() == null) return;
         ConfigSnapshot snapshot = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
         // Jobs that started before admission snapshots were introduced still need to be recovered.
@@ -389,8 +407,8 @@ public class AgentJobZombieSweeper {
                       null
                   );
         // #1368: a reaped zombie made real, priced calls through the proxy before it was abandoned —
-        // bill them from the tokens the proxy attributed to the row instead of recording zero cost.
-        AgentJobLlmUsage counts = jobRepository.findLlmUsageById(job.getId()).orElse(null);
+        // bill them from the tokens the proxy attributed to the row (captured pre-requeue) instead of
+        // recording zero cost.
         boolean billable = counts != null && counts.hasBillableUsage() && price.pricingState() != PricingState.UNPRICED;
         LlmUsageRecorder.LlmUsageSample sample = new LlmUsageRecorder.LlmUsageSample(
             LlmUsageJobType.from(job.getJobType()),

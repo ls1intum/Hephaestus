@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
@@ -38,7 +38,7 @@ public class WorkspaceLlmModelService {
     private final WorkspaceLlmConnectionRepository connectionRepository;
     private final LlmModelRepository instanceModelRepository;
     private final LlmModelPriceRepository instancePriceRepository;
-    private final AgentConfigRepository agentConfigRepository;
+    private final WorkspaceAgentBindingRepository agentBindingRepository;
     private final InstanceLlmSettingsService instanceLlmSettingsService;
     private final ConfigAuditPort configAudit;
 
@@ -237,7 +237,7 @@ public class WorkspaceLlmModelService {
     @Transactional
     public void delete(WorkspaceContext workspaceContext, Long id) {
         WorkspaceLlmModel model = get(workspaceContext, id);
-        if (agentConfigRepository.existsByWorkspaceModelIdAndWorkspaceId(id, workspaceContext.id())) {
+        if (agentBindingRepository.existsByWorkspaceModelIdAndWorkspaceId(id, workspaceContext.id())) {
             throw new LlmModelInUseException(id);
         }
         WorkspaceLlmModelSnapshot before = WorkspaceLlmModelSnapshot.of(model);

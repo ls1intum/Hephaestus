@@ -8,7 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditAction;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
@@ -46,7 +46,7 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
     private LlmModelPriceRepository instancePriceRepository;
 
     @Mock
-    private AgentConfigRepository agentConfigRepository;
+    private WorkspaceAgentBindingRepository agentBindingRepository;
 
     @Mock
     private InstanceLlmSettingsService instanceLlmSettingsService;
@@ -394,7 +394,7 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             WorkspaceLlmModel model = new WorkspaceLlmModel();
             model.setId(7L);
             when(modelRepository.findByIdAndWorkspaceIdWithConnection(7L, 1L)).thenReturn(Optional.of(model));
-            when(agentConfigRepository.existsByWorkspaceModelIdAndWorkspaceId(7L, 1L)).thenReturn(true);
+            when(agentBindingRepository.existsByWorkspaceModelIdAndWorkspaceId(7L, 1L)).thenReturn(true);
 
             assertThatThrownBy(() -> modelService.delete(workspaceContext, 7L)).isInstanceOf(
                 LlmModelInUseException.class
@@ -408,7 +408,7 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             WorkspaceLlmModel model = new WorkspaceLlmModel();
             model.setId(7L);
             when(modelRepository.findByIdAndWorkspaceIdWithConnection(7L, 1L)).thenReturn(Optional.of(model));
-            when(agentConfigRepository.existsByWorkspaceModelIdAndWorkspaceId(7L, 1L)).thenReturn(false);
+            when(agentBindingRepository.existsByWorkspaceModelIdAndWorkspaceId(7L, 1L)).thenReturn(false);
 
             modelService.delete(workspaceContext, 7L);
 

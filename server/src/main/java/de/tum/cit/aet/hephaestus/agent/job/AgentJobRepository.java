@@ -372,10 +372,19 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     @WorkspaceAgnostic("ID-based orphan/drain requeue; caller is @WorkspaceAgnostic sweeper or worker-local drain")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
+        // #1368: also ZERO the per-attempt LLM token/call/cost accumulators. The proxy accumulates
+        // onto these columns as a job runs; the caller bills the dead attempt's usage (via
+        // billTerminatedJob) BEFORE requeuing. If we left the totals in place, the next attempt's
+        // proxy calls would add ON TOP of the already-billed ones, and the next terminal billing —
+        // keyed on a fresh retry_count — would record the overlap a SECOND time. Resetting here makes
+        // each attempt's ledger row cover exactly that attempt's calls.
         "UPDATE AgentJob j SET j.status = 'QUEUED', j.workerId = null, " +
             "j.startedAt = null, j.executionStartedAt = null, " +
             "j.retryCount = j.retryCount + 1, j.availableAt = :availableAt, " +
-            "j.jobToken = :newJobToken, j.jobTokenHash = :newJobTokenHash " +
+            "j.jobToken = :newJobToken, j.jobTokenHash = :newJobTokenHash, " +
+            "j.llmTotalCalls = 0, j.llmTotalInputTokens = 0, j.llmTotalOutputTokens = 0, " +
+            "j.llmTotalReasoningTokens = 0, j.llmCacheReadTokens = 0, j.llmCacheWriteTokens = 0, " +
+            "j.llmCostUsd = 0 " +
             "WHERE j.id = :id AND j.status = 'RUNNING' AND j.workerId = :workerId AND j.retryCount < :maxRetries"
     )
     int requeueOrphan(

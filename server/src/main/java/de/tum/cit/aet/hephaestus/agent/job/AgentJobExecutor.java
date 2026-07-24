@@ -348,10 +348,16 @@ public class AgentJobExecutor {
                 transactionTemplate.executeWithoutResult(status -> {
                     AgentJob job = jobRepository.findByIdWithWorkspaceForUpdate(jobId).orElse(null);
                     if (job == null) return;
+                    // Snapshot the token counts BEFORE requeuing: the requeue zeroes the row's
+                    // accumulators atomically, so a post-requeue re-read would bill zero.
+                    AgentJobLlmUsage drainCounts =
+                        job.getExecutionStartedAt() != null ? jobRepository.findLlmUsageById(jobId).orElse(null) : null;
                     int updated =
                         workerId != null ? requeueOrphanWithRotation(jobId, workerId, job.getRetryCount()) : 0;
                     if (updated > 0) {
-                        if (job.getExecutionStartedAt() != null) billTerminatedJob(job, "worker draining");
+                        if (job.getExecutionStartedAt() != null) {
+                            billTerminatedJob(job, "worker draining", drainCounts);
+                        }
                         return;
                     }
                     int cancelled =
@@ -877,9 +883,22 @@ public class AgentJobExecutor {
      * in-memory {@code job} does not hide the proxy's committed accumulations.
      */
     private void billTerminatedJob(AgentJob job, String reason) {
+        billTerminatedJob(job, reason, jobRepository.findLlmUsageById(job.getId()).orElse(null));
+    }
+
+    /**
+     * Bill a terminated job from token counts the caller captured itself.
+     *
+     * <p>The {@code counts} MUST be read BEFORE any requeue of this job. {@link
+     * AgentJobRepository#requeueOrphan} atomically ZEROes the row's token accumulators so the next
+     * attempt bills only its own calls; a caller that requeues first and then lets billing re-read
+     * the row would see zeros and silently drop this attempt's spend (and, symmetrically, the
+     * self-reading overload is only safe on terminal — non-requeue — paths). On the retry paths the
+     * caller therefore snapshots the counts, requeues, then passes them here.
+     */
+    private void billTerminatedJob(AgentJob job, String reason, @Nullable AgentJobLlmUsage counts) {
         ConfigSnapshot snapshot = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
-        LlmPriceSnapshot price = admittedPrice(snapshot);
-        AgentJobLlmUsage counts = jobRepository.findLlmUsageById(job.getId()).orElse(null);
+        LlmPriceSnapshot price = terminalPriceOrUnpriced(snapshot);
         boolean billable = counts != null && counts.hasBillableUsage() && price.pricingState() != PricingState.UNPRICED;
         LlmUsageRecorder.LlmUsageSample sample = new LlmUsageRecorder.LlmUsageSample(
             LlmUsageJobType.from(job.getJobType()),
@@ -959,9 +978,18 @@ public class AgentJobExecutor {
         if (workerId != null && isRetryableInfraFailure(e)) {
             int currentRetryCount = job.getRetryCount();
             Integer updated = transactionTemplate.execute(status -> {
+                // Snapshot the token counts BEFORE requeuing: the requeue zeroes the row's
+                // accumulators atomically, so a post-requeue re-read would bill zero.
+                AgentJobLlmUsage retryCounts = sandboxExecutionStarted
+                    ? jobRepository.findLlmUsageById(jobId).orElse(null)
+                    : null;
                 int rows = requeueOrphanWithRotation(jobId, workerId, currentRetryCount);
                 if (rows > 0 && sandboxExecutionStarted) {
-                    billTerminatedJob(job, "infra-failure retry (attempt " + (currentRetryCount + 1) + ")");
+                    billTerminatedJob(
+                        job,
+                        "infra-failure retry (attempt " + (currentRetryCount + 1) + ")",
+                        retryCounts
+                    );
                 }
                 return rows;
             });
@@ -1427,6 +1455,21 @@ public class AgentJobExecutor {
             throw new IllegalStateException("Started job has no admitted LLM price snapshot");
         }
         return new LlmPriceSnapshot(FundingSource.INSTANCE, PricingState.UNPRICED, null, null, null, null, null, null);
+    }
+
+    /**
+     * The frozen admission price for a job's crash/terminal accounting, tolerant of a missing
+     * snapshot. Unlike {@link #admittedPrice} — used on the clean-completion path, where a started
+     * job is REQUIRED to carry a frozen price and a missing one is a bug worth surfacing loudly — the
+     * crash-billing path must NEVER throw: an exception here rolls back the very transition that
+     * marks the job terminal, resurrecting a job that has already run (and can loop). A missing price
+     * is billed UNPRICED (unverifiable), matching {@link AgentJobZombieSweeper}'s reaper.
+     */
+    private LlmPriceSnapshot terminalPriceOrUnpriced(ConfigSnapshot snapshot) {
+        LlmPriceSnapshot price = snapshot.priceSnapshot();
+        return price != null
+            ? price
+            : new LlmPriceSnapshot(FundingSource.INSTANCE, PricingState.UNPRICED, null, null, null, null, null, null);
     }
 
     private static long nullToZero(@Nullable Integer value) {

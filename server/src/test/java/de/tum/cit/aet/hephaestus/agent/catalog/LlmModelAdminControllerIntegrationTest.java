@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.agent.catalog;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -33,7 +33,7 @@ class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
     private LlmConnectionRepository llmConnectionRepository;
 
     @Autowired
-    private AgentConfigRepository agentConfigRepository;
+    private WorkspaceAgentBindingRepository agentBindingRepository;
 
     @Autowired
     private LlmModelRepository llmModelRepository;
@@ -260,7 +260,7 @@ class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     @Test
-    void deletingAModelBoundToAnAgentConfigReturns409() {
+    void deletingAModelBoundToAWorkspaceBindingReturns409() {
         LlmConnection connection = seedConnection();
         LlmModelDTO model = createModel(connection.getId(), "bound-model");
 
@@ -272,12 +272,11 @@ class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
             AccountType.ORG,
             owner
         );
-        AgentConfig config = new AgentConfig();
-        config.setWorkspace(workspace);
-        config.setName("bound-config");
-        config.setLlmProvider(LlmProvider.OPENAI);
-        config.setInstanceModel(llmModelFromRepository(model.id()));
-        agentConfigRepository.save(config);
+        WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
+        binding.setWorkspace(workspace);
+        binding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        binding.setInstanceModel(llmModelFromRepository(model.id()));
+        agentBindingRepository.save(binding);
 
         webTestClient
             .delete()
