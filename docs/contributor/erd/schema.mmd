@@ -115,6 +115,7 @@ erDiagram
         TIMESTAMPTZ available_at "NOT NULL"
         SMALLINT delivery_attempts "NOT NULL"
         TIMESTAMPTZ execution_started_at
+        VARCHAR(32) purpose
     }
 
     AuthEvent {
@@ -407,7 +408,6 @@ erDiagram
         SMALLINT id PK
         TEXT allowed_egress_hosts
         BOOLEAN allow_workspace_connections "NOT NULL"
-        VARCHAR(16) default_unpriced_policy "NOT NULL"
         TIMESTAMPTZ updated_at
         VARCHAR(255) updated_by
     }
@@ -649,16 +649,6 @@ erDiagram
         TIMESTAMPTZ last_sync_at
         BIGINT native_id UK "NOT NULL"
         BIGINT provider_id FK,UK "NOT NULL"
-    }
-
-    ModelPricing {
-        VARCHAR(128) model_id PK
-        NUMERIC(12,6) per_1k_input_usd "NOT NULL"
-        NUMERIC(12,6) per_1k_output_usd "NOT NULL"
-        NUMERIC(12,6) per_1k_cache_read_usd
-        NUMERIC(12,6) per_1k_cache_write_usd
-        TIMESTAMPTZ valid_from "NOT NULL"
-        TIMESTAMPTZ valid_to
     }
 
     OauthStateNonce {
@@ -1218,6 +1208,20 @@ erDiagram
         NUMERIC(10,2) monthly_llm_budget_usd
     }
 
+    WorkspaceAgentBinding {
+        BIGINT id PK
+        BIGINT workspace_id FK,UK "NOT NULL"
+        VARCHAR(32) purpose UK "NOT NULL"
+        BOOLEAN enabled "NOT NULL"
+        INTEGER timeout_seconds "NOT NULL"
+        INTEGER max_concurrent_jobs "NOT NULL"
+        BOOLEAN allow_internet "NOT NULL"
+        BIGINT instance_model_id FK
+        BIGINT workspace_model_id FK
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at
+    }
+
     WorkspaceLlmConnection {
         BIGINT id PK,UK
         BIGINT workspace_id FK,UK "NOT NULL"
@@ -1345,6 +1349,8 @@ erDiagram
     User ||--|| UserAchievement : has
     User ||--|| UserPreference : has
     Organization ||--|| Workspace : has
+    Workspace ||--|| WorkspaceAgentBinding : has
+    WorkspaceLlmModel ||--|| WorkspaceAgentBinding : has
     Workspace ||--|| WorkspaceLlmConnection : has
     Workspace ||--|| WorkspaceLlmModel : has
     WorkspaceLlmConnection ||--|| WorkspaceLlmModel : has
@@ -1437,6 +1443,9 @@ erDiagram
     Connection ||--o{ SyncJob : connection_id
     AgentConfig ||--o{ Workspace : practice_config_id
     AgentConfig ||--o{ Workspace : mentor_config_id
+    LlmModel ||--o{ WorkspaceAgentBinding : references
+    WorkspaceLlmModel ||--o{ WorkspaceAgentBinding : workspace_model_id
+    WorkspaceLlmModel ||--o{ WorkspaceAgentBinding : workspace_model_id
     WorkspaceLlmConnection ||--o{ WorkspaceLlmModel : connection_id
     WorkspaceLlmConnection ||--o{ WorkspaceLlmModel : connection_id
     Workspace ||--o{ WorkspaceSlugHistory : has
