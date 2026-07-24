@@ -1174,4 +1174,103 @@
         </rollback>
     </changeSet>
 
+    <changeSet id="1784636803503-57" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace_agent_binding already exists">
+            <not><tableExists tableName="workspace_agent_binding"/></not>
+        </preConditions>
+        <comment>
+            Per-purpose agent binding (#1368): exactly one model per (workspace, purpose). Replaces the
+            named agent_config profile + the scalar practice/mentor config pointers on workspace.
+        </comment>
+        <createTable tableName="workspace_agent_binding">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" primaryKeyName="pk_workspace_agent_binding"/>
+            </column>
+            <column name="workspace_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="purpose" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="enabled" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="timeout_seconds" type="INT" defaultValueNumeric="600">
+                <constraints nullable="false"/>
+            </column>
+            <column name="max_concurrent_jobs" type="INT" defaultValueNumeric="3">
+                <constraints nullable="false"/>
+            </column>
+            <column name="allow_internet" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="instance_model_id" type="BIGINT"/>
+            <column name="workspace_model_id" type="BIGINT"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </createTable>
+        <addUniqueConstraint
+            tableName="workspace_agent_binding"
+            columnNames="workspace_id, purpose"
+            constraintName="uk_workspace_agent_binding_purpose"/>
+        <addForeignKeyConstraint baseTableName="workspace_agent_binding" baseColumnNames="workspace_id"
+            referencedTableName="workspace" referencedColumnNames="id"
+            constraintName="fk_workspace_agent_binding_workspace" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="workspace_agent_binding" baseColumnNames="instance_model_id"
+            referencedTableName="llm_model" referencedColumnNames="id"
+            constraintName="fk_workspace_agent_binding_instance_model" onDelete="RESTRICT"/>
+        <addForeignKeyConstraint baseTableName="workspace_agent_binding" baseColumnNames="workspace_model_id"
+            referencedTableName="workspace_llm_model" referencedColumnNames="id"
+            constraintName="fk_workspace_agent_binding_workspace_model" onDelete="RESTRICT"/>
+        <!-- Tenancy-safe: a workspace binding can only reference a workspace model of the SAME workspace. -->
+        <addForeignKeyConstraint baseTableName="workspace_agent_binding" baseColumnNames="workspace_model_id, workspace_id"
+            referencedTableName="workspace_llm_model" referencedColumnNames="id, workspace_id"
+            constraintName="sfk_workspace_agent_binding_workspace_model_scope" onDelete="RESTRICT"/>
+        <sql>
+            ALTER TABLE workspace_agent_binding ADD CONSTRAINT ck_workspace_agent_binding_single_model
+                CHECK (num_nonnulls(instance_model_id, workspace_model_id) = 1);
+        </sql>
+        <rollback>
+            <dropTable tableName="workspace_agent_binding"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1784636803503-58" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="Agent bindings already backfilled">
+            <sqlCheck expectedResult="0">SELECT COUNT(*) FROM workspace_agent_binding</sqlCheck>
+        </preConditions>
+        <comment>
+            Backfill one binding per workspace purpose from the scalar practice/mentor config pointers,
+            copying the referenced agent_config's model + execution limits. Configs with no usable model
+            binding are skipped (the purpose stays unconfigured), matching the CHECK.
+        </comment>
+        <sql>
+            INSERT INTO workspace_agent_binding
+                (workspace_id, purpose, instance_model_id, workspace_model_id,
+                 timeout_seconds, max_concurrent_jobs, allow_internet, enabled, created_at, updated_at)
+            SELECT w.id, 'PRACTICE_DETECTION', c.instance_model_id, c.workspace_model_id,
+                   c.timeout_seconds, c.max_concurrent_jobs, c.allow_internet, c.enabled, now(), now()
+            FROM workspace w
+            JOIN agent_config c ON c.id = w.practice_config_id
+            WHERE w.practice_config_id IS NOT NULL
+              AND num_nonnulls(c.instance_model_id, c.workspace_model_id) = 1;
+
+            INSERT INTO workspace_agent_binding
+                (workspace_id, purpose, instance_model_id, workspace_model_id,
+                 timeout_seconds, max_concurrent_jobs, allow_internet, enabled, created_at, updated_at)
+            SELECT w.id, 'MENTOR', c.instance_model_id, c.workspace_model_id,
+                   c.timeout_seconds, c.max_concurrent_jobs, c.allow_internet, c.enabled, now(), now()
+            FROM workspace w
+            JOIN agent_config c ON c.id = w.mentor_config_id
+            WHERE w.mentor_config_id IS NOT NULL
+              AND num_nonnulls(c.instance_model_id, c.workspace_model_id) = 1;
+        </sql>
+        <rollback>
+            <!-- Deliberately empty: the scalar config pointers remain the source until the contract
+                 phase drops them, so a rollback simply leaves the backfilled rows in place. -->
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>
