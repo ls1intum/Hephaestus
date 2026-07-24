@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
@@ -39,7 +40,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     /** Concurrency count for a workspace's per-purpose binding (#1368). */
     long countByWorkspaceIdAndPurposeAndStatusIn(
         Long workspaceId,
-        de.tum.cit.aet.hephaestus.agent.config.AgentPurpose purpose,
+        AgentPurpose purpose,
         Collection<AgentJobStatus> statuses
     );
 

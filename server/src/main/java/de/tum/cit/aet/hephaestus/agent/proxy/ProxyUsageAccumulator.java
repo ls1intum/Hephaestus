@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,11 +23,7 @@ import tools.jackson.databind.JsonNode;
  * double-count.
  */
 @Service
-@ConditionalOnProperty(
-    name = de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole.WORKER_PROPERTY,
-    havingValue = "true",
-    matchIfMissing = true
-)
+@ConditionalOnProperty(name = RuntimeRole.WORKER_PROPERTY, havingValue = "true", matchIfMissing = true)
 public class ProxyUsageAccumulator {
 
     private static final Logger log = LoggerFactory.getLogger(ProxyUsageAccumulator.class);
