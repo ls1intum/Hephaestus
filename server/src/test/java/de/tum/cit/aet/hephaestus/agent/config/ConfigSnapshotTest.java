@@ -71,7 +71,7 @@ class ConfigSnapshotTest extends BaseUnitTest {
 
             assertThat(snapshot.schemaVersion()).isEqualTo(ConfigSnapshot.SCHEMA_VERSION);
             assertThat(snapshot.configId()).isEqualTo(42L);
-            assertThat(snapshot.configName()).isEqualTo("my-agent");
+            assertThat(snapshot.configName()).isNull(); // from(binding) no longer captures a name (#1368)
             assertThat(snapshot.apiProtocol()).isEqualTo("anthropic-messages");
             assertThat(snapshot.baseUrl()).isEqualTo("https://api.anthropic.com");
             assertThat(snapshot.upstreamModelId()).isEqualTo("claude-sonnet-4-20250514");
@@ -111,7 +111,7 @@ class ConfigSnapshotTest extends BaseUnitTest {
             assertThat(deserialized).isEqualTo(original);
             assertThat(deserialized.schemaVersion()).isEqualTo(ConfigSnapshot.SCHEMA_VERSION);
             assertThat(deserialized.configId()).isEqualTo(42L);
-            assertThat(deserialized.configName()).isEqualTo("my-agent");
+            assertThat(deserialized.configName()).isNull();
             assertThat(deserialized.timeoutSeconds()).isEqualTo(600);
         }
 
@@ -171,7 +171,7 @@ class ConfigSnapshotTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldIncludeConfigIdAndName() {
+        void shouldIncludeConfigId() {
             AgentConfig config = createConfig();
             stubResolver(config);
             ConfigSnapshot snapshot = ConfigSnapshot.from(config, resolver);
@@ -179,8 +179,8 @@ class ConfigSnapshotTest extends BaseUnitTest {
 
             assertThat(json.has("configId")).isTrue();
             assertThat(json.get("configId").asLong()).isEqualTo(42L);
-            assertThat(json.has("configName")).isTrue();
-            assertThat(json.get("configName").asString()).isEqualTo("my-agent");
+            // from(binding) no longer captures a name (#1368) — configName serializes as null.
+            assertThat(json.get("configName").isNull()).isTrue();
         }
 
         @Test

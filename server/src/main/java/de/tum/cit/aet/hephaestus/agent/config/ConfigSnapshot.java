@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
+import de.tum.cit.aet.hephaestus.agent.catalog.ModelBindingSource;
 import de.tum.cit.aet.hephaestus.agent.catalog.ResolvedLlmModel;
 import de.tum.cit.aet.hephaestus.agent.usage.AdmittedLlmModel;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
@@ -203,22 +204,22 @@ public record ConfigSnapshot(
     }
 
     /**
-     * Create a snapshot from a live {@link AgentConfig}, resolving its instance or workspace catalog
-     * model binding via {@link LlmModelResolver}.
+     * Create a snapshot from a live {@link ModelBindingSource} (a per-purpose binding or, legacy, a
+     * named config), resolving its instance or workspace catalog model via {@link LlmModelResolver}.
      */
-    public static ConfigSnapshot from(AgentConfig config, LlmModelResolver resolver) {
-        Objects.requireNonNull(config, "config must not be null");
+    public static ConfigSnapshot from(ModelBindingSource source, LlmModelResolver resolver) {
+        Objects.requireNonNull(source, "source must not be null");
         Objects.requireNonNull(resolver, "resolver must not be null");
-        ResolvedLlmModel resolved = resolver.resolve(config);
-        LlmModelResolver.ConnectionRef ref = resolver.connectionRef(config);
+        ResolvedLlmModel resolved = resolver.resolve(source);
+        LlmModelResolver.ConnectionRef ref = resolver.connectionRef(source);
         return new ConfigSnapshot(
             SCHEMA_VERSION,
-            config.getId(),
-            config.getName(),
+            source.getId(),
+            null,
             resolved.apiProtocol(),
             resolved.baseUrl(),
             resolved.upstreamModelId(),
-            config.getModelVersion(),
+            null,
             resolved.contextWindow(),
             resolved.maxOutputTokens(),
             resolved.supportsReasoning(),
@@ -226,8 +227,8 @@ public record ConfigSnapshot(
             ref.connectionId(),
             ref.modelId(),
             ref.workspaceId(),
-            config.getTimeoutSeconds(),
-            config.isAllowInternet()
+            source.getTimeoutSeconds(),
+            source.isAllowInternet()
         );
     }
 

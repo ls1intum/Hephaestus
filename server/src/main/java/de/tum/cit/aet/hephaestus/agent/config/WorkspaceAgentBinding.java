@@ -25,6 +25,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.ColumnDefault;
 
 /**
  * What model, and with what execution limits, a workspace runs a given {@link AgentPurpose} on
@@ -68,15 +69,19 @@ public class WorkspaceAgentBinding implements ModelBindingSource {
     @Column(name = "purpose", nullable = false, length = 32)
     private AgentPurpose purpose;
 
+    @ColumnDefault("true")
     @Column(name = "enabled", nullable = false)
     private boolean enabled = true;
 
+    @ColumnDefault("600")
     @Column(name = "timeout_seconds", nullable = false)
     private int timeoutSeconds = 600;
 
+    @ColumnDefault("3")
     @Column(name = "max_concurrent_jobs", nullable = false)
     private int maxConcurrentJobs = 3;
 
+    @ColumnDefault("false")
     @Column(name = "allow_internet", nullable = false)
     private boolean allowInternet = false;
 

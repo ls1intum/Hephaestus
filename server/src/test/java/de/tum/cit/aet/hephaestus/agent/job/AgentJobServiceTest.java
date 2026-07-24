@@ -15,11 +15,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
 import de.tum.cit.aet.hephaestus.agent.catalog.ResolvedLlmModel;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
@@ -35,7 +35,6 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -59,7 +58,7 @@ class AgentJobServiceTest extends BaseUnitTest {
     private AgentJobRepository agentJobRepository;
 
     @Mock
-    private AgentConfigRepository agentConfigRepository;
+    private WorkspaceAgentBindingRepository agentBindingRepository;
 
     @Mock
     private WorkspaceRepository workspaceRepository;
@@ -87,13 +86,13 @@ class AgentJobServiceTest extends BaseUnitTest {
     private AgentJobService service;
 
     private Workspace workspace;
-    private AgentConfig enabledConfig;
+    private WorkspaceAgentBinding enabledBinding;
 
     @BeforeEach
     void setUp() {
         service = new AgentJobService(
             agentJobRepository,
-            agentConfigRepository,
+            agentBindingRepository,
             workspaceRepository,
             artifactLoader,
             connectionService,
@@ -108,21 +107,20 @@ class AgentJobServiceTest extends BaseUnitTest {
         workspace = new Workspace();
         workspace.setId(1L);
         workspace.setWorkspaceSlug("test-ws");
-        // Detection runs exactly the bound practice config (no fan-out, #1368).
-        workspace.setPracticeConfigId(10L);
 
-        enabledConfig = new AgentConfig();
-        enabledConfig.setId(10L);
-        enabledConfig.setWorkspace(workspace);
-        enabledConfig.setName("test-config");
-        enabledConfig.setEnabled(true);
-        enabledConfig.setLlmProvider(LlmProvider.ANTHROPIC);
-        enabledConfig.setTimeoutSeconds(600);
-        lenient().when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(enabledConfig));
+        // Detection runs exactly the workspace's PRACTICE_DETECTION binding (no fan-out, #1368).
+        enabledBinding = new WorkspaceAgentBinding();
+        enabledBinding.setId(10L);
+        enabledBinding.setWorkspace(workspace);
+        enabledBinding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        enabledBinding.setEnabled(true);
+        enabledBinding.setTimeoutSeconds(600);
+        lenient()
+            .when(agentBindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_DETECTION))
+            .thenReturn(Optional.of(enabledBinding));
 
-        // Default resolver stub — submitForConfig freezes ConfigSnapshot.from(config, resolver) for
-        // every enabled config in the fan-out; individual tests override where the resolved shape
-        // matters.
+        // Default resolver stub — submitForBinding freezes ConfigSnapshot.from(binding, resolver);
+        // individual tests override where the resolved shape matters.
         lenient()
             .when(llmModelResolver.resolve(any()))
             .thenReturn(
@@ -166,8 +164,8 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldReturnEmptyWhenBoundConfigIsDisabled() {
-            enabledConfig.setEnabled(false); // bound-but-disabled = detection paused
+        void shouldReturnEmptyWhenBindingIsDisabled() {
+            enabledBinding.setEnabled(false); // bound-but-disabled = detection paused
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             Optional<AgentJob> result = service.submit(
@@ -182,7 +180,9 @@ class AgentJobServiceTest extends BaseUnitTest {
 
         @Test
         void shouldReturnEmptyWhenPracticeIsUnbound() {
-            workspace.setPracticeConfigId(null); // unbound = detection off, never fans out
+            when(agentBindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+                Optional.empty()
+            );
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             Optional<AgentJob> result = service.submit(
@@ -196,10 +196,8 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldSubmitOnlyBoundConfigAndSuppressFanOut() {
-            workspace.setPracticeConfigId(10L);
+        void shouldSubmitTheBoundDetectionModel() {
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(enabledConfig));
 
             JobTypeHandler handler = mock(JobTypeHandler.class);
             when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
@@ -220,56 +218,16 @@ class AgentJobServiceTest extends BaseUnitTest {
             );
 
             assertThat(result).isPresent();
-            // Fan-out is suppressed when a config is bound: the all-enabled lookup is never consulted.
-            verify(agentConfigRepository, never()).findByWorkspaceId(anyLong());
+            assertThat(result.get().getPurpose()).isEqualTo(AgentPurpose.PRACTICE_DETECTION);
             verify(agentJobRepository).saveAndFlush(any());
         }
 
         @Test
-        void shouldSubmitNothingWhenBoundConfigDisabled() {
-            AgentConfig disabled = new AgentConfig();
-            disabled.setId(10L);
-            disabled.setEnabled(false);
-            workspace.setPracticeConfigId(10L);
+        void shouldSubmitNothingWhenBoundModelIsRevoked() {
+            // The binding resolves to a since-revoked model: ConfigSnapshot.from throws, so no job is
+            // created (detection is paused for this workspace until the model is restored).
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(disabled));
-
-            Optional<AgentJob> result = service.submit(
-                1L,
-                AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class)
-            );
-
-            assertThat(result).isEmpty();
-            verify(agentJobRepository, never()).saveAndFlush(any());
-        }
-
-        @Test
-        void shouldSubmitNothingWhenBoundConfigIsForeign() {
-            // Stale/foreign binding: config 10 is not in this workspace. The scoped finder returns
-            // empty — we must pause (no job), NOT silently fall back to fan-out, and never touch the
-            // all-enabled lookup. This pins the tenancy boundary the scalar FK relies on.
-            workspace.setPracticeConfigId(10L);
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.empty());
-
-            Optional<AgentJob> result = service.submit(
-                1L,
-                AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class)
-            );
-
-            assertThat(result).isEmpty();
-            verify(agentJobRepository, never()).saveAndFlush(any());
-            verify(agentConfigRepository, never()).findByWorkspaceId(anyLong());
-        }
-
-        @Test
-        void shouldSubmitNothingWhenBoundConfigModelIsRevoked() {
-            // The bound config resolves to a since-revoked model: ConfigSnapshot.from throws, so no job
-            // is created (detection is paused for this workspace until the model is restored).
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(llmModelResolver.resolve(enabledConfig)).thenThrow(new IllegalStateException("model unavailable"));
+            when(llmModelResolver.resolve(enabledBinding)).thenThrow(new IllegalStateException("model unavailable"));
 
             JobTypeHandler handler = mock(JobTypeHandler.class);
             when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
@@ -301,7 +259,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             when(
                 agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(
                     eq(1L),
-                    eq("pr_review:owner/repo:42:authoring:abc123:config:10"),
+                    eq("pr_review:owner/repo:42:authoring:abc123:detection"),
                     any()
                 )
             ).thenReturn(Optional.of(existingJob));
@@ -345,9 +303,9 @@ class AgentJobServiceTest extends BaseUnitTest {
             assertThat(result).isPresent();
             AgentJob job = result.get();
             assertThat(job.getWorkspace()).isEqualTo(workspace);
-            assertThat(job.getConfig()).isEqualTo(enabledConfig);
+            assertThat(job.getPurpose()).isEqualTo(AgentPurpose.PRACTICE_DETECTION);
             assertThat(job.getJobType()).isEqualTo(AgentJobType.PULL_REQUEST_REVIEW);
-            assertThat(job.getIdempotencyKey()).isEqualTo("pr_review:owner/repo:42:authoring:abc123:config:10");
+            assertThat(job.getIdempotencyKey()).isEqualTo("pr_review:owner/repo:42:authoring:abc123:detection");
             assertThat(job.getConfigSnapshot()).isNotNull();
             // #1368 NATS→Postgres cutover: the QUEUED insert IS the enqueue — AgentJobExecutor's poll
             // loop discovers it directly from the agent_job table, no publish event to verify anymore.
@@ -357,8 +315,6 @@ class AgentJobServiceTest extends BaseUnitTest {
         @Test
         @DisplayName("the credential is NEVER frozen onto the job (#1368 slice 5 — ONE credential path, resolved live)")
         void neverCopiesTheCredentialOntoTheJob() {
-            enabledConfig.setLlmApiKey("sk-test-key");
-
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             JobTypeHandler handler = mock(JobTypeHandler.class);
@@ -395,7 +351,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             when(
                 agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(
                     eq(1L),
-                    eq("pr_review:owner/repo:42:authoring:abc123:config:10"),
+                    eq("pr_review:owner/repo:42:authoring:abc123:detection"),
                     any()
                 )
             ).thenReturn(Optional.empty());
@@ -440,7 +396,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             );
 
             assertThat(result).isPresent();
-            assertThat(result.get().getConfig()).isEqualTo(enabledConfig);
+            assertThat(result.get().getPurpose()).isEqualTo(AgentPurpose.PRACTICE_DETECTION);
         }
 
         @Test
@@ -525,7 +481,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             ArgumentCaptor<String> prefix = ArgumentCaptor.forClass(String.class);
             verify(agentJobRepository).findRecentJobByKeyPrefix(eq(1L), prefix.capture(), any());
             // Phase preserved, freshness stripped, both LIKE metacharacters escaped, config scope appended.
-            assertThat(prefix.getValue()).isEqualTo("pr\\_review:my\\_org/my\\%repo:42:authoring:%:config:10");
+            assertThat(prefix.getValue()).isEqualTo("pr\\_review:my\\_org/my\\%repo:42:authoring:%:detection");
         }
     }
 
@@ -601,7 +557,9 @@ class AgentJobServiceTest extends BaseUnitTest {
                     TransactionCallback<?> callback = inv.getArgument(0);
                     return callback.doInTransaction(mock(TransactionStatus.class));
                 });
-            workspace.setPracticeConfigId(null); // unbound → no job
+            when(agentBindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+                Optional.empty()
+            ); // unbound → no job
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             String result = service.submitPrepared(

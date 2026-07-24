@@ -8,15 +8,13 @@ package de.tum.cit.aet.hephaestus.practices.spi;
  */
 public interface AgentConfigChecker {
     /**
-     * Checks whether practice detection has a config that will <em>actually run</em>, honouring the
-     * workspace's {@code practiceConfigId} binding. When a config is bound, that specific config must
-     * exist and be enabled (a bound-but-disabled binding pauses detection); when unbound, any enabled
-     * config qualifies. This mirrors {@code AgentJobService.resolvePracticeConfigs} so the gate never
-     * lets detection run (incurring LLM cost) only for submission to resolve to zero jobs.
+     * Checks whether practice detection will <em>actually run</em> for a workspace: it has an enabled
+     * {@code PRACTICE_DETECTION} binding whose model is available now. Mirrors what
+     * {@code AgentJobService.submit} resolves, so the gate never lets detection run (incurring LLM
+     * cost) only for submission to produce zero jobs.
      *
-     * @param workspaceId   the workspace ID to check
-     * @param boundConfigId the workspace's practiceConfigId binding, or {@code null} when unbound
-     * @return true iff at least one config would be submitted for practice detection
+     * @param workspaceId the workspace ID to check
+     * @return true iff a practice-detection job would be submitted
      */
-    boolean hasRunnablePracticeConfig(Long workspaceId, Long boundConfigId);
+    boolean hasRunnablePractice(Long workspaceId);
 }

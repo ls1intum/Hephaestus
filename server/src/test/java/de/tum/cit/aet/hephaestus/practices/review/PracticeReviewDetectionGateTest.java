@@ -147,7 +147,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     private Workspace setupThroughPracticeMatching(PullRequest pr, Practice... practices) {
         Workspace workspace = createWorkspace();
         when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-        when(agentConfigChecker.hasRunnablePracticeConfig(WORKSPACE_ID, null)).thenReturn(true);
+        when(agentConfigChecker.hasRunnablePractice(WORKSPACE_ID)).thenReturn(true);
         when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(List.of(practices));
         return workspace;
     }
@@ -322,7 +322,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             Workspace workspace = createWorkspace();
             workspace.getFeatures().setPracticeReviewAutoTriggerEnabled(false);
             when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            when(agentConfigChecker.hasRunnablePracticeConfig(WORKSPACE_ID, null)).thenReturn(false);
+            when(agentConfigChecker.hasRunnablePractice(WORKSPACE_ID)).thenReturn(false);
 
             GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.MANUAL);
 
@@ -336,7 +336,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             Workspace workspace = createWorkspace();
             workspace.getFeatures().setPracticeReviewManualTriggerEnabled(false);
             when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            when(agentConfigChecker.hasRunnablePracticeConfig(WORKSPACE_ID, null)).thenReturn(false);
+            when(agentConfigChecker.hasRunnablePractice(WORKSPACE_ID)).thenReturn(false);
 
             GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
@@ -353,7 +353,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             PullRequest pr = createPullRequest();
             Workspace workspace = createWorkspace();
             when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            when(agentConfigChecker.hasRunnablePracticeConfig(WORKSPACE_ID, null)).thenReturn(false);
+            when(agentConfigChecker.hasRunnablePractice(WORKSPACE_ID)).thenReturn(false);
 
             GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
@@ -382,7 +382,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             PullRequest pr = createPullRequest();
             Workspace workspace = createWorkspace();
             when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            when(agentConfigChecker.hasRunnablePracticeConfig(WORKSPACE_ID, null)).thenReturn(true);
+            when(agentConfigChecker.hasRunnablePractice(WORKSPACE_ID)).thenReturn(true);
 
             Practice practice = new Practice();
             practice.setTriggerEvents(null);
@@ -402,7 +402,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             Practice nonMatching = createPractice("ReviewSubmitted");
             Workspace workspace = createWorkspace();
             when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            when(agentConfigChecker.hasRunnablePracticeConfig(WORKSPACE_ID, null)).thenReturn(true);
+            when(agentConfigChecker.hasRunnablePractice(WORKSPACE_ID)).thenReturn(true);
             when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(
                 List.of(matching1, matching2, nonMatching)
             );

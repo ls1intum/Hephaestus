@@ -2,9 +2,10 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.handler.IssueReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
@@ -45,7 +46,7 @@ public class AgentJobService {
     private static final Set<AgentJobStatus> ACTIVE_STATUSES = Set.of(AgentJobStatus.QUEUED, AgentJobStatus.RUNNING);
 
     private final AgentJobRepository agentJobRepository;
-    private final AgentConfigRepository agentConfigRepository;
+    private final WorkspaceAgentBindingRepository agentBindingRepository;
     private final WorkspaceRepository workspaceRepository;
     private final ReviewableArtifactLoader artifactLoader;
     private final ConnectionService connectionService;
@@ -58,7 +59,7 @@ public class AgentJobService {
 
     public AgentJobService(
         AgentJobRepository agentJobRepository,
-        AgentConfigRepository agentConfigRepository,
+        WorkspaceAgentBindingRepository agentBindingRepository,
         WorkspaceRepository workspaceRepository,
         ReviewableArtifactLoader artifactLoader,
         ConnectionService connectionService,
@@ -70,7 +71,7 @@ public class AgentJobService {
         LlmModelResolver llmModelResolver
     ) {
         this.agentJobRepository = agentJobRepository;
-        this.agentConfigRepository = agentConfigRepository;
+        this.agentBindingRepository = agentBindingRepository;
         this.workspaceRepository = workspaceRepository;
         this.artifactLoader = artifactLoader;
         this.connectionService = connectionService;
@@ -194,80 +195,50 @@ public class AgentJobService {
             return Optional.empty();
         }
 
-        List<AgentConfig> configs = resolvePracticeConfigs(workspace);
-        if (configs.isEmpty()) {
-            log.debug("No agent config to run practice detection: workspaceId={}", workspaceId);
+        boolean hasBinding = agentBindingRepository
+            .findByWorkspaceIdAndPurpose(workspaceId, AgentPurpose.PRACTICE_DETECTION)
+            .filter(WorkspaceAgentBinding::isEnabled)
+            .isPresent();
+        if (!hasBinding) {
+            log.debug("No practice-detection binding to run: workspaceId={}", workspaceId);
             return Optional.empty();
         }
 
         JobTypeHandler handler = handlerRegistry.getHandler(jobType);
         JobSubmission submission = handler.createSubmission(request);
 
-        AgentJob firstJob = null;
-        for (AgentConfig config : configs) {
-            AgentJob job = submitForConfig(workspace, config.getId(), jobType, submission);
-            if (job != null && firstJob == null) {
-                firstJob = job;
-            }
-        }
-
-        return Optional.ofNullable(firstJob);
+        return Optional.ofNullable(submitForBinding(workspace, jobType, submission));
     }
 
     /**
-     * Resolve the config to submit for practice detection: exactly the workspace's explicit
-     * {@code practiceConfigId} binding, when it exists and is enabled. No binding, or a
-     * bound-but-disabled config, means detection is <strong>off</strong> (returns empty) — there is
-     * no implicit fan-out to every enabled config, which would submit N jobs (N× cost, N× feedback)
-     * per event (#1368). The bound id is loaded via the workspace-scoped finder for tenancy safety.
-     *
-     * <p>The mentor likewise fails closed when its explicit binding is unavailable. Neither purpose
-     * switches models implicitly, because that could change provider, model, and price unexpectedly.
+     * Submit exactly one practice-detection job for the workspace's {@code PRACTICE_DETECTION} binding.
+     * No binding, or a bound-but-disabled/unavailable model, means detection is off — there is no
+     * implicit fan-out. The binding (and its lazy model) is re-fetched inside the transaction because
+     * the discovery read above runs detached.
      */
-    private List<AgentConfig> resolvePracticeConfigs(Workspace workspace) {
-        Long boundConfigId = workspace.getPracticeConfigId();
-        if (boundConfigId == null) {
-            return List.of();
-        }
-        return agentConfigRepository
-            .findByIdAndWorkspaceId(boundConfigId, workspace.getId())
-            .filter(AgentConfig::isEnabled)
-            .map(List::of)
-            .orElseGet(List::of);
-    }
-
-    private @Nullable AgentJob submitForConfig(
-        Workspace workspace,
-        Long configId,
-        AgentJobType jobType,
-        JobSubmission submission
-    ) {
-        String configScopedKey = submission.idempotencyKey() + ":config:" + configId;
+    private @Nullable AgentJob submitForBinding(Workspace workspace, AgentJobType jobType, JobSubmission submission) {
+        String detectionKey = submission.idempotencyKey() + ":detection";
 
         return transactionTemplate.execute(status -> {
-            // The discovery query above intentionally runs outside a transaction so each config can
-            // fail independently. Re-fetch the config and its catalog binding in this transaction;
-            // starting a transaction does not reattach the detached discovery entity, and resolving
-            // its lazy model here would otherwise fail in production.
-            AgentConfig config = agentConfigRepository
-                .findByIdAndWorkspaceId(configId, workspace.getId())
-                .filter(AgentConfig::isEnabled)
+            WorkspaceAgentBinding binding = agentBindingRepository
+                .findByWorkspaceIdAndPurpose(workspace.getId(), AgentPurpose.PRACTICE_DETECTION)
+                .filter(WorkspaceAgentBinding::isEnabled)
                 .orElse(null);
-            if (config == null) {
-                return null; // deleted, disabled, or moved since discovery
+            if (binding == null) {
+                return null; // unbound or disabled since discovery
             }
 
             // Idempotency check — application-level (partial unique index is safety net)
             Optional<AgentJob> existing = agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(
                 workspace.getId(),
-                configScopedKey,
+                detectionKey,
                 ACTIVE_STATUSES
             );
             if (existing.isPresent()) {
                 log.info(
                     "Deduplicated job submission: existingJobId={}, idempotencyKey={}",
                     existing.get().getId(),
-                    configScopedKey
+                    detectionKey
                 );
                 return existing.get();
             }
@@ -279,7 +250,7 @@ public class AgentJobService {
                 String rawPrefix = extractCooldownKeyPrefix(submission.idempotencyKey());
                 // Escape SQL LIKE wildcards in the prefix to prevent unintended pattern matching
                 String escaped = rawPrefix.replace("%", "\\%").replace("_", "\\_");
-                String cooldownPrefix = escaped + "%:config:" + config.getId();
+                String cooldownPrefix = escaped + "%:detection";
                 Instant cutoff = Instant.now().minus(java.time.Duration.ofMinutes(cooldown));
                 Optional<AgentJob> recent = agentJobRepository.findRecentJobByKeyPrefix(
                     workspace.getId(),
@@ -292,7 +263,7 @@ public class AgentJobService {
                         recent.get().getId(),
                         recent.get().getCreatedAt(),
                         cooldown,
-                        configScopedKey
+                        detectionKey
                     );
                     return null;
                 }
@@ -300,21 +271,19 @@ public class AgentJobService {
 
             AgentJob job = new AgentJob();
             job.setWorkspace(workspace);
-            job.setConfig(config);
-            job.setPurpose(de.tum.cit.aet.hephaestus.agent.config.AgentPurpose.PRACTICE_DETECTION);
+            job.setPurpose(AgentPurpose.PRACTICE_DETECTION);
             job.setJobType(jobType);
             // Explicit subject discriminator drives downstream dispatch (e.g. DiffNotePoster
             // short-circuits when subjectClass != PULL_REQUEST).
             job.setSubjectClass(subjectClassFor(jobType));
             job.setMetadata(submission.metadata());
-            job.setIdempotencyKey(configScopedKey);
+            job.setIdempotencyKey(detectionKey);
             try {
-                job.setConfigSnapshot(ConfigSnapshot.from(config, llmModelResolver).toJson(objectMapper));
+                job.setConfigSnapshot(ConfigSnapshot.from(binding, llmModelResolver).toJson(objectMapper));
             } catch (IllegalStateException unavailableModel) {
                 log.warn(
-                    "Skipping agent config whose model is no longer available: workspaceId={}, configId={}",
-                    workspace.getId(),
-                    config.getId()
+                    "Skipping practice-detection binding whose model is no longer available: workspaceId={}",
+                    workspace.getId()
                 );
                 return null;
             }
@@ -345,16 +314,15 @@ public class AgentJobService {
             } catch (DataIntegrityViolationException e) {
                 // Partial unique index race: another concurrent submit won.
                 // Mark rollback so the broken Hibernate Session is properly cleaned up.
-                log.info("Idempotency constraint caught concurrent duplicate: key={}", configScopedKey);
+                log.info("Idempotency constraint caught concurrent duplicate: key={}", detectionKey);
                 status.setRollbackOnly();
                 return null;
             }
 
             log.info(
-                "Agent job submitted: jobId={}, jobType={}, configId={}, workspaceId={}",
+                "Agent job submitted: jobId={}, jobType={}, workspaceId={}",
                 job.getId(),
                 jobType,
-                config.getId(),
                 workspace.getId()
             );
 

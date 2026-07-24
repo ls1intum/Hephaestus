@@ -176,7 +176,7 @@ public class PracticeReviewDetectionGate {
         // 3. Agent config gate: a config that will ACTUALLY run for detection must exist. Binding-aware
         // (mirrors AgentJobService.resolvePracticeConfigs) so a bound-but-disabled practice config skips
         // here instead of detecting (LLM cost) only for submission to resolve to zero jobs.
-        if (!agentConfigChecker.hasRunnablePracticeConfig(workspace.getId(), workspace.getPracticeConfigId())) {
+        if (!agentConfigChecker.hasRunnablePractice(workspace.getId())) {
             log.debug(
                 "Practice review gate: SKIP, reason=noRunnablePracticeConfig, prId={}, workspaceId={}",
                 reviewable.getId(),

@@ -5,37 +5,36 @@ import de.tum.cit.aet.hephaestus.practices.spi.AgentConfigChecker;
 import org.springframework.stereotype.Component;
 
 /**
- * Implementation of {@link AgentConfigChecker} backed by {@link AgentConfigRepository}.
+ * Implementation of {@link AgentConfigChecker} backed by the per-purpose binding table (#1368).
  */
 @Component
 public class AgentConfigCheckerAdapter implements AgentConfigChecker {
 
-    private final AgentConfigRepository agentConfigRepository;
+    private final WorkspaceAgentBindingRepository bindingRepository;
     private final LlmModelResolver llmModelResolver;
 
-    public AgentConfigCheckerAdapter(AgentConfigRepository agentConfigRepository, LlmModelResolver llmModelResolver) {
-        this.agentConfigRepository = agentConfigRepository;
+    public AgentConfigCheckerAdapter(
+        WorkspaceAgentBindingRepository bindingRepository,
+        LlmModelResolver llmModelResolver
+    ) {
+        this.bindingRepository = bindingRepository;
         this.llmModelResolver = llmModelResolver;
     }
 
     @Override
     // Keep this boundary non-transactional: resolve() reports revocation with an exception. Catching that
     // exception inside a shared transaction would still mark the transaction rollback-only.
-    public boolean hasRunnablePracticeConfig(Long workspaceId, Long boundConfigId) {
-        if (boundConfigId == null) {
-            return false; // unbound = detection off; no implicit fan-out to every enabled config (#1368)
-        }
-        // Bound: only that specific config runs; never fall back to another configuration.
-        return agentConfigRepository
-            .findByIdAndWorkspaceId(boundConfigId, workspaceId)
-            .stream()
-            .filter(AgentConfig::isEnabled)
-            .anyMatch(this::isModelAvailable);
+    public boolean hasRunnablePractice(Long workspaceId) {
+        return bindingRepository
+            .findByWorkspaceIdAndPurpose(workspaceId, AgentPurpose.PRACTICE_DETECTION)
+            .filter(WorkspaceAgentBinding::isEnabled)
+            .map(this::isModelAvailable)
+            .orElse(false);
     }
 
-    private boolean isModelAvailable(AgentConfig config) {
+    private boolean isModelAvailable(WorkspaceAgentBinding binding) {
         try {
-            llmModelResolver.resolve(config);
+            llmModelResolver.resolve(binding);
             return true;
         } catch (IllegalStateException ignored) {
             return false;

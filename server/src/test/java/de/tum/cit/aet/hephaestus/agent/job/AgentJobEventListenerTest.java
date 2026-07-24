@@ -804,7 +804,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             workspace.setWorkspaceSlug("test-workspace");
             workspace.getFeatures().setPracticesEnabled(true);
             when(fixture.workspaceResolver().resolveForRepository("owner/repo")).thenReturn(Optional.of(workspace));
-            when(fixture.agentConfigChecker().hasRunnablePracticeConfig(WORKSPACE_ID, null)).thenReturn(true);
+            when(fixture.agentConfigChecker().hasRunnablePractice(WORKSPACE_ID)).thenReturn(true);
 
             Practice practice = new Practice();
             ArrayNode events = MAPPER.createArrayNode();
@@ -837,7 +837,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             workspace.setId(WORKSPACE_ID);
             workspace.getFeatures().setPracticesEnabled(true);
             when(fixture.workspaceResolver().resolveForRepository("owner/repo")).thenReturn(Optional.of(workspace));
-            when(fixture.agentConfigChecker().hasRunnablePracticeConfig(WORKSPACE_ID, null)).thenReturn(true);
+            when(fixture.agentConfigChecker().hasRunnablePractice(WORKSPACE_ID)).thenReturn(true);
 
             // Practice only matches ReviewSubmitted, not PullRequestCreated
             Practice practice = new Practice();

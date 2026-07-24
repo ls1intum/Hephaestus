@@ -14,7 +14,7 @@ import org.mockito.Mock;
 class AgentConfigCheckerAdapterTest extends BaseUnitTest {
 
     @Mock
-    private AgentConfigRepository repository;
+    private WorkspaceAgentBindingRepository bindingRepository;
 
     @Mock
     private LlmModelResolver resolver;
@@ -23,37 +23,49 @@ class AgentConfigCheckerAdapterTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        checker = new AgentConfigCheckerAdapter(repository, resolver);
+        checker = new AgentConfigCheckerAdapter(bindingRepository, resolver);
     }
 
-    @Test
-    void boundConfigIsNotRunnableAfterItsModelIsRevoked() {
-        AgentConfig config = enabledConfig(7L);
-        when(repository.findByIdAndWorkspaceId(7L, 1L)).thenReturn(Optional.of(config));
-        when(resolver.resolve(config)).thenThrow(new IllegalStateException("unavailable"));
-
-        assertThat(checker.hasRunnablePracticeConfig(1L, 7L)).isFalse();
+    private WorkspaceAgentBinding binding(boolean enabled) {
+        WorkspaceAgentBinding b = new WorkspaceAgentBinding();
+        b.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        b.setEnabled(enabled);
+        return b;
     }
 
     @Test
     void unboundPracticeIsNotRunnable() {
-        // Unbound = detection off: no implicit fan-out to every enabled config (#1368).
-        assertThat(checker.hasRunnablePracticeConfig(1L, null)).isFalse();
+        when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            Optional.empty()
+        );
+        assertThat(checker.hasRunnablePractice(1L)).isFalse();
     }
 
     @Test
-    void boundConfigIsRunnableWhenItsModelIsAvailable() {
-        AgentConfig config = enabledConfig(8L);
-        when(repository.findByIdAndWorkspaceId(8L, 1L)).thenReturn(Optional.of(config));
-        when(resolver.resolve(config)).thenReturn(org.mockito.Mockito.mock(ResolvedLlmModel.class));
-
-        assertThat(checker.hasRunnablePracticeConfig(1L, 8L)).isTrue();
+    void disabledBindingIsNotRunnable() {
+        when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            Optional.of(binding(false))
+        );
+        assertThat(checker.hasRunnablePractice(1L)).isFalse();
     }
 
-    private static AgentConfig enabledConfig(Long id) {
-        AgentConfig config = new AgentConfig();
-        config.setId(id);
-        config.setEnabled(true);
-        return config;
+    @Test
+    void enabledBindingWithRevokedModelIsNotRunnable() {
+        WorkspaceAgentBinding b = binding(true);
+        when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            Optional.of(b)
+        );
+        when(resolver.resolve(b)).thenThrow(new IllegalStateException("unavailable"));
+        assertThat(checker.hasRunnablePractice(1L)).isFalse();
+    }
+
+    @Test
+    void enabledBindingWithAvailableModelIsRunnable() {
+        WorkspaceAgentBinding b = binding(true);
+        when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            Optional.of(b)
+        );
+        when(resolver.resolve(b)).thenReturn(org.mockito.Mockito.mock(ResolvedLlmModel.class));
+        assertThat(checker.hasRunnablePractice(1L)).isTrue();
     }
 }
