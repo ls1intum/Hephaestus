@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
@@ -8,9 +7,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Resolves an {@link AgentConfig} binding to the effective {@link ResolvedLlmModel} the runtime needs,
- * collapsing the two catalog scopes (instance vs workspace BYO) behind one shape. The credential is
- * resolved separately and live (never frozen) via {@link #resolveCredential}.
+ * Resolves a {@link ModelBindingSource} binding to the effective {@link ResolvedLlmModel} the runtime
+ * needs, collapsing the two catalog scopes (instance vs workspace BYO) behind one shape. The
+ * credential is resolved separately and live (never frozen) via {@link #resolveCredential}.
  *
  * <p>Only catalog bindings are executable. Legacy {@code AgentConfig.llm*} columns remain in the schema
  * during deprecation but are deliberately never read at runtime.
@@ -27,7 +26,7 @@ public class LlmModelResolver {
 
     /** The effective, non-secret runtime shape for a config's bound model. */
     @Transactional(readOnly = true)
-    public ResolvedLlmModel resolve(AgentConfig config) {
+    public ResolvedLlmModel resolve(ModelBindingSource config) {
         LlmModel instance = config.getInstanceModel();
         if (instance != null) {
             LlmConnection c = instance.getConnection();
@@ -86,7 +85,7 @@ public class LlmModelResolver {
 
     /** The live API key for a config's bound connection. Never frozen into a snapshot. */
     @Transactional(readOnly = true)
-    public @Nullable String resolveCredential(AgentConfig config) {
+    public @Nullable String resolveCredential(ModelBindingSource config) {
         LlmModel instance = config.getInstanceModel();
         if (instance != null) {
             return instance.getConnection().getApiKey();
@@ -136,7 +135,7 @@ public class LlmModelResolver {
 
     /** Which connection (if any) funds this config's current binding. See {@link ConnectionRef}. */
     @Transactional(readOnly = true)
-    public ConnectionRef connectionRef(AgentConfig config) {
+    public ConnectionRef connectionRef(ModelBindingSource config) {
         LlmModel instance = config.getInstanceModel();
         if (instance != null) {
             return new ConnectionRef(

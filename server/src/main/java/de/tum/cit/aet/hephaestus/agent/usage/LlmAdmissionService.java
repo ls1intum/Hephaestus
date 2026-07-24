@@ -4,11 +4,14 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelPrice;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelPriceRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
+import de.tum.cit.aet.hephaestus.agent.catalog.ModelBindingSource;
 import de.tum.cit.aet.hephaestus.agent.catalog.PricingMode;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import java.math.BigDecimal;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
@@ -22,13 +25,15 @@ public class LlmAdmissionService {
 
     private final LlmModelResolver resolver;
     private final AgentConfigRepository configRepository;
+    private final WorkspaceAgentBindingRepository bindingRepository;
     private final LlmModelPriceRepository priceRepository;
     private final LlmModelRepository modelRepository;
     private final WorkspaceLlmModelRepository workspaceModelRepository;
 
+    /** Admit a named config (legacy path — still used until the binding cutover completes). */
     @Transactional
     public AdmittedLlmModel admit(AgentConfig config) {
-        AgentConfig locked =
+        ModelBindingSource locked =
             config.getId() != null
                 ? configRepository
                       .findByIdForUpdate(config.getId())
@@ -36,6 +41,24 @@ public class LlmAdmissionService {
                           new IllegalStateException("The configured OpenAI-compatible model is not available")
                       )
                 : config;
+        return admitLocked(locked);
+    }
+
+    /** Admit a per-purpose binding: row-lock it (against activation/reprice) and freeze its price. */
+    @Transactional
+    public AdmittedLlmModel admit(WorkspaceAgentBinding binding) {
+        WorkspaceAgentBinding locked =
+            binding.getId() != null
+                ? bindingRepository
+                      .findByWorkspaceIdAndPurposeForUpdate(binding.getWorkspace().getId(), binding.getPurpose())
+                      .orElseThrow(() ->
+                          new IllegalStateException("The configured OpenAI-compatible model is not available")
+                      )
+                : binding;
+        return admitLocked(locked);
+    }
+
+    private AdmittedLlmModel admitLocked(ModelBindingSource locked) {
         if (!locked.isEnabled()) {
             throw new IllegalStateException("The configured OpenAI-compatible model is not available");
         }
