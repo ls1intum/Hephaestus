@@ -11,6 +11,8 @@ import org.jspecify.annotations.Nullable;
  * binding.
  */
 public interface ModelBindingSource {
+    Long getId();
+
     @Nullable
     LlmModel getInstanceModel();
 
@@ -20,4 +22,10 @@ public interface ModelBindingSource {
     Workspace getWorkspace();
 
     boolean isEnabled();
+
+    boolean isAllowInternet();
+
+    int getTimeoutSeconds();
+
+    int getMaxConcurrentJobs();
 }

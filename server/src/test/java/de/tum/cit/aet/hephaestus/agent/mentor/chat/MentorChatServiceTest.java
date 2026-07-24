@@ -9,11 +9,11 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
 import de.tum.cit.aet.hephaestus.agent.catalog.ResolvedLlmModel;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorAgentProperties;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorPiAdapter;
@@ -111,7 +111,7 @@ class MentorChatServiceTest extends BaseUnitTest {
     ChatThreadRepository chatThreadRepository;
 
     @Mock
-    AgentConfigRepository agentConfigRepository;
+    WorkspaceAgentBindingRepository agentBindingRepository;
 
     @Mock
     WorkspaceRepository workspaceRepository;
@@ -169,7 +169,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         service = new MentorChatService(
             userRepository,
             chatThreadRepository,
-            agentConfigRepository,
+            agentBindingRepository,
             workspaceRepository,
             mentorProps,
             workspaceContextBuilder,
@@ -201,7 +201,7 @@ class MentorChatServiceTest extends BaseUnitTest {
             )
         );
         when(llmModelResolver.connectionRef(any())).thenReturn(new LlmModelResolver.ConnectionRef(null, null));
-        when(llmAdmissionService.admit(any())).thenReturn(
+        when(llmAdmissionService.admit(any(WorkspaceAgentBinding.class))).thenReturn(
             new AdmittedLlmModel(
                 new ResolvedLlmModel(
                     "https://api.openai.com",
@@ -223,18 +223,17 @@ class MentorChatServiceTest extends BaseUnitTest {
         user.setLogin("octo");
         when(userRepository.getCurrentUserElseThrow()).thenReturn(user);
 
-        AgentConfig agentConfig = new AgentConfig();
-        agentConfig.setId(99L);
-        agentConfig.setEnabled(true);
-        agentConfig.setLlmProvider(LlmProvider.OPENAI);
-        agentConfig.setLlmApiKey("test-key");
-        agentConfig.setModelName("test-model");
-        agentConfig.setTimeoutSeconds(600);
+        WorkspaceAgentBinding mentorBinding = new WorkspaceAgentBinding();
+        mentorBinding.setId(99L);
+        mentorBinding.setPurpose(AgentPurpose.MENTOR);
+        mentorBinding.setEnabled(true);
+        mentorBinding.setTimeoutSeconds(600);
         Workspace ws = new Workspace();
         ws.setWorkspaceSlug("acme");
-        ws.setMentorConfigId(99L);
         when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(ws));
-        when(agentConfigRepository.findByIdAndWorkspaceId(99L, WORKSPACE_ID)).thenReturn(Optional.of(agentConfig));
+        when(agentBindingRepository.findByWorkspaceIdAndPurpose(WORKSPACE_ID, AgentPurpose.MENTOR)).thenReturn(
+            Optional.of(mentorBinding)
+        );
         ChatThread thread = new ChatThread();
         thread.setId(THREAD_ID);
         thread.setWorkspace(ws);
@@ -419,21 +418,20 @@ class MentorChatServiceTest extends BaseUnitTest {
     @Test
     void runTurn_prefersBoundEnabledMentorConfig_overFallback() throws Exception {
         Workspace boundWs = new Workspace();
-        boundWs.setMentorConfigId(99L);
         when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(boundWs));
-        AgentConfig boundConfig = new AgentConfig();
-        boundConfig.setEnabled(true);
-        boundConfig.setLlmProvider(LlmProvider.OPENAI);
-        boundConfig.setLlmApiKey("bound-key");
-        boundConfig.setModelName("bound-model");
-        boundConfig.setTimeoutSeconds(600);
-        when(agentConfigRepository.findByIdAndWorkspaceId(99L, WORKSPACE_ID)).thenReturn(Optional.of(boundConfig));
+        WorkspaceAgentBinding boundBinding = new WorkspaceAgentBinding();
+        boundBinding.setId(99L);
+        boundBinding.setPurpose(AgentPurpose.MENTOR);
+        boundBinding.setEnabled(true);
+        boundBinding.setTimeoutSeconds(600);
+        when(agentBindingRepository.findByWorkspaceIdAndPurpose(WORKSPACE_ID, AgentPurpose.MENTOR)).thenReturn(
+            Optional.of(boundBinding)
+        );
 
         scheduleHappyPathResponses(sandbox).run();
         runTurnSync();
 
-        verify(agentConfigRepository).findByIdAndWorkspaceId(99L, WORKSPACE_ID);
-        verify(agentConfigRepository, never()).findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(WORKSPACE_ID);
+        verify(agentBindingRepository).findByWorkspaceIdAndPurpose(WORKSPACE_ID, AgentPurpose.MENTOR);
     }
 
     // 1c. A bound-but-disabled mentor config fails closed. Silently choosing another config could
@@ -442,18 +440,20 @@ class MentorChatServiceTest extends BaseUnitTest {
     @Test
     void runTurn_disabledBoundConfig_failsClosedBeforeSandboxAttach() throws Exception {
         Workspace boundWs = new Workspace();
-        boundWs.setMentorConfigId(99L);
         when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(boundWs));
-        AgentConfig disabled = new AgentConfig();
+        WorkspaceAgentBinding disabled = new WorkspaceAgentBinding();
+        disabled.setId(99L);
+        disabled.setPurpose(AgentPurpose.MENTOR);
         disabled.setEnabled(false);
-        when(agentConfigRepository.findByIdAndWorkspaceId(99L, WORKSPACE_ID)).thenReturn(Optional.of(disabled));
+        when(agentBindingRepository.findByWorkspaceIdAndPurpose(WORKSPACE_ID, AgentPurpose.MENTOR)).thenReturn(
+            Optional.of(disabled)
+        );
 
         runTurnSync();
 
         assertThat(String.join("\n", emitter.rawData)).contains(
             "Hephaestus is not ready to mentor in this workspace yet. Connect a mentor model, then try again."
         );
-        verify(agentConfigRepository, never()).findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(WORKSPACE_ID);
         verify(interactiveSandboxService, never()).attach(any());
     }
 
@@ -463,8 +463,9 @@ class MentorChatServiceTest extends BaseUnitTest {
 
     @Test
     void runTurn_noEnabledConfig_recordsErrorAndNeverAttaches() throws Exception {
-        Workspace unbound = new Workspace();
-        when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(unbound));
+        when(agentBindingRepository.findByWorkspaceIdAndPurpose(WORKSPACE_ID, AgentPurpose.MENTOR)).thenReturn(
+            Optional.empty()
+        );
 
         runTurnSync();
 

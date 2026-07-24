@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.mentor;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
+import de.tum.cit.aet.hephaestus.agent.catalog.ModelBindingSource;
 import de.tum.cit.aet.hephaestus.agent.catalog.ResolvedLlmModel;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.usage.AdmittedLlmModel;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
@@ -10,7 +10,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Slim projection of the LLM fields that {@link MentorPiAdapter} needs to build a sandbox spec.
- * Decouples the mentor module from the JPA {@link AgentConfig} entity.
+ * Decouples the mentor module from the JPA AgentConfig entity.
  *
  * <p>#1368 slice 5: routes through {@link LlmModelResolver} — the same resolved, non-secret
  * behaviour shape ({@code ResolvedLlmModel}) the practice-review path freezes into
@@ -66,7 +66,7 @@ public record MentorLlmConfig(
         );
     }
 
-    public static MentorLlmConfig fromAgentConfig(AgentConfig config, LlmModelResolver resolver) {
+    public static MentorLlmConfig fromAgentConfig(ModelBindingSource config, LlmModelResolver resolver) {
         ResolvedLlmModel resolved = resolver.resolve(config);
         LlmModelResolver.ConnectionRef ref = resolver.connectionRef(config);
         return new MentorLlmConfig(
@@ -87,7 +87,7 @@ public record MentorLlmConfig(
         );
     }
 
-    public static MentorLlmConfig fromAdmission(AgentConfig config, AdmittedLlmModel admitted) {
+    public static MentorLlmConfig fromAdmission(ModelBindingSource config, AdmittedLlmModel admitted) {
         ResolvedLlmModel resolved = admitted.resolved();
         LlmModelResolver.ConnectionRef ref = admitted.connection();
         return new MentorLlmConfig(

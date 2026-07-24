@@ -1,7 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MentorContextKeys;
@@ -70,7 +71,7 @@ public class MentorChatService implements MentorTurnRunner {
 
     private final UserRepository userRepository;
     private final ChatThreadRepository chatThreadRepository;
-    private final AgentConfigRepository agentConfigRepository;
+    private final WorkspaceAgentBindingRepository agentBindingRepository;
     private final WorkspaceRepository workspaceRepository;
     private final MentorAgentProperties mentorAgentProperties;
     private final WorkspaceContextBuilder workspaceContextBuilder;
@@ -721,15 +722,13 @@ public class MentorChatService implements MentorTurnRunner {
      * scoped query is the only real cross-tenant guard.
      */
     private MentorLlmConfig resolveLlmConfig(long workspaceId) {
-        Long boundConfigId = workspaceRepository.findById(workspaceId).map(Workspace::getMentorConfigId).orElse(null);
-        if (boundConfigId == null) {
-            throw new IllegalStateException("No mentor model is configured for workspace " + workspaceId);
+        WorkspaceAgentBinding binding = agentBindingRepository
+            .findByWorkspaceIdAndPurpose(workspaceId, AgentPurpose.MENTOR)
+            .orElseThrow(() -> new IllegalStateException("No mentor model is configured for workspace " + workspaceId));
+        if (!binding.isEnabled()) {
+            throw new IllegalStateException("The configured mentor model is not available");
         }
-        AgentConfig config = agentConfigRepository
-            .findByIdAndWorkspaceId(boundConfigId, workspaceId)
-            .filter(AgentConfig::isEnabled)
-            .orElseThrow(() -> new IllegalStateException("The configured mentor model is not available"));
-        return MentorLlmConfig.fromAdmission(config, llmAdmissionService.admit(config));
+        return MentorLlmConfig.fromAdmission(binding, llmAdmissionService.admit(binding));
     }
 
     private JsonNode handleFetchContext(MentorRunnerClient.FetchContextRequest req, Map<String, byte[]> contextInputs) {
