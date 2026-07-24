@@ -1,13 +1,21 @@
 package de.tum.cit.aet.hephaestus.agent.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -22,8 +30,29 @@ class AgentBindingServiceTest extends BaseUnitTest {
     @Mock
     private WorkspaceAgentBindingRepository bindingRepository;
 
+    @Mock
+    private WorkspaceRepository workspaceRepository;
+
+    @Mock
+    private LlmModelRepository llmModelRepository;
+
+    @Mock
+    private WorkspaceLlmModelRepository workspaceLlmModelRepository;
+
+    @Mock
+    private LlmModelResolver llmModelResolver;
+
+    @Mock
+    private ConfigAuditPort configAudit;
+
     @InjectMocks
     private AgentBindingService service;
+
+    private WorkspaceContext context() {
+        WorkspaceContext ctx = mock(WorkspaceContext.class);
+        when(ctx.id()).thenReturn(1L);
+        return ctx;
+    }
 
     private Workspace workspace() {
         Workspace w = new Workspace();
@@ -92,5 +121,75 @@ class AgentBindingServiceTest extends BaseUnitTest {
         service.sync(w, AgentPurpose.MENTOR);
 
         verify(bindingRepository).delete(existing);
+    }
+
+    @Test
+    void upsertBindsAnAvailableInstanceModelAndClearsTheLegacyPointer() {
+        Workspace w = workspace();
+        w.setPracticeConfigId(55L); // legacy pointer to be cleared
+        when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(w));
+        when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            Optional.empty()
+        );
+        LlmModel model = new LlmModel();
+        model.setId(99L);
+        when(llmModelRepository.findById(99L)).thenReturn(Optional.of(model));
+        when(bindingRepository.save(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new UpdateAgentBindingRequestDTO(99L, null, 300, 2, true, true);
+        WorkspaceAgentBinding saved = service.upsertBinding(context(), AgentPurpose.PRACTICE_DETECTION, request);
+
+        assertThat(saved.getInstanceModel().getId()).isEqualTo(99L);
+        assertThat(saved.getTimeoutSeconds()).isEqualTo(300);
+        assertThat(saved.isEnabled()).isTrue();
+        assertThat(w.getPracticeConfigId()).isNull(); // legacy pointer decoupled
+        verify(llmModelResolver).resolve(org.mockito.ArgumentMatchers.any(WorkspaceAgentBinding.class));
+    }
+
+    @Test
+    void upsertRejectsAModelThatIsNotAvailableToTheWorkspace() {
+        Workspace w = workspace();
+        when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(w));
+        when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            Optional.empty()
+        );
+        LlmModel model = new LlmModel();
+        model.setId(99L);
+        when(llmModelRepository.findById(99L)).thenReturn(Optional.of(model));
+        when(llmModelResolver.resolve(org.mockito.ArgumentMatchers.any(WorkspaceAgentBinding.class))).thenThrow(
+            new IllegalStateException("unavailable")
+        );
+
+        var request = new UpdateAgentBindingRequestDTO(99L, null, null, null, null, true);
+        assertThatThrownBy(() ->
+            service.upsertBinding(context(), AgentPurpose.PRACTICE_DETECTION, request)
+        ).isInstanceOf(IllegalArgumentException.class);
+        verify(bindingRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void upsertRejectsWhenNotExactlyOneModelIsProvided() {
+        Workspace w = workspace();
+        when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(w));
+        when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.MENTOR)).thenReturn(Optional.empty());
+
+        var bothNull = new UpdateAgentBindingRequestDTO(null, null, null, null, null, true);
+        assertThatThrownBy(() -> service.upsertBinding(context(), AgentPurpose.MENTOR, bothNull)).isInstanceOf(
+            IllegalArgumentException.class
+        );
+    }
+
+    @Test
+    void deleteRemovesTheBindingAndClearsTheLegacyPointer() {
+        Workspace w = workspace();
+        w.setMentorConfigId(55L);
+        when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(w));
+        WorkspaceAgentBinding existing = new WorkspaceAgentBinding();
+        when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.MENTOR)).thenReturn(Optional.of(existing));
+
+        service.deleteBinding(context(), AgentPurpose.MENTOR);
+
+        verify(bindingRepository).delete(existing);
+        assertThat(w.getMentorConfigId()).isNull();
     }
 }

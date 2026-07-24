@@ -27,6 +27,8 @@ tags:
   name: Slack channel activation
 - description: Per-workspace LLM spend rollup and budget status
   name: LLM Usage
+- description: Workspace-scoped per-purpose model bindings
+  name: Agent Binding
 - description: Manage practice areas
   name: Practice Areas
 - description: Workspace-scoped agent configuration management
@@ -1437,6 +1439,90 @@ paths:
       summary: Fetch a workspace by slug
       tags:
       - workspace
+  /workspaces/{workspaceSlug}/agent-bindings:
+    get:
+      operationId: getBindings
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AgentBinding"
+          description: Bindings returned
+      summary: List the workspace's agent bindings
+      tags:
+      - Agent Binding
+  /workspaces/{workspaceSlug}/agent-bindings/{purpose}:
+    delete:
+      operationId: deleteBinding
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: purpose
+        required: true
+        schema:
+          type: string
+          enum:
+          - PRACTICE_DETECTION
+          - MENTOR
+      responses:
+        "204":
+          description: Binding removed
+      summary: Unbind an agent purpose (turn it off)
+      tags:
+      - Agent Binding
+    put:
+      operationId: upsertBinding
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: purpose
+        required: true
+        schema:
+          type: string
+          enum:
+          - PRACTICE_DETECTION
+          - MENTOR
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAgentBindingRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentBinding"
+          description: Binding saved
+        "404":
+          description: Model not found
+      summary: Bind a model and limits to an agent purpose
+      tags:
+      - Agent Binding
   /workspaces/{workspaceSlug}/agent-configs:
     get:
       operationId: getConfigs
@@ -5476,6 +5562,38 @@ components:
       - memberCount
       - status
       - workspaceSlug
+    AgentBinding:
+      type: object
+      description: A workspace's agent binding for one purpose
+      properties:
+        allowInternet:
+          type: boolean
+        enabled:
+          type: boolean
+        instanceModelId:
+          type: integer
+          format: int64
+        maxConcurrentJobs:
+          type: integer
+          format: int32
+        purpose:
+          type: string
+          enum:
+          - PRACTICE_DETECTION
+          - MENTOR
+        ready:
+          type: boolean
+          description: True when the bound model is available to run right now
+        timeoutSeconds:
+          type: integer
+          format: int32
+        workspaceModelId:
+          type: integer
+          format: int64
+      required:
+      - enabled
+      - purpose
+      - ready
     AgentConfig:
       type: object
       description: Agent configuration for a workspace (API key redacted)

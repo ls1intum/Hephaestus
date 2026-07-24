@@ -4115,6 +4115,23 @@ export type AgentConfig = {
 };
 
 /**
+ * A workspace's agent binding for one purpose
+ */
+export type AgentBinding = {
+    allowInternet?: boolean;
+    enabled: boolean;
+    instanceModelId?: number;
+    maxConcurrentJobs?: number;
+    purpose: 'PRACTICE_DETECTION' | 'MENTOR';
+    /**
+     * True when the bound model is available to run right now
+     */
+    ready: boolean;
+    timeoutSeconds?: number;
+    workspaceModelId?: number;
+};
+
+/**
  * Metadata-only workspace summary for the instance-admin overview
  */
 export type AdminWorkspaceView = {
@@ -5332,6 +5349,78 @@ export type GetWorkspaceResponses = {
 };
 
 export type GetWorkspaceResponse = GetWorkspaceResponses[keyof GetWorkspaceResponses];
+
+export type GetBindingsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-bindings';
+};
+
+export type GetBindingsResponses = {
+    /**
+     * Bindings returned
+     */
+    200: Array<AgentBinding>;
+};
+
+export type GetBindingsResponse = GetBindingsResponses[keyof GetBindingsResponses];
+
+export type DeleteBindingData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        purpose: 'PRACTICE_DETECTION' | 'MENTOR';
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-bindings/{purpose}';
+};
+
+export type DeleteBindingResponses = {
+    /**
+     * Binding removed
+     */
+    204: void;
+};
+
+export type DeleteBindingResponse = DeleteBindingResponses[keyof DeleteBindingResponses];
+
+export type UpsertBindingData = {
+    body: UpdateAgentBindingRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        purpose: 'PRACTICE_DETECTION' | 'MENTOR';
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-bindings/{purpose}';
+};
+
+export type UpsertBindingErrors = {
+    /**
+     * Model not found
+     */
+    404: unknown;
+};
+
+export type UpsertBindingResponses = {
+    /**
+     * Binding saved
+     */
+    200: AgentBinding;
+};
+
+export type UpsertBindingResponse = UpsertBindingResponses[keyof UpsertBindingResponses];
 
 export type GetConfigsData = {
     body?: never;
