@@ -7,8 +7,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.catalog.InstanceLlmSettings;
-import de.tum.cit.aet.hephaestus.agent.catalog.InstanceLlmSettingsService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -28,9 +26,6 @@ class LlmBudgetServiceTest extends BaseUnitTest {
     @Mock
     private WorkspaceRepository workspaceRepository;
 
-    @Mock
-    private InstanceLlmSettingsService instanceLlmSettingsService;
-
     private LlmBudgetService budgetService;
 
     @BeforeEach
@@ -38,7 +33,6 @@ class LlmBudgetServiceTest extends BaseUnitTest {
         budgetService = new LlmBudgetService(
             usageRepository,
             workspaceRepository,
-            instanceLlmSettingsService,
             new io.micrometer.core.instrument.simple.SimpleMeterRegistry()
         );
     }
@@ -95,35 +89,30 @@ class LlmBudgetServiceTest extends BaseUnitTest {
         }
     }
 
-    /** #1368 fix wave: {@link LlmBudgetService#blockReason} folds in defaultUnpricedPolicy=BLOCK. */
+    /**
+     * #1368: {@link LlmBudgetService#blockReason} blocks a capped workspace on EXHAUSTED and on an
+     * UNVERIFIABLE month (a cap whose true spend can't be confirmed is not a cap). Uncapped
+     * workspaces are never blocked.
+     */
     @Nested
     class BlockReason {
 
-        private void stubInstancePolicy(String policy) {
-            InstanceLlmSettings settings = new InstanceLlmSettings();
-            settings.setDefaultUnpricedPolicy(policy);
-            when(instanceLlmSettingsService.get()).thenReturn(settings);
-        }
-
         @Test
-        void uncappedWorkspaceIsNeverBlocked_evenUnderTheBlockPolicy() {
+        void uncappedWorkspaceIsNeverBlocked() {
             assertThat(budgetService.blockReason(workspaceWithBudget(null))).isEqualTo(LlmBudgetBlockReason.NONE);
-            // Never even asked the ledger or the instance policy — uncapped short-circuits first.
+            // Never even asked the ledger — uncapped short-circuits first.
             verify(usageRepository, never()).sumCost(any(), any(), any());
-            verify(instanceLlmSettingsService, never()).get();
         }
 
         @Test
-        void exhaustedBudgetBlocksRegardlessOfPolicy() {
+        void exhaustedBudgetBlocks() {
             stubMonthSpend("10.00");
 
             assertThat(budgetService.blockReason(workspaceWithBudget(new BigDecimal("10.00")))).isEqualTo(
                 LlmBudgetBlockReason.EXHAUSTED
             );
-            // EXHAUSTED is provable from the priced sum alone — never needs the unpriced-event query
-            // or the instance policy (which only matters for UNVERIFIABLE).
+            // EXHAUSTED is provable from the priced sum alone — never needs the unpriced-event query.
             verify(usageRepository, never()).existsUnpricedInstanceFunded(any(), any(), any());
-            verify(instanceLlmSettingsService, never()).get();
         }
 
         @Test
@@ -137,21 +126,9 @@ class LlmBudgetServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void unverifiableMonthIsNotBlockedUnderTheDefaultWarnPolicy() {
+        void unverifiableMonthBlocksACappedWorkspace() {
             stubMonthSpend("1.00");
             stubHasUnpriced(true);
-            stubInstancePolicy("WARN");
-
-            assertThat(budgetService.blockReason(workspaceWithBudget(new BigDecimal("10.00")))).isEqualTo(
-                LlmBudgetBlockReason.NONE
-            );
-        }
-
-        @Test
-        void unverifiableMonthIsBlockedUnderTheBlockPolicy_whenBudgetIsSet() {
-            stubMonthSpend("1.00");
-            stubHasUnpriced(true);
-            stubInstancePolicy("BLOCK");
 
             assertThat(budgetService.blockReason(workspaceWithBudget(new BigDecimal("10.00")))).isEqualTo(
                 LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED

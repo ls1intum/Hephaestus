@@ -54,9 +54,6 @@ public class InstanceLlmSettingsService {
         if (request.allowWorkspaceConnections() != null) {
             settings.setAllowWorkspaceConnections(request.allowWorkspaceConnections());
         }
-        if (request.defaultUnpricedPolicy() != null) {
-            settings.setDefaultUnpricedPolicy(request.defaultUnpricedPolicy());
-        }
 
         settings.setUpdatedAt(Instant.now());
         settings.setUpdatedBy(SecurityUtils.getCurrentUserLogin().orElse(null));
@@ -64,7 +61,7 @@ public class InstanceLlmSettingsService {
 
         LlmSettingsAudit llmSettingsAudit = llmSettingsAuditProvider.getIfAvailable();
         if (llmSettingsAudit != null) {
-            llmSettingsAudit.settingsChanged(saved.isAllowWorkspaceConnections(), saved.getDefaultUnpricedPolicy());
+            llmSettingsAudit.settingsChanged(saved.isAllowWorkspaceConnections());
         }
         return saved;
     }
@@ -73,7 +70,6 @@ public class InstanceLlmSettingsService {
         InstanceLlmSettings settings = new InstanceLlmSettings();
         settings.setId(SINGLETON_ID);
         settings.setAllowWorkspaceConnections(true);
-        settings.setDefaultUnpricedPolicy("WARN");
         return settings;
     }
 }

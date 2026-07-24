@@ -83,14 +83,10 @@ public class LlmCatalogAuditAdapter implements LlmConnectionAudit, LlmModelAudit
     }
 
     @Override
-    public void settingsChanged(boolean allowWorkspaceConnections, String defaultUnpricedPolicy) {
+    public void settingsChanged(boolean allowWorkspaceConnections) {
         record(
             AuthEvent.EventType.LLM_SETTINGS_CHANGED,
-            "{\"allowWorkspaceConnections\":" +
-                allowWorkspaceConnections +
-                ",\"defaultUnpricedPolicy\":\"" +
-                jsonEscape(defaultUnpricedPolicy) +
-                "\"}"
+            "{\"allowWorkspaceConnections\":" + allowWorkspaceConnections + "}"
         );
     }
 

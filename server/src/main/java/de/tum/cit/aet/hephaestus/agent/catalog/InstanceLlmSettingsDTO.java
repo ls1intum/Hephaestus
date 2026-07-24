@@ -13,16 +13,9 @@ public record InstanceLlmSettingsDTO(
     String allowedEgressHosts,
     @NonNull
     @Schema(description = "Whether workspaces may register their own LLM connections")
-    Boolean allowWorkspaceConnections,
-    @NonNull
-    @Schema(description = "Default policy for usage reported without a price", example = "WARN")
-    String defaultUnpricedPolicy
+    Boolean allowWorkspaceConnections
 ) {
     public static InstanceLlmSettingsDTO from(InstanceLlmSettings settings) {
-        return new InstanceLlmSettingsDTO(
-            settings.getAllowedEgressHosts(),
-            settings.isAllowWorkspaceConnections(),
-            settings.getDefaultUnpricedPolicy()
-        );
+        return new InstanceLlmSettingsDTO(settings.getAllowedEgressHosts(), settings.isAllowWorkspaceConnections());
     }
 }

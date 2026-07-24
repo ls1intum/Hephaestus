@@ -12,5 +12,5 @@ package de.tum.cit.aet.hephaestus.core.auth.spi;
  * {@code @ConditionalOnServerRole} implementation.
  */
 public interface LlmSettingsAudit {
-    void settingsChanged(boolean allowWorkspaceConnections, String defaultUnpricedPolicy);
+    void settingsChanged(boolean allowWorkspaceConnections);
 }

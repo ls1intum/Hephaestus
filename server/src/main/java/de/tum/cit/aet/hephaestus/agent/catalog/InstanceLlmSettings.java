@@ -41,10 +41,6 @@ public class InstanceLlmSettings {
     @Column(name = "allow_workspace_connections", nullable = false)
     private boolean allowWorkspaceConnections = true;
 
-    @ColumnDefault("'WARN'")
-    @Column(name = "default_unpriced_policy", nullable = false, length = 16)
-    private String defaultUnpricedPolicy = "WARN";
-
     @Nullable
     @Column(name = "updated_at")
     private Instant updatedAt;

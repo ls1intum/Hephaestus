@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.usage;
 
-import de.tum.cit.aet.hephaestus.agent.catalog.InstanceLlmSettingsService;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -37,12 +36,13 @@ import org.springframework.transaction.annotation.Transactional;
  *       SSE and Slack turns, checked before the turn persists anything.</li>
  * </ul>
  *
- * <p>{@link #blockReason} additionally folds in the instance's {@code defaultUnpricedPolicy}
- * (#1368 fix wave): when set to {@code BLOCK}, a workspace whose month is
- * {@link LlmBudgetVerdict#UNVERIFIABLE} (budget set, but at least one instance-funded event has no
- * resolvable price) is blocked exactly like {@link LlmBudgetVerdict#EXHAUSTED} at all three gates
- * above. The default {@code WARN} policy never blocks — see {@link #isBudgetExhausted}, which
- * stays EXHAUSTED-only and is what the gates used before this policy existed.
+ * <p>{@link #blockReason} also blocks a workspace whose month is
+ * {@link LlmBudgetVerdict#UNVERIFIABLE} — a budget is set, but at least one instance-funded event
+ * has no resolvable price, so the true spend cannot be confirmed against the cap. A cap you cannot
+ * verify is not a cap, so an unverifiable month on a capped workspace is blocked exactly like
+ * {@link LlmBudgetVerdict#EXHAUSTED}. An uncapped workspace is never blocked either way (it opted
+ * out of enforcement); {@link #isBudgetExhausted} stays EXHAUSTED-only for callers that want the
+ * confirmed-spend signal alone.
  */
 @Service
 public class LlmBudgetService {
@@ -51,18 +51,15 @@ public class LlmBudgetService {
 
     private final LlmUsageEventRepository usageRepository;
     private final WorkspaceRepository workspaceRepository;
-    private final InstanceLlmSettingsService instanceLlmSettingsService;
     private final MeterRegistry meterRegistry;
 
     public LlmBudgetService(
         LlmUsageEventRepository usageRepository,
         WorkspaceRepository workspaceRepository,
-        InstanceLlmSettingsService instanceLlmSettingsService,
         MeterRegistry meterRegistry
     ) {
         this.usageRepository = usageRepository;
         this.workspaceRepository = workspaceRepository;
-        this.instanceLlmSettingsService = instanceLlmSettingsService;
         this.meterRegistry = meterRegistry;
     }
 
@@ -138,24 +135,14 @@ public class LlmBudgetService {
         if (monthlyBudgetUsd == null) {
             return LlmBudgetBlockReason.NONE; // uncapped = never blocked, either reason
         }
+        // Reached only for a capped workspace (uncapped returned NONE above): an unverifiable month
+        // is blocked just like an exhausted one — a cap whose true spend can't be confirmed is not a
+        // cap. Uncapped workspaces opted out of enforcement and are never blocked for either reason.
         return switch (currentVerdict(workspaceId, monthlyBudgetUsd)) {
             case EXHAUSTED -> LlmBudgetBlockReason.EXHAUSTED;
-            case UNVERIFIABLE -> blocksUnpricedUsage()
-                ? LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED
-                : LlmBudgetBlockReason.NONE;
+            case UNVERIFIABLE -> LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED;
             case WITHIN -> LlmBudgetBlockReason.NONE;
         };
-    }
-
-    /**
-     * True when the instance's {@code defaultUnpricedPolicy} is {@code BLOCK} — the default
-     * {@code WARN} never blocks, it only surfaces in the usage rollup. Reads the settings singleton
-     * directly (no dedicated accessor on {@link InstanceLlmSettingsService}): the raw string column
-     * is validated to exactly {@code WARN|BLOCK} at the write side
-     * ({@code UpdateInstanceLlmSettingsRequestDTO}).
-     */
-    private boolean blocksUnpricedUsage() {
-        return "BLOCK".equals(instanceLlmSettingsService.get().getDefaultUnpricedPolicy());
     }
 
     /**

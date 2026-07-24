@@ -11,9 +11,9 @@ package de.tum.cit.aet.hephaestus.agent.usage;
  *   <li>{@link #EXHAUSTED} — confirmed (priced, instance-funded) spend has reached the workspace's
  *       monthly cap.</li>
  *   <li>{@link #UNPRICED_USAGE_BLOCKED} — the month is {@link LlmBudgetVerdict#UNVERIFIABLE} (at
- *       least one instance-funded event has no resolvable price) AND the instance's
- *       {@code defaultUnpricedPolicy} is {@code BLOCK}. Only reachable for a workspace that has a
- *       budget set — an uncapped workspace is never blocked by either reason.</li>
+ *       least one instance-funded event has no resolvable price), so the true spend cannot be
+ *       confirmed against the cap. Only reachable for a workspace that has a budget set — an uncapped
+ *       workspace opted out of enforcement and is never blocked by either reason.</li>
  * </ul>
  */
 public enum LlmBudgetBlockReason {

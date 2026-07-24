@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.Pattern;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -15,9 +14,5 @@ public record UpdateInstanceLlmSettingsRequestDTO(
     String allowedEgressHosts,
     @Nullable
     @Schema(description = "Whether workspaces may register their own LLM connections")
-    Boolean allowWorkspaceConnections,
-    @Nullable
-    @Pattern(regexp = "WARN|BLOCK", message = "defaultUnpricedPolicy must be WARN or BLOCK")
-    @Schema(description = "Default policy for usage reported without a price", allowableValues = { "WARN", "BLOCK" })
-    String defaultUnpricedPolicy
+    Boolean allowWorkspaceConnections
 ) {}

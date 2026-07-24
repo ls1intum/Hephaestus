@@ -1109,10 +1109,6 @@ export type UpdateInstanceLlmSettingsRequest = {
      * Comma/newline-delimited egress host allowlist; blank clears it
      */
     allowedEgressHosts?: string;
-    /**
-     * Default policy for usage reported without a price
-     */
-    defaultUnpricedPolicy?: 'WARN' | 'BLOCK';
 };
 
 /**
@@ -3117,10 +3113,6 @@ export type InstanceLlmSettings = {
      * Comma/newline-delimited egress host allowlist; blank = allow any public host
      */
     allowedEgressHosts?: string;
-    /**
-     * Default policy for usage reported without a price
-     */
-    defaultUnpricedPolicy: string;
 };
 
 /**

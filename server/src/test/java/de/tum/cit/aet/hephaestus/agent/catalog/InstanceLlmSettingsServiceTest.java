@@ -41,7 +41,7 @@ class InstanceLlmSettingsServiceTest extends BaseUnitTest {
     }
 
     private UpdateInstanceLlmSettingsRequestDTO request() {
-        return new UpdateInstanceLlmSettingsRequestDTO(null, false, "BLOCK");
+        return new UpdateInstanceLlmSettingsRequestDTO(null, false);
     }
 
     @Nested
@@ -57,7 +57,7 @@ class InstanceLlmSettingsServiceTest extends BaseUnitTest {
 
             settingsService.update(request());
 
-            verify(llmSettingsAudit).settingsChanged(false, "BLOCK");
+            verify(llmSettingsAudit).settingsChanged(false);
         }
 
         @Test

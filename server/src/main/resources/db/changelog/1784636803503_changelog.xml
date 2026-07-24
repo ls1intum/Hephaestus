@@ -1150,4 +1150,28 @@
         </rollback>
     </changeSet>
 
+    <changeSet id="1784636803503-56" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="Unpriced-usage policy column already removed">
+            <columnExists tableName="instance_llm_settings" columnName="default_unpriced_policy"/>
+        </preConditions>
+        <comment>
+            Remove the WARN/BLOCK default_unpriced_policy knob (#1368). Enforcement is now structural: a
+            capped workspace whose month is unverifiable (some instance-funded spend has no resolvable
+            price) is always blocked — a cap you cannot verify is not a cap — while an uncapped
+            workspace is never blocked. The Postgres column-drop cascades its CHECK constraint.
+        </comment>
+        <dropColumn tableName="instance_llm_settings" columnName="default_unpriced_policy"/>
+        <rollback>
+            <addColumn tableName="instance_llm_settings">
+                <column name="default_unpriced_policy" type="VARCHAR(16)" defaultValue="WARN">
+                    <constraints nullable="false"/>
+                </column>
+            </addColumn>
+            <sql>
+                ALTER TABLE instance_llm_settings ADD CONSTRAINT ck_instance_llm_settings_unpriced_policy
+                CHECK (default_unpriced_policy IN ('WARN','BLOCK'));
+            </sql>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

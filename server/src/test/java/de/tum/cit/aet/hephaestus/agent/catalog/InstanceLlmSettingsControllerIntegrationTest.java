@@ -36,12 +36,11 @@ class InstanceLlmSettingsControllerIntegrationTest extends AbstractWorkspaceInte
 
         assertThat(settings).isNotNull();
         assertThat(settings.allowWorkspaceConnections()).isTrue();
-        assertThat(settings.defaultUnpricedPolicy()).isEqualTo("WARN");
     }
 
     @Test
     void appAdminCanUpdateSettingsAndGetReflectsThePatch() {
-        var request = new UpdateInstanceLlmSettingsRequestDTO("api.openai.com\napi.anthropic.com", false, "BLOCK");
+        var request = new UpdateInstanceLlmSettingsRequestDTO("api.openai.com\napi.anthropic.com", false);
 
         InstanceLlmSettingsDTO updated = webTestClient
             .put()
@@ -58,7 +57,6 @@ class InstanceLlmSettingsControllerIntegrationTest extends AbstractWorkspaceInte
 
         assertThat(updated).isNotNull();
         assertThat(updated.allowWorkspaceConnections()).isFalse();
-        assertThat(updated.defaultUnpricedPolicy()).isEqualTo("BLOCK");
         assertThat(updated.allowedEgressHosts()).contains("api.openai.com");
 
         InstanceLlmSettingsDTO fetched = webTestClient
@@ -73,7 +71,6 @@ class InstanceLlmSettingsControllerIntegrationTest extends AbstractWorkspaceInte
             .getResponseBody();
         assertThat(fetched).isNotNull();
         assertThat(fetched.allowWorkspaceConnections()).isFalse();
-        assertThat(fetched.defaultUnpricedPolicy()).isEqualTo("BLOCK");
     }
 
     @Test
@@ -83,7 +80,7 @@ class InstanceLlmSettingsControllerIntegrationTest extends AbstractWorkspaceInte
             .uri("/admin/llm/settings")
             .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateInstanceLlmSettingsRequestDTO(null, false, null))
+            .bodyValue(new UpdateInstanceLlmSettingsRequestDTO("api.openai.com", false))
             .exchange()
             .expectStatus()
             .isOk();
@@ -93,8 +90,8 @@ class InstanceLlmSettingsControllerIntegrationTest extends AbstractWorkspaceInte
             .uri("/admin/llm/settings")
             .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
             .contentType(MediaType.APPLICATION_JSON)
-            // Only touch defaultUnpricedPolicy this time — allowWorkspaceConnections=false must survive.
-            .bodyValue(new UpdateInstanceLlmSettingsRequestDTO(null, null, "BLOCK"))
+            // Only touch the egress hosts this time — allowWorkspaceConnections=false must survive.
+            .bodyValue(new UpdateInstanceLlmSettingsRequestDTO("api.openai.com\napi.anthropic.com", null))
             .exchange()
             .expectStatus()
             .isOk()
@@ -104,7 +101,7 @@ class InstanceLlmSettingsControllerIntegrationTest extends AbstractWorkspaceInte
 
         assertThat(fetched).isNotNull();
         assertThat(fetched.allowWorkspaceConnections()).isFalse();
-        assertThat(fetched.defaultUnpricedPolicy()).isEqualTo("BLOCK");
+        assertThat(fetched.allowedEgressHosts()).contains("api.anthropic.com");
     }
 
     @Test

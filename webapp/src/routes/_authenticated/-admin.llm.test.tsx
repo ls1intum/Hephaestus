@@ -20,7 +20,6 @@ describe("AdminLlmPage", () => {
 		queryClient.setQueryData(adminGetLlmSettingsQueryKey(), {
 			allowWorkspaceConnections: true,
 			allowedEgressHosts: "",
-			defaultUnpricedPolicy: "WARN",
 		});
 
 		if (!AdminLlmPage) throw new Error("Admin LLM route must have a component");

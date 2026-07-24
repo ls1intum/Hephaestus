@@ -6,7 +6,6 @@ import { InstanceLlmSettingsCard } from "./InstanceLlmSettingsCard";
 const mockSettings: InstanceLlmSettings = {
 	allowWorkspaceConnections: true,
 	allowedEgressHosts: "api.openai.com\nllm.example.com",
-	defaultUnpricedPolicy: "WARN",
 };
 
 const meta = {
@@ -36,7 +35,7 @@ export const Default: Story = {};
 /** Every host allowed (blank allowlist) and workspace connections turned off. */
 export const NoAllowlistByoDisabled: Story = {
 	args: {
-		settings: { allowWorkspaceConnections: false, defaultUnpricedPolicy: "WARN" },
+		settings: { allowWorkspaceConnections: false },
 	},
 };
 

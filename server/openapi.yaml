@@ -7055,13 +7055,8 @@ components:
           description: Comma/newline-delimited egress host allowlist; blank = allow
             any public host
           example: "api.openai.com, llm-gateway.example.com"
-        defaultUnpricedPolicy:
-          type: string
-          description: Default policy for usage reported without a price
-          example: WARN
       required:
       - allowWorkspaceConnections
-      - defaultUnpricedPolicy
     IntegrationCatalogEntry:
       type: object
       description: Integration kind availability + connection status for this workspace
@@ -9472,13 +9467,6 @@ components:
           type: string
           description: Comma/newline-delimited egress host allowlist; blank clears
             it
-        defaultUnpricedPolicy:
-          type: string
-          description: Default policy for usage reported without a price
-          enum:
-          - WARN
-          - BLOCK
-          pattern: WARN|BLOCK
     UpdateLeaderboardDigestRequest:
       type: object
       description: Request to update the entire weekly leaderboard digest configuration
