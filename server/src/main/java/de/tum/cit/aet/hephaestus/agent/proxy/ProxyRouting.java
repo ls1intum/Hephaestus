@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -12,6 +13,9 @@ import org.jspecify.annotations.Nullable;
  *
  * @param principalDescription log/metrics-safe identifier of the caller (job id or mentor session
  *     description) — never the token.
+ * @param sourceId the {@code agent_job} id this route bills to, so the proxy can attribute per-call
+ *     token usage to the job for crash-safe accounting (#1368). {@code null} for the mentor route,
+ *     which meters per turn at completion instead.
  */
 public record ProxyRouting(
     String principalDescription,
@@ -21,7 +25,8 @@ public record ProxyRouting(
     @Nullable Long connectionId,
     @Nullable Long modelId,
     @Nullable Long workspaceId,
-    @Nullable Long legacyConfigId
+    @Nullable Long legacyConfigId,
+    @Nullable UUID sourceId
 ) {
     public ProxyRouting(
         String principalDescription,
@@ -31,6 +36,16 @@ public record ProxyRouting(
         @Nullable Long connectionId,
         @Nullable Long legacyConfigId
     ) {
-        this(principalDescription, apiProtocol, baseUrl, connectionScope, connectionId, null, null, legacyConfigId);
+        this(
+            principalDescription,
+            apiProtocol,
+            baseUrl,
+            connectionScope,
+            connectionId,
+            null,
+            null,
+            legacyConfigId,
+            null
+        );
     }
 }

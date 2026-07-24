@@ -350,7 +350,7 @@ public class AgentJobExecutor {
                     int updated =
                         workerId != null ? requeueOrphanWithRotation(jobId, workerId, job.getRetryCount()) : 0;
                     if (updated > 0) {
-                        if (job.getExecutionStartedAt() != null) recordUnverifiableUsage(job, "worker draining");
+                        if (job.getExecutionStartedAt() != null) billTerminatedJob(job, "worker draining");
                         return;
                     }
                     int cancelled =
@@ -371,7 +371,7 @@ public class AgentJobExecutor {
                                   Set.of(AgentJobStatus.RUNNING)
                               );
                     if (cancelled > 0 && job.getExecutionStartedAt() != null) {
-                        recordUnverifiableUsage(job, "worker draining");
+                        billTerminatedJob(job, "worker draining");
                     }
                 });
                 sandboxManager.cancel(jobId);
@@ -860,32 +860,53 @@ public class AgentJobExecutor {
                 Instant.now(),
                 "Cancelled during execution"
             );
-            if (updated > 0) recordUnverifiableUsage(job, "cancelled during execution");
+            if (updated > 0) billTerminatedJob(job, "cancelled during execution");
         });
         log.info("Agent job cancelled: jobId={}", jobId);
     }
 
-    /** Append an attempt-scoped UNPRICED row inside the job transition/requeue transaction. */
-    private void recordUnverifiableUsage(AgentJob job, String reason) {
+    /**
+     * Record the ledger entry for a job that ended without a clean terminal write (worker drain,
+     * cancellation, infra-retry give-up, or execution failure), inside the transition transaction.
+     *
+     * <p>#1368: the proxy attributes each non-streaming call's tokens to the job as it runs, so a
+     * job that died mid-run still knows what it spent. If it made real, priced calls, bill them
+     * PRICED here; otherwise fall back to a zero-token UNPRICED row so the month is still flagged
+     * unverifiable. The token totals are read straight from the row (a projection), so a stale
+     * in-memory {@code job} does not hide the proxy's committed accumulations.
+     */
+    private void billTerminatedJob(AgentJob job, String reason) {
         ConfigSnapshot snapshot = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
         LlmPriceSnapshot price = admittedPrice(snapshot);
+        AgentJobLlmUsage counts = jobRepository.findLlmUsageById(job.getId()).orElse(null);
+        boolean billable = counts != null && counts.hasBillableUsage() && price.pricingState() != PricingState.UNPRICED;
         LlmUsageRecorder.LlmUsageSample sample = new LlmUsageRecorder.LlmUsageSample(
             LlmUsageJobType.from(job.getJobType()),
             LlmUsageSourceType.AGENT_JOB,
             job.getId(),
             job.getRetryCount(),
             snapshot.upstreamModelId(),
-            0L,
-            0L,
-            0L,
-            0L,
-            0L,
-            0,
+            billable ? counts.inputTokens() : 0L,
+            billable ? counts.outputTokens() : 0L,
+            billable ? counts.cacheReadTokens() : 0L,
+            billable ? counts.cacheWriteTokens() : 0L,
+            billable ? counts.reasoningTokens() : 0L,
+            billable ? counts.totalCalls() : 0,
             price,
             Instant.now()
         );
-        usageRecorder.recordUnverifiable(job.getWorkspace().getId(), sample);
-        log.info("Recorded UNPRICED usage ledger entry ({}): jobId={}", reason, job.getId());
+        if (billable) {
+            usageRecorder.record(job.getWorkspace().getId(), sample);
+            log.info(
+                "Recorded PRICED usage for terminated job ({}): jobId={}, calls={}",
+                reason,
+                job.getId(),
+                counts.totalCalls()
+            );
+        } else {
+            usageRecorder.recordUnverifiable(job.getWorkspace().getId(), sample);
+            log.info("Recorded UNPRICED usage ledger entry ({}): jobId={}", reason, job.getId());
+        }
     }
 
     private @Nullable ConfigSnapshot parseSnapshotQuietly(AgentJob job) {
@@ -939,7 +960,7 @@ public class AgentJobExecutor {
             Integer updated = transactionTemplate.execute(status -> {
                 int rows = requeueOrphanWithRotation(jobId, workerId, currentRetryCount);
                 if (rows > 0 && sandboxExecutionStarted) {
-                    recordUnverifiableUsage(job, "infra-failure retry (attempt " + (currentRetryCount + 1) + ")");
+                    billTerminatedJob(job, "infra-failure retry (attempt " + (currentRetryCount + 1) + ")");
                 }
                 return rows;
             });
@@ -961,7 +982,7 @@ public class AgentJobExecutor {
 
         transactionTemplate.executeWithoutResult(status -> {
             int updated = transitionTerminal(jobId, AgentJobStatus.FAILED, Instant.now(), errorMessage);
-            if (updated > 0 && sandboxExecutionStarted) recordUnverifiableUsage(job, "execution failure");
+            if (updated > 0 && sandboxExecutionStarted) billTerminatedJob(job, "execution failure");
         });
         return AgentJobStatus.FAILED.name();
     }
@@ -1055,9 +1076,11 @@ public class AgentJobExecutor {
             if (blockReason != LlmBudgetBlockReason.NONE) {
                 Instant now = Instant.now();
                 boolean expired =
-                    job.getCreatedAt() != null && Duration.between(job.getCreatedAt(), now).compareTo(BUDGET_HOLD_MAX_AGE) > 0;
+                    job.getCreatedAt() != null &&
+                    Duration.between(job.getCreatedAt(), now).compareTo(BUDGET_HOLD_MAX_AGE) > 0;
                 if (expired) {
-                    String message = "Budget reached; queued work expired after " + BUDGET_HOLD_MAX_AGE.toDays() + " days.";
+                    String message =
+                        "Budget reached; queued work expired after " + BUDGET_HOLD_MAX_AGE.toDays() + " days.";
                     job.setStatus(AgentJobStatus.CANCELLED);
                     job.setCompletedAt(now);
                     job.setErrorMessage(message);

@@ -388,23 +388,29 @@ public class AgentJobZombieSweeper {
                       null,
                       null
                   );
-        usageRecorder.recordUnverifiable(
-            job.getWorkspace().getId(),
-            new LlmUsageRecorder.LlmUsageSample(
-                LlmUsageJobType.from(job.getJobType()),
-                LlmUsageSourceType.AGENT_JOB,
-                job.getId(),
-                job.getRetryCount(),
-                snapshot.upstreamModelId(),
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                price,
-                Instant.now()
-            )
+        // #1368: a reaped zombie made real, priced calls through the proxy before it was abandoned —
+        // bill them from the tokens the proxy attributed to the row instead of recording zero cost.
+        AgentJobLlmUsage counts = jobRepository.findLlmUsageById(job.getId()).orElse(null);
+        boolean billable = counts != null && counts.hasBillableUsage() && price.pricingState() != PricingState.UNPRICED;
+        LlmUsageRecorder.LlmUsageSample sample = new LlmUsageRecorder.LlmUsageSample(
+            LlmUsageJobType.from(job.getJobType()),
+            LlmUsageSourceType.AGENT_JOB,
+            job.getId(),
+            job.getRetryCount(),
+            snapshot.upstreamModelId(),
+            billable ? counts.inputTokens() : 0,
+            billable ? counts.outputTokens() : 0,
+            billable ? counts.cacheReadTokens() : 0,
+            billable ? counts.cacheWriteTokens() : 0,
+            billable ? counts.reasoningTokens() : 0,
+            billable ? counts.totalCalls() : 0,
+            price,
+            Instant.now()
         );
+        if (billable) {
+            usageRecorder.record(job.getWorkspace().getId(), sample);
+        } else {
+            usageRecorder.recordUnverifiable(job.getWorkspace().getId(), sample);
+        }
     }
 }

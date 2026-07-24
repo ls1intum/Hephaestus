@@ -125,7 +125,8 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
                 snapshot.connectionId(),
                 snapshot.modelId(),
                 job.getWorkspace().getId(),
-                snapshot.configId()
+                snapshot.configId(),
+                job.getId()
             )
         );
     }

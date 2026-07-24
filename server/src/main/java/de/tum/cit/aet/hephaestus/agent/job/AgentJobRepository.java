@@ -172,6 +172,48 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     );
 
     /**
+     * Add one proxied call's token usage to the job's running totals (#1368). Written by the LLM
+     * proxy per non-streaming call so a job that crashes mid-run still has the calls it made on
+     * record — the terminal write overwrites these with the runner-reported authoritative totals on
+     * a clean finish, so on the happy path this is superseded and never double-counts.
+     */
+    @WorkspaceAgnostic("ID-based per-call usage accumulation from the worker-local proxy")
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        "UPDATE AgentJob j SET " +
+            "j.llmTotalCalls = COALESCE(j.llmTotalCalls, 0) + 1, " +
+            "j.llmTotalInputTokens = COALESCE(j.llmTotalInputTokens, 0) + :input, " +
+            "j.llmTotalOutputTokens = COALESCE(j.llmTotalOutputTokens, 0) + :output, " +
+            "j.llmTotalReasoningTokens = COALESCE(j.llmTotalReasoningTokens, 0) + :reasoning, " +
+            "j.llmCacheReadTokens = COALESCE(j.llmCacheReadTokens, 0) + :cacheRead, " +
+            "j.llmCacheWriteTokens = COALESCE(j.llmCacheWriteTokens, 0) + :cacheWrite " +
+            "WHERE j.id = :id"
+    )
+    int accumulateLlmUsage(
+        @Param("id") UUID id,
+        @Param("input") int input,
+        @Param("output") int output,
+        @Param("reasoning") int reasoning,
+        @Param("cacheRead") int cacheRead,
+        @Param("cacheWrite") int cacheWrite
+    );
+
+    /**
+     * The job's accumulated LLM token totals read straight from the row (constructor projection, so
+     * it reflects committed proxy accumulations regardless of a stale in-memory entity). Used by the
+     * crash/cancel accounting paths to bill the calls a job actually made before it died.
+     */
+    @WorkspaceAgnostic("ID-based usage read; job ID from worker-local terminal accounting")
+    @Query(
+        "SELECT new de.tum.cit.aet.hephaestus.agent.job.AgentJobLlmUsage(" +
+            "COALESCE(j.llmTotalCalls, 0), COALESCE(j.llmTotalInputTokens, 0), " +
+            "COALESCE(j.llmTotalOutputTokens, 0), COALESCE(j.llmTotalReasoningTokens, 0), " +
+            "COALESCE(j.llmCacheReadTokens, 0), COALESCE(j.llmCacheWriteTokens, 0)) " +
+            "FROM AgentJob j WHERE j.id = :id"
+    )
+    java.util.Optional<AgentJobLlmUsage> findLlmUsageById(@Param("id") UUID id);
+
+    /**
      * Like {@link #transitionToCancelled}, fenced to the owning worker (#1368 fix wave, mirrors
      * {@link #transitionStatusOwnedBy}): a worker draining a job it believes it still owns must not
      * cancel a sibling's run if the job was orphan-requeued out from under it between the drain

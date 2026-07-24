@@ -911,6 +911,49 @@ class AgentJobExecutorTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("a crashed job that made priced proxy calls bills them PRICED, not zero")
+        void cancelledAfterStart_withProxyMeteredCalls_recordsPricedLedgerEntry() {
+            // The proxy accumulated real calls onto the row before the crash, and the frozen price is
+            // PRICED — the crash accounting must bill those tokens instead of a zero-token UNPRICED row.
+            var priced = new de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot(
+                de.tum.cit.aet.hephaestus.agent.usage.FundingSource.INSTANCE,
+                de.tum.cit.aet.hephaestus.agent.usage.PricingState.PRICED,
+                1L,
+                null,
+                new java.math.BigDecimal("1.00"),
+                new java.math.BigDecimal("2.00"),
+                new java.math.BigDecimal("0.10"),
+                new java.math.BigDecimal("0.20")
+            );
+            job.setConfigSnapshot(snapshot.withPriceSnapshot(priced).toJson(objectMapper));
+
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
+            when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
+            when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(jobRepository.transitionStatus(any(), eq(AgentJobStatus.CANCELLED), any(), any(), any())).thenReturn(
+                1
+            );
+            when(jobRepository.findByIdWithWorkspace(jobId)).thenReturn(Optional.of(job));
+            when(jobRepository.findLlmUsageById(job.getId())).thenReturn(
+                Optional.of(new AgentJobLlmUsage(3, 800, 500, 40, 200, 0))
+            );
+
+            setupFullExecutionWithException(new SandboxCancelledException("cancelled"));
+
+            executor.processJob(jobId);
+
+            ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample = ArgumentCaptor.forClass(
+                LlmUsageRecorder.LlmUsageSample.class
+            );
+            verify(usageRecorder).record(eq(99L), sample.capture());
+            assertThat(sample.getValue().totalCalls()).isEqualTo(3);
+            assertThat(sample.getValue().inputTokens()).isEqualTo(800);
+            assertThat(sample.getValue().outputTokens()).isEqualTo(500);
+            verify(usageRecorder, never()).recordUnverifiable(any(), any());
+        }
+
+        @Test
         @DisplayName(
             "a cancellation fence loss does not write usage outside the transaction that won the state transition"
         )

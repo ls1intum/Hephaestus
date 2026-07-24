@@ -38,6 +38,9 @@ class LlmProxyControllerTest extends BaseUnitTest {
     @Mock
     private ProxyBudgetGate budgetGate;
 
+    @Mock
+    private ProxyUsageAccumulator usageAccumulator;
+
     private LlmProxyController controller;
 
     @BeforeEach
@@ -49,7 +52,8 @@ class LlmProxyControllerTest extends BaseUnitTest {
             egressPolicy,
             OBJECT_MAPPER,
             new SimpleMeterRegistry(),
-            budgetGate
+            budgetGate,
+            usageAccumulator
         );
     }
 
@@ -341,7 +345,8 @@ class LlmProxyControllerTest extends BaseUnitTest {
             7L,
             8L,
             9L,
-            null
+            null,
+            java.util.UUID.fromString("00000000-0000-0000-0000-0000000000aa")
         );
     }
 

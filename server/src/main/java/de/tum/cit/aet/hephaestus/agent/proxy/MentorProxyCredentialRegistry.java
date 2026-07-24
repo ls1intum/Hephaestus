@@ -128,7 +128,8 @@ public class MentorProxyCredentialRegistry {
                 entry.connectionId(),
                 entry.modelId(),
                 entry.workspaceId(),
-                entry.legacyConfigId()
+                entry.legacyConfigId(),
+                null // mentor meters per turn at completion, not per proxy call
             )
         );
     }

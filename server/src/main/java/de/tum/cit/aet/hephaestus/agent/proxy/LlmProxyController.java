@@ -61,6 +61,7 @@ class LlmProxyController {
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
     private final ProxyBudgetGate budgetGate;
+    private final ProxyUsageAccumulator usageAccumulator;
 
     LlmProxyController(
         WebClient llmProxyWebClient,
@@ -68,7 +69,8 @@ class LlmProxyController {
         EgressPolicy egressPolicy,
         ObjectMapper objectMapper,
         MeterRegistry meterRegistry,
-        ProxyBudgetGate budgetGate
+        ProxyBudgetGate budgetGate,
+        ProxyUsageAccumulator usageAccumulator
     ) {
         this.webClient = llmProxyWebClient;
         this.resolver = llmModelResolver;
@@ -76,6 +78,7 @@ class LlmProxyController {
         this.objectMapper = objectMapper;
         this.meterRegistry = meterRegistry;
         this.budgetGate = budgetGate;
+        this.usageAccumulator = usageAccumulator;
     }
 
     @PostMapping({ "/chat/completions", "/responses" })
@@ -205,6 +208,23 @@ class LlmProxyController {
                 upstream.status()
             );
             return null;
+        }
+        // Crash-safe accounting (#1368): attribute this non-streaming call's tokens to the job now,
+        // so a job that dies before its terminal write still bills the calls it actually made.
+        // Detection runs non-streaming; the mentor route streams and has a null sourceId, so it is
+        // metered per turn at completion instead. Best-effort — never affects the returned response.
+        if (
+            routing.sourceId() != null && upstream.body() != null && upstream.status() >= 200 && upstream.status() < 300
+        ) {
+            try {
+                usageAccumulator.accumulate(
+                    routing.sourceId(),
+                    objectMapper.readTree(upstream.body()),
+                    RESPONSES_PROTOCOL.equals(routing.apiProtocol())
+                );
+            } catch (Exception e) {
+                log.debug("Could not parse upstream usage for job {}: {}", routing.sourceId(), e.getMessage());
+            }
         }
         return ResponseEntity.status(upstream.status()).headers(upstream.headers()).body(upstream.body());
     }
