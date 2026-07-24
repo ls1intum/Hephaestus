@@ -827,25 +827,11 @@
         Poll-query indexes for the agent job queue (#1368 fix wave — adversarial review of the
         NATS→Postgres cutover). AgentJobExecutor.pollLoop's candidate lookup
         (findQueuedIdsOldestFirst) had no dedicated index: it fell back to a sequential scan of
-        agent_job filtered by status, ordered by created_at. The fairness predicate the same fix wave
-        adds (excluding QUEUED jobs whose (workspace, purpose) binding is already at its concurrency
-        cap, closing a head-of-line-starvation gap) adds a correlated per-(workspace, purpose) RUNNING
-        count, which needs its own supporting index.
+        agent_job filtered by status, ordered by created_at. Its fairness predicate also adds a
+        correlated per-(workspace, purpose) RUNNING count; that index (ix_agent_job_running_purpose)
+        is created near the end of this changelog — it references agent_job.purpose, which is not
+        added until changeSet -59, so it must run after it.
     -->
-    <changeSet id="1784636803503-31" author="hephaestus" runInTransaction="false">
-        <preConditions onFail="MARK_RAN" onFailMessage="ix_agent_job_running_purpose already exists">
-            <not><indexExists indexName="ix_agent_job_running_purpose"/></not>
-        </preConditions>
-        <comment>Per-(workspace, purpose) RUNNING count for the poll query's concurrency-cap fairness predicate (#1368)</comment>
-        <sql>
-            CREATE INDEX CONCURRENTLY ix_agent_job_running_purpose
-                ON agent_job (workspace_id, purpose)
-                WHERE status = 'RUNNING';
-        </sql>
-        <rollback>
-            <sql>DROP INDEX CONCURRENTLY IF EXISTS ix_agent_job_running_purpose;</sql>
-        </rollback>
-    </changeSet>
 
     <!--
         Agent-queue hardening (#1368, post-pressure-test): available_at + backoff, token rotation on
@@ -1161,6 +1147,9 @@
             workspace is never blocked. The Postgres column-drop cascades its CHECK constraint.
         </comment>
         <dropColumn tableName="instance_llm_settings" columnName="default_unpriced_policy"/>
+        <!-- Rollback restores the ORIGINAL constraint name (ck_instance_llm_settings_policy, created
+             alongside the column earlier in this changelog) — a rollback must reproduce the exact prior
+             schema, not rename the constraint. -->
         <rollback>
             <addColumn tableName="instance_llm_settings">
                 <column name="default_unpriced_policy" type="VARCHAR(16)" defaultValue="WARN">
@@ -1168,7 +1157,7 @@
                 </column>
             </addColumn>
             <sql>
-                ALTER TABLE instance_llm_settings ADD CONSTRAINT ck_instance_llm_settings_unpriced_policy
+                ALTER TABLE instance_llm_settings ADD CONSTRAINT ck_instance_llm_settings_policy
                 CHECK (default_unpriced_policy IN ('WARN','BLOCK'));
             </sql>
         </rollback>
@@ -1255,6 +1244,7 @@
             FROM workspace w
             JOIN agent_config c ON c.id = w.practice_config_id
             WHERE w.practice_config_id IS NOT NULL
+              AND c.workspace_id = w.id
               AND num_nonnulls(c.instance_model_id, c.workspace_model_id) = 1;
 
             INSERT INTO workspace_agent_binding
@@ -1265,6 +1255,7 @@
             FROM workspace w
             JOIN agent_config c ON c.id = w.mentor_config_id
             WHERE w.mentor_config_id IS NOT NULL
+              AND c.workspace_id = w.id
               AND num_nonnulls(c.instance_model_id, c.workspace_model_id) = 1;
         </sql>
         <rollback>
@@ -1288,6 +1279,26 @@
         <sql>UPDATE agent_job SET purpose = 'PRACTICE_DETECTION' WHERE purpose IS NULL</sql>
         <rollback>
             <dropColumn tableName="agent_job" columnName="purpose"/>
+        </rollback>
+    </changeSet>
+
+    <!--
+        Supporting index for the poll query's per-(workspace, purpose) concurrency-cap fairness
+        predicate (findQueuedIdsOldestFirst). Kept here — after changeSet -59 adds agent_job.purpose —
+        because a CREATE INDEX on (workspace_id, purpose) cannot precede the column it references.
+    -->
+    <changeSet id="1784636803503-60" author="hephaestus" runInTransaction="false">
+        <preConditions onFail="MARK_RAN" onFailMessage="ix_agent_job_running_purpose already exists">
+            <not><indexExists indexName="ix_agent_job_running_purpose"/></not>
+        </preConditions>
+        <comment>Per-(workspace, purpose) RUNNING count for the poll query's concurrency-cap fairness predicate (#1368)</comment>
+        <sql>
+            CREATE INDEX CONCURRENTLY ix_agent_job_running_purpose
+                ON agent_job (workspace_id, purpose)
+                WHERE status = 'RUNNING';
+        </sql>
+        <rollback>
+            <sql>DROP INDEX CONCURRENTLY IF EXISTS ix_agent_job_running_purpose;</sql>
         </rollback>
     </changeSet>
 
