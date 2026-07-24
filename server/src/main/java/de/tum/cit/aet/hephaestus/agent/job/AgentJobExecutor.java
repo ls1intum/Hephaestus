@@ -26,7 +26,6 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetBlockReason;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUnpricedUsageBlockedException;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageJobType;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
@@ -111,6 +110,10 @@ public class AgentJobExecutor {
     private static final String MDC_JOB_TYPE = "agent.jobType";
     private static final int MAX_ERROR_MESSAGE_LENGTH = 4000;
     private static final int MAX_CONTAINER_LOGS_CHARS = 65536; // 64KB
+    // Budget hold (#1368): how long a claim-blocked job waits before the poll loop re-evaluates the
+    // cap, and the maximum total time it may stay held before it is cancelled as stale.
+    private static final Duration BUDGET_HOLD_INTERVAL = Duration.ofHours(1);
+    private static final Duration BUDGET_HOLD_MAX_AGE = Duration.ofDays(7);
 
     private final AgentProperties agentProperties;
     private final AgentJobRepository jobRepository;
@@ -644,7 +647,9 @@ public class AgentJobExecutor {
         ) {
             return Optional.empty();
         }
-        if (claimResult == ClaimOutcome.CONCURRENCY_FULL) {
+        if (claimResult == ClaimOutcome.CONCURRENCY_FULL || claimResult == ClaimOutcome.BUDGET_HELD) {
+            // Job stays QUEUED — concurrency will free up, or the budget hold's available_at will
+            // mature and the poll loop re-evaluates the cap on the next eligible poll.
             return Optional.empty();
         }
         if (claimResult instanceof ClaimResult claim) {
@@ -1007,6 +1012,7 @@ public class AgentJobExecutor {
         ALREADY_CLAIMED,
         CONCURRENCY_FULL,
         BUDGET_BLOCKED,
+        BUDGET_HELD,
         MODEL_UNAVAILABLE,
     }
 
@@ -1035,28 +1041,49 @@ public class AgentJobExecutor {
             // Claim-time budget recheck (#1368 fix wave): AgentJobService.submit already gated
             // submission, but a workspace can pre-queue jobs faster than the cap updates — every
             // job queued before the cap was crossed would otherwise still run. Recheck here, right
-            // before the job would start, and refuse it terminally rather than let it execute.
-            // Never re-checked once a job is past this point (no mid-execution kill on budget alone).
+            // before the job would start. Never re-checked once a job is past this point (no
+            // mid-execution kill on budget alone).
+            //
+            // The job is HELD, not cancelled: budget exhaustion is temporary (the cap resets at the
+            // UTC month rollover or when an instance admin raises it), so pushing available_at into
+            // the future and leaving the job QUEUED lets the poll loop pick it back up automatically
+            // once the workspace is back within budget — which is exactly what the paused-work copy
+            // promises the user. retry_count is left untouched (this is not an execution failure).
+            // Only a job that has been waiting past BUDGET_HOLD_MAX_AGE is cancelled terminally:
+            // month-old detection feedback is noise, and an unbounded hold would loop forever.
             LlmBudgetBlockReason blockReason = llmBudgetService.blockReason(job.getWorkspace().getId());
             if (blockReason != LlmBudgetBlockReason.NONE) {
-                String message =
-                    blockReason == LlmBudgetBlockReason.EXHAUSTED
-                        ? "Budget reached."
-                        : LlmUnpricedUsageBlockedException.MESSAGE;
-                job.setStatus(AgentJobStatus.CANCELLED);
-                job.setCompletedAt(Instant.now());
-                job.setErrorMessage(message);
-                job.setCancellationReason(AgentJobCancellationReason.BUDGET_EXHAUSTED);
+                Instant now = Instant.now();
+                boolean expired =
+                    job.getCreatedAt() != null && Duration.between(job.getCreatedAt(), now).compareTo(BUDGET_HOLD_MAX_AGE) > 0;
+                if (expired) {
+                    String message = "Budget reached; queued work expired after " + BUDGET_HOLD_MAX_AGE.toDays() + " days.";
+                    job.setStatus(AgentJobStatus.CANCELLED);
+                    job.setCompletedAt(now);
+                    job.setErrorMessage(message);
+                    job.setCancellationReason(AgentJobCancellationReason.BUDGET_EXHAUSTED);
+                    jobRepository.save(job);
+                    log.info(
+                        "Cancelling claim — held past {} days on budget: jobId={}, workspaceId={}, blockReason={}",
+                        BUDGET_HOLD_MAX_AGE.toDays(),
+                        jobId,
+                        job.getWorkspace().getId(),
+                        blockReason
+                    );
+                    meterRegistry.counter("agent.job.budget.refused").increment();
+                    return ClaimOutcome.BUDGET_BLOCKED;
+                }
+                job.setAvailableAt(now.plus(BUDGET_HOLD_INTERVAL));
                 jobRepository.save(job);
                 log.info(
-                    "Refusing claim — {}: jobId={}, workspaceId={}, blockReason={}",
-                    message,
+                    "Holding claim — monthly LLM budget {}: jobId={}, workspaceId={}, retryAt={}",
+                    blockReason == LlmBudgetBlockReason.EXHAUSTED ? "exhausted" : "unverifiable (cap set)",
                     jobId,
                     job.getWorkspace().getId(),
-                    blockReason
+                    job.getAvailableAt()
                 );
-                meterRegistry.counter("agent.job.budget.refused").increment();
-                return ClaimOutcome.BUDGET_BLOCKED;
+                meterRegistry.counter("agent.job.budget.held").increment();
+                return ClaimOutcome.BUDGET_HELD;
             }
 
             // Lock and live-revalidate the exact catalog binding immediately before RUNNING. Submit-time

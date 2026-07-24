@@ -32,7 +32,6 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetBlockReason;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUnpricedUsageBlockedException;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -340,36 +339,39 @@ class AgentJobExecutorTest extends BaseUnitTest {
     }
 
     /**
-     * Claim-time budget recheck (#1368 fix wave): a workspace can pre-queue jobs faster than the
-     * cap updates, so every claim rechecks {@code llmBudgetService.blockReason} before letting a
-     * job start — refusing it terminally (never re-considered by a later poll) rather than executing it.
+     * Claim-time budget recheck (#1368): a workspace can pre-queue jobs faster than the cap updates,
+     * so every claim rechecks {@code llmBudgetService.blockReason} before letting a job start. A
+     * blocked job is HELD (available_at pushed into the future, still QUEUED) so the poll loop
+     * re-evaluates the cap and resumes it automatically once the workspace is back within budget —
+     * only a job held past the max age is cancelled terminally.
      */
     @Nested
-    @DisplayName("Claim-time budget recheck (#1368 fix wave)")
+    @DisplayName("Claim-time budget recheck (#1368)")
     class ClaimTimeBudgetRecheck {
 
         @Test
-        void refusesAndCancelsWhenBudgetIsExhaustedAtClaimTime() {
+        void holdsAndRequeuesWhenBudgetIsExhaustedAtClaimTime() {
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(llmBudgetService.blockReason(99L)).thenReturn(LlmBudgetBlockReason.EXHAUSTED);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             boolean claimed = executor.processJob(jobId);
 
-            // Refused terminally: never executed, never claimed to RUNNING.
+            // Held, not executed and not terminal: the job stays QUEUED with a future available_at,
+            // no cancellation reason, and never reaches the model-admission or sandbox stages.
             assertThat(claimed).isFalse();
             verify(sandboxManager, never()).execute(any());
             verify(configRepository, never()).findByIdForUpdate(any());
 
             ArgumentCaptor<AgentJob> saved = ArgumentCaptor.forClass(AgentJob.class);
             verify(jobRepository).save(saved.capture());
-            assertThat(saved.getValue().getStatus()).isEqualTo(AgentJobStatus.CANCELLED);
-            assertThat(saved.getValue().getErrorMessage()).isEqualTo("Budget reached.");
-            assertThat(saved.getValue().getCancellationReason()).isEqualTo(AgentJobCancellationReason.BUDGET_EXHAUSTED);
+            assertThat(saved.getValue().getStatus()).isEqualTo(AgentJobStatus.QUEUED);
+            assertThat(saved.getValue().getCancellationReason()).isNull();
+            assertThat(saved.getValue().getAvailableAt()).isAfter(Instant.now());
         }
 
         @Test
-        void refusesWithADistinctMessageWhenUnpricedUsageIsBlockedByInstancePolicy() {
+        void holdsWhenUnpricedUsageBlocksACappedWorkspace() {
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(llmBudgetService.blockReason(99L)).thenReturn(LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -381,14 +383,33 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             ArgumentCaptor<AgentJob> saved = ArgumentCaptor.forClass(AgentJob.class);
             verify(jobRepository).save(saved.capture());
-            assertThat(saved.getValue().getStatus()).isEqualTo(AgentJobStatus.CANCELLED);
-            assertThat(saved.getValue().getErrorMessage()).isEqualTo(LlmUnpricedUsageBlockedException.MESSAGE);
-            assertThat(saved.getValue().getCancellationReason()).isEqualTo(AgentJobCancellationReason.BUDGET_EXHAUSTED);
+            assertThat(saved.getValue().getStatus()).isEqualTo(AgentJobStatus.QUEUED);
+            assertThat(saved.getValue().getCancellationReason()).isNull();
+            assertThat(saved.getValue().getAvailableAt()).isAfter(Instant.now());
         }
 
         @Test
-        void refusedPreStartJobNeverWritesAUsageLedgerEntry() {
-            // Rejected-pre-start jobs must leave NO ledger trace at all — distinct from the
+        void cancelsAJobHeldPastTheMaxAge() {
+            job.setCreatedAt(Instant.now().minus(Duration.ofDays(8)));
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
+            when(llmBudgetService.blockReason(99L)).thenReturn(LlmBudgetBlockReason.EXHAUSTED);
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            boolean claimed = executor.processJob(jobId);
+
+            assertThat(claimed).isFalse();
+            verify(sandboxManager, never()).execute(any());
+
+            ArgumentCaptor<AgentJob> saved = ArgumentCaptor.forClass(AgentJob.class);
+            verify(jobRepository).save(saved.capture());
+            assertThat(saved.getValue().getStatus()).isEqualTo(AgentJobStatus.CANCELLED);
+            assertThat(saved.getValue().getCancellationReason()).isEqualTo(AgentJobCancellationReason.BUDGET_EXHAUSTED);
+            assertThat(saved.getValue().getErrorMessage()).contains("expired");
+        }
+
+        @Test
+        void heldPreStartJobNeverWritesAUsageLedgerEntry() {
+            // A budget-blocked pre-start job must leave NO ledger trace at all — distinct from the
             // cancelled-after-start / malformed-usage cases, which DO record UNPRICED (see
             // UnpricedUsageLedgerFallback below).
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
