@@ -14,9 +14,9 @@ interface BudgetExhaustedAlertProps {
 /**
  * Compact budget-paused banner for surfaces outside the usage page. The usage page
  * (`AdminLlmUsagePage`) is where the verdict is explained in full, but nothing else in the product
- * said why practice detection or the mentor stopped responding — this fills that gap on the Models
- * tab (`AgentRuntimesPage`), where the affected `AgentConfigCard`s live. Copy matches the usage
- * page's own over-budget banner verbatim (#1368 glossary: "Budget reached" is never softened).
+ * said why practice detection or the mentor stopped responding — this fills that gap on the AI
+ * setup page (`AgentBindingsPage`), where the affected per-purpose bindings live. Copy matches the
+ * usage page's own over-budget banner verbatim (#1368 glossary: "Budget reached" is never softened).
  *
  * <p>Rendered whenever the server reports `usagePaused` (#1368 fix wave) — not just on
  * `verdict=EXHAUSTED`. Under this server's BLOCK unpriced-usage policy, a `verdict=UNVERIFIABLE`
