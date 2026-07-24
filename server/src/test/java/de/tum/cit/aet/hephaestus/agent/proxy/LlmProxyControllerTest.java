@@ -51,9 +51,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
             resolver,
             egressPolicy,
             OBJECT_MAPPER,
-            new SimpleMeterRegistry(),
-            budgetGate,
-            usageAccumulator
+            new ProxyAccounting(budgetGate, usageAccumulator, new SimpleMeterRegistry(), OBJECT_MAPPER)
         );
     }
 

@@ -7,7 +7,6 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.proxy.ProxyStreamingUtils;
 import de.tum.cit.aet.hephaestus.core.proxy.ProxyStreamingUtils.UpstreamResult;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
-import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.http.HttpServletRequest;
@@ -59,26 +58,20 @@ class LlmProxyController {
     private final LlmModelResolver resolver;
     private final EgressPolicy egressPolicy;
     private final ObjectMapper objectMapper;
-    private final MeterRegistry meterRegistry;
-    private final ProxyBudgetGate budgetGate;
-    private final ProxyUsageAccumulator usageAccumulator;
+    private final ProxyAccounting accounting;
 
     LlmProxyController(
         WebClient llmProxyWebClient,
         LlmModelResolver llmModelResolver,
         EgressPolicy egressPolicy,
         ObjectMapper objectMapper,
-        MeterRegistry meterRegistry,
-        ProxyBudgetGate budgetGate,
-        ProxyUsageAccumulator usageAccumulator
+        ProxyAccounting accounting
     ) {
         this.webClient = llmProxyWebClient;
         this.resolver = llmModelResolver;
         this.egressPolicy = egressPolicy;
         this.objectMapper = objectMapper;
-        this.meterRegistry = meterRegistry;
-        this.budgetGate = budgetGate;
-        this.usageAccumulator = usageAccumulator;
+        this.accounting = accounting;
     }
 
     @PostMapping({ "/chat/completions", "/responses" })
@@ -95,16 +88,11 @@ class LlmProxyController {
 
         MDC.put("proxy.principal", routing.principalDescription());
         MDC.put("proxy.apiProtocol", routing.apiProtocol());
-        Timer.Sample timer = Timer.start();
+        Timer.Sample timer = accounting.startTimer();
         try {
             return forward(routing, response, incomingHeaders, body);
         } finally {
-            timer.stop(
-                Timer.builder("llm.proxy.duration")
-                    .description("LLM proxy request duration")
-                    .tag("apiProtocol", routing.apiProtocol())
-                    .register(meterRegistry)
-            );
+            accounting.stopTimer(timer, routing.apiProtocol());
             MDC.remove("proxy.principal");
             MDC.remove("proxy.apiProtocol");
         }
@@ -120,8 +108,7 @@ class LlmProxyController {
         // NEW upstream calls before resolving any credential or hitting the network. Bounds a
         // runaway that started after exhaustion; never interrupts a call already streaming. Reads a
         // short-TTL cached verdict so this is not a per-call month-window SUM.
-        if (budgetGate.isBlocked(routing.workspaceId())) {
-            meterRegistry.counter("llm.proxy.budget.blocked", "apiProtocol", routing.apiProtocol()).increment();
+        if (accounting.refuseForBudget(routing.workspaceId(), routing.apiProtocol())) {
             return ResponseEntity.status(429).body("Workspace AI budget reached; new calls are paused.");
         }
 
@@ -216,15 +203,11 @@ class LlmProxyController {
         if (
             routing.sourceId() != null && upstream.body() != null && upstream.status() >= 200 && upstream.status() < 300
         ) {
-            try {
-                usageAccumulator.accumulate(
-                    routing.sourceId(),
-                    objectMapper.readTree(upstream.body()),
-                    RESPONSES_PROTOCOL.equals(routing.apiProtocol())
-                );
-            } catch (Exception e) {
-                log.debug("Could not parse upstream usage for job {}: {}", routing.sourceId(), e.getMessage());
-            }
+            accounting.recordUsage(
+                routing.sourceId(),
+                upstream.body(),
+                RESPONSES_PROTOCOL.equals(routing.apiProtocol())
+            );
         }
         return ResponseEntity.status(upstream.status()).headers(upstream.headers()).body(upstream.body());
     }
@@ -336,6 +319,6 @@ class LlmProxyController {
     }
 
     private void incrementErrors(String apiProtocol) {
-        meterRegistry.counter("llm.proxy.errors", "apiProtocol", apiProtocol).increment();
+        accounting.recordError(apiProtocol);
     }
 }
