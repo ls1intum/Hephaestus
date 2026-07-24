@@ -35,22 +35,48 @@ class LlmProxyControllerTest extends BaseUnitTest {
     @Mock
     private EgressPolicy egressPolicy;
 
+    @Mock
+    private ProxyBudgetGate budgetGate;
+
     private LlmProxyController controller;
 
     @BeforeEach
     void setUp() {
+        // budgetGate mock defaults isBlocked() to false, so existing tests see an open gate.
         controller = new LlmProxyController(
             WebClient.create(),
             resolver,
             egressPolicy,
             OBJECT_MAPPER,
-            new SimpleMeterRegistry()
+            new SimpleMeterRegistry(),
+            budgetGate
         );
     }
 
     @AfterEach
     void clearAuthentication() {
         SecurityContextHolder.clearContext();
+    }
+
+    @Nested
+    class BudgetGate {
+
+        @Test
+        void rejectsWithoutResolvingCredentialWhenWorkspaceIsOverBudget() {
+            var routing = routing("openai-completions");
+            authenticate(routing);
+            when(budgetGate.isBlocked(routing.workspaceId())).thenReturn(true);
+
+            var result = controller.proxy(
+                request("POST", "/internal/llm/chat/completions"),
+                new MockHttpServletResponse(),
+                new HttpHeaders(),
+                jsonBody()
+            );
+
+            assertThat(result.getStatusCode().value()).isEqualTo(429);
+            verifyNoInteractions(resolver);
+        }
     }
 
     @Nested

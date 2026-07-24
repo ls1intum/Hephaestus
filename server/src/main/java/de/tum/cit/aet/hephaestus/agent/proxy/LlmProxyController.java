@@ -60,19 +60,22 @@ class LlmProxyController {
     private final EgressPolicy egressPolicy;
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
+    private final ProxyBudgetGate budgetGate;
 
     LlmProxyController(
         WebClient llmProxyWebClient,
         LlmModelResolver llmModelResolver,
         EgressPolicy egressPolicy,
         ObjectMapper objectMapper,
-        MeterRegistry meterRegistry
+        MeterRegistry meterRegistry,
+        ProxyBudgetGate budgetGate
     ) {
         this.webClient = llmProxyWebClient;
         this.resolver = llmModelResolver;
         this.egressPolicy = egressPolicy;
         this.objectMapper = objectMapper;
         this.meterRegistry = meterRegistry;
+        this.budgetGate = budgetGate;
     }
 
     @PostMapping({ "/chat/completions", "/responses" })
@@ -110,6 +113,15 @@ class LlmProxyController {
         HttpHeaders incomingHeaders,
         byte[] body
     ) {
+        // In-flight budget backstop (#1368): once a workspace has crossed its monthly cap, refuse
+        // NEW upstream calls before resolving any credential or hitting the network. Bounds a
+        // runaway that started after exhaustion; never interrupts a call already streaming. Reads a
+        // short-TTL cached verdict so this is not a per-call month-window SUM.
+        if (budgetGate.isBlocked(routing.workspaceId())) {
+            meterRegistry.counter("llm.proxy.budget.blocked", "apiProtocol", routing.apiProtocol()).increment();
+            return ResponseEntity.status(429).body("Workspace AI budget reached; new calls are paused.");
+        }
+
         LlmModelResolver.ProxyCredential credential = resolver.resolveProxyCredential(
             new LlmModelResolver.ConnectionRef(
                 routing.connectionScope(),
