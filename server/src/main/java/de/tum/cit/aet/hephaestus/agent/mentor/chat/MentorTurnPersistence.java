@@ -287,16 +287,15 @@ public class MentorTurnPersistence {
     }
 
     /**
-     * Wire-facing cost estimate for the chat UI, derived from {@link ModelPricingService}'s global
-     * per-model table over the turn's observed tokens. Unrelated to the ledger's own cost (resolved
-     * separately and later by {@code LlmUsageRecorder} from the frozen catalog binding — see
-     * {@link #billTurn}); this is only what the client sees on the live Finish chunk and what
-     * {@code chat_message.metadata.costUsd} persists for the wire contract.
+     * Wire-facing cost estimate for the chat UI, derived from the turn's admission-frozen
+     * {@link LlmPriceSnapshot} over the observed tokens. This is the single pricing authority — the
+     * same frozen catalog price the ledger bills from (see {@link #billTurn}); the value here is only
+     * what the client sees on the live Finish chunk and what {@code chat_message.metadata.costUsd}
+     * persists for the wire contract.
      *
-     * <p>#1368 slice 6: previously preferred a cost Pi itself reported on {@code Usage.cost.total}.
-     * The runner registers zero SDK-local rates only because Pi requires the cost object shape (see
-     * {@code pi-provider.mjs}), so Pi can never populate a real cost there; the extraction +
-     * sanity-cap guard for it were deleted as dead code. This fallback is the only source now.
+     * <p>Returns {@code null} when the model is unpriced or no tokens were observed. Pi never reports a
+     * usable cost of its own (the runner registers zero SDK-local rates only to satisfy Pi's cost-object
+     * shape — see {@code pi-provider.mjs}), so the frozen snapshot is the only source.
      */
     @Nullable
     private Double computeFinalCostUsd(TranslatorState state) {

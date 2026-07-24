@@ -11,7 +11,7 @@
  *       symmetric with {@code agent/practice/PracticePiAdapter}.</li>
  * </ul>
  *
- * <p>Model pricing was originally nested here; it now lives at {@link de.tum.cit.aet.hephaestus.agent.pricing}
- * because the practice review pipeline will record cost on the same table.
+ * <p>Turn cost is derived from the admission-frozen {@code LlmPriceSnapshot} — the single pricing
+ * authority shared with the usage ledger in {@code agent.usage}; there is no separate pricing table.
  */
 package de.tum.cit.aet.hephaestus.agent.mentor;

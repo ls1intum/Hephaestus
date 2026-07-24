@@ -106,7 +106,6 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "WorkspaceSlugHistory", // Tracks workspace slug changes
         "IssueType", // GitHub issue types are workspace-scoped through issue
         "IdentityProvider", // Global provider instances (e.g., github.com, gitlab.com)
-        "ModelPricing", // Vendor list prices per LLM model — not tenant-scoped
         // Instance LLM-config catalog (#1368) — app_admin-owned, curated, shared across all workspaces
         "LlmConnection", // Instance-owned provider connection; global, not tenant-scoped
         "LlmModel", // Instance-curated model behind a connection; global

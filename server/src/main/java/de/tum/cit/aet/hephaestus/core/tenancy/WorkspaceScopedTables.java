@@ -51,8 +51,6 @@ public class WorkspaceScopedTables {
         "organization",
         "identity_provider",
         "issue_type",
-        // Vendor pricing (#1071: model pricing is global, not tenant-scoped)
-        "model_pricing",
         // Fleet-wide worker JWT revocation; worker JWTs are not workspace-scoped
         "worker_token_denylist",
         // core.auth (ADR 0017) — identity is user/system-scoped, not workspace-scoped.
