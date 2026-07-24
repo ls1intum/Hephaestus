@@ -237,18 +237,17 @@ fi
 api PATCH "/workspaces/$WS_SLUG/llm/connections/$CONNECTION_ID" -H 'content-type: application/json' -d '{"enabled":true}' >/dev/null
 api PATCH "/workspaces/$WS_SLUG/llm/models/$MODEL_ID" -H 'content-type: application/json' -d '{"enabled":true}' >/dev/null
 
-CFG_ID="$(api GET "/workspaces/$WS_SLUG/agent-configs" | jq -r '.[] | select(.name=="e2e-llm") | .id' | head -1)"
-if [ -z "$CFG_ID" ]; then
-  CFG_ID="$(api POST "/workspaces/$WS_SLUG/agent-configs" -H 'content-type: application/json' -d "$(jq -nc \
-    --argjson m "$MODEL_ID" \
-    '{name:"e2e-llm",enabled:true,workspaceModelId:$m,timeoutSeconds:1200,maxConcurrentJobs:1,allowInternet:true}')" | jq -r '.id')"
-else
-  api PATCH "/workspaces/$WS_SLUG/agent-configs/$CFG_ID" -H 'content-type: application/json' \
-    -d "$(jq -nc --argjson m "$MODEL_ID" '{enabled:true,workspaceModelId:$m,allowInternet:true}')" >/dev/null
-fi
-api PUT "/workspaces/$WS_SLUG/ai-settings/practice-config" -H 'content-type: application/json' -d "{\"configId\":$CFG_ID}" >/dev/null
-api PUT "/workspaces/$WS_SLUG/ai-settings/mentor-config" -H 'content-type: application/json' -d "{\"configId\":$CFG_ID}" >/dev/null
-say "catalog model bound to practice detection and mentor"
+# One binding per purpose (#1368): the binding IS the configuration — there is no named config to
+# create first and point at afterwards. PUT is an upsert, so re-running this script re-binds in place.
+BINDING_BODY="$(jq -nc --argjson m "$MODEL_ID" \
+  '{workspaceModelId:$m,enabled:true,timeoutSeconds:1200,maxConcurrentJobs:1,allowInternet:true}')"
+for PURPOSE in PRACTICE_DETECTION MENTOR; do
+  api PUT "/workspaces/$WS_SLUG/agent-bindings/$PURPOSE" \
+    -H 'content-type: application/json' -d "$BINDING_BODY" >/dev/null
+done
+READY="$(api GET "/workspaces/$WS_SLUG/agent-bindings" | jq -r '[.[] | select(.ready)] | length')"
+[ "$READY" = "2" ] || die "expected both purposes bound and ready, got $READY"
+say "catalog model bound to practice detection and mentor (both ready)"
 
 # ---- 6. the practices ------------------------------------------------------
 practice() { local slug="$1" name="$2" trig="$3" crit="$4" body

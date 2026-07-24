@@ -548,7 +548,7 @@ class AgentJobServiceTest extends BaseUnitTest {
 
         @Test
         @SuppressWarnings("unchecked")
-        void submitPreparedRunsSubmitAndRendersNoConfigMessage() {
+        void submitPreparedRendersAnActionableMessageWhenNothingWasSubmitted() {
             // submitPrepared is invoked by the controller AFTER the prep transaction commits, so submit() runs
             // outside any outer transaction (SYSTEMIC #5). With no enabled config it renders the no-job message.
             lenient()
@@ -568,7 +568,9 @@ class AgentJobServiceTest extends BaseUnitTest {
                 mock(JobSubmissionRequest.class)
             );
 
-            assertThat(result).isEqualTo("No job created (no enabled agent config?)");
+            // The message must name the two real causes an operator can act on — an unbound/disabled
+            // purpose or an exhausted budget — not a config concept that no longer exists.
+            assertThat(result).contains("No job created").contains("unbound or disabled").contains("budget");
         }
     }
 }

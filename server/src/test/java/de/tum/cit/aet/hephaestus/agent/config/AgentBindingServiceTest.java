@@ -137,7 +137,7 @@ class AgentBindingServiceTest extends BaseUnitTest {
     void getBindingsReturnsEveryPurposeConfiguredForTheWorkspace() {
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
         binding.setPurpose(AgentPurpose.MENTOR);
-        when(bindingRepository.findByWorkspaceId(1L)).thenReturn(List.of(binding));
+        when(bindingRepository.findByWorkspaceIdWithModels(1L)).thenReturn(List.of(binding));
 
         assertThat(service.getBindings(context())).containsExactly(binding);
     }

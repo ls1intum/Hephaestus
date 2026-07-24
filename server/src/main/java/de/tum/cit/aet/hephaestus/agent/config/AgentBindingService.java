@@ -40,11 +40,18 @@ public class AgentBindingService {
 
     @Transactional(readOnly = true)
     public List<WorkspaceAgentBinding> getBindings(WorkspaceContext workspaceContext) {
-        return bindingRepository.findByWorkspaceId(workspaceContext.id());
+        // Fetches the model + connection graph: the caller reports readiness per binding, which
+        // resolves those associations after this transaction has closed (see isReady).
+        return bindingRepository.findByWorkspaceIdWithModels(workspaceContext.id());
     }
 
-    /** True when the binding resolves to an available model right now (UI readiness). */
-    @Transactional(readOnly = true)
+    /**
+     * True when the binding resolves to an available model right now (UI readiness).
+     *
+     * <p>Deliberately NOT transactional: resolve() reports a revoked model by throwing, and catching
+     * that inside a shared transaction would still mark it rollback-only. The binding must therefore
+     * arrive with its model graph already fetched — {@link #getBindings} and the write paths do that.
+     */
     public boolean isReady(WorkspaceAgentBinding binding) {
         if (!binding.isEnabled()) {
             return false;

@@ -10,6 +10,22 @@ import org.springframework.data.repository.query.Param;
 public interface WorkspaceAgentBindingRepository extends JpaRepository<WorkspaceAgentBinding, Long> {
     List<WorkspaceAgentBinding> findByWorkspaceId(Long workspaceId);
 
+    /**
+     * Every binding of a workspace with its catalog model and that model's connection already
+     * fetched. The listing endpoint reports each binding's readiness, which resolves model →
+     * connection AFTER the loading transaction has closed (readiness must be judged outside a
+     * transaction — resolve() signals a revoked model by throwing, which would mark a shared
+     * transaction rollback-only). Without the fetch the detached rows would throw
+     * LazyInitializationException instead of answering.
+     */
+    @Query(
+        "SELECT b FROM WorkspaceAgentBinding b " +
+            "LEFT JOIN FETCH b.instanceModel im LEFT JOIN FETCH im.connection " +
+            "LEFT JOIN FETCH b.workspaceModel wm LEFT JOIN FETCH wm.connection " +
+            "WHERE b.workspace.id = :workspaceId"
+    )
+    List<WorkspaceAgentBinding> findByWorkspaceIdWithModels(@Param("workspaceId") Long workspaceId);
+
     Optional<WorkspaceAgentBinding> findByWorkspaceIdAndPurpose(Long workspaceId, AgentPurpose purpose);
 
     /**

@@ -155,7 +155,12 @@ public class AgentJobService {
      */
     public String submitPrepared(Long workspaceId, AgentJobType jobType, JobSubmissionRequest request) {
         Optional<AgentJob> job = submit(workspaceId, jobType, request);
-        return job.map(j -> "Job submitted: " + j.getId()).orElse("No job created (no enabled agent config?)");
+        return job
+            .map(j -> "Job submitted: " + j.getId())
+            .orElse(
+                "No job created — practice detection is unbound or disabled for this workspace, " +
+                    "or its monthly LLM budget is exhausted (see the workspace's LLM usage report)."
+            );
     }
 
     /**

@@ -178,7 +178,8 @@ public class BotCommandProcessor {
                                 ),
                             () ->
                                 log.warn(
-                                    "Bot command: no job created (no enabled agent config?), prId={}, mrNumber={}",
+                                    "Bot command: no job created (practice detection unbound/disabled, or the " +
+                                        "workspace's monthly LLM budget is exhausted), prId={}, mrNumber={}",
                                     pr.getId(),
                                     mrNumber
                                 )
