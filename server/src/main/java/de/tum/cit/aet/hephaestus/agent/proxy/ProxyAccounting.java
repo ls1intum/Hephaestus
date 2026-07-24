@@ -1,9 +1,11 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
+import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -16,7 +18,11 @@ import tools.jackson.databind.ObjectMapper;
  * and both are timed — so they live behind one collaborator instead of three constructor parameters
  * on {@link LlmProxyController}, which must stay a thin forwarding surface.
  */
+// Same worker gate as LlmProxyController and ProxyUsageAccumulator: this sits between them, so an
+// ungated bean here would demand the worker-only accumulator in every tier that runs with the worker
+// role off (server, webhook) and fail their context on startup.
 @Component
+@ConditionalOnProperty(name = RuntimeRole.WORKER_PROPERTY, havingValue = "true", matchIfMissing = true)
 public class ProxyAccounting {
 
     private static final Logger log = LoggerFactory.getLogger(ProxyAccounting.class);
