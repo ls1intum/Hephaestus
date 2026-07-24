@@ -232,33 +232,6 @@ public record ConfigSnapshot(
         );
     }
 
-    /** Creates the authoritative snapshot used after a job passes live admission at claim time. */
-    public static ConfigSnapshot fromAdmission(AgentConfig config, AdmittedLlmModel admitted) {
-        Objects.requireNonNull(config, "config must not be null");
-        Objects.requireNonNull(admitted, "admitted must not be null");
-        ResolvedLlmModel resolved = admitted.resolved();
-        LlmModelResolver.ConnectionRef ref = admitted.connection();
-        return new ConfigSnapshot(
-            SCHEMA_VERSION,
-            config.getId(),
-            config.getName(),
-            resolved.apiProtocol(),
-            resolved.baseUrl(),
-            resolved.upstreamModelId(),
-            config.getModelVersion(),
-            resolved.contextWindow(),
-            resolved.maxOutputTokens(),
-            resolved.supportsReasoning(),
-            ref.scope(),
-            ref.connectionId(),
-            ref.modelId(),
-            ref.workspaceId(),
-            config.getTimeoutSeconds(),
-            config.isAllowInternet(),
-            admitted.price()
-        );
-    }
-
     /** Attaches claim-time accounting while preserving all submit-time behaviour exactly. */
     public ConfigSnapshot withPriceSnapshot(LlmPriceSnapshot price) {
         return new ConfigSnapshot(

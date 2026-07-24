@@ -215,7 +215,7 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
 
     private void givenWorkspaceSummary() {
         when(workspaceSummaryQuery.findById(1L)).thenReturn(
-            Optional.of(new WorkspaceSummaryQuery.WorkspaceSummary(1L, "hephaestustest", "Hephaestus", null))
+            Optional.of(new WorkspaceSummaryQuery.WorkspaceSummary(1L, "hephaestustest", "Hephaestus"))
         );
     }
 

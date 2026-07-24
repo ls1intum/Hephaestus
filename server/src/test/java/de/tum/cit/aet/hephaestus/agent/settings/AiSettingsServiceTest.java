@@ -1,22 +1,13 @@
 package de.tum.cit.aet.hephaestus.agent.settings;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.InstanceLlmSettings;
 import de.tum.cit.aet.hephaestus.agent.catalog.InstanceLlmSettingsService;
-import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
-import de.tum.cit.aet.hephaestus.agent.catalog.ResolvedLlmModel;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
-import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -36,19 +27,10 @@ class AiSettingsServiceTest extends BaseUnitTest {
     private WorkspaceRepository workspaceRepository;
 
     @Mock
-    private AgentConfigRepository agentConfigRepository;
-
-    @Mock
     private ConfigAuditPort configAudit;
 
     @Mock
     private InstanceLlmSettingsService instanceLlmSettingsService;
-
-    @Mock
-    private LlmModelResolver llmModelResolver;
-
-    @Mock
-    private de.tum.cit.aet.hephaestus.agent.config.AgentBindingService agentBindingService;
 
     private AiSettingsService service;
     private Workspace workspace;
@@ -67,15 +49,7 @@ class AiSettingsServiceTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        service = new AiSettingsService(
-            workspaceRepository,
-            agentConfigRepository,
-            reviewProperties,
-            configAudit,
-            instanceLlmSettingsService,
-            llmModelResolver,
-            agentBindingService
-        );
+        service = new AiSettingsService(workspaceRepository, reviewProperties, configAudit, instanceLlmSettingsService);
         InstanceLlmSettings llmSettings = new InstanceLlmSettings();
         llmSettings.setAllowWorkspaceConnections(true);
         lenient().when(instanceLlmSettingsService.get()).thenReturn(llmSettings);
@@ -91,14 +65,11 @@ class AiSettingsServiceTest extends BaseUnitTest {
     }
 
     @Test
-    void getSettingsReturnsEffectiveValuesAndBindings() {
-        workspace.setPracticeConfigId(10L);
+    void getSettingsReturnsEffectiveAndRawOverrideValues() {
         workspace.getReviewSettings().setRunForAllUsers(true); // explicit override
 
         AiSettingsViewDTO view = service.getSettings(context);
 
-        assertThat(view.practiceConfigId()).isEqualTo(10L);
-        assertThat(view.mentorConfigId()).isNull();
         assertThat(view.runForAllUsers()).isTrue(); // override wins
         assertThat(view.skipDrafts()).isTrue(); // inherited from property
         assertThat(view.cooldownMinutes()).isEqualTo(15); // inherited from property
@@ -106,52 +77,10 @@ class AiSettingsServiceTest extends BaseUnitTest {
         assertThat(view.runForAllUsersOverride()).isTrue();
         assertThat(view.skipDraftsOverride()).isNull(); // inheriting
         assertThat(view.cooldownMinutesOverride()).isNull();
-    }
-
-    @Test
-    void bindPracticeConfigSetsValidatedId() {
-        AgentConfig config = new AgentConfig();
-        config.setId(10L);
-        config.setEnabled(true);
-        when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(config));
-        when(llmModelResolver.resolve(config)).thenReturn(mock(ResolvedLlmModel.class));
-        when(workspaceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        service.bindPracticeConfig(context, 10L);
-
-        assertThat(workspace.getPracticeConfigId()).isEqualTo(10L);
-        verify(workspaceRepository).save(workspace);
-    }
-
-    @Test
-    void bindPracticeConfigRejectsDisabledConfig() {
-        AgentConfig config = new AgentConfig();
-        config.setId(10L);
-        config.setEnabled(false);
-        when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(config));
-
-        assertThatThrownBy(() -> service.bindPracticeConfig(context, 10L))
-            .isInstanceOf(AgentConfigurationUnavailableException.class)
-            .hasMessageContaining("not available");
-
-        assertThat(workspace.getPracticeConfigId()).isNull();
-        verify(workspaceRepository, never()).save(any());
-    }
-
-    @Test
-    void bindPracticeConfigRejectsConfigWithoutAvailableCatalogModel() {
-        AgentConfig config = new AgentConfig();
-        config.setId(10L);
-        config.setEnabled(true);
-        config.setWorkspace(workspace);
-        when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(config));
-
-        assertThatThrownBy(() -> service.bindPracticeConfig(context, 10L))
-            .isInstanceOf(AgentConfigurationUnavailableException.class)
-            .hasMessageContaining("not available");
-
-        assertThat(workspace.getPracticeConfigId()).isNull();
-        verify(workspaceRepository, never()).save(any());
+        // Feature flags travel with the aggregate read so the settings page renders in one round trip.
+        assertThat(view.practicesEnabled()).isFalse();
+        assertThat(view.mentorEnabled()).isFalse();
+        assertThat(view.workspaceConnectionsAllowed()).isTrue();
     }
 
     @Test
@@ -163,57 +92,6 @@ class AiSettingsServiceTest extends BaseUnitTest {
         AiSettingsViewDTO view = service.getSettings(context);
 
         assertThat(view.skipDrafts()).isFalse();
-    }
-
-    @Test
-    void bindRejectsForeignConfigId() {
-        when(agentConfigRepository.findByIdAndWorkspaceId(99L, 1L)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.bindMentorConfig(context, 99L)).isInstanceOf(EntityNotFoundException.class);
-
-        verify(workspaceRepository, never()).save(any());
-    }
-
-    @Test
-    void bindMentorConfigRejectsDisabledConfig() {
-        AgentConfig config = new AgentConfig();
-        config.setId(10L);
-        config.setEnabled(false);
-        when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(config));
-
-        assertThatThrownBy(() -> service.bindMentorConfig(context, 10L))
-            .isInstanceOf(AgentConfigurationUnavailableException.class)
-            .hasMessageContaining("not available");
-
-        assertThat(workspace.getMentorConfigId()).isNull();
-        verify(workspaceRepository, never()).save(any());
-    }
-
-    @Test
-    void bindMentorConfigRejectsConfigWithoutAvailableCatalogModel() {
-        AgentConfig config = new AgentConfig();
-        config.setId(10L);
-        config.setEnabled(true);
-        config.setWorkspace(workspace);
-        when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(config));
-
-        assertThatThrownBy(() -> service.bindMentorConfig(context, 10L))
-            .isInstanceOf(AgentConfigurationUnavailableException.class)
-            .hasMessageContaining("not available");
-
-        assertThat(workspace.getMentorConfigId()).isNull();
-        verify(workspaceRepository, never()).save(any());
-    }
-
-    @Test
-    void bindWithNullUnbindsWithoutValidation() {
-        workspace.setMentorConfigId(10L);
-        when(workspaceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        service.bindMentorConfig(context, null);
-
-        assertThat(workspace.getMentorConfigId()).isNull();
-        verify(agentConfigRepository, never()).findByIdAndWorkspaceId(any(), any());
     }
 
     @Test

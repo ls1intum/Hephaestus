@@ -33,8 +33,6 @@ export const mockAiSettings: AiSettingsView = {
 	practicesEnabled: true,
 	mentorEnabled: true,
 	workspaceConnectionsAllowed: true,
-	practiceConfigId: 1,
-	mentorConfigId: 2,
 	cooldownMinutes: 30,
 	deliverToMerged: false,
 	runForAllUsers: true,

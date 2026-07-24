@@ -66,27 +66,6 @@ public record MentorLlmConfig(
         );
     }
 
-    public static MentorLlmConfig fromAgentConfig(ModelBindingSource config, LlmModelResolver resolver) {
-        ResolvedLlmModel resolved = resolver.resolve(config);
-        LlmModelResolver.ConnectionRef ref = resolver.connectionRef(config);
-        return new MentorLlmConfig(
-            config.getId(),
-            resolved.apiProtocol(),
-            resolved.baseUrl(),
-            resolved.upstreamModelId(),
-            resolved.contextWindow(),
-            resolved.maxOutputTokens(),
-            resolved.supportsReasoning(),
-            ref.scope(),
-            ref.connectionId(),
-            ref.modelId(),
-            ref.workspaceId(),
-            null,
-            config.isAllowInternet(),
-            config.getTimeoutSeconds()
-        );
-    }
-
     public static MentorLlmConfig fromAdmission(ModelBindingSource config, AdmittedLlmModel admitted) {
         ResolvedLlmModel resolved = admitted.resolved();
         LlmModelResolver.ConnectionRef ref = admitted.connection();

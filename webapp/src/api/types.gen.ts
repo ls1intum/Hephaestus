@@ -1125,46 +1125,6 @@ export type UpdateConnectionStatusRequest = {
     state: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
 };
 
-/**
- * Request to update an existing agent configuration (all fields optional — null fields are not changed)
- */
-export type UpdateAgentConfigRequest = {
-    /**
-     * Whether agent containers have internet access
-     */
-    allowInternet?: boolean;
-    /**
-     * Whether the agent is enabled
-     */
-    enabled?: boolean;
-    /**
-     * Bind to a shared (instance catalog) model. Mutually exclusive with workspaceModelId.
-     */
-    instanceModelId?: number;
-    /**
-     * Maximum concurrent jobs
-     */
-    maxConcurrentJobs?: number;
-    /**
-     * Job timeout in seconds
-     */
-    timeoutSeconds?: number;
-    /**
-     * Bind to a model on your own provider. Mutually exclusive with instanceModelId.
-     */
-    workspaceModelId?: number;
-};
-
-/**
- * Bind an agent config to a workspace purpose; null unbinds
- */
-export type UpdateAgentBindingRequest = {
-    /**
-     * Agent config id to bind, or null to unbind
-     */
-    configId?: number;
-};
-
 export type UpdateAccountRequest = {
     appRole?: string;
 };
@@ -3659,40 +3619,6 @@ export type CreateLlmConnectionRequest = {
 };
 
 /**
- * Request to create a new agent configuration for a workspace
- */
-export type CreateAgentConfigRequest = {
-    /**
-     * Whether agent containers have internet access
-     */
-    allowInternet?: boolean;
-    /**
-     * Whether the agent is enabled
-     */
-    enabled?: boolean;
-    /**
-     * Bind to a shared (instance catalog) model. Mutually exclusive with workspaceModelId.
-     */
-    instanceModelId?: number;
-    /**
-     * Maximum concurrent jobs
-     */
-    maxConcurrentJobs?: number;
-    /**
-     * Unique name within the workspace
-     */
-    name: string;
-    /**
-     * Job timeout in seconds
-     */
-    timeoutSeconds?: number;
-    /**
-     * Bind to a model on your own provider. Mutually exclusive with instanceModelId.
-     */
-    workspaceModelId?: number;
-};
-
-/**
  * Information about a contributor to the Hephaestus project
  */
 export type Contributor = {
@@ -4027,17 +3953,9 @@ export type AiSettingsView = {
      */
     deliverToMergedOverride?: boolean;
     /**
-     * Config explicitly bound to power the mentor (null = mentor is unconfigured)
-     */
-    mentorConfigId?: number;
-    /**
      * Whether the mentor feature is enabled for this workspace
      */
     mentorEnabled: boolean;
-    /**
-     * Config bound to power practice detection (null = fan-out to all enabled configs)
-     */
-    practiceConfigId?: number;
     /**
      * Whether the practices feature is enabled for this workspace
      */
@@ -4062,52 +3980,6 @@ export type AiSettingsView = {
      * Whether this workspace may register additional OpenAI-compatible connections
      */
     workspaceConnectionsAllowed: boolean;
-};
-
-/**
- * Agent configuration for a workspace (API key redacted)
- */
-export type AgentConfig = {
-    /**
-     * Whether agent containers have internet access
-     */
-    allowInternet: boolean;
-    /**
-     * Timestamp when the config was created
-     */
-    createdAt: Date;
-    /**
-     * Whether the agent is enabled
-     */
-    enabled: boolean;
-    /**
-     * Configuration ID
-     */
-    id: number;
-    /**
-     * Bound shared (instance catalog) model id, if bound to one
-     */
-    instanceModelId?: number;
-    /**
-     * Maximum concurrent jobs
-     */
-    maxConcurrentJobs: number;
-    /**
-     * Unique name within the workspace
-     */
-    name: string;
-    /**
-     * Job timeout in seconds
-     */
-    timeoutSeconds: number;
-    /**
-     * Timestamp when the config was last updated
-     */
-    updatedAt?: Date;
-    /**
-     * Bound model id on your own provider, if bound to one
-     */
-    workspaceModelId?: number;
 };
 
 /**
@@ -5448,146 +5320,6 @@ export type UpsertBindingResponses = {
 
 export type UpsertBindingResponse = UpsertBindingResponses[keyof UpsertBindingResponses];
 
-export type GetConfigsData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/agent-configs';
-};
-
-export type GetConfigsResponses = {
-    /**
-     * Agent configs returned
-     */
-    200: Array<AgentConfig>;
-};
-
-export type GetConfigsResponse = GetConfigsResponses[keyof GetConfigsResponses];
-
-export type CreateConfigData = {
-    body: CreateAgentConfigRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/agent-configs';
-};
-
-export type CreateConfigErrors = {
-    /**
-     * Config name already exists in this workspace
-     */
-    409: unknown;
-};
-
-export type CreateConfigResponses = {
-    /**
-     * Agent config created
-     */
-    201: AgentConfig;
-};
-
-export type CreateConfigResponse = CreateConfigResponses[keyof CreateConfigResponses];
-
-export type DeleteConfigData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        configId: number;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/agent-configs/{configId}';
-};
-
-export type DeleteConfigErrors = {
-    /**
-     * Agent config not found
-     */
-    404: unknown;
-    /**
-     * Cannot delete config with active jobs
-     */
-    409: unknown;
-};
-
-export type DeleteConfigResponses = {
-    /**
-     * Agent config deleted
-     */
-    204: void;
-};
-
-export type DeleteConfigResponse = DeleteConfigResponses[keyof DeleteConfigResponses];
-
-export type GetConfigData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        configId: number;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/agent-configs/{configId}';
-};
-
-export type GetConfigErrors = {
-    /**
-     * Agent config not found
-     */
-    404: unknown;
-};
-
-export type GetConfigResponses = {
-    /**
-     * Agent config returned
-     */
-    200: AgentConfig;
-};
-
-export type GetConfigResponse = GetConfigResponses[keyof GetConfigResponses];
-
-export type UpdateConfigData = {
-    body: UpdateAgentConfigRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        configId: number;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/agent-configs/{configId}';
-};
-
-export type UpdateConfigErrors = {
-    /**
-     * Agent config not found
-     */
-    404: unknown;
-};
-
-export type UpdateConfigResponses = {
-    /**
-     * Agent config updated
-     */
-    200: AgentConfig;
-};
-
-export type UpdateConfigResponse = UpdateConfigResponses[keyof UpdateConfigResponses];
-
 export type ListJobsData = {
     body?: never;
     path: {
@@ -5731,70 +5463,6 @@ export type GetAiSettingsResponses = {
 };
 
 export type GetAiSettingsResponse = GetAiSettingsResponses[keyof GetAiSettingsResponses];
-
-export type UpdateMentorConfigData = {
-    body: UpdateAgentBindingRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/ai-settings/mentor-config';
-};
-
-export type UpdateMentorConfigErrors = {
-    /**
-     * Config not found in this workspace
-     */
-    404: unknown;
-    /**
-     * Config is disabled or its catalog model is unavailable
-     */
-    409: unknown;
-};
-
-export type UpdateMentorConfigResponses = {
-    /**
-     * Binding updated
-     */
-    200: AiSettingsView;
-};
-
-export type UpdateMentorConfigResponse = UpdateMentorConfigResponses[keyof UpdateMentorConfigResponses];
-
-export type UpdatePracticeConfigData = {
-    body: UpdateAgentBindingRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/ai-settings/practice-config';
-};
-
-export type UpdatePracticeConfigErrors = {
-    /**
-     * Config not found in this workspace
-     */
-    404: unknown;
-    /**
-     * Config is disabled or its catalog model is unavailable
-     */
-    409: unknown;
-};
-
-export type UpdatePracticeConfigResponses = {
-    /**
-     * Binding updated
-     */
-    200: AiSettingsView;
-};
-
-export type UpdatePracticeConfigResponse = UpdatePracticeConfigResponses[keyof UpdatePracticeConfigResponses];
 
 export type UpdatePracticeReviewSettingsData = {
     body: UpdatePracticeReviewSettings;

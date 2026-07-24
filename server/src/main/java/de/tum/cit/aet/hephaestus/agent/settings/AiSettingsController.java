@@ -48,58 +48,6 @@ public class AiSettingsController {
         return ResponseEntity.ok(aiSettingsService.getSettings(workspaceContext));
     }
 
-    @PutMapping("/practice-config")
-    @Operation(summary = "Bind (or unbind) the agent config that powers practice detection")
-    @ApiResponse(
-        responseCode = "200",
-        description = "Binding updated",
-        content = @Content(schema = @Schema(implementation = AiSettingsViewDTO.class))
-    )
-    @ApiResponse(
-        responseCode = "404",
-        description = "Config not found in this workspace",
-        content = @Content(schema = @Schema(hidden = true))
-    )
-    @ApiResponse(
-        responseCode = "409",
-        description = "Config is disabled or its catalog model is unavailable",
-        content = @Content(schema = @Schema(hidden = true))
-    )
-    @RequireAtLeastWorkspaceAdmin
-    @Audited("AI_CONFIG_BINDING")
-    public ResponseEntity<AiSettingsViewDTO> updatePracticeConfig(
-        WorkspaceContext workspaceContext,
-        @Valid @RequestBody UpdateAgentBindingRequestDTO request
-    ) {
-        return ResponseEntity.ok(aiSettingsService.bindPracticeConfig(workspaceContext, request.configId()));
-    }
-
-    @PutMapping("/mentor-config")
-    @Operation(summary = "Bind (or unbind) the agent config that powers the mentor")
-    @ApiResponse(
-        responseCode = "200",
-        description = "Binding updated",
-        content = @Content(schema = @Schema(implementation = AiSettingsViewDTO.class))
-    )
-    @ApiResponse(
-        responseCode = "404",
-        description = "Config not found in this workspace",
-        content = @Content(schema = @Schema(hidden = true))
-    )
-    @ApiResponse(
-        responseCode = "409",
-        description = "Config is disabled or its catalog model is unavailable",
-        content = @Content(schema = @Schema(hidden = true))
-    )
-    @RequireAtLeastWorkspaceAdmin
-    @Audited("AI_CONFIG_BINDING")
-    public ResponseEntity<AiSettingsViewDTO> updateMentorConfig(
-        WorkspaceContext workspaceContext,
-        @Valid @RequestBody UpdateAgentBindingRequestDTO request
-    ) {
-        return ResponseEntity.ok(aiSettingsService.bindMentorConfig(workspaceContext, request.configId()));
-    }
-
     @PatchMapping("/practice-review")
     @Operation(summary = "Update per-workspace practice-review policy")
     @ApiResponse(

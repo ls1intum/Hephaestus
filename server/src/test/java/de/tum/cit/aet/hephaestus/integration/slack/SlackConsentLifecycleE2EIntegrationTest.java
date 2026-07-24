@@ -218,9 +218,7 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
             userRepository,
             new SlackHephaestusUiLinks(
                 workspaceId ->
-                    Optional.of(
-                        new WorkspaceSummaryQuery.WorkspaceSummary(workspaceId, "hephaestus", "Hephaestus", null)
-                    ),
+                    Optional.of(new WorkspaceSummaryQuery.WorkspaceSummary(workspaceId, "hephaestus", "Hephaestus")),
                 "https://hephaestus.test"
             ),
             new TransactionTemplate(transactionManager),

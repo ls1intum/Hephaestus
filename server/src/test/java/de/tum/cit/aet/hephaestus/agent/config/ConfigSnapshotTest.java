@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
 import de.tum.cit.aet.hephaestus.agent.catalog.ResolvedLlmModel;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
@@ -28,25 +28,25 @@ class ConfigSnapshotTest extends BaseUnitTest {
     @Mock
     private LlmModelResolver resolver;
 
-    private AgentConfig createConfig() {
+    private WorkspaceAgentBinding createBinding() {
         Workspace ws = new Workspace();
         ws.setId(1L);
 
-        AgentConfig config = new AgentConfig();
-        config.setId(42L);
-        config.setWorkspace(ws);
-        config.setName("my-agent");
-        config.setLlmProvider(LlmProvider.ANTHROPIC);
-        config.setModelName("claude-sonnet-4-20250514");
-        config.setTimeoutSeconds(600);
-        config.setAllowInternet(false);
-        config.setLlmApiKey("sk-secret-key");
-        config.setMaxConcurrentJobs(5);
-        return config;
+        WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
+        binding.setId(42L);
+        binding.setWorkspace(ws);
+        binding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        LlmModel model = new LlmModel();
+        model.setId(20L);
+        binding.setInstanceModel(model);
+        binding.setTimeoutSeconds(600);
+        binding.setAllowInternet(false);
+        binding.setMaxConcurrentJobs(5);
+        return binding;
     }
 
-    private void stubResolver(AgentConfig config) {
-        when(resolver.resolve(config)).thenReturn(
+    private void stubResolver(WorkspaceAgentBinding binding) {
+        when(resolver.resolve(binding)).thenReturn(
             new ResolvedLlmModel(
                 "https://api.anthropic.com",
                 "anthropic-messages",
@@ -57,21 +57,24 @@ class ConfigSnapshotTest extends BaseUnitTest {
                 FundingSource.INSTANCE
             )
         );
-        when(resolver.connectionRef(config)).thenReturn(new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 7L));
+        when(resolver.connectionRef(binding)).thenReturn(
+            new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 7L)
+        );
     }
 
     @Nested
-    class FromConfig {
+    class FromBinding {
 
         @Test
         void shouldCaptureAllIncludedFields() {
-            AgentConfig config = createConfig();
-            stubResolver(config);
-            ConfigSnapshot snapshot = ConfigSnapshot.from(config, resolver);
+            WorkspaceAgentBinding binding = createBinding();
+            stubResolver(binding);
+            ConfigSnapshot snapshot = ConfigSnapshot.from(binding, resolver);
 
             assertThat(snapshot.schemaVersion()).isEqualTo(ConfigSnapshot.SCHEMA_VERSION);
             assertThat(snapshot.configId()).isEqualTo(42L);
             assertThat(snapshot.configName()).isNull(); // from(binding) no longer captures a name (#1368)
+            assertThat(snapshot.modelVersion()).isNull(); // ditto — the catalog model carries the identity
             assertThat(snapshot.apiProtocol()).isEqualTo("anthropic-messages");
             assertThat(snapshot.baseUrl()).isEqualTo("https://api.anthropic.com");
             assertThat(snapshot.upstreamModelId()).isEqualTo("claude-sonnet-4-20250514");
@@ -84,13 +87,13 @@ class ConfigSnapshotTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldRejectNullConfig() {
+        void shouldRejectNullSource() {
             assertThatThrownBy(() -> ConfigSnapshot.from(null, resolver)).isInstanceOf(NullPointerException.class);
         }
 
         @Test
         void shouldRejectNullResolver() {
-            assertThatThrownBy(() -> ConfigSnapshot.from(createConfig(), null)).isInstanceOf(
+            assertThatThrownBy(() -> ConfigSnapshot.from(createBinding(), null)).isInstanceOf(
                 NullPointerException.class
             );
         }
@@ -101,9 +104,9 @@ class ConfigSnapshotTest extends BaseUnitTest {
 
         @Test
         void shouldSerializeAndDeserializeCorrectly() {
-            AgentConfig config = createConfig();
-            stubResolver(config);
-            ConfigSnapshot original = ConfigSnapshot.from(config, resolver);
+            WorkspaceAgentBinding binding = createBinding();
+            stubResolver(binding);
+            ConfigSnapshot original = ConfigSnapshot.from(binding, resolver);
 
             JsonNode json = original.toJson(OBJECT_MAPPER);
             ConfigSnapshot deserialized = ConfigSnapshot.fromJson(json, OBJECT_MAPPER);
@@ -116,18 +119,20 @@ class ConfigSnapshotTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldNotContainLlmApiKeyInJson() {
-            AgentConfig config = createConfig();
-            config.setLlmApiKey("sk-super-secret");
-            stubResolver(config);
+        void shouldNotContainCredentialMaterialInJson() {
+            // The binding itself never carries a key, and the snapshot must never grow a field that
+            // copies one out of the resolved connection — the proxy re-resolves it live instead.
+            WorkspaceAgentBinding binding = createBinding();
+            stubResolver(binding);
 
-            ConfigSnapshot snapshot = ConfigSnapshot.from(config, resolver);
+            ConfigSnapshot snapshot = ConfigSnapshot.from(binding, resolver);
             JsonNode json = snapshot.toJson(OBJECT_MAPPER);
             String jsonString = json.toString();
 
             assertThat(jsonString).doesNotContain("llmApiKey");
             assertThat(jsonString).doesNotContain("llm_api_key");
-            assertThat(jsonString).doesNotContain("sk-super-secret");
+            assertThat(jsonString).doesNotContain("apiKey");
+            assertThat(jsonString).doesNotContain("api_key");
         }
 
         @Test
@@ -135,10 +140,10 @@ class ConfigSnapshotTest extends BaseUnitTest {
             // Locked decision (#1368 slice 5): NEVER freeze the credential OR any header material —
             // authHeaderName/authValuePrefix are re-resolved live from the connection, never from the
             // snapshot.
-            AgentConfig config = createConfig();
-            stubResolver(config);
+            WorkspaceAgentBinding binding = createBinding();
+            stubResolver(binding);
 
-            ConfigSnapshot snapshot = ConfigSnapshot.from(config, resolver);
+            ConfigSnapshot snapshot = ConfigSnapshot.from(binding, resolver);
             String jsonString = snapshot.toJson(OBJECT_MAPPER).toString();
 
             assertThat(jsonString).doesNotContain("authHeaderName");
@@ -147,11 +152,11 @@ class ConfigSnapshotTest extends BaseUnitTest {
 
         @Test
         void shouldNotContainMaxConcurrentJobsInJson() {
-            AgentConfig config = createConfig();
-            config.setMaxConcurrentJobs(10);
-            stubResolver(config);
+            WorkspaceAgentBinding binding = createBinding();
+            binding.setMaxConcurrentJobs(10);
+            stubResolver(binding);
 
-            ConfigSnapshot snapshot = ConfigSnapshot.from(config, resolver);
+            ConfigSnapshot snapshot = ConfigSnapshot.from(binding, resolver);
             JsonNode json = snapshot.toJson(OBJECT_MAPPER);
             String jsonString = json.toString();
 
@@ -161,9 +166,9 @@ class ConfigSnapshotTest extends BaseUnitTest {
 
         @Test
         void shouldIncludeSchemaVersionInJson() {
-            AgentConfig config = createConfig();
-            stubResolver(config);
-            ConfigSnapshot snapshot = ConfigSnapshot.from(config, resolver);
+            WorkspaceAgentBinding binding = createBinding();
+            stubResolver(binding);
+            ConfigSnapshot snapshot = ConfigSnapshot.from(binding, resolver);
             JsonNode json = snapshot.toJson(OBJECT_MAPPER);
 
             assertThat(json.has("schemaVersion")).isTrue();
@@ -172,9 +177,9 @@ class ConfigSnapshotTest extends BaseUnitTest {
 
         @Test
         void shouldIncludeConfigId() {
-            AgentConfig config = createConfig();
-            stubResolver(config);
-            ConfigSnapshot snapshot = ConfigSnapshot.from(config, resolver);
+            WorkspaceAgentBinding binding = createBinding();
+            stubResolver(binding);
+            ConfigSnapshot snapshot = ConfigSnapshot.from(binding, resolver);
             JsonNode json = snapshot.toJson(OBJECT_MAPPER);
 
             assertThat(json.has("configId")).isTrue();
@@ -185,9 +190,9 @@ class ConfigSnapshotTest extends BaseUnitTest {
 
         @Test
         void shouldRejectNewerSchemaVersion() {
-            AgentConfig config = createConfig();
-            stubResolver(config);
-            ConfigSnapshot original = ConfigSnapshot.from(config, resolver);
+            WorkspaceAgentBinding binding = createBinding();
+            stubResolver(binding);
+            ConfigSnapshot original = ConfigSnapshot.from(binding, resolver);
             JsonNode json = original.toJson(OBJECT_MAPPER);
 
             // Mutate schemaVersion to a future version
@@ -200,9 +205,9 @@ class ConfigSnapshotTest extends BaseUnitTest {
 
         @Test
         void shouldTolerateUnknownFields() {
-            AgentConfig config = createConfig();
-            stubResolver(config);
-            ConfigSnapshot original = ConfigSnapshot.from(config, resolver);
+            WorkspaceAgentBinding binding = createBinding();
+            stubResolver(binding);
+            ConfigSnapshot original = ConfigSnapshot.from(binding, resolver);
             JsonNode json = original.toJson(OBJECT_MAPPER);
 
             // Add an unknown field (simulates future schema addition)

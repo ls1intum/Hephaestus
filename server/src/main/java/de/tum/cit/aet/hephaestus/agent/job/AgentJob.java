@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -80,11 +79,6 @@ public class AgentJob {
     @JoinColumn(name = "workspace_id", nullable = false, foreignKey = @ForeignKey(name = "fk_agent_job_workspace"))
     @ToString.Exclude
     private Workspace workspace;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "config_id", foreignKey = @ForeignKey(name = "fk_agent_job_config"))
-    @ToString.Exclude
-    private AgentConfig config;
 
     /**
      * Which per-purpose {@link WorkspaceAgentBinding} this job runs on (#1368). The executor admits

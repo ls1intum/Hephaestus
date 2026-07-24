@@ -53,30 +53,9 @@ erDiagram
         TIMESTAMPTZ ingested_at "NOT NULL"
     }
 
-    AgentConfig {
-        BIGINT id PK
-        BIGINT workspace_id FK,UK "NOT NULL"
-        VARCHAR(100) name UK "NOT NULL"
-        BOOLEAN enabled "NOT NULL"
-        VARCHAR(128) model_name
-        TEXT llm_api_key
-        VARCHAR(32) llm_provider
-        INTEGER timeout_seconds "NOT NULL"
-        INTEGER max_concurrent_jobs "NOT NULL"
-        BOOLEAN allow_internet "NOT NULL"
-        TIMESTAMPTZ created_at "NOT NULL"
-        TIMESTAMPTZ updated_at
-        VARCHAR(16) credential_mode "NOT NULL"
-        VARCHAR(50) model_version
-        VARCHAR(2048) llm_base_url
-        BIGINT instance_model_id FK
-        BIGINT workspace_model_id FK
-    }
-
     AgentJob {
         UUID id PK
         BIGINT workspace_id FK "NOT NULL"
-        BIGINT config_id FK
         VARCHAR(50) job_type "NOT NULL"
         VARCHAR(20) status "NOT NULL"
         JSONB metadata
@@ -1199,8 +1178,6 @@ erDiagram
         BOOLEAN practice_review_manual_trigger_enabled "NOT NULL"
         BOOLEAN mentor_enabled "NOT NULL"
         TIMESTAMPTZ leaderboard_league_cycle_at
-        BIGINT practice_config_id FK
-        BIGINT mentor_config_id FK
         BOOLEAN practice_run_for_all_users
         BOOLEAN practice_skip_drafts
         BOOLEAN practice_deliver_to_merged
@@ -1299,8 +1276,6 @@ erDiagram
     %% One-to-One relationships
     Account ||--|| AccountFeature : has
     Workspace ||--|| ActivityEvent : has
-    Workspace ||--|| AgentConfig : has
-    WorkspaceLlmModel ||--|| AgentConfig : has
     ChatMessage ||--|| ChatMessageVote : has
     GitCommit ||--|| CommitContributor : has
     Workspace ||--|| Connection : has
@@ -1361,11 +1336,7 @@ erDiagram
     Account ||--o{ AccountExport : has
     User ||--o{ ActivityEvent : references
     Repository ||--o{ ActivityEvent : has
-    LlmModel ||--o{ AgentConfig : references
-    WorkspaceLlmModel ||--o{ AgentConfig : workspace_model_id
-    WorkspaceLlmModel ||--o{ AgentConfig : workspace_model_id
     Workspace ||--o{ AgentJob : has
-    AgentConfig ||--o{ AgentJob : has
     Account ||--o{ AuthEvent : account_id
     Account ||--o{ AuthEvent : acting_account_id
     IdentityProvider ||--o{ AuthEvent : references
@@ -1441,8 +1412,6 @@ erDiagram
     Connection ||--o{ SyncJob : references
     Connection ||--o{ SyncJob : connection_id
     Connection ||--o{ SyncJob : connection_id
-    AgentConfig ||--o{ Workspace : practice_config_id
-    AgentConfig ||--o{ Workspace : mentor_config_id
     LlmModel ||--o{ WorkspaceAgentBinding : references
     WorkspaceLlmModel ||--o{ WorkspaceAgentBinding : workspace_model_id
     WorkspaceLlmModel ||--o{ WorkspaceAgentBinding : workspace_model_id

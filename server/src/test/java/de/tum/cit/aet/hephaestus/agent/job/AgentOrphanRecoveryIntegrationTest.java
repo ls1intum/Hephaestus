@@ -11,9 +11,10 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelPriceRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.ModelVisibility;
 import de.tum.cit.aet.hephaestus.agent.catalog.PricingMode;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
@@ -83,7 +84,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
-    private AgentConfigRepository agentConfigRepository;
+    private WorkspaceAgentBindingRepository agentBindingRepository;
 
     @Autowired
     private LlmConnectionRepository connectionRepository;
@@ -101,7 +102,8 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     private TransactionTemplate transactionTemplate;
 
     private Workspace workspace;
-    private AgentConfig agentConfig;
+    private WorkspaceAgentBinding agentBinding;
+    private LlmModel instanceModel;
 
     @BeforeEach
     void setUp() {
@@ -123,21 +125,22 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         model.setUpstreamModelId("test-model");
         model.setVisibility(ModelVisibility.PUBLIC);
         model.setEnabled(true);
-        model = modelRepository.save(model);
+        instanceModel = modelRepository.save(model);
 
         LlmModelPrice price = new LlmModelPrice();
-        price.setModel(model);
+        price.setModel(instanceModel);
         price.setPricingMode(PricingMode.NO_CHARGE);
         price.setNote("Integration-test model has no per-token charge");
         price.setEffectiveFrom(Instant.now().minusSeconds(60));
         priceRepository.save(price);
 
-        agentConfig = new AgentConfig();
-        agentConfig.setWorkspace(workspace);
-        agentConfig.setName("orphan-recovery-config");
-        agentConfig.setEnabled(true);
-        agentConfig.setInstanceModel(model);
-        agentConfig = agentConfigRepository.save(agentConfig);
+        // The workspace's PRACTICE_DETECTION binding: what the executor admits at claim time (#1368).
+        WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
+        binding.setWorkspace(workspace);
+        binding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        binding.setEnabled(true);
+        binding.setInstanceModel(instanceModel);
+        agentBinding = agentBindingRepository.save(binding);
     }
 
     @Test
@@ -328,14 +331,14 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     private UUID runningJobOwnedBy(String workerId, Instant startedAt, int retryCount) {
         AgentJob job = new AgentJob();
         job.setWorkspace(workspace);
-        job.setConfig(agentConfig);
+        job.setPurpose(AgentPurpose.PRACTICE_DETECTION);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         job.setStatus(AgentJobStatus.RUNNING);
         job.setConfigSnapshot(
             new ConfigSnapshot(
                 ConfigSnapshot.SCHEMA_VERSION,
-                agentConfig.getId(),
-                "orphan-recovery-config",
+                agentBinding.getId(),
+                null,
                 "openai-completions",
                 "https://api.openai.com/v1",
                 "test-model",
@@ -344,8 +347,8 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                 null,
                 false,
                 FundingSource.INSTANCE,
-                agentConfig.getInstanceModel().getConnection().getId(),
-                agentConfig.getInstanceModel().getId(),
+                instanceModel.getConnection().getId(),
+                instanceModel.getId(),
                 workspace.getId(),
                 600,
                 false

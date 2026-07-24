@@ -6,13 +6,13 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmConnection;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmConnectionRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -44,10 +44,10 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Integration test for {@link PracticeReviewDetectionGate} exercising real PostgreSQL
- * queries for workspace resolution, agent config checking, and JSONB practice matching.
+ * queries for workspace resolution, practice-detection binding checking, and JSONB practice matching.
  *
- * <p>Primary integration value: workspace resolver heuristic, agent config existence check,
- * and JSONB containment query ({@code triggerEvents @> ?}) against real PostgreSQL.
+ * <p>Primary integration value: workspace resolver heuristic, the per-purpose binding existence
+ * check, and JSONB containment query ({@code triggerEvents @> ?}) against real PostgreSQL.
  *
  * <p>Mocks only the role-check SPI ({@link UserRoleChecker}).
  * Label/draft/assignee checks operate on the in-memory PR object passed to the gate
@@ -64,7 +64,7 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
     private PracticeRepository practiceRepository;
 
     @Autowired
-    private AgentConfigRepository agentConfigRepository;
+    private WorkspaceAgentBindingRepository agentBindingRepository;
 
     @Autowired
     private WorkspaceLlmConnectionRepository workspaceLlmConnectionRepository;
@@ -127,15 +127,14 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
         workspaceModel.setEnabled(true);
         workspaceModel = workspaceLlmModelRepository.save(workspaceModel);
 
-        // Enabled config backed by a live catalog model.
-        AgentConfig config = new AgentConfig();
-        config.setWorkspace(workspace);
-        config.setName("gate-config");
-        config.setEnabled(true);
-        config.setLlmProvider(LlmProvider.ANTHROPIC);
-        config.setWorkspaceModel(workspaceModel);
-        config.setTimeoutSeconds(300);
-        agentConfigRepository.save(config);
+        // Enabled practice-detection binding backed by a live catalog model.
+        WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
+        binding.setWorkspace(workspace);
+        binding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        binding.setEnabled(true);
+        binding.setWorkspaceModel(workspaceModel);
+        binding.setTimeoutSeconds(300);
+        agentBindingRepository.save(binding);
 
         provider = gitProviderRepository
             .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
@@ -282,8 +281,8 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
     class GateSkips {
 
         @Test
-        void skipsNoConfig() {
-            agentConfigRepository.deleteAll();
+        void skipsNoBinding() {
+            agentBindingRepository.deleteAll();
             createPractice("no-config", "No Config", List.of("PullRequestCreated"), true);
             PullRequest pr = createPullRequest(false, Set.of(), Set.of(assignee));
 

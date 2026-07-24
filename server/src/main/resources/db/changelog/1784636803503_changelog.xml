@@ -1302,4 +1302,58 @@
         </rollback>
     </changeSet>
 
+    <!--
+        Retire the named-agent-config model (#1368). Every runtime path now resolves
+        workspace_agent_binding: the scalar workspace pointers were backfilled into bindings by
+        changeSet -58, agent_job.config_id has been NULL for every job the binding runtime submits,
+        and the entity, repository, REST surface (/agent-configs, PUT /ai-settings/{practice,mentor}-config)
+        and the transitional mirror that kept the two models in sync are all gone from the code.
+
+        Dropped in dependency order — the referencing columns first, then the table itself. Pre-1.0,
+        so this lands in one release rather than deprecate-then-remove across two (see
+        docs/contributor/database-migration.mdx); the data it holds is fully represented by
+        workspace_agent_binding, which is why each rollback restores the column but not its contents.
+    -->
+
+    <changeSet id="1784636803503-61" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="agent_job.config_id already removed">
+            <columnExists tableName="agent_job" columnName="config_id"/>
+        </preConditions>
+        <comment>Drop agent_job.config_id — jobs are attributed to a (workspace, purpose) binding (#1368)</comment>
+        <dropColumn tableName="agent_job" columnName="config_id"/>
+        <rollback>
+            <addColumn tableName="agent_job">
+                <column name="config_id" type="BIGINT"/>
+            </addColumn>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1784636803503-62" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace config pointers already removed">
+            <columnExists tableName="workspace" columnName="practice_config_id"/>
+        </preConditions>
+        <comment>Drop the scalar workspace→config pointers; workspace_agent_binding is the binding (#1368)</comment>
+        <dropColumn tableName="workspace" columnName="practice_config_id"/>
+        <dropColumn tableName="workspace" columnName="mentor_config_id"/>
+        <rollback>
+            <addColumn tableName="workspace">
+                <column name="practice_config_id" type="BIGINT"/>
+                <column name="mentor_config_id" type="BIGINT"/>
+            </addColumn>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1784636803503-63" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="agent_config already removed">
+            <tableExists tableName="agent_config"/>
+        </preConditions>
+        <comment>Drop the retired agent_config table (#1368)</comment>
+        <dropTable tableName="agent_config"/>
+        <rollback>
+            <!-- Deliberately empty: agent_config's every live column was migrated into
+                 workspace_agent_binding by changeSet -58, so re-creating an empty shell of the table
+                 would restore a structure with no data and no reader. Roll forward instead. -->
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

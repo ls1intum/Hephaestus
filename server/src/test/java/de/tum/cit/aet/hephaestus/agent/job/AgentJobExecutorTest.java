@@ -15,7 +15,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
@@ -112,7 +111,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
     private UUID jobId;
     private AgentJob job;
-    private AgentConfig config;
     private WorkspaceAgentBinding binding;
     private ConfigSnapshot snapshot;
 
@@ -138,10 +136,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
         );
 
         jobId = UUID.randomUUID();
-
-        config = new AgentConfig();
-        config.setId(10L);
-        config.setMaxConcurrentJobs(3);
 
         binding = new WorkspaceAgentBinding();
         binding.setId(10L);
@@ -170,7 +164,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
         job = new AgentJob();
         job.prePersist();
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-        job.setConfig(config);
         job.setPurpose(AgentPurpose.PRACTICE_DETECTION);
         job.setConfigSnapshot(snapshot.toJson(objectMapper));
         job.setJobToken("test-token");

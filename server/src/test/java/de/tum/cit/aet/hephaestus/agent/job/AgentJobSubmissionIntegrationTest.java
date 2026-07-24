@@ -8,8 +8,9 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.ModelVisibility;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -51,7 +52,7 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
     private AgentJobRepository agentJobRepository;
 
     @Autowired
-    private AgentConfigRepository agentConfigRepository;
+    private WorkspaceAgentBindingRepository agentBindingRepository;
 
     @Autowired
     private LlmConnectionRepository llmConnectionRepository;
@@ -75,7 +76,7 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
     private UserRepository userRepository;
 
     private Workspace workspace;
-    private AgentConfig agentConfig;
+    private WorkspaceAgentBinding agentBinding;
     private Long prId;
     private Repository repo;
 
@@ -102,13 +103,14 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
         model.setEnabled(true);
         model = llmModelRepository.save(model);
 
-        agentConfig = new AgentConfig();
-        agentConfig.setWorkspace(workspace);
-        agentConfig.setName("test-config");
-        agentConfig.setEnabled(true);
-        agentConfig.setInstanceModel(model);
-        agentConfig.setTimeoutSeconds(300);
-        agentConfig = agentConfigRepository.save(agentConfig);
+        // The workspace's PRACTICE_DETECTION binding — what submit() discovers and freezes (#1368).
+        WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
+        binding.setWorkspace(workspace);
+        binding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        binding.setEnabled(true);
+        binding.setInstanceModel(model);
+        binding.setTimeoutSeconds(300);
+        agentBinding = agentBindingRepository.save(binding);
 
         // Seed git entities needed for the submission request
         IdentityProvider provider = gitProviderRepository
@@ -211,9 +213,12 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             assertThat(job.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
             assertThat(job.getJobType()).isEqualTo(AgentJobType.PULL_REQUEST_REVIEW);
             assertThat(job.getIdempotencyKey()).isEqualTo(
-                // per-phase key: a manual/dev submission carries the "manual" phase segment
-                "pr_review:org/submit-repo:10:manual:abc123:config:" + agentConfig.getId()
+                // per-phase key: a manual/dev submission carries the "manual" phase segment, and the
+                // trailing segment is now the purpose — one PRACTICE_DETECTION job per workspace,
+                // no per-config fan-out (#1368)
+                "pr_review:org/submit-repo:10:manual:abc123:detection"
             );
+            assertThat(job.getPurpose()).isEqualTo(AgentPurpose.PRACTICE_DETECTION);
             assertThat(job.getConfigSnapshot()).isNotNull();
             assertThat(job.getMetadata().get("pull_request_id").asLong()).isEqualTo(prId);
             assertThat(job.getMetadata().get("pr_number").asInt()).isEqualTo(10);
@@ -280,11 +285,11 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             // simulating a job created by a concurrent request before this one.
             AgentJob existing = new AgentJob();
             existing.setWorkspace(workspace);
-            existing.setConfig(agentConfig);
+            existing.setPurpose(AgentPurpose.PRACTICE_DETECTION);
             existing.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
             existing.setIdempotencyKey(
                 // per-phase key: must carry the "manual" phase to dedup against a manual submission
-                "pr_review:" + repo.getNameWithOwner() + ":10:manual:race123:config:" + agentConfig.getId()
+                "pr_review:" + repo.getNameWithOwner() + ":10:manual:race123:detection"
             );
             existing.setMetadata(OBJECT_MAPPER.createObjectNode());
             existing.setConfigSnapshot(OBJECT_MAPPER.createObjectNode());
@@ -304,11 +309,11 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    class NoConfig {
+    class NoBinding {
 
         @Test
-        void returnsEmptyWhenNoConfig() {
-            agentConfigRepository.deleteAll();
+        void returnsEmptyWhenNoBinding() {
+            agentBindingRepository.deleteAll();
 
             var request = createRequest("noconfig123");
             Optional<AgentJob> result = agentJobService.submit(
@@ -322,8 +327,8 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
 
         @Test
         void returnsEmptyWhenDisabled() {
-            agentConfig.setEnabled(false);
-            agentConfigRepository.save(agentConfig);
+            agentBinding.setEnabled(false);
+            agentBindingRepository.save(agentBinding);
 
             var request = createRequest("disabled123");
             Optional<AgentJob> result = agentJobService.submit(
@@ -353,9 +358,9 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             var snapshot = result.get().getConfigSnapshot();
             assertThat(snapshot.get("timeoutSeconds").asInt()).isEqualTo(300);
 
-            // Change the config after submission
-            agentConfig.setTimeoutSeconds(900);
-            agentConfigRepository.save(agentConfig);
+            // Change the binding after submission
+            agentBinding.setTimeoutSeconds(900);
+            agentBindingRepository.save(agentBinding);
 
             // Re-load the job from DB — snapshot should still reflect the original
             AgentJob fromDb = agentJobRepository.findById(result.get().getId()).orElseThrow();

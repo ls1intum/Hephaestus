@@ -3,9 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
@@ -27,9 +25,6 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     @Autowired
     private AgentJobRepository agentJobRepository;
 
-    @Autowired
-    private AgentConfigRepository agentConfigRepository;
-
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private Workspace setupWorkspace() {
@@ -39,22 +34,10 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         return workspace;
     }
 
-    private AgentConfig createConfig(Workspace workspace, String name) {
-        AgentConfig config = new AgentConfig();
-        config.setWorkspace(workspace);
-        config.setName(name);
-        config.setLlmProvider(LlmProvider.ANTHROPIC);
-        return agentConfigRepository.save(config);
-    }
-
     private AgentJob createJob(Workspace workspace, AgentJobStatus status) {
-        return createJob(workspace, status, null);
-    }
-
-    private AgentJob createJob(Workspace workspace, AgentJobStatus status, AgentConfig config) {
         AgentJob job = new AgentJob();
         job.setWorkspace(workspace);
-        job.setConfig(config);
+        job.setPurpose(AgentPurpose.PRACTICE_DETECTION);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         job.setStatus(status);
         // Include upstreamModelId so the DTO's snapshotString extractor (AgentJobDTO.from) is exercised

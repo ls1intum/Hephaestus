@@ -4,9 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
@@ -78,9 +76,6 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
     private AgentJobRepository agentJobRepository;
 
     @Autowired
-    private AgentConfigRepository agentConfigRepository;
-
-    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -112,17 +107,9 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         createPractice("pr-description-quality", "PR Description Quality");
         createPractice("error-handling", "Error Handling");
 
-        AgentConfig config = new AgentConfig();
-        config.setWorkspace(workspace);
-        config.setName("delivery-config");
-        config.setEnabled(true);
-        config.setLlmProvider(LlmProvider.ANTHROPIC);
-        config.setTimeoutSeconds(300);
-        config = agentConfigRepository.save(config);
-
         agentJob = new AgentJob();
         agentJob.setWorkspace(workspace);
-        agentJob.setConfig(config);
+        agentJob.setPurpose(AgentPurpose.PRACTICE_DETECTION);
         agentJob.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         agentJob.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
         agentJob = agentJobRepository.save(agentJob);

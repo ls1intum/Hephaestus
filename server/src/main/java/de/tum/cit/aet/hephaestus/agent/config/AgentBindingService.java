@@ -24,7 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
  * Reads and writes each workspace's per-purpose {@link WorkspaceAgentBinding}s (#1368) — the single
  * source the runtime resolves a model from.
  *
- * <p>Also mirrors bindings from the legacy named-{@link AgentConfig} pointers ({@link #sync}) so
  * older config edits still reach the runtime during the transition; a direct binding write clears the
  * matching pointer so the two never fight.
  */
@@ -32,7 +31,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AgentBindingService {
 
-    private final AgentConfigRepository agentConfigRepository;
     private final WorkspaceAgentBindingRepository bindingRepository;
     private final WorkspaceRepository workspaceRepository;
     private final LlmModelRepository llmModelRepository;
@@ -94,14 +92,12 @@ public class AgentBindingService {
             binding.setEnabled(request.enabled());
         }
 
-        clearPointer(workspace, purpose);
         WorkspaceAgentBinding saved = bindingRepository.save(binding);
-        workspaceRepository.save(workspace);
         audit(purpose, workspaceId, before, BindingSnapshot.of(saved));
         return saved;
     }
 
-    /** Remove the workspace's binding for a purpose (detection/mentor off) and clear its legacy pointer. */
+    /** Remove the workspace's binding for a purpose (detection/mentor off). */
     @Transactional
     public void deleteBinding(WorkspaceContext workspaceContext, AgentPurpose purpose) {
         Long workspaceId = workspaceContext.id();
@@ -115,8 +111,6 @@ public class AgentBindingService {
                 bindingRepository.delete(binding);
                 audit(purpose, workspaceId, before, BindingSnapshot.empty());
             });
-        clearPointer(workspace, purpose);
-        workspaceRepository.save(workspace);
     }
 
     private void applyModel(
@@ -152,56 +146,6 @@ public class AgentBindingService {
         }
     }
 
-    // ---- transitional config-mirror (unchanged) --------------------------------------------------
-
-    /**
-     * Re-derive the workspace's binding for one purpose from its current scalar pointer. No pointer, a
-     * missing/deleted config, or a config without exactly one usable model → the binding is removed
-     * (the purpose is unconfigured). Otherwise the binding is upserted from the pointed-at config's
-     * model and execution limits. Must run inside the caller's transaction so it sees the just-written
-     * pointer and the lazy model associations.
-     */
-    @Transactional(propagation = Propagation.MANDATORY)
-    public void sync(Workspace workspace, AgentPurpose purpose) {
-        Long configId = pointerFor(workspace, purpose);
-        WorkspaceAgentBinding existing = bindingRepository
-            .findByWorkspaceIdAndPurpose(workspace.getId(), purpose)
-            .orElse(null);
-
-        AgentConfig config =
-            configId == null
-                ? null
-                : agentConfigRepository.findByIdAndWorkspaceId(configId, workspace.getId()).orElse(null);
-
-        boolean configured = config != null && hasExactlyOneModel(config);
-        if (!configured) {
-            if (existing != null) {
-                bindingRepository.delete(existing);
-            }
-            return;
-        }
-
-        WorkspaceAgentBinding binding = existing != null ? existing : newBinding(workspace, purpose);
-        binding.setInstanceModel(config.getInstanceModel());
-        binding.setWorkspaceModel(config.getWorkspaceModel());
-        binding.setTimeoutSeconds(config.getTimeoutSeconds());
-        binding.setMaxConcurrentJobs(config.getMaxConcurrentJobs());
-        binding.setAllowInternet(config.isAllowInternet());
-        binding.setEnabled(config.isEnabled());
-        bindingRepository.save(binding);
-    }
-
-    /** Re-sync every purpose currently pointed at {@code configId} (a config's model/limits changed). */
-    @Transactional(propagation = Propagation.MANDATORY)
-    public void syncPurposesBoundTo(Workspace workspace, Long configId) {
-        if (configId.equals(workspace.getPracticeConfigId())) {
-            sync(workspace, AgentPurpose.PRACTICE_DETECTION);
-        }
-        if (configId.equals(workspace.getMentorConfigId())) {
-            sync(workspace, AgentPurpose.MENTOR);
-        }
-    }
-
     private void audit(AgentPurpose purpose, Long workspaceId, BindingSnapshot before, BindingSnapshot after) {
         configAudit.record(
             ConfigAuditEntry.updated(
@@ -212,24 +156,6 @@ public class AgentBindingService {
                 after
             )
         );
-    }
-
-    private static void clearPointer(Workspace workspace, AgentPurpose purpose) {
-        if (purpose == AgentPurpose.PRACTICE_DETECTION) {
-            workspace.setPracticeConfigId(null);
-        } else {
-            workspace.setMentorConfigId(null);
-        }
-    }
-
-    private static Long pointerFor(Workspace workspace, AgentPurpose purpose) {
-        return purpose == AgentPurpose.PRACTICE_DETECTION
-            ? workspace.getPracticeConfigId()
-            : workspace.getMentorConfigId();
-    }
-
-    private static boolean hasExactlyOneModel(AgentConfig config) {
-        return (config.getInstanceModel() == null) != (config.getWorkspaceModel() == null);
     }
 
     private static WorkspaceAgentBinding newBinding(Workspace workspace, AgentPurpose purpose) {

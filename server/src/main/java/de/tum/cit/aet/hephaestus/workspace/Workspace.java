@@ -253,23 +253,6 @@ public class Workspace {
     // AI configuration
 
     /**
-     * The agent config that powers practice detection. When set, only this config is submitted
-     * for a review (no fan-out); when {@code null}, the "all enabled configs" fan-out applies.
-     * Scalar FK (not a {@code @ManyToOne AgentConfig}) on purpose — an association would close a
-     * {@code workspace → agent} Modulith cycle. {@code ON DELETE SET NULL} at the DB level.
-     */
-    @Column(name = "practice_config_id")
-    private Long practiceConfigId;
-
-    /**
-     * The agent config explicitly selected for the mentor. {@code null} means the mentor is not
-     * configured; an unavailable binding fails closed and never switches models implicitly. Scalar FK
-     * for the same cycle-avoidance reason.
-     */
-    @Column(name = "mentor_config_id")
-    private Long mentorConfigId;
-
-    /**
      * Monthly LLM budget cap in USD (#1368). {@code null} = uncapped. When the workspace's
      * calendar-month (UTC) spend in the {@code llm_usage_event} ledger reaches this cap, agent
      * job submission and mentor turns pause until the month rolls over or an instance admin

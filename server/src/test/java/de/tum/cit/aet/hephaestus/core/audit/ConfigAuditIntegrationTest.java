@@ -3,9 +3,8 @@ package de.tum.cit.aet.hephaestus.core.audit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigDTO;
-import de.tum.cit.aet.hephaestus.agent.config.CreateAgentConfigRequestDTO;
+import de.tum.cit.aet.hephaestus.agent.catalog.CreateWorkspaceLlmConnectionRequestDTO;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmAuthMode;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditActorKind;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -125,25 +124,6 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(rows).hasSize(2);
         assertThat(rows.get(1).changedKeyList()).containsExactly("cooldownMinutes");
         assertThat(rows.get(1).getNewValue()).contains("\"cooldownMinutes\":null");
-    }
-
-    @Test
-    @WithAdminUser
-    void agentConfigCreateAuditsOnlySupportedNonSecretSettings() {
-        Workspace workspace = setupWorkspace("audit-cfg");
-
-        createConfig(workspace, "primary");
-
-        ConfigAuditEvent row = configAuditEventRepository
-            .findAll()
-            .stream()
-            .filter(e -> e.getEntityType() == ConfigAuditEntityType.AGENT_CONFIG)
-            .findFirst()
-            .orElseThrow();
-        assertThat(row.getOldValue()).isNull();
-        assertThat(row.getNewValue())
-            .contains("\"name\":\"primary\"")
-            .doesNotContain("llmApiKey", "llmProvider", "llmBaseUrl");
     }
 
     @Test
@@ -279,7 +259,12 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         String future = Instant.now().plusSeconds(60).toString();
         String past = Instant.now().minusSeconds(60).toString();
         return java.util.stream.Stream.of(
-            org.junit.jupiter.params.provider.Arguments.of("entityType matches", "entityType", "AGENT_CONFIG", 1),
+            org.junit.jupiter.params.provider.Arguments.of(
+                "entityType matches",
+                "entityType",
+                "WORKSPACE_LLM_CONNECTION",
+                1
+            ),
             org.junit.jupiter.params.provider.Arguments.of(
                 "entityType matches the other kind",
                 "entityType",
@@ -302,7 +287,7 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     void eachFilterPredicateNarrowsIndependently(String name, String param, String value, int expected) {
         Workspace workspace = setupWorkspace("audit-matrix");
         patchPracticeReview(workspace, Map.of("cooldownMinutes", 45));
-        createConfig(workspace, "primary");
+        createConnection(workspace, "primary");
 
         assertFilterYields(workspace, uri -> uri.queryParam(param, value), expected);
     }
@@ -338,11 +323,14 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         // single-value test cannot distinguish from plain equality.
         Workspace workspace = setupWorkspace("audit-multi");
         patchPracticeReview(workspace, Map.of("cooldownMinutes", 45));
-        createConfig(workspace, "primary");
+        createConnection(workspace, "primary");
 
         assertFilterYields(
             workspace,
-            uri -> uri.queryParam("entityType", "AGENT_CONFIG").queryParam("entityType", "PRACTICE_REVIEW_SETTINGS"),
+            uri ->
+                uri
+                    .queryParam("entityType", "WORKSPACE_LLM_CONNECTION")
+                    .queryParam("entityType", "PRACTICE_REVIEW_SETTINGS"),
             2
         );
         assertFilterYields(workspace, uri -> uri.queryParam("action", "CREATED").queryParam("action", "DELETED"), 1);
@@ -446,26 +434,29 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
             .isOk();
     }
 
-    private AgentConfigDTO createConfig(Workspace workspace, String name) {
-        return webTestClient
+    /**
+     * A second producer, of a different entity type and with a CREATED action, so the filter matrix
+     * below can prove each predicate narrows rather than matching everything.
+     */
+    private void createConnection(Workspace workspace, String slug) {
+        webTestClient
             .post()
-            .uri("/workspaces/{slug}/agent-configs", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/llm/connections", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(
-                CreateAgentConfigRequestDTO.builder()
-                    .name(name)
-                    .enabled(false)
-                    .timeoutSeconds(300)
-                    .maxConcurrentJobs(2)
-                    .allowInternet(false)
-                    .build()
+                new CreateWorkspaceLlmConnectionRequestDTO(
+                    slug,
+                    "My Provider",
+                    "https://api.openai.com",
+                    "openai-completions",
+                    LlmAuthMode.BEARER,
+                    "sk-workspace-secret-9999",
+                    true
+                )
             )
             .exchange()
             .expectStatus()
-            .isCreated()
-            .expectBody(AgentConfigDTO.class)
-            .returnResult()
-            .getResponseBody();
+            .isCreated();
     }
 }

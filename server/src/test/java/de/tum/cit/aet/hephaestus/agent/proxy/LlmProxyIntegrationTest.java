@@ -9,9 +9,10 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.ModelVisibility;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
@@ -48,7 +49,7 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
     private AgentJobRepository jobRepository;
 
     @Autowired
-    private AgentConfigRepository configRepository;
+    private WorkspaceAgentBindingRepository agentBindingRepository;
 
     @Autowired
     private LlmConnectionRepository connectionRepository;
@@ -231,15 +232,19 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         model.setEnabled(modelEnabled);
         model = modelRepository.save(model);
 
-        AgentConfig config = new AgentConfig();
-        config.setWorkspace(workspace);
-        config.setName("config-" + System.nanoTime());
-        config = configRepository.save(config);
+        // The per-purpose binding IS the config pointer now: one row per (workspace, purpose).
+        WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
+        binding.setWorkspace(workspace);
+        binding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        binding.setInstanceModel(model);
+        binding.setEnabled(true);
+        binding.setTimeoutSeconds(600);
+        binding.setAllowInternet(false);
+        binding = agentBindingRepository.save(binding);
 
         ObjectNode snapshot = OBJECT_MAPPER.createObjectNode();
         snapshot.put("schemaVersion", ConfigSnapshot.SCHEMA_VERSION);
-        snapshot.put("configId", config.getId());
-        snapshot.put("configName", config.getName());
+        snapshot.put("configId", binding.getId());
         snapshot.put("apiProtocol", protocol);
         snapshot.put("baseUrl", connection.getBaseUrl());
         snapshot.put("upstreamModelId", upstreamModelId);
@@ -253,7 +258,7 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         AgentJob job = new AgentJob();
         job.setWorkspace(workspace);
-        job.setConfig(config);
+        job.setPurpose(AgentPurpose.PRACTICE_DETECTION);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         job.setStatus(AgentJobStatus.RUNNING);
         job.setConfigSnapshot(snapshot);

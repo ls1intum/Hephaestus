@@ -5,7 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -57,6 +58,16 @@ class LlmModelResolverTest extends BaseUnitTest {
         lenient().when(instanceModels.findById(20L)).thenReturn(Optional.of(model));
     }
 
+    /** A per-purpose binding for workspace 30 with no model bound yet. */
+    private static WorkspaceAgentBinding binding() {
+        Workspace workspace = new Workspace();
+        workspace.setId(30L);
+        WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
+        binding.setWorkspace(workspace);
+        binding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        return binding;
+    }
+
     @Test
     void shouldResolveActivePublicInstanceModelForWorkspace() {
         var ref = new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 10L, 20L, 30L);
@@ -73,13 +84,10 @@ class LlmModelResolverTest extends BaseUnitTest {
     @Test
     void shouldRejectDisabledModelBeforeBuildingRuntimeConfiguration() {
         model.setEnabled(false);
-        Workspace workspace = new Workspace();
-        workspace.setId(30L);
-        AgentConfig config = new AgentConfig();
-        config.setWorkspace(workspace);
-        config.setInstanceModel(model);
+        WorkspaceAgentBinding binding = binding();
+        binding.setInstanceModel(model);
 
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> resolver.resolve(config))
+        assertThatThrownBy(() -> resolver.resolve(binding))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("not available");
     }
@@ -116,22 +124,21 @@ class LlmModelResolverTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldRejectUnboundLegacyConfig() {
-        AgentConfig config = new AgentConfig();
-        config.setWorkspace(new Workspace());
-        config.setModelName("legacy-model");
+    void shouldRejectBindingWithoutACatalogModel() {
+        WorkspaceAgentBinding binding = binding(); // neither instance nor workspace model set
 
-        assertThatThrownBy(() -> resolver.resolve(config))
+        assertThatThrownBy(() -> resolver.resolve(binding))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("bind");
     }
 
     @Test
-    void shouldNotReadCredentialFromLegacyConfigColumns() {
-        AgentConfig config = new AgentConfig();
-        config.setLlmApiKey("legacy-secret");
+    void shouldNotResolveACredentialForABindingWithoutACatalogModel() {
+        // The credential only ever comes from the bound model's connection — an unbound binding has no
+        // other place a key could come from, so resolution fails closed.
+        WorkspaceAgentBinding binding = binding();
 
-        assertThat(resolver.resolveCredential(config)).isNull();
+        assertThat(resolver.resolveCredential(binding)).isNull();
     }
 
     @Test
