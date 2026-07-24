@@ -1,6 +1,12 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import {
+	createMemoryHistory,
+	createRootRoute,
+	createRouter,
+	RouterProvider,
+} from "@tanstack/react-router";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { AgentConfig, AiSettingsView, AvailableLlmModel } from "@/api/types.gen";
+import type { AgentBinding, AiSettingsView, AvailableLlmModel } from "@/api/types.gen";
 import { PracticeDetectionPolicyCard } from "./PracticeDetectionPolicyCard";
 
 const availableModel: AvailableLlmModel = {
@@ -12,29 +18,11 @@ const availableModel: AvailableLlmModel = {
 	pricingMode: "NO_CHARGE",
 };
 
-const validConfig: AgentConfig = {
-	id: 1,
-	name: "Available reviewer",
+const readyBinding: AgentBinding = {
+	purpose: "PRACTICE_DETECTION",
 	enabled: true,
+	ready: true,
 	instanceModelId: availableModel.id,
-	allowInternet: false,
-	maxConcurrentJobs: 1,
-	timeoutSeconds: 600,
-	createdAt: new Date("2026-07-01T00:00:00Z"),
-};
-
-const disabledConfig: AgentConfig = {
-	...validConfig,
-	id: 2,
-	name: "Disabled reviewer",
-	enabled: false,
-};
-
-const revokedConfig: AgentConfig = {
-	...validConfig,
-	id: 3,
-	name: "Revoked reviewer",
-	instanceModelId: 999,
 };
 
 const settings: AiSettingsView = {
@@ -47,100 +35,70 @@ const settings: AiSettingsView = {
 	cooldownMinutes: 15,
 };
 
-function renderCard(practiceConfigId?: number) {
-	render(
-		<PracticeDetectionPolicyCard
-			settings={{ ...settings, practiceConfigId }}
-			configs={[validConfig, disabledConfig, revokedConfig]}
-			availableModels={[availableModel]}
-			autoTriggerEnabled
-			manualTriggerEnabled
-			isLoading={false}
-			isSaving={false}
-			onBindConfig={vi.fn()}
-			onUpdateReviewSettings={vi.fn()}
-			onUpdateFeatures={vi.fn()}
-			onResetReviewField={vi.fn()}
-		/>,
-	);
-}
-
-describe("PracticeDetectionPolicyCard model binding", () => {
-	it("keeps an unavailable existing binding visible and explains why reviews are paused", () => {
-		renderCard(revokedConfig.id);
-
-		expect(screen.getByRole("combobox", { name: "Configuration" }).textContent).toContain(
-			"Revoked reviewer (unavailable)",
-		);
-		expect(
-			screen.getByText(/the selected configuration cannot run.*clear the binding/i),
-		).toBeTruthy();
-		fireEvent.click(screen.getByRole("combobox", { name: "Configuration" }));
-		expect(
-			screen
-				.getByRole("option", { name: "Revoked reviewer (unavailable)" })
-				.hasAttribute("data-disabled"),
-		).toBe(true);
-	});
-
-	it("offers only configurations whose current model is executable", () => {
-		renderCard();
-
-		fireEvent.click(screen.getByRole("combobox", { name: "Configuration" }));
-
-		expect(screen.getByText("Available reviewer")).toBeTruthy();
-		expect(screen.queryByText("Disabled reviewer")).toBeNull();
-		expect(screen.queryByText("Revoked reviewer")).toBeNull();
-	});
-
-	it("does not offer fan-out or new triggers when nothing can run", () => {
-		render(
+/** The card renders TanStack `Link`s to the AI setup page, so it needs a router in scope. */
+function renderCard(props: Partial<React.ComponentProps<typeof PracticeDetectionPolicyCard>> = {}) {
+	const rootRoute = createRootRoute({
+		component: () => (
 			<PracticeDetectionPolicyCard
 				settings={settings}
-				configs={[disabledConfig, revokedConfig]}
+				detectionBinding={readyBinding}
 				availableModels={[availableModel]}
-				autoTriggerEnabled={false}
-				manualTriggerEnabled={false}
+				workspaceSlug="acme"
+				autoTriggerEnabled
+				manualTriggerEnabled
 				isLoading={false}
 				isSaving={false}
-				onBindConfig={vi.fn()}
 				onUpdateReviewSettings={vi.fn()}
 				onUpdateFeatures={vi.fn()}
 				onResetReviewField={vi.fn()}
-			/>,
-		);
+				{...props}
+			/>
+		),
+	});
+	const router = createRouter({
+		routeTree: rootRoute,
+		history: createMemoryHistory({ initialEntries: ["/"] }),
+	});
+	// biome-ignore lint/suspicious/noExplicitAny: standalone test router has no generated route types
+	render(<RouterProvider router={router as any} />);
+}
 
-		expect(screen.getByText("No runnable configuration")).toBeTruthy();
+describe("PracticeDetectionPolicyCard model binding", () => {
+	it("reports the model detection runs on, and points at the page that owns the binding", async () => {
+		renderCard();
+
+		expect(await screen.findByText("GPT Test")).toBeTruthy();
+		expect(screen.getByRole("link", { name: "AI setup page" })).toBeTruthy();
+	});
+
+	it("explains that reviews are paused when the bound model can no longer run", async () => {
+		renderCard({ detectionBinding: { ...readyBinding, ready: false } });
+
+		expect(await screen.findByText("Bound model cannot run")).toBeTruthy();
+		expect(screen.getByRole("link", { name: "Open AI setup" })).toBeTruthy();
+	});
+
+	it("explains that reviews cannot run at all when no model is bound", async () => {
+		renderCard({ detectionBinding: undefined });
+
+		expect(await screen.findByText("No model bound")).toBeTruthy();
+		expect(screen.getByRole("link", { name: "Open AI setup" })).toBeTruthy();
+	});
+
+	it("does not let an admin switch triggers on while nothing can run", async () => {
+		renderCard({
+			detectionBinding: undefined,
+			autoTriggerEnabled: false,
+			manualTriggerEnabled: false,
+		});
+
 		expect(
-			screen.getByRole("combobox", { name: "Configuration" }).hasAttribute("data-disabled"),
-		).toBe(true);
-		expect(
-			screen.getByRole("switch", { name: "Automatic reviews" }).hasAttribute("data-disabled"),
+			(await screen.findByRole("switch", { name: "Automatic reviews" })).hasAttribute(
+				"data-disabled",
+			),
 		).toBe(true);
 		expect(
 			screen.getByRole("switch", { name: "Manual reviews" }).hasAttribute("data-disabled"),
 		).toBe(true);
-	});
-
-	it("lets an admin clear an unavailable explicit binding", () => {
-		const onBindConfig = vi.fn();
-		render(
-			<PracticeDetectionPolicyCard
-				settings={{ ...settings, practiceConfigId: revokedConfig.id }}
-				configs={[revokedConfig]}
-				availableModels={[availableModel]}
-				autoTriggerEnabled={false}
-				manualTriggerEnabled={false}
-				isLoading={false}
-				isSaving={false}
-				onBindConfig={onBindConfig}
-				onUpdateReviewSettings={vi.fn()}
-				onUpdateFeatures={vi.fn()}
-				onResetReviewField={vi.fn()}
-			/>,
-		);
-
-		fireEvent.click(screen.getByRole("button", { name: "Clear binding" }));
-		expect(onBindConfig).toHaveBeenCalledWith(null);
 	});
 });

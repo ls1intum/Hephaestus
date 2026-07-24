@@ -22,13 +22,13 @@ import {
 	SheetTitle,
 } from "@/components/ui/sheet";
 import {
-	configLabel,
 	DELIVERY_STATUS_LABELS,
 	deliveryBadgeVariant,
 	formatCostUsd,
 	formatTokens,
 	isCancellable,
 	isDeliveryRetryable,
+	modelLabel,
 	STATUS_LABELS,
 	statusBadgeVariant,
 } from "./jobUtils";
@@ -95,7 +95,7 @@ export function AgentJobDetailsPanel({
 												</Badge>
 											}
 										/>
-										<Row label="Model" value={configLabel(job)} />
+										<Row label="Model" value={modelLabel(job)} />
 										<Row label="Model name" value={job.llmModel ?? job.llmModelVersion ?? "—"} />
 										<Row
 											label="Created"

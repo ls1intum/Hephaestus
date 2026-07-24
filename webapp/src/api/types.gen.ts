@@ -2452,14 +2452,6 @@ export type AgentJob = {
      */
     completedAt?: Date;
     /**
-     * ID of the agent config that ran this job (from the frozen snapshot)
-     */
-    configId?: number;
-    /**
-     * Name of the agent config that ran this job (from the frozen snapshot)
-     */
-    configName?: string;
-    /**
      * Frozen agent config at submit time (an INSTANCE-scoped connection's baseUrl is redacted to scheme://host; only a WORKSPACE-scoped BYO connection's baseUrl is left intact)
      */
     configSnapshot: unknown;
@@ -2535,6 +2527,10 @@ export type AgentJob = {
      * Job metadata (routing/display info)
      */
     metadata?: unknown;
+    /**
+     * Upstream model this job was admitted on, frozen at submit time (e.g. gpt-5.4-mini). Available from submission, unlike llmModel, which the runner reports only once the job has run.
+     */
+    model?: string;
     /**
      * Job output (agent results)
      */
@@ -5605,10 +5601,6 @@ export type ListJobsData = {
          * Filter by job status
          */
         status?: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
-        /**
-         * Filter by config ID
-         */
-        configId?: number;
         page?: number;
         size?: number;
     };

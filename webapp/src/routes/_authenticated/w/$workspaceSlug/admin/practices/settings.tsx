@@ -4,11 +4,10 @@ import { toast } from "sonner";
 import {
 	getAiSettingsOptions,
 	getAiSettingsQueryKey,
-	getConfigsOptions,
+	getBindingsOptions,
 	getWorkspaceOptions,
 	listWorkspacesQueryKey,
 	updateFeaturesMutation,
-	updatePracticeConfigMutation,
 	updatePracticeReviewSettingsMutation,
 	workspaceListAvailableLlmModelsOptions,
 } from "@/api/@tanstack/react-query.gen";
@@ -33,8 +32,8 @@ function ReviewSettingsContainer() {
 		enabled: Boolean(workspaceSlug),
 	});
 
-	const configsQuery = useQuery({
-		...getConfigsOptions({ path: { workspaceSlug: slug } }),
+	const bindingsQuery = useQuery({
+		...getBindingsOptions({ path: { workspaceSlug: slug } }),
 		enabled: Boolean(workspaceSlug),
 	});
 
@@ -53,19 +52,6 @@ function ReviewSettingsContainer() {
 			queryKey: getAiSettingsQueryKey({ path: { workspaceSlug: slug } }),
 		});
 	};
-
-	const updatePracticeConfig = useMutation({
-		...updatePracticeConfigMutation(),
-		onSuccess: () => {
-			invalidateAiSettings();
-			toast.success("Model updated");
-		},
-		onError: (error) => {
-			toast.error("Failed to update model", {
-				description: error instanceof Error ? error.message : undefined,
-			});
-		},
-	});
 
 	const updatePracticeReviewSettings = useMutation({
 		...updatePracticeReviewSettingsMutation(),
@@ -97,14 +83,6 @@ function ReviewSettingsContainer() {
 		},
 	});
 
-	const handleBindConfig = (configId: number | null) => {
-		if (!workspaceSlug) return;
-		updatePracticeConfig.mutate({
-			path: { workspaceSlug },
-			body: { configId: configId ?? undefined },
-		});
-	};
-
 	const handleUpdateReviewSettings = (settings: UpdatePracticeReviewSettings) => {
 		if (!workspaceSlug) return;
 		updatePracticeReviewSettings.mutate({ path: { workspaceSlug }, body: settings });
@@ -132,35 +110,33 @@ function ReviewSettingsContainer() {
 
 			<PracticeDetectionPolicyCard
 				settings={aiSettingsQuery.data}
-				configs={configsQuery.data ?? []}
+				detectionBinding={bindingsQuery.data?.find(
+					(binding) => binding.purpose === "PRACTICE_DETECTION",
+				)}
+				workspaceSlug={slug}
 				availableModels={availableModelsQuery.data ?? []}
 				autoTriggerEnabled={workspaceQuery.data?.practiceReviewAutoTriggerEnabled ?? true}
 				manualTriggerEnabled={workspaceQuery.data?.practiceReviewManualTriggerEnabled ?? true}
 				isLoading={
 					aiSettingsQuery.isLoading ||
-					configsQuery.isLoading ||
+					bindingsQuery.isLoading ||
 					availableModelsQuery.isLoading ||
 					workspaceQuery.isLoading ||
 					!workspaceSlug
 				}
 				isError={
 					aiSettingsQuery.isError ||
-					configsQuery.isError ||
+					bindingsQuery.isError ||
 					availableModelsQuery.isError ||
 					workspaceQuery.isError
 				}
-				isSaving={
-					updatePracticeConfig.isPending ||
-					updatePracticeReviewSettings.isPending ||
-					updateFeatures.isPending
-				}
-				onBindConfig={handleBindConfig}
+				isSaving={updatePracticeReviewSettings.isPending || updateFeatures.isPending}
 				onUpdateReviewSettings={handleUpdateReviewSettings}
 				onUpdateFeatures={handleUpdateFeatures}
 				onResetReviewField={handleResetReviewField}
 				onRetry={() => {
 					aiSettingsQuery.refetch();
-					configsQuery.refetch();
+					bindingsQuery.refetch();
 					availableModelsQuery.refetch();
 					workspaceQuery.refetch();
 				}}

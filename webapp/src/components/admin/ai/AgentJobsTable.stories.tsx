@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
 import { AgentJobsTable } from "./AgentJobsTable";
-import { mockConfigs, mockJobs } from "./storyMockData";
+import { mockJobs } from "./storyMockData";
 
 /**
  * Paginated table of agent job runs with status/runtime filters. Each row opens the
@@ -13,12 +13,9 @@ const meta = {
 	tags: ["autodocs"],
 	args: {
 		jobs: mockJobs,
-		configs: mockConfigs,
 		isLoading: false,
 		statusFilter: "ALL",
-		configFilter: "ALL",
 		onStatusFilterChange: fn(),
-		onConfigFilterChange: fn(),
 		onSelectJob: fn(),
 	},
 } satisfies Meta<typeof AgentJobsTable>;

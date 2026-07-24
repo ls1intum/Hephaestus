@@ -3,7 +3,6 @@ import { useState } from "react";
 import { toast } from "sonner";
 import {
 	cancelJobMutation,
-	getConfigsOptions,
 	listJobsOptions,
 	retryDeliveryMutation,
 } from "@/api/@tanstack/react-query.gen";
@@ -49,22 +48,15 @@ interface AgentActivityPageProps {
 export function AgentActivityPage({ workspaceSlug }: AgentActivityPageProps) {
 	const queryClient = useQueryClient();
 	const [statusFilter, setStatusFilter] = useState<JobStatus | "ALL">("ALL");
-	const [configFilter, setConfigFilter] = useState<number | "ALL">("ALL");
 	const [page, setPage] = useState(0);
 	const [selectedJob, setSelectedJob] = useState<AgentJob | null>(null);
 	const [panelOpen, setPanelOpen] = useState(false);
-
-	const configsQuery = useQuery({
-		...getConfigsOptions({ path: { workspaceSlug } }),
-		enabled: Boolean(workspaceSlug),
-	});
 
 	const jobsQuery = useQuery({
 		...listJobsOptions({
 			path: { workspaceSlug },
 			query: {
 				status: statusFilter === "ALL" ? undefined : statusFilter,
-				configId: configFilter === "ALL" ? undefined : configFilter,
 				page,
 				size: PAGE_SIZE,
 			},
@@ -132,17 +124,11 @@ export function AgentActivityPage({ workspaceSlug }: AgentActivityPageProps) {
 
 			<AgentJobsTable
 				jobs={jobs}
-				configs={configsQuery.data ?? []}
 				isLoading={jobsQuery.isLoading || !workspaceSlug}
 				isError={jobsQuery.isError}
 				statusFilter={statusFilter}
-				configFilter={configFilter}
 				onStatusFilterChange={(value) => {
 					setStatusFilter(value);
-					setPage(0);
-				}}
-				onConfigFilterChange={(value) => {
-					setConfigFilter(value);
 					setPage(0);
 				}}
 				onSelectJob={handleSelectJob}

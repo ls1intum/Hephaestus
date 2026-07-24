@@ -21,8 +21,10 @@ public record AgentJobDTO(
         description = "Frozen agent config at submit time (an INSTANCE-scoped connection's baseUrl is redacted to scheme://host; only a WORKSPACE-scoped BYO connection's baseUrl is left intact)"
     )
     Object configSnapshot,
-    @Schema(description = "ID of the agent config that ran this job (from the frozen snapshot)") Long configId,
-    @Schema(description = "Name of the agent config that ran this job (from the frozen snapshot)") String configName,
+    @Schema(
+        description = "Upstream model this job was admitted on, frozen at submit time (e.g. gpt-5.4-mini). Available from submission, unlike llmModel, which the runner reports only once the job has run."
+    )
+    String model,
     @Schema(description = "Docker container ID") String containerId,
     @Schema(description = "Container exit code") Integer exitCode,
     @Schema(description = "Human-readable error message") String errorMessage,
@@ -58,8 +60,7 @@ public record AgentJobDTO(
             job.getMetadata(),
             job.getOutput(),
             redactInstanceBaseUrl(snapshot),
-            snapshotLong(snapshot, "configId"),
-            snapshotString(snapshot, "configName"),
+            snapshotString(snapshot, "upstreamModelId"),
             job.getContainerId(),
             job.getExitCode(),
             job.getErrorMessage(),
@@ -123,13 +124,6 @@ public record AgentJobDTO(
         } catch (IllegalArgumentException e) {
             return "(redacted)";
         }
-    }
-
-    private static Long snapshotLong(JsonNode snapshot, String field) {
-        if (snapshot == null || !snapshot.has(field) || snapshot.get(field).isNull()) {
-            return null;
-        }
-        return snapshot.get(field).asLong();
     }
 
     private static String snapshotString(JsonNode snapshot, String field) {

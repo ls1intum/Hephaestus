@@ -1687,13 +1687,6 @@ paths:
           - FAILED
           - TIMED_OUT
           - CANCELLED
-      - description: Filter by config ID
-        in: query
-        name: configId
-        required: false
-        schema:
-          type: integer
-          format: int64
       - in: query
         name: page
         required: false
@@ -5679,14 +5672,6 @@ components:
           type: string
           format: date-time
           description: Timestamp when the job completed
-        configId:
-          type: integer
-          format: int64
-          description: ID of the agent config that ran this job (from the frozen snapshot)
-        configName:
-          type: string
-          description: Name of the agent config that ran this job (from the frozen
-            snapshot)
         configSnapshot:
           description: Frozen agent config at submit time (an INSTANCE-scoped connection's
             baseUrl is redacted to scheme://host; only a WORKSPACE-scoped BYO connection's
@@ -5765,6 +5750,11 @@ components:
           description: Total reasoning/thinking tokens
         metadata:
           description: Job metadata (routing/display info)
+        model:
+          type: string
+          description: "Upstream model this job was admitted on, frozen at submit\
+            \ time (e.g. gpt-5.4-mini). Available from submission, unlike llmModel,\
+            \ which the runner reports only once the job has run."
         output:
           description: Job output (agent results)
         retryCount:

@@ -57,8 +57,8 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         job.setConfig(config);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         job.setStatus(status);
-        // Include configId/configName so the DTO's snapshotLong/snapshotString extractors (AgentJobDTO.from)
-        // are exercised on their present-value branch end-to-end, not just the absent-field null path.
+        // Include upstreamModelId so the DTO's snapshotString extractor (AgentJobDTO.from) is exercised
+        // on its present-value branch end-to-end, not just the absent-field null path.
         job.setConfigSnapshot(
             OBJECT_MAPPER.valueToTree(
                 Map.of(
@@ -66,10 +66,8 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                     "CLAUDE_CODE",
                     "model",
                     "claude-sonnet-4-20250514",
-                    "configId",
-                    99,
-                    "configName",
-                    "frozen-config"
+                    "upstreamModelId",
+                    "gpt-5.4-mini"
                 )
             )
         );
@@ -147,40 +145,6 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
     @Test
     @WithAdminUser
-    void listJobsFiltersByConfigId() {
-        Workspace workspace = setupWorkspace();
-        AgentConfig configA = createConfig(workspace, "config-a");
-        AgentConfig configB = createConfig(workspace, "config-b");
-
-        createJob(workspace, AgentJobStatus.COMPLETED, configA);
-        createJob(workspace, AgentJobStatus.RUNNING, configA);
-        createJob(workspace, AgentJobStatus.QUEUED, configB);
-
-        webTestClient
-            .get()
-            .uri("/workspaces/{slug}/agent-jobs?configId={configId}", workspace.getWorkspaceSlug(), configA.getId())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.totalElements")
-            .isEqualTo(2);
-
-        webTestClient
-            .get()
-            .uri("/workspaces/{slug}/agent-jobs?configId={configId}", workspace.getWorkspaceSlug(), configB.getId())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.totalElements")
-            .isEqualTo(1);
-    }
-
-    @Test
-    @WithAdminUser
     void getJobReturnsJobDetail() {
         Workspace workspace = setupWorkspace();
         AgentJob job = createJob(workspace, AgentJobStatus.COMPLETED);
@@ -200,9 +164,8 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         assertThat(result.id()).isEqualTo(job.getId());
         assertThat(result.status()).isEqualTo(AgentJobStatus.COMPLETED);
         assertThat(result.jobType()).isEqualTo(AgentJobType.PULL_REQUEST_REVIEW);
-        // The configId/configName are projected out of the JSONB configSnapshot by AgentJobDTO.from.
-        assertThat(result.configId()).isEqualTo(99L);
-        assertThat(result.configName()).isEqualTo("frozen-config");
+        // The model is projected out of the JSONB configSnapshot by AgentJobDTO.from.
+        assertThat(result.model()).isEqualTo("gpt-5.4-mini");
     }
 
     @Test

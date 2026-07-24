@@ -1,11 +1,20 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
+import type { AgentBinding } from "@/api/types.gen";
 import { PracticeDetectionPolicyCard } from "./PracticeDetectionPolicyCard";
-import { mockAiSettings, mockAvailableModels, mockConfigs } from "./storyMockData";
+import { mockAiSettings, mockAvailableModels } from "./storyMockData";
+
+const readyBinding: AgentBinding = {
+	purpose: "PRACTICE_DETECTION",
+	enabled: true,
+	ready: true,
+	instanceModelId: 1,
+};
 
 /**
- * Policy editor for practice-detection reviews: runtime binding, automatic/manual
- * triggers, and review policy (drafts, cooldown, coverage). Saves field-by-field.
+ * Policy editor for practice-detection reviews: which model detection runs on (read-only —
+ * the binding is owned by the AI setup page), automatic/manual triggers, and review policy
+ * (drafts, cooldown, coverage). Saves field-by-field.
  */
 const meta = {
 	component: PracticeDetectionPolicyCard,
@@ -13,13 +22,13 @@ const meta = {
 	tags: ["autodocs"],
 	args: {
 		settings: mockAiSettings,
-		configs: mockConfigs,
+		detectionBinding: readyBinding,
 		availableModels: mockAvailableModels,
+		workspaceSlug: "acme",
 		autoTriggerEnabled: true,
 		manualTriggerEnabled: true,
 		isLoading: false,
 		isSaving: false,
-		onBindConfig: fn(),
 		onUpdateReviewSettings: fn(),
 		onUpdateFeatures: fn(),
 		onResetReviewField: fn(),
@@ -36,21 +45,17 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** A specific model is selected; triggers and policy populated. */
+/** Detection is bound to a runnable model; triggers and policy populated. */
 export const RuntimeBound: Story = {};
 
-/** No specific configuration selected — reviews run on every available configuration. */
-export const FanOut: Story = {
-	args: {
-		settings: { ...mockAiSettings, practiceConfigId: undefined },
-	},
+/** No model bound to practice detection — nothing can run until one is set on the AI setup page. */
+export const Unbound: Story = {
+	args: { detectionBinding: undefined },
 };
 
-/** The selected model was disabled elsewhere — detection is paused (destructive warning). */
-export const BoundRuntimeDisabled: Story = {
-	args: {
-		settings: { ...mockAiSettings, practiceConfigId: 3 }, // mockConfigDisabled (enabled: false)
-	},
+/** The bound model was disabled or revoked elsewhere — detection is paused (destructive warning). */
+export const BoundModelUnavailable: Story = {
+	args: { detectionBinding: { ...readyBinding, ready: false } },
 };
 
 /** Coverage scoped to the opt-in role. */

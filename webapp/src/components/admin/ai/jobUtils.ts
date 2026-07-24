@@ -66,6 +66,10 @@ export function formatCostUsd(value: number | undefined): string {
 	return `$${value.toFixed(value < 1 ? 3 : 2)}`;
 }
 
-export function configLabel(job: Pick<AgentJob, "configName" | "configId">): string {
-	return job.configName ?? (job.configId != null ? `#${job.configId}` : "—");
+/**
+ * The model a job ran on, read from its frozen submit-time snapshot. Populated from submission
+ * onward, unlike the runner-reported `llmModel`, which only exists once the job has actually run.
+ */
+export function modelLabel(job: Pick<AgentJob, "model">): string {
+	return job.model ?? "—";
 }

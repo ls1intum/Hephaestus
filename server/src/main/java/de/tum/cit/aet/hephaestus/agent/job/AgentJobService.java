@@ -86,15 +86,9 @@ public class AgentJobService {
     // Read operations
 
     @Transactional(readOnly = true)
-    public Page<AgentJob> getJobs(Long workspaceId, AgentJobStatus status, Long configId, Pageable pageable) {
-        if (status != null && configId != null) {
-            return agentJobRepository.findByWorkspaceIdAndStatusAndConfigId(workspaceId, status, configId, pageable);
-        }
+    public Page<AgentJob> getJobs(Long workspaceId, AgentJobStatus status, Pageable pageable) {
         if (status != null) {
             return agentJobRepository.findByWorkspaceIdAndStatus(workspaceId, status, pageable);
-        }
-        if (configId != null) {
-            return agentJobRepository.findByWorkspaceIdAndConfigId(workspaceId, configId, pageable);
         }
         return agentJobRepository.findByWorkspaceId(workspaceId, pageable);
     }

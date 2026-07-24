@@ -1,62 +1,4 @@
-import type { AgentConfig, AgentJob, AiSettingsView, AvailableLlmModel } from "@/api/types.gen";
-
-export const mockConfigProxy: AgentConfig = {
-	id: 1,
-	name: "Default reviewer",
-	instanceModelId: 1,
-	allowInternet: false,
-	enabled: true,
-	maxConcurrentJobs: 2,
-	timeoutSeconds: 600,
-	createdAt: new Date("2026-04-01T10:00:00Z"),
-	updatedAt: new Date("2026-05-01T10:00:00Z"),
-};
-
-export const mockConfigApiKey: AgentConfig = {
-	id: 2,
-	name: "GPU gateway (OpenAI)",
-	workspaceModelId: 10,
-	allowInternet: true,
-	enabled: true,
-	maxConcurrentJobs: 1,
-	timeoutSeconds: 1200,
-	createdAt: new Date("2026-04-10T10:00:00Z"),
-};
-
-export const mockConfigDisabled: AgentConfig = {
-	id: 3,
-	name: "Disabled model",
-	instanceModelId: 2,
-	allowInternet: true,
-	enabled: false,
-	maxConcurrentJobs: 1,
-	timeoutSeconds: 300,
-	createdAt: new Date("2026-03-01T10:00:00Z"),
-};
-
-export const mockConfigBoundShared: AgentConfig = {
-	id: 4,
-	name: "Shared GPT-5",
-	allowInternet: false,
-	enabled: true,
-	instanceModelId: 1,
-	maxConcurrentJobs: 2,
-	timeoutSeconds: 600,
-	createdAt: new Date("2026-06-01T10:00:00Z"),
-};
-
-export const mockConfigBoundOwn: AgentConfig = {
-	id: 5,
-	name: "My own key",
-	allowInternet: true,
-	enabled: true,
-	workspaceModelId: 10,
-	maxConcurrentJobs: 1,
-	timeoutSeconds: 900,
-	createdAt: new Date("2026-06-01T10:00:00Z"),
-};
-
-export const mockConfigs: AgentConfig[] = [mockConfigProxy, mockConfigApiKey, mockConfigDisabled];
+import type { AgentJob, AiSettingsView, AvailableLlmModel } from "@/api/types.gen";
 
 export const mockAvailableModels: AvailableLlmModel[] = [
 	{
@@ -108,8 +50,7 @@ export const mockJobCompleted: AgentJob = {
 	id: "job-completed-1",
 	jobType: "PULL_REQUEST_REVIEW",
 	status: "COMPLETED",
-	configId: 1,
-	configName: "Default reviewer",
+	model: "gpt-5.4-mini",
 	configSnapshot: { name: "Default reviewer", llmProvider: "OPENAI" },
 	createdAt: new Date("2026-05-20T10:00:00Z"),
 	completedAt: new Date("2026-05-20T10:05:00Z"),
@@ -128,8 +69,7 @@ export const mockJobRunning: AgentJob = {
 	id: "job-running-1",
 	jobType: "PULL_REQUEST_REVIEW",
 	status: "RUNNING",
-	configId: 2,
-	configName: "GPU gateway (OpenAI)",
+	model: "openai/gpt-oss-120b",
 	configSnapshot: { name: "GPU gateway (OpenAI)", llmProvider: "OPENAI" },
 	createdAt: new Date("2026-05-20T11:58:00Z"),
 	retryCount: 0,
@@ -139,8 +79,7 @@ export const mockJobFailedDelivery: AgentJob = {
 	id: "job-failed-delivery-1",
 	jobType: "PULL_REQUEST_REVIEW",
 	status: "COMPLETED",
-	configId: 1,
-	configName: "Default reviewer",
+	model: "gpt-5.4-mini",
 	configSnapshot: { name: "Default reviewer" },
 	createdAt: new Date("2026-05-20T09:00:00Z"),
 	completedAt: new Date("2026-05-20T09:05:00Z"),
@@ -158,8 +97,7 @@ export const mockJobQueued: AgentJob = {
 	id: "job-queued-1",
 	jobType: "PULL_REQUEST_REVIEW",
 	status: "QUEUED",
-	configId: 1,
-	configName: "Default reviewer",
+	model: "gpt-5.4-mini",
 	configSnapshot: { name: "Default reviewer" },
 	createdAt: new Date("2026-05-20T12:00:00Z"),
 	retryCount: 0,
@@ -169,8 +107,7 @@ export const mockJobTimedOut: AgentJob = {
 	id: "job-timed-out-1",
 	jobType: "PULL_REQUEST_REVIEW",
 	status: "TIMED_OUT",
-	configId: 2,
-	configName: "GPU gateway (OpenAI)",
+	model: "openai/gpt-oss-120b",
 	configSnapshot: { name: "GPU gateway (OpenAI)", llmProvider: "OPENAI" },
 	createdAt: new Date("2026-05-20T08:00:00Z"),
 	completedAt: new Date("2026-05-20T08:20:00Z"),
