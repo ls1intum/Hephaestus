@@ -274,19 +274,22 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      * read here (a job already claimed by a sibling between this query and the claim attempt) just
      * costs a skipped candidate, never a double-claim.
      *
-     * <p>Fairness predicate (#1368 fix wave): excludes candidates whose {@code agent_config} is
-     * already at its {@code max_concurrent_jobs} cap. Without this, a config with a deep QUEUED
-     * backlog that is fully saturated on RUNNING jobs monopolises every LIMIT window — {@code
+     * <p>Fairness predicate (#1368): excludes candidates whose {@code (workspace, purpose)} binding is
+     * already at its {@code max_concurrent_jobs} cap. Without this, one workspace-purpose with a deep
+     * QUEUED backlog that is fully saturated on RUNNING jobs monopolises every LIMIT window — {@code
      * processJob} would re-check and skip every one of them (correctly refusing to over-claim), but a
-     * younger, immediately-runnable job from a different config never even gets fetched into the
-     * candidate batch, so it waits out poll cycle after poll cycle behind jobs nobody can claim yet
-     * (head-of-line starvation). The concurrency count re-check inside {@code claimJob}'s {@code
-     * FOR UPDATE} transaction remains the authoritative gate — this predicate only shapes which
-     * candidates are worth fetching in the first place, so a stale read here (a RUNNING job
-     * completing between this query and the claim) costs nothing beyond an ordinary skipped
-     * candidate. Backed by {@code ix_agent_job_queued_available} (queued jobs eligible now, oldest
-     * {@code available_at} first — #1368 hardening) and {@code ix_agent_job_running_config} (running
-     * jobs per config, for the correlated count).
+     * younger, immediately-runnable job from a different workspace or purpose never even gets fetched
+     * into the candidate batch, so it waits out poll cycle after poll cycle behind jobs nobody can
+     * claim yet (head-of-line starvation). The cap lives on {@code workspace_agent_binding} (the
+     * runtime source of truth since the per-config redesign); a candidate whose binding row is gone
+     * (COALESCE to unbounded) is still fetched — the {@code FOR UPDATE} claim's admission re-check is
+     * the authoritative gate and will reject it there rather than let it starve siblings here. That
+     * re-check inside {@code claimJob}'s transaction remains authoritative in all cases — this
+     * predicate only shapes which candidates are worth fetching, so a stale read here (a RUNNING job
+     * completing between this query and the claim) costs nothing beyond an ordinary skipped candidate.
+     * Backed by {@code ix_agent_job_queued_available} (queued jobs eligible now, oldest {@code
+     * available_at} first) and {@code ix_agent_job_running_purpose} (running jobs per
+     * {@code (workspace, purpose)}, for the correlated count).
      *
      * <p>{@code available_at <= now()} (#1368 hardening) excludes jobs backed off after an infra
      * failure / orphan requeue / drain requeue (see {@link #requeueOrphan}) until their backoff
@@ -298,9 +301,10 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
             "WHERE j.status = 'QUEUED' " +
             "AND j.available_at <= now() " +
             "AND (" +
-            "  j.config_id IS NULL " +
-            "  OR (SELECT count(*) FROM agent_job r WHERE r.config_id = j.config_id AND r.status = 'RUNNING') " +
-            "     < (SELECT c.max_concurrent_jobs FROM agent_config c WHERE c.id = j.config_id)" +
+            "  (SELECT count(*) FROM agent_job r " +
+            "     WHERE r.workspace_id = j.workspace_id AND r.purpose = j.purpose AND r.status = 'RUNNING') " +
+            "  < COALESCE((SELECT b.max_concurrent_jobs FROM workspace_agent_binding b " +
+            "     WHERE b.workspace_id = j.workspace_id AND b.purpose = j.purpose), 2147483647)" +
             ") " +
             "ORDER BY j.available_at ASC, j.id ASC LIMIT :limit",
         nativeQuery = true

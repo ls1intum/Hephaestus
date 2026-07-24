@@ -828,22 +828,22 @@
         NATS→Postgres cutover). AgentJobExecutor.pollLoop's candidate lookup
         (findQueuedIdsOldestFirst) had no dedicated index: it fell back to a sequential scan of
         agent_job filtered by status, ordered by created_at. The fairness predicate the same fix wave
-        adds (excluding QUEUED jobs whose config is already at its concurrency cap, closing a
-        head-of-line-starvation gap) adds a correlated per-config RUNNING count, which needs its own
-        supporting index.
+        adds (excluding QUEUED jobs whose (workspace, purpose) binding is already at its concurrency
+        cap, closing a head-of-line-starvation gap) adds a correlated per-(workspace, purpose) RUNNING
+        count, which needs its own supporting index.
     -->
     <changeSet id="1784636803503-31" author="hephaestus" runInTransaction="false">
-        <preConditions onFail="MARK_RAN" onFailMessage="ix_agent_job_running_config already exists">
-            <not><indexExists indexName="ix_agent_job_running_config"/></not>
+        <preConditions onFail="MARK_RAN" onFailMessage="ix_agent_job_running_purpose already exists">
+            <not><indexExists indexName="ix_agent_job_running_purpose"/></not>
         </preConditions>
-        <comment>Per-config RUNNING count for the poll query's concurrency-cap fairness predicate (#1368 fix wave)</comment>
+        <comment>Per-(workspace, purpose) RUNNING count for the poll query's concurrency-cap fairness predicate (#1368)</comment>
         <sql>
-            CREATE INDEX CONCURRENTLY ix_agent_job_running_config
-                ON agent_job (config_id)
+            CREATE INDEX CONCURRENTLY ix_agent_job_running_purpose
+                ON agent_job (workspace_id, purpose)
                 WHERE status = 'RUNNING';
         </sql>
         <rollback>
-            <sql>DROP INDEX CONCURRENTLY IF EXISTS ix_agent_job_running_config;</sql>
+            <sql>DROP INDEX CONCURRENTLY IF EXISTS ix_agent_job_running_purpose;</sql>
         </rollback>
     </changeSet>
 
