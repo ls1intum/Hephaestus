@@ -34,6 +34,7 @@ public class AgentConfigService {
     private final LlmModelRepository llmModelRepository;
     private final WorkspaceLlmModelRepository workspaceLlmModelRepository;
     private final LlmModelWorkspaceGrantRepository llmModelWorkspaceGrantRepository;
+    private final AgentBindingService agentBindingService;
 
     @Transactional(readOnly = true)
     public List<AgentConfig> getConfigs(WorkspaceContext workspaceContext) {
@@ -133,6 +134,9 @@ public class AgentConfigService {
         requireAvailableBindingWhenEnabled(config, workspaceContext.id());
 
         AgentConfig saved = agentConfigRepository.save(config);
+        // Mirror the effective model + limits into any binding currently pointed at this config, so a
+        // model/limit/enabled edit propagates to the runtime source of truth (#1368).
+        agentBindingService.syncPurposesBoundTo(saved.getWorkspace(), saved.getId());
         configAudit.record(
             ConfigAuditEntry.updated(
                 ConfigAuditEntityType.AGENT_CONFIG,

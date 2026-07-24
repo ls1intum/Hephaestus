@@ -62,6 +62,9 @@ class AgentConfigServiceTest extends BaseUnitTest {
     @Mock
     private LlmModelWorkspaceGrantRepository llmModelWorkspaceGrantRepository;
 
+    @Mock
+    private AgentBindingService agentBindingService;
+
     @InjectMocks
     private AgentConfigService agentConfigService;
 

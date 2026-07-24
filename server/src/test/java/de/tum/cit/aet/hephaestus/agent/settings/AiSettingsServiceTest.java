@@ -47,6 +47,9 @@ class AiSettingsServiceTest extends BaseUnitTest {
     @Mock
     private LlmModelResolver llmModelResolver;
 
+    @Mock
+    private de.tum.cit.aet.hephaestus.agent.config.AgentBindingService agentBindingService;
+
     private AiSettingsService service;
     private Workspace workspace;
     private WorkspaceContext context;
@@ -70,7 +73,8 @@ class AiSettingsServiceTest extends BaseUnitTest {
             reviewProperties,
             configAudit,
             instanceLlmSettingsService,
-            llmModelResolver
+            llmModelResolver,
+            agentBindingService
         );
         InstanceLlmSettings llmSettings = new InstanceLlmSettings();
         llmSettings.setAllowWorkspaceConnections(true);

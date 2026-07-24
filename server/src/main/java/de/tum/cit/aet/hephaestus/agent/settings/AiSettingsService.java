@@ -2,8 +2,10 @@ package de.tum.cit.aet.hephaestus.agent.settings;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.InstanceLlmSettingsService;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
+import de.tum.cit.aet.hephaestus.agent.config.AgentBindingService;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
@@ -42,6 +44,7 @@ public class AiSettingsService {
     private final ConfigAuditPort configAudit;
     private final InstanceLlmSettingsService instanceLlmSettingsService;
     private final LlmModelResolver llmModelResolver;
+    private final AgentBindingService agentBindingService;
 
     public AiSettingsViewDTO getSettings(WorkspaceContext workspaceContext) {
         return toView(requireWorkspace(workspaceContext));
@@ -52,6 +55,7 @@ public class AiSettingsService {
         Workspace workspace = requireWorkspaceForUpdate(workspaceContext);
         AgentBindingSnapshot before = new AgentBindingSnapshot(workspace.getPracticeConfigId());
         workspace.setPracticeConfigId(validateExecutableConfigId(workspaceContext.id(), configId));
+        agentBindingService.sync(workspace, AgentPurpose.PRACTICE_DETECTION);
         auditBinding(workspaceContext, PRACTICE_CONFIG_BINDING, before, workspace.getPracticeConfigId());
         return toView(workspaceRepository.save(workspace));
     }
@@ -61,6 +65,7 @@ public class AiSettingsService {
         Workspace workspace = requireWorkspaceForUpdate(workspaceContext);
         AgentBindingSnapshot before = new AgentBindingSnapshot(workspace.getMentorConfigId());
         workspace.setMentorConfigId(validateExecutableConfigId(workspaceContext.id(), configId));
+        agentBindingService.sync(workspace, AgentPurpose.MENTOR);
         auditBinding(workspaceContext, MENTOR_CONFIG_BINDING, before, workspace.getMentorConfigId());
         return toView(workspaceRepository.save(workspace));
     }
