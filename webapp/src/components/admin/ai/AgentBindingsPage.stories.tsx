@@ -89,7 +89,16 @@ export const LoadForbidden: Story = {
 			handlers: [
 				http.get("*/workspaces/acme/agent-bindings", () =>
 					HttpResponse.json(
-						{ title: "Forbidden", detail: "You are not an admin of this workspace." },
+						// A faithful RFC 9457 ProblemDetail: the server puts `status` in the BODY, and the
+						// generated client throws that body verbatim — so the body is where the alert reads
+						// the status from when it decides a 403 cannot be retried away.
+						{
+							type: "about:blank",
+							title: "Forbidden",
+							status: 403,
+							detail: "You are not an admin of this workspace.",
+							instance: "/workspaces/acme/agent-bindings",
+						},
 						{ status: 403 },
 					),
 				),
