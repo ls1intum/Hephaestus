@@ -1,14 +1,11 @@
-package de.tum.cit.aet.hephaestus.agent.settings;
+package de.tum.cit.aet.hephaestus.practices.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.catalog.InstanceLlmSettings;
-import de.tum.cit.aet.hephaestus.agent.catalog.InstanceLlmSettingsService;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
-import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -21,7 +18,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
-class AiSettingsServiceTest extends BaseUnitTest {
+class PracticeReviewSettingsServiceTest extends BaseUnitTest {
 
     @Mock
     private WorkspaceRepository workspaceRepository;
@@ -29,10 +26,7 @@ class AiSettingsServiceTest extends BaseUnitTest {
     @Mock
     private ConfigAuditPort configAudit;
 
-    @Mock
-    private InstanceLlmSettingsService instanceLlmSettingsService;
-
-    private AiSettingsService service;
+    private PracticeReviewSettingsService service;
     private Workspace workspace;
     private WorkspaceContext context;
 
@@ -49,10 +43,7 @@ class AiSettingsServiceTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        service = new AiSettingsService(workspaceRepository, reviewProperties, configAudit, instanceLlmSettingsService);
-        InstanceLlmSettings llmSettings = new InstanceLlmSettings();
-        llmSettings.setAllowWorkspaceConnections(true);
-        lenient().when(instanceLlmSettingsService.get()).thenReturn(llmSettings);
+        service = new PracticeReviewSettingsService(workspaceRepository, reviewProperties, configAudit);
         workspace = new Workspace();
         workspace.setId(1L);
         workspace.setWorkspaceSlug("ws");
@@ -68,7 +59,7 @@ class AiSettingsServiceTest extends BaseUnitTest {
     void getSettingsReturnsEffectiveAndRawOverrideValues() {
         workspace.getReviewSettings().setRunForAllUsers(true); // explicit override
 
-        AiSettingsViewDTO view = service.getSettings(context);
+        PracticeReviewSettingsDTO view = service.getSettings(context);
 
         assertThat(view.runForAllUsers()).isTrue(); // override wins
         assertThat(view.skipDrafts()).isTrue(); // inherited from property
@@ -77,10 +68,6 @@ class AiSettingsServiceTest extends BaseUnitTest {
         assertThat(view.runForAllUsersOverride()).isTrue();
         assertThat(view.skipDraftsOverride()).isNull(); // inheriting
         assertThat(view.cooldownMinutesOverride()).isNull();
-        // Feature flags travel with the aggregate read so the settings page renders in one round trip.
-        assertThat(view.practicesEnabled()).isFalse();
-        assertThat(view.mentorEnabled()).isFalse();
-        assertThat(view.workspaceConnectionsAllowed()).isTrue();
     }
 
     @Test
@@ -89,7 +76,7 @@ class AiSettingsServiceTest extends BaseUnitTest {
         // not an OR). Guards the resolution precedence in both directions.
         workspace.getReviewSettings().setSkipDrafts(false);
 
-        AiSettingsViewDTO view = service.getSettings(context);
+        PracticeReviewSettingsDTO view = service.getSettings(context);
 
         assertThat(view.skipDrafts()).isFalse();
     }
@@ -98,9 +85,9 @@ class AiSettingsServiceTest extends BaseUnitTest {
     void updatePracticeReviewAppliesPatch() {
         when(workspaceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        AiSettingsViewDTO view = service.updatePracticeReview(
+        PracticeReviewSettingsDTO view = service.updatePracticeReview(
             context,
-            new UpdatePracticeReviewSettingsDTO(null, false, null, 30, null)
+            new UpdatePracticeReviewSettingsRequestDTO(null, false, null, 30, null)
         );
 
         assertThat(workspace.getReviewSettings().getSkipDrafts()).isFalse();
@@ -116,9 +103,9 @@ class AiSettingsServiceTest extends BaseUnitTest {
         workspace.getReviewSettings().setSkipDrafts(false); // explicit override
         when(workspaceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        AiSettingsViewDTO view = service.updatePracticeReview(
+        PracticeReviewSettingsDTO view = service.updatePracticeReview(
             context,
-            new UpdatePracticeReviewSettingsDTO(null, null, null, null, Set.of(PracticeReviewField.SKIP_DRAFTS))
+            new UpdatePracticeReviewSettingsRequestDTO(null, null, null, null, Set.of(PracticeReviewField.SKIP_DRAFTS))
         );
 
         // Override cleared → inheriting again; effective falls back to the fleet default (true).

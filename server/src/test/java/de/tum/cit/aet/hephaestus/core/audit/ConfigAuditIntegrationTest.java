@@ -425,7 +425,7 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     private void patchPracticeReview(Workspace workspace, Map<String, Object> body) {
         webTestClient
             .patch()
-            .uri("/workspaces/{slug}/ai-settings/practice-review", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/practices/review-settings", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(body)

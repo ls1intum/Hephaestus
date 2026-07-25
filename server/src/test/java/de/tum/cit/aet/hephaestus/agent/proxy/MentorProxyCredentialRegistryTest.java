@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.agent.proxy.MentorProxyCredentialRegistry.Route;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.UUID;
@@ -19,7 +20,10 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
     @Test
     void mintedTokenAuthenticatesBeforeRevoke() {
         UUID sessionId = UUID.randomUUID();
-        String token = registry.mint(sessionId, "openai-completions", "https://api.openai.com", null, null, 7L);
+        String token = registry.mint(
+            sessionId,
+            new Route("openai-completions", "https://api.openai.com", null, null, null, null)
+        );
 
         assertThat(registry.validate(token)).isPresent();
     }
@@ -27,7 +31,10 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
     @Test
     void revokedTokenNoLongerAuthenticates() {
         UUID sessionId = UUID.randomUUID();
-        String token = registry.mint(sessionId, "openai-completions", "https://api.openai.com", null, null, 7L);
+        String token = registry.mint(
+            sessionId,
+            new Route("openai-completions", "https://api.openai.com", null, null, null, null)
+        );
 
         registry.revoke(sessionId);
 
@@ -37,7 +44,10 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
     @Test
     void revokeIsIdempotent() {
         UUID sessionId = UUID.randomUUID();
-        String token = registry.mint(sessionId, "openai-completions", "https://api.openai.com", null, null, 7L);
+        String token = registry.mint(
+            sessionId,
+            new Route("openai-completions", "https://api.openai.com", null, null, null, null)
+        );
 
         registry.revoke(sessionId);
         // A second close callback (or a race between idle-reap and manual close) must not throw.
@@ -58,8 +68,14 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
     void revokingOneSessionDoesNotAffectAnother() {
         UUID sessionA = UUID.randomUUID();
         UUID sessionB = UUID.randomUUID();
-        String tokenA = registry.mint(sessionA, "openai-completions", "https://api.openai.com", null, null, 1L);
-        String tokenB = registry.mint(sessionB, "anthropic-messages", "https://api.anthropic.com", null, null, 2L);
+        String tokenA = registry.mint(
+            sessionA,
+            new Route("openai-completions", "https://api.openai.com", null, null, null, null)
+        );
+        String tokenB = registry.mint(
+            sessionB,
+            new Route("anthropic-messages", "https://api.anthropic.com", null, null, null, null)
+        );
 
         registry.revoke(sessionA);
 
@@ -72,11 +88,7 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
         UUID sessionId = UUID.randomUUID();
         String token = registry.mint(
             sessionId,
-            "anthropic-messages",
-            "https://api.anthropic.com",
-            FundingSource.INSTANCE,
-            42L,
-            null
+            new Route("anthropic-messages", "https://api.anthropic.com", FundingSource.INSTANCE, 42L, null, null)
         );
 
         var routing = registry.validate(token).orElseThrow();

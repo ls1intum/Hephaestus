@@ -5,7 +5,7 @@ import { budgetResetDayLabel, currentMonthUtc } from "@/components/admin/usage/u
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 
-type BudgetVerdict = WorkspaceLlmUsageReport["byoBudgetVerdict"];
+type BudgetVerdict = WorkspaceLlmUsageReport["ownProviderBudgetVerdict"];
 
 interface BudgetExhaustedAlertProps {
 	/**
@@ -32,7 +32,7 @@ interface BudgetExhaustedAlertProps {
 	context: "usage" | "models";
 	workspaceSlug: string;
 	/** Opens the provider-cap editor. Used by `context="usage"`, where that cap is edited. */
-	onEditByoCap?: () => void;
+	onEditOwnProviderCap?: () => void;
 }
 
 /**
@@ -51,7 +51,7 @@ export function BudgetExhaustedAlert({
 	unpricedEventCount,
 	context,
 	workspaceSlug,
-	onEditByoCap,
+	onEditOwnProviderCap,
 }: BudgetExhaustedAlertProps) {
 	const noPriceSet = verdict === "UNVERIFIABLE";
 	const own = scope === "own";
@@ -83,7 +83,7 @@ export function BudgetExhaustedAlert({
 					noPriceSet={noPriceSet}
 					context={context}
 					workspaceSlug={workspaceSlug}
-					onEditByoCap={onEditByoCap}
+					onEditOwnProviderCap={onEditOwnProviderCap}
 				/>
 			</AlertDescription>
 		</Alert>
@@ -108,7 +108,7 @@ interface PauseActionProps {
 	noPriceSet: boolean;
 	context: "usage" | "models";
 	workspaceSlug: string;
-	onEditByoCap?: () => void;
+	onEditOwnProviderCap?: () => void;
 }
 
 /**
@@ -120,7 +120,7 @@ function PauseAction({
 	noPriceSet,
 	context,
 	workspaceSlug,
-	onEditByoCap,
+	onEditOwnProviderCap,
 }: PauseActionProps) {
 	if (scope === "own") {
 		if (context === "models") {
@@ -146,7 +146,7 @@ function PauseAction({
 						Open AI models
 					</Button>
 				)}
-				<Button variant="outline" size="sm" onClick={onEditByoCap}>
+				<Button variant="outline" size="sm" onClick={onEditOwnProviderCap}>
 					Adjust cap
 				</Button>
 			</div>

@@ -1,52 +1,38 @@
-package de.tum.cit.aet.hephaestus.agent.settings;
+package de.tum.cit.aet.hephaestus.practices.review;
 
-import de.tum.cit.aet.hephaestus.agent.catalog.InstanceLlmSettingsService;
-import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
-import de.tum.cit.aet.hephaestus.agent.config.AgentBindingService;
-import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceFeatures;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewSettings;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Reads and writes the per-workspace AI configuration: which agent config powers practice
- * detection / the mentor, and the practice-review policy overrides. Hosted in the {@code agent}
- * module to avoid a {@code workspace → agent} Modulith cycle; see {@code Workspace.practiceConfigId}.
+ * Reads and writes a workspace's practice-review policy overrides, resolving each knob against the
+ * fleet default in {@link PracticeReviewProperties}.
  */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class AiSettingsService {
-
-    /**
-     * Audit entity ids for the two bindings. There is one of each per workspace, so the binding's own
-     * name is its stable key — the workspace is already a column.
-     */
+public class PracticeReviewSettingsService {
 
     private final WorkspaceRepository workspaceRepository;
     private final PracticeReviewProperties reviewProperties;
     private final ConfigAuditPort configAudit;
-    private final InstanceLlmSettingsService instanceLlmSettingsService;
 
-    public AiSettingsViewDTO getSettings(WorkspaceContext workspaceContext) {
+    public PracticeReviewSettingsDTO getSettings(WorkspaceContext workspaceContext) {
         return toView(requireWorkspace(workspaceContext));
     }
 
     @Transactional
-    public AiSettingsViewDTO updatePracticeReview(
+    public PracticeReviewSettingsDTO updatePracticeReview(
         WorkspaceContext workspaceContext,
-        UpdatePracticeReviewSettingsDTO req
+        UpdatePracticeReviewSettingsRequestDTO req
     ) {
         Workspace workspace = requireWorkspaceForUpdate(workspaceContext);
         PracticeReviewSettings settings = workspace.getReviewSettings();
@@ -83,10 +69,9 @@ public class AiSettingsService {
             .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceContext.slug()));
     }
 
-    private AiSettingsViewDTO toView(Workspace workspace) {
+    private PracticeReviewSettingsDTO toView(Workspace workspace) {
         PracticeReviewSettings s = workspace.getReviewSettings();
-        WorkspaceFeatures f = workspace.getFeatures();
-        return new AiSettingsViewDTO(
+        return new PracticeReviewSettingsDTO(
             s.resolveRunForAllUsers(reviewProperties.runForAllUsers()),
             s.resolveSkipDrafts(reviewProperties.skipDrafts()),
             s.resolveDeliverToMerged(reviewProperties.deliverToMerged()),
@@ -94,10 +79,7 @@ public class AiSettingsService {
             s.getRunForAllUsers(),
             s.getSkipDrafts(),
             s.getDeliverToMerged(),
-            s.getCooldownMinutes(),
-            f.getPracticesEnabled(),
-            f.getMentorEnabled(),
-            instanceLlmSettingsService.get().isAllowWorkspaceConnections()
+            s.getCooldownMinutes()
         );
     }
 }

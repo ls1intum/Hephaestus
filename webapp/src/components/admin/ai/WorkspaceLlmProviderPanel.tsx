@@ -53,7 +53,7 @@ import { WorkspaceLlmModelsTable } from "./WorkspaceLlmModelsTable";
 
 export interface WorkspaceLlmProviderPanelProps {
 	workspaceSlug: string;
-	workspaceConnectionsAllowed: boolean;
+	ownProviderAllowed: boolean;
 }
 
 type TestResult = { ok: boolean; message: string };
@@ -61,7 +61,7 @@ type TestResult = { ok: boolean; message: string };
 /** Workspace-owned OpenAI-compatible connections and the models grouped under each connection. */
 export function WorkspaceLlmProviderPanel({
 	workspaceSlug,
-	workspaceConnectionsAllowed,
+	ownProviderAllowed,
 }: WorkspaceLlmProviderPanelProps) {
 	const queryClient = useQueryClient();
 	const [connectionDialogOpen, setConnectionDialogOpen] = useState(false);
@@ -74,7 +74,7 @@ export function WorkspaceLlmProviderPanel({
 	const [probingConnectionId, setProbingConnectionId] = useState<number | null>(null);
 	const [testResults, setTestResults] = useState<Record<number, TestResult>>({});
 	const [deletingConnection, setDeletingConnection] = useState<WorkspaceLlmConnection | null>(null);
-	const registrationBlocked = !workspaceConnectionsAllowed || registrationDisabled;
+	const registrationBlocked = !ownProviderAllowed || registrationDisabled;
 
 	const connectionsQuery = useQuery(
 		workspaceListLlmConnectionsOptions({ path: { workspaceSlug } }),

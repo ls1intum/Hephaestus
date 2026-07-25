@@ -25,27 +25,5 @@ public record ProxyRouting(
     @Nullable Long connectionId,
     @Nullable Long modelId,
     @Nullable Long workspaceId,
-    @Nullable Long legacyConfigId,
     @Nullable UUID sourceId
-) {
-    public ProxyRouting(
-        String principalDescription,
-        String apiProtocol,
-        String baseUrl,
-        @Nullable FundingSource connectionScope,
-        @Nullable Long connectionId,
-        @Nullable Long legacyConfigId
-    ) {
-        this(
-            principalDescription,
-            apiProtocol,
-            baseUrl,
-            connectionScope,
-            connectionId,
-            null,
-            null,
-            legacyConfigId,
-            null
-        );
-    }
-}
+) {}

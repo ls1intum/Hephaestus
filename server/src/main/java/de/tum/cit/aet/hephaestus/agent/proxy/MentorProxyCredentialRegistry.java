@@ -50,8 +50,7 @@ public class MentorProxyCredentialRegistry {
         @Nullable FundingSource connectionScope,
         @Nullable Long connectionId,
         @Nullable Long modelId,
-        @Nullable Long workspaceId,
-        @Nullable Long legacyConfigId
+        @Nullable Long workspaceId
     ) {}
 
     /** Routing + expiry for a minted mentor proxy token. */
@@ -62,7 +61,6 @@ public class MentorProxyCredentialRegistry {
         @Nullable Long connectionId,
         @Nullable Long modelId,
         @Nullable Long workspaceId,
-        @Nullable Long legacyConfigId,
         Instant expiresAt
     ) {}
 
@@ -86,26 +84,11 @@ public class MentorProxyCredentialRegistry {
                 route.connectionId(),
                 route.modelId(),
                 route.workspaceId(),
-                route.legacyConfigId(),
                 Instant.now().plus(TTL)
             )
         );
         tokenHashBySession.put(sessionId, hash);
         return token;
-    }
-
-    public String mint(
-        UUID sessionId,
-        String apiProtocol,
-        String baseUrl,
-        @Nullable FundingSource connectionScope,
-        @Nullable Long connectionId,
-        @Nullable Long legacyConfigId
-    ) {
-        return mint(
-            sessionId,
-            new Route(apiProtocol, baseUrl, connectionScope, connectionId, null, null, legacyConfigId)
-        );
     }
 
     /** Validate a bearer token, evicting it if expired. Empty when unknown or expired. */
@@ -128,7 +111,6 @@ public class MentorProxyCredentialRegistry {
                 entry.connectionId(),
                 entry.modelId(),
                 entry.workspaceId(),
-                entry.legacyConfigId(),
                 null // mentor meters per turn at completion, not per proxy call
             )
         );

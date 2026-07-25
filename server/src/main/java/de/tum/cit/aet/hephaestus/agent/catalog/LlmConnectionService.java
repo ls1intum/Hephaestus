@@ -96,7 +96,8 @@ public class LlmConnectionService {
         if (request.displayName() != null) {
             connection.setDisplayName(request.displayName());
         }
-        // Clearing the key wins over a supplied value, mirroring AgentConfig's clearLlmApiKey semantics.
+        // Clearing wins over supplying: a request that sets clearApiKey drops the stored key even if it
+        // also carries a new one, so an ambiguous request can never leave a credential behind.
         if (Boolean.TRUE.equals(request.clearApiKey())) {
             connection.setApiKey(null);
         } else if (request.apiKey() != null) {

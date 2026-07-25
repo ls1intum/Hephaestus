@@ -10,19 +10,19 @@ const NOW = new Date("2026-07-10T12:00:00.000Z");
 const baseReport: WorkspaceLlmUsageReport = {
 	month: "2026-07",
 	instanceMonthlyBudgetUsd: 25,
-	byoMonthlyBudgetUsd: undefined,
-	pricedTotalCostUsd: 13.4821,
-	byoTotalCostUsd: 0,
+	ownProviderMonthlyBudgetUsd: undefined,
+	instanceTotalCostUsd: 13.4821,
+	ownProviderTotalCostUsd: 0,
 	instanceBudgetVerdict: "WITHIN",
-	byoBudgetVerdict: "WITHIN",
-	instanceFundedPaused: false,
-	byoPaused: false,
+	ownProviderBudgetVerdict: "WITHIN",
+	instancePaused: false,
+	ownProviderPaused: false,
 	unpricedEventCount: 0,
 	byJobType: [
 		{
 			jobType: "PULL_REQUEST_REVIEW",
-			pricedTotalCostUsd: 8.1034,
-			byoTotalCostUsd: 0,
+			instanceTotalCostUsd: 8.1034,
+			ownProviderTotalCostUsd: 0,
 			unpricedEventCount: 0,
 			inputTokens: 1_204_331,
 			outputTokens: 88_412,
@@ -33,8 +33,8 @@ const baseReport: WorkspaceLlmUsageReport = {
 		},
 		{
 			jobType: "MENTOR_TURN",
-			pricedTotalCostUsd: 3.9902,
-			byoTotalCostUsd: 0,
+			instanceTotalCostUsd: 3.9902,
+			ownProviderTotalCostUsd: 0,
 			unpricedEventCount: 0,
 			inputTokens: 402_118,
 			outputTokens: 61_240,
@@ -45,8 +45,8 @@ const baseReport: WorkspaceLlmUsageReport = {
 		},
 		{
 			jobType: "ISSUE_REVIEW",
-			pricedTotalCostUsd: 1.3885,
-			byoTotalCostUsd: 0,
+			instanceTotalCostUsd: 1.3885,
+			ownProviderTotalCostUsd: 0,
 			unpricedEventCount: 0,
 			inputTokens: 150_221,
 			outputTokens: 20_114,
@@ -59,29 +59,29 @@ const baseReport: WorkspaceLlmUsageReport = {
 	byDay: [
 		{
 			day: new Date("2026-07-01"),
-			pricedTotalCostUsd: 2.1,
-			byoTotalCostUsd: 0,
+			instanceTotalCostUsd: 2.1,
+			ownProviderTotalCostUsd: 0,
 			unpricedEventCount: 0,
 			events: 14,
 		},
 		{
 			day: new Date("2026-07-02"),
-			pricedTotalCostUsd: 4.83,
-			byoTotalCostUsd: 0,
+			instanceTotalCostUsd: 4.83,
+			ownProviderTotalCostUsd: 0,
 			unpricedEventCount: 0,
 			events: 31,
 		},
 		{
 			day: new Date("2026-07-03"),
-			pricedTotalCostUsd: 0.92,
-			byoTotalCostUsd: 0,
+			instanceTotalCostUsd: 0.92,
+			ownProviderTotalCostUsd: 0,
 			unpricedEventCount: 0,
 			events: 6,
 		},
 		{
 			day: new Date("2026-07-06"),
-			pricedTotalCostUsd: 5.6321,
-			byoTotalCostUsd: 0,
+			instanceTotalCostUsd: 5.6321,
+			ownProviderTotalCostUsd: 0,
 			unpricedEventCount: 0,
 			events: 66,
 		},
@@ -91,13 +91,13 @@ const baseReport: WorkspaceLlmUsageReport = {
 /** The same month with the workspace running part of its work on a provider of its own. */
 const withOwnProvider: WorkspaceLlmUsageReport = {
 	...baseReport,
-	byoMonthlyBudgetUsd: 10,
-	byoTotalCostUsd: 2.4,
+	ownProviderMonthlyBudgetUsd: 10,
+	ownProviderTotalCostUsd: 2.4,
 	byJobType: baseReport.byJobType.map((row, index) =>
-		index === 1 ? { ...row, byoTotalCostUsd: 2.4 } : row,
+		index === 1 ? { ...row, ownProviderTotalCostUsd: 2.4 } : row,
 	),
 	byDay: baseReport.byDay.map((row, index) =>
-		index === 3 ? { ...row, byoTotalCostUsd: 2.4 } : row,
+		index === 3 ? { ...row, ownProviderTotalCostUsd: 2.4 } : row,
 	),
 };
 
@@ -131,7 +131,7 @@ const meta = {
 		onRetry: fn(),
 		onPrevMonth: fn(),
 		onNextMonth: fn(),
-		onEditByoCap: fn(),
+		onEditOwnProviderCap: fn(),
 	},
 } satisfies Meta<typeof AdminLlmUsagePage>;
 
@@ -222,14 +222,14 @@ export const BothCapsHealthy: Story = {
 /** 84% of the provider cap is gone — warned as a status, with the date the pace reaches it. */
 export const ApproachingProviderCap: Story = {
 	args: {
-		report: { ...withOwnProvider, byoTotalCostUsd: 8.4 },
+		report: { ...withOwnProvider, ownProviderTotalCostUsd: 8.4 },
 	},
 };
 
 /** 88% of the shared-model budget is gone. Same shape, different owner — and a different remedy. */
 export const ApproachingSharedBudget: Story = {
 	args: {
-		report: { ...withOwnProvider, pricedTotalCostUsd: 22 },
+		report: { ...withOwnProvider, instanceTotalCostUsd: 22 },
 	},
 };
 
@@ -240,7 +240,7 @@ export const ApproachingSharedBudget: Story = {
 export const ApproachingWithoutProjection: Story = {
 	args: {
 		now: new Date("2026-07-02T12:00:00.000Z"),
-		report: { ...withOwnProvider, byoTotalCostUsd: 8.4 },
+		report: { ...withOwnProvider, ownProviderTotalCostUsd: 8.4 },
 	},
 };
 
@@ -249,9 +249,9 @@ export const ProviderCapReached: Story = {
 	args: {
 		report: {
 			...withOwnProvider,
-			byoTotalCostUsd: 10.12,
-			byoBudgetVerdict: "EXHAUSTED",
-			byoPaused: true,
+			ownProviderTotalCostUsd: 10.12,
+			ownProviderBudgetVerdict: "EXHAUSTED",
+			ownProviderPaused: true,
 		},
 	},
 };
@@ -261,8 +261,8 @@ export const ProviderCapUnenforceable: Story = {
 	args: {
 		report: {
 			...withOwnProvider,
-			byoBudgetVerdict: "UNVERIFIABLE",
-			byoPaused: true,
+			ownProviderBudgetVerdict: "UNVERIFIABLE",
+			ownProviderPaused: true,
 			unpricedEventCount: 7,
 		},
 	},
@@ -273,9 +273,9 @@ export const SharedBudgetReached: Story = {
 	args: {
 		report: {
 			...withOwnProvider,
-			pricedTotalCostUsd: 25.0142,
+			instanceTotalCostUsd: 25.0142,
 			instanceBudgetVerdict: "EXHAUSTED",
-			instanceFundedPaused: true,
+			instancePaused: true,
 		},
 	},
 };
@@ -286,7 +286,7 @@ export const SharedBudgetUnverifiable: Story = {
 		report: {
 			...withOwnProvider,
 			instanceBudgetVerdict: "UNVERIFIABLE",
-			instanceFundedPaused: true,
+			instancePaused: true,
 			unpricedEventCount: 7,
 		},
 	},
@@ -297,12 +297,12 @@ export const BothPaused: Story = {
 	args: {
 		report: {
 			...withOwnProvider,
-			pricedTotalCostUsd: 25.0142,
-			byoTotalCostUsd: 10.12,
+			instanceTotalCostUsd: 25.0142,
+			ownProviderTotalCostUsd: 10.12,
 			instanceBudgetVerdict: "EXHAUSTED",
-			instanceFundedPaused: true,
-			byoBudgetVerdict: "EXHAUSTED",
-			byoPaused: true,
+			instancePaused: true,
+			ownProviderBudgetVerdict: "EXHAUSTED",
+			ownProviderPaused: true,
 		},
 	},
 };
@@ -315,7 +315,7 @@ export const NoProviderConnected: Story = {
 /** Provider spend with no cap on it yet: the meter is absent, the offer to cap it is not. */
 export const ProviderUncapped: Story = {
 	args: {
-		report: { ...withOwnProvider, byoMonthlyBudgetUsd: undefined },
+		report: { ...withOwnProvider, ownProviderMonthlyBudgetUsd: undefined },
 	},
 };
 
@@ -324,10 +324,10 @@ export const ZeroProviderCap: Story = {
 	args: {
 		report: {
 			...withOwnProvider,
-			byoMonthlyBudgetUsd: 0,
-			byoTotalCostUsd: 0,
-			byoBudgetVerdict: "EXHAUSTED",
-			byoPaused: true,
+			ownProviderMonthlyBudgetUsd: 0,
+			ownProviderTotalCostUsd: 0,
+			ownProviderBudgetVerdict: "EXHAUSTED",
+			ownProviderPaused: true,
 		},
 	},
 };
@@ -347,7 +347,7 @@ export const PastMonth: Story = {
 		report: {
 			...withOwnProvider,
 			month: "2026-06",
-			pricedTotalCostUsd: 25.0142,
+			instanceTotalCostUsd: 25.0142,
 			instanceBudgetVerdict: "EXHAUSTED",
 		},
 	},
@@ -358,8 +358,8 @@ export const Empty: Story = {
 	args: {
 		report: {
 			...baseReport,
-			pricedTotalCostUsd: 0,
-			byoTotalCostUsd: 0,
+			instanceTotalCostUsd: 0,
+			ownProviderTotalCostUsd: 0,
 			byJobType: [],
 			byDay: [],
 		},
@@ -419,12 +419,12 @@ export const MobileReflow: Story = {
 	args: {
 		report: {
 			...withOwnProvider,
-			pricedTotalCostUsd: 25.0142,
-			byoTotalCostUsd: 10.12,
+			instanceTotalCostUsd: 25.0142,
+			ownProviderTotalCostUsd: 10.12,
 			instanceBudgetVerdict: "EXHAUSTED",
-			instanceFundedPaused: true,
-			byoBudgetVerdict: "EXHAUSTED",
-			byoPaused: true,
+			instancePaused: true,
+			ownProviderBudgetVerdict: "EXHAUSTED",
+			ownProviderPaused: true,
 		},
 	},
 	parameters: {

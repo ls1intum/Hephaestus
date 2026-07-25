@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.agent.settings;
+package de.tum.cit.aet.hephaestus.practices.review;
 
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditSnapshot;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewSettings;

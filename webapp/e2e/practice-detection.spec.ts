@@ -23,7 +23,7 @@ test("dev-login then configure practice review settings (read + mutate over http
 	const before = await skipDrafts.getAttribute("aria-checked");
 	const [response] = await Promise.all([
 		page.waitForResponse(
-			(r) => r.url().includes("/ai-settings/practice-review") && r.request().method() === "PATCH",
+			(r) => r.url().includes("/practices/review-settings") && r.request().method() === "PATCH",
 		),
 		skipDrafts.click(),
 	]);

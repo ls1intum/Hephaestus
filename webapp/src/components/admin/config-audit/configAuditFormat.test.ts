@@ -186,7 +186,7 @@ describe("subjectLabel", () => {
 	it("renders a slug identifier as-is", () => {
 		expect(
 			subjectLabel(
-				entry({ entityType: "AI_CONFIG_BINDING", entityId: "practice-config", newValue: "{}" }),
+				entry({ entityType: "AGENT_BINDING", entityId: "practice-config", newValue: "{}" }),
 			),
 		).toEqual({ label: "AI binding practice-config" });
 	});

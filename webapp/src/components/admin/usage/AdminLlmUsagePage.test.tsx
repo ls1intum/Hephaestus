@@ -12,19 +12,19 @@ import { AdminLlmUsagePage } from "./AdminLlmUsagePage";
 const baseReport: WorkspaceLlmUsageReport = {
 	month: "2026-07",
 	instanceMonthlyBudgetUsd: 25,
-	byoMonthlyBudgetUsd: 10,
-	pricedTotalCostUsd: 4.25,
-	byoTotalCostUsd: 1.75,
+	ownProviderMonthlyBudgetUsd: 10,
+	instanceTotalCostUsd: 4.25,
+	ownProviderTotalCostUsd: 1.75,
 	instanceBudgetVerdict: "WITHIN",
-	byoBudgetVerdict: "WITHIN",
-	instanceFundedPaused: false,
-	byoPaused: false,
+	ownProviderBudgetVerdict: "WITHIN",
+	instancePaused: false,
+	ownProviderPaused: false,
 	unpricedEventCount: 2,
 	byJobType: [
 		{
 			jobType: "PULL_REQUEST_REVIEW",
-			pricedTotalCostUsd: 4.25,
-			byoTotalCostUsd: 1.75,
+			instanceTotalCostUsd: 4.25,
+			ownProviderTotalCostUsd: 1.75,
 			unpricedEventCount: 2,
 			inputTokens: 1_000,
 			outputTokens: 250,
@@ -37,8 +37,8 @@ const baseReport: WorkspaceLlmUsageReport = {
 	byDay: [
 		{
 			day: new Date("2026-07-05T00:00:00.000Z"),
-			pricedTotalCostUsd: 4.25,
-			byoTotalCostUsd: 1.75,
+			instanceTotalCostUsd: 4.25,
+			ownProviderTotalCostUsd: 1.75,
 			unpricedEventCount: 2,
 			events: 3,
 		},
@@ -64,7 +64,7 @@ async function renderPage(
 				error={null}
 				onPrevMonth={() => {}}
 				onNextMonth={() => {}}
-				onEditByoCap={() => {}}
+				onEditOwnProviderCap={() => {}}
 				now={new Date("2026-07-10T12:00:00.000Z")}
 				{...props}
 			/>
@@ -134,10 +134,15 @@ describe("AdminLlmUsagePage", () => {
 
 	describe("pause banners", () => {
 		it("routes a reached provider cap to the admin who can lift it", async () => {
-			const onEditByoCap = vi.fn();
+			const onEditOwnProviderCap = vi.fn();
 			await renderPage(
-				{ ...baseReport, byoPaused: true, byoBudgetVerdict: "EXHAUSTED", byoTotalCostUsd: 10 },
-				{ onEditByoCap },
+				{
+					...baseReport,
+					ownProviderPaused: true,
+					ownProviderBudgetVerdict: "EXHAUSTED",
+					ownProviderTotalCostUsd: 10,
+				},
+				{ onEditOwnProviderCap },
 			);
 
 			expect(screen.getByText("Your provider cap is reached")).toBeTruthy();
@@ -146,11 +151,15 @@ describe("AdminLlmUsagePage", () => {
 			).toBeTruthy();
 
 			fireEvent.click(screen.getByRole("button", { name: "Adjust cap" }));
-			expect(onEditByoCap).toHaveBeenCalled();
+			expect(onEditOwnProviderCap).toHaveBeenCalled();
 		});
 
 		it("tells an unenforceable provider cap how to become enforceable again", async () => {
-			await renderPage({ ...baseReport, byoPaused: true, byoBudgetVerdict: "UNVERIFIABLE" });
+			await renderPage({
+				...baseReport,
+				ownProviderPaused: true,
+				ownProviderBudgetVerdict: "UNVERIFIABLE",
+			});
 
 			const banner = screen.getByText("Your cap can't be enforced").closest("[role='alert']");
 			expect(banner).toBeTruthy();
@@ -169,9 +178,9 @@ describe("AdminLlmUsagePage", () => {
 		it("keeps an exhausted shared budget non-destructive and off the workspace's plate", async () => {
 			await renderPage({
 				...baseReport,
-				instanceFundedPaused: true,
+				instancePaused: true,
 				instanceBudgetVerdict: "EXHAUSTED",
-				pricedTotalCostUsd: 25,
+				instanceTotalCostUsd: 25,
 			});
 
 			expect(screen.getByText("Shared-model budget reached")).toBeTruthy();
@@ -184,7 +193,7 @@ describe("AdminLlmUsagePage", () => {
 		it("never asks the workspace admin to price a shared model", async () => {
 			await renderPage({
 				...baseReport,
-				instanceFundedPaused: true,
+				instancePaused: true,
 				instanceBudgetVerdict: "UNVERIFIABLE",
 			});
 
@@ -199,9 +208,9 @@ describe("AdminLlmUsagePage", () => {
 		it("puts the cap they can act on first when both are paused", async () => {
 			await renderPage({
 				...baseReport,
-				byoPaused: true,
-				byoBudgetVerdict: "EXHAUSTED",
-				instanceFundedPaused: true,
+				ownProviderPaused: true,
+				ownProviderBudgetVerdict: "EXHAUSTED",
+				instancePaused: true,
 				instanceBudgetVerdict: "EXHAUSTED",
 			});
 
@@ -212,7 +221,7 @@ describe("AdminLlmUsagePage", () => {
 
 		it("shows no pause banner for a past month", async () => {
 			await renderPage(
-				{ ...baseReport, byoPaused: true, byoBudgetVerdict: "EXHAUSTED" },
+				{ ...baseReport, ownProviderPaused: true, ownProviderBudgetVerdict: "EXHAUSTED" },
 				{ month: "2026-06", isCurrentMonth: false },
 			);
 
@@ -222,7 +231,7 @@ describe("AdminLlmUsagePage", () => {
 
 	describe("approaching a cap", () => {
 		it("warns at 80% with a burn-rate date, as a status rather than an alert", async () => {
-			await renderPage({ ...baseReport, byoTotalCostUsd: 8.4 });
+			await renderPage({ ...baseReport, ownProviderTotalCostUsd: 8.4 });
 
 			const warning = screen.getByText("You've used 84% of your provider cap");
 			expect(warning.closest("[role='status']")).toBeTruthy();
@@ -231,7 +240,7 @@ describe("AdminLlmUsagePage", () => {
 
 		it("withholds the projection in the first days of the month, keeping the warning", async () => {
 			await renderPage(
-				{ ...baseReport, byoTotalCostUsd: 8.4 },
+				{ ...baseReport, ownProviderTotalCostUsd: 8.4 },
 				{ now: new Date("2026-07-02T12:00:00.000Z") },
 			);
 
@@ -248,9 +257,9 @@ describe("AdminLlmUsagePage", () => {
 		it("does not warn about a cap that is already paused", async () => {
 			await renderPage({
 				...baseReport,
-				byoTotalCostUsd: 10,
-				byoPaused: true,
-				byoBudgetVerdict: "EXHAUSTED",
+				ownProviderTotalCostUsd: 10,
+				ownProviderPaused: true,
+				ownProviderBudgetVerdict: "EXHAUSTED",
 			});
 
 			expect(screen.queryByText(/You've used 100% of your provider cap/)).toBeNull();
@@ -259,25 +268,25 @@ describe("AdminLlmUsagePage", () => {
 
 	describe("provider card", () => {
 		it("offers a cap even when nothing has run on a provider of their own", async () => {
-			const onEditByoCap = vi.fn();
+			const onEditOwnProviderCap = vi.fn();
 			await renderPage(
 				{
 					...baseReport,
-					byoMonthlyBudgetUsd: undefined,
-					byoTotalCostUsd: 0,
+					ownProviderMonthlyBudgetUsd: undefined,
+					ownProviderTotalCostUsd: 0,
 					byJobType: [],
 					byDay: [],
 				},
-				{ onEditByoCap },
+				{ onEditOwnProviderCap },
 			);
 
 			expect(screen.getByText(/Nothing ran on a provider of your own this month\./)).toBeTruthy();
 			fireEvent.click(screen.getByRole("button", { name: "Set cap" }));
-			expect(onEditByoCap).toHaveBeenCalled();
+			expect(onEditOwnProviderCap).toHaveBeenCalled();
 		});
 
 		it("keeps the card whenever there is provider spend, capped or not", async () => {
-			await renderPage({ ...baseReport, byoMonthlyBudgetUsd: undefined });
+			await renderPage({ ...baseReport, ownProviderMonthlyBudgetUsd: undefined });
 
 			expect(screen.getByText("No cap set.")).toBeTruthy();
 			expect(screen.getByRole("button", { name: "Set cap" })).toBeTruthy();
@@ -295,15 +304,15 @@ describe("AdminLlmUsagePage", () => {
 		const twoDays: WorkspaceLlmUsageReport["byDay"] = [
 			{
 				day: new Date("2026-07-05T00:00:00.000Z"),
-				pricedTotalCostUsd: 6.2,
-				byoTotalCostUsd: 0,
+				instanceTotalCostUsd: 6.2,
+				ownProviderTotalCostUsd: 0,
 				unpricedEventCount: 0,
 				events: 2,
 			},
 			{
 				day: new Date("2026-07-06T00:00:00.000Z"),
-				pricedTotalCostUsd: 6.2,
-				byoTotalCostUsd: 0,
+				instanceTotalCostUsd: 6.2,
+				ownProviderTotalCostUsd: 0,
 				unpricedEventCount: 0,
 				events: 2,
 			},
@@ -319,9 +328,9 @@ describe("AdminLlmUsagePage", () => {
 			await renderPage({
 				...baseReport,
 				instanceMonthlyBudgetUsd: 0,
-				byoMonthlyBudgetUsd: undefined,
-				pricedTotalCostUsd: 12.4,
-				byoTotalCostUsd: 0,
+				ownProviderMonthlyBudgetUsd: undefined,
+				instanceTotalCostUsd: 12.4,
+				ownProviderTotalCostUsd: 0,
 				unpricedEventCount: 0,
 				byJobType: [],
 				byDay: twoDays,
@@ -340,9 +349,9 @@ describe("AdminLlmUsagePage", () => {
 			await renderPage({
 				...baseReport,
 				instanceMonthlyBudgetUsd: 0,
-				byoMonthlyBudgetUsd: undefined,
-				pricedTotalCostUsd: 0,
-				byoTotalCostUsd: 0,
+				ownProviderMonthlyBudgetUsd: undefined,
+				instanceTotalCostUsd: 0,
+				ownProviderTotalCostUsd: 0,
 				unpricedEventCount: 0,
 				byJobType: [],
 				byDay: [],
@@ -357,9 +366,9 @@ describe("AdminLlmUsagePage", () => {
 				{
 					...baseReport,
 					instanceMonthlyBudgetUsd: 50,
-					pricedTotalCostUsd: 43.9,
-					byoMonthlyBudgetUsd: undefined,
-					byoTotalCostUsd: 0,
+					instanceTotalCostUsd: 43.9,
+					ownProviderMonthlyBudgetUsd: undefined,
+					ownProviderTotalCostUsd: 0,
 					unpricedEventCount: 0,
 					fx: eur,
 					// Late enough in the month that the pace lands under the cap, which is the branch that

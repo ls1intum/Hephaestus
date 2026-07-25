@@ -389,7 +389,7 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
     class Delete {
 
         @Test
-        void rejectsDeleteWhileAnAgentConfigStillBindsTheModel() {
+        void rejectsDeleteWhileAnAgentBindingStillBindsTheModel() {
             byoEnabled(true);
             WorkspaceLlmModel model = new WorkspaceLlmModel();
             model.setId(7L);

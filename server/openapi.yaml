@@ -27,8 +27,6 @@ tags:
   name: Slack channel activation
 - description: Per-workspace LLM spend rollup and budget status
   name: LLM Usage
-- description: Workspace-scoped per-purpose model bindings
-  name: Agent Binding
 - description: Manage practice areas
   name: Practice Areas
 - description: Workspace-scoped mentor chat threads
@@ -41,6 +39,8 @@ tags:
     Controller for managing workspace memberships and roles.
      Handles CRUD operations for workspace members and role assignments.
   name: workspace-membership-controller
+- description: Workspace-scoped per-purpose agent configuration
+  name: Agents
 - description: Workspace-scoped agent job monitoring
   name: Agent Jobs
 - description: "User account management (settings, deletion)"
@@ -63,6 +63,8 @@ tags:
   name: Leaderboard
 - description: Session lifecycle
   name: Auth
+- description: Workspace-scoped practice-review policy
+  name: Practice Review Settings
 - description: Active sessions
   name: Account
 - description: Workspace-scoped "bring your own" AI provider connections
@@ -103,9 +105,6 @@ tags:
      <p>Both endpoints are gated by the <code>GITLAB_WORKSPACE_CREATION</code> feature flag via
      <code>@PreAuthorize</code> — identical to the previous protection on the merged controller.
   name: git-lab-preflight-controller
-- description: Workspace-scoped AI configuration (runtime bindings + practice-review
-    policy)
-  name: AI Settings
 - description: Integration sync observability and manual controls
   name: Sync
 - description: "Current user identity, linked accounts, deletion"
@@ -328,14 +327,17 @@ paths:
             type: string
             enum:
             - PRACTICE_REVIEW_SETTINGS
-            - AI_CONFIG_BINDING
+            - AGENT_BINDING
             - AGENT_CONFIG
+            - AI_CONFIG_BINDING
             - WORKSPACE_ROLE
             - WORKSPACE_FEATURES
             - WORKSPACE_STATUS
             - WORKSPACE_TOKEN
             - WORKSPACE_VISIBILITY
             - PRACTICE_ACTIVE
+            - WORKSPACE_INSTANCE_LLM_BUDGET
+            - WORKSPACE_OWN_PROVIDER_LLM_BUDGET
             - WORKSPACE_LLM_BUDGET
             - WORKSPACE_BYO_LLM_BUDGET
             - WORKSPACE_LLM_CONNECTION
@@ -388,28 +390,6 @@ paths:
           description: OK
       summary: "List admin configuration changes across workspaces (paged, newest\
         \ first)"
-      tags:
-      - Admin
-  /admin/llm-usage:
-    get:
-      operationId: adminListLlmUsage
-      parameters:
-      - in: query
-        name: month
-        required: false
-        schema:
-          type: string
-          pattern: "\\d{4}-(0[1-9]|1[0-2])"
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/AdminWorkspaceLlmUsage"
-          description: OK
-      summary: Per-workspace LLM spend rollup for one month (all workspaces)
       tags:
       - Admin
   /admin/llm/connections:
@@ -759,6 +739,26 @@ paths:
       summary: Update instance-wide LLM governance settings
       tags:
       - Admin LLM
+  /admin/llm/usage:
+    get:
+      operationId: adminGetLlmUsageReport
+      parameters:
+      - in: query
+        name: month
+        required: false
+        schema:
+          type: string
+          pattern: "\\d{4}-(0[1-9]|1[0-2])"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminLlmUsageReport"
+          description: OK
+      summary: Per-workspace LLM spend rollup for one month (all workspaces)
+      tags:
+      - Admin
   /admin/login-providers:
     get:
       operationId: adminListLoginProviders
@@ -922,26 +922,25 @@ paths:
       summary: List all workspaces (metadata only)
       tags:
       - Admin
-  /admin/workspaces/{workspaceId}/llm-budget:
+  /admin/workspaces/{workspaceSlug}/llm/budget:
     put:
       operationId: adminUpdateWorkspaceLlmBudget
       parameters:
       - in: path
-        name: workspaceId
+        name: workspaceSlug
         required: true
         schema:
-          type: integer
-          format: int64
+          type: string
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateWorkspaceLlmBudgetRequest"
+              $ref: "#/components/schemas/UpdateLlmBudgetRequest"
         required: true
       responses:
         "200":
           description: OK
-      summary: Set or clear a workspace's monthly LLM budget cap
+      summary: Set or clear a workspace's monthly cap on host-funded LLM spend
       tags:
       - Admin
   /auth/impersonate:
@@ -1438,9 +1437,9 @@ paths:
       summary: Fetch a workspace by slug
       tags:
       - workspace
-  /workspaces/{workspaceSlug}/agent-bindings:
+  /workspaces/{workspaceSlug}/agents:
     get:
-      operationId: getBindings
+      operationId: listAgents
       parameters:
       - description: Workspace slug
         in: path
@@ -1458,73 +1457,12 @@ paths:
                 items:
                   $ref: "#/components/schemas/AgentBinding"
           description: Bindings returned
-      summary: List the workspace's agent bindings
+      summary: List the workspace's agents and how each is configured
       tags:
-      - Agent Binding
-  /workspaces/{workspaceSlug}/agent-bindings/{purpose}:
-    delete:
-      operationId: deleteBinding
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: purpose
-        required: true
-        schema:
-          type: string
-          enum:
-          - PRACTICE_DETECTION
-          - MENTOR
-      responses:
-        "204":
-          description: Binding removed
-      summary: Unbind an agent purpose (turn it off)
-      tags:
-      - Agent Binding
-    put:
-      operationId: upsertBinding
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: purpose
-        required: true
-        schema:
-          type: string
-          enum:
-          - PRACTICE_DETECTION
-          - MENTOR
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/AgentBindingUpsertRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AgentBinding"
-          description: Binding saved
-        "404":
-          description: Model not found
-      summary: Bind a model and limits to an agent purpose
-      tags:
-      - Agent Binding
-  /workspaces/{workspaceSlug}/agent-jobs:
+      - Agents
+  /workspaces/{workspaceSlug}/agents/jobs:
     get:
-      operationId: listJobs
+      operationId: listAgentJobs
       parameters:
       - description: Workspace slug
         in: path
@@ -1570,9 +1508,9 @@ paths:
       summary: List agent jobs for a workspace
       tags:
       - Agent Jobs
-  /workspaces/{workspaceSlug}/agent-jobs/{jobId}:
+  /workspaces/{workspaceSlug}/agents/jobs/{jobId}:
     get:
-      operationId: getJob
+      operationId: getAgentJob
       parameters:
       - description: Workspace slug
         in: path
@@ -1599,9 +1537,9 @@ paths:
       summary: Get agent job details
       tags:
       - Agent Jobs
-  /workspaces/{workspaceSlug}/agent-jobs/{jobId}/cancel:
+  /workspaces/{workspaceSlug}/agents/jobs/{jobId}/cancel:
     post:
-      operationId: cancelJob
+      operationId: cancelAgentJob
       parameters:
       - description: Workspace slug
         in: path
@@ -1630,9 +1568,9 @@ paths:
       summary: Cancel an agent job
       tags:
       - Agent Jobs
-  /workspaces/{workspaceSlug}/agent-jobs/{jobId}/delivery/retry:
+  /workspaces/{workspaceSlug}/agents/jobs/{jobId}/delivery/retry:
     post:
-      operationId: retryDelivery
+      operationId: retryAgentJobDelivery
       parameters:
       - description: Workspace slug
         in: path
@@ -1661,9 +1599,9 @@ paths:
       summary: Retry delivery for a completed agent job
       tags:
       - Agent Jobs
-  /workspaces/{workspaceSlug}/ai-settings:
-    get:
-      operationId: getAiSettings
+  /workspaces/{workspaceSlug}/agents/{purpose}:
+    delete:
+      operationId: deleteAgent
       parameters:
       - description: Workspace slug
         in: path
@@ -1672,19 +1610,22 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: purpose
+        required: true
+        schema:
+          type: string
+          enum:
+          - PRACTICE_DETECTION
+          - MENTOR
       responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AiSettingsView"
-          description: AI settings returned
-      summary: Get aggregate workspace AI settings
+        "204":
+          description: Binding removed
+      summary: Remove the agent for one purpose (turn it off)
       tags:
-      - AI Settings
-  /workspaces/{workspaceSlug}/ai-settings/practice-review:
-    patch:
-      operationId: updatePracticeReviewSettings
+      - Agents
+    put:
+      operationId: configureAgent
       parameters:
       - description: Workspace slug
         in: path
@@ -1693,22 +1634,32 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: purpose
+        required: true
+        schema:
+          type: string
+          enum:
+          - PRACTICE_DETECTION
+          - MENTOR
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdatePracticeReviewSettings"
+              $ref: "#/components/schemas/AgentBindingRequest"
         required: true
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AiSettingsView"
-          description: Policy updated
-      summary: Update per-workspace practice-review policy
+                $ref: "#/components/schemas/AgentBinding"
+          description: Binding saved
+        "404":
+          description: Model not found
+      summary: Configure the agent for one purpose
       tags:
-      - AI Settings
+      - Agents
   /workspaces/{workspaceSlug}/config-audit:
     get:
       operationId: listWorkspaceConfigAuditEvents
@@ -1743,14 +1694,17 @@ paths:
             type: string
             enum:
             - PRACTICE_REVIEW_SETTINGS
-            - AI_CONFIG_BINDING
+            - AGENT_BINDING
             - AGENT_CONFIG
+            - AI_CONFIG_BINDING
             - WORKSPACE_ROLE
             - WORKSPACE_FEATURES
             - WORKSPACE_STATUS
             - WORKSPACE_TOKEN
             - WORKSPACE_VISIBILITY
             - PRACTICE_ACTIVE
+            - WORKSPACE_INSTANCE_LLM_BUDGET
+            - WORKSPACE_OWN_PROVIDER_LLM_BUDGET
             - WORKSPACE_LLM_BUDGET
             - WORKSPACE_BYO_LLM_BUDGET
             - WORKSPACE_LLM_CONNECTION
@@ -2433,60 +2387,6 @@ paths:
       summary: Reset and recalculate workspace leagues
       tags:
       - workspace
-  /workspaces/{workspaceSlug}/llm-usage:
-    get:
-      operationId: getLlmUsageReport
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: query
-        name: month
-        required: false
-        schema:
-          type: string
-          pattern: "\\d{4}-(0[1-9]|1[0-2])"
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/WorkspaceLlmUsageReport"
-          description: OK
-      summary: Get the workspace's LLM usage report for one month
-      tags:
-      - LLM Usage
-  /workspaces/{workspaceSlug}/llm-usage/byo-budget:
-    put:
-      description: |-
-        The workspace's own cap on its own-provider spend — the same control an instance admin has over
-         the shared-model budget, for the money this workspace actually pays. It cannot affect the
-         shared-model budget, so a workspace admin can only ever restrict their own spending.
-      operationId: updateByoLlmBudget
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateByoLlmBudgetRequest"
-        required: true
-      responses:
-        "204":
-          description: Cap updated
-      summary: Set or clear this workspace's monthly cap on its own-provider LLM spend
-      tags:
-      - LLM Usage
   /workspaces/{workspaceSlug}/llm/available-models:
     get:
       operationId: workspaceListAvailableLlmModels
@@ -2510,6 +2410,29 @@ paths:
       summary: List models this workspace can bind a Task to (shared + your own)
       tags:
       - Workspace LLM
+  /workspaces/{workspaceSlug}/llm/budget:
+    put:
+      operationId: updateWorkspaceLlmBudget
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLlmBudgetRequest"
+        required: true
+      responses:
+        "204":
+          description: Cap updated
+      summary: Set or clear this workspace's monthly cap on its own-provider LLM spend
+      tags:
+      - LLM Usage
   /workspaces/{workspaceSlug}/llm/connections:
     get:
       operationId: workspaceListLlmConnections
@@ -2831,6 +2754,54 @@ paths:
       summary: Update a model on your AI provider
       tags:
       - Workspace LLM
+  /workspaces/{workspaceSlug}/llm/settings:
+    get:
+      operationId: workspaceGetLlmSettings
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceLlmSettings"
+          description: OK
+      summary: Get the instance LLM policy as it applies to this workspace
+      tags:
+      - Workspace LLM
+  /workspaces/{workspaceSlug}/llm/usage:
+    get:
+      operationId: getLlmUsageReport
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: query
+        name: month
+        required: false
+        schema:
+          type: string
+          pattern: "\\d{4}-(0[1-9]|1[0-2])"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceLlmUsageReport"
+          description: OK
+      summary: Get the workspace's LLM usage report for one month
+      tags:
+      - LLM Usage
   /workspaces/{workspaceSlug}/members:
     get:
       description: |-
@@ -3962,6 +3933,53 @@ paths:
       summary: Reorder the practices within an area
       tags:
       - Practice Catalog
+  /workspaces/{workspaceSlug}/practices/review-settings:
+    get:
+      operationId: getPracticeReviewSettings
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeReviewSettings"
+          description: Policy returned
+      summary: Get the workspace's practice-review policy
+      tags:
+      - Practice Review Settings
+    patch:
+      operationId: updatePracticeReviewSettings
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePracticeReviewSettingsRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeReviewSettings"
+          description: Policy updated
+      summary: Update the workspace's practice-review policy
+      tags:
+      - Practice Review Settings
   /workspaces/{workspaceSlug}/practices/{practiceSlug}:
     delete:
       operationId: deletePractice
@@ -5299,42 +5317,37 @@ components:
           type: string
         status:
           type: string
-    AdminWorkspaceLlmUsage:
+    AdminLlmUsageReport:
       type: object
       description: "Instance-admin per-workspace month rollup (metadata only, no tenant\
         \ content)"
       properties:
-        byoBudgetVerdict:
+        fx:
+          $ref: "#/components/schemas/FxRateInfo"
+          description: Display-only conversion when the instance has a display currency.
+            Absent = show USD only. Applies to every USD amount in this response.
+        month:
           type: string
-          description: The same verdict for the workspace's own-provider spend against
-            its own cap.
-          enum:
-          - WITHIN
-          - EXHAUSTED
-          - UNVERIFIABLE
-        byoMonthlyBudgetUsd:
-          type: number
-          description: "The workspace's own cap in USD on its own-provider spend;\
-            \ null = uncapped. Read-only here — it governs the workspace's money,\
-            \ so only its own admins may change it."
-        byoPaused:
-          type: boolean
-          description: Whether work on the workspace's OWN provider is paused right
-            now.
-        byoTotalCostUsd:
-          type: number
-          description: "This month's confirmed spend on the workspace's own connected\
-            \ provider(s), in USD — compared against byoMonthlyBudgetUsd."
+          description: "Calendar month (UTC), ISO yyyy-MM"
+          example: 2026-07
+        workspaces:
+          type: array
+          description: One row per workspace with ledger activity this month
+          items:
+            $ref: "#/components/schemas/AdminWorkspaceLlmUsage"
+      required:
+      - month
+      - workspaces
+    AdminWorkspaceLlmUsage:
+      type: object
+      description: "One workspace's month of spend, as an instance admin sees it"
+      properties:
         displayName:
           type: string
         events:
           type: integer
           format: int64
-          description: "Ledger events (jobs / mentor turns) this month, any provider"
-        fx:
-          $ref: "#/components/schemas/FxRateInfo"
-          description: Display-only conversion when the instance has a display currency.
-            Absent = show USD only. Identical on every row of one response.
+          description: "Ledger events (jobs / mentor turns) this month, either purse"
         instanceBudgetVerdict:
           type: string
           description: "Whether shared-model spend is within the instance cap, has\
@@ -5344,33 +5357,52 @@ components:
           - WITHIN
           - EXHAUSTED
           - UNVERIFIABLE
-        instanceFundedPaused:
-          type: boolean
-          description: "Whether work on SHARED models is paused for this workspace\
-            \ right now (current month only) — authoritative, mirroring the live gate."
         instanceMonthlyBudgetUsd:
           type: number
           description: Monthly cap in USD on spend this instance pays for; null =
             uncapped. Yours to set.
-        pricedTotalCostUsd:
+        instancePaused:
+          type: boolean
+          description: "Whether work on SHARED models is paused for this workspace\
+            \ right now (current month only) — authoritative, mirroring the live gate."
+        instanceTotalCostUsd:
           type: number
           description: "This month's confirmed spend on shared (instance) models,\
             \ in USD — compared against instanceMonthlyBudgetUsd."
-        workspaceId:
-          type: integer
-          format: int64
+        ownProviderBudgetVerdict:
+          type: string
+          description: The same verdict for the workspace's own-provider spend against
+            its own cap.
+          enum:
+          - WITHIN
+          - EXHAUSTED
+          - UNVERIFIABLE
+        ownProviderMonthlyBudgetUsd:
+          type: number
+          description: "The workspace's own cap in USD on its own-provider spend;\
+            \ null = uncapped. Read-only here — it governs the workspace's money,\
+            \ so only its own admins may change it."
+        ownProviderPaused:
+          type: boolean
+          description: Whether work on the workspace's OWN provider is paused right
+            now.
+        ownProviderTotalCostUsd:
+          type: number
+          description: "This month's confirmed spend on the workspace's own connected\
+            \ provider(s), in USD — compared against ownProviderMonthlyBudgetUsd."
         workspaceSlug:
           type: string
+          description: "Addresses the workspace everywhere else in the API, including\
+            \ its cap"
       required:
-      - byoBudgetVerdict
-      - byoPaused
-      - byoTotalCostUsd
       - displayName
       - events
       - instanceBudgetVerdict
-      - instanceFundedPaused
-      - pricedTotalCostUsd
-      - workspaceId
+      - instancePaused
+      - instanceTotalCostUsd
+      - ownProviderBudgetVerdict
+      - ownProviderPaused
+      - ownProviderTotalCostUsd
       - workspaceSlug
     AdminWorkspaceView:
       type: object
@@ -5442,7 +5474,7 @@ components:
       - enabled
       - purpose
       - ready
-    AgentBindingUpsertRequest:
+    AgentBindingRequest:
       type: object
       description: Bind a model and execution limits to an agent purpose
       properties:
@@ -5588,55 +5620,6 @@ components:
       - jobType
       - retryCount
       - status
-    AiSettingsView:
-      type: object
-      description: "Aggregate workspace AI settings: runtime bindings + effective\
-        \ + raw-override practice-review policy"
-      properties:
-        cooldownMinutes:
-          type: integer
-          format: int32
-          description: "Effective: minimum minutes between reviews for the same PR"
-        cooldownMinutesOverride:
-          type: integer
-          format: int32
-          description: Raw override; null = inheriting the fleet default
-        deliverToMerged:
-          type: boolean
-          description: "Effective: deliver feedback to merged PRs/MRs"
-        deliverToMergedOverride:
-          type: boolean
-          description: Raw override; null = inheriting the fleet default
-        mentorEnabled:
-          type: boolean
-          description: Whether the mentor feature is enabled for this workspace
-        practicesEnabled:
-          type: boolean
-          description: Whether the practices feature is enabled for this workspace
-        runForAllUsers:
-          type: boolean
-          description: "Effective: run practice review for all developers"
-        runForAllUsersOverride:
-          type: boolean
-          description: Raw override; null = inheriting the fleet default
-        skipDrafts:
-          type: boolean
-          description: "Effective: skip draft PRs/MRs"
-        skipDraftsOverride:
-          type: boolean
-          description: Raw override; null = inheriting the fleet default
-        workspaceConnectionsAllowed:
-          type: boolean
-          description: Whether this workspace may register additional OpenAI-compatible
-            connections
-      required:
-      - cooldownMinutes
-      - deliverToMerged
-      - mentorEnabled
-      - practicesEnabled
-      - runForAllUsers
-      - skipDrafts
-      - workspaceConnectionsAllowed
     AssignRoleRequest:
       type: object
       description: Request to assign or update a user's role in a workspace
@@ -5912,14 +5895,17 @@ components:
           type: string
           enum:
           - PRACTICE_REVIEW_SETTINGS
-          - AI_CONFIG_BINDING
+          - AGENT_BINDING
           - AGENT_CONFIG
+          - AI_CONFIG_BINDING
           - WORKSPACE_ROLE
           - WORKSPACE_FEATURES
           - WORKSPACE_STATUS
           - WORKSPACE_TOKEN
           - WORKSPACE_VISIBILITY
           - PRACTICE_ACTIVE
+          - WORKSPACE_INSTANCE_LLM_BUDGET
+          - WORKSPACE_OWN_PROVIDER_LLM_BUDGET
           - WORKSPACE_LLM_BUDGET
           - WORKSPACE_BYO_LLM_BUDGET
           - WORKSPACE_LLM_CONNECTION
@@ -7394,39 +7380,35 @@ components:
       type: object
       description: Spend for one UTC day
       properties:
-        byoTotalCostUsd:
-          type: number
-          description: "Spend on this workspace's own connected provider(s) for this\
-            \ day, in USD."
         day:
           type: string
           format: date
         events:
           type: integer
           format: int64
-        pricedTotalCostUsd:
+        instanceTotalCostUsd:
           type: number
           description: "Confirmed spend on shared (instance) models for this day,\
             \ in USD."
+        ownProviderTotalCostUsd:
+          type: number
+          description: "Spend on this workspace's own connected provider(s) for this\
+            \ day, in USD."
         unpricedEventCount:
           type: integer
           format: int64
           description: Calls this day whose price is not yet known. Excluded from
             both totals above.
       required:
-      - byoTotalCostUsd
       - day
       - events
-      - pricedTotalCostUsd
+      - instanceTotalCostUsd
+      - ownProviderTotalCostUsd
       - unpricedEventCount
     LlmUsageByJobType:
       type: object
       description: Month spend aggregated by job type
       properties:
-        byoTotalCostUsd:
-          type: number
-          description: "Spend on this workspace's own connected provider(s) for this\
-            \ job type, in USD."
         cacheReadTokens:
           type: integer
           format: int64
@@ -7440,6 +7422,10 @@ components:
         inputTokens:
           type: integer
           format: int64
+        instanceTotalCostUsd:
+          type: number
+          description: "Confirmed spend on shared (instance) models for this job type,\
+            \ in USD."
         jobType:
           type: string
           enum:
@@ -7450,10 +7436,10 @@ components:
         outputTokens:
           type: integer
           format: int64
-        pricedTotalCostUsd:
+        ownProviderTotalCostUsd:
           type: number
-          description: "Confirmed spend on shared (instance) models for this job type,\
-            \ in USD."
+          description: "Spend on this workspace's own connected provider(s) for this\
+            \ job type, in USD."
         totalCalls:
           type: integer
           format: int64
@@ -7466,14 +7452,14 @@ components:
           description: Calls for this job type whose price is not yet known. Excluded
             from both totals above.
       required:
-      - byoTotalCostUsd
       - cacheReadTokens
       - cacheWriteTokens
       - events
       - inputTokens
+      - instanceTotalCostUsd
       - jobType
       - outputTokens
-      - pricedTotalCostUsd
+      - ownProviderTotalCostUsd
       - totalCalls
       - unpricedEventCount
     LoginProviderView:
@@ -8079,6 +8065,42 @@ components:
       - id
       - name
       - slug
+    PracticeReviewSettings:
+      type: object
+      description: "A workspace's practice-review policy: effective values plus raw\
+        \ overrides"
+      properties:
+        cooldownMinutes:
+          type: integer
+          format: int32
+          description: "Effective: minimum minutes between reviews for the same PR"
+        cooldownMinutesOverride:
+          type: integer
+          format: int32
+          description: Raw override; null = inheriting the fleet default
+        deliverToMerged:
+          type: boolean
+          description: "Effective: deliver feedback to merged PRs/MRs"
+        deliverToMergedOverride:
+          type: boolean
+          description: Raw override; null = inheriting the fleet default
+        runForAllUsers:
+          type: boolean
+          description: "Effective: run practice review for all developers"
+        runForAllUsersOverride:
+          type: boolean
+          description: Raw override; null = inheriting the fleet default
+        skipDrafts:
+          type: boolean
+          description: "Effective: skip draft PRs/MRs"
+        skipDraftsOverride:
+          type: boolean
+          description: Raw override; null = inheriting the fleet default
+      required:
+      - cooldownMinutes
+      - deliverToMerged
+      - runForAllUsers
+      - skipDrafts
     ProbeLlmConnectionRequest:
       type: object
       description: Draft connection probe using a supplied (never-persisted) credential
@@ -9312,16 +9334,6 @@ components:
       properties:
         appRole:
           type: string
-    UpdateByoLlmBudgetRequest:
-      type: object
-      description: Set or clear the workspace's own monthly cap on its own-provider
-        spend
-      properties:
-        monthlyByoLlmBudgetUsd:
-          type: number
-          description: "Cap in USD on this workspace's own-provider spend; 0 pauses\
-            \ that work immediately, null removes the cap"
-          minimum: 0.00
     UpdateConnectionStatusRequest:
       type: object
       description: Request to update a connection's lifecycle status
@@ -9382,6 +9394,15 @@ components:
       required:
       - day
       - time
+    UpdateLlmBudgetRequest:
+      type: object
+      description: Set or clear a monthly LLM budget cap
+      properties:
+        monthlyBudgetUsd:
+          type: number
+          description: "Cap in USD; 0 pauses the affected work immediately, null removes\
+            \ the cap"
+          minimum: 0.00
     UpdateLlmConnectionRequest:
       type: object
       description: Update an instance LLM provider connection (all fields optional)
@@ -9604,7 +9625,7 @@ components:
           maxLength: 2000
           minLength: 0
           pattern: .*\S.*
-    UpdatePracticeReviewSettings:
+    UpdatePracticeReviewSettingsRequest:
       type: object
       description: Update per-workspace practice-review policy. Null fields unchanged;
         'reset' clears to inherit.
@@ -9719,15 +9740,6 @@ components:
         progressionEnabled:
           type: boolean
           description: Enable the league/progression system
-    UpdateWorkspaceLlmBudgetRequest:
-      type: object
-      description: Set or clear a workspace's monthly LLM budget cap
-      properties:
-        monthlyLlmBudgetUsd:
-          type: number
-          description: "Budget cap in USD; 0 pauses immediately, null removes the\
-            \ cap"
-          minimum: 0.00
     UpdateWorkspaceLlmConnectionRequest:
       type: object
       description: Update your AI provider connection (all fields optional)
@@ -10293,6 +10305,15 @@ components:
       required:
       - modelCount
       - reachable
+    WorkspaceLlmSettings:
+      type: object
+      description: The instance LLM policy as it applies to this workspace (read-only)
+      properties:
+        ownProviderAllowed:
+          type: boolean
+          description: Whether this workspace may register its own LLM provider connections
+      required:
+      - ownProviderAllowed
     WorkspaceLlmUsageReport:
       type: object
       description: "One calendar month of a workspace's LLM spend, rolled up from\
@@ -10306,28 +10327,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LlmUsageByJobType"
-        byoBudgetVerdict:
-          type: string
-          description: "The same verdict for spend on this workspace's own provider,\
-            \ against its own cap."
-          enum:
-          - WITHIN
-          - EXHAUSTED
-          - UNVERIFIABLE
-        byoMonthlyBudgetUsd:
-          type: number
-          description: Monthly cap in USD on spend this workspace pays for through
-            its own connected provider; null = uncapped. Set by this workspace's own
-            admins.
-        byoPaused:
-          type: boolean
-          description: Whether work on this workspace's OWN provider is currently
-            paused.
-        byoTotalCostUsd:
-          type: number
-          description: "This month's confirmed spend on this workspace's own connected\
-            \ provider(s), in USD — the figure byoMonthlyBudgetUsd compares against.\
-            \ Different money from pricedTotalCostUsd: the two are never added together."
         fx:
           $ref: "#/components/schemas/FxRateInfo"
           description: Display-only conversion when the instance has a display currency.
@@ -10341,42 +10340,65 @@ components:
           - WITHIN
           - EXHAUSTED
           - UNVERIFIABLE
-        instanceFundedPaused:
-          type: boolean
-          description: "Whether work on SHARED models is currently paused for this\
-            \ workspace. Authoritative — it mirrors the live gate rather than being\
-            \ derivable from the verdict alone. Always false for a past month, which\
-            \ cannot pause anything."
         instanceMonthlyBudgetUsd:
           type: number
           description: Monthly cap in USD on spend the host pays for (shared models);
             null = uncapped. Set by instance admins only — a workspace admin can see
             it but not change it.
+        instancePaused:
+          type: boolean
+          description: "Whether work on SHARED models is currently paused for this\
+            \ workspace. Authoritative — it mirrors the live gate rather than being\
+            \ derivable from the verdict alone. Always false for a past month, which\
+            \ cannot pause anything."
+        instanceTotalCostUsd:
+          type: number
+          description: "This month's confirmed spend on shared (instance) models,\
+            \ in USD — the figure instanceMonthlyBudgetUsd compares against. A floor,\
+            \ not the full total, while unpricedEventCount is non-zero."
         month:
           type: string
           description: "Calendar month (UTC), ISO yyyy-MM"
           example: 2026-07
-        pricedTotalCostUsd:
+        ownProviderBudgetVerdict:
+          type: string
+          description: "The same verdict for spend on this workspace's own provider,\
+            \ against its own cap."
+          enum:
+          - WITHIN
+          - EXHAUSTED
+          - UNVERIFIABLE
+        ownProviderMonthlyBudgetUsd:
           type: number
-          description: "This month's confirmed spend on shared (instance) models,\
-            \ in USD — the figure the monthly budget compares against. A floor, not\
-            \ the full total, while unpricedEventCount is non-zero."
+          description: Monthly cap in USD on spend this workspace pays for through
+            its own connected provider; null = uncapped. Set by this workspace's own
+            admins.
+        ownProviderPaused:
+          type: boolean
+          description: Whether work on this workspace's OWN provider is currently
+            paused.
+        ownProviderTotalCostUsd:
+          type: number
+          description: "This month's confirmed spend on this workspace's own connected\
+            \ provider(s), in USD — the figure ownProviderMonthlyBudgetUsd compares\
+            \ against. Different money from instanceTotalCostUsd: the two are never\
+            \ added together."
         unpricedEventCount:
           type: integer
           format: int64
-          description: "Calls this month (any provider) whose price is not yet known.\
+          description: "Calls this month (either purse) whose price is not yet known.\
             \ They are excluded from both totals above, so a non-zero value means\
             \ the real spend may be higher than shown."
       required:
       - byDay
       - byJobType
-      - byoBudgetVerdict
-      - byoPaused
-      - byoTotalCostUsd
       - instanceBudgetVerdict
-      - instanceFundedPaused
+      - instancePaused
+      - instanceTotalCostUsd
       - month
-      - pricedTotalCostUsd
+      - ownProviderBudgetVerdict
+      - ownProviderPaused
+      - ownProviderTotalCostUsd
       - unpricedEventCount
     WorkspaceMembership:
       type: object

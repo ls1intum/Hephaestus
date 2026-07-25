@@ -1,4 +1,4 @@
-import type { AgentJob, AiSettingsView, AvailableLlmModel } from "@/api/types.gen";
+import type { AgentJob, AvailableLlmModel, PracticeReviewSettings } from "@/api/types.gen";
 
 export const mockAvailableModels: AvailableLlmModel[] = [
 	{
@@ -29,10 +29,7 @@ export const mockAvailableModels: AvailableLlmModel[] = [
 	},
 ];
 
-export const mockAiSettings: AiSettingsView = {
-	practicesEnabled: true,
-	mentorEnabled: true,
-	workspaceConnectionsAllowed: true,
+export const mockPracticeReviewSettings: PracticeReviewSettings = {
 	cooldownMinutes: 30,
 	deliverToMerged: false,
 	runForAllUsers: true,

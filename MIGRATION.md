@@ -91,6 +91,53 @@ Entries exist only for releases that need operator action. Everything else is in
 3. Optional cleanup: the `AGENT` JetStream stream is no longer read from or written to. Delete it with `nats stream rm AGENT` if you want to reclaim its storage; leaving it in place is harmless.
 4. Do not remove NATS itself or `NATS_ENABLED` — webhook ingest and SCM/Slack sync still require it.
 
+#### 🔴 AI endpoints renamed to one vocabulary
+
+**Affected**: any script or integration calling the workspace AI, agent-job, or LLM spend endpoints. No
+action is needed for the web UI, which ships updated in the same release.
+
+**Before**: the AI area accumulated four vocabularies for one feature — `ai-settings`, `agent-bindings`,
+`agent-jobs`, `llm-usage`, `llm-budget`, `byo-budget` — and the two monthly spend caps had different
+path shapes, different path variable types (numeric id vs slug) and differently named request fields.
+
+**After**: every address is either `llm/…` (models and what they cost) or `agents/…` (the things that
+run them). Both caps are `…/llm/budget` with the body `{ "monthlyBudgetUsd": … }`, and both address a
+workspace by slug. `ai-settings` is gone: the practice-review policy it held moved next to the practice
+catalogue, and the one instance-policy flag it exposed became `GET /workspaces/{slug}/llm/settings`.
+
+**There are no redirects or aliases.** An old address returns 404.
+
+| Was | Now |
+| --- | --- |
+| `GET /admin/llm-usage` | `GET /admin/llm/usage` |
+| `PUT /admin/workspaces/{workspaceId}/llm-budget` | `PUT /admin/workspaces/{workspaceSlug}/llm/budget` |
+| `GET /workspaces/{slug}/llm-usage` | `GET /workspaces/{slug}/llm/usage` |
+| `PUT /workspaces/{slug}/llm-usage/byo-budget` | `PUT /workspaces/{slug}/llm/budget` |
+| `GET|PUT|DELETE /workspaces/{slug}/agent-bindings[/{purpose}]` | `GET|PUT|DELETE /workspaces/{slug}/agents[/{purpose}]` |
+| `GET /workspaces/{slug}/agent-jobs[/{jobId}[/cancel\|/delivery/retry]]` | `GET /workspaces/{slug}/agents/jobs[/…]` |
+| `GET /workspaces/{slug}/ai-settings` | `GET /workspaces/{slug}/practices/review-settings` |
+| `PATCH /workspaces/{slug}/ai-settings/practice-review` | `PATCH /workspaces/{slug}/practices/review-settings` |
+| — (new) | `GET /workspaces/{slug}/llm/settings` |
+
+**Migration**:
+
+1. Update every call site to the addresses above. `server/openapi.yaml` is the authoritative list.
+2. Change both budget request bodies to `{ "monthlyBudgetUsd": … }` (was `monthlyLlmBudgetUsd` for the
+   instance cap and `monthlyByoLlmBudgetUsd` for the workspace's own).
+3. Address the instance cap by workspace **slug** instead of numeric id. `GET /admin/llm/usage` reports
+   `workspaceSlug` on each row; `workspaceId` was removed.
+4. Re-parse `GET /admin/llm/usage`: it now returns `{ month, fx, workspaces: [...] }` rather than a bare
+   array, with the exchange rate reported once instead of on every row.
+5. Rename the spend fields you read: `pricedTotalCostUsd` → `instanceTotalCostUsd`, `byoTotalCostUsd` →
+   `ownProviderTotalCostUsd`, `byoMonthlyBudgetUsd` → `ownProviderMonthlyBudgetUsd`, `byoBudgetVerdict`
+   → `ownProviderBudgetVerdict`, `byoPaused` → `ownProviderPaused`, `instanceFundedPaused` →
+   `instancePaused`. The same names apply inside `byJobType[]` and `byDay[]`.
+6. If you read `GET /ai-settings` for `practicesEnabled` / `mentorEnabled`, take them from the workspace
+   itself (`GET /workspaces/{slug}`); the review-settings response returns the review policy only.
+
+No database action is required. The config-audit trail keeps its historical entity-type values as
+written — the table is append-only by database trigger, so past rows are never rewritten.
+
 ### v0.69.0
 
 #### 🔴 Agent image pin moved from `docker/agent-image-pin.env` to a signed release asset

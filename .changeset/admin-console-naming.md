@@ -10,4 +10,3 @@ sidebar tells you which console you are in. In a workspace, "Manage members" / "
 instance tab and a workspace tab are finally distinguishable when both are open.
 
 The instance model catalogue moved from `/admin/llm` to `/admin/models`, matching the workspace page.
-The old address redirects, so existing bookmarks keep working.

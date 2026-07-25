@@ -102,8 +102,6 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
     private ConfigSnapshot admittedSnapshot(int timeoutSeconds) {
         return new ConfigSnapshot(
             ConfigSnapshot.SCHEMA_VERSION,
-            1L,
-            "cfg",
             "openai-completions",
             "https://api.openai.com/v1",
             "test-model",
@@ -116,7 +114,8 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
             1L,
             null,
             timeoutSeconds,
-            false
+            false,
+            null
         ).withPriceSnapshot(
             new LlmPriceSnapshot(FundingSource.INSTANCE, PricingState.NO_CHARGE, null, null, null, null, null, null)
         );
@@ -258,8 +257,6 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
             legacyJob.setConfigSnapshot(
                 new ConfigSnapshot(
                     snapshot.schemaVersion(),
-                    snapshot.configId(),
-                    snapshot.configName(),
                     snapshot.apiProtocol(),
                     snapshot.baseUrl(),
                     snapshot.upstreamModelId(),
@@ -272,8 +269,10 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
                     snapshot.modelId(),
                     snapshot.workspaceId(),
                     snapshot.timeoutSeconds(),
-                    snapshot.allowInternet()
-                ).toJson(objectMapper)
+                    snapshot.allowInternet(),
+                    null // the point of the fixture: an orphan frozen before admission pricing existed
+                )
+                    .toJson(objectMapper)
             );
             when(jobRepository.findByIdWithWorkspaceForUpdate(jobId)).thenReturn(java.util.Optional.of(legacyJob));
 

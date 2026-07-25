@@ -3,7 +3,7 @@ import { fn, within } from "storybook/test";
 import type { AgentBinding } from "@/api/types.gen";
 import { expectPageReflows, expectTargetSpacing, expectWithinViewport } from "@/test/reflow";
 import { PracticeDetectionPolicyCard } from "./PracticeDetectionPolicyCard";
-import { mockAiSettings, mockAvailableModels } from "./storyMockData";
+import { mockAvailableModels, mockPracticeReviewSettings } from "./storyMockData";
 
 const readyBinding: AgentBinding = {
 	purpose: "PRACTICE_DETECTION",
@@ -22,7 +22,7 @@ const meta = {
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
 	args: {
-		settings: mockAiSettings,
+		settings: mockPracticeReviewSettings,
 		detectionBinding: readyBinding,
 		availableModels: mockAvailableModels,
 		workspaceSlug: "acme",
@@ -62,7 +62,7 @@ export const BoundModelUnavailable: Story = {
 /** Coverage scoped to the opt-in role. */
 export const RoleScopedCoverage: Story = {
 	args: {
-		settings: { ...mockAiSettings, runForAllUsers: false },
+		settings: { ...mockPracticeReviewSettings, runForAllUsers: false },
 	},
 };
 
@@ -70,7 +70,7 @@ export const RoleScopedCoverage: Story = {
 export const AllInherited: Story = {
 	args: {
 		settings: {
-			...mockAiSettings,
+			...mockPracticeReviewSettings,
 			skipDraftsOverride: undefined,
 			deliverToMergedOverride: undefined,
 			cooldownMinutesOverride: undefined,

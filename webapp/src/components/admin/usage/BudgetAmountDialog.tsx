@@ -50,7 +50,7 @@ export interface BudgetAmountDialogProps {
 
 /**
  * The money-cap editor shared by both budget dialogs — instance-admin (`SetBudgetDialog`, the
- * shared-model budget) and workspace-admin (`SetByoBudgetDialog`, the workspace's provider cap).
+ * shared-model budget) and workspace-admin (`SetOwnProviderBudgetDialog`, the workspace's provider cap).
  * Both edit the same kind of value under the same rules (USD, >= 0, cent
  * precision, `null` removes, `0` pauses immediately), so the validation, the currency input, the
  * "Remove cap" affordance, the pending state, and server-error rendering live here once; the

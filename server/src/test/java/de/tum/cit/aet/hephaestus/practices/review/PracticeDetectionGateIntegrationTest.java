@@ -290,7 +290,7 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             // No runnable practice config → gate skips before detection.
-            assertThat(((GateDecision.Skip) decision).reason()).contains("no runnable practice config");
+            assertThat(((GateDecision.Skip) decision).reason()).contains("no runnable practice-detection agent");
         }
 
         @Test
@@ -303,7 +303,7 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
             GateDecision decision = gate.evaluate(pr, "PullRequestCreated", TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).contains("no runnable practice config");
+            assertThat(((GateDecision.Skip) decision).reason()).contains("no runnable practice-detection agent");
         }
 
         @Test

@@ -1,14 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import { expectControlOnScreen, expectDialogFitsViewport } from "@/test/reflow";
-import { SetByoBudgetDialog } from "./SetByoBudgetDialog";
+import { SetOwnProviderBudgetDialog } from "./SetOwnProviderBudgetDialog";
 
 /**
  * The workspace admin's cap on spend through their own provider — their money, so unlike the
  * shared-model budget this one is theirs to set, change, and remove.
  */
 const meta = {
-	component: SetByoBudgetDialog,
+	component: SetOwnProviderBudgetDialog,
 	parameters: { layout: "centered" },
 	tags: ["autodocs"],
 	args: {
@@ -19,7 +19,7 @@ const meta = {
 		onOpenChange: fn(),
 		onSubmit: fn(),
 	},
-} satisfies Meta<typeof SetByoBudgetDialog>;
+} satisfies Meta<typeof SetOwnProviderBudgetDialog>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

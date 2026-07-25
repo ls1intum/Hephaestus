@@ -10,7 +10,23 @@ import java.util.List;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-/** DTOs of the per-workspace LLM usage rollup + monthly budget cap API (#1368). */
+/**
+ * DTOs of the per-workspace LLM usage rollup + monthly budget cap API (#1368).
+ *
+ * <h2>Two purses, named on one axis</h2>
+ *
+ * <p>Every figure here belongs to exactly one of two purses: {@code instance*} is spend the host pays
+ * for on shared models, {@code ownProvider*} is spend the workspace pays for through its own connected
+ * provider. They are never added together. The pair is deliberately named symmetrically —
+ * {@code instanceTotalCostUsd}/{@code ownProviderTotalCostUsd},
+ * {@code instanceBudgetVerdict}/{@code ownProviderBudgetVerdict} — because the previous naming
+ * described the two halves on different axes ({@code priced…} vs {@code byo…}), which read as two
+ * unrelated concepts rather than one concept with two owners.
+ *
+ * <p>"Priced" is gone from the field names for the same reason: BOTH totals exclude usage whose price
+ * is not yet known, so qualifying only one of them implied a difference that never existed.
+ * {@code unpricedEventCount} states the exclusion once, for both.
+ */
 public final class LlmUsageDTOs {
 
     private LlmUsageDTOs() {}
@@ -25,19 +41,19 @@ public final class LlmUsageDTOs {
         @Nullable @Schema(
             description = "Monthly cap in USD on spend this workspace pays for through its own connected " +
                 "provider; null = uncapped. Set by this workspace's own admins."
-        ) BigDecimal byoMonthlyBudgetUsd,
+        ) BigDecimal ownProviderMonthlyBudgetUsd,
         @NonNull @Schema(
-            description = "This month's confirmed spend on shared (instance) models, in USD — the figure the " +
-                "monthly budget compares against. A floor, not the full total, while unpricedEventCount is " +
-                "non-zero."
-        ) BigDecimal pricedTotalCostUsd,
+            description = "This month's confirmed spend on shared (instance) models, in USD — the figure " +
+                "instanceMonthlyBudgetUsd compares against. A floor, not the full total, while " +
+                "unpricedEventCount is non-zero."
+        ) BigDecimal instanceTotalCostUsd,
         @NonNull @Schema(
             description = "This month's confirmed spend on this workspace's own connected provider(s), in USD — " +
-                "the figure byoMonthlyBudgetUsd compares against. Different money from pricedTotalCostUsd: the " +
-                "two are never added together."
-        ) BigDecimal byoTotalCostUsd,
+                "the figure ownProviderMonthlyBudgetUsd compares against. Different money from " +
+                "instanceTotalCostUsd: the two are never added together."
+        ) BigDecimal ownProviderTotalCostUsd,
         @NonNull @Schema(
-            description = "Calls this month (any provider) whose price is not yet known. They are excluded from " +
+            description = "Calls this month (either purse) whose price is not yet known. They are excluded from " +
                 "both totals above, so a non-zero value means the real spend may be higher than shown."
         ) Long unpricedEventCount,
         @NonNull @Schema(
@@ -46,15 +62,15 @@ public final class LlmUsageDTOs {
         ) LlmBudgetVerdict instanceBudgetVerdict,
         @NonNull @Schema(
             description = "The same verdict for spend on this workspace's own provider, against its own cap."
-        ) LlmBudgetVerdict byoBudgetVerdict,
+        ) LlmBudgetVerdict ownProviderBudgetVerdict,
         @NonNull @Schema(
             description = "Whether work on SHARED models is currently paused for this workspace. Authoritative — " +
                 "it mirrors the live gate rather than being derivable from the verdict alone. Always false for a " +
                 "past month, which cannot pause anything."
-        ) Boolean instanceFundedPaused,
+        ) Boolean instancePaused,
         @NonNull @Schema(
             description = "Whether work on this workspace's OWN provider is currently paused."
-        ) Boolean byoPaused,
+        ) Boolean ownProviderPaused,
         @NonNull List<LlmUsageByJobTypeDTO> byJobType,
         @NonNull List<LlmUsageByDayDTO> byDay,
         @Nullable @Schema(
@@ -68,10 +84,10 @@ public final class LlmUsageDTOs {
         @NonNull LlmUsageJobType jobType,
         @NonNull @Schema(
             description = "Confirmed spend on shared (instance) models for this job type, in USD."
-        ) BigDecimal pricedTotalCostUsd,
+        ) BigDecimal instanceTotalCostUsd,
         @NonNull @Schema(
             description = "Spend on this workspace's own connected provider(s) for this job type, in USD."
-        ) BigDecimal byoTotalCostUsd,
+        ) BigDecimal ownProviderTotalCostUsd,
         @NonNull @Schema(
             description = "Calls for this job type whose price is not yet known. Excluded from both totals above."
         ) Long unpricedEventCount,
@@ -91,10 +107,10 @@ public final class LlmUsageDTOs {
         @NonNull LocalDate day,
         @NonNull @Schema(
             description = "Confirmed spend on shared (instance) models for this day, in USD."
-        ) BigDecimal pricedTotalCostUsd,
+        ) BigDecimal instanceTotalCostUsd,
         @NonNull @Schema(
             description = "Spend on this workspace's own connected provider(s) for this day, in USD."
-        ) BigDecimal byoTotalCostUsd,
+        ) BigDecimal ownProviderTotalCostUsd,
         @NonNull @Schema(
             description = "Calls this day whose price is not yet known. Excluded from both totals above."
         ) Long unpricedEventCount,
@@ -102,17 +118,31 @@ public final class LlmUsageDTOs {
     ) {}
 
     /**
-     * <p><b>Why {@code fx} rides on the row.</b> {@code GET /admin/llm-usage} returns a bare array, so
-     * a month-level fact has nowhere else to go. Wrapping the array in an envelope would change the
-     * response shape for every instance — including the overwhelming majority that never configure a
-     * display currency — and the zero-regression rule for this feature is that an unconfigured
-     * instance keeps serving byte-identical responses. The value is identical on every row of one
-     * response (one month resolves to exactly one rate), so a client may read it from any row.
+     * The instance-admin cross-tenant rollup for one month.
+     *
+     * <p>An envelope rather than a bare array because {@code month} and {@code fx} are facts about the
+     * REQUEST, not about any workspace in it. They previously rode on every row — one month resolves to
+     * exactly one rate, so the value was identical on all N rows and a client had to reach into
+     * {@code rows[0]} to find a response-level fact. That is a shape defect, and with the array gone
+     * there is now exactly one place each of them can be read from.
      */
     @Schema(description = "Instance-admin per-workspace month rollup (metadata only, no tenant content)")
+    public record AdminLlmUsageReportDTO(
+        @NonNull @Schema(description = "Calendar month (UTC), ISO yyyy-MM", example = "2026-07") String month,
+        @Nullable @Schema(
+            description = "Display-only conversion when the instance has a display currency. " +
+                "Absent = show USD only. Applies to every USD amount in this response."
+        ) FxRateInfoDTO fx,
+        @NonNull @Schema(description = "One row per workspace with ledger activity this month") List<
+            AdminWorkspaceLlmUsageDTO
+        > workspaces
+    ) {}
+
+    @Schema(description = "One workspace's month of spend, as an instance admin sees it")
     public record AdminWorkspaceLlmUsageDTO(
-        @NonNull Long workspaceId,
-        @NonNull String workspaceSlug,
+        @NonNull @Schema(
+            description = "Addresses the workspace everywhere else in the API, including its cap"
+        ) String workspaceSlug,
         @NonNull String displayName,
         @Nullable @Schema(
             description = "Monthly cap in USD on spend this instance pays for; null = uncapped. Yours to set."
@@ -120,48 +150,45 @@ public final class LlmUsageDTOs {
         @Nullable @Schema(
             description = "The workspace's own cap in USD on its own-provider spend; null = uncapped. Read-only " +
                 "here — it governs the workspace's money, so only its own admins may change it."
-        ) BigDecimal byoMonthlyBudgetUsd,
+        ) BigDecimal ownProviderMonthlyBudgetUsd,
         @NonNull @Schema(
             description = "This month's confirmed spend on shared (instance) models, in USD — compared against " +
                 "instanceMonthlyBudgetUsd."
-        ) BigDecimal pricedTotalCostUsd,
+        ) BigDecimal instanceTotalCostUsd,
         @NonNull @Schema(
             description = "This month's confirmed spend on the workspace's own connected provider(s), in USD — " +
-                "compared against byoMonthlyBudgetUsd."
-        ) BigDecimal byoTotalCostUsd,
-        @NonNull @Schema(description = "Ledger events (jobs / mentor turns) this month, any provider") Long events,
+                "compared against ownProviderMonthlyBudgetUsd."
+        ) BigDecimal ownProviderTotalCostUsd,
+        @NonNull @Schema(description = "Ledger events (jobs / mentor turns) this month, either purse") Long events,
         @NonNull @Schema(
             description = "Whether shared-model spend is within the instance cap, has reached it, or can't be " +
                 "confirmed because some shared-model usage has no price set."
         ) LlmBudgetVerdict instanceBudgetVerdict,
         @NonNull @Schema(
             description = "The same verdict for the workspace's own-provider spend against its own cap."
-        ) LlmBudgetVerdict byoBudgetVerdict,
+        ) LlmBudgetVerdict ownProviderBudgetVerdict,
         @NonNull @Schema(
             description = "Whether work on SHARED models is paused for this workspace right now (current month " +
                 "only) — authoritative, mirroring the live gate."
-        ) Boolean instanceFundedPaused,
+        ) Boolean instancePaused,
         @NonNull @Schema(
             description = "Whether work on the workspace's OWN provider is paused right now."
-        ) Boolean byoPaused,
-        @Nullable @Schema(
-            description = "Display-only conversion when the instance has a display currency. " +
-                "Absent = show USD only. Identical on every row of one response."
-        ) FxRateInfoDTO fx
+        ) Boolean ownProviderPaused
     ) {}
 
-    @Schema(description = "Set or clear a workspace's monthly LLM budget cap")
-    public record UpdateWorkspaceLlmBudgetRequestDTO(
+    /**
+     * The body for BOTH monthly caps: the instance's cap on a workspace
+     * ({@code PUT /admin/workspaces/{workspaceSlug}/llm/budget}) and the workspace's cap on its own
+     * provider ({@code PUT /workspaces/{workspaceSlug}/llm/budget}).
+     *
+     * <p>One record, because it is one instrument used by two authorities. Which purse a request
+     * governs is already carried by the path it is sent to; encoding it a second time in the field name
+     * is what produced two near-identical DTOs whose only real difference was who was allowed to PUT.
+     */
+    @Schema(description = "Set or clear a monthly LLM budget cap")
+    public record UpdateLlmBudgetRequestDTO(
         @Nullable @DecimalMin(value = "0.00") @Digits(integer = 8, fraction = 2) @Schema(
-            description = "Budget cap in USD; 0 pauses immediately, null removes the cap"
-        ) BigDecimal monthlyLlmBudgetUsd
-    ) {}
-
-    @Schema(description = "Set or clear the workspace's own monthly cap on its own-provider spend")
-    public record UpdateByoLlmBudgetRequestDTO(
-        @Nullable @DecimalMin(value = "0.00") @Digits(integer = 8, fraction = 2) @Schema(
-            description = "Cap in USD on this workspace's own-provider spend; 0 pauses that work immediately, " +
-                "null removes the cap"
-        ) BigDecimal monthlyByoLlmBudgetUsd
+            description = "Cap in USD; 0 pauses the affected work immediately, null removes the cap"
+        ) BigDecimal monthlyBudgetUsd
     ) {}
 }

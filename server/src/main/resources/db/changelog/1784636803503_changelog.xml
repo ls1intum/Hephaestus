@@ -1444,4 +1444,43 @@
         <rollback><dropTable tableName="fx_rate"/></rollback>
     </changeSet>
 
+    <!-- Admit the config-audit entity types that replace the names carried over from the deleted
+         named-agent-config model and from "BYO" jargon (#1368). These strings are rendered on the admin
+         audit trail, so they are user-visible vocabulary, not internal identifiers.
+
+         WIDEN ONLY — the old names stay admitted and existing rows are NOT rewritten. That is not
+         politeness, it is the table's contract: trg_config_audit_event_block_mutation (changelog
+         1784242879917) raises on any UPDATE except erasure, so this trail is tamper-evident by
+         construction and an entity_type rewrite is precisely the mutation it exists to refuse. A
+         migration that disabled the trigger to "tidy up" history would trade a compliance control for a
+         cosmetic one.
+
+         So history keeps the vocabulary it was written in — the same treatment AGENT_CONFIG already
+         gets — and only new rows use the new names. Nothing writes the old three after this release. -->
+    <changeSet id="1784636803503-68" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="renamed config-audit entity types already admitted">
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM pg_constraint
+                WHERE conname = 'ck_config_audit_event_entity_type'
+                  AND pg_get_constraintdef(oid) LIKE '%WORKSPACE_OWN_PROVIDER_LLM_BUDGET%'
+            </sqlCheck>
+        </preConditions>
+        <comment>Admit AGENT_BINDING / WORKSPACE_INSTANCE_LLM_BUDGET / WORKSPACE_OWN_PROVIDER_LLM_BUDGET (#1368)</comment>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
+            ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
+                CHECK (entity_type IN (
+                    'PRACTICE_REVIEW_SETTINGS', 'AGENT_BINDING', 'AGENT_CONFIG', 'AI_CONFIG_BINDING',
+                    'WORKSPACE_ROLE', 'WORKSPACE_FEATURES', 'WORKSPACE_STATUS',
+                    'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY', 'PRACTICE_ACTIVE',
+                    'WORKSPACE_INSTANCE_LLM_BUDGET', 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET',
+                    'WORKSPACE_LLM_BUDGET', 'WORKSPACE_BYO_LLM_BUDGET',
+                    'WORKSPACE_LLM_CONNECTION', 'WORKSPACE_LLM_MODEL'
+                ));
+        ]]></sql>
+        <!-- Empty, as for every widening of this CHECK: once a row carries a new entity type, re-adding
+             the narrower constraint is a data-preserving downgrade that does not exist. -->
+        <rollback/>
+    </changeSet>
+
 </databaseChangeLog>

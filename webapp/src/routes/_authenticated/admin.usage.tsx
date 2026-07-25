@@ -4,8 +4,8 @@ import { CircleDollarSign } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
-	adminListLlmUsageOptions,
-	adminListLlmUsageQueryKey,
+	adminGetLlmUsageReportOptions,
+	adminGetLlmUsageReportQueryKey,
 	adminUpdateWorkspaceLlmBudgetMutation,
 	getLlmUsageReportOptions,
 } from "@/api/@tanstack/react-query.gen";
@@ -29,16 +29,19 @@ function AdminInstanceUsagePage() {
 	const [expanded, setExpanded] = useState<AdminWorkspaceLlmUsage | null>(null);
 
 	const listQuery = useQuery({
-		...adminListLlmUsageOptions({ query: { month } }),
+		...adminGetLlmUsageReportOptions({ query: { month } }),
 		// Keep the previous month's rows on screen while stepping months — no spinner flash.
 		placeholderData: keepPreviousData,
 	});
 	// Most expensive workspaces first — that's what an instance admin scans for. Name is a stable
 	// tiebreak so the many $0.00 rows don't reshuffle on every refetch.
-	const rows = [...(listQuery.data ?? [])].sort(
+	const rows = [...(listQuery.data?.workspaces ?? [])].sort(
 		(a, b) =>
-			b.pricedTotalCostUsd - a.pricedTotalCostUsd || a.displayName.localeCompare(b.displayName),
+			b.instanceTotalCostUsd - a.instanceTotalCostUsd || a.displayName.localeCompare(b.displayName),
 	);
+	// The rate belongs to the month, not to any row: it survives a month with no workspaces in it,
+	// where reading it off the first row used to leave the page silently USD-only.
+	const fx = listQuery.data?.fx;
 	const detailQuery = useQuery({
 		...getLlmUsageReportOptions({
 			path: { workspaceSlug: expanded?.workspaceSlug ?? "" },
@@ -51,11 +54,11 @@ function AdminInstanceUsagePage() {
 		...adminUpdateWorkspaceLlmBudgetMutation(),
 		onSuccess: (_data, variables) => {
 			// Prefix key (no options) invalidates every cached month.
-			queryClient.invalidateQueries({ queryKey: adminListLlmUsageQueryKey() });
+			queryClient.invalidateQueries({ queryKey: adminGetLlmUsageReportQueryKey() });
 			// The proxy caches its answer for about 30s, so "resumes now" would be a small lie. A bound
 			// ("within a minute") rather than a hedge ("about a minute") — it is one the gate keeps.
 			toast.success(
-				variables.body.monthlyLlmBudgetUsd == null
+				variables.body.monthlyBudgetUsd == null
 					? "Cap removed. New calls resume within a minute."
 					: "Cap saved. New calls resume within a minute.",
 			);
@@ -65,14 +68,14 @@ function AdminInstanceUsagePage() {
 		// sits next to the value that was rejected instead of evaporating above it.
 	});
 
-	const handleSubmitBudget = (monthlyLlmBudgetUsd: number | null) => {
+	const handleSubmitBudget = (monthlyBudgetUsd: number | null) => {
 		if (!editing) {
 			return;
 		}
 		updateBudget.mutate({
-			path: { workspaceId: editing.workspaceId },
+			path: { workspaceSlug: editing.workspaceSlug },
 			// undefined (field omitted) clears the cap server-side.
-			body: { monthlyLlmBudgetUsd: monthlyLlmBudgetUsd ?? undefined },
+			body: { monthlyBudgetUsd: monthlyBudgetUsd ?? undefined },
 		});
 	};
 
@@ -95,18 +98,19 @@ function AdminInstanceUsagePage() {
 
 			<AdminInstanceLlmUsageTable
 				rows={rows}
+				fx={fx}
 				isCurrentMonth={month >= currentMonthUtc()}
 				isLoading={listQuery.isLoading}
 				error={listQuery.error}
 				onRetry={() => listQuery.refetch()}
-				expandedWorkspaceId={expanded?.workspaceId ?? null}
+				expandedWorkspaceSlug={expanded?.workspaceSlug ?? null}
 				detailReport={detailQuery.data}
 				isDetailLoading={detailQuery.isLoading}
 				detailError={detailQuery.error}
 				onRetryDetail={() => detailQuery.refetch()}
 				onToggleDetails={(workspace) =>
 					setExpanded((current) =>
-						current?.workspaceId === workspace.workspaceId ? null : workspace,
+						current?.workspaceSlug === workspace.workspaceSlug ? null : workspace,
 					)
 				}
 				onEditBudget={setEditing}
@@ -114,6 +118,7 @@ function AdminInstanceUsagePage() {
 
 			<SetBudgetDialog
 				workspace={editing}
+				fx={fx}
 				isPending={updateBudget.isPending}
 				serverError={
 					updateBudget.error != null

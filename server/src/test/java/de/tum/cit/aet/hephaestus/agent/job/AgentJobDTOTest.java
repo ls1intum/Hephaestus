@@ -34,8 +34,6 @@ class AgentJobDTOTest extends BaseUnitTest {
     private static ConfigSnapshot snapshotWithScope(FundingSource scope) {
         return new ConfigSnapshot(
             ConfigSnapshot.SCHEMA_VERSION,
-            10L,
-            "test-config",
             "openai-completions",
             "https://gateway.example.com/v1/openai?tenant=secret-project",
             "gpt-5",
@@ -43,11 +41,13 @@ class AgentJobDTOTest extends BaseUnitTest {
             null,
             null,
             false,
-            null,
             scope,
             scope != null ? 42L : null,
+            null,
+            null,
             600,
-            false
+            false,
+            null
         );
     }
 

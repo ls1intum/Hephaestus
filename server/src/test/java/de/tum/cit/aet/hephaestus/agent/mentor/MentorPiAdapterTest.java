@@ -70,13 +70,15 @@ class MentorPiAdapterTest extends BaseUnitTest {
         String resolvedBaseUrl =
             rawBaseUrl != null && !rawBaseUrl.isBlank() ? rawBaseUrl.trim() : "https://api.openai.com";
         return new MentorLlmConfig(
-            10L,
             "openai-completions",
             resolvedBaseUrl,
             "gpt-5.4",
             null,
             null,
             false,
+            null,
+            null,
+            null,
             null,
             null,
             allowInternet,

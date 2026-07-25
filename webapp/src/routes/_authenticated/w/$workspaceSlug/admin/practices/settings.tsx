@@ -2,16 +2,19 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
-	getAiSettingsOptions,
-	getAiSettingsQueryKey,
-	getBindingsOptions,
+	getPracticeReviewSettingsOptions,
+	getPracticeReviewSettingsQueryKey,
 	getWorkspaceOptions,
+	listAgentsOptions,
 	listWorkspacesQueryKey,
 	updateFeaturesMutation,
 	updatePracticeReviewSettingsMutation,
 	workspaceListAvailableLlmModelsOptions,
 } from "@/api/@tanstack/react-query.gen";
-import type { UpdatePracticeReviewSettings, UpdateWorkspaceFeaturesRequest } from "@/api/types.gen";
+import type {
+	UpdatePracticeReviewSettingsRequest,
+	UpdateWorkspaceFeaturesRequest,
+} from "@/api/types.gen";
 import {
 	PracticeDetectionPolicyCard,
 	type PracticeReviewField,
@@ -29,13 +32,13 @@ function ReviewSettingsContainer() {
 	const { workspaceSlug } = useActiveWorkspaceSlug();
 	const slug = workspaceSlug ?? "";
 
-	const aiSettingsQuery = useQuery({
-		...getAiSettingsOptions({ path: { workspaceSlug: slug } }),
+	const reviewSettingsQuery = useQuery({
+		...getPracticeReviewSettingsOptions({ path: { workspaceSlug: slug } }),
 		enabled: Boolean(workspaceSlug),
 	});
 
 	const bindingsQuery = useQuery({
-		...getBindingsOptions({ path: { workspaceSlug: slug } }),
+		...listAgentsOptions({ path: { workspaceSlug: slug } }),
 		enabled: Boolean(workspaceSlug),
 	});
 
@@ -49,16 +52,16 @@ function ReviewSettingsContainer() {
 		enabled: Boolean(workspaceSlug),
 	});
 
-	const invalidateAiSettings = () => {
+	const invalidateReviewSettings = () => {
 		queryClient.invalidateQueries({
-			queryKey: getAiSettingsQueryKey({ path: { workspaceSlug: slug } }),
+			queryKey: getPracticeReviewSettingsQueryKey({ path: { workspaceSlug: slug } }),
 		});
 	};
 
 	const updatePracticeReviewSettings = useMutation({
 		...updatePracticeReviewSettingsMutation(),
 		onSuccess: () => {
-			invalidateAiSettings();
+			invalidateReviewSettings();
 			toast.success("Review settings updated");
 		},
 		onError: (error) => {
@@ -75,7 +78,7 @@ function ReviewSettingsContainer() {
 				queryKey: getWorkspaceOptions({ path: { workspaceSlug: slug } }).queryKey,
 			});
 			queryClient.invalidateQueries({ queryKey: listWorkspacesQueryKey() });
-			invalidateAiSettings();
+			invalidateReviewSettings();
 			toast.success("Trigger settings updated");
 		},
 		onError: (error) => {
@@ -85,7 +88,7 @@ function ReviewSettingsContainer() {
 		},
 	});
 
-	const handleUpdateReviewSettings = (settings: UpdatePracticeReviewSettings) => {
+	const handleUpdateReviewSettings = (settings: UpdatePracticeReviewSettingsRequest) => {
 		if (!workspaceSlug) return;
 		updatePracticeReviewSettings.mutate({ path: { workspaceSlug }, body: settings });
 	};
@@ -111,7 +114,7 @@ function ReviewSettingsContainer() {
 			</header>
 
 			<PracticeDetectionPolicyCard
-				settings={aiSettingsQuery.data}
+				settings={reviewSettingsQuery.data}
 				detectionBinding={bindingsQuery.data?.find(
 					(binding) => binding.purpose === "PRACTICE_DETECTION",
 				)}
@@ -120,20 +123,20 @@ function ReviewSettingsContainer() {
 				autoTriggerEnabled={workspaceQuery.data?.practiceReviewAutoTriggerEnabled ?? true}
 				manualTriggerEnabled={workspaceQuery.data?.practiceReviewManualTriggerEnabled ?? true}
 				isLoading={
-					aiSettingsQuery.isLoading ||
+					reviewSettingsQuery.isLoading ||
 					bindingsQuery.isLoading ||
 					availableModelsQuery.isLoading ||
 					workspaceQuery.isLoading ||
 					!workspaceSlug
 				}
 				isError={
-					aiSettingsQuery.isError ||
+					reviewSettingsQuery.isError ||
 					bindingsQuery.isError ||
 					availableModelsQuery.isError ||
 					workspaceQuery.isError
 				}
 				error={
-					aiSettingsQuery.error ??
+					reviewSettingsQuery.error ??
 					bindingsQuery.error ??
 					availableModelsQuery.error ??
 					workspaceQuery.error
@@ -143,7 +146,7 @@ function ReviewSettingsContainer() {
 				onUpdateFeatures={handleUpdateFeatures}
 				onResetReviewField={handleResetReviewField}
 				onRetry={() => {
-					aiSettingsQuery.refetch();
+					reviewSettingsQuery.refetch();
 					bindingsQuery.refetch();
 					availableModelsQuery.refetch();
 					workspaceQuery.refetch();

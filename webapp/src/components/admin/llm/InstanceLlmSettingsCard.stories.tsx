@@ -33,7 +33,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {};
 
 /** Every host allowed (blank allowlist) and workspace connections turned off. */
-export const NoAllowlistByoDisabled: Story = {
+export const NoAllowlistOwnProviderDisabled: Story = {
 	args: {
 		settings: { allowWorkspaceConnections: false },
 	},

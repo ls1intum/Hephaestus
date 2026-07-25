@@ -42,7 +42,7 @@ async function land(url: string) {
 describe("instance-admin route gate", () => {
 	it("enumerates the instance-admin routes", () => {
 		// A filter that matched nothing would leave every case below vacuously green.
-		expect(adminUrls.length).toBeGreaterThanOrEqual(4);
+		expect(adminUrls.length).toBeGreaterThanOrEqual(6);
 	});
 
 	it.each(adminUrls)("redirects a non-admin away from %s", async (url) => {
@@ -53,13 +53,6 @@ describe("instance-admin route gate", () => {
 	it("admits an APP_ADMIN", async () => {
 		mockAppRole("APP_ADMIN");
 		expect(await land("/admin/users")).toBe("/admin/users");
-	});
-
-	// `/admin/llm` was the old URL for the model catalogue; it is now a redirect-only stub, so a
-	// bookmark or a link in someone's runbook still lands on the page.
-	it("forwards the retired /admin/llm to /admin/models", async () => {
-		mockAppRole("APP_ADMIN");
-		expect(await land("/admin/llm")).toBe("/admin/models");
 	});
 });
 

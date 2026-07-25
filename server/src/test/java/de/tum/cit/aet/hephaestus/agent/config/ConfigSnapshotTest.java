@@ -72,9 +72,7 @@ class ConfigSnapshotTest extends BaseUnitTest {
             ConfigSnapshot snapshot = ConfigSnapshot.from(binding, resolver);
 
             assertThat(snapshot.schemaVersion()).isEqualTo(ConfigSnapshot.SCHEMA_VERSION);
-            assertThat(snapshot.configId()).isEqualTo(42L);
-            assertThat(snapshot.configName()).isNull(); // from(binding) no longer captures a name (#1368)
-            assertThat(snapshot.modelVersion()).isNull(); // ditto — the catalog model carries the identity
+            assertThat(snapshot.modelVersion()).isNull(); // the catalog model carries the identity
             assertThat(snapshot.apiProtocol()).isEqualTo("anthropic-messages");
             assertThat(snapshot.baseUrl()).isEqualTo("https://api.anthropic.com");
             assertThat(snapshot.upstreamModelId()).isEqualTo("claude-sonnet-4-20250514");
@@ -113,8 +111,6 @@ class ConfigSnapshotTest extends BaseUnitTest {
 
             assertThat(deserialized).isEqualTo(original);
             assertThat(deserialized.schemaVersion()).isEqualTo(ConfigSnapshot.SCHEMA_VERSION);
-            assertThat(deserialized.configId()).isEqualTo(42L);
-            assertThat(deserialized.configName()).isNull();
             assertThat(deserialized.timeoutSeconds()).isEqualTo(600);
         }
 
@@ -176,19 +172,6 @@ class ConfigSnapshotTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldIncludeConfigId() {
-            WorkspaceAgentBinding binding = createBinding();
-            stubResolver(binding);
-            ConfigSnapshot snapshot = ConfigSnapshot.from(binding, resolver);
-            JsonNode json = snapshot.toJson(OBJECT_MAPPER);
-
-            assertThat(json.has("configId")).isTrue();
-            assertThat(json.get("configId").asLong()).isEqualTo(42L);
-            // from(binding) no longer captures a name (#1368) — configName serializes as null.
-            assertThat(json.get("configName").isNull()).isTrue();
-        }
-
-        @Test
         void shouldRejectNewerSchemaVersion() {
             WorkspaceAgentBinding binding = createBinding();
             stubResolver(binding);
@@ -218,6 +201,43 @@ class ConfigSnapshotTest extends BaseUnitTest {
         }
 
         @Test
+        void shouldDeserializeV4SnapshotStillCarryingTheDroppedConfigFields() {
+            // Regression guard for agent_job.config_snapshot rows already in production databases: v4
+            // froze configId/configName, v5 dropped both components. Such a row must read through the
+            // CURRENT shape with the two dead keys simply ignored — and must NOT be routed to the
+            // pre-v4 legacy translation, which would null the connection identity and leave an
+            // in-flight job unroutable at the proxy. Every catalog field asserted below is one the
+            // legacy path would have nulled or defaulted away.
+            String v4 =
+                "{\"schemaVersion\":4,\"configId\":42,\"configName\":\"detection\"," +
+                "\"apiProtocol\":\"openai-completions\",\"baseUrl\":\"https://gpu.example.com/v1\"," +
+                "\"upstreamModelId\":\"gpt-oss-120b\",\"modelVersion\":\"2025-05-01\"," +
+                "\"contextWindow\":128000,\"maxOutputTokens\":4096,\"supportsReasoning\":true," +
+                "\"connectionScope\":\"WORKSPACE\",\"connectionId\":7,\"modelId\":20,\"workspaceId\":1," +
+                "\"timeoutSeconds\":900,\"allowInternet\":true,\"priceSnapshot\":null}";
+            JsonNode node = OBJECT_MAPPER.readTree(v4);
+
+            ConfigSnapshot snapshot = ConfigSnapshot.fromJson(node, OBJECT_MAPPER);
+
+            // The connection identity survives — proof the direct read ran, not fromLegacyJson.
+            assertThat(snapshot.connectionScope()).isEqualTo(FundingSource.WORKSPACE);
+            assertThat(snapshot.connectionId()).isEqualTo(7L);
+            assertThat(snapshot.modelId()).isEqualTo(20L);
+            assertThat(snapshot.workspaceId()).isEqualTo(1L);
+            // ...and so does everything else the row froze.
+            assertThat(snapshot.schemaVersion()).isEqualTo(4);
+            assertThat(snapshot.apiProtocol()).isEqualTo("openai-completions");
+            assertThat(snapshot.baseUrl()).isEqualTo("https://gpu.example.com/v1");
+            assertThat(snapshot.upstreamModelId()).isEqualTo("gpt-oss-120b");
+            assertThat(snapshot.modelVersion()).isEqualTo("2025-05-01");
+            assertThat(snapshot.contextWindow()).isEqualTo(128000);
+            assertThat(snapshot.maxOutputTokens()).isEqualTo(4096);
+            assertThat(snapshot.supportsReasoning()).isTrue();
+            assertThat(snapshot.timeoutSeconds()).isEqualTo(900);
+            assertThat(snapshot.allowInternet()).isTrue();
+        }
+
+        @Test
         void shouldDeserializeLegacyV3Snapshot() {
             // Pre-v4 snapshot shape: llmProvider/credentialMode/llmBaseUrl/modelName, no
             // apiProtocol/connectionScope/connectionId. fromJson must translate it rather than
@@ -232,8 +252,6 @@ class ConfigSnapshotTest extends BaseUnitTest {
 
             ConfigSnapshot snapshot = ConfigSnapshot.fromJson(node, OBJECT_MAPPER);
 
-            assertThat(snapshot.configId()).isEqualTo(42L);
-            assertThat(snapshot.configName()).isEqualTo("legacy");
             assertThat(snapshot.apiProtocol()).isEqualTo("anthropic-messages");
             assertThat(snapshot.baseUrl()).isEqualTo("https://api.anthropic.com");
             assertThat(snapshot.upstreamModelId()).isEqualTo("claude-sonnet-4-20250514");
@@ -282,9 +300,7 @@ class ConfigSnapshotTest extends BaseUnitTest {
         void shouldRejectNullApiProtocol() {
             assertThatThrownBy(() ->
                 new ConfigSnapshot(
-                    4,
-                    1L,
-                    "name",
+                    ConfigSnapshot.SCHEMA_VERSION,
                     null,
                     "https://api.openai.com",
                     "gpt",
@@ -295,8 +311,10 @@ class ConfigSnapshotTest extends BaseUnitTest {
                     null,
                     null,
                     null,
+                    null,
                     600,
-                    false
+                    false,
+                    null
                 )
             ).isInstanceOf(NullPointerException.class);
         }
@@ -305,9 +323,7 @@ class ConfigSnapshotTest extends BaseUnitTest {
         void shouldRejectNullBaseUrl() {
             assertThatThrownBy(() ->
                 new ConfigSnapshot(
-                    4,
-                    1L,
-                    "name",
+                    ConfigSnapshot.SCHEMA_VERSION,
                     "openai-completions",
                     null,
                     "gpt",
@@ -318,8 +334,10 @@ class ConfigSnapshotTest extends BaseUnitTest {
                     null,
                     null,
                     null,
+                    null,
                     600,
-                    false
+                    false,
+                    null
                 )
             ).isInstanceOf(NullPointerException.class);
         }
@@ -328,9 +346,7 @@ class ConfigSnapshotTest extends BaseUnitTest {
         void shouldRejectZeroTimeout() {
             assertThatThrownBy(() ->
                 new ConfigSnapshot(
-                    4,
-                    1L,
-                    "name",
+                    ConfigSnapshot.SCHEMA_VERSION,
                     "openai-completions",
                     "https://api.openai.com",
                     "gpt",
@@ -341,8 +357,10 @@ class ConfigSnapshotTest extends BaseUnitTest {
                     null,
                     null,
                     null,
+                    null,
                     0,
-                    false
+                    false,
+                    null
                 )
             ).isInstanceOf(IllegalArgumentException.class);
         }
@@ -351,9 +369,7 @@ class ConfigSnapshotTest extends BaseUnitTest {
         void shouldRejectNegativeTimeout() {
             assertThatThrownBy(() ->
                 new ConfigSnapshot(
-                    4,
-                    1L,
-                    "name",
+                    ConfigSnapshot.SCHEMA_VERSION,
                     "openai-completions",
                     "https://api.openai.com",
                     "gpt",
@@ -364,8 +380,10 @@ class ConfigSnapshotTest extends BaseUnitTest {
                     null,
                     null,
                     null,
+                    null,
                     -1,
-                    false
+                    false,
+                    null
                 )
             ).isInstanceOf(IllegalArgumentException.class);
         }

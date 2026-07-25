@@ -50,16 +50,13 @@ function model(id: number, connectionId: number, displayName: string): Workspace
 }
 
 describe("WorkspaceLlmProviderPanel", () => {
-	function renderPanel(workspaceConnectionsAllowed = true) {
+	function renderPanel(ownProviderAllowed = true) {
 		const queryClient = new QueryClient({
 			defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
 		});
 		return render(
 			<QueryClientProvider client={queryClient}>
-				<WorkspaceLlmProviderPanel
-					workspaceSlug="demo"
-					workspaceConnectionsAllowed={workspaceConnectionsAllowed}
-				/>
+				<WorkspaceLlmProviderPanel workspaceSlug="demo" ownProviderAllowed={ownProviderAllowed} />
 			</QueryClientProvider>,
 		);
 	}
@@ -97,7 +94,7 @@ describe("WorkspaceLlmProviderPanel", () => {
 		await waitFor(() => expect(deleted).toBe(true));
 	});
 
-	it("explains the instance policy and hides registration when BYO is disabled", async () => {
+	it("explains the instance policy and hides registration when own-provider connections are disabled", async () => {
 		server.use(http.get("*/workspaces/demo/llm/connections", () => HttpResponse.json([])));
 		renderPanel(false);
 		expect(await screen.findByText("New workspace providers and models are disabled")).toBeTruthy();

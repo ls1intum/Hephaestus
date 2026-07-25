@@ -540,7 +540,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
             Instant heldUntil = Instant.now().plus(Duration.ofHours(1));
             AgentJob held = queuedJob(workspace, heldUntil, AgentJob.HOLD_REASON_BUDGET);
 
-            llmUsageService.updateByoBudget(workspace.getId(), new BigDecimal("50.00"));
+            llmUsageService.updateOwnProviderBudget(workspace.getId(), new BigDecimal("50.00"));
 
             AgentJob reloaded = jobRepository.findById(held.getId()).orElseThrow();
             assertThat(reloaded.getHoldReason()).isNull();
@@ -555,7 +555,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
             Instant heldUntil = Instant.now().plus(Duration.ofHours(1));
             AgentJob held = queuedJob(workspace, heldUntil, AgentJob.HOLD_REASON_BUDGET);
 
-            llmUsageAdminService.updateBudget(workspace.getId(), new BigDecimal("50.00"));
+            llmUsageAdminService.updateBudget(workspace.getWorkspaceSlug(), new BigDecimal("50.00"));
 
             AgentJob reloaded = jobRepository.findById(held.getId()).orElseThrow();
             assertThat(reloaded.getHoldReason()).isNull();
@@ -571,7 +571,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
             Instant backoffUntil = Instant.now().plus(Duration.ofHours(1));
             AgentJob backingOff = queuedJob(workspace, backoffUntil, null);
 
-            llmUsageService.updateByoBudget(workspace.getId(), new BigDecimal("50.00"));
+            llmUsageService.updateOwnProviderBudget(workspace.getId(), new BigDecimal("50.00"));
 
             AgentJob reloaded = jobRepository.findById(backingOff.getId()).orElseThrow();
             assertThat(reloaded.getAvailableAt()).isCloseTo(backoffUntil, within(1, ChronoUnit.MILLIS));
@@ -587,7 +587,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
             running.setStatus(AgentJobStatus.RUNNING);
             jobRepository.saveAndFlush(running);
 
-            llmUsageService.updateByoBudget(workspace.getId(), new BigDecimal("50.00"));
+            llmUsageService.updateOwnProviderBudget(workspace.getId(), new BigDecimal("50.00"));
 
             AgentJob reloaded = jobRepository.findById(running.getId()).orElseThrow();
             assertThat(reloaded.getAvailableAt()).isCloseTo(availableAt, within(1, ChronoUnit.MILLIS));
@@ -602,7 +602,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
             Instant heldUntil = Instant.now().plus(Duration.ofHours(1));
             AgentJob otherTenantJob = queuedJob(theirs, heldUntil, AgentJob.HOLD_REASON_BUDGET);
 
-            llmUsageService.updateByoBudget(mine.getId(), new BigDecimal("50.00"));
+            llmUsageService.updateOwnProviderBudget(mine.getId(), new BigDecimal("50.00"));
 
             AgentJob reloaded = jobRepository.findById(otherTenantJob.getId()).orElseThrow();
             assertThat(reloaded.getAvailableAt()).isCloseTo(heldUntil, within(1, ChronoUnit.MILLIS));
@@ -617,7 +617,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
             workspaceRepository.save(workspace);
             AgentJob held = queuedJob(workspace, Instant.now().plus(Duration.ofHours(1)), AgentJob.HOLD_REASON_BUDGET);
 
-            llmUsageService.updateByoBudget(workspace.getId(), null);
+            llmUsageService.updateOwnProviderBudget(workspace.getId(), null);
 
             assertThat(jobRepository.findById(held.getId()).orElseThrow().getHoldReason()).isNull();
             assertThat(

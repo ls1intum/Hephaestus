@@ -188,7 +188,7 @@ api PATCH "/workspaces/$WS_SLUG/features" -H 'content-type: application/json' \
 say "practice detection and mentor enabled on the workspace"
 
 # ---- 5. OpenAI-compatible catalog + runtime bindings ----------------------
-# Keep the real key in the connection catalog. It never enters agent_config, SQL, or a sandbox.
+# Keep the real key in the connection catalog. It never enters an agent binding, SQL, or a sandbox.
 SETTINGS="$(api GET /admin/llm/settings)"
 if [ "$(echo "$SETTINGS" | jq -r '.allowWorkspaceConnections')" != true ]; then
   api PUT /admin/llm/settings -H 'content-type: application/json' \
@@ -242,10 +242,10 @@ api PATCH "/workspaces/$WS_SLUG/llm/models/$MODEL_ID" -H 'content-type: applicat
 BINDING_BODY="$(jq -nc --argjson m "$MODEL_ID" \
   '{workspaceModelId:$m,enabled:true,timeoutSeconds:1200,maxConcurrentJobs:1,allowInternet:true}')"
 for PURPOSE in PRACTICE_DETECTION MENTOR; do
-  api PUT "/workspaces/$WS_SLUG/agent-bindings/$PURPOSE" \
+  api PUT "/workspaces/$WS_SLUG/agents/$PURPOSE" \
     -H 'content-type: application/json' -d "$BINDING_BODY" >/dev/null
 done
-READY="$(api GET "/workspaces/$WS_SLUG/agent-bindings" | jq -r '[.[] | select(.ready)] | length')"
+READY="$(api GET "/workspaces/$WS_SLUG/agents" | jq -r '[.[] | select(.ready)] | length')"
 [ "$READY" = "2" ] || die "expected both purposes bound and ready, got $READY"
 say "catalog model bound to practice detection and mentor (both ready)"
 

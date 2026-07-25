@@ -511,7 +511,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
             new BigDecimal("3")
         );
         MentorLlmConfig config = new MentorLlmConfig(
-            1L,
             "openai-responses",
             "https://api.openai.com/v1",
             "test-model",

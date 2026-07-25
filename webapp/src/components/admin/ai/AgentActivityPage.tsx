@@ -2,9 +2,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
-	cancelJobMutation,
-	listJobsOptions,
-	retryDeliveryMutation,
+	cancelAgentJobMutation,
+	listAgentJobsOptions,
+	listAgentJobsQueryKey,
+	retryAgentJobDeliveryMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { AgentJob } from "@/api/types.gen";
 import {
@@ -54,7 +55,7 @@ export function AgentActivityPage({ workspaceSlug }: AgentActivityPageProps) {
 	const [panelOpen, setPanelOpen] = useState(false);
 
 	const jobsQuery = useQuery({
-		...listJobsOptions({
+		...listAgentJobsOptions({
 			path: { workspaceSlug },
 			query: {
 				status: statusFilter === "ALL" ? undefined : statusFilter,
@@ -65,19 +66,22 @@ export function AgentActivityPage({ workspaceSlug }: AgentActivityPageProps) {
 		enabled: Boolean(workspaceSlug),
 	});
 
-	// Prefix-invalidate every listJobs page so the current filter/page refetches
-	// regardless of its exact query params.
+	// Prefix-invalidate every job-list page so the current filter/page refetches regardless of its
+	// exact query params. The operation id is read off the generated key helper rather than spelled
+	// out here: a literal would keep compiling after the operation is renamed and silently stop
+	// matching anything, leaving the table stale after a cancel or a retry.
+	const jobsQueryId = listAgentJobsQueryKey({ path: { workspaceSlug } })[0]._id;
 	const invalidateJobs = () => {
 		queryClient.invalidateQueries({
 			predicate: (query) => {
 				const first = query.queryKey[0] as { _id?: string } | undefined;
-				return first?._id === "listJobs";
+				return first?._id === jobsQueryId;
 			},
 		});
 	};
 
 	const cancelJob = useMutation({
-		...cancelJobMutation(),
+		...cancelAgentJobMutation(),
 		onSuccess: (updated) => {
 			invalidateJobs();
 			setSelectedJob(updated);
@@ -93,7 +97,7 @@ export function AgentActivityPage({ workspaceSlug }: AgentActivityPageProps) {
 	});
 
 	const retryDelivery = useMutation({
-		...retryDeliveryMutation(),
+		...retryAgentJobDeliveryMutation(),
 		onSuccess: (updated) => {
 			invalidateJobs();
 			setSelectedJob(updated);

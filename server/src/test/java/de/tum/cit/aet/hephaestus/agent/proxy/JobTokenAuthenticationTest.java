@@ -13,7 +13,9 @@ class JobTokenAuthenticationTest extends BaseUnitTest {
         "https://api.anthropic.com",
         null,
         null,
-        1L
+        null,
+        null,
+        null
     );
 
     @Test

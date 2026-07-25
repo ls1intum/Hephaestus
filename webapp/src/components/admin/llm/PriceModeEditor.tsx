@@ -23,7 +23,7 @@ export interface PriceModeEditorProps {
 }
 
 /**
- * The price radio + fields shared by the instance model form and the workspace BYO model form
+ * The price radio + fields shared by the instance model form and the workspace's own-provider model form
  * (#1368 glossary). "Free" and "No price set" relabel per audience — every workspace model would
  * otherwise read "Free", which undersells that the organization is paying for it.
  */

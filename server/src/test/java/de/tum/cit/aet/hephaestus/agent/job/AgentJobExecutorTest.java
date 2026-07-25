@@ -147,8 +147,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         snapshot = new ConfigSnapshot(
             ConfigSnapshot.SCHEMA_VERSION,
-            10L,
-            "test-config",
             "anthropic-messages",
             "https://api.anthropic.com",
             "claude-sonnet-4",
@@ -159,8 +157,10 @@ class AgentJobExecutorTest extends BaseUnitTest {
             null,
             null,
             null,
+            null,
             600,
-            false
+            false,
+            null
         );
 
         job = new AgentJob();

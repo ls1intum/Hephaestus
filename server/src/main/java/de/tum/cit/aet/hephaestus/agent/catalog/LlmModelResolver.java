@@ -11,8 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
  * needs, collapsing the two catalog scopes (instance vs workspace BYO) behind one shape. The
  * credential is resolved separately and live (never frozen) via {@link #resolveCredential}.
  *
- * <p>Only catalog bindings are executable. Legacy {@code AgentConfig.llm*} columns remain in the schema
- * during deprecation but are deliberately never read at runtime.
+ * <p>Only catalog bindings are executable: a binding that names no catalog model cannot run.
  */
 @Service
 @RequiredArgsConstructor
@@ -166,18 +165,10 @@ public class LlmModelResolver {
      * came from the snapshot while the credential is re-resolved live, a connection repointed to a new
      * host after dispatch would send the NEW (rotated) key to the OLD (stale, frozen) host — routing and
      * credential must come from the same live row. Returns empty when the model or connection is
-     * unavailable. The legacy parameters remain only so already-persisted job snapshots deserialize;
-     * they are never used for routing or credentials.
-     *
-     * @param legacyConfigId ignored legacy snapshot field
-     * @param legacyApiProtocol ignored legacy snapshot field
+     * unavailable.
      */
     @Transactional(readOnly = true)
-    public @Nullable ProxyCredential resolveProxyCredential(
-        ConnectionRef ref,
-        @Nullable Long legacyConfigId,
-        @Nullable String legacyApiProtocol
-    ) {
+    public @Nullable ProxyCredential resolveProxyCredential(ConnectionRef ref) {
         if (ref.scope() == FundingSource.INSTANCE && ref.connectionId() != null) {
             if (!isUsableInstanceModel(ref)) {
                 return null;

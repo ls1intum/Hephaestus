@@ -56,8 +56,8 @@ export function LlmUsageByJobTypeTable({ rows, fx }: LlmUsageByJobTypeTableProps
 		rows == null || rows.length < 2
 			? null
 			: {
-					priced: sumBy(rows, (row) => row.pricedTotalCostUsd),
-					byo: sumBy(rows, (row) => row.byoTotalCostUsd),
+					priced: sumBy(rows, (row) => row.instanceTotalCostUsd),
+					ownProvider: sumBy(rows, (row) => row.ownProviderTotalCostUsd),
 					unpriced: sumBy(rows, (row) => row.unpricedEventCount),
 					inputTokens: sumBy(rows, (row) => row.inputTokens),
 					outputTokens: sumBy(rows, (row) => row.outputTokens),
@@ -104,10 +104,10 @@ export function LlmUsageByJobTypeTable({ rows, fx }: LlmUsageByJobTypeTableProps
 						<TableRow key={row.jobType}>
 							<TableCell className="font-medium">{JOB_TYPE_LABELS[row.jobType]}</TableCell>
 							<TableCell className="text-right tabular-nums">
-								<MoneyCell>{formatCostUsd(row.pricedTotalCostUsd)}</MoneyCell>
+								<MoneyCell>{formatCostUsd(row.instanceTotalCostUsd)}</MoneyCell>
 							</TableCell>
 							<TableCell className="text-right tabular-nums">
-								<MoneyCell>{formatCostUsd(row.byoTotalCostUsd)}</MoneyCell>
+								<MoneyCell>{formatCostUsd(row.ownProviderTotalCostUsd)}</MoneyCell>
 							</TableCell>
 							<TableCell className="text-right tabular-nums">
 								<AvgPerEvent row={row} />
@@ -140,8 +140,8 @@ export function LlmUsageByJobTypeTable({ rows, fx }: LlmUsageByJobTypeTableProps
 							<FxSpendLine usd={totals.priced} fx={fx} />
 						</TableCell>
 						<TableCell className="text-right tabular-nums">
-							<MoneyCell>{formatCostUsd(totals.byo)}</MoneyCell>
-							<FxSpendLine usd={totals.byo} fx={fx} />
+							<MoneyCell>{formatCostUsd(totals.ownProvider)}</MoneyCell>
+							<FxSpendLine usd={totals.ownProvider} fx={fx} />
 						</TableCell>
 						{/* No blended average: the two money streams are different money and averaging
 						    across job types on top of that would mean nothing to anyone. */}
@@ -181,8 +181,8 @@ export function LlmUsageByJobTypeTable({ rows, fx }: LlmUsageByJobTypeTableProps
  */
 function AvgPerEvent({ row }: { row: LlmUsageByJobType }) {
 	const parts = [
-		{ key: "shared", label: "shared models", total: row.pricedTotalCostUsd },
-		{ key: "provider", label: "your provider", total: row.byoTotalCostUsd },
+		{ key: "shared", label: "shared models", total: row.instanceTotalCostUsd },
+		{ key: "provider", label: "your provider", total: row.ownProviderTotalCostUsd },
 	].filter((part) => part.total > 0);
 
 	if (row.events <= 0 || parts.length === 0) {
@@ -220,8 +220,8 @@ export function LlmUsageByDayTable({ rows, fx }: LlmUsageByDayTableProps) {
 		rows == null || rows.length < 2
 			? null
 			: {
-					priced: sumBy(rows, (row) => row.pricedTotalCostUsd),
-					byo: sumBy(rows, (row) => row.byoTotalCostUsd),
+					priced: sumBy(rows, (row) => row.instanceTotalCostUsd),
+					ownProvider: sumBy(rows, (row) => row.ownProviderTotalCostUsd),
 					unpriced: sumBy(rows, (row) => row.unpricedEventCount),
 					events: sumBy(rows, (row) => row.events),
 				};
@@ -253,10 +253,10 @@ export function LlmUsageByDayTable({ rows, fx }: LlmUsageByDayTableProps) {
 						<TableRow key={String(row.day)}>
 							<TableCell className="font-medium">{formatUsageDay(row.day)}</TableCell>
 							<TableCell className="text-right tabular-nums">
-								<MoneyCell>{formatCostUsd(row.pricedTotalCostUsd)}</MoneyCell>
+								<MoneyCell>{formatCostUsd(row.instanceTotalCostUsd)}</MoneyCell>
 							</TableCell>
 							<TableCell className="text-right tabular-nums">
-								<MoneyCell>{formatCostUsd(row.byoTotalCostUsd)}</MoneyCell>
+								<MoneyCell>{formatCostUsd(row.ownProviderTotalCostUsd)}</MoneyCell>
 							</TableCell>
 							<TableCell className="text-right tabular-nums">
 								{row.unpricedEventCount.toLocaleString()}
@@ -277,8 +277,8 @@ export function LlmUsageByDayTable({ rows, fx }: LlmUsageByDayTableProps) {
 							<FxSpendLine usd={totals.priced} fx={fx} />
 						</TableCell>
 						<TableCell className="text-right tabular-nums">
-							<MoneyCell>{formatCostUsd(totals.byo)}</MoneyCell>
-							<FxSpendLine usd={totals.byo} fx={fx} />
+							<MoneyCell>{formatCostUsd(totals.ownProvider)}</MoneyCell>
+							<FxSpendLine usd={totals.ownProvider} fx={fx} />
 						</TableCell>
 						<TableCell className="text-right tabular-nums">
 							{totals.unpriced.toLocaleString()}

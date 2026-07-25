@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
 import de.tum.cit.aet.hephaestus.agent.catalog.ModelBindingSource;
 import de.tum.cit.aet.hephaestus.agent.catalog.ResolvedLlmModel;
-import de.tum.cit.aet.hephaestus.agent.usage.AdmittedLlmModel;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import java.util.Objects;
@@ -13,13 +12,13 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Immutable projection of {@link AgentConfig} frozen at job submission time.
+ * Immutable projection of a workspace's {@link WorkspaceAgentBinding} frozen at job submission time.
  *
  * <p>Stored as JSONB on {@link de.tum.cit.aet.hephaestus.agent.job.AgentJob#getConfigSnapshot()}.
- * The executor reads this snapshot instead of the live config so that in-flight jobs are not
- * affected by config changes.
+ * The executor reads this snapshot instead of the live binding so that in-flight jobs are not
+ * affected by binding changes.
  *
- * <h2>Deliberately excluded fields (#1368 slice 5 — runtime switch-over)</h2>
+ * <h2>Deliberately excluded fields</h2>
  *
  * <p>Everything here is non-secret, frozen BEHAVIOUR: the wire protocol, the model id, and its
  * capability envelope. The credential itself — and any authentication-header material — is
@@ -27,7 +26,7 @@ import tools.jackson.databind.ObjectMapper;
  * {@link #connectionScope}/{@link #connectionId} instead identify WHICH connection row funds the job,
  * so the LLM proxy can re-resolve the live credential at call time via
  * {@link LlmModelResolver#resolveProxyCredential}, picking up rotation/revocation immediately. A
- * A legacy snapshot carries no connection identity and therefore fails closed at the proxy.
+ * pre-v4 snapshot carries no connection identity and therefore fails closed at the proxy.
  *
  * <h3>{@link #baseUrl} is split: frozen here, but NOT what the proxy routes on</h3>
  *
@@ -41,15 +40,13 @@ import tools.jackson.databind.ObjectMapper;
  * (stale) host — a split-brain that leaks the new credential to whatever now answers at the old address.
  *
  * <ul>
- *   <li>{@code maxConcurrentJobs} — concurrency gate read live from AgentConfig so admin
+ *   <li>{@code maxConcurrentJobs} — concurrency gate read live from the binding so admin
  *       changes take effect immediately</li>
  * </ul>
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ConfigSnapshot(
     int schemaVersion,
-    Long configId,
-    String configName,
     String apiProtocol,
     String baseUrl,
     String upstreamModelId,
@@ -65,122 +62,6 @@ public record ConfigSnapshot(
     boolean allowInternet,
     @Nullable LlmPriceSnapshot priceSnapshot
 ) {
-    /** Compatibility constructor for snapshots created before admission pricing was added. */
-    public ConfigSnapshot(
-        int schemaVersion,
-        Long configId,
-        String configName,
-        String apiProtocol,
-        String baseUrl,
-        String upstreamModelId,
-        @Nullable String modelVersion,
-        @Nullable Integer contextWindow,
-        @Nullable Integer maxOutputTokens,
-        boolean supportsReasoning,
-        @Nullable FundingSource connectionScope,
-        @Nullable Long connectionId,
-        @Nullable Long modelId,
-        @Nullable Long workspaceId,
-        int timeoutSeconds,
-        boolean allowInternet
-    ) {
-        this(
-            schemaVersion,
-            configId,
-            configName,
-            apiProtocol,
-            baseUrl,
-            upstreamModelId,
-            modelVersion,
-            contextWindow,
-            maxOutputTokens,
-            supportsReasoning,
-            connectionScope,
-            connectionId,
-            modelId,
-            workspaceId,
-            timeoutSeconds,
-            allowInternet,
-            null
-        );
-    }
-
-    /** Reads source-compatible pre-removal construction sites; the obsolete cache hint is ignored. */
-    public ConfigSnapshot(
-        int schemaVersion,
-        Long configId,
-        String configName,
-        String apiProtocol,
-        String baseUrl,
-        String upstreamModelId,
-        @Nullable String modelVersion,
-        @Nullable Integer contextWindow,
-        @Nullable Integer maxOutputTokens,
-        boolean supportsReasoning,
-        @Nullable String ignoredCacheControlFormat,
-        @Nullable FundingSource connectionScope,
-        @Nullable Long connectionId,
-        int timeoutSeconds,
-        boolean allowInternet
-    ) {
-        this(
-            schemaVersion,
-            configId,
-            configName,
-            apiProtocol,
-            baseUrl,
-            upstreamModelId,
-            modelVersion,
-            contextWindow,
-            maxOutputTokens,
-            supportsReasoning,
-            connectionScope,
-            connectionId,
-            null,
-            null,
-            timeoutSeconds,
-            allowInternet,
-            null
-        );
-    }
-
-    public ConfigSnapshot(
-        int schemaVersion,
-        Long configId,
-        String configName,
-        String apiProtocol,
-        String baseUrl,
-        String upstreamModelId,
-        @Nullable String modelVersion,
-        @Nullable Integer contextWindow,
-        @Nullable Integer maxOutputTokens,
-        boolean supportsReasoning,
-        @Nullable FundingSource connectionScope,
-        @Nullable Long connectionId,
-        int timeoutSeconds,
-        boolean allowInternet
-    ) {
-        this(
-            schemaVersion,
-            configId,
-            configName,
-            apiProtocol,
-            baseUrl,
-            upstreamModelId,
-            modelVersion,
-            contextWindow,
-            maxOutputTokens,
-            supportsReasoning,
-            connectionScope,
-            connectionId,
-            null,
-            null,
-            timeoutSeconds,
-            allowInternet,
-            null
-        );
-    }
-
     /**
      * Current schema version. Bump only for breaking changes (field removal, type change,
      * semantic reinterpretation). Additive nullable fields are forward- AND backward-compatible
@@ -191,8 +72,24 @@ public record ConfigSnapshot(
      * {@code modelName} with the resolver's non-secret behaviour shape + a connection reference — a
      * genuine reshape, not an additive change, so {@link #fromJson} translates v1-v3 payloads
      * explicitly instead of relying on Jackson's default-null fill (see {@link #fromLegacyJson}).
+     *
+     * <p>v5 dropped {@code configId}/{@code configName}, the last two fields of the deleted
+     * named-agent-config model. Nothing read them, so a persisted v4 row needs no translation — its
+     * two extra keys are simply ignored on the way in (see {@link #CATALOG_SHAPE_MIN_VERSION}).
      */
-    public static final int SCHEMA_VERSION = 4;
+    public static final int SCHEMA_VERSION = 5;
+
+    /**
+     * Oldest version whose payload already uses the catalog shape this record maps directly. Versions
+     * at or above it deserialize straight through (unknown keys ignored); anything older is a
+     * different shape and must go through {@link #fromLegacyJson}.
+     *
+     * <p>This is the constant that makes "drop a field" cheap and "rename a field" expensive: the gap
+     * between it and {@link #SCHEMA_VERSION} is exactly the set of persisted versions that differ from
+     * the current record by dropped keys alone. A rename would have to move this floor up and grow a
+     * translation step, a removal does not.
+     */
+    private static final int CATALOG_SHAPE_MIN_VERSION = 4;
 
     public ConfigSnapshot {
         Objects.requireNonNull(apiProtocol, "apiProtocol must not be null");
@@ -204,8 +101,8 @@ public record ConfigSnapshot(
     }
 
     /**
-     * Create a snapshot from a live {@link ModelBindingSource} (a per-purpose binding or, legacy, a
-     * named config), resolving its instance or workspace catalog model via {@link LlmModelResolver}.
+     * Create a snapshot from a live {@link ModelBindingSource}, resolving its instance or workspace
+     * catalog model via {@link LlmModelResolver}.
      */
     public static ConfigSnapshot from(ModelBindingSource source, LlmModelResolver resolver) {
         Objects.requireNonNull(source, "source must not be null");
@@ -214,8 +111,6 @@ public record ConfigSnapshot(
         LlmModelResolver.ConnectionRef ref = resolver.connectionRef(source);
         return new ConfigSnapshot(
             SCHEMA_VERSION,
-            source.getId(),
-            null,
             resolved.apiProtocol(),
             resolved.baseUrl(),
             resolved.upstreamModelId(),
@@ -228,7 +123,8 @@ public record ConfigSnapshot(
             ref.modelId(),
             ref.workspaceId(),
             source.getTimeoutSeconds(),
-            source.isAllowInternet()
+            source.isAllowInternet(),
+            null
         );
     }
 
@@ -236,8 +132,6 @@ public record ConfigSnapshot(
     public ConfigSnapshot withPriceSnapshot(LlmPriceSnapshot price) {
         return new ConfigSnapshot(
             schemaVersion,
-            configId,
-            configName,
             apiProtocol,
             baseUrl,
             upstreamModelId,
@@ -266,8 +160,8 @@ public record ConfigSnapshot(
      * Deserialize from JSONB. Rejects snapshots from a newer schema version to prevent
      * silent data corruption during rolling deploys. Snapshots persisted before v4 (schemaVersion
      * 0-3) use the pre-catalog shape (llmProvider/credentialMode/llmBaseUrl/modelName) and are
-     * translated via {@link #fromLegacyJson} only for structural deserialization. Since it has no
-     * catalog identity, proxy credential resolution rejects it.
+     * translated via {@link #fromLegacyJson} only for structural deserialization. Since such a row has
+     * no catalog identity, proxy credential resolution rejects it.
      */
     public static ConfigSnapshot fromJson(JsonNode node, ObjectMapper objectMapper) {
         Objects.requireNonNull(node, "node must not be null");
@@ -280,14 +174,14 @@ public record ConfigSnapshot(
                 )
             );
         }
-        if (version < SCHEMA_VERSION) {
+        if (version < CATALOG_SHAPE_MIN_VERSION) {
             return fromLegacyJson(node);
         }
         return objectMapper.convertValue(node, ConfigSnapshot.class);
     }
 
     /**
-     * Translates a pre-v4 snapshot (llmProvider/credentialMode/llmBaseUrl/modelName) into the v4
+     * Translates a pre-v4 snapshot (llmProvider/credentialMode/llmBaseUrl/modelName) into the current
      * shape so historical rows remain readable. {@code connectionScope}/{@code connectionId} are
      * always null, which deliberately makes such a job non-routable at the proxy.
      */
@@ -313,14 +207,10 @@ public record ConfigSnapshot(
         String baseUrl = legacyBaseUrl != null && !legacyBaseUrl.isBlank() ? legacyBaseUrl : defaultBaseUrl;
         String modelName = node.path("modelName").asString(null);
         String modelVersion = node.path("modelVersion").asString(null);
-        long configId = node.path("configId").asLong(0);
-        String configName = node.path("configName").asString("");
         int timeoutSeconds = node.path("timeoutSeconds").asInt(600);
         boolean allowInternet = node.path("allowInternet").asBoolean(false);
         return new ConfigSnapshot(
             node.path("schemaVersion").asInt(0),
-            configId,
-            configName,
             apiProtocol,
             baseUrl,
             modelName != null ? modelName : "",
@@ -330,8 +220,11 @@ public record ConfigSnapshot(
             false,
             null,
             null,
+            null,
+            null,
             timeoutSeconds,
-            allowInternet
+            allowInternet,
+            null
         );
     }
 }

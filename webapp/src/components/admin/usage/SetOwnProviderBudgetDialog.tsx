@@ -1,7 +1,7 @@
 import { BudgetAmountDialog } from "./BudgetAmountDialog";
 import type { Fx } from "./fx";
 
-export interface SetByoBudgetDialogProps {
+export interface SetOwnProviderBudgetDialogProps {
 	open: boolean;
 	/** The cap in force today, in USD; `null`/`undefined` means the workspace is uncapped. */
 	currentCapUsd?: number | null;
@@ -12,7 +12,7 @@ export interface SetByoBudgetDialogProps {
 	serverError?: string | null;
 	onOpenChange: (open: boolean) => void;
 	/** `null` removes the cap; a number (USD, >= 0, 2 decimals) sets it. */
-	onSubmit: (monthlyByoLlmBudgetUsd: number | null) => void;
+	onSubmit: (monthlyBudgetUsd: number | null) => void;
 }
 
 /**
@@ -21,7 +21,7 @@ export interface SetByoBudgetDialogProps {
  * $0 pauses work on their provider immediately; it never affects work on shared models, which the
  * host pays for and caps separately.
  */
-export function SetByoBudgetDialog({
+export function SetOwnProviderBudgetDialog({
 	open,
 	currentCapUsd,
 	fx,
@@ -29,7 +29,7 @@ export function SetByoBudgetDialog({
 	serverError,
 	onOpenChange,
 	onSubmit,
-}: SetByoBudgetDialogProps) {
+}: SetOwnProviderBudgetDialogProps) {
 	return (
 		<BudgetAmountDialog
 			open={open}

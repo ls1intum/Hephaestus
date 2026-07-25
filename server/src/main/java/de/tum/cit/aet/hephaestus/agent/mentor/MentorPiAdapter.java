@@ -65,10 +65,10 @@ public class MentorPiAdapter {
 
         String baseUrl = llmConfig.baseUrl();
 
-        // The config API floor (@Min(30) on AgentConfig timeoutSeconds) sits below PiPlanSpec's runtime
-        // floor (must exceed TIMEOUT_BUFFER_SECONDS=60), so a legitimately persisted 30-60s config would
-        // otherwise throw from PiPlanSpec and surface as an ERROR on the chat stream. Clamp up to the
-        // minimum buildable budget so any valid config always yields a mentor sandbox.
+        // The binding API floor (@Min(30) on AgentBindingRequestDTO timeoutSeconds) sits below PiPlanSpec's
+        // runtime floor (must exceed TIMEOUT_BUFFER_SECONDS=60), so a legitimately persisted 30-60s binding
+        // would otherwise throw from PiPlanSpec and surface as an ERROR on the chat stream. Clamp up to the
+        // minimum buildable budget so any valid binding always yields a mentor sandbox.
         int timeoutSeconds = Math.max(llmConfig.timeoutSeconds(), PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS + 1);
 
         // ONE credential path (#1368 slice 5): the mentor's interactive sandbox is not an AgentJob row,
@@ -85,8 +85,7 @@ public class MentorPiAdapter {
                 llmConfig.connectionScope(),
                 llmConfig.connectionId(),
                 llmConfig.modelId(),
-                llmConfig.workspaceId(),
-                llmConfig.connectionScope() == null ? llmConfig.configId() : null
+                llmConfig.workspaceId()
             )
         );
 

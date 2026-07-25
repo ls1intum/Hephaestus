@@ -13,14 +13,21 @@ type ActorKind = NonNullable<ConfigAuditEntryView["actorKind"]>;
 
 export const ENTITY_TYPE_LABELS: Record<EntityType, string> = {
 	PRACTICE_REVIEW_SETTINGS: "Review settings",
-	AI_CONFIG_BINDING: "AI binding",
+	AGENT_BINDING: "AI binding",
+	// Retained for rows written before agent config and agent bindings were merged.
 	AGENT_CONFIG: "Agent config",
+	// The pre-rename spelling of AGENT_BINDING. The trail is append-only at the database level, so old
+	// rows keep the name they were written under; they describe the same thing, so they read the same.
+	AI_CONFIG_BINDING: "AI binding",
 	WORKSPACE_ROLE: "Workspace role",
 	WORKSPACE_FEATURES: "Feature flags",
 	WORKSPACE_STATUS: "Workspace status",
 	WORKSPACE_TOKEN: "Access token",
 	WORKSPACE_VISIBILITY: "Visibility",
 	PRACTICE_ACTIVE: "Practice active",
+	WORKSPACE_INSTANCE_LLM_BUDGET: "AI budget",
+	WORKSPACE_OWN_PROVIDER_LLM_BUDGET: "Own-provider AI cap",
+	// Pre-rename spellings of the two above; same meaning, so the same label.
 	WORKSPACE_LLM_BUDGET: "AI budget",
 	WORKSPACE_BYO_LLM_BUDGET: "Own-provider AI cap",
 	WORKSPACE_LLM_CONNECTION: "Workspace AI provider",

@@ -64,7 +64,7 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         webTestClient
             .get()
-            .uri("/workspaces/{slug}/agent-jobs", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/agents/jobs", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -89,7 +89,7 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         webTestClient
             .get()
-            .uri("/workspaces/{slug}/agent-jobs?size=2", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/agents/jobs?size=2", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -114,7 +114,7 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         webTestClient
             .get()
-            .uri("/workspaces/{slug}/agent-jobs?status=RUNNING", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/agents/jobs?status=RUNNING", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -134,7 +134,7 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         AgentJobDTO result = webTestClient
             .get()
-            .uri("/workspaces/{slug}/agent-jobs/{id}", workspace.getWorkspaceSlug(), job.getId())
+            .uri("/workspaces/{slug}/agents/jobs/{id}", workspace.getWorkspaceSlug(), job.getId())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -158,7 +158,7 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         webTestClient
             .get()
-            .uri("/workspaces/{slug}/agent-jobs/{id}", workspace.getWorkspaceSlug(), UUID.randomUUID())
+            .uri("/workspaces/{slug}/agents/jobs/{id}", workspace.getWorkspaceSlug(), UUID.randomUUID())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -179,7 +179,7 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         // Try to access workspace A's job via workspace B — should be 404 (IDOR protection)
         webTestClient
             .get()
-            .uri("/workspaces/{slug}/agent-jobs/{id}", workspaceB.getWorkspaceSlug(), jobInA.getId())
+            .uri("/workspaces/{slug}/agents/jobs/{id}", workspaceB.getWorkspaceSlug(), jobInA.getId())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -194,7 +194,7 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         String responseBody = webTestClient
             .get()
-            .uri("/workspaces/{slug}/agent-jobs/{id}", workspace.getWorkspaceSlug(), job.getId())
+            .uri("/workspaces/{slug}/agents/jobs/{id}", workspace.getWorkspaceSlug(), job.getId())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -221,7 +221,7 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         AgentJobDTO result = webTestClient
             .post()
-            .uri("/workspaces/{slug}/agent-jobs/{id}/cancel", workspace.getWorkspaceSlug(), job.getId())
+            .uri("/workspaces/{slug}/agents/jobs/{id}/cancel", workspace.getWorkspaceSlug(), job.getId())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -242,7 +242,7 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         webTestClient
             .post()
-            .uri("/workspaces/{slug}/agent-jobs/{id}/cancel", workspace.getWorkspaceSlug(), job.getId())
+            .uri("/workspaces/{slug}/agents/jobs/{id}/cancel", workspace.getWorkspaceSlug(), job.getId())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -260,7 +260,7 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         webTestClient
             .post()
-            .uri("/workspaces/{slug}/agent-jobs/{id}/cancel", workspace.getWorkspaceSlug(), job.getId())
+            .uri("/workspaces/{slug}/agents/jobs/{id}/cancel", workspace.getWorkspaceSlug(), job.getId())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -274,7 +274,7 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         webTestClient
             .post()
-            .uri("/workspaces/{slug}/agent-jobs/{id}/cancel", workspace.getWorkspaceSlug(), UUID.randomUUID())
+            .uri("/workspaces/{slug}/agents/jobs/{id}/cancel", workspace.getWorkspaceSlug(), UUID.randomUUID())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -295,7 +295,7 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         // IDOR protection: cancel workspace A's job via workspace B → 404
         webTestClient
             .post()
-            .uri("/workspaces/{slug}/agent-jobs/{id}/cancel", workspaceB.getWorkspaceSlug(), jobInA.getId())
+            .uri("/workspaces/{slug}/agents/jobs/{id}/cancel", workspaceB.getWorkspaceSlug(), jobInA.getId())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -310,7 +310,7 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         AgentJobDTO result = webTestClient
             .post()
-            .uri("/workspaces/{slug}/agent-jobs/{id}/cancel", workspace.getWorkspaceSlug(), job.getId())
+            .uri("/workspaces/{slug}/agents/jobs/{id}/cancel", workspace.getWorkspaceSlug(), job.getId())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -334,7 +334,7 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         String csrf = TestAuthUtils.fetchCsrfToken(webTestClient);
         webTestClient
             .post()
-            .uri("/workspaces/{slug}/agent-jobs/{id}/cancel", workspace.getWorkspaceSlug(), UUID.randomUUID())
+            .uri("/workspaces/{slug}/agents/jobs/{id}/cancel", workspace.getWorkspaceSlug(), UUID.randomUUID())
             .headers(TestAuthUtils.withCsrf(csrf))
             .exchange()
             .expectStatus()
@@ -348,7 +348,7 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         webTestClient
             .get()
-            .uri("/workspaces/{slug}/agent-jobs", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/agents/jobs", workspace.getWorkspaceSlug())
             .exchange()
             .expectStatus()
             .isUnauthorized();

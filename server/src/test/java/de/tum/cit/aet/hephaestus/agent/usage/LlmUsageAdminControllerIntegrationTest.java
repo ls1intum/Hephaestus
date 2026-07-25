@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.usage;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageDTOs.AdminLlmUsageReportDTO;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageDTOs.AdminWorkspaceLlmUsageDTO;
 import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRate;
 import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateRepository;
@@ -15,7 +16,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Tag;
@@ -25,9 +25,9 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
- * Instance-admin LLM cost governance: {@code GET /admin/llm-usage} (cross-workspace month
- * rollup) and {@code PUT /admin/workspaces/{id}/llm-budget} (the cap). Verifies the app_admin
- * authority gate, the rollup values, budget set/clear, and request validation.
+ * Instance-admin LLM cost governance: {@code GET /admin/llm/usage} (cross-workspace month
+ * rollup) and {@code PUT /admin/workspaces/{workspaceSlug}/llm/budget} (the cap). Verifies the
+ * app_admin authority gate, the rollup values, budget set/clear, and request validation.
  */
 @Tag("integration")
 class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
@@ -74,21 +74,24 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     private AdminWorkspaceLlmUsageDTO rollupFor(Workspace workspace) {
-        List<AdminWorkspaceLlmUsageDTO> rows = webTestClient
+        AdminLlmUsageReportDTO report = webTestClient
             .get()
-            .uri("/admin/llm-usage")
+            .uri("/admin/llm/usage")
             .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
             .exchange()
             .expectStatus()
             .isOk()
-            .expectBodyList(AdminWorkspaceLlmUsageDTO.class)
+            .expectBody(AdminLlmUsageReportDTO.class)
             .returnResult()
             .getResponseBody();
 
-        assertThat(rows).isNotNull();
-        return rows
+        assertThat(report).isNotNull();
+        // Rows are addressed by slug — the same handle the cap endpoint takes, so an admin never has
+        // to translate between two identifiers to act on what the rollup shows them.
+        return report
+            .workspaces()
             .stream()
-            .filter(r -> r.workspaceId().equals(workspace.getId()))
+            .filter(r -> r.workspaceSlug().equals(workspace.getWorkspaceSlug()))
             .findFirst()
             .orElseThrow();
     }
@@ -102,15 +105,15 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         seedEvent(spender, "3.00");
 
         var spenderRow = rollupFor(spender);
-        assertThat(spenderRow.pricedTotalCostUsd()).isEqualByComparingTo("3.00");
-        assertThat(spenderRow.byoTotalCostUsd()).isEqualByComparingTo("0");
+        assertThat(spenderRow.instanceTotalCostUsd()).isEqualByComparingTo("3.00");
+        assertThat(spenderRow.ownProviderTotalCostUsd()).isEqualByComparingTo("0");
         assertThat(spenderRow.instanceMonthlyBudgetUsd()).isEqualByComparingTo("2.00");
         assertThat(spenderRow.instanceBudgetVerdict()).isEqualTo(LlmBudgetVerdict.EXHAUSTED);
-        assertThat(spenderRow.instanceFundedPaused()).isTrue();
+        assertThat(spenderRow.instancePaused()).isTrue();
         var idleRow = rollupFor(idle);
-        assertThat(idleRow.pricedTotalCostUsd()).isEqualByComparingTo("0");
+        assertThat(idleRow.instanceTotalCostUsd()).isEqualByComparingTo("0");
         assertThat(idleRow.instanceBudgetVerdict()).isEqualTo(LlmBudgetVerdict.WITHIN);
-        assertThat(idleRow.instanceFundedPaused()).isFalse();
+        assertThat(idleRow.instancePaused()).isFalse();
     }
 
     /**
@@ -130,13 +133,13 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         var row = rollupFor(workspace);
 
         assertThat(row.instanceMonthlyBudgetUsd()).isEqualByComparingTo("100.00");
-        assertThat(row.byoMonthlyBudgetUsd()).isEqualByComparingTo("5.00");
-        assertThat(row.pricedTotalCostUsd()).isEqualByComparingTo("1.00");
-        assertThat(row.byoTotalCostUsd()).isEqualByComparingTo("5.00");
+        assertThat(row.ownProviderMonthlyBudgetUsd()).isEqualByComparingTo("5.00");
+        assertThat(row.instanceTotalCostUsd()).isEqualByComparingTo("1.00");
+        assertThat(row.ownProviderTotalCostUsd()).isEqualByComparingTo("5.00");
         assertThat(row.instanceBudgetVerdict()).isEqualTo(LlmBudgetVerdict.WITHIN);
-        assertThat(row.byoBudgetVerdict()).isEqualTo(LlmBudgetVerdict.EXHAUSTED);
-        assertThat(row.instanceFundedPaused()).isFalse();
-        assertThat(row.byoPaused()).isTrue();
+        assertThat(row.ownProviderBudgetVerdict()).isEqualTo(LlmBudgetVerdict.EXHAUSTED);
+        assertThat(row.instancePaused()).isFalse();
+        assertThat(row.ownProviderPaused()).isTrue();
     }
 
     /** Each verdict is only ever UNVERIFIABLE from a blind spot its own owner can clear. */
@@ -152,9 +155,9 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         var row = rollupFor(workspace);
 
         assertThat(row.instanceBudgetVerdict()).isEqualTo(LlmBudgetVerdict.WITHIN);
-        assertThat(row.byoBudgetVerdict()).isEqualTo(LlmBudgetVerdict.UNVERIFIABLE);
-        assertThat(row.instanceFundedPaused()).isFalse();
-        assertThat(row.byoPaused()).isTrue();
+        assertThat(row.ownProviderBudgetVerdict()).isEqualTo(LlmBudgetVerdict.UNVERIFIABLE);
+        assertThat(row.instancePaused()).isFalse();
+        assertThat(row.ownProviderPaused()).isTrue();
     }
 
     @Test
@@ -163,10 +166,10 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
 
         webTestClient
             .put()
-            .uri("/admin/workspaces/{id}/llm-budget", workspace.getId())
+            .uri("/admin/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
             .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("monthlyLlmBudgetUsd", "25.00"))
+            .bodyValue(Map.of("monthlyBudgetUsd", "25.00"))
             .exchange()
             .expectStatus()
             .isNoContent();
@@ -176,7 +179,7 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
 
         webTestClient
             .put()
-            .uri("/admin/workspaces/{id}/llm-budget", workspace.getId())
+            .uri("/admin/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
             .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(Map.of())
@@ -186,16 +189,34 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getMonthlyLlmBudgetUsd()).isNull();
     }
 
+    /**
+     * The cap is now addressed by slug, so an unknown slug has to answer 404 rather than silently
+     * writing nothing: a typo'd slug that returned 204 would tell an operator their cap is in place
+     * when no workspace is capped at all.
+     */
+    @Test
+    void settingTheCapOnAnUnknownWorkspaceSlugIs404() {
+        webTestClient
+            .put()
+            .uri("/admin/workspaces/{slug}/llm/budget", "adm-no-such-workspace")
+            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(Map.of("monthlyBudgetUsd", "25.00"))
+            .exchange()
+            .expectStatus()
+            .isNotFound();
+    }
+
     @Test
     void negativeBudgetIsRejectedWith400() {
         Workspace workspace = setupWorkspace("adm-negative");
 
         webTestClient
             .put()
-            .uri("/admin/workspaces/{id}/llm-budget", workspace.getId())
+            .uri("/admin/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
             .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("monthlyLlmBudgetUsd", "-1.00"))
+            .bodyValue(Map.of("monthlyBudgetUsd", "-1.00"))
             .exchange()
             .expectStatus()
             .isBadRequest();
@@ -203,7 +224,8 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
 
     /**
      * Zero-regression guard, mirroring the workspace-scoped one: with no display currency configured
-     * the rollup rows carry no {@code fx} key at all, even though a fresh rate is stored.
+     * the response carries no {@code fx} key at all — neither on the envelope nor on a row — even
+     * though a fresh rate is stored.
      */
     @Test
     void rollupOmitsFxEntirelyWhenNoDisplayCurrencyConfigured() {
@@ -217,13 +239,15 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
 
         byte[] body = webTestClient
             .get()
-            .uri("/admin/llm-usage")
+            .uri("/admin/llm/usage")
             .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
             .exchange()
             .expectStatus()
             .isOk()
             .expectBody()
-            .jsonPath("$[0].fx")
+            .jsonPath("$.fx")
+            .doesNotExist()
+            .jsonPath("$.workspaces[0].fx")
             .doesNotExist()
             .returnResult()
             .getResponseBody();
@@ -235,7 +259,7 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
     void nonAdminIsForbidden() {
         webTestClient
             .get()
-            .uri("/admin/llm-usage")
+            .uri("/admin/llm/usage")
             .headers(h -> h.setBearerAuth(MENTOR_TOKEN))
             .exchange()
             .expectStatus()

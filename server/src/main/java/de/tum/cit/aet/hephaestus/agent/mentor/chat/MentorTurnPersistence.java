@@ -228,7 +228,6 @@ public class MentorTurnPersistence {
             assistantMessageId,
             userMessageId,
             new MentorLlmConfig(
-                0L,
                 "openai-responses",
                 "",
                 "unknown",

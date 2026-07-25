@@ -58,7 +58,7 @@ describe("workspace-admin route gate", () => {
 	it("enumerates the admin routes", () => {
 		// A filter that matched nothing would leave every case below vacuously green, and one that
 		// matched a subset would quietly shrink the coverage this suite exists for.
-		expect(adminUrls.length).toBeGreaterThanOrEqual(14);
+		expect(adminUrls.length).toBeGreaterThanOrEqual(19);
 	});
 
 	// Per route, because each route's nesting is a separate fact: an un-nested one fails only its

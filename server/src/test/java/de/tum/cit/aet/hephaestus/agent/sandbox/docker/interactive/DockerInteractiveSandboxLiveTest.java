@@ -217,7 +217,10 @@ class DockerInteractiveSandboxLiveTest {
         AtomicReference<String> token
     ) {
         InteractiveSandboxSpec base = buildMentorSpec(userId, workspaceId);
-        String minted = proxyCredentialRegistry.mint(base.sessionId(), "openai-completions", baseUrl, null, null, 1L);
+        String minted = proxyCredentialRegistry.mint(
+            base.sessionId(),
+            new MentorProxyCredentialRegistry.Route("openai-completions", baseUrl, null, null, null, null)
+        );
         token.set(minted);
         return new InteractiveSandboxSpec(
             base.sessionId(),

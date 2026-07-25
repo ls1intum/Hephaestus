@@ -14,96 +14,91 @@ const rows: AdminWorkspaceLlmUsageRow[] = [
 	{
 		// Both caps set; the instance cap is spent, so host-funded work is paused — the workspace's
 		// own provider keeps running, because that cap is nowhere near.
-		workspaceId: 1,
 		workspaceSlug: "example-workspace",
 		displayName: "Example Workspace",
 		instanceMonthlyBudgetUsd: 25,
-		pricedTotalCostUsd: 25.0142,
+		instanceTotalCostUsd: 25.0142,
 		instanceBudgetVerdict: "EXHAUSTED",
-		instanceFundedPaused: true,
-		byoMonthlyBudgetUsd: 40,
-		byoTotalCostUsd: 6.5,
-		byoBudgetVerdict: "WITHIN",
-		byoPaused: false,
+		instancePaused: true,
+		ownProviderMonthlyBudgetUsd: 40,
+		ownProviderTotalCostUsd: 6.5,
+		ownProviderBudgetVerdict: "WITHIN",
+		ownProviderPaused: false,
 		events: 118,
 	},
 	{
 		// Both caps set; the workspace is closing in on its own cap (86%), which is its own admins'
 		// problem to solve — the instance admin can see it but cannot raise it.
-		workspaceId: 2,
 		workspaceSlug: "hephaestus-dev",
 		displayName: "Hephaestus Dev",
 		instanceMonthlyBudgetUsd: 100,
-		pricedTotalCostUsd: 13.4821,
+		instanceTotalCostUsd: 13.4821,
 		instanceBudgetVerdict: "WITHIN",
-		instanceFundedPaused: false,
-		byoMonthlyBudgetUsd: 25,
-		byoTotalCostUsd: 21.4,
-		byoBudgetVerdict: "WITHIN",
-		byoPaused: false,
+		instancePaused: false,
+		ownProviderMonthlyBudgetUsd: 25,
+		ownProviderTotalCostUsd: 21.4,
+		ownProviderBudgetVerdict: "WITHIN",
+		ownProviderPaused: false,
 		events: 74,
 	},
 	{
 		// Instance cap only, three quarters spent, and some usage has no price on record — so the
 		// meter is a floor, which the warning line says out loud.
-		workspaceId: 4,
 		workspaceSlug: "launchpad",
 		displayName: "Launchpad",
 		instanceMonthlyBudgetUsd: 50,
-		pricedTotalCostUsd: 38.2,
+		instanceTotalCostUsd: 38.2,
 		instanceBudgetVerdict: "UNVERIFIABLE",
-		instanceFundedPaused: false,
-		byoTotalCostUsd: 0,
+		instancePaused: false,
+		ownProviderTotalCostUsd: 0,
 		events: 22,
-		byoBudgetVerdict: "WITHIN" as const,
-		byoPaused: false,
+		ownProviderBudgetVerdict: "WITHIN" as const,
+		ownProviderPaused: false,
 	},
 	{
 		// Neither cap — nobody has taken responsibility for this workspace's spend yet.
-		workspaceId: 3,
 		workspaceSlug: "sandbox",
 		displayName: "Sandbox",
-		pricedTotalCostUsd: 0.42,
+		instanceTotalCostUsd: 0.42,
 		instanceBudgetVerdict: "WITHIN",
-		byoTotalCostUsd: 0,
+		ownProviderTotalCostUsd: 0,
 		events: 3,
-		byoBudgetVerdict: "WITHIN" as const,
-		byoPaused: false,
-		instanceFundedPaused: false,
+		ownProviderBudgetVerdict: "WITHIN" as const,
+		ownProviderPaused: false,
+		instancePaused: false,
 	},
 	{
 		// Provider cap only, and spent: this workspace pauses itself without the instance admin ever
 		// setting a cap — the case that decides whether they bother setting one at all.
-		workspaceId: 5,
 		workspaceSlug: "atelier",
 		displayName: "Atelier",
-		pricedTotalCostUsd: 0,
+		instanceTotalCostUsd: 0,
 		instanceBudgetVerdict: "WITHIN",
-		byoMonthlyBudgetUsd: 12,
-		byoTotalCostUsd: 12.4,
-		byoBudgetVerdict: "EXHAUSTED",
-		byoPaused: true,
+		ownProviderMonthlyBudgetUsd: 12,
+		ownProviderTotalCostUsd: 12.4,
+		ownProviderBudgetVerdict: "EXHAUSTED",
+		ownProviderPaused: true,
 		events: 40,
-		instanceFundedPaused: false,
+		instancePaused: false,
 	},
 ];
 
 const detailReport: WorkspaceLlmUsageReport = {
 	month: "2026-07",
 	instanceMonthlyBudgetUsd: 25,
-	pricedTotalCostUsd: 25.0142,
+	instanceTotalCostUsd: 25.0142,
 	instanceBudgetVerdict: "EXHAUSTED",
-	instanceFundedPaused: true,
-	byoMonthlyBudgetUsd: 40,
-	byoTotalCostUsd: 1.5,
-	byoBudgetVerdict: "WITHIN",
-	byoPaused: false,
+	instancePaused: true,
+	ownProviderMonthlyBudgetUsd: 40,
+	ownProviderTotalCostUsd: 1.5,
+	ownProviderBudgetVerdict: "WITHIN",
+	ownProviderPaused: false,
 	unpricedEventCount: 0,
 	byJobType: [
 		{
 			jobType: "PULL_REQUEST_REVIEW",
-			pricedTotalCostUsd: 25.0142,
-			byoTotalCostUsd: 1.5,
+			instanceTotalCostUsd: 25.0142,
+			ownProviderTotalCostUsd: 1.5,
 			unpricedEventCount: 0,
 			inputTokens: 80_000,
 			outputTokens: 12_000,
@@ -116,8 +111,8 @@ const detailReport: WorkspaceLlmUsageReport = {
 	byDay: [
 		{
 			day: new Date("2026-07-05T00:00:00.000Z"),
-			pricedTotalCostUsd: 25.0142,
-			byoTotalCostUsd: 1.5,
+			instanceTotalCostUsd: 25.0142,
+			ownProviderTotalCostUsd: 1.5,
 			unpricedEventCount: 0,
 			events: 18,
 		},
@@ -139,7 +134,8 @@ const meta = {
 		isLoading: false,
 		error: null,
 		onRetry: fn(),
-		expandedWorkspaceId: null,
+		fx: undefined,
+		expandedWorkspaceSlug: null,
 		isDetailLoading: false,
 		detailError: null,
 		onRetryDetail: fn(),
@@ -166,26 +162,23 @@ export const Default: Story = {
 /** One workspace expanded to show the existing by-job and daily usage rollups. */
 export const Expanded: Story = {
 	args: {
-		expandedWorkspaceId: rows[0].workspaceId,
+		expandedWorkspaceSlug: rows[0].workspaceSlug,
 		detailReport,
 	},
 };
 
 /**
- * The same month on an instance that displays EUR. One month resolves to exactly one rate, so
- * every row carries the same block and the estimate sits under the shared-model spend — the column
- * the instance admin is accountable for — where a second line costs no width.
+ * The same month on an instance that displays EUR. One month resolves to exactly one rate, which
+ * arrives once with the report rather than on every row, and the estimate sits under each spend
+ * figure — a second line costs no column width.
  */
 export const DisplayCurrencyThisMonth: Story = {
 	args: {
-		rows: rows.map((row) => ({
-			...row,
-			fx: {
-				currencyCode: "EUR",
-				ratePerUsd: 0.878966,
-				rateDate: new Date("2026-07-24T00:00:00.000Z"),
-			},
-		})),
+		fx: {
+			currencyCode: "EUR",
+			ratePerUsd: 0.878966,
+			rateDate: new Date("2026-07-24T00:00:00.000Z"),
+		},
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
@@ -200,14 +193,11 @@ export const DisplayCurrencyThisMonth: Story = {
 export const DisplayCurrencyClosedMonth: Story = {
 	args: {
 		isCurrentMonth: false,
-		rows: rows.map((row) => ({
-			...row,
-			fx: {
-				currencyCode: "EUR",
-				ratePerUsd: 0.874312,
-				rateDate: new Date("2026-06-30T00:00:00.000Z"),
-			},
-		})),
+		fx: {
+			currencyCode: "EUR",
+			ratePerUsd: 0.874312,
+			rateDate: new Date("2026-06-30T00:00:00.000Z"),
+		},
 	},
 	play: async ({ canvasElement }) => {
 		await expect(
@@ -229,7 +219,7 @@ export const DisplayCurrencyClosedMonth: Story = {
  */
 export const ExpandedMobileReflow: Story = {
 	args: {
-		expandedWorkspaceId: rows[0].workspaceId,
+		expandedWorkspaceSlug: rows[0].workspaceSlug,
 		detailReport,
 	},
 	parameters: {
@@ -239,7 +229,7 @@ export const ExpandedMobileReflow: Story = {
 	play: async ({ canvasElement }) => {
 		const scroller = canvasElement.querySelector<HTMLElement>('[data-slot="table-container"]');
 		const panel = canvasElement.querySelector<HTMLElement>(
-			`#workspace-usage-details-${rows[0].workspaceId}`,
+			`#workspace-usage-details-${rows[0].workspaceSlug}`,
 		);
 		await expect(scroller).not.toBeNull();
 		await expect(panel).not.toBeNull();
@@ -256,7 +246,7 @@ export const ExpandedMobileReflow: Story = {
 		});
 		await expect(toggle).toHaveAttribute(
 			"aria-controls",
-			`workspace-usage-details-${rows[0].workspaceId}`,
+			`workspace-usage-details-${rows[0].workspaceSlug}`,
 		);
 	},
 };
@@ -269,17 +259,16 @@ export const NearCap: Story = {
 	args: {
 		rows: [
 			{
-				workspaceId: 10,
 				workspaceSlug: "close-call",
 				displayName: "Close Call",
 				instanceMonthlyBudgetUsd: 50,
-				pricedTotalCostUsd: 41,
+				instanceTotalCostUsd: 41,
 				instanceBudgetVerdict: "WITHIN",
-				instanceFundedPaused: false,
-				byoMonthlyBudgetUsd: 30,
-				byoTotalCostUsd: 27.6,
-				byoBudgetVerdict: "WITHIN",
-				byoPaused: false,
+				instancePaused: false,
+				ownProviderMonthlyBudgetUsd: 30,
+				ownProviderTotalCostUsd: 27.6,
+				ownProviderBudgetVerdict: "WITHIN",
+				ownProviderPaused: false,
 				events: 210,
 			},
 		],
@@ -301,17 +290,16 @@ export const PausedByBothCaps: Story = {
 	args: {
 		rows: [
 			{
-				workspaceId: 11,
 				workspaceSlug: "full-stop",
 				displayName: "Full Stop",
 				instanceMonthlyBudgetUsd: 20,
-				pricedTotalCostUsd: 20.5,
+				instanceTotalCostUsd: 20.5,
 				instanceBudgetVerdict: "EXHAUSTED",
-				instanceFundedPaused: true,
-				byoMonthlyBudgetUsd: 15,
-				byoTotalCostUsd: 15,
-				byoBudgetVerdict: "EXHAUSTED",
-				byoPaused: true,
+				instancePaused: true,
+				ownProviderMonthlyBudgetUsd: 15,
+				ownProviderTotalCostUsd: 15,
+				ownProviderBudgetVerdict: "EXHAUSTED",
+				ownProviderPaused: true,
 				events: 96,
 			},
 		],
@@ -326,16 +314,15 @@ export const ZeroInstanceCap: Story = {
 	args: {
 		rows: [
 			{
-				workspaceId: 12,
 				workspaceSlug: "frozen",
 				displayName: "Frozen",
 				instanceMonthlyBudgetUsd: 0,
-				pricedTotalCostUsd: 0,
+				instanceTotalCostUsd: 0,
 				instanceBudgetVerdict: "EXHAUSTED",
-				instanceFundedPaused: true,
-				byoTotalCostUsd: 0,
-				byoBudgetVerdict: "WITHIN",
-				byoPaused: false,
+				instancePaused: true,
+				ownProviderTotalCostUsd: 0,
+				ownProviderBudgetVerdict: "WITHIN",
+				ownProviderPaused: false,
 				events: 0,
 			},
 		],
@@ -350,9 +337,9 @@ export const NoProviderCapsSet: Story = {
 	args: {
 		rows: rows.map((row) => ({
 			...row,
-			byoMonthlyBudgetUsd: undefined,
-			byoBudgetVerdict: "WITHIN" as const,
-			byoPaused: false,
+			ownProviderMonthlyBudgetUsd: undefined,
+			ownProviderBudgetVerdict: "WITHIN" as const,
+			ownProviderPaused: false,
 		})),
 	},
 };
@@ -368,6 +355,27 @@ export const PastMonth: Story = {
 /** The rollup left-joins from workspace, so zero rows means the instance has no workspaces. */
 export const Empty: Story = {
 	args: { rows: [] },
+};
+
+/**
+ * A EUR instance whose month has no workspaces in it. The rate belongs to the month, so it is still
+ * known here — it used to be read off `rows[0]`, which this month does not have. Nothing on screen
+ * converted, so nothing is disclosed.
+ */
+export const EmptyOnDisplayCurrencyInstance: Story = {
+	args: {
+		rows: [],
+		fx: {
+			currencyCode: "EUR",
+			ratePerUsd: 0.878966,
+			rateDate: new Date("2026-07-24T00:00:00.000Z"),
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("No workspaces on this instance yet")).toBeVisible();
+		await expect(canvas.queryByText(/ECB reference rate/)).toBeNull();
+	},
 };
 
 /** Rollup still loading. */

@@ -11,7 +11,9 @@
  *   <li>{@code agent.sandbox} — Docker sandbox runtime + interactive variant for mentor</li>
  *   <li>{@code agent.runtime} — shared Pi-runtime kernel (workspace ABI, plan/result, image, proxy auth)</li>
  *   <li>{@code agent.proxy} — worker-side LLM proxy (credential-scoped per-job)</li>
- *   <li>{@code agent.config} — the {@code AgentConfig} aggregate (model + credentials) and its seeder</li>
+ *   <li>{@code agent.config} — the per-purpose {@code WorkspaceAgentBinding} (which model each
+ *       {@code AgentPurpose} runs on, plus its execution limits), the frozen {@code ConfigSnapshot},
+ *       and the binding controller/service/DTOs</li>
  *   <li>{@code agent.settings} — per-workspace agent/model bindings &amp; review policy (AI-settings API)</li>
  *   <li>{@code agent.usage} — the LLM usage ledger, admission-frozen pricing, and monthly budget cap</li>
  *   <li>{@code agent.task} — sealed Task envelope shared with sandbox containers</li>

@@ -71,14 +71,14 @@ class LlmModelResolverTest extends BaseUnitTest {
     @Test
     void shouldResolveActivePublicInstanceModelForWorkspace() {
         var ref = new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 10L, 20L, 30L);
-        assertThat(resolver.resolveProxyCredential(ref, null, null)).isNotNull();
+        assertThat(resolver.resolveProxyCredential(ref)).isNotNull();
     }
 
     @Test
     void shouldRejectDisabledInstanceModelEvenWhenConnectionIsActive() {
         model.setEnabled(false);
         var ref = new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 10L, 20L, 30L);
-        assertThat(resolver.resolveProxyCredential(ref, null, null)).isNull();
+        assertThat(resolver.resolveProxyCredential(ref)).isNull();
     }
 
     @Test
@@ -95,7 +95,7 @@ class LlmModelResolverTest extends BaseUnitTest {
     @Test
     void shouldRejectCatalogSnapshotWithoutModelIdentity() {
         var ref = new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 10L);
-        assertThat(resolver.resolveProxyCredential(ref, null, null)).isNull();
+        assertThat(resolver.resolveProxyCredential(ref)).isNull();
     }
 
     @Test
@@ -103,7 +103,7 @@ class LlmModelResolverTest extends BaseUnitTest {
         model.setVisibility(ModelVisibility.GRANTED);
         when(grants.existsByIdModelIdAndIdWorkspaceId(20L, 30L)).thenReturn(false);
         var ref = new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 10L, 20L, 30L);
-        assertThat(resolver.resolveProxyCredential(ref, null, null)).isNull();
+        assertThat(resolver.resolveProxyCredential(ref)).isNull();
     }
 
     @Test
@@ -120,7 +120,7 @@ class LlmModelResolverTest extends BaseUnitTest {
         workspaceModel.setConnection(workspaceConnection);
         workspaceModel.setEnabled(true);
         var ref = new LlmModelResolver.ConnectionRef(FundingSource.WORKSPACE, 11L, 21L, 30L);
-        assertThat(resolver.resolveProxyCredential(ref, null, null)).isNull();
+        assertThat(resolver.resolveProxyCredential(ref)).isNull();
     }
 
     @Test
@@ -143,8 +143,6 @@ class LlmModelResolverTest extends BaseUnitTest {
 
     @Test
     void shouldNotResolveLegacyProxyCredential() {
-        assertThat(
-            resolver.resolveProxyCredential(new LlmModelResolver.ConnectionRef(null, null), 99L, "openai-responses")
-        ).isNull();
+        assertThat(resolver.resolveProxyCredential(new LlmModelResolver.ConnectionRef(null, null))).isNull();
     }
 }

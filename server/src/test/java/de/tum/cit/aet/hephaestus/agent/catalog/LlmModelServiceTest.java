@@ -504,7 +504,7 @@ class LlmModelServiceTest extends BaseUnitTest {
     class Deletion {
 
         @Test
-        void deletingAModelStillBoundToAnAgentConfigIsRejected() {
+        void deletingAModelStillBoundToAnAgentBindingIsRejected() {
             when(agentBindingRepository.existsByInstanceModelId(7L)).thenReturn(true);
 
             assertThatThrownBy(() -> modelService.delete(7L)).isInstanceOf(LlmModelInUseException.class);

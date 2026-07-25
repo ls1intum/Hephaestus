@@ -98,9 +98,9 @@ public class LlmUsageService {
             .toList();
 
         BigDecimal pricedTotal = usageRepository.sumCost(workspaceId, window.from(), window.to());
-        BigDecimal byoTotal = usageRepository.sumByoCost(workspaceId, window.from(), window.to());
+        BigDecimal ownProviderTotal = usageRepository.sumByoCost(workspaceId, window.from(), window.to());
         BigDecimal instanceBudget = workspace.getMonthlyLlmBudgetUsd();
-        BigDecimal byoBudget = workspace.getMonthlyByoLlmBudgetUsd();
+        BigDecimal ownProviderBudget = workspace.getMonthlyByoLlmBudgetUsd();
         long uncosted = usageRepository.countUncosted(workspaceId, window.from(), window.to());
         // Each purse is judged only against blind spots its own owner can clear: an unpriced shared
         // model is the host's to price, an unpriced BYO model the workspace's.
@@ -109,10 +109,10 @@ public class LlmUsageService {
             usageRepository.existsUnpricedInstanceFunded(workspaceId, window.from(), window.to()),
             instanceBudget
         );
-        LlmBudgetVerdict byoVerdict = LlmBudgetService.verdictFor(
-            byoTotal,
+        LlmBudgetVerdict ownProviderVerdict = LlmBudgetService.verdictFor(
+            ownProviderTotal,
             usageRepository.existsUnpricedWorkspaceFunded(workspaceId, window.from(), window.to()),
-            byoBudget
+            ownProviderBudget
         );
         // The paused flags mirror LlmBudgetService's decision — the SAME live gate that
         // AgentJobService.submit / the claim-time recheck / MentorChatService actually enforce, rather
@@ -124,12 +124,12 @@ public class LlmUsageService {
         return new WorkspaceLlmUsageReportDTO(
             month.toString(),
             instanceBudget,
-            byoBudget,
+            ownProviderBudget,
             pricedTotal,
-            byoTotal,
+            ownProviderTotal,
             uncosted,
             instanceVerdict,
-            byoVerdict,
+            ownProviderVerdict,
             decision.blocks(FundingSource.INSTANCE),
             decision.blocks(FundingSource.WORKSPACE),
             byJobType,
@@ -139,7 +139,7 @@ public class LlmUsageService {
     }
 
     /**
-     * Set or clear this workspace's own monthly cap on its own-provider (BYO) spend (#1368).
+     * Set or clear this workspace's own monthly cap on its own-provider spend (#1368).
      *
      * <p>The workspace-side mirror of {@code LlmUsageAdminService#updateBudget}: same instrument,
      * same audit trail, different purse. A workspace admin owns this one because it governs money the
@@ -150,25 +150,25 @@ public class LlmUsageService {
      * effect on the next poll rather than up to an hour later.
      */
     @Transactional
-    public void updateByoBudget(Long workspaceId, @Nullable BigDecimal monthlyByoLlmBudgetUsd) {
+    public void updateOwnProviderBudget(Long workspaceId, @Nullable BigDecimal monthlyBudgetUsd) {
         Workspace workspace = workspaceRepository
             .findById(workspaceId)
             .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
         BigDecimal before = workspace.getMonthlyByoLlmBudgetUsd();
-        workspace.setMonthlyByoLlmBudgetUsd(monthlyByoLlmBudgetUsd);
+        workspace.setMonthlyByoLlmBudgetUsd(monthlyBudgetUsd);
         workspaceRepository.save(workspace);
         configAudit.record(
             ConfigAuditEntry.updated(
-                ConfigAuditEntityType.WORKSPACE_BYO_LLM_BUDGET,
+                ConfigAuditEntityType.WORKSPACE_OWN_PROVIDER_LLM_BUDGET,
                 workspaceId,
                 workspaceId,
-                new ByoLlmBudgetSnapshot(before),
-                new ByoLlmBudgetSnapshot(monthlyByoLlmBudgetUsd)
+                new OwnProviderLlmBudgetSnapshot(before),
+                new OwnProviderLlmBudgetSnapshot(monthlyBudgetUsd)
             )
         );
         jobRepository.releaseBudgetHolds(workspaceId, Instant.now());
     }
 
     /** The cap itself — a plain amount, no credential material. {@code null} = uncapped. */
-    public record ByoLlmBudgetSnapshot(@Nullable BigDecimal monthlyByoLlmBudgetUsd) implements ConfigAuditSnapshot {}
+    public record OwnProviderLlmBudgetSnapshot(@Nullable BigDecimal monthlyBudgetUsd) implements ConfigAuditSnapshot {}
 }

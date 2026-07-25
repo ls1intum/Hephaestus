@@ -133,7 +133,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
             var routing = workspaceFundedRouting();
             authenticate(routing);
             when(budgetGate.isBlocked(routing.workspaceId(), FundingSource.WORKSPACE)).thenReturn(false);
-            when(resolver.resolveProxyCredential(any(), any(), any())).thenReturn(null);
+            when(resolver.resolveProxyCredential(any())).thenReturn(null);
 
             var result = controller.proxy(
                 request("POST", "/internal/llm/chat/completions"),
@@ -408,7 +408,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
             7L,
             8L,
             9L,
-            null,
             java.util.UUID.fromString("00000000-0000-0000-0000-0000000000aa")
         );
     }
@@ -423,7 +422,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
             7L,
             8L,
             9L,
-            null,
             java.util.UUID.fromString("00000000-0000-0000-0000-0000000000aa")
         );
     }
@@ -452,9 +450,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
                         routing.modelId(),
                         routing.workspaceId()
                     )
-                ),
-                eq(routing.legacyConfigId()),
-                eq(routing.apiProtocol())
+                )
             )
         ).thenReturn(credential);
     }

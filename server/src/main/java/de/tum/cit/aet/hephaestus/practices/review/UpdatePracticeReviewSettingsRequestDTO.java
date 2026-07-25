@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.agent.settings;
+package de.tum.cit.aet.hephaestus.practices.review;
 
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewField;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -12,7 +12,7 @@ import java.util.Set;
  * the value patch, so a field can be reset and re-set in one request.
  */
 @Schema(description = "Update per-workspace practice-review policy. Null fields unchanged; 'reset' clears to inherit.")
-public record UpdatePracticeReviewSettingsDTO(
+public record UpdatePracticeReviewSettingsRequestDTO(
     @Schema(description = "Run practice review for all developers (vs only the run_practice_review role)")
     Boolean runForAllUsers,
     @Schema(description = "Skip practice review for draft PRs/MRs") Boolean skipDrafts,

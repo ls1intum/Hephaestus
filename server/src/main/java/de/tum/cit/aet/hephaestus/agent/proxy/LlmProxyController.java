@@ -120,9 +120,7 @@ class LlmProxyController {
                 routing.connectionId(),
                 routing.modelId(),
                 routing.workspaceId()
-            ),
-            routing.legacyConfigId(),
-            routing.apiProtocol()
+            )
         );
         if (credential == null) {
             incrementErrors(routing.apiProtocol());

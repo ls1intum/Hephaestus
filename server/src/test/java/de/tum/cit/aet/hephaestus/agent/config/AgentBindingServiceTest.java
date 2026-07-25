@@ -71,7 +71,7 @@ class AgentBindingServiceTest extends BaseUnitTest {
         when(llmModelRepository.findById(99L)).thenReturn(Optional.of(model));
         when(bindingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        var request = new AgentBindingUpsertRequestDTO(99L, null, 300, 2, true, true);
+        var request = new AgentBindingRequestDTO(99L, null, 300, 2, true, true);
         WorkspaceAgentBinding saved = service.upsertBinding(context(), AgentPurpose.PRACTICE_DETECTION, request);
 
         assertThat(saved.getWorkspace()).isSameAs(w);
@@ -101,7 +101,7 @@ class AgentBindingServiceTest extends BaseUnitTest {
             new IllegalStateException("unavailable")
         );
 
-        var request = new AgentBindingUpsertRequestDTO(99L, null, null, null, null, true);
+        var request = new AgentBindingRequestDTO(99L, null, null, null, null, true);
         assertThatThrownBy(() ->
             service.upsertBinding(context(), AgentPurpose.PRACTICE_DETECTION, request)
         ).isInstanceOf(IllegalArgumentException.class);
@@ -114,7 +114,7 @@ class AgentBindingServiceTest extends BaseUnitTest {
         when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(w));
         when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.MENTOR)).thenReturn(Optional.empty());
 
-        var bothNull = new AgentBindingUpsertRequestDTO(null, null, null, null, null, true);
+        var bothNull = new AgentBindingRequestDTO(null, null, null, null, null, true);
         assertThatThrownBy(() -> service.upsertBinding(context(), AgentPurpose.MENTOR, bothNull)).isInstanceOf(
             IllegalArgumentException.class
         );

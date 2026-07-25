@@ -74,7 +74,7 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
 
         webTestClient
             .put()
-            .uri("/workspaces/{slug}/agent-bindings/{purpose}", workspace.getWorkspaceSlug(), "PRACTICE_DETECTION")
+            .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), "PRACTICE_DETECTION")
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(Map.of("instanceModelId", model.getId(), "enabled", true))
@@ -86,7 +86,7 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
         // session, which is exactly the path that regressed.
         webTestClient
             .get()
-            .uri("/workspaces/{slug}/agent-bindings", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/agents", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -111,7 +111,7 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
 
         webTestClient
             .put()
-            .uri("/workspaces/{slug}/agent-bindings/{purpose}", workspace.getWorkspaceSlug(), "MENTOR")
+            .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), "MENTOR")
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(Map.of("instanceModelId", model.getId(), "enabled", false))
@@ -121,7 +121,7 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
 
         webTestClient
             .get()
-            .uri("/workspaces/{slug}/agent-bindings", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/agents", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -134,7 +134,7 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
 
         webTestClient
             .delete()
-            .uri("/workspaces/{slug}/agent-bindings/{purpose}", workspace.getWorkspaceSlug(), "MENTOR")
+            .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), "MENTOR")
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -142,7 +142,7 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
 
         webTestClient
             .get()
-            .uri("/workspaces/{slug}/agent-bindings", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/agents", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -163,7 +163,7 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
 
         webTestClient
             .put()
-            .uri("/workspaces/{slug}/agent-bindings/{purpose}", workspace.getWorkspaceSlug(), "PRACTICE_DETECTION")
+            .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), "PRACTICE_DETECTION")
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(Map.of("instanceModelId", model.getId(), "enabled", true))
@@ -188,7 +188,7 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
 
         webTestClient
             .get()
-            .uri("/workspaces/{slug}/agent-bindings", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/agents", workspace.getWorkspaceSlug())
             .exchange()
             .expectStatus()
             .isUnauthorized();

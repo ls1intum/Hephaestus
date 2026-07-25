@@ -1,0 +1,53 @@
+package de.tum.cit.aet.hephaestus.agent.usage;
+
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageDTOs.UpdateLlmBudgetRequestDTO;
+import de.tum.cit.aet.hephaestus.core.Audited;
+import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
+import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
+import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+
+/**
+ * The workspace's own monthly cap on spend through its own connected provider.
+ *
+ * <p>The exact instrument an instance admin has over the host-funded purse
+ * ({@code PUT /admin/workspaces/{workspaceSlug}/llm/budget}), for the money this workspace actually
+ * pays: same path tail, same body, same audit shape. It cannot touch the host-funded cap, so a
+ * workspace admin can only ever restrict their own spending, never loosen the instance's protection.
+ */
+@WorkspaceScopedController
+@RequestMapping("/llm/budget")
+@Tag(name = "LLM Usage", description = "Per-workspace LLM spend rollup and budget status")
+@Validated
+public class WorkspaceLlmBudgetController {
+
+    private final LlmUsageService llmUsageService;
+
+    public WorkspaceLlmBudgetController(LlmUsageService llmUsageService) {
+        this.llmUsageService = llmUsageService;
+    }
+
+    @PutMapping
+    @Operation(
+        summary = "Set or clear this workspace's monthly cap on its own-provider LLM spend",
+        operationId = "updateWorkspaceLlmBudget"
+    )
+    @ApiResponse(responseCode = "204", description = "Cap updated")
+    @RequireAtLeastWorkspaceAdmin
+    @Audited("WORKSPACE_OWN_PROVIDER_LLM_BUDGET")
+    public ResponseEntity<Void> updateBudget(
+        WorkspaceContext workspaceContext,
+        @Valid @RequestBody UpdateLlmBudgetRequestDTO request
+    ) {
+        llmUsageService.updateOwnProviderBudget(workspaceContext.id(), request.monthlyBudgetUsd());
+        return ResponseEntity.noContent().build();
+    }
+}

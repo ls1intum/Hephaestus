@@ -4,7 +4,7 @@ import { BudgetAmountDialog } from "./BudgetAmountDialog";
 
 /**
  * The money-cap editor behind both budget dialogs — `SetBudgetDialog` (the shared-model budget)
- * and `SetByoBudgetDialog` (the workspace's provider cap). It owns the rules both caps
+ * and `SetOwnProviderBudgetDialog` (the workspace's provider cap). It owns the rules both caps
  * share: USD, at least $0, at most two decimals, `null` to remove, `0` to pause immediately, and a
  * server rejection shown against the field rather than in a toast. Callers supply only copy.
  */

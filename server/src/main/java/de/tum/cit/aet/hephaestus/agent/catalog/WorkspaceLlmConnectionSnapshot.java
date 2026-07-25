@@ -7,7 +7,8 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Audit snapshot of a workspace's "bring your own" LLM connection (#1368) — "who rotated the key",
- * "who repointed the endpoint". Same redaction discipline as {@code agent.config.AgentConfigSnapshot}:
+ * "who repointed the endpoint". A connection row is the one place a credential lives, so the snapshot
+ * records only non-secret facts about it:
  *
  * <ul>
  *   <li>{@code WorkspaceLlmConnection.apiKey} is encrypted at rest, but its getter returns plaintext, so
@@ -41,9 +42,9 @@ record WorkspaceLlmConnectionSnapshot(
     }
 
     /**
-     * Reduces a base URL to scheme, host, port and path — same treatment as
-     * {@code AgentConfigSnapshot#credentialFreeBaseUrl}. Unparseable input collapses to a marker rather
-     * than being passed through, so a malformed value cannot smuggle a credential past this.
+     * Reduces a base URL to scheme, host, port and path, dropping userinfo, query and fragment — the
+     * three places a credential can hide in a URL. Unparseable input collapses to a marker rather than
+     * being passed through, so a malformed value cannot smuggle a credential past this.
      */
     private static @Nullable String credentialFreeBaseUrl(@Nullable String url) {
         if (url == null) {

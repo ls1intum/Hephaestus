@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.agent.usage;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageDTOs.AdminWorkspaceLlmUsageDTO;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageDTOs.WorkspaceLlmUsageReportDTO;
 import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRate;
 import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateRepository;
@@ -13,16 +12,15 @@ import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
-import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
@@ -91,7 +89,7 @@ class LlmUsageFxDisplayIntegrationTest extends AbstractWorkspaceIntegrationTest 
 
         WorkspaceLlmUsageReportDTO report = webTestClient
             .get()
-            .uri("/workspaces/{slug}/llm-usage", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/llm/usage", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -107,36 +105,50 @@ class LlmUsageFxDisplayIntegrationTest extends AbstractWorkspaceIntegrationTest 
         assertThat(report.fx().ratePerUsd()).isEqualByComparingTo("0.878966");
         assertThat(report.fx().rateDate()).isEqualTo(today);
         // The amounts themselves stay USD: conversion is the client's, and it is labelled as an estimate.
-        assertThat(report.pricedTotalCostUsd()).isEqualByComparingTo("10.00");
+        assertThat(report.instanceTotalCostUsd()).isEqualByComparingTo("10.00");
     }
 
+    /**
+     * The admin envelope's reason for existing (#1368). {@code month} and {@code fx} are facts about
+     * the REQUEST, not about any workspace in it: one month resolves to exactly one rate. With TWO
+     * workspaces spending, they must therefore appear ONCE — on the envelope — and not be copied onto
+     * every row, which is what forced a client to reach into {@code rows[0]} for a response-level fact.
+     */
     @Test
-    void adminRollupCarriesTheSameRateOnEveryRow() {
+    void theAdminRollupReportsMonthAndRateOnceOnTheEnvelopeAndNeverOnARow() {
         Workspace first = setupWorkspaceWithAdmin("fx-admin-a");
         Workspace second = setupWorkspaceWithAdmin("fx-admin-b");
         seedEvent(first, "1.00");
         seedEvent(second, "2.00");
         LocalDate today = seedTodaysRate();
 
-        List<AdminWorkspaceLlmUsageDTO> rollups = webTestClient
+        byte[] body = webTestClient
             .get()
-            .uri("/admin/llm-usage")
+            .uri("/admin/llm/usage?month={month}", CURRENT.toString())
             .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
             .exchange()
             .expectStatus()
             .isOk()
-            .expectBody(new ParameterizedTypeReference<List<AdminWorkspaceLlmUsageDTO>>() {})
+            .expectBody()
+            .jsonPath("$.month")
+            .isEqualTo(CURRENT.toString())
+            .jsonPath("$.workspaces.length()")
+            .isEqualTo(2)
+            .jsonPath("$.fx.currencyCode")
+            .isEqualTo("EUR")
+            .jsonPath("$.fx.rateDate")
+            .isEqualTo(today.toString())
+            .jsonPath("$.fx.ratePerUsd")
+            .value(rate -> assertThat(new BigDecimal(rate.toString())).isEqualByComparingTo("0.878966"))
+            .jsonPath("$.workspaces[0].fx")
+            .doesNotExist()
+            .jsonPath("$.workspaces[1].fx")
+            .doesNotExist()
             .returnResult()
             .getResponseBody();
 
-        assertThat(rollups).hasSize(2);
-        // One month resolves to exactly one rate, so a client may read it off any row.
-        assertThat(rollups).allSatisfy(row -> {
-            assertThat(row.fx()).isNotNull();
-            assertThat(row.fx().currencyCode()).isEqualTo("EUR");
-            assertThat(row.fx().ratePerUsd()).isEqualByComparingTo("0.878966");
-            assertThat(row.fx().rateDate()).isEqualTo(today);
-        });
+        // Once for the whole response, not once per row: the key occurs a single time on the wire.
+        assertThat(new String(body, StandardCharsets.UTF_8).split("\"fx\"", -1)).hasSize(2);
     }
 
     @Test
@@ -153,7 +165,7 @@ class LlmUsageFxDisplayIntegrationTest extends AbstractWorkspaceIntegrationTest 
         // A conversion drifting a week behind reality is worse than none: the UI falls back to USD.
         webTestClient
             .get()
-            .uri("/workspaces/{slug}/llm-usage", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/llm/usage", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()

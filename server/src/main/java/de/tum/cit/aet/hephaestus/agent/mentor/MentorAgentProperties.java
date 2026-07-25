@@ -7,8 +7,8 @@ import org.springframework.validation.annotation.Validated;
 
 /**
  * Instance-level mentor knobs. LLM provider / credentials / model / timeout all come from the
- * workspace-scoped {@link de.tum.cit.aet.hephaestus.agent.config.AgentConfig} (via
- * {@link de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver}); the only knobs worth setting
+ * workspace's {@code MENTOR} {@link de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding} (via
+ * {@link de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver}); the only knob worth setting
  * per deployment is the prompt-size guard.
  */
 @Validated

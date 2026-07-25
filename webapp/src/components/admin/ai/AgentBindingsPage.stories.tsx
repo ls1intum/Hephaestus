@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { HttpResponse, http } from "msw";
 import { expect, screen, userEvent, within } from "storybook/test";
-import type { AgentBinding, AiSettingsView, AvailableLlmModel } from "@/api/types.gen";
+import type { AgentBinding, AvailableLlmModel } from "@/api/types.gen";
 import { expectControlOnScreen, expectPageReflows } from "@/test/reflow";
 import { AgentBindingsPage } from "./AgentBindingsPage";
 import { mockAvailableModels } from "./storyMockData";
@@ -16,26 +16,21 @@ const detectionBinding: AgentBinding = {
 	allowInternet: false,
 };
 
+/** Both purposes are turned on for the workspace, so each card offers a real binding form. */
+const workspace = { practicesEnabled: true, mentorEnabled: true };
+
 /** Workspace providers are covered by their own panel's stories, so they stay out of the way here. */
-const settings: AiSettingsView = {
-	practicesEnabled: true,
-	mentorEnabled: true,
-	workspaceConnectionsAllowed: false,
-	cooldownMinutes: 30,
-	deliverToMerged: false,
-	runForAllUsers: true,
-	skipDrafts: true,
-};
+const llmSettings = { ownProviderAllowed: false };
 
 const usage = {
 	month: "2026-07",
-	pricedTotalCostUsd: 0,
-	byoTotalCostUsd: 0,
+	instanceTotalCostUsd: 0,
+	ownProviderTotalCostUsd: 0,
 	unpricedEventCount: 0,
-	instanceFundedPaused: false,
-	byoPaused: false,
+	instancePaused: false,
+	ownProviderPaused: false,
 	instanceBudgetVerdict: "WITHIN",
-	byoBudgetVerdict: "WITHIN",
+	ownProviderBudgetVerdict: "WITHIN",
 	byDay: [],
 	byJobType: [],
 };
@@ -48,11 +43,12 @@ function handlers({
 	models?: AvailableLlmModel[];
 } = {}) {
 	return [
-		http.get("*/workspaces/acme/agent-bindings", () => HttpResponse.json(bindings)),
-		http.get("*/workspaces/acme/ai-settings", () => HttpResponse.json(settings)),
+		http.get("*/workspaces/acme/agents", () => HttpResponse.json(bindings)),
+		http.get("*/workspaces/acme/llm/settings", () => HttpResponse.json(llmSettings)),
 		http.get("*/workspaces/acme/llm/available-models", () => HttpResponse.json(models)),
-		http.get("*/workspaces/acme/llm-usage", () => HttpResponse.json(usage)),
-		http.put("*/workspaces/acme/agent-bindings/*", () => HttpResponse.json(detectionBinding)),
+		http.get("*/workspaces/acme/llm/usage", () => HttpResponse.json(usage)),
+		http.get("*/workspaces/acme", () => HttpResponse.json(workspace)),
+		http.put("*/workspaces/acme/agents/*", () => HttpResponse.json(detectionBinding)),
 	];
 }
 
@@ -88,7 +84,7 @@ export const LoadForbidden: Story = {
 		// MSW picks the first matching handler, so this 403 shadows the successful one below it.
 		msw: {
 			handlers: [
-				http.get("*/workspaces/acme/agent-bindings", () =>
+				http.get("*/workspaces/acme/agents", () =>
 					HttpResponse.json(
 						// A faithful RFC 9457 ProblemDetail: the server puts `status` in the BODY, and the
 						// generated client throws that body verbatim — so the body is where the alert reads
@@ -98,7 +94,7 @@ export const LoadForbidden: Story = {
 							title: "Forbidden",
 							status: 403,
 							detail: "You are not an admin of this workspace.",
-							instance: "/workspaces/acme/agent-bindings",
+							instance: "/workspaces/acme/agents",
 						},
 						{ status: 403 },
 					),

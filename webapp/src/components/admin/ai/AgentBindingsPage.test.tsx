@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
-import type { AgentBinding, AiSettingsView, AvailableLlmModel } from "@/api/types.gen";
+import type { AgentBinding, AvailableLlmModel } from "@/api/types.gen";
 import { server } from "@/mocks/server";
 import { AgentBindingsPage } from "./AgentBindingsPage";
 
@@ -25,36 +25,33 @@ const detectionBinding: AgentBinding = {
 	allowInternet: false,
 };
 
-const settings: AiSettingsView = {
-	runForAllUsers: false,
-	skipDrafts: true,
-	deliverToMerged: false,
-	cooldownMinutes: 15,
-	practicesEnabled: true,
-	mentorEnabled: true,
-	workspaceConnectionsAllowed: false,
-};
+/** Whether a purpose may run at all is a property of the workspace, not of the AI config. */
+const workspace = { practicesEnabled: true, mentorEnabled: true };
+
+/** Registering providers of your own is an instance-level permission, asked for separately. */
+const llmSettings = { ownProviderAllowed: false };
 
 function renderPage(bindings: AgentBinding[] = [detectionBinding], captured?: { body?: unknown }) {
 	server.use(
-		http.get("*/workspaces/demo/agent-bindings", () => HttpResponse.json(bindings)),
-		http.get("*/workspaces/demo/ai-settings", () => HttpResponse.json(settings)),
+		http.get("*/workspaces/demo/agents", () => HttpResponse.json(bindings)),
+		http.get("*/workspaces/demo/llm/settings", () => HttpResponse.json(llmSettings)),
 		http.get("*/workspaces/demo/llm/available-models", () => HttpResponse.json([model])),
-		http.get("*/workspaces/demo/llm-usage", () =>
+		http.get("*/workspaces/demo", () => HttpResponse.json(workspace)),
+		http.get("*/workspaces/demo/llm/usage", () =>
 			HttpResponse.json({
 				month: "2026-07",
-				pricedTotalCostUsd: 0,
-				byoTotalCostUsd: 0,
+				instanceTotalCostUsd: 0,
+				ownProviderTotalCostUsd: 0,
 				unpricedEventCount: 0,
-				instanceFundedPaused: false,
-				byoPaused: false,
+				instancePaused: false,
+				ownProviderPaused: false,
 				instanceBudgetVerdict: "WITHIN",
-				byoBudgetVerdict: "WITHIN",
+				ownProviderBudgetVerdict: "WITHIN",
 				byDay: [],
 				byJobType: [],
 			}),
 		),
-		http.put("*/workspaces/demo/agent-bindings/PRACTICE_DETECTION", async ({ request }) => {
+		http.put("*/workspaces/demo/agents/PRACTICE_DETECTION", async ({ request }) => {
 			if (captured) captured.body = await request.json();
 			return HttpResponse.json({ ...detectionBinding, ready: true });
 		}),

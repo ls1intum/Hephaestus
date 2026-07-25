@@ -337,8 +337,6 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         job.setConfigSnapshot(
             new ConfigSnapshot(
                 ConfigSnapshot.SCHEMA_VERSION,
-                agentBinding.getId(),
-                null,
                 "openai-completions",
                 "https://api.openai.com/v1",
                 "test-model",
@@ -351,7 +349,8 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                 instanceModel.getId(),
                 workspace.getId(),
                 600,
-                false
+                false,
+                null
             )
                 .withPriceSnapshot(
                     new LlmPriceSnapshot(

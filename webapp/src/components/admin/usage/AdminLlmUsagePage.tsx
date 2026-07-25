@@ -54,7 +54,7 @@ export interface AdminLlmUsagePageProps {
 	onPrevMonth: () => void;
 	onNextMonth: () => void;
 	/** Open the provider-cap editor. The dialog itself lives in the route container. */
-	onEditByoCap: () => void;
+	onEditOwnProviderCap: () => void;
 	/** Injected so burn-rate projections are deterministic in tests and stories. */
 	now?: Date;
 }
@@ -80,21 +80,21 @@ export function AdminLlmUsagePage({
 	onRetry,
 	onPrevMonth,
 	onNextMonth,
-	onEditByoCap,
+	onEditOwnProviderCap,
 	now = new Date(),
 }: AdminLlmUsagePageProps) {
 	// The confirmed (priced) spend on each side — the figures the two caps compare against. When
 	// some usage this month has no price on record, each is a floor, not the full total (see
 	// `unpricedEventCount` below).
-	const sharedSpend = report?.pricedTotalCostUsd ?? 0;
-	const providerSpend = report?.byoTotalCostUsd ?? 0;
+	const sharedSpend = report?.instanceTotalCostUsd ?? 0;
+	const providerSpend = report?.ownProviderTotalCostUsd ?? 0;
 	const sharedBudget = report?.instanceMonthlyBudgetUsd;
-	const providerCap = report?.byoMonthlyBudgetUsd;
+	const providerCap = report?.ownProviderMonthlyBudgetUsd;
 	const sharedPercent = budgetUsedPercent(sharedSpend, sharedBudget);
 	const providerPercent = budgetUsedPercent(providerSpend, providerCap);
 	const unpricedEventCount = report?.unpricedEventCount ?? 0;
-	const providerPaused = isCurrentMonth && (report?.byoPaused ?? false);
-	const sharedPaused = isCurrentMonth && (report?.instanceFundedPaused ?? false);
+	const providerPaused = isCurrentMonth && (report?.ownProviderPaused ?? false);
+	const sharedPaused = isCurrentMonth && (report?.instancePaused ?? false);
 	// A cap that is already at the wall is reported by its pause banner; warning "you've used 100%"
 	// underneath it would just say the same thing more quietly.
 	const providerWarning =
@@ -193,12 +193,12 @@ export function AdminLlmUsagePage({
 					{providerPaused && (
 						<BudgetExhaustedAlert
 							scope="own"
-							verdict={report.byoBudgetVerdict}
+							verdict={report.ownProviderBudgetVerdict}
 							month={month}
 							unpricedEventCount={unpricedEventCount}
 							context="usage"
 							workspaceSlug={workspaceSlug}
-							onEditByoCap={onEditByoCap}
+							onEditOwnProviderCap={onEditOwnProviderCap}
 						/>
 					)}
 					{sharedPaused && (
@@ -270,11 +270,14 @@ export function AdminLlmUsagePage({
 								capUsd={providerCap}
 								percent={providerPercent}
 								paused={providerPaused}
-								onEditByoCap={onEditByoCap}
+								onEditOwnProviderCap={onEditOwnProviderCap}
 								titleFx={providerTitleFx}
 							/>
 						) : (
-							<NoProviderCard workspaceSlug={workspaceSlug} onEditByoCap={onEditByoCap} />
+							<NoProviderCard
+								workspaceSlug={workspaceSlug}
+								onEditOwnProviderCap={onEditOwnProviderCap}
+							/>
 						)}
 					</div>
 
@@ -478,7 +481,7 @@ interface ProviderCapCardProps {
 	capUsd: number | undefined;
 	percent: number | undefined;
 	paused: boolean;
-	onEditByoCap: () => void;
+	onEditOwnProviderCap: () => void;
 	/** The estimate that trails the headline, or `null` when there is nothing to convert. */
 	titleFx: FxConversion | null;
 }
@@ -490,7 +493,7 @@ function ProviderCapCard({
 	capUsd,
 	percent,
 	paused,
-	onEditByoCap,
+	onEditOwnProviderCap,
 	titleFx,
 }: ProviderCapCardProps) {
 	return (
@@ -530,7 +533,7 @@ function ProviderCapCard({
 				{/* A set cap is already the "of $50" in the headline and the meter under it; only its
 				    absence still needs saying. */}
 				{capUsd == null && <p className="text-sm text-muted-foreground">No cap set.</p>}
-				<Button variant="outline" size="sm" onClick={onEditByoCap}>
+				<Button variant="outline" size="sm" onClick={onEditOwnProviderCap}>
 					{capUsd != null ? "Change cap" : "Set cap"}
 				</Button>
 			</CardContent>
@@ -540,11 +543,11 @@ function ProviderCapCard({
 
 interface NoProviderCardProps {
 	workspaceSlug: string;
-	onEditByoCap: () => void;
+	onEditOwnProviderCap: () => void;
 }
 
 /** Quiet call-to-action: no provider cap and nothing has run on a provider of their own. */
-function NoProviderCard({ workspaceSlug, onEditByoCap }: NoProviderCardProps) {
+function NoProviderCard({ workspaceSlug, onEditOwnProviderCap }: NoProviderCardProps) {
 	return (
 		<Card>
 			<CardHeader>
@@ -557,7 +560,7 @@ function NoProviderCard({ workspaceSlug, onEditByoCap }: NoProviderCardProps) {
 			</CardHeader>
 			<CardContent className="space-y-3">
 				<p className="text-sm text-muted-foreground">No cap set.</p>
-				<Button variant="outline" size="sm" onClick={onEditByoCap}>
+				<Button variant="outline" size="sm" onClick={onEditOwnProviderCap}>
 					Set cap
 				</Button>
 			</CardContent>

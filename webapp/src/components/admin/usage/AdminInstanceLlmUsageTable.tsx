@@ -25,7 +25,7 @@ import { LlmUsageByDayTable, LlmUsageByJobTypeTable } from "./LlmUsageBreakdownT
  * The admin rollup row, widened with the workspace's provider-cap fields.
  *
  * The two caps are different people's money and are never summed: `instanceMonthlyBudgetUsd` is the
- * *instance cap* an instance admin sets over host-funded shared-model spend, while the `byo*` fields
+ * *instance cap* an instance admin sets over host-funded shared-model spend, while the `ownProvider*` fields
  * below describe the *provider cap* the workspace's own admins set over spend on their own provider.
  * They pause independently.
  *
@@ -38,6 +38,12 @@ export interface AdminInstanceLlmUsageTableProps {
 	/** Per-workspace month rollups, already sorted by the container (cost desc). */
 	rows: AdminWorkspaceLlmUsageRow[];
 	/**
+	 * The month's display-currency rate, from the report envelope rather than from any row. One month
+	 * resolves to exactly one rate, and it applies to a month with no workspaces in it just as much as
+	 * to a busy one — which is what reading it off `rows[0]` used to get wrong.
+	 */
+	fx?: Fx;
+	/**
 	 * Whether the shown month is the current calendar month (UTC). The verdicts compare a
 	 * workspace's *current* caps against the selected month's spend, so they only describe a real
 	 * pause for the current month — past months show a neutral status instead.
@@ -49,7 +55,7 @@ export interface AdminInstanceLlmUsageTableProps {
 	/** Retry the failed rollup load. */
 	onRetry?: () => void;
 	/** The workspace whose detail row is expanded, or null when all rows are collapsed. */
-	expandedWorkspaceId: number | null;
+	expandedWorkspaceSlug: string | null;
 	/** Detailed rollup for the expanded workspace. */
 	detailReport?: WorkspaceLlmUsageReport;
 	isDetailLoading: boolean;
@@ -65,8 +71,8 @@ export interface AdminInstanceLlmUsageTableProps {
 const SKELETON_COLUMNS = ["w-32", "w-16", "w-24", "w-16", "w-24", "w-28", "w-12", null];
 
 /** Stable target for the toggle's `aria-controls` and the panel's own `id`. */
-function detailPanelId(workspaceId: number): string {
-	return `workspace-usage-details-${workspaceId}`;
+function detailPanelId(workspaceSlug: string): string {
+	return `workspace-usage-details-${workspaceSlug}`;
 }
 
 /**
@@ -127,11 +133,12 @@ function capUsage(input: {
  */
 export function AdminInstanceLlmUsageTable({
 	rows,
+	fx,
 	isCurrentMonth,
 	isLoading,
 	error,
 	onRetry,
-	expandedWorkspaceId,
+	expandedWorkspaceSlug,
 	detailReport,
 	isDetailLoading,
 	detailError,
@@ -161,17 +168,14 @@ export function AdminInstanceLlmUsageTable({
 	// its own two tables each opened a second horizontal scroller inside the first — two-dimensional
 	// scrolling to read a breakdown, which is exactly what WCAG 2.2 SC 1.4.10 rules out. Out here it
 	// reflows to the page width at any viewport and the `aria-controls` relationship is unchanged.
-	const expandedRow = rows.find((row) => row.workspaceId === expandedWorkspaceId);
-	// One month resolves to exactly one rate, so every row of a response carries the same block —
-	// read it off the first row rather than reconciling nine copies of it.
-	const fx: Fx = rows[0]?.fx;
+	const expandedRow = rows.find((row) => row.workspaceSlug === expandedWorkspaceSlug);
 	// The caption explains estimates that are actually on screen; with every workspace at $0 there
 	// are none, and a footnote about them would be noise. Both spend columns convert, so both count
 	// — a page that converted only provider spend still owes the reader its rate.
 	const hasConversion = rows.some(
 		(row) =>
-			spendConversion(row.pricedTotalCostUsd, fx) != null ||
-			spendConversion(row.byoTotalCostUsd, fx) != null,
+			spendConversion(row.instanceTotalCostUsd, fx) != null ||
+			spendConversion(row.ownProviderTotalCostUsd, fx) != null,
 	);
 
 	return (
@@ -213,23 +217,23 @@ export function AdminInstanceLlmUsageTable({
 				) : (
 					<TableBody>
 						{rows.map((row) => {
-							const isExpanded = expandedWorkspaceId === row.workspaceId;
+							const isExpanded = expandedWorkspaceSlug === row.workspaceSlug;
 							const shared = capUsage({
 								cap: row.instanceMonthlyBudgetUsd,
-								spend: row.pricedTotalCostUsd,
+								spend: row.instanceTotalCostUsd,
 								verdict: row.instanceBudgetVerdict,
-								paused: row.instanceFundedPaused,
+								paused: row.instancePaused,
 								isCurrentMonth,
 							});
 							const provider = capUsage({
-								cap: row.byoMonthlyBudgetUsd,
-								spend: row.byoTotalCostUsd,
-								verdict: row.byoBudgetVerdict,
-								paused: row.byoPaused,
+								cap: row.ownProviderMonthlyBudgetUsd,
+								spend: row.ownProviderTotalCostUsd,
+								verdict: row.ownProviderBudgetVerdict,
+								paused: row.ownProviderPaused,
 								isCurrentMonth,
 							});
 							return (
-								<TableRow key={row.workspaceId}>
+								<TableRow key={row.workspaceSlug}>
 									<TableCell>
 										<div className="font-medium">{row.displayName}</div>
 										<div className="font-mono text-xs text-muted-foreground">
@@ -241,13 +245,13 @@ export function AdminInstanceLlmUsageTable({
 									    different in kind" — they are the same physical quantity, differently funded.
 									    The cap columns stay USD-only: a cap is a number someone typed in USD. */}
 									<TableCell className="text-right tabular-nums">
-										<MoneyCell>{formatCostUsd(row.pricedTotalCostUsd)}</MoneyCell>
-										<FxSpendLine usd={row.pricedTotalCostUsd} fx={fx} />
+										<MoneyCell>{formatCostUsd(row.instanceTotalCostUsd)}</MoneyCell>
+										<FxSpendLine usd={row.instanceTotalCostUsd} fx={fx} />
 									</TableCell>
 									<CapCell usage={shared} label="Instance cap" workspace={row.displayName} />
 									<TableCell className="text-right tabular-nums">
-										<MoneyCell>{formatCostUsd(row.byoTotalCostUsd)}</MoneyCell>
-										<FxSpendLine usd={row.byoTotalCostUsd} fx={fx} />
+										<MoneyCell>{formatCostUsd(row.ownProviderTotalCostUsd)}</MoneyCell>
+										<FxSpendLine usd={row.ownProviderTotalCostUsd} fx={fx} />
 									</TableCell>
 									<CapCell usage={provider} label="Provider cap" workspace={row.displayName} />
 									<TableCell>
@@ -268,7 +272,7 @@ export function AdminInstanceLlmUsageTable({
 												aria-expanded={isExpanded}
 												// The detail panel only exists while expanded, so pointing at it
 												// beforehand would be a dangling IDREF.
-												aria-controls={isExpanded ? detailPanelId(row.workspaceId) : undefined}
+												aria-controls={isExpanded ? detailPanelId(row.workspaceSlug) : undefined}
 												aria-label={`${isExpanded ? "Hide" : "View"} usage details for ${row.displayName}`}
 												onClick={() => onToggleDetails(row)}
 											>
@@ -340,7 +344,7 @@ function WorkspaceUsageDetails({
 	onRetry,
 	fx,
 }: WorkspaceUsageDetailsProps) {
-	const panelId = detailPanelId(workspace.workspaceId);
+	const panelId = detailPanelId(workspace.workspaceSlug);
 	return (
 		<section
 			id={panelId}

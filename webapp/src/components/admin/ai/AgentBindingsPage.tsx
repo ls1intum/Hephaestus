@@ -3,12 +3,13 @@ import { ChevronDown } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
 import {
-	deleteBindingMutation,
-	getAiSettingsOptions,
-	getBindingsOptions,
-	getBindingsQueryKey,
+	configureAgentMutation,
+	deleteAgentMutation,
 	getLlmUsageReportOptions,
-	upsertBindingMutation,
+	getWorkspaceOptions,
+	listAgentsOptions,
+	listAgentsQueryKey,
+	workspaceGetLlmSettingsOptions,
 	workspaceListAvailableLlmModelsOptions,
 } from "@/api/@tanstack/react-query.gen";
 import type { AgentBinding, AvailableLlmModel } from "@/api/types.gen";
@@ -95,11 +96,19 @@ interface AgentBindingsPageProps {
 
 export function AgentBindingsPage({ workspaceSlug }: AgentBindingsPageProps) {
 	const bindingsQuery = useQuery({
-		...getBindingsOptions({ path: { workspaceSlug } }),
+		...listAgentsOptions({ path: { workspaceSlug } }),
 		enabled: Boolean(workspaceSlug),
 	});
-	const aiSettingsQuery = useQuery({
-		...getAiSettingsOptions({ path: { workspaceSlug } }),
+	// Whether a purpose may run at all is a property of the workspace, not of any AI settings blob —
+	// it is the same flag the sidebar and the practices pages read.
+	const workspaceQuery = useQuery({
+		...getWorkspaceOptions({ path: { workspaceSlug } }),
+		enabled: Boolean(workspaceSlug),
+	});
+	// Whether this workspace may register providers of its own is set by the instance, so it is a
+	// separate question from anything the workspace itself configures.
+	const llmSettingsQuery = useQuery({
+		...workspaceGetLlmSettingsOptions({ path: { workspaceSlug } }),
 		enabled: Boolean(workspaceSlug),
 	});
 	const availableModelsQuery = useQuery({
@@ -118,19 +127,31 @@ export function AgentBindingsPage({ workspaceSlug }: AgentBindingsPageProps) {
 
 	const featureEnabled = (purpose: Purpose): boolean =>
 		purpose === "MENTOR"
-			? (aiSettingsQuery.data?.mentorEnabled ?? false)
-			: (aiSettingsQuery.data?.practicesEnabled ?? false);
+			? (workspaceQuery.data?.mentorEnabled ?? false)
+			: (workspaceQuery.data?.practicesEnabled ?? false);
 
 	const isLoading =
-		bindingsQuery.isLoading || aiSettingsQuery.isLoading || availableModelsQuery.isLoading;
-	const isError = bindingsQuery.isError || aiSettingsQuery.isError || availableModelsQuery.isError;
-	// Whichever of the three failed first supplies the ProblemDetail and the status the alert
+		bindingsQuery.isLoading ||
+		workspaceQuery.isLoading ||
+		llmSettingsQuery.isLoading ||
+		availableModelsQuery.isLoading;
+	const isError =
+		bindingsQuery.isError ||
+		workspaceQuery.isError ||
+		llmSettingsQuery.isError ||
+		availableModelsQuery.isError;
+	// Whichever of the four failed first supplies the ProblemDetail and the status the alert
 	// classifies on — a 403 must not offer a Retry that would be refused identically.
-	const loadError = bindingsQuery.error ?? aiSettingsQuery.error ?? availableModelsQuery.error;
+	const loadError =
+		bindingsQuery.error ??
+		workspaceQuery.error ??
+		llmSettingsQuery.error ??
+		availableModelsQuery.error;
 
 	const handleRetry = () => {
 		bindingsQuery.refetch();
-		aiSettingsQuery.refetch();
+		workspaceQuery.refetch();
+		llmSettingsQuery.refetch();
 		availableModelsQuery.refetch();
 	};
 
@@ -142,18 +163,18 @@ export function AgentBindingsPage({ workspaceSlug }: AgentBindingsPageProps) {
 
 			{/* The two caps pause independently, so each paused side gets its own banner — the one the
 			    workspace can act on first. */}
-			{(usageQuery.data?.byoPaused || usageQuery.data?.instanceFundedPaused) && (
+			{(usageQuery.data?.ownProviderPaused || usageQuery.data?.instancePaused) && (
 				<div className="mb-6 space-y-3">
-					{usageQuery.data.byoPaused && (
+					{usageQuery.data.ownProviderPaused && (
 						<BudgetExhaustedAlert
 							scope="own"
-							verdict={usageQuery.data.byoBudgetVerdict}
+							verdict={usageQuery.data.ownProviderBudgetVerdict}
 							unpricedEventCount={usageQuery.data.unpricedEventCount}
 							context="models"
 							workspaceSlug={workspaceSlug}
 						/>
 					)}
-					{usageQuery.data.instanceFundedPaused && (
+					{usageQuery.data.instancePaused && (
 						<BudgetExhaustedAlert
 							scope="shared"
 							verdict={usageQuery.data.instanceBudgetVerdict}
@@ -187,13 +208,10 @@ export function AgentBindingsPage({ workspaceSlug }: AgentBindingsPageProps) {
 						))}
 					</section>
 
-					{aiSettingsQuery.data?.workspaceConnectionsAllowed && (
+					{llmSettingsQuery.data?.ownProviderAllowed && (
 						<section className="space-y-4">
 							<h2 className="text-lg font-semibold">Workspace providers</h2>
-							<WorkspaceLlmProviderPanel
-								workspaceSlug={workspaceSlug}
-								workspaceConnectionsAllowed
-							/>
+							<WorkspaceLlmProviderPanel workspaceSlug={workspaceSlug} ownProviderAllowed />
 						</section>
 					)}
 				</div>
@@ -230,10 +248,10 @@ function AgentPurposeCard({
 	const [showErrors, setShowErrors] = useState(false);
 
 	const invalidate = () =>
-		queryClient.invalidateQueries({ queryKey: getBindingsQueryKey({ path: { workspaceSlug } }) });
+		queryClient.invalidateQueries({ queryKey: listAgentsQueryKey({ path: { workspaceSlug } }) });
 
 	const upsert = useMutation({
-		...upsertBindingMutation(),
+		...configureAgentMutation(),
 		onSuccess: () => {
 			invalidate();
 			toast.success(`${meta.title} saved`);
@@ -246,7 +264,7 @@ function AgentPurposeCard({
 	});
 
 	const remove = useMutation({
-		...deleteBindingMutation(),
+		...deleteAgentMutation(),
 		onSuccess: () => {
 			invalidate();
 			toast.success(`${meta.title} turned off`);

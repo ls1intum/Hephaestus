@@ -142,8 +142,8 @@ describe("never sums conversions", () => {
 	it("renders the breakdown footer from the USD total", () => {
 		const day = (costUsd: number, iso: string): LlmUsageByDay => ({
 			day: new Date(iso),
-			pricedTotalCostUsd: costUsd,
-			byoTotalCostUsd: 0,
+			instanceTotalCostUsd: costUsd,
+			ownProviderTotalCostUsd: 0,
 			unpricedEventCount: 0,
 			events: 1,
 		});
@@ -241,8 +241,8 @@ describe("without a configured currency", () => {
 	const rows: LlmUsageByDay[] = [
 		{
 			day: new Date("2026-07-05T00:00:00.000Z"),
-			pricedTotalCostUsd: 4.25,
-			byoTotalCostUsd: 1.75,
+			instanceTotalCostUsd: 4.25,
+			ownProviderTotalCostUsd: 1.75,
 			unpricedEventCount: 0,
 			events: 3,
 		},

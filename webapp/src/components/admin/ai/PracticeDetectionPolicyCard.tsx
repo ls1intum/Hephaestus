@@ -2,9 +2,9 @@ import { Link } from "@tanstack/react-router";
 import { AlertCircle } from "lucide-react";
 import type {
 	AgentBinding,
-	AiSettingsView,
 	AvailableLlmModel,
-	UpdatePracticeReviewSettings,
+	PracticeReviewSettings,
+	UpdatePracticeReviewSettingsRequest,
 	UpdateWorkspaceFeaturesRequest,
 } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
@@ -30,7 +30,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 
 /** The resettable policy fields — derived from the generated client so it stays in sync. */
-export type PracticeReviewField = NonNullable<UpdatePracticeReviewSettings["reset"]>[number];
+export type PracticeReviewField = NonNullable<UpdatePracticeReviewSettingsRequest["reset"]>[number];
 
 const COVERAGE_ALL = "all";
 const COVERAGE_ROLE = "role";
@@ -41,7 +41,7 @@ const COVERAGE_ITEMS = [
 ];
 
 export interface PracticeDetectionPolicyCardProps {
-	settings?: AiSettingsView;
+	settings?: PracticeReviewSettings;
 	/** This workspace's PRACTICE_DETECTION binding, or undefined when the purpose is unbound. */
 	detectionBinding?: AgentBinding;
 	availableModels: AvailableLlmModel[];
@@ -55,7 +55,7 @@ export interface PracticeDetectionPolicyCardProps {
 	 * Retry is offered at all (a 403 cannot be retried away). */
 	error?: unknown;
 	isSaving: boolean;
-	onUpdateReviewSettings: (settings: UpdatePracticeReviewSettings) => void;
+	onUpdateReviewSettings: (settings: UpdatePracticeReviewSettingsRequest) => void;
 	onUpdateFeatures: (features: UpdateWorkspaceFeaturesRequest) => void;
 	onResetReviewField: (field: PracticeReviewField) => void;
 	onRetry?: () => void;

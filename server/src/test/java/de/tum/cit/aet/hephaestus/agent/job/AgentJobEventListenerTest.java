@@ -28,7 +28,7 @@ import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
-import de.tum.cit.aet.hephaestus.practices.spi.AgentConfigChecker;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeDetectionReadiness;
 import de.tum.cit.aet.hephaestus.practices.spi.UserRoleChecker;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -744,7 +744,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         private record CollaborationFixture(
             AgentJobEventListener listener,
             UserRoleChecker userRoleChecker,
-            AgentConfigChecker agentConfigChecker,
+            PracticeDetectionReadiness practiceDetectionReadiness,
             PracticeRepository practiceRepository,
             WorkspaceResolver workspaceResolver
         ) {
@@ -753,14 +753,14 @@ class AgentJobEventListenerTest extends BaseUnitTest {
                 PullRequestRepository pullRequestRepository
             ) {
                 var userRoleChecker = mock(UserRoleChecker.class);
-                var agentConfigChecker = mock(AgentConfigChecker.class);
+                var practiceDetectionReadiness = mock(PracticeDetectionReadiness.class);
                 var practiceRepository = mock(PracticeRepository.class);
                 var workspaceResolver = mock(WorkspaceResolver.class);
                 var properties = new PracticeReviewProperties(true, true, false, "", 15, false, false); // runForAllUsers=true
                 var realGate = new PracticeReviewDetectionGate(
                     properties,
                     userRoleChecker,
-                    agentConfigChecker,
+                    practiceDetectionReadiness,
                     practiceRepository,
                     workspaceResolver
                 );
@@ -768,7 +768,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
                 return new CollaborationFixture(
                     listener,
                     userRoleChecker,
-                    agentConfigChecker,
+                    practiceDetectionReadiness,
                     practiceRepository,
                     workspaceResolver
                 );
@@ -804,7 +804,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             workspace.setWorkspaceSlug("test-workspace");
             workspace.getFeatures().setPracticesEnabled(true);
             when(fixture.workspaceResolver().resolveForRepository("owner/repo")).thenReturn(Optional.of(workspace));
-            when(fixture.agentConfigChecker().hasRunnablePractice(WORKSPACE_ID)).thenReturn(true);
+            when(fixture.practiceDetectionReadiness().hasRunnableAgent(WORKSPACE_ID)).thenReturn(true);
 
             Practice practice = new Practice();
             ArrayNode events = MAPPER.createArrayNode();
@@ -837,7 +837,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             workspace.setId(WORKSPACE_ID);
             workspace.getFeatures().setPracticesEnabled(true);
             when(fixture.workspaceResolver().resolveForRepository("owner/repo")).thenReturn(Optional.of(workspace));
-            when(fixture.agentConfigChecker().hasRunnablePractice(WORKSPACE_ID)).thenReturn(true);
+            when(fixture.practiceDetectionReadiness().hasRunnableAgent(WORKSPACE_ID)).thenReturn(true);
 
             // Practice only matches ReviewSubmitted, not PullRequestCreated
             Practice practice = new Practice();

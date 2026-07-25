@@ -379,11 +379,14 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             );
             String mentorToken = mentorRegistry.mint(
                 UUID.randomUUID(),
-                "openai-completions",
-                "https://api.openai.com",
-                null,
-                null,
-                5L
+                new MentorProxyCredentialRegistry.Route(
+                    "openai-completions",
+                    "https://api.openai.com",
+                    null,
+                    null,
+                    null,
+                    null
+                )
             );
 
             var authCapture = new AtomicReference<Authentication>();
@@ -404,7 +407,6 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
             ProxyRouting routing = (ProxyRouting) ((JobTokenAuthentication) authCapture.get()).getPrincipal();
             assertThat(routing.apiProtocol()).isEqualTo("openai-completions");
-            assertThat(routing.legacyConfigId()).isEqualTo(5L);
         }
 
         @Test
@@ -430,8 +432,6 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         job.setJobToken(VALID_TOKEN);
         ConfigSnapshot snapshot = new ConfigSnapshot(
             ConfigSnapshot.SCHEMA_VERSION,
-            42L,
-            "test-config",
             "openai-completions",
             "https://api.openai.com/v1",
             "gpt-5-mini",
@@ -442,8 +442,10 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             null,
             null,
             null,
+            null,
             600,
-            false
+            false,
+            null
         );
         job.setConfigSnapshot(snapshot.toJson(objectMapper));
         job.setId(java.util.UUID.randomUUID());

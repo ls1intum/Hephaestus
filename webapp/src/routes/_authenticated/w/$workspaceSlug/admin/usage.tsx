@@ -5,10 +5,10 @@ import { toast } from "sonner";
 import {
 	getLlmUsageReportOptions,
 	getLlmUsageReportQueryKey,
-	updateByoLlmBudgetMutation,
+	updateWorkspaceLlmBudgetMutation,
 } from "@/api/@tanstack/react-query.gen";
 import { AdminLlmUsagePage } from "@/components/admin/usage/AdminLlmUsagePage";
-import { SetByoBudgetDialog } from "@/components/admin/usage/SetByoBudgetDialog";
+import { SetOwnProviderBudgetDialog } from "@/components/admin/usage/SetOwnProviderBudgetDialog";
 import { addMonths, currentMonthUtc } from "@/components/admin/usage/usageUtils";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
@@ -24,7 +24,7 @@ function AdminUsageContainer() {
 	const queryClient = useQueryClient();
 	const { workspaceSlug, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
 	const [month, setMonth] = useState(currentMonthUtc);
-	const [isEditingByoCap, setIsEditingByoCap] = useState(false);
+	const [isEditingOwnProviderCap, setIsEditingOwnProviderCap] = useState(false);
 
 	const reportQueryOptions = getLlmUsageReportOptions({
 		path: { workspaceSlug: workspaceSlug ?? "" },
@@ -42,8 +42,8 @@ function AdminUsageContainer() {
 		placeholderData: keepPreviousData,
 	});
 
-	const updateByoCap = useMutation({
-		...updateByoLlmBudgetMutation(),
+	const updateOwnProviderCap = useMutation({
+		...updateWorkspaceLlmBudgetMutation(),
 		onSuccess: (_data, variables) => {
 			// Omitting `query` invalidates every cached month for this workspace, not just the one
 			// on screen — the cap is not month-scoped.
@@ -52,11 +52,11 @@ function AdminUsageContainer() {
 			});
 			// The proxy caches its answer for about 30s, so "resumes now" would be a small lie.
 			toast.success(
-				variables.body.monthlyByoLlmBudgetUsd == null
+				variables.body.monthlyBudgetUsd == null
 					? "Cap removed. New calls resume within about a minute."
 					: "Cap saved. New calls resume within about a minute.",
 			);
-			setIsEditingByoCap(false);
+			setIsEditingOwnProviderCap(false);
 		},
 		// No toast: the dialog renders the server's reason next to the amount that caused it.
 	});
@@ -80,28 +80,28 @@ function AdminUsageContainer() {
 				onRetry={() => refetch()}
 				onPrevMonth={() => setMonth((m) => addMonths(m, -1))}
 				onNextMonth={() => setMonth((m) => (m < currentMonthUtc() ? addMonths(m, 1) : m))}
-				onEditByoCap={() => setIsEditingByoCap(true)}
+				onEditOwnProviderCap={() => setIsEditingOwnProviderCap(true)}
 			/>
-			<SetByoBudgetDialog
-				open={isEditingByoCap}
-				currentCapUsd={report?.byoMonthlyBudgetUsd ?? null}
+			<SetOwnProviderBudgetDialog
+				open={isEditingOwnProviderCap}
+				currentCapUsd={report?.ownProviderMonthlyBudgetUsd ?? null}
 				fx={report?.fx}
-				isPending={updateByoCap.isPending}
+				isPending={updateOwnProviderCap.isPending}
 				serverError={
-					updateByoCap.error != null
-						? problemDetailOf(updateByoCap.error, "Couldn't save the cap")
+					updateOwnProviderCap.error != null
+						? problemDetailOf(updateOwnProviderCap.error, "Couldn't save the cap")
 						: null
 				}
 				onOpenChange={(open) => {
 					if (!open) {
-						setIsEditingByoCap(false);
+						setIsEditingOwnProviderCap(false);
 					}
 				}}
-				onSubmit={(monthlyByoLlmBudgetUsd) =>
-					updateByoCap.mutate({
+				onSubmit={(monthlyBudgetUsd) =>
+					updateOwnProviderCap.mutate({
 						path: { workspaceSlug: workspaceSlug ?? "" },
 						// undefined (field omitted) clears the cap server-side.
-						body: { monthlyByoLlmBudgetUsd: monthlyByoLlmBudgetUsd ?? undefined },
+						body: { monthlyBudgetUsd: monthlyBudgetUsd ?? undefined },
 					})
 				}
 			/>

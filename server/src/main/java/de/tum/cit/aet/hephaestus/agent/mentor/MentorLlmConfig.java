@@ -10,17 +10,15 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Slim projection of the LLM fields that {@link MentorPiAdapter} needs to build a sandbox spec.
- * Decouples the mentor module from the JPA AgentConfig entity.
+ * Decouples the mentor module from the workspace's agent binding.
  *
- * <p>#1368 slice 5: routes through {@link LlmModelResolver} — the same resolved, non-secret
- * behaviour shape ({@code ResolvedLlmModel}) the practice-review path freezes into
- * {@code ConfigSnapshot} — instead of copying {@code AgentConfig.llmProvider}/{@code credentialMode}
- * verbatim. This closes the capability drift the mentor runner previously hardcoded (context window,
- * max output tokens) and gives the mentor the SAME connection-scoped, live
- * credential resolution the proxy performs for one-shot jobs.
+ * <p>Routes through {@link LlmModelResolver} — the same resolved, non-secret behaviour shape
+ * ({@code ResolvedLlmModel}) the practice-review path freezes into {@code ConfigSnapshot}. This
+ * closes the capability drift the mentor runner previously hardcoded (context window, max output
+ * tokens) and gives the mentor the SAME connection-scoped, live credential resolution the proxy
+ * performs for one-shot jobs.
  */
 public record MentorLlmConfig(
-    Long configId,
     String apiProtocol,
     String baseUrl,
     String upstreamModelId,
@@ -35,42 +33,10 @@ public record MentorLlmConfig(
     boolean allowInternet,
     int timeoutSeconds
 ) {
-    public MentorLlmConfig(
-        Long configId,
-        String apiProtocol,
-        String baseUrl,
-        String upstreamModelId,
-        @Nullable Integer contextWindow,
-        @Nullable Integer maxOutputTokens,
-        boolean supportsReasoning,
-        @Nullable FundingSource connectionScope,
-        @Nullable Long connectionId,
-        boolean allowInternet,
-        int timeoutSeconds
-    ) {
-        this(
-            configId,
-            apiProtocol,
-            baseUrl,
-            upstreamModelId,
-            contextWindow,
-            maxOutputTokens,
-            supportsReasoning,
-            connectionScope,
-            connectionId,
-            null,
-            null,
-            null,
-            allowInternet,
-            timeoutSeconds
-        );
-    }
-
     public static MentorLlmConfig fromAdmission(ModelBindingSource config, AdmittedLlmModel admitted) {
         ResolvedLlmModel resolved = admitted.resolved();
         LlmModelResolver.ConnectionRef ref = admitted.connection();
         return new MentorLlmConfig(
-            config.getId(),
             resolved.apiProtocol(),
             resolved.baseUrl(),
             resolved.upstreamModelId(),

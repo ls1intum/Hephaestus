@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.agent.settings;
+package de.tum.cit.aet.hephaestus.practices.review;
 
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
@@ -14,11 +14,11 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
- * HTTP-boundary coverage for the AI-settings surface: the aggregate read, and the practice-review
- * PATCH (override / reset-to-inherit, 400 on an out-of-range cooldown). Model selection itself moved
- * to the per-purpose agent bindings ({@code /agent-bindings}) and is covered there.
+ * HTTP-boundary coverage for a workspace's practice-review policy: the read, and the PATCH
+ * (override / reset-to-inherit, 400 on an out-of-range cooldown). Model selection lives on the
+ * per-purpose agents ({@code /agents}) and is covered there.
  */
-class AiSettingsControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
+class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
     private WebTestClient webTestClient;
@@ -32,12 +32,12 @@ class AiSettingsControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
 
     @Test
     @WithAdminUser
-    void aggregateReadReturnsFeatureFlagsAndInheritedPolicy() {
-        Workspace workspace = setupWorkspace("ai-read");
+    void readReturnsInheritedPolicyAndNothingElse() {
+        Workspace workspace = setupWorkspace("review-read");
 
         webTestClient
             .get()
-            .uri("/workspaces/{slug}/ai-settings", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/practices/review-settings", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -49,10 +49,15 @@ class AiSettingsControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
             .doesNotExist()
             .jsonPath("$.skipDrafts")
             .isEqualTo(true)
+            // The workspace's feature flags used to be copied onto this response. They are not the
+            // review policy and every client already holds them on the workspace itself, so their
+            // absence here is the point of the endpoint's rename — assert it rather than assume it.
             .jsonPath("$.practicesEnabled")
-            .isEqualTo(false)
+            .doesNotExist()
             .jsonPath("$.mentorEnabled")
-            .isEqualTo(false);
+            .doesNotExist()
+            .jsonPath("$.workspaceConnectionsAllowed")
+            .doesNotExist();
     }
 
     @Test
@@ -62,7 +67,7 @@ class AiSettingsControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
 
         webTestClient
             .patch()
-            .uri("/workspaces/{slug}/ai-settings/practice-review", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/practices/review-settings", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(Map.of("cooldownMinutes", 5000))
@@ -79,7 +84,7 @@ class AiSettingsControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
         // Override skipDrafts to false (fleet default is true).
         webTestClient
             .patch()
-            .uri("/workspaces/{slug}/ai-settings/practice-review", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/practices/review-settings", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(Map.of("skipDrafts", false))
@@ -95,7 +100,7 @@ class AiSettingsControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
         // Reset it back to inherit → override null, effective falls back to the fleet default (true).
         webTestClient
             .patch()
-            .uri("/workspaces/{slug}/ai-settings/practice-review", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/practices/review-settings", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(Map.of("reset", List.of("SKIP_DRAFTS")))

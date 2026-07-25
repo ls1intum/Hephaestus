@@ -7,35 +7,34 @@ import {
 } from "./AdminInstanceLlmUsageTable";
 
 const workspace: AdminWorkspaceLlmUsageRow = {
-	workspaceId: 1,
 	workspaceSlug: "example-workspace",
 	displayName: "Example Workspace",
 	instanceMonthlyBudgetUsd: 25,
-	pricedTotalCostUsd: 4.25,
+	instanceTotalCostUsd: 4.25,
 	instanceBudgetVerdict: "WITHIN",
-	instanceFundedPaused: false,
-	byoTotalCostUsd: 1.75,
-	byoBudgetVerdict: "WITHIN",
-	byoPaused: false,
+	instancePaused: false,
+	ownProviderTotalCostUsd: 1.75,
+	ownProviderBudgetVerdict: "WITHIN",
+	ownProviderPaused: false,
 	events: 3,
 };
 
 const detailReport: WorkspaceLlmUsageReport = {
 	month: "2026-07",
 	instanceMonthlyBudgetUsd: 25,
-	pricedTotalCostUsd: 4.25,
+	instanceTotalCostUsd: 4.25,
 	instanceBudgetVerdict: "WITHIN",
-	instanceFundedPaused: false,
-	byoMonthlyBudgetUsd: 10,
-	byoTotalCostUsd: 1.75,
-	byoBudgetVerdict: "WITHIN",
-	byoPaused: false,
+	instancePaused: false,
+	ownProviderMonthlyBudgetUsd: 10,
+	ownProviderTotalCostUsd: 1.75,
+	ownProviderBudgetVerdict: "WITHIN",
+	ownProviderPaused: false,
 	unpricedEventCount: 0,
 	byJobType: [
 		{
 			jobType: "MENTOR_TURN",
-			pricedTotalCostUsd: 4.25,
-			byoTotalCostUsd: 1.75,
+			instanceTotalCostUsd: 4.25,
+			ownProviderTotalCostUsd: 1.75,
 			unpricedEventCount: 0,
 			inputTokens: 100,
 			outputTokens: 25,
@@ -50,8 +49,8 @@ const detailReport: WorkspaceLlmUsageReport = {
 	byDay: [
 		{
 			day: new Date("2026-07-05T00:00:00.000Z"),
-			pricedTotalCostUsd: 4.25,
-			byoTotalCostUsd: 1.75,
+			instanceTotalCostUsd: 4.25,
+			ownProviderTotalCostUsd: 1.75,
 			unpricedEventCount: 0,
 			events: 1,
 		},
@@ -60,15 +59,16 @@ const detailReport: WorkspaceLlmUsageReport = {
 
 function renderTable(
 	rows: AdminWorkspaceLlmUsageRow[],
-	overrides: { isCurrentMonth?: boolean } = {},
+	overrides: { isCurrentMonth?: boolean; fx?: FxRateInfo } = {},
 ) {
 	return render(
 		<AdminInstanceLlmUsageTable
 			rows={rows}
+			fx={overrides.fx}
 			isCurrentMonth={overrides.isCurrentMonth ?? true}
 			isLoading={false}
 			error={null}
-			expandedWorkspaceId={null}
+			expandedWorkspaceSlug={null}
 			isDetailLoading={false}
 			detailError={null}
 			onToggleDetails={() => {}}
@@ -91,7 +91,7 @@ describe("AdminInstanceLlmUsageTable", () => {
 				isCurrentMonth
 				isLoading={false}
 				error={null}
-				expandedWorkspaceId={null}
+				expandedWorkspaceSlug={null}
 				isDetailLoading={false}
 				detailError={null}
 				onToggleDetails={onToggleDetails}
@@ -113,7 +113,9 @@ describe("AdminInstanceLlmUsageTable", () => {
 	});
 
 	it("separates the instance cap from the workspace's own provider cap", () => {
-		renderTable([{ ...workspace, byoMonthlyBudgetUsd: 10, byoBudgetVerdict: "WITHIN" }]);
+		renderTable([
+			{ ...workspace, ownProviderMonthlyBudgetUsd: 10, ownProviderBudgetVerdict: "WITHIN" },
+		]);
 
 		expect(screen.getByRole("columnheader", { name: "Instance cap" })).toBeTruthy();
 		expect(screen.getByRole("columnheader", { name: "Provider cap" })).toBeTruthy();
@@ -124,7 +126,7 @@ describe("AdminInstanceLlmUsageTable", () => {
 	});
 
 	it("shows how much of each cap is used, not just whether it is reached", () => {
-		renderTable([{ ...workspace, instanceMonthlyBudgetUsd: 50, pricedTotalCostUsd: 38.2 }]);
+		renderTable([{ ...workspace, instanceMonthlyBudgetUsd: 50, instanceTotalCostUsd: 38.2 }]);
 
 		const row = within(firstDataRow());
 		expect(row.getByText("$38.20 · 76%")).toBeTruthy();
@@ -135,7 +137,7 @@ describe("AdminInstanceLlmUsageTable", () => {
 	});
 
 	it("warns before the cap is reached", () => {
-		renderTable([{ ...workspace, instanceMonthlyBudgetUsd: 50, pricedTotalCostUsd: 41 }]);
+		renderTable([{ ...workspace, instanceMonthlyBudgetUsd: 50, instanceTotalCostUsd: 41 }]);
 
 		const row = within(firstDataRow());
 		expect(row.getByText("Near cap · instance cap")).toBeTruthy();
@@ -148,11 +150,11 @@ describe("AdminInstanceLlmUsageTable", () => {
 			{
 				...workspace,
 				instanceBudgetVerdict: "EXHAUSTED",
-				instanceFundedPaused: true,
-				byoMonthlyBudgetUsd: 10,
-				byoTotalCostUsd: 10,
-				byoBudgetVerdict: "EXHAUSTED",
-				byoPaused: true,
+				instancePaused: true,
+				ownProviderMonthlyBudgetUsd: 10,
+				ownProviderTotalCostUsd: 10,
+				ownProviderBudgetVerdict: "EXHAUSTED",
+				ownProviderPaused: true,
 			},
 		]);
 
@@ -166,10 +168,10 @@ describe("AdminInstanceLlmUsageTable", () => {
 			{
 				...workspace,
 				instanceMonthlyBudgetUsd: undefined,
-				byoMonthlyBudgetUsd: 10,
-				byoTotalCostUsd: 10,
-				byoBudgetVerdict: "EXHAUSTED",
-				byoPaused: true,
+				ownProviderMonthlyBudgetUsd: 10,
+				ownProviderTotalCostUsd: 10,
+				ownProviderBudgetVerdict: "EXHAUSTED",
+				ownProviderPaused: true,
 			},
 		]);
 
@@ -179,7 +181,9 @@ describe("AdminInstanceLlmUsageTable", () => {
 	});
 
 	it("keeps the provider cap read-only — it is the workspace's own money", () => {
-		renderTable([{ ...workspace, byoMonthlyBudgetUsd: 10, byoBudgetVerdict: "WITHIN" }]);
+		renderTable([
+			{ ...workspace, ownProviderMonthlyBudgetUsd: 10, ownProviderBudgetVerdict: "WITHIN" },
+		]);
 
 		const buttons = within(firstDataRow())
 			.getAllByRole("button")
@@ -194,7 +198,7 @@ describe("AdminInstanceLlmUsageTable", () => {
 				isCurrentMonth
 				isLoading={false}
 				error={null}
-				expandedWorkspaceId={workspace.workspaceId}
+				expandedWorkspaceSlug={workspace.workspaceSlug}
 				detailReport={detailReport}
 				isDetailLoading={false}
 				detailError={null}
@@ -224,7 +228,8 @@ describe("AdminInstanceLlmUsageTable", () => {
 		};
 
 		it("converts both spend columns, not just the one the host pays for", () => {
-			renderTable([{ ...workspace, fx: eur }]);
+			// The rate arrives with the month, not on any row — the rows below carry none.
+			renderTable([workspace], { fx: eur });
 
 			const row = within(firstDataRow());
 			// $4.25 shared and $1.75 on the workspace's own provider — the same physical quantity,
@@ -234,7 +239,7 @@ describe("AdminInstanceLlmUsageTable", () => {
 		});
 
 		it("puts the rate footnote after the figures it qualifies", () => {
-			const { container } = renderTable([{ ...workspace, fx: eur }]);
+			const { container } = renderTable([workspace], { fx: eur });
 
 			const disclosure = screen.getByText(/ECB reference rate/);
 			const table = container.querySelector("table");
@@ -248,19 +253,32 @@ describe("AdminInstanceLlmUsageTable", () => {
 		});
 
 		it("stays silent about a rate nothing on the table used", () => {
-			renderTable([{ ...workspace, pricedTotalCostUsd: 0, byoTotalCostUsd: 0, fx: eur }]);
+			renderTable([{ ...workspace, instanceTotalCostUsd: 0, ownProviderTotalCostUsd: 0 }], {
+				fx: eur,
+			});
 
+			expect(screen.queryByText(/ECB reference rate/)).toBeNull();
+		});
+
+		it("survives a month with no workspaces in it", () => {
+			// The rate belongs to the month, so it is still known here — it used to be read off
+			// `rows[0]`, which an empty month does not have. Nothing converted, so nothing is
+			// disclosed, but that is now the deliberate outcome rather than missing data.
+			renderTable([], { fx: eur });
+
+			expect(screen.getByText("No workspaces on this instance yet")).toBeTruthy();
 			expect(screen.queryByText(/ECB reference rate/)).toBeNull();
 		});
 
 		it("hands the table's own rate to the expanded breakdown", () => {
 			render(
 				<AdminInstanceLlmUsageTable
-					rows={[{ ...workspace, fx: eur }]}
+					rows={[workspace]}
+					fx={eur}
 					isCurrentMonth
 					isLoading={false}
 					error={null}
-					expandedWorkspaceId={workspace.workspaceId}
+					expandedWorkspaceSlug={workspace.workspaceSlug}
 					// The detail response carries its own block. One month resolves to one rate, so the two
 					// agree today — but nothing enforces that, and two rates on one screen is a bug nobody
 					// would spot. The panel renders the table's.
@@ -271,8 +289,8 @@ describe("AdminInstanceLlmUsageTable", () => {
 							detailReport.byDay[0],
 							{
 								day: new Date("2026-07-06T00:00:00.000Z"),
-								pricedTotalCostUsd: 4.25,
-								byoTotalCostUsd: 1.75,
+								instanceTotalCostUsd: 4.25,
+								ownProviderTotalCostUsd: 1.75,
 								unpricedEventCount: 0,
 								events: 1,
 							},

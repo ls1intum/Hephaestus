@@ -71,7 +71,7 @@ export function InstanceLlmSettingsCard({
 
 				<Field orientation="horizontal">
 					<FieldContent>
-						<FieldLabel htmlFor="llm-settings-allow-byo">
+						<FieldLabel htmlFor="llm-settings-allow-own-provider">
 							Let workspaces add providers and models
 						</FieldLabel>
 						<FieldDescription>
@@ -80,7 +80,7 @@ export function InstanceLlmSettingsCard({
 						</FieldDescription>
 					</FieldContent>
 					<Switch
-						id="llm-settings-allow-byo"
+						id="llm-settings-allow-own-provider"
 						checked={allowWorkspaceConnections}
 						onCheckedChange={(checked) => {
 							setAllowWorkspaceConnections(checked);

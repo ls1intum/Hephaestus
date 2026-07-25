@@ -6,7 +6,7 @@ import {
 } from "@tanstack/react-router";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { AgentBinding, AiSettingsView, AvailableLlmModel } from "@/api/types.gen";
+import type { AgentBinding, AvailableLlmModel, PracticeReviewSettings } from "@/api/types.gen";
 import { PracticeDetectionPolicyCard } from "./PracticeDetectionPolicyCard";
 
 const availableModel: AvailableLlmModel = {
@@ -25,10 +25,7 @@ const readyBinding: AgentBinding = {
 	instanceModelId: availableModel.id,
 };
 
-const settings: AiSettingsView = {
-	practicesEnabled: true,
-	mentorEnabled: true,
-	workspaceConnectionsAllowed: true,
+const settings: PracticeReviewSettings = {
 	runForAllUsers: true,
 	skipDrafts: true,
 	deliverToMerged: false,

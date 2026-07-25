@@ -106,8 +106,6 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         ConfigSnapshot snapshot = new ConfigSnapshot(
             ConfigSnapshot.SCHEMA_VERSION,
-            1L,
-            "test-config",
             "openai-completions",
             "https://api.openai.com/v1",
             "test-model",
@@ -120,7 +118,8 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
             1L,
             null,
             600,
-            false
+            false,
+            null
         ).withPriceSnapshot(
             new LlmPriceSnapshot(FundingSource.INSTANCE, PricingState.NO_CHARGE, null, null, null, null, null, null)
         );

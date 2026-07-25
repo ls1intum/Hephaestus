@@ -11,10 +11,21 @@ package de.tum.cit.aet.hephaestus.core.audit.spi;
 public enum ConfigAuditEntityType {
     /** Per-workspace practice-review trigger/delivery policy overrides. */
     PRACTICE_REVIEW_SETTINGS,
-    /** Which agent config powers practice detection / the mentor for a workspace. */
-    AI_CONFIG_BINDING,
-    /** An agent config aggregate (model, endpoint, credential mode). */
+    /** Which model, with what limits, runs practice detection / the mentor for a workspace. */
+    AGENT_BINDING,
+    /**
+     * Historical only. The named-agent-config aggregate this described was deleted in #1368; the value
+     * survives so rows recording what an operator once did to it keep rendering. Nothing writes it.
+     */
     AGENT_CONFIG,
+    /**
+     * Historical only — what {@link #AGENT_BINDING} was called before #1368. Rows written under the old
+     * name keep it: {@code trg_config_audit_event_block_mutation} makes this table append-only, so
+     * rewriting them to the current spelling is the exact mutation that trigger exists to refuse.
+     * Nothing writes this value any more; the UI renders it with the same label as
+     * {@link #AGENT_BINDING}.
+     */
+    AI_CONFIG_BINDING,
     /**
      * A member's role or roster visibility. Covers admin-initiated grants, changes and removals, and
      * role changes applied by org sync (actor {@code SYSTEM}). Deliberately excludes memberships
@@ -35,11 +46,20 @@ public enum ConfigAuditEntityType {
     PRACTICE_ACTIVE,
 
     /**
-     * The workspace's monthly LLM budget cap. Set by instance admins, and it gates whether detection
-     * and mentor turns run at all once spend reaches it — so "who raised this workspace's cap, and
-     * when" is exactly the accountability question this trail answers.
+     * A workspace's monthly cap on HOST-funded LLM spend. Set by instance admins, and it gates whether
+     * detection and mentor turns run at all once spend reaches it — so "who raised this workspace's
+     * cap, and when" is exactly the accountability question this trail answers.
+     */
+    WORKSPACE_INSTANCE_LLM_BUDGET,
+    /** A workspace's own cap on spend through its own connected provider. Set by its own admins. */
+    WORKSPACE_OWN_PROVIDER_LLM_BUDGET,
+    /**
+     * Historical only — the pre-#1368 spellings of the two values above. Retained for the same reason as
+     * {@link #AI_CONFIG_BINDING}: this trail is append-only at the database level, so old rows keep the
+     * vocabulary they were written in. Nothing writes them.
      */
     WORKSPACE_LLM_BUDGET,
+    /** Historical only — see {@link #WORKSPACE_LLM_BUDGET}. */
     WORKSPACE_BYO_LLM_BUDGET,
 
     /**

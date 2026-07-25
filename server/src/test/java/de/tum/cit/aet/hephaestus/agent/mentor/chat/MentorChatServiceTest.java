@@ -191,9 +191,9 @@ class MentorChatServiceTest extends BaseUnitTest {
         // unstubbed null would NPE every unrelated test rather than reading as "not blocked".
         when(llmBudgetService.decide(WORKSPACE_ID)).thenReturn(LlmBudgetDecision.ALLOWED);
 
-        // Default resolver stub — MentorLlmConfig.fromAgentConfig routes every AgentConfig through
+        // Default resolver stub — MentorLlmConfig.fromAdmission routes every agent binding through
         // this; individual tests override where the resolved shape matters. Class-level
-        // Strictness.LENIENT (see @MockitoSettings above) covers any test that never resolves a config.
+        // Strictness.LENIENT (see @MockitoSettings above) covers any test that never resolves a binding.
         when(llmModelResolver.resolve(any())).thenReturn(
             new ResolvedLlmModel(
                 "https://api.openai.com",
@@ -462,7 +462,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         verify(interactiveSandboxService, never()).attach(any());
     }
 
-    // 1d. No enabled AgentConfig for the workspace → resolveLlmConfig.orElseThrow. This is the only
+    // 1d. No enabled MENTOR agent binding for the workspace → resolveLlmConfig.orElseThrow. This is the only
     // un-covered exit of the documented cross-tenant guard, and it fires BEFORE the sandbox attaches —
     // a distinct early-failure ordering (no runner, lock still released, ERROR outcome).
 

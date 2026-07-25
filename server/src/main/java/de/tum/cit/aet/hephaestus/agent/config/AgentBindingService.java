@@ -73,7 +73,7 @@ public class AgentBindingService {
     public WorkspaceAgentBinding upsertBinding(
         WorkspaceContext workspaceContext,
         AgentPurpose purpose,
-        AgentBindingUpsertRequestDTO request
+        AgentBindingRequestDTO request
     ) {
         Long workspaceId = workspaceContext.id();
         Workspace workspace = workspaceRepository
@@ -155,13 +155,7 @@ public class AgentBindingService {
 
     private void audit(AgentPurpose purpose, Long workspaceId, BindingSnapshot before, BindingSnapshot after) {
         configAudit.record(
-            ConfigAuditEntry.updated(
-                ConfigAuditEntityType.AI_CONFIG_BINDING,
-                purpose.name(),
-                workspaceId,
-                before,
-                after
-            )
+            ConfigAuditEntry.updated(ConfigAuditEntityType.AGENT_BINDING, purpose.name(), workspaceId, before, after)
         );
     }
 

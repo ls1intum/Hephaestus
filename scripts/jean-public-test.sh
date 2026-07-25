@@ -329,16 +329,16 @@ mentor_status() {
 	ready="$(psql_seed -tAc "
 		select count(*)
 		from workspace w
-		join agent_config ac on ac.id=w.mentor_config_id and ac.workspace_id=w.id
-		left join llm_model im on im.id=ac.instance_model_id
+		join workspace_agent_binding ab on ab.workspace_id=w.id and ab.purpose='MENTOR'
+		left join llm_model im on im.id=ab.instance_model_id
 		left join llm_connection ic on ic.id=im.connection_id
-		left join workspace_llm_model wlm on wlm.id=ac.workspace_model_id and wlm.workspace_id=w.id
+		left join workspace_llm_model wlm on wlm.id=ab.workspace_model_id and wlm.workspace_id=w.id
 		left join workspace_llm_connection wlc on wlc.id=wlm.connection_id and wlc.workspace_id=w.id
 		where w.status='ACTIVE'
 		  and lower(w.account_login)=lower('${GITLAB_GROUP_PATH}')
-		  and w.mentor_enabled=true and ac.enabled=true
-		  and ((ac.instance_model_id is not null and im.enabled=true and ic.enabled=true)
-		    or (ac.workspace_model_id is not null and wlm.enabled=true and wlc.enabled=true))
+		  and w.mentor_enabled=true and ab.enabled=true
+		  and ((ab.instance_model_id is not null and im.enabled=true and ic.enabled=true)
+		    or (ab.workspace_model_id is not null and wlm.enabled=true and wlc.enabled=true))
 		  and exists (
 		    select 1 from workspace_membership mem
 		    join identity_link il on il.external_actor_id=mem.user_id and il.disabled_at is null

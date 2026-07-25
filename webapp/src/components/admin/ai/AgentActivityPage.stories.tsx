@@ -10,7 +10,7 @@ const TOTAL_PAGES = 12;
 
 function handlers(totalPages = TOTAL_PAGES) {
 	return [
-		http.get("*/workspaces/acme/agent-jobs", ({ request }) => {
+		http.get("*/workspaces/acme/agents/jobs", ({ request }) => {
 			const page = Number(new URL(request.url).searchParams.get("page") ?? 0);
 			return HttpResponse.json({
 				content: mockJobs,

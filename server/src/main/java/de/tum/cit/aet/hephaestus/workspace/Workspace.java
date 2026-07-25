@@ -273,8 +273,14 @@ public class Workspace {
      *
      * <p>Two caps rather than one because instance-funded and own-provider spend are different
      * people's money — they are never summed, and each cap may only be blocked by a blind spot its
-     * own owner can clear (an unpriced shared model is the host's to fix; an unpriced BYO model is
-     * the workspace's).
+     * own owner can clear (an unpriced shared model is the host's to fix; an unpriced own-provider
+     * model is the workspace's).
+     *
+     * <p><b>Why this still says "byo" when the API says "ownProvider".</b> #1368 renamed the jargon out
+     * of the HTTP surface and the UI. The column keeps its name because renaming a released column is a
+     * destructive migration that has to run deprecate-then-remove across two releases
+     * (docs/contributor/database-migration.mdx) — a cost with no operator-visible benefit. The field
+     * follows the column so that the mapping stays greppable in both directions.
      */
     @Column(name = "monthly_byo_llm_budget_usd", precision = 10, scale = 2)
     private BigDecimal monthlyByoLlmBudgetUsd;

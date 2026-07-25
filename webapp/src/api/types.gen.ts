@@ -123,22 +123,6 @@ export type WorkspaceLlmUsageReport = {
     byDay: Array<LlmUsageByDay>;
     byJobType: Array<LlmUsageByJobType>;
     /**
-     * The same verdict for spend on this workspace's own provider, against its own cap.
-     */
-    byoBudgetVerdict: 'WITHIN' | 'EXHAUSTED' | 'UNVERIFIABLE';
-    /**
-     * Monthly cap in USD on spend this workspace pays for through its own connected provider; null = uncapped. Set by this workspace's own admins.
-     */
-    byoMonthlyBudgetUsd?: number;
-    /**
-     * Whether work on this workspace's OWN provider is currently paused.
-     */
-    byoPaused: boolean;
-    /**
-     * This month's confirmed spend on this workspace's own connected provider(s), in USD — the figure byoMonthlyBudgetUsd compares against. Different money from pricedTotalCostUsd: the two are never added together.
-     */
-    byoTotalCostUsd: number;
-    /**
      * Display-only conversion when the instance has a display currency. Absent = show USD only.
      */
     fx?: FxRateInfo;
@@ -147,23 +131,39 @@ export type WorkspaceLlmUsageReport = {
      */
     instanceBudgetVerdict: 'WITHIN' | 'EXHAUSTED' | 'UNVERIFIABLE';
     /**
-     * Whether work on SHARED models is currently paused for this workspace. Authoritative — it mirrors the live gate rather than being derivable from the verdict alone. Always false for a past month, which cannot pause anything.
-     */
-    instanceFundedPaused: boolean;
-    /**
      * Monthly cap in USD on spend the host pays for (shared models); null = uncapped. Set by instance admins only — a workspace admin can see it but not change it.
      */
     instanceMonthlyBudgetUsd?: number;
+    /**
+     * Whether work on SHARED models is currently paused for this workspace. Authoritative — it mirrors the live gate rather than being derivable from the verdict alone. Always false for a past month, which cannot pause anything.
+     */
+    instancePaused: boolean;
+    /**
+     * This month's confirmed spend on shared (instance) models, in USD — the figure instanceMonthlyBudgetUsd compares against. A floor, not the full total, while unpricedEventCount is non-zero.
+     */
+    instanceTotalCostUsd: number;
     /**
      * Calendar month (UTC), ISO yyyy-MM
      */
     month: string;
     /**
-     * This month's confirmed spend on shared (instance) models, in USD — the figure the monthly budget compares against. A floor, not the full total, while unpricedEventCount is non-zero.
+     * The same verdict for spend on this workspace's own provider, against its own cap.
      */
-    pricedTotalCostUsd: number;
+    ownProviderBudgetVerdict: 'WITHIN' | 'EXHAUSTED' | 'UNVERIFIABLE';
     /**
-     * Calls this month (any provider) whose price is not yet known. They are excluded from both totals above, so a non-zero value means the real spend may be higher than shown.
+     * Monthly cap in USD on spend this workspace pays for through its own connected provider; null = uncapped. Set by this workspace's own admins.
+     */
+    ownProviderMonthlyBudgetUsd?: number;
+    /**
+     * Whether work on this workspace's OWN provider is currently paused.
+     */
+    ownProviderPaused: boolean;
+    /**
+     * This month's confirmed spend on this workspace's own connected provider(s), in USD — the figure ownProviderMonthlyBudgetUsd compares against. Different money from instanceTotalCostUsd: the two are never added together.
+     */
+    ownProviderTotalCostUsd: number;
+    /**
+     * Calls this month (either purse) whose price is not yet known. They are excluded from both totals above, so a non-zero value means the real spend may be higher than shown.
      */
     unpricedEventCount: number;
 };
@@ -190,10 +190,6 @@ export type FxRateInfo = {
  * Month spend aggregated by job type
  */
 export type LlmUsageByJobType = {
-    /**
-     * Spend on this workspace's own connected provider(s) for this job type, in USD.
-     */
-    byoTotalCostUsd: number;
     cacheReadTokens: number;
     cacheWriteTokens: number;
     /**
@@ -201,12 +197,16 @@ export type LlmUsageByJobType = {
      */
     events: number;
     inputTokens: number;
-    jobType: 'PULL_REQUEST_REVIEW' | 'ISSUE_REVIEW' | 'CONVERSATION_REVIEW' | 'MENTOR_TURN';
-    outputTokens: number;
     /**
      * Confirmed spend on shared (instance) models for this job type, in USD.
      */
-    pricedTotalCostUsd: number;
+    instanceTotalCostUsd: number;
+    jobType: 'PULL_REQUEST_REVIEW' | 'ISSUE_REVIEW' | 'CONVERSATION_REVIEW' | 'MENTOR_TURN';
+    outputTokens: number;
+    /**
+     * Spend on this workspace's own connected provider(s) for this job type, in USD.
+     */
+    ownProviderTotalCostUsd: number;
     /**
      * LLM API calls, as reported by the runtime. Detection jobs and mentor turns both include every assistant call in an internal tool loop.
      */
@@ -221,20 +221,30 @@ export type LlmUsageByJobType = {
  * Spend for one UTC day
  */
 export type LlmUsageByDay = {
-    /**
-     * Spend on this workspace's own connected provider(s) for this day, in USD.
-     */
-    byoTotalCostUsd: number;
     day: Date;
     events: number;
     /**
      * Confirmed spend on shared (instance) models for this day, in USD.
      */
-    pricedTotalCostUsd: number;
+    instanceTotalCostUsd: number;
+    /**
+     * Spend on this workspace's own connected provider(s) for this day, in USD.
+     */
+    ownProviderTotalCostUsd: number;
     /**
      * Calls this day whose price is not yet known. Excluded from both totals above.
      */
     unpricedEventCount: number;
+};
+
+/**
+ * The instance LLM policy as it applies to this workspace (read-only)
+ */
+export type WorkspaceLlmSettings = {
+    /**
+     * Whether this workspace may register its own LLM provider connections
+     */
+    ownProviderAllowed: boolean;
 };
 
 /**
@@ -802,16 +812,6 @@ export type UpdateWorkspaceLlmConnectionRequest = {
 };
 
 /**
- * Set or clear a workspace's monthly LLM budget cap
- */
-export type UpdateWorkspaceLlmBudgetRequest = {
-    /**
-     * Budget cap in USD; 0 pauses immediately, null removes the cap
-     */
-    monthlyLlmBudgetUsd?: number;
-};
-
-/**
  * Request to update workspace feature flags. Null fields are left unchanged.
  */
 export type UpdateWorkspaceFeaturesRequest = {
@@ -894,7 +894,7 @@ export type UpdateRepositorySettingsRequest = {
 /**
  * Update per-workspace practice-review policy. Null fields unchanged; 'reset' clears to inherit.
  */
-export type UpdatePracticeReviewSettings = {
+export type UpdatePracticeReviewSettingsRequest = {
     /**
      * Minimum minutes between reviews for the same PR; 0 disables the cooldown
      */
@@ -1106,6 +1106,16 @@ export type UpdateLlmConnectionRequest = {
 };
 
 /**
+ * Set or clear a monthly LLM budget cap
+ */
+export type UpdateLlmBudgetRequest = {
+    /**
+     * Cap in USD; 0 pauses the affected work immediately, null removes the cap
+     */
+    monthlyBudgetUsd?: number;
+};
+
+/**
  * Request to update the entire weekly leaderboard digest configuration atomically
  */
 export type UpdateLeaderboardDigestRequest = {
@@ -1157,16 +1167,6 @@ export type UpdateConnectionStatusRequest = {
      * Target lifecycle state. Admin-settable: ACTIVE, SUSPENDED, UNINSTALLED.
      */
     state: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
-};
-
-/**
- * Set or clear the workspace's own monthly cap on its own-provider spend
- */
-export type UpdateByoLlmBudgetRequest = {
-    /**
-     * Cap in USD on this workspace's own-provider spend; 0 pauses that work immediately, null removes the cap
-     */
-    monthlyByoLlmBudgetUsd?: number;
 };
 
 export type UpdateAccountRequest = {
@@ -2137,6 +2137,44 @@ export type ProbeLlmConnectionRequest = {
 };
 
 /**
+ * A workspace's practice-review policy: effective values plus raw overrides
+ */
+export type PracticeReviewSettings = {
+    /**
+     * Effective: minimum minutes between reviews for the same PR
+     */
+    cooldownMinutes: number;
+    /**
+     * Raw override; null = inheriting the fleet default
+     */
+    cooldownMinutesOverride?: number;
+    /**
+     * Effective: deliver feedback to merged PRs/MRs
+     */
+    deliverToMerged: boolean;
+    /**
+     * Raw override; null = inheriting the fleet default
+     */
+    deliverToMergedOverride?: boolean;
+    /**
+     * Effective: run practice review for all developers
+     */
+    runForAllUsers: boolean;
+    /**
+     * Raw override; null = inheriting the fleet default
+     */
+    runForAllUsersOverride?: boolean;
+    /**
+     * Effective: skip draft PRs/MRs
+     */
+    skipDrafts: boolean;
+    /**
+     * Raw override; null = inheriting the fleet default
+     */
+    skipDraftsOverride?: boolean;
+};
+
+/**
  * A practice area grouping related practices into a learning objective
  */
 export type PracticeArea = {
@@ -2383,7 +2421,7 @@ export type ConfigAuditEntryView = {
      */
     changedKeys?: Array<string>;
     entityId?: string;
-    entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AI_CONFIG_BINDING' | 'AGENT_CONFIG' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL';
+    entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL';
     id?: number;
     newValue?: string;
     occurredAt?: Date;
@@ -3977,59 +4015,9 @@ export type AssignRoleRequest = {
 };
 
 /**
- * Aggregate workspace AI settings: runtime bindings + effective + raw-override practice-review policy
- */
-export type AiSettingsView = {
-    /**
-     * Effective: minimum minutes between reviews for the same PR
-     */
-    cooldownMinutes: number;
-    /**
-     * Raw override; null = inheriting the fleet default
-     */
-    cooldownMinutesOverride?: number;
-    /**
-     * Effective: deliver feedback to merged PRs/MRs
-     */
-    deliverToMerged: boolean;
-    /**
-     * Raw override; null = inheriting the fleet default
-     */
-    deliverToMergedOverride?: boolean;
-    /**
-     * Whether the mentor feature is enabled for this workspace
-     */
-    mentorEnabled: boolean;
-    /**
-     * Whether the practices feature is enabled for this workspace
-     */
-    practicesEnabled: boolean;
-    /**
-     * Effective: run practice review for all developers
-     */
-    runForAllUsers: boolean;
-    /**
-     * Raw override; null = inheriting the fleet default
-     */
-    runForAllUsersOverride?: boolean;
-    /**
-     * Effective: skip draft PRs/MRs
-     */
-    skipDrafts: boolean;
-    /**
-     * Raw override; null = inheriting the fleet default
-     */
-    skipDraftsOverride?: boolean;
-    /**
-     * Whether this workspace may register additional OpenAI-compatible connections
-     */
-    workspaceConnectionsAllowed: boolean;
-};
-
-/**
  * Bind a model and execution limits to an agent purpose
  */
-export type AgentBindingUpsertRequest = {
+export type AgentBindingRequest = {
     /**
      * Whether the sandbox may reach the public internet
      */
@@ -4089,52 +4077,68 @@ export type AdminWorkspaceView = {
 };
 
 /**
- * Instance-admin per-workspace month rollup (metadata only, no tenant content)
+ * One workspace's month of spend, as an instance admin sees it
  */
 export type AdminWorkspaceLlmUsage = {
-    /**
-     * The same verdict for the workspace's own-provider spend against its own cap.
-     */
-    byoBudgetVerdict: 'WITHIN' | 'EXHAUSTED' | 'UNVERIFIABLE';
-    /**
-     * The workspace's own cap in USD on its own-provider spend; null = uncapped. Read-only here — it governs the workspace's money, so only its own admins may change it.
-     */
-    byoMonthlyBudgetUsd?: number;
-    /**
-     * Whether work on the workspace's OWN provider is paused right now.
-     */
-    byoPaused: boolean;
-    /**
-     * This month's confirmed spend on the workspace's own connected provider(s), in USD — compared against byoMonthlyBudgetUsd.
-     */
-    byoTotalCostUsd: number;
     displayName: string;
     /**
-     * Ledger events (jobs / mentor turns) this month, any provider
+     * Ledger events (jobs / mentor turns) this month, either purse
      */
     events: number;
-    /**
-     * Display-only conversion when the instance has a display currency. Absent = show USD only. Identical on every row of one response.
-     */
-    fx?: FxRateInfo;
     /**
      * Whether shared-model spend is within the instance cap, has reached it, or can't be confirmed because some shared-model usage has no price set.
      */
     instanceBudgetVerdict: 'WITHIN' | 'EXHAUSTED' | 'UNVERIFIABLE';
     /**
-     * Whether work on SHARED models is paused for this workspace right now (current month only) — authoritative, mirroring the live gate.
-     */
-    instanceFundedPaused: boolean;
-    /**
      * Monthly cap in USD on spend this instance pays for; null = uncapped. Yours to set.
      */
     instanceMonthlyBudgetUsd?: number;
     /**
+     * Whether work on SHARED models is paused for this workspace right now (current month only) — authoritative, mirroring the live gate.
+     */
+    instancePaused: boolean;
+    /**
      * This month's confirmed spend on shared (instance) models, in USD — compared against instanceMonthlyBudgetUsd.
      */
-    pricedTotalCostUsd: number;
-    workspaceId: number;
+    instanceTotalCostUsd: number;
+    /**
+     * The same verdict for the workspace's own-provider spend against its own cap.
+     */
+    ownProviderBudgetVerdict: 'WITHIN' | 'EXHAUSTED' | 'UNVERIFIABLE';
+    /**
+     * The workspace's own cap in USD on its own-provider spend; null = uncapped. Read-only here — it governs the workspace's money, so only its own admins may change it.
+     */
+    ownProviderMonthlyBudgetUsd?: number;
+    /**
+     * Whether work on the workspace's OWN provider is paused right now.
+     */
+    ownProviderPaused: boolean;
+    /**
+     * This month's confirmed spend on the workspace's own connected provider(s), in USD — compared against ownProviderMonthlyBudgetUsd.
+     */
+    ownProviderTotalCostUsd: number;
+    /**
+     * Addresses the workspace everywhere else in the API, including its cap
+     */
     workspaceSlug: string;
+};
+
+/**
+ * Instance-admin per-workspace month rollup (metadata only, no tenant content)
+ */
+export type AdminLlmUsageReport = {
+    /**
+     * Display-only conversion when the instance has a display currency. Absent = show USD only. Applies to every USD amount in this response.
+     */
+    fx?: FxRateInfo;
+    /**
+     * Calendar month (UTC), ISO yyyy-MM
+     */
+    month: string;
+    /**
+     * One row per workspace with ledger activity this month
+     */
+    workspaces: Array<AdminWorkspaceLlmUsage>;
 };
 
 export type AdminAccountView = {
@@ -4258,7 +4262,7 @@ export type AdminListConfigAuditEventsData = {
         workspaceId?: number;
         page?: number;
         size?: number;
-        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AI_CONFIG_BINDING' | 'AGENT_CONFIG' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
+        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
         entityId?: string;
         changedKey?: string;
         action?: Array<'CREATED' | 'UPDATED' | 'DELETED'>;
@@ -4277,24 +4281,6 @@ export type AdminListConfigAuditEventsResponses = {
 };
 
 export type AdminListConfigAuditEventsResponse = AdminListConfigAuditEventsResponses[keyof AdminListConfigAuditEventsResponses];
-
-export type AdminListLlmUsageData = {
-    body?: never;
-    path?: never;
-    query?: {
-        month?: string;
-    };
-    url: '/admin/llm-usage';
-};
-
-export type AdminListLlmUsageResponses = {
-    /**
-     * OK
-     */
-    200: Array<AdminWorkspaceLlmUsage>;
-};
-
-export type AdminListLlmUsageResponse = AdminListLlmUsageResponses[keyof AdminListLlmUsageResponses];
 
 export type AdminListLlmConnectionsData = {
     body?: never;
@@ -4658,6 +4644,24 @@ export type AdminUpdateLlmSettingsResponses = {
 
 export type AdminUpdateLlmSettingsResponse = AdminUpdateLlmSettingsResponses[keyof AdminUpdateLlmSettingsResponses];
 
+export type AdminGetLlmUsageReportData = {
+    body?: never;
+    path?: never;
+    query?: {
+        month?: string;
+    };
+    url: '/admin/llm/usage';
+};
+
+export type AdminGetLlmUsageReportResponses = {
+    /**
+     * OK
+     */
+    200: AdminLlmUsageReport;
+};
+
+export type AdminGetLlmUsageReportResponse = AdminGetLlmUsageReportResponses[keyof AdminGetLlmUsageReportResponses];
+
 export type AdminListLoginProvidersData = {
     body?: never;
     path?: never;
@@ -4796,12 +4800,12 @@ export type AdminListWorkspacesResponses = {
 export type AdminListWorkspacesResponse = AdminListWorkspacesResponses[keyof AdminListWorkspacesResponses];
 
 export type AdminUpdateWorkspaceLlmBudgetData = {
-    body: UpdateWorkspaceLlmBudgetRequest;
+    body: UpdateLlmBudgetRequest;
     path: {
-        workspaceId: number;
+        workspaceSlug: string;
     };
     query?: never;
-    url: '/admin/workspaces/{workspaceId}/llm-budget';
+    url: '/admin/workspaces/{workspaceSlug}/llm/budget';
 };
 
 export type AdminUpdateWorkspaceLlmBudgetResponses = {
@@ -5315,7 +5319,7 @@ export type GetWorkspaceResponses = {
 
 export type GetWorkspaceResponse = GetWorkspaceResponses[keyof GetWorkspaceResponses];
 
-export type GetBindingsData = {
+export type ListAgentsData = {
     body?: never;
     path: {
         /**
@@ -5324,70 +5328,19 @@ export type GetBindingsData = {
         workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/agent-bindings';
+    url: '/workspaces/{workspaceSlug}/agents';
 };
 
-export type GetBindingsResponses = {
+export type ListAgentsResponses = {
     /**
      * Bindings returned
      */
     200: Array<AgentBinding>;
 };
 
-export type GetBindingsResponse = GetBindingsResponses[keyof GetBindingsResponses];
+export type ListAgentsResponse = ListAgentsResponses[keyof ListAgentsResponses];
 
-export type DeleteBindingData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        purpose: 'PRACTICE_DETECTION' | 'MENTOR';
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/agent-bindings/{purpose}';
-};
-
-export type DeleteBindingResponses = {
-    /**
-     * Binding removed
-     */
-    204: void;
-};
-
-export type DeleteBindingResponse = DeleteBindingResponses[keyof DeleteBindingResponses];
-
-export type UpsertBindingData = {
-    body: AgentBindingUpsertRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        purpose: 'PRACTICE_DETECTION' | 'MENTOR';
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/agent-bindings/{purpose}';
-};
-
-export type UpsertBindingErrors = {
-    /**
-     * Model not found
-     */
-    404: unknown;
-};
-
-export type UpsertBindingResponses = {
-    /**
-     * Binding saved
-     */
-    200: AgentBinding;
-};
-
-export type UpsertBindingResponse = UpsertBindingResponses[keyof UpsertBindingResponses];
-
-export type ListJobsData = {
+export type ListAgentJobsData = {
     body?: never;
     path: {
         /**
@@ -5403,19 +5356,19 @@ export type ListJobsData = {
         page?: number;
         size?: number;
     };
-    url: '/workspaces/{workspaceSlug}/agent-jobs';
+    url: '/workspaces/{workspaceSlug}/agents/jobs';
 };
 
-export type ListJobsResponses = {
+export type ListAgentJobsResponses = {
     /**
      * Paginated job list
      */
     200: PageAgentJob;
 };
 
-export type ListJobsResponse = ListJobsResponses[keyof ListJobsResponses];
+export type ListAgentJobsResponse = ListAgentJobsResponses[keyof ListAgentJobsResponses];
 
-export type GetJobData = {
+export type GetAgentJobData = {
     body?: never;
     path: {
         /**
@@ -5425,26 +5378,26 @@ export type GetJobData = {
         jobId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/agent-jobs/{jobId}';
+    url: '/workspaces/{workspaceSlug}/agents/jobs/{jobId}';
 };
 
-export type GetJobErrors = {
+export type GetAgentJobErrors = {
     /**
      * Job not found in this workspace
      */
     404: unknown;
 };
 
-export type GetJobResponses = {
+export type GetAgentJobResponses = {
     /**
      * Job detail returned
      */
     200: AgentJob;
 };
 
-export type GetJobResponse = GetJobResponses[keyof GetJobResponses];
+export type GetAgentJobResponse = GetAgentJobResponses[keyof GetAgentJobResponses];
 
-export type CancelJobData = {
+export type CancelAgentJobData = {
     body?: never;
     path: {
         /**
@@ -5454,10 +5407,10 @@ export type CancelJobData = {
         jobId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/agent-jobs/{jobId}/cancel';
+    url: '/workspaces/{workspaceSlug}/agents/jobs/{jobId}/cancel';
 };
 
-export type CancelJobErrors = {
+export type CancelAgentJobErrors = {
     /**
      * Job not found in this workspace
      */
@@ -5468,16 +5421,16 @@ export type CancelJobErrors = {
     409: unknown;
 };
 
-export type CancelJobResponses = {
+export type CancelAgentJobResponses = {
     /**
      * Job cancelled
      */
     200: AgentJob;
 };
 
-export type CancelJobResponse = CancelJobResponses[keyof CancelJobResponses];
+export type CancelAgentJobResponse = CancelAgentJobResponses[keyof CancelAgentJobResponses];
 
-export type RetryDeliveryData = {
+export type RetryAgentJobDeliveryData = {
     body?: never;
     path: {
         /**
@@ -5487,10 +5440,10 @@ export type RetryDeliveryData = {
         jobId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/agent-jobs/{jobId}/delivery/retry';
+    url: '/workspaces/{workspaceSlug}/agents/jobs/{jobId}/delivery/retry';
 };
 
-export type RetryDeliveryErrors = {
+export type RetryAgentJobDeliveryErrors = {
     /**
      * Job not found in this workspace
      */
@@ -5501,56 +5454,65 @@ export type RetryDeliveryErrors = {
     409: unknown;
 };
 
-export type RetryDeliveryResponses = {
+export type RetryAgentJobDeliveryResponses = {
     /**
      * Delivery retried
      */
     200: AgentJob;
 };
 
-export type RetryDeliveryResponse = RetryDeliveryResponses[keyof RetryDeliveryResponses];
+export type RetryAgentJobDeliveryResponse = RetryAgentJobDeliveryResponses[keyof RetryAgentJobDeliveryResponses];
 
-export type GetAiSettingsData = {
+export type DeleteAgentData = {
     body?: never;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
+        purpose: 'PRACTICE_DETECTION' | 'MENTOR';
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/ai-settings';
+    url: '/workspaces/{workspaceSlug}/agents/{purpose}';
 };
 
-export type GetAiSettingsResponses = {
+export type DeleteAgentResponses = {
     /**
-     * AI settings returned
+     * Binding removed
      */
-    200: AiSettingsView;
+    204: void;
 };
 
-export type GetAiSettingsResponse = GetAiSettingsResponses[keyof GetAiSettingsResponses];
+export type DeleteAgentResponse = DeleteAgentResponses[keyof DeleteAgentResponses];
 
-export type UpdatePracticeReviewSettingsData = {
-    body: UpdatePracticeReviewSettings;
+export type ConfigureAgentData = {
+    body: AgentBindingRequest;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
+        purpose: 'PRACTICE_DETECTION' | 'MENTOR';
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/ai-settings/practice-review';
+    url: '/workspaces/{workspaceSlug}/agents/{purpose}';
 };
 
-export type UpdatePracticeReviewSettingsResponses = {
+export type ConfigureAgentErrors = {
     /**
-     * Policy updated
+     * Model not found
      */
-    200: AiSettingsView;
+    404: unknown;
 };
 
-export type UpdatePracticeReviewSettingsResponse = UpdatePracticeReviewSettingsResponses[keyof UpdatePracticeReviewSettingsResponses];
+export type ConfigureAgentResponses = {
+    /**
+     * Binding saved
+     */
+    200: AgentBinding;
+};
+
+export type ConfigureAgentResponse = ConfigureAgentResponses[keyof ConfigureAgentResponses];
 
 export type ListWorkspaceConfigAuditEventsData = {
     body?: never;
@@ -5563,7 +5525,7 @@ export type ListWorkspaceConfigAuditEventsData = {
     query?: {
         page?: number;
         size?: number;
-        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AI_CONFIG_BINDING' | 'AGENT_CONFIG' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
+        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
         entityId?: string;
         changedKey?: string;
         action?: Array<'CREATED' | 'UPDATED' | 'DELETED'>;
@@ -6057,50 +6019,6 @@ export type ResetAndRecalculateLeaguesResponses = {
     200: unknown;
 };
 
-export type GetLlmUsageReportData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: {
-        month?: string;
-    };
-    url: '/workspaces/{workspaceSlug}/llm-usage';
-};
-
-export type GetLlmUsageReportResponses = {
-    /**
-     * OK
-     */
-    200: WorkspaceLlmUsageReport;
-};
-
-export type GetLlmUsageReportResponse = GetLlmUsageReportResponses[keyof GetLlmUsageReportResponses];
-
-export type UpdateByoLlmBudgetData = {
-    body: UpdateByoLlmBudgetRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/llm-usage/byo-budget';
-};
-
-export type UpdateByoLlmBudgetResponses = {
-    /**
-     * Cap updated
-     */
-    204: void;
-};
-
-export type UpdateByoLlmBudgetResponse = UpdateByoLlmBudgetResponses[keyof UpdateByoLlmBudgetResponses];
-
 export type WorkspaceListAvailableLlmModelsData = {
     body?: never;
     path: {
@@ -6121,6 +6039,27 @@ export type WorkspaceListAvailableLlmModelsResponses = {
 };
 
 export type WorkspaceListAvailableLlmModelsResponse = WorkspaceListAvailableLlmModelsResponses[keyof WorkspaceListAvailableLlmModelsResponses];
+
+export type UpdateWorkspaceLlmBudgetData = {
+    body: UpdateLlmBudgetRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/llm/budget';
+};
+
+export type UpdateWorkspaceLlmBudgetResponses = {
+    /**
+     * Cap updated
+     */
+    204: void;
+};
+
+export type UpdateWorkspaceLlmBudgetResponse = UpdateWorkspaceLlmBudgetResponses[keyof UpdateWorkspaceLlmBudgetResponses];
 
 export type WorkspaceListLlmConnectionsData = {
     body?: never;
@@ -6432,6 +6371,50 @@ export type WorkspaceUpdateLlmModelResponses = {
 };
 
 export type WorkspaceUpdateLlmModelResponse = WorkspaceUpdateLlmModelResponses[keyof WorkspaceUpdateLlmModelResponses];
+
+export type WorkspaceGetLlmSettingsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/llm/settings';
+};
+
+export type WorkspaceGetLlmSettingsResponses = {
+    /**
+     * OK
+     */
+    200: WorkspaceLlmSettings;
+};
+
+export type WorkspaceGetLlmSettingsResponse = WorkspaceGetLlmSettingsResponses[keyof WorkspaceGetLlmSettingsResponses];
+
+export type GetLlmUsageReportData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        month?: string;
+    };
+    url: '/workspaces/{workspaceSlug}/llm/usage';
+};
+
+export type GetLlmUsageReportResponses = {
+    /**
+     * OK
+     */
+    200: WorkspaceLlmUsageReport;
+};
+
+export type GetLlmUsageReportResponse = GetLlmUsageReportResponses[keyof GetLlmUsageReportResponses];
 
 export type ListMembersData = {
     body?: never;
@@ -7428,6 +7411,48 @@ export type ReorderPracticesResponses = {
 };
 
 export type ReorderPracticesResponse = ReorderPracticesResponses[keyof ReorderPracticesResponses];
+
+export type GetPracticeReviewSettingsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/review-settings';
+};
+
+export type GetPracticeReviewSettingsResponses = {
+    /**
+     * Policy returned
+     */
+    200: PracticeReviewSettings;
+};
+
+export type GetPracticeReviewSettingsResponse = GetPracticeReviewSettingsResponses[keyof GetPracticeReviewSettingsResponses];
+
+export type UpdatePracticeReviewSettingsData = {
+    body: UpdatePracticeReviewSettingsRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/review-settings';
+};
+
+export type UpdatePracticeReviewSettingsResponses = {
+    /**
+     * Policy updated
+     */
+    200: PracticeReviewSettings;
+};
+
+export type UpdatePracticeReviewSettingsResponse = UpdatePracticeReviewSettingsResponses[keyof UpdatePracticeReviewSettingsResponses];
 
 export type DeletePracticeData = {
     body?: never;

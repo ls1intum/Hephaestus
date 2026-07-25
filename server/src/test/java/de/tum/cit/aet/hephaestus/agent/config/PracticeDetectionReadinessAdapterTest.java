@@ -11,7 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
-class AgentConfigCheckerAdapterTest extends BaseUnitTest {
+class PracticeDetectionReadinessAdapterTest extends BaseUnitTest {
 
     @Mock
     private WorkspaceAgentBindingRepository bindingRepository;
@@ -19,11 +19,11 @@ class AgentConfigCheckerAdapterTest extends BaseUnitTest {
     @Mock
     private LlmModelResolver resolver;
 
-    private AgentConfigCheckerAdapter checker;
+    private PracticeDetectionReadinessAdapter checker;
 
     @BeforeEach
     void setUp() {
-        checker = new AgentConfigCheckerAdapter(bindingRepository, resolver);
+        checker = new PracticeDetectionReadinessAdapter(bindingRepository, resolver);
     }
 
     private WorkspaceAgentBinding binding(boolean enabled) {
@@ -38,7 +38,7 @@ class AgentConfigCheckerAdapterTest extends BaseUnitTest {
         when(bindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
             Optional.empty()
         );
-        assertThat(checker.hasRunnablePractice(1L)).isFalse();
+        assertThat(checker.hasRunnableAgent(1L)).isFalse();
     }
 
     @Test
@@ -46,7 +46,7 @@ class AgentConfigCheckerAdapterTest extends BaseUnitTest {
         when(bindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
             Optional.of(binding(false))
         );
-        assertThat(checker.hasRunnablePractice(1L)).isFalse();
+        assertThat(checker.hasRunnableAgent(1L)).isFalse();
     }
 
     @Test
@@ -56,7 +56,7 @@ class AgentConfigCheckerAdapterTest extends BaseUnitTest {
             Optional.of(b)
         );
         when(resolver.resolve(b)).thenThrow(new IllegalStateException("unavailable"));
-        assertThat(checker.hasRunnablePractice(1L)).isFalse();
+        assertThat(checker.hasRunnableAgent(1L)).isFalse();
     }
 
     @Test
@@ -66,6 +66,6 @@ class AgentConfigCheckerAdapterTest extends BaseUnitTest {
             Optional.of(b)
         );
         when(resolver.resolve(b)).thenReturn(org.mockito.Mockito.mock(ResolvedLlmModel.class));
-        assertThat(checker.hasRunnablePractice(1L)).isTrue();
+        assertThat(checker.hasRunnableAgent(1L)).isTrue();
     }
 }

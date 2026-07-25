@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.usage;
 
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageDTOs.AdminLlmUsageReportDTO;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageDTOs.AdminWorkspaceLlmUsageDTO;
 import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateInfoDTO;
 import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateLookup;
@@ -55,17 +56,18 @@ public class LlmUsageAdminService {
     }
 
     @Transactional(readOnly = true)
-    public List<AdminWorkspaceLlmUsageDTO> getWorkspaceRollups(YearMonth month) {
+    public AdminLlmUsageReportDTO getReport(YearMonth month) {
         LlmBudgetService.MonthWindow window = LlmBudgetService.MonthWindow.of(month);
         boolean isCurrentMonth = month.equals(YearMonth.now(ZoneOffset.UTC));
-        // Resolved once for the whole response: one month has exactly one rate, and repeating the
-        // same value on every row is what keeps the endpoint's array shape unchanged.
+        // Resolved once for the whole response and reported once, on the envelope: one month has
+        // exactly one rate, so a per-row copy was N duplicates of a single request-level fact.
         FxRateInfoDTO fx = fxRateLookup.forMonth(month).orElse(null);
-        return usageRepository
+        List<AdminWorkspaceLlmUsageDTO> workspaces = usageRepository
             .aggregateByWorkspace(window.from(), window.to())
             .stream()
-            .map(row -> toRollup(row, isCurrentMonth, fx))
+            .map(row -> toRollup(row, isCurrentMonth))
             .toList();
+        return new AdminLlmUsageReportDTO(month.toString(), fx, workspaces);
     }
 
     /**
@@ -76,16 +78,16 @@ public class LlmUsageAdminService {
      * fails, the cap change rolls back with it rather than committing untracked.
      */
     @Transactional
-    public void updateBudget(Long workspaceId, @Nullable BigDecimal monthlyLlmBudgetUsd) {
+    public void updateBudget(String workspaceSlug, @Nullable BigDecimal monthlyLlmBudgetUsd) {
         Workspace workspace = workspaceRepository
-            .findById(workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
+            .findByWorkspaceSlug(workspaceSlug)
+            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceSlug));
         BigDecimal before = workspace.getMonthlyLlmBudgetUsd();
         workspace.setMonthlyLlmBudgetUsd(monthlyLlmBudgetUsd);
         workspaceRepository.save(workspace);
         configAudit.record(
             ConfigAuditEntry.updated(
-                ConfigAuditEntityType.WORKSPACE_LLM_BUDGET,
+                ConfigAuditEntityType.WORKSPACE_INSTANCE_LLM_BUDGET,
                 workspace.getId(),
                 workspace.getId(),
                 new LlmBudgetSnapshot(before),
@@ -95,7 +97,7 @@ public class LlmUsageAdminService {
         // Raising the cap must take effect now, not up to an hour from now: jobs the claim loop held
         // on this budget are released so the next poll can pick them up. Harmless when the cap was
         // lowered instead — a released job is simply re-held on its next claim attempt.
-        jobRepository.releaseBudgetHolds(workspaceId, Instant.now());
+        jobRepository.releaseBudgetHolds(workspace.getId(), Instant.now());
     }
 
     /**
@@ -105,21 +107,19 @@ public class LlmUsageAdminService {
      */
     private static AdminWorkspaceLlmUsageDTO toRollup(
         LlmUsageEventRepository.WorkspaceAggregate row,
-        boolean isCurrentMonth,
-        @Nullable FxRateInfoDTO fx
+        boolean isCurrentMonth
     ) {
         LlmBudgetVerdict instanceVerdict = LlmBudgetService.verdictFor(
             row.getPricedTotalCostUsd(),
             row.isHasUnpricedInstanceUsage(),
             row.getMonthlyBudgetUsd()
         );
-        LlmBudgetVerdict byoVerdict = LlmBudgetService.verdictFor(
+        LlmBudgetVerdict ownProviderVerdict = LlmBudgetService.verdictFor(
             row.getByoTotalCostUsd(),
             row.isHasUnpricedByoUsage(),
             row.getByoMonthlyBudgetUsd()
         );
         return new AdminWorkspaceLlmUsageDTO(
-            row.getWorkspaceId(),
             row.getWorkspaceSlug(),
             row.getDisplayName(),
             row.getMonthlyBudgetUsd(),
@@ -128,10 +128,9 @@ public class LlmUsageAdminService {
             row.getByoTotalCostUsd(),
             row.getEvents(),
             instanceVerdict,
-            byoVerdict,
+            ownProviderVerdict,
             isCurrentMonth && instanceVerdict != LlmBudgetVerdict.WITHIN,
-            isCurrentMonth && byoVerdict != LlmBudgetVerdict.WITHIN,
-            fx
+            isCurrentMonth && ownProviderVerdict != LlmBudgetVerdict.WITHIN
         );
     }
 
