@@ -13,10 +13,10 @@ export interface SetBudgetDialogProps {
 }
 
 /**
- * Instance-admin dialog to set or remove a workspace's monthly budget for spend the *host* pays
- * for (shared models). A cap of $0 pauses shared-model work immediately; removing the cap leaves
- * that spend uncapped. The workspace's own-provider spend is separate money and is never affected
- * — that cap is the workspace's own (`SetByoBudgetDialog`).
+ * Instance-admin dialog to set or remove a workspace's monthly shared-model budget — the spend the
+ * *host* pays for. A budget of $0 pauses shared-model work immediately; removing it leaves that
+ * spend uncapped. Spend on the workspace's own provider is separate money and is never affected —
+ * that cap is the workspace's own (`SetByoBudgetDialog`).
  *
  * The field, validation, and error rendering come from `BudgetAmountDialog`; only the copy is here.
  */
@@ -32,18 +32,19 @@ export function SetBudgetDialog({
 			open={workspace !== null}
 			// Keyed so the input state resets whenever a different workspace is edited.
 			resetKey={workspace?.workspaceId}
-			title="Set monthly AI budget"
+			title="Set shared-model budget"
 			description={
 				workspace !== null ? (
 					<>
-						Shared-model budget for <strong>{workspace.displayName}</strong> (
-						{workspace.workspaceSlug}). When the month's spend on shared models reaches the cap,
-						work on them pauses until next month. A cap of $0 pauses immediately.
+						What <strong>{workspace.displayName}</strong> ({workspace.workspaceSlug}) can spend on
+						shared models each month. At the cap, shared-model work pauses until the month resets;
+						the workspace's own provider is not affected. $0 pauses now.
 					</>
 				) : null
 			}
 			fieldLabel="Monthly budget (USD)"
-			fieldDescription="Spend above this amount pauses work on shared models until the next UTC month."
+			fieldDescription="Reaching this amount pauses shared-model work until the month resets."
+			submitLabel="Save budget"
 			currentValueUsd={workspace?.instanceMonthlyBudgetUsd ?? null}
 			isPending={isPending}
 			serverError={serverError}

@@ -35,6 +35,36 @@ function decode(value: string): ModelSelection {
 }
 
 /**
+ * An option's accessible name. It has to repeat the price that the visual row shows on its right:
+ * an explicit `aria-label` replaces the item's contents wholesale, so leaving the price out would
+ * cost screen-reader users the one number the choice turns on.
+ */
+function optionLabel(model: AvailableLlmModel): string {
+	return `${model.displayName} · ${model.connectionDisplayName} · ${priceLabel(model, "workspace")}`;
+}
+
+/** The options of one funding group — identical rows, so both groups share this. */
+function ModelOptions({ models }: { models: AvailableLlmModel[] }) {
+	return models.map((model) => (
+		<SelectItem
+			key={encode(model.scope, model.id)}
+			value={encode(model.scope, model.id)}
+			aria-label={optionLabel(model)}
+		>
+			<span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+				<span className="min-w-0 truncate">
+					{model.displayName}
+					<span className="text-muted-foreground"> · {model.connectionDisplayName}</span>
+				</span>
+				<span className="shrink-0 text-xs text-muted-foreground">
+					{priceLabel(model, "workspace")}
+				</span>
+			</span>
+		</SelectItem>
+	));
+}
+
+/**
  * Model picker for an agent config binding (#1368) — replaces the old raw provider/base-url/API-key/
  * model-name fields. Groups by funding source: instance-shared models and models billed through the
  * workspace's own provider accounts. Never shows the upstream
@@ -81,50 +111,18 @@ export function ModelPicker({
 								managed and funded by the instance
 							</span>
 						</SelectLabel>
-						{shared.map((model) => (
-							<SelectItem
-								key={encode("SHARED", model.id)}
-								value={encode("SHARED", model.id)}
-								aria-label={`${model.displayName} · ${model.connectionDisplayName}`}
-							>
-								<span className="flex min-w-0 flex-1 items-center justify-between gap-2">
-									<span className="min-w-0 truncate">
-										{model.displayName}
-										<span className="text-muted-foreground"> · {model.connectionDisplayName}</span>
-									</span>
-									<span className="shrink-0 text-xs text-muted-foreground">
-										{priceLabel(model, "workspace")}
-									</span>
-								</span>
-							</SelectItem>
-						))}
+						<ModelOptions models={shared} />
 					</SelectGroup>
 				)}
 				{own.length > 0 && (
 					<SelectGroup>
 						<SelectLabel>
-							Workspace models
+							Your models
 							<span className="block font-normal normal-case text-muted-foreground/80">
 								billed to the account that owns the credential
 							</span>
 						</SelectLabel>
-						{own.map((model) => (
-							<SelectItem
-								key={encode("WORKSPACE", model.id)}
-								value={encode("WORKSPACE", model.id)}
-								aria-label={`${model.displayName} · ${model.connectionDisplayName}`}
-							>
-								<span className="flex min-w-0 flex-1 items-center justify-between gap-2">
-									<span className="min-w-0 truncate">
-										{model.displayName}
-										<span className="text-muted-foreground"> · {model.connectionDisplayName}</span>
-									</span>
-									<span className="shrink-0 text-xs text-muted-foreground">
-										{priceLabel(model, "workspace")}
-									</span>
-								</span>
-							</SelectItem>
-						))}
+						<ModelOptions models={own} />
 					</SelectGroup>
 				)}
 			</SelectContent>

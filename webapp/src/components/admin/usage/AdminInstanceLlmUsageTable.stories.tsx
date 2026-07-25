@@ -7,8 +7,8 @@ import {
 } from "./AdminInstanceLlmUsageTable";
 
 /**
- * Mixed cap ownership, in the container's sort order (instance-funded cost desc): both caps set,
- * self cap only, instance cap only, and neither.
+ * Mixed cap ownership, in the container's sort order (shared-model spend desc): both caps set,
+ * provider cap only, instance cap only, and neither.
  */
 const rows: AdminWorkspaceLlmUsageRow[] = [
 	{
@@ -72,7 +72,7 @@ const rows: AdminWorkspaceLlmUsageRow[] = [
 		instanceFundedPaused: false,
 	},
 	{
-		// Self cap only, and spent: this workspace pauses itself without the instance admin ever
+		// Provider cap only, and spent: this workspace pauses itself without the instance admin ever
 		// setting a cap — the case that decides whether they bother setting one at all.
 		workspaceId: 5,
 		workspaceSlug: "atelier",
@@ -125,9 +125,9 @@ const detailReport: WorkspaceLlmUsageReport = {
 };
 
 /**
- * Instance-admin table of every workspace's LLM spend for one month, against both caps: the
- * instance cap the host funds (editable here, via `onEditBudget`) and the workspace's own self cap
- * (read-only — it is the workspace's money). Pure/presentational.
+ * Instance-admin table of every workspace's AI spend for one month, against both caps: the
+ * instance cap the host pays for (editable here, via `onEditBudget`) and the workspace's own
+ * provider cap (read-only — it is the workspace's money). Pure/presentational.
  */
 const meta = {
 	component: AdminInstanceLlmUsageTable,
@@ -152,8 +152,9 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Current month with every cap combination: both caps, instance only, self only, neither — plus a
- * paused instance cap, a paused self cap, a near-cap warning and an unverifiable total.
+ * Current month with every cap combination: both caps, instance only, provider only, neither —
+ * plus a paused instance cap, a paused provider cap, a near-cap warning, and a total that can't be
+ * verified.
  */
 export const Default: Story = {};
 
@@ -196,7 +197,7 @@ export const PausedByInstanceCap: Story = {
 };
 
 /** Paused on the workspace's own money — raising the instance cap would change nothing. */
-export const PausedBySelfCap: Story = {
+export const PausedByProviderCap: Story = {
 	args: { rows: [rows[4]] },
 };
 
@@ -247,10 +248,10 @@ export const ZeroInstanceCap: Story = {
 };
 
 /**
- * Workspaces that have not set a cap of their own: the self-cap column reads as unset, which is the
- * signal that nobody is bounding that workspace's own-provider spend.
+ * Workspaces that have not set a cap of their own: the provider-cap column reads as unset, which is
+ * the signal that nobody is bounding that workspace's provider spend.
  */
-export const NoSelfCapsSet: Story = {
+export const NoProviderCapsSet: Story = {
 	args: {
 		rows: rows.map((row) => ({
 			...row,
@@ -283,7 +284,7 @@ export const Loading: Story = {
 export const ErrorState: Story = {
 	args: {
 		rows: [],
-		error: { status: 500, detail: "Failed to roll up LLM usage." },
+		error: { status: 500, detail: "Couldn't roll up AI usage." },
 	},
 };
 

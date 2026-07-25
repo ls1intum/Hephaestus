@@ -91,4 +91,68 @@ describe("AgentBindingsPage", () => {
 		await waitFor(() => expect(captured.body).toBeDefined());
 		expect(captured.body).toMatchObject({ instanceModelId: 20, enabled: true });
 	});
+
+	it("exposes the advanced settings as a disclosure", async () => {
+		renderPage();
+
+		const trigger = (await screen.findAllByRole("button", { name: /Advanced/ }))[0];
+		expect(trigger.getAttribute("aria-expanded")).toBe("false");
+		expect(screen.queryByLabelText("Timeout (seconds)")).toBeNull();
+
+		fireEvent.click(trigger);
+
+		expect(trigger.getAttribute("aria-expanded")).toBe("true");
+		// The panel the trigger claims to control is the one that actually holds the fields.
+		const panelId = trigger.getAttribute("aria-controls");
+		expect(panelId).toBeTruthy();
+		const timeout = screen.getByLabelText("Timeout (seconds)");
+		expect(panelId && document.getElementById(panelId)?.contains(timeout)).toBe(true);
+	});
+
+	it("refuses to save a cleared timeout instead of sending a zero", async () => {
+		const captured: { body?: unknown } = {};
+		renderPage([detectionBinding], captured);
+
+		fireEvent.click((await screen.findAllByRole("button", { name: /Advanced/ }))[0]);
+		fireEvent.change(screen.getByLabelText("Timeout (seconds)"), { target: { value: "" } });
+		fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
+
+		expect(await screen.findByText("Enter a number of seconds.")).toBeTruthy();
+		expect(screen.getByLabelText("Timeout (seconds)").getAttribute("aria-invalid")).toBe("true");
+		// Nothing was sent — the old code PUT `timeoutSeconds: 0` here.
+		await waitFor(() => expect(captured.body).toBeUndefined());
+	});
+
+	it("rejects a timeout below the floor and only saves once it is corrected", async () => {
+		const captured: { body?: unknown } = {};
+		renderPage([detectionBinding], captured);
+
+		fireEvent.click((await screen.findAllByRole("button", { name: /Advanced/ }))[0]);
+		const timeout = screen.getByLabelText("Timeout (seconds)");
+		fireEvent.change(timeout, { target: { value: "5" } });
+		fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
+
+		expect(await screen.findByText("Enter a whole number of seconds, 30 or more.")).toBeTruthy();
+		expect(captured.body).toBeUndefined();
+
+		fireEvent.change(timeout, { target: { value: "45" } });
+		fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
+
+		await waitFor(() => expect(captured.body).toBeDefined());
+		expect(captured.body).toMatchObject({ timeoutSeconds: 45 });
+	});
+
+	it("reopens the advanced disclosure when the field that blocked the save is inside it", async () => {
+		renderPage();
+
+		fireEvent.click((await screen.findAllByRole("button", { name: /Advanced/ }))[0]);
+		fireEvent.change(screen.getByLabelText("Max concurrent runs"), { target: { value: "0" } });
+		// Collapse it again, so the invalid field is out of sight when Save is pressed.
+		fireEvent.click(screen.getAllByRole("button", { name: /Advanced/ })[0]);
+		expect(screen.queryByLabelText("Max concurrent runs")).toBeNull();
+
+		fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
+
+		expect(await screen.findByText("Enter a whole number of runs, 1 or more.")).toBeTruthy();
+	});
 });

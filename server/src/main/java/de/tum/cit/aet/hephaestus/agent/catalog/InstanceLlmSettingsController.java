@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Instance-admin management of the instance-wide LLM governance settings (#1368): the egress
- * allowlist, the workspace-BYO-connection flag, and the default unpriced-usage policy. GLOBAL —
+ * allowlist and the workspace-provider-connection flag. GLOBAL —
  * gated by {@code app_admin}, not workspace context.
  */
 @RestController

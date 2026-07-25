@@ -87,7 +87,7 @@ const baseReport: WorkspaceLlmUsageReport = {
 	],
 };
 
-/** The same month with the workspace running part of its work on its own connected provider. */
+/** The same month with the workspace running part of its work on a provider of its own. */
 const withOwnProvider: WorkspaceLlmUsageReport = {
 	...baseReport,
 	byoMonthlyBudgetUsd: 10,
@@ -102,8 +102,8 @@ const withOwnProvider: WorkspaceLlmUsageReport = {
 
 /**
  * The workspace admin's cost-control page. Two independently owned caps — the shared-model budget
- * the host sets, and the own-provider cap the workspace sets for itself — each with its own meter,
- * its own pause banner, and its own pre-wall warning.
+ * the host sets, and the provider cap the workspace sets for itself — each with its own meter, its
+ * own pause banner, and its own pre-wall warning.
  */
 const meta = {
 	component: AdminLlmUsagePage,
@@ -127,7 +127,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Comfortably inside the host's budget, with no provider of the workspace's own connected yet. */
+/** Comfortably inside the shared-model budget, with no provider of the workspace's own yet. */
 export const WithinBudget: Story = {};
 
 /** Both sides live and under their caps — the two meters never merge into one number. */
@@ -135,14 +135,14 @@ export const BothCapsHealthy: Story = {
 	args: { report: withOwnProvider },
 };
 
-/** 84% of the workspace's own cap is gone — warned as a status, with the date the pace reaches it. */
-export const ApproachingOwnCap: Story = {
+/** 84% of the provider cap is gone — warned as a status, with the date the pace reaches it. */
+export const ApproachingProviderCap: Story = {
 	args: {
 		report: { ...withOwnProvider, byoTotalCostUsd: 8.4 },
 	},
 };
 
-/** 88% of the host's budget is gone. Same shape, different owner — and a different remedy. */
+/** 88% of the shared-model budget is gone. Same shape, different owner — and a different remedy. */
 export const ApproachingSharedBudget: Story = {
 	args: {
 		report: { ...withOwnProvider, pricedTotalCostUsd: 22 },
@@ -160,8 +160,8 @@ export const ApproachingWithoutProjection: Story = {
 	},
 };
 
-/** The workspace spent its own cap — the one pause its admin can lift themselves. */
-export const OwnCapExhausted: Story = {
+/** The workspace spent its provider cap — the one pause its admin can lift themselves. */
+export const ProviderCapReached: Story = {
 	args: {
 		report: {
 			...withOwnProvider,
@@ -172,8 +172,8 @@ export const OwnCapExhausted: Story = {
 	},
 };
 
-/** Unpriced calls on the workspace's own models: the cap can't be checked, so work stops. */
-export const OwnCapUnverifiable: Story = {
+/** Calls on the workspace's own models with no price set: the cap can't be checked, so work stops. */
+export const ProviderCapUnenforceable: Story = {
 	args: {
 		report: {
 			...withOwnProvider,
@@ -184,8 +184,8 @@ export const OwnCapUnverifiable: Story = {
 	},
 };
 
-/** The host's budget is spent. A warning, not a catastrophe — the workspace's own provider runs on. */
-export const SharedBudgetExhausted: Story = {
+/** The shared-model budget is spent. A warning, not a catastrophe — their provider runs on. */
+export const SharedBudgetReached: Story = {
 	args: {
 		report: {
 			...withOwnProvider,
@@ -196,7 +196,7 @@ export const SharedBudgetExhausted: Story = {
 	},
 };
 
-/** Unpriced shared-model calls — only the host can fix this, and the copy never pretends otherwise. */
+/** Shared-model calls with no price set — only the host can fix this, and the copy says so. */
 export const SharedBudgetUnverifiable: Story = {
 	args: {
 		report: {
@@ -223,20 +223,20 @@ export const BothPaused: Story = {
 	},
 };
 
-/** No provider of their own connected — a quiet offer rather than an empty meter. */
-export const NoOwnProvider: Story = {
+/** No provider of their own — a quiet offer rather than an empty meter. */
+export const NoProviderConnected: Story = {
 	args: { report: baseReport },
 };
 
-/** Own-provider spend with no cap on it yet: the meter is absent, the offer to cap it is not. */
-export const OwnProviderUncapped: Story = {
+/** Provider spend with no cap on it yet: the meter is absent, the offer to cap it is not. */
+export const ProviderUncapped: Story = {
 	args: {
 		report: { ...withOwnProvider, byoMonthlyBudgetUsd: undefined },
 	},
 };
 
-/** A $0 own cap pauses immediately — it reads 100% used, not "—". */
-export const ZeroOwnCap: Story = {
+/** A $0 provider cap pauses immediately — it reads 100% used, not "—". */
+export const ZeroProviderCap: Story = {
 	args: {
 		report: {
 			...withOwnProvider,
@@ -283,17 +283,17 @@ export const Empty: Story = {
 };
 
 /**
- * Some calls ran on a model with no pricing row, so both reported totals — and the caps that read
- * them — under-count. A secondary callout explains the data-quality gap and who can close it.
+ * Some calls ran on a model with no price set, so both reported totals — and the caps that read
+ * them — under-count. A secondary callout explains the gap and who can close it.
  */
-export const UncostedUsage: Story = {
+export const CallsWithNoPriceSet: Story = {
 	args: {
 		report: { ...withOwnProvider, unpricedEventCount: 42 },
 	},
 };
 
-/** A single uncosted call — the callout reads "1 call", not "1 calls". */
-export const SingleUncostedCall: Story = {
+/** A single call with no price set — the callout reads "1 call", not "1 calls". */
+export const SingleCallWithNoPriceSet: Story = {
 	args: {
 		report: { ...withOwnProvider, unpricedEventCount: 1 },
 	},
@@ -311,7 +311,7 @@ export const Loading: Story = {
 export const ErrorState: Story = {
 	args: {
 		report: undefined,
-		error: { status: 500, detail: "Failed to build the usage report." },
+		error: { status: 500, detail: "Couldn't build the usage report." },
 	},
 };
 

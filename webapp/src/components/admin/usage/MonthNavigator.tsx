@@ -11,7 +11,7 @@ export interface MonthNavigatorProps {
 	onNextMonth: () => void;
 }
 
-/** Prev/next month stepper shared by the workspace and instance LLM usage pages. */
+/** Prev/next month stepper shared by the workspace and instance AI usage pages. */
 export function MonthNavigator({
 	month,
 	canGoNext,

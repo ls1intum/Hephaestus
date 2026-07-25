@@ -30,7 +30,7 @@ export interface LlmUsageByJobTypeTableProps {
 	rows?: LlmUsageByJobType[];
 }
 
-/** Per-job-type usage with spend split by who funds the model. */
+/** Per-job-type usage with spend split by who pays for the model. */
 export function LlmUsageByJobTypeTable({ rows }: LlmUsageByJobTypeTableProps) {
 	return (
 		<Table containerClassName="rounded-md border">
@@ -39,16 +39,16 @@ export function LlmUsageByJobTypeTable({ rows }: LlmUsageByJobTypeTableProps) {
 				<TableRow>
 					<TableHead scope="col">Job type</TableHead>
 					<TableHead scope="col" className="text-right">
-						Instance-funded
+						Shared models
 					</TableHead>
 					<TableHead scope="col" className="text-right">
-						Workspace-owned
+						Your provider
 					</TableHead>
 					<TableHead scope="col" className="text-right">
 						Avg per event
 					</TableHead>
 					<TableHead scope="col" className="text-right">
-						Unpriced calls
+						No price set
 					</TableHead>
 					<TableHead scope="col" className="text-right">
 						Input tokens
@@ -105,14 +105,14 @@ export function LlmUsageByJobTypeTable({ rows }: LlmUsageByJobTypeTableProps) {
 
 /**
  * What one unit of this work costs on average — the figure people actually reason with ("a review
- * costs me about $0.14"), which a monthly total never gives them. The two funding sources keep
- * their own averages: they are different money and are never added together, so when both are in
- * play the cell shows two labelled lines rather than one blended number.
+ * costs me about $0.14"), which a monthly total never gives them. The two money streams keep their
+ * own averages: they are different money and are never added together, so when both are in play the
+ * cell shows two labelled lines rather than one blended number.
  */
 function AvgPerEvent({ row }: { row: LlmUsageByJobType }) {
 	const parts = [
-		{ key: "shared", label: "shared", total: row.pricedTotalCostUsd },
-		{ key: "own", label: "own", total: row.byoTotalCostUsd },
+		{ key: "shared", label: "shared models", total: row.pricedTotalCostUsd },
+		{ key: "provider", label: "your provider", total: row.byoTotalCostUsd },
 	].filter((part) => part.total > 0);
 
 	if (row.events <= 0 || parts.length === 0) {
@@ -140,7 +140,7 @@ export interface LlmUsageByDayTableProps {
 	rows?: LlmUsageByDay[];
 }
 
-/** Daily usage with the same funding split as the job-type rollup. */
+/** Daily usage with the same two money streams as the job-type rollup. */
 export function LlmUsageByDayTable({ rows }: LlmUsageByDayTableProps) {
 	return (
 		<Table containerClassName="rounded-md border">
@@ -149,13 +149,13 @@ export function LlmUsageByDayTable({ rows }: LlmUsageByDayTableProps) {
 				<TableRow>
 					<TableHead scope="col">Day</TableHead>
 					<TableHead scope="col" className="text-right">
-						Instance-funded
+						Shared models
 					</TableHead>
 					<TableHead scope="col" className="text-right">
-						Workspace-owned
+						Your provider
 					</TableHead>
 					<TableHead scope="col" className="text-right">
-						Unpriced calls
+						No price set
 					</TableHead>
 					<TableHead scope="col" className="text-right">
 						Events

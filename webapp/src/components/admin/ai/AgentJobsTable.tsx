@@ -1,5 +1,6 @@
 import { formatDistanceToNow } from "date-fns";
 import { AlertCircle, Bot, ChevronRight } from "lucide-react";
+import { useId } from "react";
 import type { AgentJob } from "@/api/types.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +12,7 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
+import { Field, FieldLabel } from "@/components/ui/field";
 import {
 	Select,
 	SelectContent,
@@ -22,6 +24,7 @@ import { Spinner } from "@/components/ui/spinner";
 import {
 	Table,
 	TableBody,
+	TableCaption,
 	TableCell,
 	TableHead,
 	TableHeader,
@@ -73,11 +76,16 @@ export function AgentJobsTable({
 	onSelectJob,
 	onRetry,
 }: AgentJobsTableProps) {
+	const statusFilterId = useId();
 	return (
 		<div className="space-y-4">
 			<div className="flex flex-wrap items-center gap-3">
-				<div className="flex items-center gap-2 text-sm">
-					<span className="text-muted-foreground">Status</span>
+				{/* The visible "Status" text *is* the control's label, so the accessible name can never
+				    drift from what a speech-control user reads out loud (WCAG SC 2.5.3). */}
+				<Field orientation="horizontal" className="w-auto text-sm">
+					<FieldLabel htmlFor={statusFilterId} className="text-muted-foreground">
+						Status
+					</FieldLabel>
 					<Select
 						items={STATUS_ITEMS}
 						value={statusFilter}
@@ -85,7 +93,7 @@ export function AgentJobsTable({
 							onStatusFilterChange(value === FILTER_ALL ? "ALL" : (value as JobStatus))
 						}
 					>
-						<SelectTrigger size="sm" className="w-40" aria-label="Filter by status">
+						<SelectTrigger id={statusFilterId} size="sm" className="w-40">
 							<SelectValue />
 						</SelectTrigger>
 						<SelectContent>
@@ -97,15 +105,15 @@ export function AgentJobsTable({
 							))}
 						</SelectContent>
 					</Select>
-				</div>
+				</Field>
 			</div>
 
 			{isError ? (
 				<Alert variant="destructive">
 					<AlertCircle />
-					<AlertTitle>Failed to load jobs</AlertTitle>
+					<AlertTitle>Couldn't load runs</AlertTitle>
 					<AlertDescription>
-						<p>The agent jobs could not be loaded.</p>
+						<p>Something went wrong on the way. Try again in a moment.</p>
 						{onRetry && (
 							<Button variant="outline" size="sm" className="mt-2" onClick={onRetry}>
 								Retry
@@ -115,79 +123,86 @@ export function AgentJobsTable({
 				</Alert>
 			) : isLoading ? (
 				<div className="flex h-40 items-center justify-center">
-					<Spinner className="h-6 w-6" />
+					<Spinner className="size-6" />
 				</div>
 			) : jobs.length === 0 ? (
-				<Empty className="border border-dashed">
+				<Empty className="border">
 					<EmptyHeader>
 						<EmptyMedia variant="icon">
 							<Bot />
 						</EmptyMedia>
-						<EmptyTitle>No reviews yet</EmptyTitle>
-						<EmptyDescription>Reviews appear here once a practice review runs.</EmptyDescription>
+						<EmptyTitle>No runs yet</EmptyTitle>
+						<EmptyDescription>
+							A run appears here every time AI reviews a pull request, an issue, or a conversation.
+						</EmptyDescription>
 					</EmptyHeader>
 				</Empty>
 			) : (
 				<Table>
+					<TableCaption className="sr-only">AI runs for this workspace, newest first</TableCaption>
 					<TableHeader>
 						<TableRow>
-							<TableHead>Status</TableHead>
-							<TableHead>Model</TableHead>
-							<TableHead>Model name</TableHead>
-							<TableHead>Created</TableHead>
-							<TableHead>Delivery</TableHead>
-							<TableHead className="text-right">Usage</TableHead>
-							<TableHead className="text-right">Details</TableHead>
+							<TableHead scope="col">Status</TableHead>
+							<TableHead scope="col">Model</TableHead>
+							<TableHead scope="col">Model name</TableHead>
+							<TableHead scope="col">Created</TableHead>
+							<TableHead scope="col">Delivery</TableHead>
+							<TableHead scope="col" className="text-right">
+								Usage
+							</TableHead>
+							<TableHead scope="col" className="text-right">
+								Details
+							</TableHead>
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{jobs.map((job) => (
-							<TableRow key={job.id} className="cursor-pointer" onClick={() => onSelectJob(job)}>
-								<TableCell>
-									<Badge variant={statusBadgeVariant(job.status)}>
-										{STATUS_LABELS[job.status]}
-									</Badge>
-								</TableCell>
-								<TableCell className="max-w-40 truncate">{modelLabel(job)}</TableCell>
-								<TableCell className="text-muted-foreground">
-									{job.llmModel ?? job.llmModelVersion ?? "—"}
-								</TableCell>
-								<TableCell className="text-muted-foreground">
-									{formatDistanceToNow(new Date(job.createdAt), { addSuffix: true })}
-								</TableCell>
-								<TableCell>
-									{job.deliveryStatus ? (
-										<Badge variant={deliveryBadgeVariant(job.deliveryStatus)}>
-											{DELIVERY_STATUS_LABELS[job.deliveryStatus]}
+						{jobs.map((job) => {
+							const created = formatDistanceToNow(new Date(job.createdAt), { addSuffix: true });
+							return (
+								<TableRow key={job.id}>
+									<TableCell>
+										<Badge variant={statusBadgeVariant(job.status)}>
+											{STATUS_LABELS[job.status]}
 										</Badge>
-									) : (
-										<span className="text-muted-foreground">—</span>
-									)}
-								</TableCell>
-								<TableCell className="text-right text-muted-foreground">
-									<span className="tabular-nums">
-										{formatTokens(job.llmTotalInputTokens)} /{" "}
-										{formatTokens(job.llmTotalOutputTokens)}
-									</span>
-									<span className="ml-2">{formatCostUsd(job.llmCostUsd)}</span>
-								</TableCell>
-								<TableCell className="text-right">
-									<div className="flex justify-end">
-										<Button
-											variant="ghost"
-											size="icon-sm"
-											aria-label={`View job ${job.id} details`}
-											onClick={(e) => {
-												e.stopPropagation();
-												onSelectJob(job);
-											}}
-										>
-											<ChevronRight className="h-4 w-4" />
-										</Button>
-									</div>
-								</TableCell>
-							</TableRow>
-						))}
+									</TableCell>
+									<TableCell className="max-w-40 truncate">{modelLabel(job)}</TableCell>
+									<TableCell className="text-muted-foreground">
+										{job.llmModel ?? job.llmModelVersion ?? "—"}
+									</TableCell>
+									<TableCell className="text-muted-foreground">{created}</TableCell>
+									<TableCell>
+										{job.deliveryStatus ? (
+											<Badge variant={deliveryBadgeVariant(job.deliveryStatus)}>
+												{DELIVERY_STATUS_LABELS[job.deliveryStatus]}
+											</Badge>
+										) : (
+											<span className="text-muted-foreground">—</span>
+										)}
+									</TableCell>
+									<TableCell className="text-right text-muted-foreground">
+										<span className="tabular-nums">
+											{formatTokens(job.llmTotalInputTokens)} /{" "}
+											{formatTokens(job.llmTotalOutputTokens)}
+										</span>
+										<span className="ml-2 tabular-nums">{formatCostUsd(job.llmCostUsd)}</span>
+									</TableCell>
+									<TableCell className="text-right">
+										{/* The button is the only affordance: a click handler on the row itself is
+										    unreachable by keyboard and invisible to assistive tech. */}
+										<div className="flex justify-end">
+											<Button
+												variant="ghost"
+												size="icon-sm"
+												aria-label={`View details for the ${modelLabel(job)} run ${created}`}
+												onClick={() => onSelectJob(job)}
+											>
+												<ChevronRight className="size-4" />
+											</Button>
+										</div>
+									</TableCell>
+								</TableRow>
+							);
+						})}
 					</TableBody>
 				</Table>
 			)}

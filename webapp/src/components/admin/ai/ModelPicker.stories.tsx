@@ -67,6 +67,22 @@ export const NoModelsYet: Story = {
 	args: { availableModels: [] },
 };
 
+/**
+ * Nothing is selected and the owning field has flagged it: the trigger carries `aria-invalid` and
+ * points at the explanation, which the field renders — `Field` wires no ids on its own.
+ */
+export const Invalid: Story = {
+	args: { invalid: true, "aria-describedby": "model-picker-error" },
+	render: (args) => (
+		<div className="space-y-2">
+			<ModelPicker {...args} />
+			<p id="model-picker-error" className="text-sm text-destructive">
+				Choose the model this runs on.
+			</p>
+		</div>
+	),
+};
+
 export const OpensAndListsGroups: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);

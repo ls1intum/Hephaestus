@@ -1,5 +1,5 @@
 import { AlertTriangle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type {
 	CreateWorkspaceLlmConnectionRequest,
 	UpdateWorkspaceLlmConnectionRequest,
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
 	Dialog,
+	DialogClose,
 	DialogContent,
 	DialogDescription,
 	DialogFooter,
@@ -21,6 +22,7 @@ import {
 	FieldContent,
 	FieldDescription,
 	FieldError,
+	FieldGroup,
 	FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -54,38 +56,56 @@ export interface WorkspaceLlmConnectionFormDialogProps {
 	onUpdate: (id: number, body: UpdateWorkspaceLlmConnectionRequest) => void;
 }
 
-/** Create or update a workspace-owned OpenAI-compatible connection. */
+/**
+ * Create or update a workspace-owned OpenAI-compatible connection.
+ *
+ * The body is a separate component keyed on the edited connection, so switching which connection is
+ * edited remounts it with fresh initial state instead of copying props into state from an effect.
+ */
 export function WorkspaceLlmConnectionFormDialog({
 	open,
 	onOpenChange,
 	editing,
+	...contentProps
+}: WorkspaceLlmConnectionFormDialogProps) {
+	return (
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			{open && (
+				<WorkspaceLlmConnectionFormDialogContent
+					key={editing?.id ?? "new"}
+					editing={editing}
+					{...contentProps}
+				/>
+			)}
+		</Dialog>
+	);
+}
+
+type WorkspaceLlmConnectionFormDialogContentProps = Omit<
+	WorkspaceLlmConnectionFormDialogProps,
+	"open" | "onOpenChange"
+>;
+
+function WorkspaceLlmConnectionFormDialogContent({
+	editing,
 	isSubmitting,
 	onCreate,
 	onUpdate,
-}: WorkspaceLlmConnectionFormDialogProps) {
+}: WorkspaceLlmConnectionFormDialogContentProps) {
 	const isEdit = editing !== null;
-	const [displayName, setDisplayName] = useState("");
-	const [baseUrl, setBaseUrl] = useState("");
-	const [preset, setPreset] = useState<ProviderPreset>("OPENAI");
-	const [useResponsesApi, setUseResponsesApi] = useState(false);
-	const [authMode, setAuthMode] = useState<LlmAuthMode>("BEARER");
+	const [displayName, setDisplayName] = useState(editing?.displayName ?? "");
+	const [baseUrl, setBaseUrl] = useState(editing?.baseUrl ?? baseUrlDefaultFor("OPENAI"));
+	const [preset, setPreset] = useState<ProviderPreset>(
+		editing ? presetForConnection(editing) : "OPENAI",
+	);
+	const [useResponsesApi, setUseResponsesApi] = useState(
+		editing ? usesResponsesApi(editing.apiProtocol) : false,
+	);
+	const [authMode, setAuthMode] = useState<LlmAuthMode>(editing?.authMode ?? "BEARER");
 	const [apiKey, setApiKey] = useState("");
 	const [clearApiKey, setClearApiKey] = useState(false);
-	const [enabled, setEnabled] = useState(false);
+	const [enabled, setEnabled] = useState(editing?.enabled ?? false);
 	const [errors, setErrors] = useState<{ displayName?: string; baseUrl?: string }>({});
-
-	useEffect(() => {
-		if (!open) return;
-		setDisplayName(editing?.displayName ?? "");
-		setBaseUrl(editing?.baseUrl ?? baseUrlDefaultFor("OPENAI"));
-		setPreset(editing ? presetForConnection(editing) : "OPENAI");
-		setUseResponsesApi(editing ? usesResponsesApi(editing.apiProtocol) : false);
-		setAuthMode(editing?.authMode ?? "BEARER");
-		setApiKey("");
-		setClearApiKey(false);
-		setEnabled(editing?.enabled ?? false);
-		setErrors({});
-	}, [open, editing]);
 
 	const apiProtocol = defaultProtocolFor(useResponsesApi);
 
@@ -96,6 +116,7 @@ export function WorkspaceLlmConnectionFormDialog({
 		setErrors(next);
 		return Object.keys(next).length === 0;
 	};
+
 	const handleSubmit = (event: React.FormEvent) => {
 		event.preventDefault();
 		if (!validate()) return;
@@ -122,30 +143,30 @@ export function WorkspaceLlmConnectionFormDialog({
 	};
 
 	return (
-		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="sm:max-w-lg">
-				<form onSubmit={handleSubmit} className="space-y-4" noValidate>
-					<DialogHeader>
-						<DialogTitle>{isEdit ? "Edit connection" : "Add connection"}</DialogTitle>
-						<DialogDescription>
-							Connect an endpoint that implements an OpenAI API. Models are added and priced after
-							the connection is saved.
-						</DialogDescription>
-					</DialogHeader>
+		<DialogContent className="sm:max-w-lg">
+			<form onSubmit={handleSubmit} className="space-y-4" noValidate>
+				<DialogHeader>
+					<DialogTitle>{isEdit ? "Edit connection" : "Add connection"}</DialogTitle>
+					<DialogDescription>
+						Connect an endpoint that implements an OpenAI API. Models are added and priced after the
+						connection is saved.
+					</DialogDescription>
+				</DialogHeader>
 
-					<Field data-invalid={Boolean(errors.displayName)}>
-						<FieldLabel htmlFor="llm-conn-display-name">Display name</FieldLabel>
-						<Input
-							id="llm-conn-display-name"
-							value={displayName}
-							onChange={(event) => setDisplayName(event.target.value)}
-							placeholder="e.g. Production OpenAI"
-							aria-invalid={Boolean(errors.displayName)}
-						/>
-						{errors.displayName && <FieldError>{errors.displayName}</FieldError>}
-					</Field>
+				<Field data-invalid={Boolean(errors.displayName)}>
+					<FieldLabel htmlFor="llm-conn-display-name">Display name</FieldLabel>
+					<Input
+						id="llm-conn-display-name"
+						value={displayName}
+						onChange={(event) => setDisplayName(event.target.value)}
+						placeholder="e.g. Production OpenAI"
+						aria-invalid={Boolean(errors.displayName)}
+					/>
+					{errors.displayName && <FieldError>{errors.displayName}</FieldError>}
+				</Field>
 
-					{!isEdit && (
+				{!isEdit && (
+					<FieldGroup className="gap-3">
 						<Field>
 							<FieldLabel htmlFor="llm-conn-provider-preset">Endpoint preset</FieldLabel>
 							<Select
@@ -172,16 +193,6 @@ export function WorkspaceLlmConnectionFormDialog({
 									))}
 								</SelectContent>
 							</Select>
-							<div className="mt-2 flex items-center gap-2 text-sm font-normal text-muted-foreground">
-								<Checkbox
-									id="llm-conn-responses-api"
-									checked={useResponsesApi}
-									onCheckedChange={(checked) => setUseResponsesApi(checked === true)}
-								/>
-								<label htmlFor="llm-conn-responses-api">
-									Use the Responses API instead of Chat Completions
-								</label>
-							</div>
 							{preset === "AZURE_OPENAI_V1" && (
 								<FieldDescription>
 									Replace RESOURCE below with your Azure resource name. The v1 API does not need an
@@ -189,50 +200,65 @@ export function WorkspaceLlmConnectionFormDialog({
 								</FieldDescription>
 							)}
 						</Field>
-					)}
 
-					<Field data-invalid={Boolean(errors.baseUrl)}>
-						<FieldLabel htmlFor="llm-conn-base-url">Base URL</FieldLabel>
-						<Input
-							id="llm-conn-base-url"
-							type="url"
-							value={baseUrl}
-							onChange={(event) => setBaseUrl(event.target.value)}
-							disabled={isEdit}
-							placeholder="https://api.openai.com/v1"
-							aria-invalid={Boolean(errors.baseUrl)}
-						/>
-						{isEdit && (
-							<FieldDescription>
-								Endpoint, API shape, and authentication are immutable. Add a connection to change
-								them.
-							</FieldDescription>
-						)}
-						{errors.baseUrl && <FieldError>{errors.baseUrl}</FieldError>}
-					</Field>
-
-					{!isEdit && preset === "OTHER" && (
-						<Field>
-							<FieldLabel htmlFor="llm-conn-auth-mode">Authentication</FieldLabel>
-							<Select
-								items={[
-									{ value: "BEARER", label: "Bearer token" },
-									{ value: "API_KEY", label: "api-key header" },
-								]}
-								value={authMode}
-								onValueChange={(value) => value && setAuthMode(value as LlmAuthMode)}
-							>
-								<SelectTrigger id="llm-conn-auth-mode" className="w-full">
-									<SelectValue />
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="BEARER">Bearer token</SelectItem>
-									<SelectItem value="API_KEY">api-key header</SelectItem>
-								</SelectContent>
-							</Select>
+						<Field orientation="horizontal">
+							<Checkbox
+								id="llm-conn-responses-api"
+								checked={useResponsesApi}
+								onCheckedChange={(checked) => setUseResponsesApi(checked === true)}
+							/>
+							<FieldContent>
+								<FieldLabel htmlFor="llm-conn-responses-api" className="font-normal">
+									Use the Responses API instead of Chat Completions
+								</FieldLabel>
+							</FieldContent>
 						</Field>
-					)}
+					</FieldGroup>
+				)}
 
+				<Field data-invalid={Boolean(errors.baseUrl)}>
+					<FieldLabel htmlFor="llm-conn-base-url">Base URL</FieldLabel>
+					<Input
+						id="llm-conn-base-url"
+						type="url"
+						value={baseUrl}
+						onChange={(event) => setBaseUrl(event.target.value)}
+						disabled={isEdit}
+						placeholder="https://api.openai.com/v1"
+						aria-invalid={Boolean(errors.baseUrl)}
+					/>
+					{isEdit && (
+						<FieldDescription>
+							Endpoint, API shape, and authentication are immutable. Add a connection to change
+							them.
+						</FieldDescription>
+					)}
+					{errors.baseUrl && <FieldError>{errors.baseUrl}</FieldError>}
+				</Field>
+
+				{!isEdit && preset === "OTHER" && (
+					<Field>
+						<FieldLabel htmlFor="llm-conn-auth-mode">Authentication</FieldLabel>
+						<Select
+							items={[
+								{ value: "BEARER", label: "Bearer token" },
+								{ value: "API_KEY", label: "api-key header" },
+							]}
+							value={authMode}
+							onValueChange={(value) => value && setAuthMode(value as LlmAuthMode)}
+						>
+							<SelectTrigger id="llm-conn-auth-mode" className="w-full">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="BEARER">Bearer token</SelectItem>
+								<SelectItem value="API_KEY">api-key header</SelectItem>
+							</SelectContent>
+						</Select>
+					</Field>
+				)}
+
+				<FieldGroup className="gap-3">
 					<Field>
 						<FieldLabel htmlFor="llm-conn-api-key">API key</FieldLabel>
 						<Input
@@ -251,57 +277,60 @@ export function WorkspaceLlmConnectionFormDialog({
 						<FieldDescription>
 							{editing?.hasApiKey ? "Leave blank to keep the current key." : "Stored encrypted."}
 						</FieldDescription>
-						{editing?.hasApiKey && (
-							<div className="flex items-center gap-2 text-sm text-muted-foreground">
-								<Checkbox
-									id="llm-conn-clear-api-key"
-									checked={clearApiKey}
-									onCheckedChange={(checked) => {
-										setClearApiKey(checked === true);
-										if (checked === true) setApiKey("");
-									}}
-								/>
-								<label htmlFor="llm-conn-clear-api-key">Remove stored API key</label>
-							</div>
-						)}
 					</Field>
 
-					<Field orientation="horizontal">
-						<FieldContent>
-							<FieldLabel htmlFor="llm-conn-enabled">Active</FieldLabel>
-							<FieldDescription>
-								{isEdit
-									? "Turn off to stop new requests using this connection."
-									: "New connections start inactive. Save and test this connection, add a priced model, then activate both."}
-							</FieldDescription>
-						</FieldContent>
-						<Switch
-							id="llm-conn-enabled"
-							checked={enabled}
-							disabled={!isEdit}
-							onCheckedChange={setEnabled}
-						/>
-					</Field>
-					{editing?.enabled && !enabled && (
-						<Alert variant="warning">
-							<AlertTriangle aria-hidden />
-							<AlertTitle>All workspace models will stop immediately</AlertTitle>
-							<AlertDescription>
-								Existing Practice and Mentor configurations using this provider cannot run until the
-								connection is reactivated or another model is selected.
-							</AlertDescription>
-						</Alert>
+					{editing?.hasApiKey && (
+						<Field orientation="horizontal">
+							<Checkbox
+								id="llm-conn-clear-api-key"
+								checked={clearApiKey}
+								onCheckedChange={(checked) => {
+									setClearApiKey(checked === true);
+									if (checked === true) setApiKey("");
+								}}
+							/>
+							<FieldContent>
+								<FieldLabel htmlFor="llm-conn-clear-api-key" className="font-normal">
+									Remove stored API key
+								</FieldLabel>
+							</FieldContent>
+						</Field>
 					)}
-					<DialogFooter>
-						<Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-							Cancel
-						</Button>
-						<Button type="submit" disabled={isSubmitting}>
-							{isEdit ? "Save changes" : "Connect inactive provider"}
-						</Button>
-					</DialogFooter>
-				</form>
-			</DialogContent>
-		</Dialog>
+				</FieldGroup>
+
+				<Field orientation="horizontal">
+					<FieldContent>
+						<FieldLabel htmlFor="llm-conn-enabled">Active</FieldLabel>
+						<FieldDescription>
+							{isEdit
+								? "Turn off to stop new requests using this connection."
+								: "New connections start inactive. Save and test this connection, add a priced model, then activate both."}
+						</FieldDescription>
+					</FieldContent>
+					<Switch
+						id="llm-conn-enabled"
+						checked={enabled}
+						disabled={!isEdit}
+						onCheckedChange={setEnabled}
+					/>
+				</Field>
+				{editing?.enabled && !enabled && (
+					<Alert variant="warning">
+						<AlertTriangle aria-hidden />
+						<AlertTitle>All workspace models will stop immediately</AlertTitle>
+						<AlertDescription>
+							Existing Practice and Mentor configurations using this provider cannot run until the
+							connection is reactivated or another model is selected.
+						</AlertDescription>
+					</Alert>
+				)}
+				<DialogFooter>
+					<DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+					<Button type="submit" disabled={isSubmitting}>
+						{isEdit ? "Save changes" : "Connect inactive provider"}
+					</Button>
+				</DialogFooter>
+			</form>
+		</DialogContent>
 	);
 }

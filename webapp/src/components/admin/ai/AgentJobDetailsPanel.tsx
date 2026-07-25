@@ -1,5 +1,6 @@
 import { formatDistanceToNow } from "date-fns";
 import type { AgentJob } from "@/api/types.gen";
+import { JOB_TYPE_LABELS } from "@/components/admin/usage/usageUtils";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -43,11 +44,15 @@ interface AgentJobDetailsPanelProps {
 	onRetryDelivery: (job: AgentJob) => void;
 }
 
+/**
+ * One label/value pair of a `<dl>`. `dt`/`dd` is what associates the two programmatically — a pair
+ * of neighbouring spans reads as two unrelated strings to a screen reader.
+ */
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
 	return (
 		<div className="flex items-baseline justify-between gap-4 py-1.5">
-			<span className="text-sm text-muted-foreground">{label}</span>
-			<span className="text-sm font-medium text-right">{value}</span>
+			<dt className="text-sm text-muted-foreground">{label}</dt>
+			<dd className="text-sm font-medium text-right">{value}</dd>
 		</div>
 	);
 }
@@ -76,8 +81,11 @@ export function AgentJobDetailsPanel({
 				{job ? (
 					<>
 						<SheetHeader>
-							<SheetTitle>Job {job.id}</SheetTitle>
-							<SheetDescription>{job.jobType.replace(/_/g, " ").toLowerCase()}</SheetDescription>
+							<SheetTitle>Run details</SheetTitle>
+							<SheetDescription>
+								{JOB_TYPE_LABELS[job.jobType]} ·{" "}
+								{formatDistanceToNow(new Date(job.createdAt), { addSuffix: true })}
+							</SheetDescription>
 						</SheetHeader>
 
 						<ScrollArea className="flex-1 px-4">
@@ -86,7 +94,7 @@ export function AgentJobDetailsPanel({
 									<h3 className="mb-1 text-xs font-semibold uppercase text-muted-foreground">
 										Overview
 									</h3>
-									<div className="divide-y">
+									<dl className="divide-y">
 										<Row
 											label="Status"
 											value={
@@ -123,7 +131,7 @@ export function AgentJobDetailsPanel({
 										/>
 										{job.exitCode != null && <Row label="Exit code" value={job.exitCode} />}
 										{job.retryCount > 0 && <Row label="Retries" value={job.retryCount} />}
-									</div>
+									</dl>
 								</section>
 
 								{job.errorMessage && (
@@ -141,16 +149,16 @@ export function AgentJobDetailsPanel({
 									<h3 className="mb-1 text-xs font-semibold uppercase text-muted-foreground">
 										Usage
 									</h3>
-									<div className="divide-y">
+									<dl className="divide-y">
 										<Row label="Input tokens" value={formatTokens(job.llmTotalInputTokens)} />
 										<Row label="Output tokens" value={formatTokens(job.llmTotalOutputTokens)} />
 										<Row
 											label="Reasoning tokens"
 											value={formatTokens(job.llmTotalReasoningTokens)}
 										/>
-										<Row label="LLM calls" value={formatTokens(job.llmTotalCalls)} />
+										<Row label="Model calls" value={formatTokens(job.llmTotalCalls)} />
 										<Row label="Cost" value={formatCostUsd(job.llmCostUsd)} />
-									</div>
+									</dl>
 								</section>
 
 								<section>
@@ -171,15 +179,15 @@ export function AgentJobDetailsPanel({
 										<AlertDialogTrigger
 											render={
 												<Button variant="outline" disabled={isCancelling}>
-													{isCancelling ? "Cancelling…" : "Cancel job"}
+													{isCancelling ? "Cancelling…" : "Cancel run"}
 												</Button>
 											}
 										/>
 										<AlertDialogContent>
 											<AlertDialogHeader>
-												<AlertDialogTitle>Cancel this job?</AlertDialogTitle>
+												<AlertDialogTitle>Cancel this run?</AlertDialogTitle>
 												<AlertDialogDescription>
-													The running container will be stopped. This cannot be undone.
+													The running container stops. This can't be undone.
 												</AlertDialogDescription>
 											</AlertDialogHeader>
 											<AlertDialogFooter>
@@ -189,7 +197,7 @@ export function AgentJobDetailsPanel({
 													disabled={isCancelling}
 													onClick={() => onCancel(job)}
 												>
-													Cancel job
+													Cancel run
 												</AlertDialogAction>
 											</AlertDialogFooter>
 										</AlertDialogContent>
@@ -230,7 +238,7 @@ export function AgentJobDetailsPanel({
 				) : (
 					// Always render a title so base-ui never warns about a titleless dialog.
 					<SheetHeader>
-						<SheetTitle className="sr-only">Job details</SheetTitle>
+						<SheetTitle className="sr-only">Run details</SheetTitle>
 					</SheetHeader>
 				)}
 			</SheetContent>

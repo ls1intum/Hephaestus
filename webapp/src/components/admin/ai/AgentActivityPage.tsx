@@ -16,6 +16,7 @@ import {
 	PaginationNext,
 	PaginationPrevious,
 } from "@/components/ui/pagination";
+import { problemDetailOf } from "@/lib/problem-detail";
 import { AgentJobDetailsPanel } from "./AgentJobDetailsPanel";
 import { AgentJobsTable } from "./AgentJobsTable";
 import type { JobStatus } from "./jobUtils";
@@ -80,11 +81,13 @@ export function AgentActivityPage({ workspaceSlug }: AgentActivityPageProps) {
 		onSuccess: (updated) => {
 			invalidateJobs();
 			setSelectedJob(updated);
-			toast.success("Job cancelled");
+			toast.success("Run cancelled");
 		},
 		onError: (error) => {
-			toast.error("Failed to cancel job", {
-				description: error instanceof Error ? error.message : undefined,
+			// The server's ProblemDetail says *why* (already running, already finished, not yours);
+			// `error.message` would only ever say "Request failed".
+			toast.error("Couldn't cancel the run", {
+				description: problemDetailOf(error, "Try again in a moment."),
 			});
 		},
 	});
@@ -97,8 +100,8 @@ export function AgentActivityPage({ workspaceSlug }: AgentActivityPageProps) {
 			toast.success("Delivery retried");
 		},
 		onError: (error) => {
-			toast.error("Failed to retry delivery", {
-				description: error instanceof Error ? error.message : undefined,
+			toast.error("Couldn't retry the delivery", {
+				description: problemDetailOf(error, "Try again in a moment."),
 			});
 		},
 	});
@@ -118,7 +121,7 @@ export function AgentActivityPage({ workspaceSlug }: AgentActivityPageProps) {
 			<div className="mb-6">
 				<h1 className="text-3xl font-bold tracking-tight">Runs</h1>
 				<p className="text-muted-foreground">
-					Every practice review run — its model, token usage, cost, and delivery status.
+					Every AI run in this workspace — its model, token usage, cost, and delivery status.
 				</p>
 			</div>
 

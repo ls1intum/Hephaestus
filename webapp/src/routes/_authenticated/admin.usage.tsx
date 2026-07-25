@@ -50,15 +50,18 @@ function AdminInstanceUsagePage() {
 		onSuccess: (_data, variables) => {
 			// Prefix key (no options) invalidates every cached month.
 			queryClient.invalidateQueries({ queryKey: adminListLlmUsageQueryKey() });
+			// The proxy caches its answer for about 30s, so "resumes now" would be a small lie.
 			toast.success(
 				variables.body.monthlyLlmBudgetUsd == null
-					? "Instance cap removed"
-					: "Instance cap updated",
+					? "Cap removed. New calls resume within about a minute."
+					: "Cap saved. New calls resume within about a minute.",
 			);
 			setEditing(null);
 		},
 		onError: (error) => {
-			toast.error(problemDetailOf(error, "Failed to update budget"));
+			toast.error("Couldn't save the budget", {
+				description: problemDetailOf(error, "Try again in a moment."),
+			});
 		},
 	});
 
@@ -79,13 +82,13 @@ function AdminInstanceUsagePage() {
 				<header className="space-y-1">
 					<div className="flex items-center gap-2">
 						<CircleDollarSign className="size-6 text-muted-foreground" aria-hidden />
-						<h1 className="text-2xl font-semibold">LLM usage</h1>
+						<h1 className="text-2xl font-semibold">AI usage</h1>
 					</div>
 					<p className="text-sm text-muted-foreground">
-						Per-workspace AI spend for the selected month (metadata only). Set an instance cap to
-						pause a workspace's AI work on shared models once the spend you fund reaches it. A
-						workspace's own self cap covers spend on its own provider — you can see it, only its
-						admins can change it. The two never add up and pause independently.
+						What each workspace spent on AI in the selected month (metadata only). An instance cap
+						bounds the shared-model spend you pay for; a workspace's provider cap bounds spend on
+						its own provider — you can see it, only its admins can change it. The two never add up
+						and pause independently.
 					</p>
 				</header>
 				<MonthNavigator

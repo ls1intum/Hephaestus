@@ -1,11 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "storybook/test";
+import { expect, fn, userEvent, within } from "storybook/test";
 import { AgentJobsTable } from "./AgentJobsTable";
 import { mockJobs } from "./storyMockData";
 
 /**
- * Paginated table of agent job runs with status/runtime filters. Each row opens the
- * details panel; the table itself exposes no cancel/retry actions.
+ * Paginated table of AI runs with a status filter. The Details button in each row is the single
+ * affordance that opens the details panel; the table itself exposes no cancel/retry actions.
  */
 const meta = {
 	component: AgentJobsTable,
@@ -25,6 +25,34 @@ type Story = StoryObj<typeof meta>;
 
 /** Mixed statuses: completed+delivered, running, failed-delivery. */
 export const Default: Story = {};
+
+/**
+ * The row itself is inert. A click handler on a `<TableRow>` is reachable by mouse only, so the
+ * Details button — a real button, in the tab order — is the one way into a run.
+ */
+export const DetailsButtonIsTheOnlyAffordance: Story = {
+	play: async ({ args, canvas }) => {
+		await userEvent.click(
+			within(canvas.getAllByRole("row")[1]).getByRole("cell", { name: /—|\$/ }),
+		);
+		await expect(args.onSelectJob).not.toHaveBeenCalled();
+
+		await userEvent.click(canvas.getAllByRole("button", { name: /^View details for/ })[0]);
+		await expect(args.onSelectJob).toHaveBeenCalledWith(mockJobs[0]);
+	},
+};
+
+/**
+ * The visible "Status" text is the filter's label, so its accessible name is exactly what a
+ * speech-control user would say out loud (WCAG SC 2.5.3).
+ */
+export const FilterIsLabelledByItsVisibleText: Story = {
+	play: async ({ canvas }) => {
+		await expect(canvas.getByLabelText("Status")).toBe(
+			canvas.getByRole("combobox", { name: "Status" }),
+		);
+	},
+};
 
 export const Loading: Story = {
 	args: { isLoading: true },

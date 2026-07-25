@@ -85,6 +85,25 @@ describe("PracticeDetectionPolicyCard model binding", () => {
 		expect(screen.getByRole("link", { name: "Open AI setup" })).toBeTruthy();
 	});
 
+	it("reports a load failure with the server's reason and no Retry when one cannot help", async () => {
+		renderCard({
+			isError: true,
+			settings: undefined,
+			error: { status: 403, detail: "You are not an admin of this workspace." },
+			onRetry: vi.fn(),
+		});
+
+		expect(await screen.findByText("Couldn't load the review policy")).toBeTruthy();
+		expect(screen.getByText(/You are not an admin of this workspace/)).toBeTruthy();
+		expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+	});
+
+	it("offers a Retry when the failure is transient", async () => {
+		renderCard({ isError: true, settings: undefined, error: { status: 503 }, onRetry: vi.fn() });
+
+		expect(await screen.findByRole("button", { name: "Retry" })).toBeTruthy();
+	});
+
 	it("does not let an admin switch triggers on while nothing can run", async () => {
 		renderCard({
 			detectionBinding: undefined,

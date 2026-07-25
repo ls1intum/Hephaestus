@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle } from "lucide-react";
-import { useState } from "react";
+import { ChevronDown } from "lucide-react";
+import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
 import {
 	deleteBindingMutation,
@@ -13,11 +13,20 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import type { AgentBinding, AvailableLlmModel } from "@/api/types.gen";
 import { currentMonthUtc } from "@/components/admin/usage/usageUtils";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+	Field,
+	FieldDescription,
+	FieldError,
+	FieldGroup,
+	FieldLabel,
+	FieldLegend,
+	FieldSet,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
@@ -48,11 +57,37 @@ const PURPOSES: PurposeMeta[] = [
 	},
 ];
 
+const MIN_TIMEOUT_SECONDS = 30;
+const MIN_CONCURRENT_JOBS = 1;
+
 function bindingToSelection(binding?: AgentBinding): ModelSelection | null {
 	if (binding?.instanceModelId != null) return { scope: "SHARED", id: binding.instanceModelId };
 	if (binding?.workspaceModelId != null)
 		return { scope: "WORKSPACE", id: binding.workspaceModelId };
 	return null;
+}
+
+/**
+ * A numeric field held as the string the user typed, so an emptied input stays empty instead of
+ * collapsing to `Number("") === 0` and silently saving a zero.
+ */
+interface ParsedNumber {
+	/** The value to submit, or `null` while the text isn't a usable number. */
+	value: number | null;
+	/** Why the text isn't usable — rendered as this field's `FieldError`, never as a toast. */
+	error: string | null;
+}
+
+function parseWholeNumber(raw: string, min: number, unit: string): ParsedNumber {
+	const trimmed = raw.trim();
+	if (trimmed === "") {
+		return { value: null, error: `Enter a number of ${unit}.` };
+	}
+	const parsed = Number(trimmed);
+	if (!Number.isInteger(parsed) || parsed < min) {
+		return { value: null, error: `Enter a whole number of ${unit}, ${min} or more.` };
+	}
+	return { value: parsed, error: null };
 }
 
 interface AgentBindingsPageProps {
@@ -90,6 +125,9 @@ export function AgentBindingsPage({ workspaceSlug }: AgentBindingsPageProps) {
 	const isLoading =
 		bindingsQuery.isLoading || aiSettingsQuery.isLoading || availableModelsQuery.isLoading;
 	const isError = bindingsQuery.isError || aiSettingsQuery.isError || availableModelsQuery.isError;
+	// Whichever of the three failed first supplies the ProblemDetail and the status the alert
+	// classifies on — a 403 must not offer a Retry that would be refused identically.
+	const loadError = bindingsQuery.error ?? aiSettingsQuery.error ?? availableModelsQuery.error;
 
 	const handleRetry = () => {
 		bindingsQuery.refetch();
@@ -121,19 +159,10 @@ export function AgentBindingsPage({ workspaceSlug }: AgentBindingsPageProps) {
 			)}
 
 			{isError ? (
-				<Alert variant="destructive">
-					<AlertCircle />
-					<AlertTitle>Failed to load AI setup</AlertTitle>
-					<AlertDescription>
-						<p>The bindings, workspace policy, or the available model list could not be loaded.</p>
-						<Button variant="outline" size="sm" className="mt-2" onClick={handleRetry}>
-							Retry
-						</Button>
-					</AlertDescription>
-				</Alert>
+				<QueryErrorAlert error={loadError} title="Couldn't load AI models" onRetry={handleRetry} />
 			) : isLoading ? (
 				<div className="flex h-40 items-center justify-center">
-					<Spinner className="h-6 w-6" />
+					<Spinner className="size-6" />
 				</div>
 			) : (
 				<div className="space-y-6">
@@ -184,10 +213,14 @@ function AgentPurposeCard({
 	const queryClient = useQueryClient();
 	const [selection, setSelection] = useState<ModelSelection | null>(bindingToSelection(binding));
 	const [enabled, setEnabled] = useState(binding?.enabled ?? true);
-	const [timeoutSeconds, setTimeoutSeconds] = useState(binding?.timeoutSeconds ?? 600);
-	const [maxConcurrentJobs, setMaxConcurrentJobs] = useState(binding?.maxConcurrentJobs ?? 3);
+	const [timeoutSeconds, setTimeoutSeconds] = useState(String(binding?.timeoutSeconds ?? 600));
+	const [maxConcurrentJobs, setMaxConcurrentJobs] = useState(
+		String(binding?.maxConcurrentJobs ?? 3),
+	);
 	const [allowInternet, setAllowInternet] = useState(binding?.allowInternet ?? false);
 	const [showAdvanced, setShowAdvanced] = useState(false);
+	// Withheld until the first submit, so nothing is marked invalid before anything was attempted.
+	const [showErrors, setShowErrors] = useState(false);
 
 	const invalidate = () =>
 		queryClient.invalidateQueries({ queryKey: getBindingsQueryKey({ path: { workspaceSlug } }) });
@@ -199,7 +232,7 @@ function AgentPurposeCard({
 			toast.success(`${meta.title} saved`);
 		},
 		onError: (error) => {
-			toast.error(`Failed to save ${meta.title.toLowerCase()}`, {
+			toast.error(`Couldn't save ${meta.title.toLowerCase()}`, {
 				description: problemDetailOf(error),
 			});
 		},
@@ -212,7 +245,7 @@ function AgentPurposeCard({
 			toast.success(`${meta.title} turned off`);
 		},
 		onError: (error) => {
-			toast.error(`Failed to turn off ${meta.title.toLowerCase()}`, {
+			toast.error(`Couldn't turn off ${meta.title.toLowerCase()}`, {
 				description: problemDetailOf(error),
 			});
 		},
@@ -221,15 +254,34 @@ function AgentPurposeCard({
 	const noModels = availableModels.length === 0;
 	const pending = upsert.isPending || remove.isPending;
 
-	const handleSave = () => {
-		if (!selection) return;
+	const timeout = parseWholeNumber(timeoutSeconds, MIN_TIMEOUT_SECONDS, "seconds");
+	const concurrency = parseWholeNumber(maxConcurrentJobs, MIN_CONCURRENT_JOBS, "runs");
+	const modelError = showErrors && !selection ? "Choose the model this runs on." : null;
+	const timeoutError = showErrors ? timeout.error : null;
+	const concurrencyError = showErrors ? concurrency.error : null;
+
+	const modelHintId = `${meta.purpose}-model-hint`;
+	const modelErrorId = `${meta.purpose}-model-error`;
+	const modelDescribedBy =
+		[noModels ? modelHintId : null, modelError ? modelErrorId : null].filter(Boolean).join(" ") ||
+		undefined;
+
+	const handleSubmit = (event: FormEvent) => {
+		event.preventDefault();
+		if (!selection || timeout.value == null || concurrency.value == null) {
+			// Save stays enabled precisely so this reveals *why* the binding can't be saved — and the
+			// disclosure opens, because the offending field may be inside it.
+			setShowErrors(true);
+			if (timeout.value == null || concurrency.value == null) setShowAdvanced(true);
+			return;
+		}
 		upsert.mutate({
 			path: { workspaceSlug, purpose: meta.purpose },
 			body: {
 				instanceModelId: selection.scope === "SHARED" ? selection.id : undefined,
 				workspaceModelId: selection.scope === "WORKSPACE" ? selection.id : undefined,
-				timeoutSeconds,
-				maxConcurrentJobs,
+				timeoutSeconds: timeout.value,
+				maxConcurrentJobs: concurrency.value,
 				allowInternet,
 				enabled,
 			},
@@ -244,7 +296,7 @@ function AgentPurposeCard({
 		return (
 			<Card>
 				<CardHeader>
-					<CardTitle className="text-base">{meta.title}</CardTitle>
+					<CardTitle>{meta.title}</CardTitle>
 					<CardDescription>
 						This feature is turned off for the workspace. An instance admin enables it.
 					</CardDescription>
@@ -258,7 +310,7 @@ function AgentPurposeCard({
 			<CardHeader>
 				<div className="flex items-start justify-between gap-4">
 					<div>
-						<CardTitle className="text-base">{meta.title}</CardTitle>
+						<CardTitle>{meta.title}</CardTitle>
 						<CardDescription>{meta.description}</CardDescription>
 					</div>
 					{binding &&
@@ -269,91 +321,135 @@ function AgentPurposeCard({
 						))}
 				</div>
 			</CardHeader>
-			<CardContent className="space-y-4">
-				<Field>
-					<FieldLabel htmlFor={`${meta.purpose}-model`}>{meta.title} runs on</FieldLabel>
-					<ModelPicker
-						id={`${meta.purpose}-model`}
-						availableModels={availableModels}
-						value={selection}
-						onChange={setSelection}
-						disabled={pending || noModels}
-					/>
-					{noModels && (
-						<FieldDescription>
-							No models are available yet. Ask an instance admin to grant one, or add your own under
-							Workspace providers.
-						</FieldDescription>
-					)}
-				</Field>
-
-				<Field orientation="horizontal">
-					<FieldLabel htmlFor={`${meta.purpose}-enabled`}>Active</FieldLabel>
-					<Switch
-						id={`${meta.purpose}-enabled`}
-						checked={enabled}
-						onCheckedChange={setEnabled}
-						disabled={pending}
-					/>
-				</Field>
-
-				<Button type="button" variant="ghost" size="sm" onClick={() => setShowAdvanced((v) => !v)}>
-					{showAdvanced ? "Hide advanced" : "Advanced"}
-				</Button>
-
-				{showAdvanced && (
-					<div className="space-y-3 rounded-lg border p-3">
-						<Field>
-							<FieldLabel htmlFor={`${meta.purpose}-timeout`}>Timeout (seconds)</FieldLabel>
-							<Input
-								id={`${meta.purpose}-timeout`}
-								type="number"
-								min={30}
-								value={timeoutSeconds}
-								onChange={(e) => setTimeoutSeconds(Number(e.target.value))}
-								disabled={pending}
+			{/* noValidate: this form validates itself so every rejection surfaces through `FieldError`.
+			    Left to the browser, `min` would block submit with a native bubble the field can't explain. */}
+			<form onSubmit={handleSubmit} noValidate>
+				<CardContent className="space-y-4">
+					<FieldGroup>
+						<Field data-invalid={Boolean(modelError)}>
+							<FieldLabel htmlFor={`${meta.purpose}-model`}>{meta.title} runs on</FieldLabel>
+							<ModelPicker
+								id={`${meta.purpose}-model`}
+								availableModels={availableModels}
+								value={selection}
+								onChange={(next) => {
+									setSelection(next);
+									setShowErrors(false);
+								}}
+								disabled={pending || noModels}
+								invalid={Boolean(modelError)}
+								aria-describedby={modelDescribedBy}
 							/>
+							{noModels && (
+								<FieldDescription id={modelHintId}>
+									No models are available yet. Ask an instance admin to grant one, or add your own
+									under Workspace providers.
+								</FieldDescription>
+							)}
+							{modelError && <FieldError id={modelErrorId}>{modelError}</FieldError>}
 						</Field>
-						<Field>
-							<FieldLabel htmlFor={`${meta.purpose}-concurrency`}>Max concurrent runs</FieldLabel>
-							<Input
-								id={`${meta.purpose}-concurrency`}
-								type="number"
-								min={1}
-								value={maxConcurrentJobs}
-								onChange={(e) => setMaxConcurrentJobs(Number(e.target.value))}
-								disabled={pending}
-							/>
-						</Field>
+
 						<Field orientation="horizontal">
-							<FieldLabel htmlFor={`${meta.purpose}-internet`}>Internet access</FieldLabel>
+							<FieldLabel htmlFor={`${meta.purpose}-enabled`}>Active</FieldLabel>
 							<Switch
-								id={`${meta.purpose}-internet`}
-								checked={allowInternet}
-								onCheckedChange={setAllowInternet}
+								id={`${meta.purpose}-enabled`}
+								checked={enabled}
+								onCheckedChange={setEnabled}
 								disabled={pending}
 							/>
 						</Field>
-					</div>
-				)}
+					</FieldGroup>
 
-				<div className="flex justify-end gap-2">
-					{binding && (
-						<Button
-							type="button"
-							variant="outline"
-							size="sm"
-							onClick={handleTurnOff}
-							disabled={pending}
-						>
-							Turn off
+					<Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+						<CollapsibleTrigger
+							render={
+								<Button type="button" variant="ghost" size="sm" className="-ml-2 group/adv">
+									Advanced
+									<ChevronDown
+										className="transition-transform group-aria-expanded/adv:rotate-180"
+										aria-hidden
+									/>
+								</Button>
+							}
+						/>
+						<CollapsibleContent>
+							<FieldSet className="pt-4">
+								<FieldLegend variant="label">Run limits</FieldLegend>
+								<FieldGroup>
+									<Field data-invalid={Boolean(timeoutError)}>
+										<FieldLabel htmlFor={`${meta.purpose}-timeout`}>Timeout (seconds)</FieldLabel>
+										<Input
+											id={`${meta.purpose}-timeout`}
+											type="number"
+											inputMode="numeric"
+											min={MIN_TIMEOUT_SECONDS}
+											value={timeoutSeconds}
+											aria-invalid={Boolean(timeoutError)}
+											onChange={(e) => {
+												setTimeoutSeconds(e.target.value);
+												setShowErrors(false);
+											}}
+											disabled={pending}
+										/>
+										<FieldDescription>
+											How long one run may take before it is abandoned.
+										</FieldDescription>
+										{timeoutError && <FieldError>{timeoutError}</FieldError>}
+									</Field>
+									<Field data-invalid={Boolean(concurrencyError)}>
+										<FieldLabel htmlFor={`${meta.purpose}-concurrency`}>
+											Max concurrent runs
+										</FieldLabel>
+										<Input
+											id={`${meta.purpose}-concurrency`}
+											type="number"
+											inputMode="numeric"
+											min={MIN_CONCURRENT_JOBS}
+											value={maxConcurrentJobs}
+											aria-invalid={Boolean(concurrencyError)}
+											onChange={(e) => {
+												setMaxConcurrentJobs(e.target.value);
+												setShowErrors(false);
+											}}
+											disabled={pending}
+										/>
+										<FieldDescription>
+											How many runs this workspace may have in flight at once.
+										</FieldDescription>
+										{concurrencyError && <FieldError>{concurrencyError}</FieldError>}
+									</Field>
+									<Field orientation="horizontal">
+										<FieldLabel htmlFor={`${meta.purpose}-internet`}>Internet access</FieldLabel>
+										<Switch
+											id={`${meta.purpose}-internet`}
+											checked={allowInternet}
+											onCheckedChange={setAllowInternet}
+											disabled={pending}
+										/>
+									</Field>
+								</FieldGroup>
+							</FieldSet>
+						</CollapsibleContent>
+					</Collapsible>
+
+					<div className="flex justify-end gap-2">
+						{binding && (
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								onClick={handleTurnOff}
+								disabled={pending}
+							>
+								Turn off
+							</Button>
+						)}
+						<Button type="submit" size="sm" disabled={pending}>
+							Save
 						</Button>
-					)}
-					<Button type="button" size="sm" onClick={handleSave} disabled={pending || !selection}>
-						Save
-					</Button>
-				</div>
-			</CardContent>
+					</div>
+				</CardContent>
+			</form>
 		</Card>
 	);
 }

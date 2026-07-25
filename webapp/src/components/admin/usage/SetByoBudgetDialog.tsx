@@ -13,10 +13,10 @@ export interface SetByoBudgetDialogProps {
 }
 
 /**
- * Workspace-admin dialog for the cap on the workspace's *own* provider spend — its own money, so
- * unlike the host's shared-model budget this one is theirs to set, change, and remove. A cap of $0
- * pauses own-provider work immediately; it never affects work on shared models, which the host
- * funds and caps separately.
+ * Workspace-admin dialog for the cap on spend through the workspace's *own* provider — its own
+ * money, so unlike the shared-model budget this one is theirs to set, change, and remove. A cap of
+ * $0 pauses work on their provider immediately; it never affects work on shared models, which the
+ * host pays for and caps separately.
  */
 export function SetByoBudgetDialog({
 	open,
@@ -29,10 +29,10 @@ export function SetByoBudgetDialog({
 	return (
 		<BudgetAmountDialog
 			open={open}
-			title={currentCapUsd != null ? "Change your monthly cap" : "Set your monthly cap"}
-			description="Your monthly limit on what this workspace spends through its own connected provider. When the month's spend reaches it, work on your own provider pauses until the next UTC month — work on shared models is not affected. A cap of $0 pauses immediately."
+			title="Set your provider cap"
+			description="What this workspace can spend on its own provider each month. At the cap, work on your provider pauses until the month resets. $0 pauses now."
 			fieldLabel="Monthly cap (USD)"
-			fieldDescription="Applies only to spend on your own provider. Leave the cap off to stay uncapped."
+			fieldDescription="Applies only to spend on your own provider. Shared models are not affected."
 			currentValueUsd={currentCapUsd ?? null}
 			isPending={isPending}
 			serverError={serverError}

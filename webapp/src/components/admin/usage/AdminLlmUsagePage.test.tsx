@@ -80,23 +80,25 @@ async function renderPage(
 }
 
 describe("AdminLlmUsagePage", () => {
-	it("separates instance-funded and workspace-owned spend in every rollup", async () => {
+	it("separates shared-model and provider spend in every rollup", async () => {
 		await renderPage();
 
-		expect(screen.getByText("Shared models — budget set by your host")).toBeTruthy();
-		expect(screen.getByText("Your own provider — your cap")).toBeTruthy();
+		expect(screen.getByText("Shared-model spend so far")).toBeTruthy();
+		expect(screen.getByText("Shared-model budget · set by your host")).toBeTruthy();
+		expect(screen.getByText("Your provider spend so far")).toBeTruthy();
+		expect(screen.getByText(/Your provider cap · set by you/)).toBeTruthy();
 
 		const byJobType = screen.getByRole("table", { name: "AI spend by job type" });
-		expect(within(byJobType).getByRole("columnheader", { name: "Instance-funded" })).toBeTruthy();
-		expect(within(byJobType).getByRole("columnheader", { name: "Workspace-owned" })).toBeTruthy();
-		expect(within(byJobType).getByRole("columnheader", { name: "Unpriced calls" })).toBeTruthy();
+		expect(within(byJobType).getByRole("columnheader", { name: "Shared models" })).toBeTruthy();
+		expect(within(byJobType).getByRole("columnheader", { name: "Your provider" })).toBeTruthy();
+		expect(within(byJobType).getByRole("columnheader", { name: "No price set" })).toBeTruthy();
 		expect(within(byJobType).getByText("$4.25")).toBeTruthy();
 		expect(within(byJobType).getByText("$1.75")).toBeTruthy();
 
 		const byDay = screen.getByRole("table", { name: "AI spend by day" });
-		expect(within(byDay).getByRole("columnheader", { name: "Instance-funded" })).toBeTruthy();
-		expect(within(byDay).getByRole("columnheader", { name: "Workspace-owned" })).toBeTruthy();
-		expect(within(byDay).getByRole("columnheader", { name: "Unpriced calls" })).toBeTruthy();
+		expect(within(byDay).getByRole("columnheader", { name: "Shared models" })).toBeTruthy();
+		expect(within(byDay).getByRole("columnheader", { name: "Your provider" })).toBeTruthy();
+		expect(within(byDay).getByRole("columnheader", { name: "No price set" })).toBeTruthy();
 		expect(within(byDay).getByText("$4.25")).toBeTruthy();
 		expect(within(byDay).getByText("$1.75")).toBeTruthy();
 	});
@@ -105,16 +107,16 @@ describe("AdminLlmUsagePage", () => {
 		await renderPage();
 
 		expect(screen.getByRole("progressbar", { name: "Shared-model budget used" })).toBeTruthy();
-		expect(screen.getByRole("progressbar", { name: "Your own-provider cap used" })).toBeTruthy();
+		expect(screen.getByRole("progressbar", { name: "Your provider cap used" })).toBeTruthy();
 	});
 
-	it("gives the right pricing owner an actionable unpriced-usage warning", async () => {
+	it("gives the right pricing owner an actionable no-price-set warning", async () => {
 		await renderPage();
 
+		expect(screen.getByText("2 calls aren't counted in these totals")).toBeTruthy();
 		expect(
-			screen.getByText(/For a model on your own provider, add its price in Models\./),
+			screen.getByText(/Add prices for your own models in .*; for shared models, ask your host\./),
 		).toBeTruthy();
-		expect(screen.getByText(/For a shared model, ask your host to add pricing\./)).toBeTruthy();
 	});
 
 	it("shows the per-event average alongside the untouched funding columns", async () => {
@@ -123,39 +125,40 @@ describe("AdminLlmUsagePage", () => {
 		const byJobType = screen.getByRole("table", { name: "AI spend by job type" });
 		expect(within(byJobType).getByRole("columnheader", { name: "Avg per event" })).toBeTruthy();
 		// 5 events: $4.25 shared and $1.75 own, each averaged on its own — never summed.
-		expect(within(byJobType).getByText("≈ $0.850")).toBeTruthy();
-		expect(within(byJobType).getByText("shared")).toBeTruthy();
-		expect(within(byJobType).getByText("≈ $0.350")).toBeTruthy();
-		expect(within(byJobType).getByText("own")).toBeTruthy();
+		// Money renders in cents, never a third decimal.
+		expect(within(byJobType).getByText("≈ $0.85")).toBeTruthy();
+		expect(within(byJobType).getByText("shared models")).toBeTruthy();
+		expect(within(byJobType).getByText("≈ $0.35")).toBeTruthy();
+		expect(within(byJobType).getByText("your provider")).toBeTruthy();
 	});
 
 	describe("pause banners", () => {
-		it("routes an exhausted own-provider cap to the admin who can lift it", async () => {
+		it("routes a reached provider cap to the admin who can lift it", async () => {
 			const onEditByoCap = vi.fn();
 			await renderPage(
 				{ ...baseReport, byoPaused: true, byoBudgetVerdict: "EXHAUSTED", byoTotalCostUsd: 10 },
 				{ onEditByoCap },
 			);
 
-			expect(screen.getByText("Your monthly cap is reached")).toBeTruthy();
+			expect(screen.getByText("Your provider cap is reached")).toBeTruthy();
 			expect(
 				screen.getByText(
 					/Work on your own provider is paused until August 1 \(UTC\), or until you raise or remove your cap\./,
 				),
 			).toBeTruthy();
 
-			fireEvent.click(screen.getByRole("button", { name: "Change your cap" }));
+			fireEvent.click(screen.getByRole("button", { name: "Adjust cap" }));
 			expect(onEditByoCap).toHaveBeenCalled();
 		});
 
-		it("tells an unenforceable own cap how to become enforceable again", async () => {
+		it("tells an unenforceable provider cap how to become enforceable again", async () => {
 			await renderPage({ ...baseReport, byoPaused: true, byoBudgetVerdict: "UNVERIFIABLE" });
 
 			const banner = screen.getByText("Your cap can't be enforced").closest("[role='alert']");
 			expect(banner).toBeTruthy();
 			expect(
 				within(banner as HTMLElement)
-					.getByRole("link", { name: "models page" })
+					.getByRole("link", { name: "AI models" })
 					.getAttribute("href"),
 			).toBe("/w/acme/admin/models");
 		});
@@ -171,12 +174,10 @@ describe("AdminLlmUsagePage", () => {
 			expect(screen.getByText("Shared-model budget reached")).toBeTruthy();
 			expect(
 				screen.getByText(
-					/paused until August 1 \(UTC\) or until your host raises the budget\. Work on your own connected provider is not affected\./,
+					/paused until August 1 \(UTC\) or until your host raises the budget\. Work on your own provider is not affected\./,
 				),
 			).toBeTruthy();
-			expect(
-				screen.getByRole("link", { name: "Switch a purpose to your own provider" }),
-			).toBeTruthy();
+			expect(screen.getByRole("link", { name: "Switch a purpose to your provider" })).toBeTruthy();
 		});
 
 		it("never asks the workspace admin to price a shared model", async () => {
@@ -202,7 +203,7 @@ describe("AdminLlmUsagePage", () => {
 			});
 
 			const alerts = screen.getAllByRole("alert");
-			expect(alerts[0].textContent).toContain("Your monthly cap is reached");
+			expect(alerts[0].textContent).toContain("Your provider cap is reached");
 			expect(alerts[1].textContent).toContain("Shared-model budget reached");
 		});
 
@@ -212,7 +213,7 @@ describe("AdminLlmUsagePage", () => {
 				{ month: "2026-06", isCurrentMonth: false },
 			);
 
-			expect(screen.queryByText("Your monthly cap is reached")).toBeNull();
+			expect(screen.queryByText("Your provider cap is reached")).toBeNull();
 		});
 	});
 
@@ -220,7 +221,7 @@ describe("AdminLlmUsagePage", () => {
 		it("warns at 80% with a burn-rate date, as a status rather than an alert", async () => {
 			await renderPage({ ...baseReport, byoTotalCostUsd: 8.4 });
 
-			const warning = screen.getByText("You've used 84% of your own-provider cap");
+			const warning = screen.getByText("You've used 84% of your provider cap");
 			expect(warning.closest("[role='status']")).toBeTruthy();
 			expect(
 				screen.getByText(/At this month's pace you'll reach it around July 12\./),
@@ -233,7 +234,7 @@ describe("AdminLlmUsagePage", () => {
 				{ now: new Date("2026-07-02T12:00:00.000Z") },
 			);
 
-			expect(screen.getByText("You've used 84% of your own-provider cap")).toBeTruthy();
+			expect(screen.getByText("You've used 84% of your provider cap")).toBeTruthy();
 			expect(screen.queryByText(/At this month's pace/)).toBeNull();
 		});
 
@@ -251,11 +252,11 @@ describe("AdminLlmUsagePage", () => {
 				byoBudgetVerdict: "EXHAUSTED",
 			});
 
-			expect(screen.queryByText(/You've used 100% of your own-provider cap/)).toBeNull();
+			expect(screen.queryByText(/You've used 100% of your provider cap/)).toBeNull();
 		});
 	});
 
-	describe("own-provider card", () => {
+	describe("provider card", () => {
 		it("offers a cap even when nothing has run on a provider of their own", async () => {
 			const onEditByoCap = vi.fn();
 			await renderPage(
@@ -269,20 +270,16 @@ describe("AdminLlmUsagePage", () => {
 				{ onEditByoCap },
 			);
 
-			expect(
-				screen.getByText(/Nothing has run on a provider of your own this month\./),
-			).toBeTruthy();
-			fireEvent.click(screen.getByRole("button", { name: "Set a cap" }));
+			expect(screen.getByText(/Nothing ran on a provider of your own this month\./)).toBeTruthy();
+			fireEvent.click(screen.getByRole("button", { name: "Set cap" }));
 			expect(onEditByoCap).toHaveBeenCalled();
 		});
 
-		it("keeps the card whenever there is own-provider spend, capped or not", async () => {
+		it("keeps the card whenever there is provider spend, capped or not", async () => {
 			await renderPage({ ...baseReport, byoMonthlyBudgetUsd: undefined });
 
-			expect(
-				screen.getByText(/No cap — this workspace's own-provider spend is unlimited\./),
-			).toBeTruthy();
-			expect(screen.getByRole("button", { name: "Set a cap" })).toBeTruthy();
+			expect(screen.getByText("No cap")).toBeTruthy();
+			expect(screen.getByRole("button", { name: "Set cap" })).toBeTruthy();
 		});
 	});
 });

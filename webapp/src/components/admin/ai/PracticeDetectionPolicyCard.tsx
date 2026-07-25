@@ -7,10 +7,17 @@ import type {
 	UpdatePracticeReviewSettings,
 	UpdateWorkspaceFeaturesRequest,
 } from "@/api/types.gen";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/ui/field";
+import {
+	Field,
+	FieldContent,
+	FieldDescription,
+	FieldLabel,
+	FieldTitle,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
 	Select,
@@ -44,6 +51,9 @@ export interface PracticeDetectionPolicyCardProps {
 	manualTriggerEnabled: boolean;
 	isLoading: boolean;
 	isError?: boolean;
+	/** The failure behind `isError`; its ProblemDetail and status decide the wording and whether a
+	 * Retry is offered at all (a 403 cannot be retried away). */
+	error?: unknown;
 	isSaving: boolean;
 	onUpdateReviewSettings: (settings: UpdatePracticeReviewSettings) => void;
 	onUpdateFeatures: (features: UpdateWorkspaceFeaturesRequest) => void;
@@ -60,6 +70,7 @@ export function PracticeDetectionPolicyCard({
 	manualTriggerEnabled,
 	isLoading,
 	isError = false,
+	error,
 	isSaving,
 	onUpdateReviewSettings,
 	onUpdateFeatures,
@@ -68,25 +79,14 @@ export function PracticeDetectionPolicyCard({
 }: PracticeDetectionPolicyCardProps) {
 	if (isError) {
 		return (
-			<Alert variant="destructive">
-				<AlertCircle />
-				<AlertTitle>Failed to load policy</AlertTitle>
-				<AlertDescription>
-					<p>The practice detection policy could not be loaded.</p>
-					{onRetry && (
-						<Button variant="outline" size="sm" className="mt-2" onClick={onRetry}>
-							Retry
-						</Button>
-					)}
-				</AlertDescription>
-			</Alert>
+			<QueryErrorAlert error={error} title="Couldn't load the review policy" onRetry={onRetry} />
 		);
 	}
 
 	if (isLoading || !settings) {
 		return (
 			<div className="flex h-40 items-center justify-center">
-				<Spinner className="h-6 w-6" />
+				<Spinner className="size-6" />
 			</div>
 		);
 	}
@@ -126,12 +126,14 @@ export function PracticeDetectionPolicyCard({
 		<div className="space-y-6">
 			<Card>
 				<CardHeader>
-					<CardTitle className="text-base">Model</CardTitle>
+					<CardTitle>Model</CardTitle>
 				</CardHeader>
 				<CardContent className="space-y-4">
 					{detectionRunnable ? (
 						<Field>
-							<FieldLabel>Practice detection runs on</FieldLabel>
+							{/* A read-only report, not a control: `FieldTitle` names the value below it without
+							    claiming a `for` target that doesn't exist. */}
+							<FieldTitle>Practice detection runs on</FieldTitle>
 							<p className="font-medium text-sm">
 								{boundModel?.displayName ?? `Model #${boundModelId}`}
 							</p>
@@ -163,6 +165,8 @@ export function PracticeDetectionPolicyCard({
 									variant="outline"
 									size="sm"
 									className="mt-2"
+									// No `nativeButton={false}`: it would stamp `role="button"` over the anchor, and
+									// this is a navigation — it must keep announcing itself as a link.
 									render={<Link to="/w/$workspaceSlug/admin/models" params={{ workspaceSlug }} />}
 								>
 									Open AI setup
@@ -175,7 +179,7 @@ export function PracticeDetectionPolicyCard({
 
 			<Card>
 				<CardHeader>
-					<CardTitle className="text-base">Triggers</CardTitle>
+					<CardTitle>Triggers</CardTitle>
 				</CardHeader>
 				<CardContent className="space-y-4">
 					<Field orientation="horizontal">
@@ -213,7 +217,7 @@ export function PracticeDetectionPolicyCard({
 
 			<Card>
 				<CardHeader>
-					<CardTitle className="text-base">Review policy</CardTitle>
+					<CardTitle>Review policy</CardTitle>
 				</CardHeader>
 				<CardContent className="space-y-4">
 					<Field orientation="horizontal">

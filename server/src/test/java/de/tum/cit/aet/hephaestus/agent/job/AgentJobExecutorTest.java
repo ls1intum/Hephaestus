@@ -532,7 +532,9 @@ class AgentJobExecutorTest extends BaseUnitTest {
             verify(jobRepository).save(saved.capture());
             assertThat(saved.getValue().getStatus()).isEqualTo(AgentJobStatus.CANCELLED);
             assertThat(saved.getValue().getCancellationReason()).isEqualTo(AgentJobCancellationReason.BUDGET_EXHAUSTED);
-            assertThat(saved.getValue().getErrorMessage()).contains("expired");
+            // The message must say why it was cancelled and that waiting is over — not merely "expired",
+            // which reads like the job itself timed out rather than the budget never being raised.
+            assertThat(saved.getValue().getErrorMessage()).contains("budget").contains("on hold");
         }
 
         @Test

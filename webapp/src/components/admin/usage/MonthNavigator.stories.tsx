@@ -3,7 +3,7 @@ import { fn } from "storybook/test";
 import { MonthNavigator } from "./MonthNavigator";
 
 /**
- * Prev/next month stepper shared by the workspace and instance LLM usage pages.
+ * Prev/next month stepper shared by the workspace and instance AI usage pages.
  * Pure/presentational — the container owns the selected month.
  */
 const meta = {

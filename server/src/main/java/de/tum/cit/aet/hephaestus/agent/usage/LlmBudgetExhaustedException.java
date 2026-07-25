@@ -13,7 +13,9 @@ package de.tum.cit.aet.hephaestus.agent.usage;
 public class LlmBudgetExhaustedException extends RuntimeException {
 
     public LlmBudgetExhaustedException(Long workspaceId, FundingSource fundingSource) {
-        super(message(fundingSource) + " (workspace " + workspaceId + ")");
+        // No workspace id in the text: this surfaces verbatim in a chat reply, where an internal
+        // identifier is noise to the reader and means nothing they can act on.
+        super(message(fundingSource));
     }
 
     private static String message(FundingSource fundingSource) {

@@ -1,5 +1,5 @@
 import { AlertTriangle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type {
 	CreateWorkspaceLlmModelRequest,
 	UpdateWorkspaceLlmModelRequest,
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
 	Dialog,
+	DialogClose,
 	DialogContent,
 	DialogDescription,
 	DialogFooter,
@@ -48,22 +49,52 @@ function priceValueOf(model: WorkspaceLlmModel | null): PriceModeValue {
 }
 
 /** Create/edit a model on your own provider (#1368). Price is set inline — the workspace scope has no
- * separate price endpoint, unlike the instance catalog. */
+ * separate price endpoint, unlike the instance catalog.
+ *
+ * The body is a separate component keyed on the edited model, so switching which model is edited
+ * remounts it with fresh initial state instead of copying props into state from an effect.
+ */
 export function WorkspaceLlmModelFormDialog({
 	open,
 	onOpenChange,
 	editing,
+	...contentProps
+}: WorkspaceLlmModelFormDialogProps) {
+	return (
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			{open && (
+				<WorkspaceLlmModelFormDialogContent
+					key={editing?.id ?? "new"}
+					editing={editing}
+					{...contentProps}
+				/>
+			)}
+		</Dialog>
+	);
+}
+
+type WorkspaceLlmModelFormDialogContentProps = Omit<
+	WorkspaceLlmModelFormDialogProps,
+	"open" | "onOpenChange"
+>;
+
+function WorkspaceLlmModelFormDialogContent({
+	editing,
 	isSubmitting,
 	onCreate,
 	onUpdate,
-}: WorkspaceLlmModelFormDialogProps) {
+}: WorkspaceLlmModelFormDialogContentProps) {
 	const isEdit = editing !== null;
-	const [displayName, setDisplayName] = useState("");
-	const [upstreamModelId, setUpstreamModelId] = useState("");
-	const [contextWindow, setContextWindow] = useState("");
-	const [maxOutputTokens, setMaxOutputTokens] = useState("");
-	const [supportsReasoning, setSupportsReasoning] = useState(false);
-	const [enabled, setEnabled] = useState(false);
+	const [displayName, setDisplayName] = useState(editing?.displayName ?? "");
+	const [upstreamModelId, setUpstreamModelId] = useState(editing?.upstreamModelId ?? "");
+	const [contextWindow, setContextWindow] = useState(
+		editing?.contextWindow != null ? String(editing.contextWindow) : "",
+	);
+	const [maxOutputTokens, setMaxOutputTokens] = useState(
+		editing?.maxOutputTokens != null ? String(editing.maxOutputTokens) : "",
+	);
+	const [supportsReasoning, setSupportsReasoning] = useState(editing?.supportsReasoning ?? false);
+	const [enabled, setEnabled] = useState(editing?.enabled ?? false);
 	const [price, setPrice] = useState<PriceModeValue>(() => priceValueOf(editing));
 	const [errors, setErrors] = useState<{
 		displayName?: string;
@@ -72,18 +103,6 @@ export function WorkspaceLlmModelFormDialog({
 		per1mOutputUsd?: string;
 		note?: string;
 	}>({});
-
-	useEffect(() => {
-		if (!open) return;
-		setDisplayName(editing?.displayName ?? "");
-		setUpstreamModelId(editing?.upstreamModelId ?? "");
-		setContextWindow(editing?.contextWindow != null ? String(editing.contextWindow) : "");
-		setMaxOutputTokens(editing?.maxOutputTokens != null ? String(editing.maxOutputTokens) : "");
-		setSupportsReasoning(editing?.supportsReasoning ?? false);
-		setEnabled(editing?.enabled ?? false);
-		setPrice(priceValueOf(editing));
-		setErrors({});
-	}, [open, editing]);
 
 	const validate = (): boolean => {
 		const next: typeof errors = {};
@@ -130,133 +149,133 @@ export function WorkspaceLlmModelFormDialog({
 	};
 
 	return (
-		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="sm:max-w-lg">
-				<form onSubmit={handleSubmit} className="space-y-4" noValidate>
-					<DialogHeader>
-						<DialogTitle>{isEdit ? "Edit model" : "Add model"}</DialogTitle>
-						<DialogDescription>A model on your own connected provider.</DialogDescription>
-					</DialogHeader>
+		<DialogContent className="sm:max-w-lg">
+			<form onSubmit={handleSubmit} className="space-y-4" noValidate>
+				<DialogHeader>
+					<DialogTitle>{isEdit ? "Edit model" : "Add model"}</DialogTitle>
+					<DialogDescription>A model on your own connected provider.</DialogDescription>
+				</DialogHeader>
 
-					<Field data-invalid={Boolean(errors.displayName)}>
-						<FieldLabel htmlFor="wm-display-name">Display name</FieldLabel>
+				<Field data-invalid={Boolean(errors.displayName)}>
+					<FieldLabel htmlFor="wm-display-name">Display name</FieldLabel>
+					<Input
+						id="wm-display-name"
+						value={displayName}
+						onChange={(e) => setDisplayName(e.target.value)}
+						placeholder="e.g. GPT-5 mini"
+						required
+						aria-invalid={Boolean(errors.displayName)}
+					/>
+					{errors.displayName && <FieldError>{errors.displayName}</FieldError>}
+				</Field>
+
+				<Field data-invalid={Boolean(errors.upstreamModelId)}>
+					<FieldLabel htmlFor="wm-upstream-id">Upstream model id</FieldLabel>
+					<Input
+						id="wm-upstream-id"
+						value={upstreamModelId}
+						onChange={(e) => setUpstreamModelId(e.target.value)}
+						disabled={isEdit}
+						placeholder="e.g. openai/gpt-5-mini"
+						required
+						autoComplete="off"
+						aria-invalid={Boolean(errors.upstreamModelId)}
+					/>
+					<FieldDescription>
+						{isEdit
+							? "Create a new model to use a different upstream id."
+							: "The exact id your provider expects. Slashes are part of the id."}
+					</FieldDescription>
+					{errors.upstreamModelId && <FieldError>{errors.upstreamModelId}</FieldError>}
+				</Field>
+
+				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+					<Field>
+						<FieldLabel htmlFor="wm-context-window">
+							Context window <span className="font-normal text-muted-foreground">(optional)</span>
+						</FieldLabel>
 						<Input
-							id="wm-display-name"
-							value={displayName}
-							onChange={(e) => setDisplayName(e.target.value)}
-							placeholder="e.g. GPT-5 mini"
-							required
-							aria-invalid={Boolean(errors.displayName)}
+							id="wm-context-window"
+							type="number"
+							min={0}
+							value={contextWindow}
+							onChange={(e) => setContextWindow(e.target.value)}
 						/>
-						{errors.displayName && <FieldError>{errors.displayName}</FieldError>}
 					</Field>
-
-					<Field data-invalid={Boolean(errors.upstreamModelId)}>
-						<FieldLabel htmlFor="wm-upstream-id">Upstream model id</FieldLabel>
+					<Field>
+						<FieldLabel htmlFor="wm-max-output">
+							Max output tokens{" "}
+							<span className="font-normal text-muted-foreground">(optional)</span>
+						</FieldLabel>
 						<Input
-							id="wm-upstream-id"
-							value={upstreamModelId}
-							onChange={(e) => setUpstreamModelId(e.target.value)}
-							disabled={isEdit}
-							placeholder="e.g. openai/gpt-5-mini"
-							required
-							autoComplete="off"
-							aria-invalid={Boolean(errors.upstreamModelId)}
+							id="wm-max-output"
+							type="number"
+							min={0}
+							value={maxOutputTokens}
+							onChange={(e) => setMaxOutputTokens(e.target.value)}
 						/>
+					</Field>
+				</div>
+
+				<Field orientation="horizontal">
+					<Checkbox
+						id="wm-supports-reasoning"
+						checked={supportsReasoning}
+						onCheckedChange={(checked) => setSupportsReasoning(checked === true)}
+					/>
+					<FieldContent>
+						<FieldLabel htmlFor="wm-supports-reasoning" className="font-normal">
+							Supports a reasoning mode
+						</FieldLabel>
+					</FieldContent>
+				</Field>
+
+				<Field orientation="horizontal">
+					<FieldContent>
+						<FieldLabel htmlFor="wm-enabled">Active</FieldLabel>
 						<FieldDescription>
 							{isEdit
-								? "Create a new model to use a different upstream id."
-								: "The exact id your provider expects. Slashes are part of the id."}
+								? "Only active models with a declared price can be selected."
+								: "New models start inactive. Save a price, then review and activate the model."}
 						</FieldDescription>
-						{errors.upstreamModelId && <FieldError>{errors.upstreamModelId}</FieldError>}
-					</Field>
-
-					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-						<Field>
-							<FieldLabel htmlFor="wm-context-window">
-								Context window <span className="font-normal text-muted-foreground">(optional)</span>
-							</FieldLabel>
-							<Input
-								id="wm-context-window"
-								type="number"
-								min={0}
-								value={contextWindow}
-								onChange={(e) => setContextWindow(e.target.value)}
-							/>
-						</Field>
-						<Field>
-							<FieldLabel htmlFor="wm-max-output">
-								Max output tokens{" "}
-								<span className="font-normal text-muted-foreground">(optional)</span>
-							</FieldLabel>
-							<Input
-								id="wm-max-output"
-								type="number"
-								min={0}
-								value={maxOutputTokens}
-								onChange={(e) => setMaxOutputTokens(e.target.value)}
-							/>
-						</Field>
-					</div>
-
-					<div className="flex items-center gap-2 text-sm">
-						<Checkbox
-							id="wm-supports-reasoning"
-							checked={supportsReasoning}
-							onCheckedChange={(checked) => setSupportsReasoning(checked === true)}
-						/>
-						<label htmlFor="wm-supports-reasoning">Supports a reasoning mode</label>
-					</div>
-
-					<Field orientation="horizontal">
-						<FieldContent>
-							<FieldLabel htmlFor="wm-enabled">Active</FieldLabel>
-							<FieldDescription>
-								{isEdit
-									? "Only active models with a declared price can be selected."
-									: "New models start inactive. Save a price, then review and activate the model."}
-							</FieldDescription>
-						</FieldContent>
-						<Switch
-							id="wm-enabled"
-							checked={enabled}
-							disabled={!isEdit || price.pricingMode === "UNPRICED"}
-							onCheckedChange={setEnabled}
-						/>
-					</Field>
-
-					{editing?.enabled && !enabled && (
-						<Alert variant="warning">
-							<AlertTriangle aria-hidden />
-							<AlertTitle>Existing configurations will stop immediately</AlertTitle>
-							<AlertDescription>
-								Practice detection and Mentor configurations using this model cannot run until the
-								model is reactivated or replaced.
-							</AlertDescription>
-						</Alert>
-					)}
-
-					<PriceModeEditor
-						audience="workspace"
-						idPrefix="wm-price"
-						value={price}
-						onChange={(next) => {
-							setPrice(next);
-							if (next.pricingMode === "UNPRICED") setEnabled(false);
-						}}
-						errors={errors}
+					</FieldContent>
+					<Switch
+						id="wm-enabled"
+						checked={enabled}
+						disabled={!isEdit || price.pricingMode === "UNPRICED"}
+						onCheckedChange={setEnabled}
 					/>
+				</Field>
 
-					<DialogFooter>
-						<Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-							Cancel
-						</Button>
-						<Button type="submit" disabled={isSubmitting}>
-							{isEdit ? "Save changes" : "Add inactive model"}
-						</Button>
-					</DialogFooter>
-				</form>
-			</DialogContent>
-		</Dialog>
+				{editing?.enabled && !enabled && (
+					<Alert variant="warning">
+						<AlertTriangle aria-hidden />
+						<AlertTitle>Existing configurations will stop immediately</AlertTitle>
+						<AlertDescription>
+							Practice detection and Mentor configurations using this model cannot run until the
+							model is reactivated or replaced.
+						</AlertDescription>
+					</Alert>
+				)}
+
+				<PriceModeEditor
+					audience="workspace"
+					idPrefix="wm-price"
+					value={price}
+					onChange={(next) => {
+						setPrice(next);
+						if (next.pricingMode === "UNPRICED") setEnabled(false);
+					}}
+					errors={errors}
+				/>
+
+				<DialogFooter>
+					<DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+					<Button type="submit" disabled={isSubmitting}>
+						{isEdit ? "Save changes" : "Add inactive model"}
+					</Button>
+				</DialogFooter>
+			</form>
+		</DialogContent>
 	);
 }

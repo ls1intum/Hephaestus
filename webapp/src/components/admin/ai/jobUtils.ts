@@ -61,9 +61,44 @@ export function formatTokens(value: number | undefined): string {
 	return value.toLocaleString();
 }
 
+const USD = new Intl.NumberFormat("en-US", {
+	style: "currency",
+	currency: "USD",
+	minimumFractionDigits: 2,
+	maximumFractionDigits: 2,
+});
+
+const USD_WHOLE = new Intl.NumberFormat("en-US", {
+	style: "currency",
+	currency: "USD",
+	minimumFractionDigits: 0,
+	maximumFractionDigits: 0,
+});
+
+/**
+ * An amount of money that was spent.
+ *
+ * <p>Three cases, because reading spend at a glance is the whole job of these tables:
+ * nothing spent reads as `$0` — not `$0.000`, which looks like a broken decimal; an amount too
+ * small to show in cents reads as `<$0.01`, which is honest about being nonzero where rounding to
+ * `$0.00` would claim the opposite; everything else is plain cents.
+ */
 export function formatCostUsd(value: number | undefined): string {
 	if (value == null) return "—";
-	return `$${value.toFixed(value < 1 ? 3 : 2)}`;
+	if (value === 0) return "$0";
+	if (value > 0 && value < 0.005) return "<$0.01";
+	return USD.format(value);
+}
+
+/**
+ * A cap someone typed, rendered the way they typed it: `$50`, not `$50.00`. Cents appear only when
+ * the cap actually has them, so a round number stays scannable next to the spend it bounds.
+ */
+export function formatCapUsd(value: number | undefined): string {
+	if (value == null) return "—";
+	// Cents are all-or-nothing: "$49.50", never "$49.5". Intl's maximumFractionDigits would happily
+	// emit a single decimal, which reads as a typo in a column of money.
+	return Number.isInteger(value) ? USD_WHOLE.format(value) : USD.format(value);
 }
 
 /**

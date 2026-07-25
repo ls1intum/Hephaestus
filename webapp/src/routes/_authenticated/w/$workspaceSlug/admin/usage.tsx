@@ -48,11 +48,11 @@ function AdminUsageContainer() {
 			queryClient.invalidateQueries({
 				queryKey: getLlmUsageReportQueryKey({ path: { workspaceSlug: workspaceSlug ?? "" } }),
 			});
-			// The proxy caches its verdict for about 30s, so "resumes now" would be a small lie.
+			// The proxy caches its answer for about 30s, so "resumes now" would be a small lie.
 			toast.success(
 				variables.body.monthlyByoLlmBudgetUsd == null
-					? "Cap removed — any paused work on your provider resumes within about a minute."
-					: "Cap saved — it takes effect within about a minute.",
+					? "Cap removed. New calls resume within about a minute."
+					: "Cap saved. New calls resume within about a minute.",
 			);
 			setIsEditingByoCap(false);
 		},

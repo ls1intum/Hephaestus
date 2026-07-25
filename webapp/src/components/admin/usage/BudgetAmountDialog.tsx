@@ -42,8 +42,8 @@ export interface BudgetAmountDialogProps {
 
 /**
  * The money-cap editor shared by both budget dialogs — instance-admin (`SetBudgetDialog`, the
- * host's shared-model budget) and workspace-admin (`SetByoBudgetDialog`, the workspace's own
- * provider cap). Both edit the same kind of value under the same rules (USD, >= 0, cent
+ * shared-model budget) and workspace-admin (`SetByoBudgetDialog`, the workspace's provider cap).
+ * Both edit the same kind of value under the same rules (USD, >= 0, cent
  * precision, `null` removes, `0` pauses immediately), so the validation, the currency input, the
  * "Remove cap" affordance, the pending state, and server-error rendering live here once; the
  * wrappers supply only the copy.
@@ -99,7 +99,7 @@ function BudgetAmountDialogContent({
 	const hasCentPrecision = /^\d*(\.\d{0,2})?$/.test(value.trim());
 	const isValid = !isEmpty && Number.isFinite(parsed) && parsed >= 0 && hasCentPrecision;
 	const localError = isEmpty
-		? "Enter a budget amount, or remove the cap entirely."
+		? "Enter an amount, or use Remove cap."
 		: !Number.isFinite(parsed) || parsed < 0
 			? "Enter an amount of $0 or more."
 			: "Use at most two decimal places.";

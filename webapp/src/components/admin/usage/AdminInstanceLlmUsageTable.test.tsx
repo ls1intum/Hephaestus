@@ -97,25 +97,28 @@ describe("AdminInstanceLlmUsageTable", () => {
 			/>,
 		);
 
-		expect(screen.getByRole("columnheader", { name: "Instance-funded" })).toBeTruthy();
-		expect(screen.getByRole("columnheader", { name: "Workspace-owned" })).toBeTruthy();
+		expect(screen.getByRole("columnheader", { name: "Shared-model spend" })).toBeTruthy();
+		expect(screen.getByRole("columnheader", { name: "Provider spend" })).toBeTruthy();
 		const toggle = screen.getByRole("button", {
 			name: "View usage details for Example Workspace",
 		});
 		expect(toggle.getAttribute("aria-expanded")).toBe("false");
+		// The detail row doesn't exist yet, so nothing may point at it.
+		expect(toggle.getAttribute("aria-controls")).toBeNull();
 
 		fireEvent.click(toggle);
 		expect(onToggleDetails).toHaveBeenCalledWith(workspace);
 	});
 
-	it("separates the instance cap from the workspace's own self cap", () => {
+	it("separates the instance cap from the workspace's own provider cap", () => {
 		renderTable([{ ...workspace, byoMonthlyBudgetUsd: 10, byoBudgetVerdict: "WITHIN" }]);
 
 		expect(screen.getByRole("columnheader", { name: "Instance cap" })).toBeTruthy();
-		expect(screen.getByRole("columnheader", { name: "Self cap" })).toBeTruthy();
+		expect(screen.getByRole("columnheader", { name: "Provider cap" })).toBeTruthy();
 		const row = within(firstDataRow());
-		expect(row.getByText("$25.00")).toBeTruthy();
-		expect(row.getByText("$10.00")).toBeTruthy();
+		// A cap renders without trailing cents — "$25", not "$25.00".
+		expect(row.getByText("$25")).toBeTruthy();
+		expect(row.getByText("$10")).toBeTruthy();
 	});
 
 	it("shows how much of each cap is used, not just whether it is reached", () => {
@@ -126,12 +129,16 @@ describe("AdminInstanceLlmUsageTable", () => {
 		expect(
 			row.getByRole("progressbar", { name: "Instance cap used by Example Workspace" }),
 		).toBeTruthy();
+		expect(screen.getByRole("cell", { name: /Within budget/ })).toBeTruthy();
 	});
 
 	it("warns before the cap is reached", () => {
 		renderTable([{ ...workspace, instanceMonthlyBudgetUsd: 50, pricedTotalCostUsd: 41 }]);
 
-		expect(within(firstDataRow()).getByText("Near cap — instance")).toBeTruthy();
+		const row = within(firstDataRow());
+		expect(row.getByText("Near cap · instance cap")).toBeTruthy();
+		// The tone alone must never carry the state (WCAG SC 1.4.1).
+		expect(row.getByText("$41.00 · 82% · Near cap")).toBeTruthy();
 	});
 
 	it("names the cap that paused the workspace", () => {
@@ -148,11 +155,11 @@ describe("AdminInstanceLlmUsageTable", () => {
 		]);
 
 		const row = within(firstDataRow());
-		expect(row.getByText("Paused — instance cap")).toBeTruthy();
-		expect(row.getByText("Paused — self cap")).toBeTruthy();
+		expect(row.getByText("Paused · instance cap")).toBeTruthy();
+		expect(row.getByText("Paused · provider cap")).toBeTruthy();
 	});
 
-	it("reports a self-cap pause even when the instance cap is untouched", () => {
+	it("reports a provider-cap pause even when the instance cap is untouched", () => {
 		renderTable([
 			{
 				...workspace,
@@ -165,11 +172,11 @@ describe("AdminInstanceLlmUsageTable", () => {
 		]);
 
 		const row = within(firstDataRow());
-		expect(row.getByText("Paused — self cap")).toBeTruthy();
-		expect(row.queryByText("Paused — instance cap")).toBeNull();
+		expect(row.getByText("Paused · provider cap")).toBeTruthy();
+		expect(row.queryByText("Paused · instance cap")).toBeNull();
 	});
 
-	it("keeps the self cap read-only — it is the workspace's own money", () => {
+	it("keeps the provider cap read-only — it is the workspace's own money", () => {
 		renderTable([{ ...workspace, byoMonthlyBudgetUsd: 10, byoBudgetVerdict: "WITHIN" }]);
 
 		const buttons = within(firstDataRow())

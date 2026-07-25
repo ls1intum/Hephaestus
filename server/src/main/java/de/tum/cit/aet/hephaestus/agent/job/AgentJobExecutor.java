@@ -1115,7 +1115,7 @@ public class AgentJobExecutor {
                     Duration.between(job.getCreatedAt(), now).compareTo(BUDGET_HOLD_MAX_AGE) > 0;
                 if (expired) {
                     String message =
-                        "Budget reached; queued work expired after " + BUDGET_HOLD_MAX_AGE.toDays() + " days.";
+                        "Cancelled: still over budget after " + BUDGET_HOLD_MAX_AGE.toDays() + " days on hold.";
                     job.setStatus(AgentJobStatus.CANCELLED);
                     job.setCompletedAt(now);
                     job.setErrorMessage(message);

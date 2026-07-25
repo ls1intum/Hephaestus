@@ -3,8 +3,8 @@ import { expect, fn, screen, userEvent, within } from "storybook/test";
 import { BudgetAmountDialog } from "./BudgetAmountDialog";
 
 /**
- * The money-cap editor behind both budget dialogs — `SetBudgetDialog` (the host's shared-model
- * budget) and `SetByoBudgetDialog` (the workspace's own-provider cap). It owns the rules both caps
+ * The money-cap editor behind both budget dialogs — `SetBudgetDialog` (the shared-model budget)
+ * and `SetByoBudgetDialog` (the workspace's provider cap). It owns the rules both caps
  * share: USD, at least $0, at most two decimals, `null` to remove, `0` to pause immediately, and a
  * server rejection shown against the field rather than in a toast. Callers supply only copy.
  */
@@ -15,9 +15,9 @@ const meta = {
 	args: {
 		open: true,
 		title: "Set monthly cap",
-		description: "When the month's spend reaches the cap, that work pauses until next month.",
+		description: "At the cap, that work pauses until the month resets. $0 pauses now.",
 		fieldLabel: "Monthly cap (USD)",
-		fieldDescription: "Spend above this amount pauses the capped work until the next UTC month.",
+		fieldDescription: "Reaching this amount pauses the capped work until the month resets.",
 		currentValueUsd: 25,
 		isPending: false,
 		serverError: null,

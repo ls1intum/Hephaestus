@@ -17,6 +17,7 @@ import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empt
 import {
 	Table,
 	TableBody,
+	TableCaption,
 	TableCell,
 	TableHead,
 	TableHeader,
@@ -43,7 +44,7 @@ export function WorkspaceLlmModelsTable({
 
 	if (models.length === 0) {
 		return (
-			<Empty className="border border-dashed">
+			<Empty className="border">
 				<EmptyHeader>
 					<EmptyMedia variant="icon">
 						<Bot />
@@ -57,12 +58,15 @@ export function WorkspaceLlmModelsTable({
 	return (
 		<>
 			<Table containerClassName="rounded-md border">
+				<TableCaption className="sr-only">Models on your own connected providers</TableCaption>
 				<TableHeader>
 					<TableRow>
-						<TableHead>Model</TableHead>
-						<TableHead>Price</TableHead>
-						<TableHead>Active</TableHead>
-						<TableHead className="text-right">Actions</TableHead>
+						<TableHead scope="col">Model</TableHead>
+						<TableHead scope="col">Price</TableHead>
+						<TableHead scope="col">Active</TableHead>
+						<TableHead scope="col" className="text-right">
+							Actions
+						</TableHead>
 					</TableRow>
 				</TableHeader>
 				<TableBody>

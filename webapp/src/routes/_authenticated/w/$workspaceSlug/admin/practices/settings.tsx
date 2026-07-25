@@ -130,6 +130,12 @@ function ReviewSettingsContainer() {
 					availableModelsQuery.isError ||
 					workspaceQuery.isError
 				}
+				error={
+					aiSettingsQuery.error ??
+					bindingsQuery.error ??
+					availableModelsQuery.error ??
+					workspaceQuery.error
+				}
 				isSaving={updatePracticeReviewSettings.isPending || updateFeatures.isPending}
 				onUpdateReviewSettings={handleUpdateReviewSettings}
 				onUpdateFeatures={handleUpdateFeatures}

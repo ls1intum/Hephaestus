@@ -3,8 +3,8 @@ import { expect, fn, screen, userEvent, within } from "storybook/test";
 import { SetByoBudgetDialog } from "./SetByoBudgetDialog";
 
 /**
- * The workspace admin's own cap on their own connected provider — their money, so unlike the
- * host's shared-model budget this one is theirs to set, change, and remove.
+ * The workspace admin's cap on spend through their own provider — their money, so unlike the
+ * shared-model budget this one is theirs to set, change, and remove.
  */
 const meta = {
 	component: SetByoBudgetDialog,
@@ -26,7 +26,7 @@ type Story = StoryObj<typeof meta>;
 /** Changing an existing cap — "Remove cap" is offered alongside it. */
 export const WithExistingCap: Story = {};
 
-/** No cap yet — the title asks to set one and there is nothing to remove. */
+/** No cap yet — nothing to remove. */
 export const Uncapped: Story = {
 	args: { currentCapUsd: null },
 };
@@ -55,7 +55,7 @@ export const InvalidEmptyValue: Story = {
 		await userEvent.clear(dialog.getByLabelText(/monthly cap/i));
 		await userEvent.click(dialog.getByRole("button", { name: /save cap/i }));
 
-		await expect(dialog.getByRole("alert")).toHaveTextContent(/enter a budget amount/i);
+		await expect(dialog.getByRole("alert")).toHaveTextContent(/enter an amount/i);
 		await expect(args.onSubmit).not.toHaveBeenCalled();
 	},
 };

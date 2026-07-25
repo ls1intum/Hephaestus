@@ -2,12 +2,18 @@ import { Progress as ProgressRoot } from "@base-ui/react/progress";
 import { ChevronDown, ChevronRight, CircleDollarSign, Info } from "lucide-react";
 import { Fragment } from "react";
 import type { AdminWorkspaceLlmUsage, WorkspaceLlmUsageReport } from "@/api/types.gen";
-import { formatCostUsd } from "@/components/admin/ai/jobUtils";
+import { formatCapUsd, formatCostUsd } from "@/components/admin/ai/jobUtils";
 import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty";
 import { ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 import {
 	Table,
@@ -22,12 +28,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { LlmUsageByDayTable, LlmUsageByJobTypeTable } from "./LlmUsageBreakdownTables";
 
 /**
- * The admin rollup row, widened with the workspace's own-provider (BYO) cap fields.
+ * The admin rollup row, widened with the workspace's provider-cap fields.
  *
  * The two caps are different people's money and are never summed: `instanceMonthlyBudgetUsd` is the
- * *instance* cap an instance admin sets over host-funded shared-model spend, while the BYO fields
- * below describe the cap the *workspace's own* admins set over spend on their own connected
- * provider. They pause independently.
+ * *instance cap* an instance admin sets over host-funded shared-model spend, while the `byo*` fields
+ * below describe the *provider cap* the workspace's own admins set over spend on their own provider.
+ * They pause independently.
  *
  * The admin rollup reports both caps with the same names and meanings the per-workspace report
  * uses, so a row renders identically on either surface.
@@ -57,7 +63,7 @@ export interface AdminInstanceLlmUsageTableProps {
 	/** Retry the expanded workspace report. */
 	onRetryDetail?: () => void;
 	onToggleDetails: (workspace: AdminWorkspaceLlmUsageRow) => void;
-	/** Edit the *instance* cap. There is deliberately no counterpart for the self cap. */
+	/** Edit the *instance* cap. There is deliberately no counterpart for the provider cap. */
 	onEditBudget: (workspace: AdminWorkspaceLlmUsageRow) => void;
 }
 
@@ -72,7 +78,7 @@ const COLUMN_COUNT = SKELETON_COLUMNS.length;
  */
 const NEAR_CAP_PERCENT = 80;
 
-/** One money stream (host-funded or workspace-owned) measured against its own cap. */
+/** One money stream (shared models or the workspace's provider) measured against its own cap. */
 interface CapUsage {
 	/** The cap in USD, or undefined when this stream is uncapped / not reported. */
 	cap?: number;
@@ -117,10 +123,10 @@ function capUsage(input: {
 }
 
 /**
- * Instance-admin table of every workspace's LLM spend for one month (metadata only, no tenant
- * content), against both caps: the instance cap the host funds and the self cap the workspace's
- * own admins set over their own provider. Pure/presentational — instance-cap edits are raised to
- * the container via `onEditBudget`; the self cap is read-only here by design.
+ * Instance-admin table of every workspace's AI spend for one month (metadata only, no tenant
+ * content), against both caps: the instance cap the host funds and the provider cap the workspace's
+ * own admins set over spend on their own provider. Pure/presentational — instance-cap edits are
+ * raised to the container via `onEditBudget`; the provider cap is read-only here by design.
  */
 export function AdminInstanceLlmUsageTable({
 	rows,
@@ -137,17 +143,20 @@ export function AdminInstanceLlmUsageTable({
 	onEditBudget,
 }: AdminInstanceLlmUsageTableProps) {
 	if (error != null) {
-		return <QueryErrorAlert error={error} title="Couldn't load LLM usage" onRetry={onRetry} />;
+		return <QueryErrorAlert error={error} title="Couldn't load AI usage" onRetry={onRetry} />;
 	}
 	if (rows.length === 0 && !isLoading) {
 		return (
-			<Empty className="border border-dashed">
+			<Empty className="border">
 				<EmptyHeader>
 					<EmptyMedia variant="icon">
 						<CircleDollarSign />
 					</EmptyMedia>
 					{/* The rollup left-joins from workspace, so zero rows means zero workspaces. */}
 					<EmptyTitle>No workspaces on this instance yet</EmptyTitle>
+					<EmptyDescription>
+						Spend and caps appear here as soon as the first workspace is created.
+					</EmptyDescription>
 				</EmptyHeader>
 			</Empty>
 		);
@@ -162,21 +171,21 @@ export function AdminInstanceLlmUsageTable({
 				<TableRow>
 					<TableHead scope="col">Workspace</TableHead>
 					<TableHead scope="col" className="text-right">
-						Instance-funded
+						Shared-model spend
 					</TableHead>
 					{/* Spend sits next to the cap it is measured against, so a row reads left to right as
 					    "this much, out of this much" without the admin holding a number in their head. */}
 					<TableHead scope="col" className="text-right">
-						<HelpHeader help="Monthly cap on spend the host pays for, on shared instance models. You set it.">
+						<HelpHeader help="Monthly cap on the shared-model spend the host pays for. You set it.">
 							Instance cap
 						</HelpHeader>
 					</TableHead>
 					<TableHead scope="col" className="text-right">
-						Workspace-owned
+						Provider spend
 					</TableHead>
 					<TableHead scope="col" className="text-right">
-						<HelpHeader help="The workspace's own cap on spend through its own connected provider — their money, so only their admins can change it. Read-only here.">
-							Self cap
+						<HelpHeader help="The workspace's own cap on spend through its own provider — their money, so only their admins can change it. Read-only here.">
+							Provider cap
 						</HelpHeader>
 					</TableHead>
 					<TableHead scope="col">Status</TableHead>
@@ -195,14 +204,14 @@ export function AdminInstanceLlmUsageTable({
 					{rows.map((row) => {
 						const isExpanded = expandedWorkspaceId === row.workspaceId;
 						const detailId = `workspace-usage-details-${row.workspaceId}`;
-						const instance = capUsage({
+						const shared = capUsage({
 							cap: row.instanceMonthlyBudgetUsd,
 							spend: row.pricedTotalCostUsd,
 							verdict: row.instanceBudgetVerdict,
 							paused: row.instanceFundedPaused,
 							isCurrentMonth,
 						});
-						const self = capUsage({
+						const provider = capUsage({
 							cap: row.byoMonthlyBudgetUsd,
 							spend: row.byoTotalCostUsd,
 							verdict: row.byoBudgetVerdict,
@@ -221,13 +230,17 @@ export function AdminInstanceLlmUsageTable({
 									<TableCell className="text-right tabular-nums">
 										{formatCostUsd(row.pricedTotalCostUsd)}
 									</TableCell>
-									<CapCell usage={instance} label="Instance cap" workspace={row.displayName} />
+									<CapCell usage={shared} label="Instance cap" workspace={row.displayName} />
 									<TableCell className="text-right tabular-nums">
 										{formatCostUsd(row.byoTotalCostUsd)}
 									</TableCell>
-									<CapCell usage={self} label="Self cap" workspace={row.displayName} />
+									<CapCell usage={provider} label="Provider cap" workspace={row.displayName} />
 									<TableCell>
-										<StatusCell instance={instance} self={self} isCurrentMonth={isCurrentMonth} />
+										<StatusCell
+											shared={shared}
+											provider={provider}
+											isCurrentMonth={isCurrentMonth}
+										/>
 									</TableCell>
 									<TableCell className="text-right tabular-nums">
 										{row.events.toLocaleString()}
@@ -238,14 +251,16 @@ export function AdminInstanceLlmUsageTable({
 												variant="outline"
 												size="sm"
 												aria-expanded={isExpanded}
-												aria-controls={detailId}
+												// The detail row only exists while expanded, so pointing at it
+												// beforehand would be a dangling IDREF.
+												aria-controls={isExpanded ? detailId : undefined}
 												aria-label={`${isExpanded ? "Hide" : "View"} usage details for ${row.displayName}`}
 												onClick={() => onToggleDetails(row)}
 											>
 												{isExpanded ? <ChevronDown aria-hidden /> : <ChevronRight aria-hidden />}
 												Details
 											</Button>
-											{/* Only the instance cap gets an edit control — the self cap is the
+											{/* Only the instance cap gets an edit control — the provider cap is the
 											    workspace's own money and its own admins' call. */}
 											<Button variant="outline" size="sm" onClick={() => onEditBudget(row)}>
 												Set instance cap
@@ -338,18 +353,20 @@ function CapCell({ usage, label, workspace }: CapCellProps) {
 
 	const percent = usage.percent ?? 0;
 	const rounded = Math.round(percent);
+	// The tone never carries the state alone — the line underneath says it in words (WCAG SC 1.4.1).
+	const state = usage.paused ? "Paused" : usage.nearCap ? "Near cap" : null;
 	const tone = usage.paused ? "bg-destructive" : usage.nearCap ? "bg-warning" : "bg-primary";
 
 	return (
 		<TableCell className="text-right">
 			<div className="ml-auto flex w-24 flex-col items-end gap-1">
-				<span className="tabular-nums">{formatCostUsd(usage.cap)}</span>
+				<span className="tabular-nums">{formatCapUsd(usage.cap)}</span>
 				<ProgressRoot.Root
 					value={Math.min(percent, 100)}
 					className="flex w-full"
 					aria-label={`${label} used by ${workspace}`}
 					getAriaValueText={() =>
-						`${formatCostUsd(usage.spend)} of ${formatCostUsd(usage.cap)} used, ${rounded}%`
+						`${formatCostUsd(usage.spend)} of ${formatCapUsd(usage.cap)} used, ${rounded}%`
 					}
 				>
 					<ProgressTrack className="h-1.5 rounded-full">
@@ -357,7 +374,7 @@ function CapCell({ usage, label, workspace }: CapCellProps) {
 					</ProgressTrack>
 				</ProgressRoot.Root>
 				<span className="text-xs text-muted-foreground tabular-nums">
-					{formatCostUsd(usage.spend)} · {rounded}%
+					{formatCostUsd(usage.spend)} · {rounded}%{state != null && ` · ${state}`}
 				</span>
 			</div>
 		</TableCell>
@@ -365,8 +382,8 @@ function CapCell({ usage, label, workspace }: CapCellProps) {
 }
 
 interface StatusCellProps {
-	instance: CapUsage;
-	self: CapUsage;
+	shared: CapUsage;
+	provider: CapUsage;
 	isCurrentMonth: boolean;
 }
 
@@ -380,7 +397,7 @@ interface StatusBadge {
  * Which cap, if any, is currently holding the workspace back. Naming the cap is the point: the
  * admin can only raise one of the two, and the other one is not theirs to touch.
  */
-function StatusCell({ instance, self, isCurrentMonth }: StatusCellProps) {
+function StatusCell({ shared, provider, isCurrentMonth }: StatusCellProps) {
 	if (!isCurrentMonth) {
 		return <span className="text-muted-foreground">—</span>;
 	}
@@ -388,23 +405,23 @@ function StatusCell({ instance, self, isCurrentMonth }: StatusCellProps) {
 	// Both caps can be spent at once, and an admin who only sees "Paused" fields a ticket they
 	// cannot answer — so each cap contributes its own badge and they stack.
 	const badges: StatusBadge[] = [];
-	if (instance.paused) {
-		badges.push({ key: "paused-instance", label: "Paused — instance cap", variant: "destructive" });
+	if (shared.paused) {
+		badges.push({ key: "paused-instance", label: "Paused · instance cap", variant: "destructive" });
 	}
-	if (self.paused) {
-		badges.push({ key: "paused-self", label: "Paused — self cap", variant: "destructive" });
+	if (provider.paused) {
+		badges.push({ key: "paused-provider", label: "Paused · provider cap", variant: "destructive" });
 	}
-	if (instance.nearCap) {
-		badges.push({ key: "near-instance", label: "Near cap — instance", variant: "warning" });
+	if (shared.nearCap) {
+		badges.push({ key: "near-instance", label: "Near cap · instance cap", variant: "warning" });
 	}
-	if (self.nearCap) {
-		badges.push({ key: "near-self", label: "Near cap — self", variant: "warning" });
+	if (provider.nearCap) {
+		badges.push({ key: "near-provider", label: "Near cap · provider cap", variant: "warning" });
 	}
-	const unverifiable = instance.unverifiable || self.unverifiable;
+	const noPriceSet = shared.unverifiable || provider.unverifiable;
 
-	if (badges.length === 0 && !unverifiable) {
-		return instance.cap != null || self.cap != null ? (
-			<Badge variant="outline">OK</Badge>
+	if (badges.length === 0 && !noPriceSet) {
+		return shared.cap != null || provider.cap != null ? (
+			<Badge variant="outline">Within budget</Badge>
 		) : (
 			<span className="text-muted-foreground">—</span>
 		);
@@ -417,10 +434,9 @@ function StatusCell({ instance, self, isCurrentMonth }: StatusCellProps) {
 					{badge.label}
 				</Badge>
 			))}
-			{unverifiable && (
-				// Not a badge — the #1368 glossary treats "unverifiable" as a warning line, never a
-				// status word (there's no "Unverified" state name to badge).
-				<span className="text-warning text-xs">Some usage has no price set</span>
+			{noPriceSet && (
+				// Not a badge — "can't be verified" is a sentence about the data, never a state name.
+				<span className="text-warning text-xs">Some calls have no price set</span>
 			)}
 		</div>
 	);

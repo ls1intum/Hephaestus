@@ -91,3 +91,16 @@ export const Saving: Story = {
 export const Loading: Story = {
 	args: { isLoading: true, settings: undefined },
 };
+
+/**
+ * The policy could not be loaded because the account lacks the permission — the alert repeats the
+ * server's explanation and withholds a Retry that would be refused identically.
+ */
+export const LoadForbidden: Story = {
+	args: {
+		isError: true,
+		settings: undefined,
+		error: { status: 403, detail: "You are not an admin of this workspace." },
+		onRetry: fn(),
+	},
+};
