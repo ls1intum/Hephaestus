@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
+import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,7 +32,12 @@ public class WorkspaceLlmSettingsController {
         operationId = "workspaceGetLlmSettings"
     )
     @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<WorkspaceLlmSettingsDTO> get() {
+    public ResponseEntity<WorkspaceLlmSettingsDTO> get(WorkspaceContext workspaceContext) {
+        // The policy this answers with is instance-wide, so the context is not read. It is declared
+        // anyway because every workspace-scoped handler declares it (enforced by
+        // WorkspaceScopedControllerComplianceTest): resolving it is what proves the caller belongs to
+        // the workspace in the path, and "this one happens not to need the id" is exactly the
+        // assumption that rule exists to stop anyone making silently.
         return ResponseEntity.ok(
             new WorkspaceLlmSettingsDTO(instanceLlmSettingsService.get().isAllowWorkspaceConnections())
         );
