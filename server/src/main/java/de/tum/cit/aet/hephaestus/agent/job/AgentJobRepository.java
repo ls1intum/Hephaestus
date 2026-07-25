@@ -41,6 +41,26 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
 
     // Execution pipeline queries (issue #746)
 
+    /**
+     * Release this workspace's budget-held jobs so they can be claimed on the next poll (#1368).
+     * Called right after either monthly cap is raised or cleared: the hold pushed {@code available_at}
+     * up to an hour out, and without this the flagship self-serve action ("I raised my cap") would
+     * look broken for that whole hour.
+     *
+     * <p>Deliberately scoped to {@code hold_reason = 'BUDGET'} rather than "any future
+     * available_at": fast-forwarding a crash-retry backoff would send a crash-looping job straight
+     * back at a failing upstream.
+     *
+     * @return how many held jobs were released
+     */
+    @WorkspaceAgnostic("Workspace-scoped release; caller is the budget writer for that workspace")
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        "UPDATE AgentJob j SET j.availableAt = :now, j.holdReason = null " +
+            "WHERE j.workspace.id = :workspaceId AND j.status = 'QUEUED' AND j.holdReason = 'BUDGET'"
+    )
+    int releaseBudgetHolds(@Param("workspaceId") Long workspaceId, @Param("now") Instant now);
+
     /** Idempotency check: find active job with same idempotency key in workspace. */
     Optional<AgentJob> findByWorkspaceIdAndIdempotencyKeyAndStatusIn(
         Long workspaceId,

@@ -337,6 +337,7 @@ paths:
             - WORKSPACE_VISIBILITY
             - PRACTICE_ACTIVE
             - WORKSPACE_LLM_BUDGET
+            - WORKSPACE_BYO_LLM_BUDGET
             - WORKSPACE_LLM_CONNECTION
             - WORKSPACE_LLM_MODEL
       - in: query
@@ -1751,6 +1752,7 @@ paths:
             - WORKSPACE_VISIBILITY
             - PRACTICE_ACTIVE
             - WORKSPACE_LLM_BUDGET
+            - WORKSPACE_BYO_LLM_BUDGET
             - WORKSPACE_LLM_CONNECTION
             - WORKSPACE_LLM_MODEL
       - in: query
@@ -2456,6 +2458,33 @@ paths:
                 $ref: "#/components/schemas/WorkspaceLlmUsageReport"
           description: OK
       summary: Get the workspace's LLM usage report for one month
+      tags:
+      - LLM Usage
+  /workspaces/{workspaceSlug}/llm-usage/byo-budget:
+    put:
+      description: |-
+        The workspace's own cap on its own-provider spend — the same control an instance admin has over
+         the shared-model budget, for the money this workspace actually pays. It cannot affect the
+         shared-model budget, so a workspace admin can only ever restrict their own spending.
+      operationId: updateByoLlmBudget
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateByoLlmBudgetRequest"
+        required: true
+      responses:
+        "204":
+          description: Cap updated
+      summary: Set or clear this workspace's monthly cap on its own-provider LLM spend
       tags:
       - LLM Usage
   /workspaces/{workspaceSlug}/llm/available-models:
@@ -5275,42 +5304,69 @@ components:
       description: "Instance-admin per-workspace month rollup (metadata only, no tenant\
         \ content)"
       properties:
+        byoBudgetVerdict:
+          type: string
+          description: The same verdict for the workspace's own-provider spend against
+            its own cap.
+          enum:
+          - WITHIN
+          - EXHAUSTED
+          - UNVERIFIABLE
+        byoMonthlyBudgetUsd:
+          type: number
+          description: "The workspace's own cap in USD on its own-provider spend;\
+            \ null = uncapped. Read-only here — it governs the workspace's money,\
+            \ so only its own admins may change it."
+        byoPaused:
+          type: boolean
+          description: Whether work on the workspace's OWN provider is paused right
+            now. The two pause independently.
         byoTotalCostUsd:
           type: number
-          description: "This month's spend on the workspace's own connected provider(s),\
-            \ in USD. Never counts toward the budget cap."
+          description: "This month's confirmed spend on the workspace's own connected\
+            \ provider(s), in USD — compared against byoMonthlyBudgetUsd. Different\
+            \ money: never added to pricedTotalCostUsd."
         displayName:
           type: string
         events:
           type: integer
           format: int64
           description: "Ledger events (jobs / mentor turns) this month, any provider"
-        monthlyBudgetUsd:
-          type: number
-        pricedTotalCostUsd:
-          type: number
-          description: "This month's confirmed spend on shared (instance) models,\
-            \ in USD — compared against the budget cap above."
-        verdict:
+        instanceBudgetVerdict:
           type: string
-          description: "Whether this month's confirmed spend is within the cap, has\
-            \ reached it, or can't be fully confirmed yet because some usage has no\
-            \ price set."
+          description: "Whether shared-model spend is within the instance cap, has\
+            \ reached it, or can't be confirmed because some shared-model usage has\
+            \ no price set."
           enum:
           - WITHIN
           - EXHAUSTED
           - UNVERIFIABLE
+        instanceFundedPaused:
+          type: boolean
+          description: "Whether work on SHARED models is paused for this workspace\
+            \ right now (current month only) — authoritative, mirroring the live gate."
+        instanceMonthlyBudgetUsd:
+          type: number
+          description: Monthly cap in USD on spend this instance pays for; null =
+            uncapped. Yours to set.
+        pricedTotalCostUsd:
+          type: number
+          description: "This month's confirmed spend on shared (instance) models,\
+            \ in USD — compared against instanceMonthlyBudgetUsd."
         workspaceId:
           type: integer
           format: int64
         workspaceSlug:
           type: string
       required:
+      - byoBudgetVerdict
+      - byoPaused
       - byoTotalCostUsd
       - displayName
       - events
+      - instanceBudgetVerdict
+      - instanceFundedPaused
       - pricedTotalCostUsd
-      - verdict
       - workspaceId
       - workspaceSlug
     AdminWorkspaceView:
@@ -5862,6 +5918,7 @@ components:
           - WORKSPACE_VISIBILITY
           - PRACTICE_ACTIVE
           - WORKSPACE_LLM_BUDGET
+          - WORKSPACE_BYO_LLM_BUDGET
           - WORKSPACE_LLM_CONNECTION
           - WORKSPACE_LLM_MODEL
         id:
@@ -9226,6 +9283,16 @@ components:
       properties:
         appRole:
           type: string
+    UpdateByoLlmBudgetRequest:
+      type: object
+      description: Set or clear the workspace's own monthly cap on its own-provider
+        spend
+      properties:
+        monthlyByoLlmBudgetUsd:
+          type: number
+          description: "Cap in USD on this workspace's own-provider spend; 0 pauses\
+            \ that work immediately, null removes the cap"
+          minimum: 0.00
     UpdateConnectionStatusRequest:
       type: object
       description: Request to update a connection's lifecycle status
@@ -10210,18 +10277,53 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LlmUsageByJobType"
+        byoBudgetVerdict:
+          type: string
+          description: "The same verdict for spend on this workspace's own provider,\
+            \ against its own cap."
+          enum:
+          - WITHIN
+          - EXHAUSTED
+          - UNVERIFIABLE
+        byoMonthlyBudgetUsd:
+          type: number
+          description: Monthly cap in USD on spend this workspace pays for through
+            its own connected provider; null = uncapped. Set by this workspace's own
+            admins.
+        byoPaused:
+          type: boolean
+          description: "Whether work on this workspace's OWN provider is currently\
+            \ paused. The two pause independently: an exhausted shared-model budget\
+            \ never stops work the workspace pays for itself."
         byoTotalCostUsd:
           type: number
-          description: "This month's spend on this workspace's own connected provider(s),\
-            \ in USD. Shown separately — it never counts toward the monthly budget\
-            \ and must never be added to pricedTotalCostUsd."
+          description: "This month's confirmed spend on this workspace's own connected\
+            \ provider(s), in USD — the figure byoMonthlyBudgetUsd compares against.\
+            \ Different money from pricedTotalCostUsd: the two are never added together."
+        instanceBudgetVerdict:
+          type: string
+          description: "Whether host-funded (shared-model) spend is within its cap,\
+            \ has reached it, or can't be confirmed because some shared-model usage\
+            \ has no price set."
+          enum:
+          - WITHIN
+          - EXHAUSTED
+          - UNVERIFIABLE
+        instanceFundedPaused:
+          type: boolean
+          description: "Whether work on SHARED models is currently paused for this\
+            \ workspace. Authoritative — it mirrors the live gate rather than being\
+            \ derivable from the verdict alone. Always false for a past month, which\
+            \ cannot pause anything."
+        instanceMonthlyBudgetUsd:
+          type: number
+          description: Monthly cap in USD on spend the host pays for (shared models);
+            null = uncapped. Set by instance admins only — a workspace admin can see
+            it but not change it.
         month:
           type: string
           description: "Calendar month (UTC), ISO yyyy-MM"
           example: 2026-07
-        monthlyBudgetUsd:
-          type: number
-          description: Monthly budget cap in USD; null = uncapped
         pricedTotalCostUsd:
           type: number
           description: "This month's confirmed spend on shared (instance) models,\
@@ -10234,32 +10336,17 @@ components:
           description: "Calls this month (any provider) whose price is not yet known.\
             \ They are excluded from both totals above, so a non-zero value means\
             \ the real spend may be higher than shown."
-        usagePaused:
-          type: boolean
-          description: "Whether new AI work is currently paused for this workspace\
-            \ by this server's budget policy — true when the cap is reached (verdict=EXHAUSTED),\
-            \ or when verdict=UNVERIFIABLE AND this server's unpriced-usage policy\
-            \ is BLOCK (the default WARN policy never pauses on UNVERIFIABLE alone).\
-            \ Authoritative: the webapp cannot derive this from verdict alone because\
-            \ it doesn't know the instance's unpriced-usage policy."
-        verdict:
-          type: string
-          description: "Whether this month's confirmed spend is within the cap, has\
-            \ reached it (work is paused), or can't be fully confirmed yet because\
-            \ some usage above has no price set."
-          enum:
-          - WITHIN
-          - EXHAUSTED
-          - UNVERIFIABLE
       required:
       - byDay
       - byJobType
+      - byoBudgetVerdict
+      - byoPaused
       - byoTotalCostUsd
+      - instanceBudgetVerdict
+      - instanceFundedPaused
       - month
       - pricedTotalCostUsd
       - unpricedEventCount
-      - usagePaused
-      - verdict
     WorkspaceMembership:
       type: object
       description: A user's membership in a workspace

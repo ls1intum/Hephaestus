@@ -1,8 +1,10 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -45,12 +47,12 @@ public class ProxyAccounting {
     }
 
     /**
-     * Whether this workspace has crossed its monthly cap and new upstream calls must be refused.
+     * Whether the payer of THIS call has crossed their monthly cap, so it must be refused.
      * Reads a short-TTL cached verdict, so this is not a per-call month-window SUM. Counts the
      * refusal itself, so "blocked" is observable without the caller touching a registry.
      */
-    public boolean refuseForBudget(Long workspaceId, String apiProtocol) {
-        if (!budgetGate.isBlocked(workspaceId)) {
+    public boolean refuseForBudget(Long workspaceId, @Nullable FundingSource fundingSource, String apiProtocol) {
+        if (!budgetGate.isBlocked(workspaceId, fundingSource)) {
             return false;
         }
         meterRegistry.counter("llm.proxy.budget.blocked", "apiProtocol", apiProtocol).increment();

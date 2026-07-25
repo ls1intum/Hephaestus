@@ -32,6 +32,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.AdmittedLlmModel;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetBlockReason;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetDecision;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -185,6 +186,10 @@ class MentorChatServiceTest extends BaseUnitTest {
             llmBudgetService,
             llmAdmissionService
         );
+
+        // Both purses open by default (#1368) — the turn-level gate dereferences this decision, so an
+        // unstubbed null would NPE every unrelated test rather than reading as "not blocked".
+        when(llmBudgetService.decide(WORKSPACE_ID)).thenReturn(LlmBudgetDecision.ALLOWED);
 
         // Default resolver stub — MentorLlmConfig.fromAgentConfig routes every AgentConfig through
         // this; individual tests override where the resolved shape matters. Class-level
@@ -489,19 +494,44 @@ class MentorChatServiceTest extends BaseUnitTest {
         assertOutcomeRecorded(MentorChatMetrics.Outcome.ERROR);
     }
 
-    // 1e. Monthly LLM budget gate (#1368, extended by the #1368 fix wave): both blocking reasons
-    // must refuse the turn BEFORE anything persists, with their own user-facing message.
+    // 1e. Monthly LLM budget gate (#1368): both blocking reasons must refuse the turn BEFORE
+    // anything persists, with their own user-facing message. The gate is scoped to whoever funds the
+    // resolved mentor model — the default fixture admits an INSTANCE-funded (shared) model.
+
+    /** A decision that blocks only the host's purse — the fixture's mentor model is INSTANCE-funded. */
+    private static LlmBudgetDecision instanceBlocked(LlmBudgetBlockReason reason) {
+        return new LlmBudgetDecision(reason, LlmBudgetBlockReason.NONE);
+    }
+
+    /** Re-admit the fixture's mentor binding as a WORKSPACE-funded (own-provider) model. */
+    private void admitWorkspaceFundedMentorModel() {
+        when(llmAdmissionService.admit(any(WorkspaceAgentBinding.class))).thenReturn(
+            new AdmittedLlmModel(
+                new ResolvedLlmModel(
+                    "https://byo.example.com",
+                    "openai-completions",
+                    "byo-model",
+                    null,
+                    null,
+                    false,
+                    FundingSource.WORKSPACE
+                ),
+                new LlmModelResolver.ConnectionRef(FundingSource.WORKSPACE, 1L, 2L, WORKSPACE_ID),
+                new LlmPriceSnapshot(FundingSource.WORKSPACE, PricingState.NO_CHARGE, null, 4L, null, null, null, null)
+            )
+        );
+    }
 
     @Test
     void runTurn_budgetExhausted_blocksBeforePersistingWithBudgetMessage() throws Exception {
-        when(llmBudgetService.blockReason(WORKSPACE_ID)).thenReturn(LlmBudgetBlockReason.EXHAUSTED);
+        when(llmBudgetService.decide(WORKSPACE_ID)).thenReturn(instanceBlocked(LlmBudgetBlockReason.EXHAUSTED));
 
         runTurnSync();
 
         assertThat(emitter.recordedTypes()).contains("error");
         assertThat(String.join("\n", emitter.rawData))
-            .contains("The monthly AI budget for this workspace is used up")
-            .doesNotContain("Some usage in this workspace has no price set");
+            .contains("The monthly shared-model AI budget for this workspace is used up")
+            .doesNotContain("has no price set");
         verify(persistence, never()).persistInFlight(any(), any(), any(), any());
         try {
             verify(interactiveSandboxService, never()).attach(any());
@@ -513,15 +543,17 @@ class MentorChatServiceTest extends BaseUnitTest {
     }
 
     @Test
-    void runTurn_unpricedUsageBlockedByInstancePolicy_blocksBeforePersistingWithDistinctMessage() throws Exception {
-        when(llmBudgetService.blockReason(WORKSPACE_ID)).thenReturn(LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED);
+    void runTurn_unpricedUsageBlocksACappedWorkspace_blocksBeforePersistingWithDistinctMessage() throws Exception {
+        when(llmBudgetService.decide(WORKSPACE_ID)).thenReturn(
+            instanceBlocked(LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED)
+        );
 
         runTurnSync();
 
         assertThat(emitter.recordedTypes()).contains("error");
         assertThat(String.join("\n", emitter.rawData))
-            .contains("Some usage in this workspace has no price set, so spending can't be verified.")
-            .doesNotContain("monthly AI budget");
+            .contains("Some shared-model usage in this workspace has no price set")
+            .doesNotContain("is used up");
         verify(persistence, never()).persistInFlight(any(), any(), any(), any());
         try {
             verify(interactiveSandboxService, never()).attach(any());
@@ -530,11 +562,59 @@ class MentorChatServiceTest extends BaseUnitTest {
         }
         assertOutcomeRecorded(MentorChatMetrics.Outcome.ERROR);
         assertThat(meterRegistry.find("llm.budget.blocked").tag("surface", "mentor").counter().count()).isEqualTo(1d);
+    }
+
+    /**
+     * #1368: the host's exhausted budget must not pause a mentor running on the workspace's OWN
+     * provider — that is the workspace's money, governed by the workspace's own cap.
+     */
+    @Test
+    void runTurn_instanceBudgetExhaustedButMentorRunsOnOwnProvider_proceedsNormally() throws Exception {
+        admitWorkspaceFundedMentorModel();
+        when(llmBudgetService.decide(WORKSPACE_ID)).thenReturn(instanceBlocked(LlmBudgetBlockReason.EXHAUSTED));
+        scheduleHappyPathResponses(sandbox).run();
+
+        runTurnSync();
+
+        assertThat(emitter.recordedTypes()).doesNotContain("error");
+        assertOutcomeRecorded(MentorChatMetrics.Outcome.SUCCESS);
+    }
+
+    /** The mirror: an exhausted BYO cap pauses own-provider mentoring, and says who can lift it. */
+    @Test
+    void runTurn_byoBudgetExhaustedAndMentorRunsOnOwnProvider_blocksWithWorkspaceAdminCopy() throws Exception {
+        admitWorkspaceFundedMentorModel();
+        when(llmBudgetService.decide(WORKSPACE_ID)).thenReturn(
+            new LlmBudgetDecision(LlmBudgetBlockReason.NONE, LlmBudgetBlockReason.EXHAUSTED)
+        );
+
+        runTurnSync();
+
+        assertThat(emitter.recordedTypes()).contains("error");
+        assertThat(String.join("\n", emitter.rawData))
+            .contains("This workspace's monthly budget for its own AI provider is used up")
+            .contains("a workspace admin raises the cap");
+        verify(persistence, never()).persistInFlight(any(), any(), any(), any());
+        assertOutcomeRecorded(MentorChatMetrics.Outcome.ERROR);
+    }
+
+    /** And the reverse asymmetry: an exhausted BYO cap never pauses a shared-model mentor turn. */
+    @Test
+    void runTurn_byoBudgetExhaustedButMentorRunsOnASharedModel_proceedsNormally() throws Exception {
+        when(llmBudgetService.decide(WORKSPACE_ID)).thenReturn(
+            new LlmBudgetDecision(LlmBudgetBlockReason.NONE, LlmBudgetBlockReason.EXHAUSTED)
+        );
+        scheduleHappyPathResponses(sandbox).run();
+
+        runTurnSync();
+
+        assertThat(emitter.recordedTypes()).doesNotContain("error");
+        assertOutcomeRecorded(MentorChatMetrics.Outcome.SUCCESS);
     }
 
     @Test
     void runTurn_budgetNotBlocked_proceedsNormally() throws Exception {
-        when(llmBudgetService.blockReason(WORKSPACE_ID)).thenReturn(LlmBudgetBlockReason.NONE);
+        when(llmBudgetService.decide(WORKSPACE_ID)).thenReturn(LlmBudgetDecision.ALLOWED);
         scheduleHappyPathResponses(sandbox).run();
 
         runTurnSync();

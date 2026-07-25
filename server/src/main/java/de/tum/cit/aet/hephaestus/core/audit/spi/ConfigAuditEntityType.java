@@ -40,6 +40,7 @@ public enum ConfigAuditEntityType {
      * when" is exactly the accountability question this trail answers.
      */
     WORKSPACE_LLM_BUDGET,
+    WORKSPACE_BYO_LLM_BUDGET,
 
     /**
      * A workspace's own "bring your own" LLM provider connection (#1368): the endpoint the workspace

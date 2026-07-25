@@ -31,7 +31,9 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxCancelledException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetBlockReason;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetDecision;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -170,10 +172,10 @@ class AgentJobExecutorTest extends BaseUnitTest {
         job.setStatus(AgentJobStatus.QUEUED);
         job.setWorkspace(workspaceStub());
 
-        // Claim-time budget recheck (#1368 fix wave): default to NONE so every pre-existing claim
-        // test keeps its original meaning. An unstubbed mock would return null here (not a boolean),
-        // and null != NONE reads as "blocked" — so this default is load-bearing, not decorative.
-        lenient().when(llmBudgetService.blockReason(anyLong())).thenReturn(LlmBudgetBlockReason.NONE);
+        // Claim-time budget recheck (#1368 fix wave): default to "both purses open" so every
+        // pre-existing claim test keeps its original meaning. An unstubbed mock would return null
+        // here, and the executor would NPE dereferencing it — so this default is load-bearing.
+        lenient().when(llmBudgetService.decide(anyLong())).thenReturn(LlmBudgetDecision.ALLOWED);
         lenient().when(jobRepository.markExecutionStarted(any(), any(), any())).thenReturn(1);
 
         // Default: transactionTemplate.execute invokes the callback
@@ -367,28 +369,46 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
     /**
      * Claim-time budget recheck (#1368): a workspace can pre-queue jobs faster than the cap updates,
-     * so every claim rechecks {@code llmBudgetService.blockReason} before letting a job start. A
-     * blocked job is HELD (available_at pushed into the future, still QUEUED) so the poll loop
-     * re-evaluates the cap and resumes it automatically once the workspace is back within budget —
-     * only a job held past the max age is cancelled terminally.
+     * so every claim rechecks {@code llmBudgetService.decide} before letting a job start. A blocked
+     * job is HELD (available_at pushed into the future, still QUEUED, marked {@code hold_reason=BUDGET})
+     * so the poll loop re-evaluates the cap and resumes it automatically once the workspace is back
+     * within budget — only a job held past the max age is cancelled terminally.
+     *
+     * <p>The recheck is scoped to whoever pays for the job's purpose, so an exhausted host budget
+     * never holds work the workspace funds through its own provider (and vice versa).
      */
     @Nested
     @DisplayName("Claim-time budget recheck (#1368)")
     class ClaimTimeBudgetRecheck {
 
+        /** A decision that blocks only the host's purse. */
+        private LlmBudgetDecision instanceBlocked(LlmBudgetBlockReason reason) {
+            return new LlmBudgetDecision(reason, LlmBudgetBlockReason.NONE);
+        }
+
+        /** Bind the job's purpose to a model funded by {@code fundingSource}. */
+        private void bindFundedBy(FundingSource fundingSource) {
+            if (fundingSource == FundingSource.INSTANCE) {
+                binding.setInstanceModel(new de.tum.cit.aet.hephaestus.agent.catalog.LlmModel());
+            }
+            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+                Optional.of(binding)
+            );
+        }
+
         @Test
         void holdsAndRequeuesWhenBudgetIsExhaustedAtClaimTime() {
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(llmBudgetService.blockReason(99L)).thenReturn(LlmBudgetBlockReason.EXHAUSTED);
+            bindFundedBy(FundingSource.INSTANCE);
+            when(llmBudgetService.decide(99L)).thenReturn(instanceBlocked(LlmBudgetBlockReason.EXHAUSTED));
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             boolean claimed = executor.processJob(jobId);
 
             // Held, not executed and not terminal: the job stays QUEUED with a future available_at,
-            // no cancellation reason, and never reaches the model-admission or sandbox stages.
+            // no cancellation reason, and never reaches the sandbox stage.
             assertThat(claimed).isFalse();
             verify(sandboxManager, never()).execute(any());
-            verify(bindingRepository, never()).findByWorkspaceIdAndPurpose(any(), any());
 
             ArgumentCaptor<AgentJob> saved = ArgumentCaptor.forClass(AgentJob.class);
             verify(jobRepository).save(saved.capture());
@@ -398,9 +418,89 @@ class AgentJobExecutorTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("a budget hold is labelled BUDGET, so raising the cap can release exactly it")
+        void marksTheHoldAsABudgetHold() {
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
+            bindFundedBy(FundingSource.INSTANCE);
+            when(llmBudgetService.decide(99L)).thenReturn(instanceBlocked(LlmBudgetBlockReason.EXHAUSTED));
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            executor.processJob(jobId);
+
+            ArgumentCaptor<AgentJob> saved = ArgumentCaptor.forClass(AgentJob.class);
+            verify(jobRepository).save(saved.capture());
+            assertThat(saved.getValue().getHoldReason()).isEqualTo(AgentJob.HOLD_REASON_BUDGET);
+        }
+
+        @Test
+        @DisplayName("an exhausted INSTANCE cap does not hold a job the workspace funds itself")
+        void doesNotHoldWorkspaceFundedWorkWhenOnlyTheInstanceCapIsExhausted() {
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
+            bindFundedBy(FundingSource.WORKSPACE); // no instance model bound = the workspace pays
+            when(llmBudgetService.decide(99L)).thenReturn(instanceBlocked(LlmBudgetBlockReason.EXHAUSTED));
+            when(
+                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
+                    eq(99L),
+                    eq(AgentPurpose.PRACTICE_DETECTION),
+                    any()
+                )
+            ).thenReturn(0L);
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            setupFullExecution();
+
+            boolean claimed = executor.processJob(jobId);
+
+            assertThat(claimed).isTrue();
+            ArgumentCaptor<AgentJob> saved = ArgumentCaptor.forClass(AgentJob.class);
+            verify(jobRepository).save(saved.capture());
+            assertThat(saved.getValue().getStatus()).isEqualTo(AgentJobStatus.RUNNING);
+        }
+
+        @Test
+        @DisplayName("an exhausted BYO cap does hold a job the workspace funds itself")
+        void holdsWorkspaceFundedWorkWhenTheByoCapIsExhausted() {
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
+            bindFundedBy(FundingSource.WORKSPACE);
+            when(llmBudgetService.decide(99L)).thenReturn(
+                new LlmBudgetDecision(LlmBudgetBlockReason.NONE, LlmBudgetBlockReason.EXHAUSTED)
+            );
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            boolean claimed = executor.processJob(jobId);
+
+            assertThat(claimed).isFalse();
+            verify(sandboxManager, never()).execute(any());
+            ArgumentCaptor<AgentJob> saved = ArgumentCaptor.forClass(AgentJob.class);
+            verify(jobRepository).save(saved.capture());
+            assertThat(saved.getValue().getStatus()).isEqualTo(AgentJobStatus.QUEUED);
+            assertThat(saved.getValue().getHoldReason()).isEqualTo(AgentJob.HOLD_REASON_BUDGET);
+        }
+
+        @Test
+        @DisplayName("a job whose binding is gone is judged against BOTH caps — never a way around one")
+        void anUnattributableJobIsHeldByEitherCap() {
+            // No binding row: the funding source is unknown, so a single blocked purse still holds it.
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
+            when(llmBudgetService.decide(99L)).thenReturn(
+                new LlmBudgetDecision(LlmBudgetBlockReason.NONE, LlmBudgetBlockReason.EXHAUSTED)
+            );
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            boolean claimed = executor.processJob(jobId);
+
+            assertThat(claimed).isFalse();
+            ArgumentCaptor<AgentJob> saved = ArgumentCaptor.forClass(AgentJob.class);
+            verify(jobRepository).save(saved.capture());
+            assertThat(saved.getValue().getStatus()).isEqualTo(AgentJobStatus.QUEUED);
+            assertThat(saved.getValue().getHoldReason()).isEqualTo(AgentJob.HOLD_REASON_BUDGET);
+        }
+
+        @Test
         void holdsWhenUnpricedUsageBlocksACappedWorkspace() {
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(llmBudgetService.blockReason(99L)).thenReturn(LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED);
+            bindFundedBy(FundingSource.INSTANCE);
+            when(llmBudgetService.decide(99L)).thenReturn(instanceBlocked(LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED));
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             boolean claimed = executor.processJob(jobId);
@@ -419,7 +519,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
         void cancelsAJobHeldPastTheMaxAge() {
             job.setCreatedAt(Instant.now().minus(Duration.ofDays(8)));
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(llmBudgetService.blockReason(99L)).thenReturn(LlmBudgetBlockReason.EXHAUSTED);
+            bindFundedBy(FundingSource.INSTANCE);
+            when(llmBudgetService.decide(99L)).thenReturn(instanceBlocked(LlmBudgetBlockReason.EXHAUSTED));
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             boolean claimed = executor.processJob(jobId);
@@ -440,7 +541,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
             // cancelled-after-start / malformed-usage cases, which DO record UNPRICED (see
             // UnpricedUsageLedgerFallback below).
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(llmBudgetService.blockReason(99L)).thenReturn(LlmBudgetBlockReason.EXHAUSTED);
+            bindFundedBy(FundingSource.INSTANCE);
+            when(llmBudgetService.decide(99L)).thenReturn(instanceBlocked(LlmBudgetBlockReason.EXHAUSTED));
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             executor.processJob(jobId);
@@ -450,9 +552,36 @@ class AgentJobExecutorTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("claiming a previously held job clears its BUDGET hold marker")
+        void clearsTheHoldMarkerOnceTheJobIsClaimed() {
+            // Otherwise a stale 'BUDGET' marker would survive onto a later crash-retry backoff and let
+            // a cap raise fast-forward a job that is backing off for an entirely different reason.
+            job.setHoldReason(AgentJob.HOLD_REASON_BUDGET);
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
+            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+                Optional.of(binding)
+            );
+            when(
+                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
+                    eq(99L),
+                    eq(AgentPurpose.PRACTICE_DETECTION),
+                    any()
+                )
+            ).thenReturn(0L);
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            setupFullExecution();
+
+            assertThat(executor.processJob(jobId)).isTrue();
+            ArgumentCaptor<AgentJob> saved = ArgumentCaptor.forClass(AgentJob.class);
+            verify(jobRepository).save(saved.capture());
+            assertThat(saved.getValue().getHoldReason()).isNull();
+        }
+
+        @Test
         void proceedsToConcurrencyGateWhenBudgetIsNotBlocked() {
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(llmBudgetService.blockReason(99L)).thenReturn(LlmBudgetBlockReason.NONE);
+            when(llmBudgetService.decide(99L)).thenReturn(LlmBudgetDecision.ALLOWED);
             when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
                 Optional.of(binding)
             );

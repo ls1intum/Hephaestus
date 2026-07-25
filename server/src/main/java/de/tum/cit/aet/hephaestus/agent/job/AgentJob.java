@@ -204,6 +204,22 @@ public class AgentJob {
     @Column(name = "available_at", nullable = false)
     private Instant availableAt;
 
+    /** {@link #holdReason} value for a job held because its payer is over their monthly LLM cap. */
+    public static final String HOLD_REASON_BUDGET = "BUDGET";
+
+    /**
+     * Why this QUEUED job's {@link #availableAt} was pushed into the future, when the reason is one an
+     * admin can undo (#1368). Only {@code BUDGET} is used today: the claim loop holds a job whose
+     * payer is over their cap rather than cancelling it.
+     *
+     * <p>It exists so raising a cap can release exactly those jobs immediately
+     * ({@link AgentJobRepository#releaseBudgetHolds}) without also fast-forwarding a crash-retry
+     * backoff — resetting every future {@code available_at} would hammer a failing upstream. Cleared
+     * when the job is claimed, so it never outlives the hold it describes.
+     */
+    @Column(name = "hold_reason", length = 32)
+    private String holdReason;
+
     /**
      * Bounded attempt counter for the delivery-recovery sweep ({@link AgentJobZombieSweeper}): a job
      * stuck at {@link DeliveryStatus#PENDING} (the executor crashed between marking PENDING and finishing

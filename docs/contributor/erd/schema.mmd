@@ -95,6 +95,7 @@ erDiagram
         SMALLINT delivery_attempts "NOT NULL"
         TIMESTAMPTZ execution_started_at
         VARCHAR(32) purpose
+        VARCHAR(32) hold_reason
     }
 
     AuthEvent {
@@ -1183,6 +1184,7 @@ erDiagram
         BOOLEAN practice_deliver_to_merged
         INTEGER practice_cooldown_minutes
         NUMERIC(10,2) monthly_llm_budget_usd
+        NUMERIC(10,2) monthly_byo_llm_budget_usd
     }
 
     WorkspaceAgentBinding {

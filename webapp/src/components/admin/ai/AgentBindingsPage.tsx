@@ -107,9 +107,16 @@ export function AgentBindingsPage({ workspaceSlug }: AgentBindingsPageProps) {
 				</p>
 			</div>
 
-			{usageQuery.data?.usagePaused && (
-				<div className="mb-6">
-					<BudgetExhaustedAlert verdict={usageQuery.data.verdict} />
+			{/* The two caps pause independently, so each paused side gets its own banner — the one the
+			    workspace can act on first. */}
+			{(usageQuery.data?.byoPaused || usageQuery.data?.instanceFundedPaused) && (
+				<div className="mb-6 space-y-3">
+					{usageQuery.data.byoPaused && (
+						<BudgetExhaustedAlert scope="own" verdict={usageQuery.data.byoBudgetVerdict} />
+					)}
+					{usageQuery.data.instanceFundedPaused && (
+						<BudgetExhaustedAlert scope="shared" verdict={usageQuery.data.instanceBudgetVerdict} />
+					)}
 				</div>
 			)}
 

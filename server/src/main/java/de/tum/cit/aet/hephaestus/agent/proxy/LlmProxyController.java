@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.proxy;
 import de.tum.cit.aet.hephaestus.agent.catalog.EgressPolicy;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmAuthMode;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.proxy.ProxyStreamingUtils;
 import de.tum.cit.aet.hephaestus.core.proxy.ProxyStreamingUtils.UpstreamResult;
@@ -13,6 +14,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.net.URI;
 import java.time.Duration;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -108,8 +110,8 @@ class LlmProxyController {
         // NEW upstream calls before resolving any credential or hitting the network. Bounds a
         // runaway that started after exhaustion; never interrupts a call already streaming. Reads a
         // short-TTL cached verdict so this is not a per-call month-window SUM.
-        if (accounting.refuseForBudget(routing.workspaceId(), routing.apiProtocol())) {
-            return ResponseEntity.status(429).body("Workspace AI budget reached; new calls are paused.");
+        if (accounting.refuseForBudget(routing.workspaceId(), routing.connectionScope(), routing.apiProtocol())) {
+            return ResponseEntity.status(429).body(budgetReachedMessage(routing.connectionScope()));
         }
 
         LlmModelResolver.ProxyCredential credential = resolver.resolveProxyCredential(
@@ -316,6 +318,16 @@ class LlmProxyController {
             return tokenAuthentication.getPrincipal();
         }
         throw new IllegalStateException("Expected JobTokenAuthentication on security context");
+    }
+
+    /**
+     * The 429 body names WHOSE cap stopped the call, because the two have different remedies: the
+     * workspace can raise its own cap itself, while a shared-model cap is the host's to raise.
+     */
+    private static String budgetReachedMessage(@Nullable FundingSource fundingSource) {
+        return fundingSource == FundingSource.WORKSPACE
+            ? "This workspace's own-provider budget is reached; new calls are paused until a workspace admin raises the cap or the month rolls over."
+            : "The shared-model budget for this workspace is reached; new calls are paused until an instance admin raises the budget or the month rolls over.";
     }
 
     private void incrementErrors(String apiProtocol) {

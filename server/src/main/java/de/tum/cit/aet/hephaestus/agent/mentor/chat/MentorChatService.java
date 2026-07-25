@@ -21,6 +21,7 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.AttachedSandbox;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetBlockReason;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetExhaustedException;
@@ -227,23 +228,26 @@ public class MentorChatService implements MentorTurnRunner {
         MentorChannel channel,
         AtomicReference<MentorRunnerClient> clientHolder
     ) {
-        // Monthly budget cap (#1368, extended by the #1368 fix wave): transport-neutral gate
-        // covering web SSE and Slack turns. Checked before ANYTHING persists so a blocked turn
-        // leaves no user message or in-flight assistant row behind. Surfaces as a user-facing
-        // error chunk via userFacingError. blockReason folds in defaultUnpricedPolicy=BLOCK, so an
-        // UNVERIFIABLE month blocks exactly like EXHAUSTED when the instance opted into it.
-        LlmBudgetBlockReason blockReason = llmBudgetService.blockReason(request.workspaceId());
-        if (blockReason == LlmBudgetBlockReason.EXHAUSTED) {
-            metrics.recordBudgetBlocked();
-            throw new LlmBudgetExhaustedException(request.workspaceId());
-        }
-        if (blockReason == LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED) {
-            metrics.recordBudgetBlocked();
-            throw new LlmUnpricedUsageBlockedException(request.workspaceId());
-        }
         // Admission precedes every thread/message/session read or write. A revoked binding leaves no
         // partial mentor turn and never warms/attaches a sandbox.
         MentorLlmConfig llmConfig = resolveLlmConfig(request.workspaceId());
+
+        // Monthly budget cap (#1368): transport-neutral gate covering web SSE and Slack turns. Runs
+        // AFTER admission because the cap that applies depends on who pays for the bound model — a
+        // workspace on its own provider is governed by its own cap, not the host's. Still before
+        // ANYTHING persists, so a blocked turn leaves no user message or in-flight assistant row
+        // behind; it surfaces as a user-facing error chunk via userFacingError. A capped purse whose
+        // month is unverifiable blocks exactly like an exhausted one.
+        FundingSource mentorFunding = llmConfig.connectionScope();
+        LlmBudgetBlockReason blockReason = llmBudgetService.decide(request.workspaceId()).forFunding(mentorFunding);
+        if (blockReason == LlmBudgetBlockReason.EXHAUSTED) {
+            metrics.recordBudgetBlocked();
+            throw new LlmBudgetExhaustedException(request.workspaceId(), mentorFunding);
+        }
+        if (blockReason == LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED) {
+            metrics.recordBudgetBlocked();
+            throw new LlmUnpricedUsageBlockedException(request.workspaceId(), mentorFunding);
+        }
         User user = userRepository.getCurrentUserElseThrow();
         ChatThread thread = persistence.ensureThread(
             request.workspaceId(),

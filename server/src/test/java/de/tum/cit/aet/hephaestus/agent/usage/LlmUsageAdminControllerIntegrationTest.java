@@ -45,30 +45,27 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     private void seedEvent(Workspace workspace, String cost) {
+        seedEvent(workspace, cost, FundingSource.INSTANCE, PricingState.PRICED);
+    }
+
+    private void seedEvent(Workspace workspace, String cost, FundingSource funding, PricingState pricing) {
         LlmUsageEvent event = new LlmUsageEvent();
         event.setId(UUID.randomUUID());
         event.setWorkspace(workspace);
         event.setJobType(LlmUsageJobType.PULL_REQUEST_REVIEW);
         event.setSourceType(LlmUsageSourceType.AGENT_JOB);
         event.setSourceId(UUID.randomUUID());
-        event.setCostUsd(new BigDecimal(cost));
+        event.setCostUsd(pricing == PricingState.UNPRICED ? null : new BigDecimal(cost));
         // Budgeted spend only counts PRICED + INSTANCE-funded rows (#1368 slice 6) — both are the
         // entity defaults, but set them explicitly so this fixture keeps meaning that if the
         // defaults ever change.
-        event.setPricingState(PricingState.PRICED);
-        event.setFundingSource(FundingSource.INSTANCE);
+        event.setPricingState(pricing);
+        event.setFundingSource(funding);
         event.setOccurredAt(Instant.now());
         usageRepository.save(event);
     }
 
-    @Test
-    void adminSeesPerWorkspaceSpendIncludingZeroSpendWorkspaces() {
-        Workspace spender = setupWorkspace("adm-spender");
-        spender.setMonthlyLlmBudgetUsd(new BigDecimal("2.00"));
-        workspaceRepository.save(spender);
-        Workspace idle = setupWorkspace("adm-idle");
-        seedEvent(spender, "3.00");
-
+    private AdminWorkspaceLlmUsageDTO rollupFor(Workspace workspace) {
         List<AdminWorkspaceLlmUsageDTO> rows = webTestClient
             .get()
             .uri("/admin/llm-usage")
@@ -81,22 +78,75 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
             .getResponseBody();
 
         assertThat(rows).isNotNull();
-        var spenderRow = rows
+        return rows
             .stream()
-            .filter(r -> r.workspaceId().equals(spender.getId()))
+            .filter(r -> r.workspaceId().equals(workspace.getId()))
             .findFirst()
             .orElseThrow();
+    }
+
+    @Test
+    void adminSeesPerWorkspaceSpendIncludingZeroSpendWorkspaces() {
+        Workspace spender = setupWorkspace("adm-spender");
+        spender.setMonthlyLlmBudgetUsd(new BigDecimal("2.00"));
+        workspaceRepository.save(spender);
+        Workspace idle = setupWorkspace("adm-idle");
+        seedEvent(spender, "3.00");
+
+        var spenderRow = rollupFor(spender);
         assertThat(spenderRow.pricedTotalCostUsd()).isEqualByComparingTo("3.00");
         assertThat(spenderRow.byoTotalCostUsd()).isEqualByComparingTo("0");
-        assertThat(spenderRow.monthlyBudgetUsd()).isEqualByComparingTo("2.00");
-        assertThat(spenderRow.verdict()).isEqualTo(LlmBudgetVerdict.EXHAUSTED);
-        var idleRow = rows
-            .stream()
-            .filter(r -> r.workspaceId().equals(idle.getId()))
-            .findFirst()
-            .orElseThrow();
+        assertThat(spenderRow.instanceMonthlyBudgetUsd()).isEqualByComparingTo("2.00");
+        assertThat(spenderRow.instanceBudgetVerdict()).isEqualTo(LlmBudgetVerdict.EXHAUSTED);
+        assertThat(spenderRow.instanceFundedPaused()).isTrue();
+        var idleRow = rollupFor(idle);
         assertThat(idleRow.pricedTotalCostUsd()).isEqualByComparingTo("0");
-        assertThat(idleRow.verdict()).isEqualTo(LlmBudgetVerdict.WITHIN);
+        assertThat(idleRow.instanceBudgetVerdict()).isEqualTo(LlmBudgetVerdict.WITHIN);
+        assertThat(idleRow.instanceFundedPaused()).isFalse();
+    }
+
+    /**
+     * #1368: the admin rollup reports the workspace's OWN cap and its own-provider verdict as a
+     * separate column. Read-only here — it governs the workspace's money — and it must not bleed
+     * into the instance verdict the admin acts on.
+     */
+    @Test
+    void adminSeesTheWorkspacesOwnCapAndVerdictWithoutItAffectingTheInstanceVerdict() {
+        Workspace workspace = setupWorkspace("adm-byo");
+        workspace.setMonthlyLlmBudgetUsd(new BigDecimal("100.00")); // host cap: nowhere near reached
+        workspace.setMonthlyByoLlmBudgetUsd(new BigDecimal("5.00")); // workspace's own cap: reached
+        workspaceRepository.save(workspace);
+        seedEvent(workspace, "1.00");
+        seedEvent(workspace, "5.00", FundingSource.WORKSPACE, PricingState.PRICED);
+
+        var row = rollupFor(workspace);
+
+        assertThat(row.instanceMonthlyBudgetUsd()).isEqualByComparingTo("100.00");
+        assertThat(row.byoMonthlyBudgetUsd()).isEqualByComparingTo("5.00");
+        assertThat(row.pricedTotalCostUsd()).isEqualByComparingTo("1.00");
+        assertThat(row.byoTotalCostUsd()).isEqualByComparingTo("5.00");
+        assertThat(row.instanceBudgetVerdict()).isEqualTo(LlmBudgetVerdict.WITHIN);
+        assertThat(row.byoBudgetVerdict()).isEqualTo(LlmBudgetVerdict.EXHAUSTED);
+        assertThat(row.instanceFundedPaused()).isFalse();
+        assertThat(row.byoPaused()).isTrue();
+    }
+
+    /** Each verdict is only ever UNVERIFIABLE from a blind spot its own owner can clear. */
+    @Test
+    void anUnpricedOwnProviderEventLeavesTheInstanceVerdictUntouched() {
+        Workspace workspace = setupWorkspace("adm-byo-unpriced");
+        workspace.setMonthlyLlmBudgetUsd(new BigDecimal("100.00"));
+        workspace.setMonthlyByoLlmBudgetUsd(new BigDecimal("100.00"));
+        workspaceRepository.save(workspace);
+        seedEvent(workspace, "1.00");
+        seedEvent(workspace, null, FundingSource.WORKSPACE, PricingState.UNPRICED);
+
+        var row = rollupFor(workspace);
+
+        assertThat(row.instanceBudgetVerdict()).isEqualTo(LlmBudgetVerdict.WITHIN);
+        assertThat(row.byoBudgetVerdict()).isEqualTo(LlmBudgetVerdict.UNVERIFIABLE);
+        assertThat(row.instanceFundedPaused()).isFalse();
+        assertThat(row.byoPaused()).isTrue();
     }
 
     @Test

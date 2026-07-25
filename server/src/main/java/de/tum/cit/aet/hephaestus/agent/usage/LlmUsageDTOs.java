@@ -17,32 +17,44 @@ public final class LlmUsageDTOs {
     @Schema(description = "One calendar month of a workspace's LLM spend, rolled up from the usage ledger")
     public record WorkspaceLlmUsageReportDTO(
         @NonNull @Schema(description = "Calendar month (UTC), ISO yyyy-MM", example = "2026-07") String month,
-        @Nullable @Schema(description = "Monthly budget cap in USD; null = uncapped") BigDecimal monthlyBudgetUsd,
+        @Nullable @Schema(
+            description = "Monthly cap in USD on spend the host pays for (shared models); null = uncapped. Set " +
+                "by instance admins only — a workspace admin can see it but not change it."
+        ) BigDecimal instanceMonthlyBudgetUsd,
+        @Nullable @Schema(
+            description = "Monthly cap in USD on spend this workspace pays for through its own connected " +
+                "provider; null = uncapped. Set by this workspace's own admins."
+        ) BigDecimal byoMonthlyBudgetUsd,
         @NonNull @Schema(
             description = "This month's confirmed spend on shared (instance) models, in USD — the figure the " +
                 "monthly budget compares against. When unpricedEventCount is non-zero this is a floor, not the " +
                 "full total: render it as \"at least $X\"."
         ) BigDecimal pricedTotalCostUsd,
         @NonNull @Schema(
-            description = "This month's spend on this workspace's own connected provider(s), in USD. Shown " +
-                "separately — it never counts toward the monthly budget and must never be added to " +
-                "pricedTotalCostUsd."
+            description = "This month's confirmed spend on this workspace's own connected provider(s), in USD — " +
+                "the figure byoMonthlyBudgetUsd compares against. Different money from pricedTotalCostUsd: the " +
+                "two are never added together."
         ) BigDecimal byoTotalCostUsd,
         @NonNull @Schema(
             description = "Calls this month (any provider) whose price is not yet known. They are excluded from " +
                 "both totals above, so a non-zero value means the real spend may be higher than shown."
         ) Long unpricedEventCount,
         @NonNull @Schema(
-            description = "Whether this month's confirmed spend is within the cap, has reached it (work is " +
-                "paused), or can't be fully confirmed yet because some usage above has no price set."
-        ) LlmBudgetVerdict verdict,
+            description = "Whether host-funded (shared-model) spend is within its cap, has reached it, or can't " +
+                "be confirmed because some shared-model usage has no price set."
+        ) LlmBudgetVerdict instanceBudgetVerdict,
         @NonNull @Schema(
-            description = "Whether new AI work is currently paused for this workspace by this server's budget " +
-                "policy — true when the cap is reached (verdict=EXHAUSTED), or when verdict=UNVERIFIABLE AND " +
-                "this server's unpriced-usage policy is BLOCK (the default WARN policy never pauses on " +
-                "UNVERIFIABLE alone). Authoritative: the webapp cannot derive this from verdict alone because " +
-                "it doesn't know the instance's unpriced-usage policy."
-        ) Boolean usagePaused,
+            description = "The same verdict for spend on this workspace's own provider, against its own cap."
+        ) LlmBudgetVerdict byoBudgetVerdict,
+        @NonNull @Schema(
+            description = "Whether work on SHARED models is currently paused for this workspace. Authoritative — " +
+                "it mirrors the live gate rather than being derivable from the verdict alone. Always false for a " +
+                "past month, which cannot pause anything."
+        ) Boolean instanceFundedPaused,
+        @NonNull @Schema(
+            description = "Whether work on this workspace's OWN provider is currently paused. The two pause " +
+                "independently: an exhausted shared-model budget never stops work the workspace pays for itself."
+        ) Boolean byoPaused,
         @NonNull List<LlmUsageByJobTypeDTO> byJobType,
         @NonNull List<LlmUsageByDayDTO> byDay
     ) {}
@@ -92,20 +104,37 @@ public final class LlmUsageDTOs {
         @NonNull Long workspaceId,
         @NonNull String workspaceSlug,
         @NonNull String displayName,
-        @Nullable BigDecimal monthlyBudgetUsd,
+        @Nullable @Schema(
+            description = "Monthly cap in USD on spend this instance pays for; null = uncapped. Yours to set."
+        ) BigDecimal instanceMonthlyBudgetUsd,
+        @Nullable @Schema(
+            description = "The workspace's own cap in USD on its own-provider spend; null = uncapped. Read-only " +
+                "here — it governs the workspace's money, so only its own admins may change it."
+        ) BigDecimal byoMonthlyBudgetUsd,
         @NonNull @Schema(
             description = "This month's confirmed spend on shared (instance) models, in USD — compared against " +
-                "the budget cap above."
+                "instanceMonthlyBudgetUsd."
         ) BigDecimal pricedTotalCostUsd,
         @NonNull @Schema(
-            description = "This month's spend on the workspace's own connected provider(s), in USD. Never counts " +
-                "toward the budget cap."
+            description = "This month's confirmed spend on the workspace's own connected provider(s), in USD — " +
+                "compared against byoMonthlyBudgetUsd. Different money: never added to pricedTotalCostUsd."
         ) BigDecimal byoTotalCostUsd,
         @NonNull @Schema(description = "Ledger events (jobs / mentor turns) this month, any provider") Long events,
         @NonNull @Schema(
-            description = "Whether this month's confirmed spend is within the cap, has reached it, or can't be " +
-                "fully confirmed yet because some usage has no price set."
-        ) LlmBudgetVerdict verdict
+            description = "Whether shared-model spend is within the instance cap, has reached it, or can't be " +
+                "confirmed because some shared-model usage has no price set."
+        ) LlmBudgetVerdict instanceBudgetVerdict,
+        @NonNull @Schema(
+            description = "The same verdict for the workspace's own-provider spend against its own cap."
+        ) LlmBudgetVerdict byoBudgetVerdict,
+        @NonNull @Schema(
+            description = "Whether work on SHARED models is paused for this workspace right now (current month " +
+                "only) — authoritative, mirroring the live gate."
+        ) Boolean instanceFundedPaused,
+        @NonNull @Schema(
+            description = "Whether work on the workspace's OWN provider is paused right now. The two pause " +
+                "independently."
+        ) Boolean byoPaused
     ) {}
 
     @Schema(description = "Set or clear a workspace's monthly LLM budget cap")
@@ -113,5 +142,13 @@ public final class LlmUsageDTOs {
         @Nullable @DecimalMin(value = "0.00") @Digits(integer = 8, fraction = 2) @Schema(
             description = "Budget cap in USD; 0 pauses immediately, null removes the cap"
         ) BigDecimal monthlyLlmBudgetUsd
+    ) {}
+
+    @Schema(description = "Set or clear the workspace's own monthly cap on its own-provider spend")
+    public record UpdateByoLlmBudgetRequestDTO(
+        @Nullable @DecimalMin(value = "0.00") @Digits(integer = 8, fraction = 2) @Schema(
+            description = "Cap in USD on this workspace's own-provider spend; 0 pauses that work immediately, " +
+                "null removes the cap"
+        ) BigDecimal monthlyByoLlmBudgetUsd
     ) {}
 }

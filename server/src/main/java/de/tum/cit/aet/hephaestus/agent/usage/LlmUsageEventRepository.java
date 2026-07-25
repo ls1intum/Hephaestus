@@ -54,13 +54,20 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
     BigDecimal sumCost(@Param("workspaceId") Long workspaceId, @Param("from") Instant from, @Param("to") Instant to);
 
     /**
-     * This workspace's own-provider (BYO) spend for the window — informational only, shown
-     * separately from the budgeted total and never summed into it (#1368 slice 6).
+     * This workspace's confirmed own-provider (BYO) spend for the window — what its own cap is
+     * measured against, and never summed into the instance-funded total (the two are different
+     * people's money).
+     *
+     * <p>The {@code pricing_state = 'PRICED'} predicate is explicit rather than implied by
+     * "UNPRICED rows have a NULL cost": this sum now decides whether a workspace is paused, so the
+     * rule it enforces has to be readable in the query rather than inferred from a column's
+     * nullability. Unpriced BYO usage is reported through
+     * {@link #existsUnpricedWorkspaceFunded} instead, exactly as its instance-funded mirror.
      */
     @Query(
         value = "SELECT COALESCE(SUM(e.cost_usd), 0) FROM llm_usage_event e " +
             "WHERE e.workspace_id = :workspaceId AND e.occurred_at >= :from AND e.occurred_at < :to " +
-            "AND e.funding_source = 'WORKSPACE'",
+            "AND e.pricing_state = 'PRICED' AND e.funding_source = 'WORKSPACE'",
         nativeQuery = true
     )
     BigDecimal sumByoCost(@Param("workspaceId") Long workspaceId, @Param("from") Instant from, @Param("to") Instant to);
@@ -96,6 +103,28 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
     );
 
     /**
+     * The BYO mirror of {@link #existsUnpricedInstanceFunded}: at least one own-provider event this
+     * window has no resolved price, so {@link #sumByoCost} cannot prove the workspace is under its
+     * own cap.
+     *
+     * <p>Only the workspace admin can fix this one — BYO prices are set on the workspace's own model
+     * (see {@code WorkspaceLlmModel}), which is why an unpriced BYO model may pause BYO work but
+     * never instance-funded work, and vice versa. Each cap is only ever blocked by a blind spot its
+     * own owner can clear.
+     */
+    @Query(
+        value = "SELECT EXISTS(SELECT 1 FROM llm_usage_event e " +
+            "WHERE e.workspace_id = :workspaceId AND e.occurred_at >= :from AND e.occurred_at < :to " +
+            "AND e.pricing_state = 'UNPRICED' AND e.funding_source = 'WORKSPACE')",
+        nativeQuery = true
+    )
+    boolean existsUnpricedWorkspaceFunded(
+        @Param("workspaceId") Long workspaceId,
+        @Param("from") Instant from,
+        @Param("to") Instant to
+    );
+
+    /**
      * Per-job-type breakdown, split the same way the top-level totals are (#1368 slice 6): a
      * budgeted (priced, instance-funded) sum, a separate BYO sum, and an unpriced-event count — never
      * one blind {@code SUM(cost_usd)} mixing funding sources and pricing states.
@@ -104,7 +133,10 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
         value = "SELECT e.job_type AS jobType, " +
             "COALESCE(SUM(e.cost_usd) FILTER (WHERE e.pricing_state = 'PRICED' AND e.funding_source = 'INSTANCE'), 0) " +
             "AS pricedTotalCostUsd, " +
-            "COALESCE(SUM(e.cost_usd) FILTER (WHERE e.funding_source = 'WORKSPACE'), 0) AS byoTotalCostUsd, " +
+            "COALESCE(SUM(e.cost_usd) FILTER (WHERE e.pricing_state = 'PRICED' AND e.funding_source = 'WORKSPACE'), 0) " +
+            "AS byoTotalCostUsd, " +
+            "COALESCE(BOOL_OR(e.pricing_state = 'UNPRICED' AND e.funding_source = 'WORKSPACE'), false) " +
+            "AS hasUnpricedByoUsage, " +
             "COUNT(*) FILTER (WHERE e.cost_usd IS NULL) AS unpricedEventCount, " +
             "SUM(e.input_tokens) AS inputTokens, SUM(e.output_tokens) AS outputTokens, " +
             "SUM(e.cache_read_tokens) AS cacheReadTokens, SUM(e.cache_write_tokens) AS cacheWriteTokens, " +
@@ -127,7 +159,10 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
         value = "SELECT (e.occurred_at AT TIME ZONE 'UTC')::date AS day, " +
             "COALESCE(SUM(e.cost_usd) FILTER (WHERE e.pricing_state = 'PRICED' AND e.funding_source = 'INSTANCE'), 0) " +
             "AS pricedTotalCostUsd, " +
-            "COALESCE(SUM(e.cost_usd) FILTER (WHERE e.funding_source = 'WORKSPACE'), 0) AS byoTotalCostUsd, " +
+            "COALESCE(SUM(e.cost_usd) FILTER (WHERE e.pricing_state = 'PRICED' AND e.funding_source = 'WORKSPACE'), 0) " +
+            "AS byoTotalCostUsd, " +
+            "COALESCE(BOOL_OR(e.pricing_state = 'UNPRICED' AND e.funding_source = 'WORKSPACE'), false) " +
+            "AS hasUnpricedByoUsage, " +
             "COUNT(*) FILTER (WHERE e.cost_usd IS NULL) AS unpricedEventCount, " +
             "COUNT(*) AS events " +
             "FROM llm_usage_event e " +
@@ -152,15 +187,20 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
     @Query(
         value = "SELECT w.id AS workspaceId, w.slug AS workspaceSlug, w.display_name AS displayName, " +
             "w.monthly_llm_budget_usd AS monthlyBudgetUsd, " +
+            "w.monthly_byo_llm_budget_usd AS byoMonthlyBudgetUsd, " +
             "COALESCE(SUM(e.cost_usd) FILTER (WHERE e.pricing_state = 'PRICED' AND e.funding_source = 'INSTANCE'), 0) " +
             "AS pricedTotalCostUsd, " +
-            "COALESCE(SUM(e.cost_usd) FILTER (WHERE e.funding_source = 'WORKSPACE'), 0) AS byoTotalCostUsd, " +
+            "COALESCE(SUM(e.cost_usd) FILTER (WHERE e.pricing_state = 'PRICED' AND e.funding_source = 'WORKSPACE'), 0) " +
+            "AS byoTotalCostUsd, " +
+            "COALESCE(BOOL_OR(e.pricing_state = 'UNPRICED' AND e.funding_source = 'WORKSPACE'), false) " +
+            "AS hasUnpricedByoUsage, " +
             "COALESCE(bool_or(e.pricing_state = 'UNPRICED' AND e.funding_source = 'INSTANCE'), false) " +
             "AS hasUnpricedInstanceUsage, " +
             "COUNT(e.id) AS events " +
             "FROM workspace w LEFT JOIN llm_usage_event e " +
             "ON e.workspace_id = w.id AND e.occurred_at >= :from AND e.occurred_at < :to " +
-            "GROUP BY w.id, w.slug, w.display_name, w.monthly_llm_budget_usd ORDER BY pricedTotalCostUsd DESC",
+            "GROUP BY w.id, w.slug, w.display_name, w.monthly_llm_budget_usd, w.monthly_byo_llm_budget_usd " +
+            "ORDER BY pricedTotalCostUsd DESC",
         nativeQuery = true
     )
     List<WorkspaceAggregate> aggregateByWorkspace(@Param("from") Instant from, @Param("to") Instant to);
@@ -191,9 +231,11 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
         String getWorkspaceSlug();
         String getDisplayName();
         BigDecimal getMonthlyBudgetUsd();
+        BigDecimal getByoMonthlyBudgetUsd();
         BigDecimal getPricedTotalCostUsd();
         BigDecimal getByoTotalCostUsd();
         boolean isHasUnpricedInstanceUsage();
+        boolean isHasUnpricedByoUsage();
         long getEvents();
     }
 }

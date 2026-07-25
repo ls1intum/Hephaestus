@@ -1,26 +1,35 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { AdminWorkspaceLlmUsage, WorkspaceLlmUsageReport } from "@/api/types.gen";
-import { AdminInstanceLlmUsageTable } from "./AdminInstanceLlmUsageTable";
+import type { WorkspaceLlmUsageReport } from "@/api/types.gen";
+import {
+	AdminInstanceLlmUsageTable,
+	type AdminWorkspaceLlmUsageRow,
+} from "./AdminInstanceLlmUsageTable";
 
-const workspace: AdminWorkspaceLlmUsage = {
+const workspace: AdminWorkspaceLlmUsageRow = {
 	workspaceId: 1,
 	workspaceSlug: "example-workspace",
 	displayName: "Example Workspace",
-	monthlyBudgetUsd: 25,
+	instanceMonthlyBudgetUsd: 25,
 	pricedTotalCostUsd: 4.25,
+	instanceBudgetVerdict: "WITHIN",
+	instanceFundedPaused: false,
 	byoTotalCostUsd: 1.75,
+	byoBudgetVerdict: "WITHIN",
+	byoPaused: false,
 	events: 3,
-	verdict: "WITHIN",
 };
 
 const detailReport: WorkspaceLlmUsageReport = {
 	month: "2026-07",
-	monthlyBudgetUsd: 25,
+	instanceMonthlyBudgetUsd: 25,
 	pricedTotalCostUsd: 4.25,
+	instanceBudgetVerdict: "WITHIN",
+	instanceFundedPaused: false,
+	byoMonthlyBudgetUsd: 10,
 	byoTotalCostUsd: 1.75,
-	verdict: "WITHIN",
-	usagePaused: false,
+	byoBudgetVerdict: "WITHIN",
+	byoPaused: false,
 	unpricedEventCount: 0,
 	byJobType: [
 		{
@@ -46,6 +55,30 @@ const detailReport: WorkspaceLlmUsageReport = {
 		},
 	],
 };
+
+function renderTable(
+	rows: AdminWorkspaceLlmUsageRow[],
+	overrides: { isCurrentMonth?: boolean } = {},
+) {
+	return render(
+		<AdminInstanceLlmUsageTable
+			rows={rows}
+			isCurrentMonth={overrides.isCurrentMonth ?? true}
+			isLoading={false}
+			error={null}
+			expandedWorkspaceId={null}
+			isDetailLoading={false}
+			detailError={null}
+			onToggleDetails={() => {}}
+			onEditBudget={() => {}}
+		/>,
+	);
+}
+
+/** The body row for the single-workspace fixtures below. */
+function firstDataRow() {
+	return screen.getAllByRole("row")[1];
+}
 
 describe("AdminInstanceLlmUsageTable", () => {
 	it("offers an accessible per-workspace detail toggle", () => {
@@ -73,6 +106,76 @@ describe("AdminInstanceLlmUsageTable", () => {
 
 		fireEvent.click(toggle);
 		expect(onToggleDetails).toHaveBeenCalledWith(workspace);
+	});
+
+	it("separates the instance cap from the workspace's own self cap", () => {
+		renderTable([{ ...workspace, byoMonthlyBudgetUsd: 10, byoBudgetVerdict: "WITHIN" }]);
+
+		expect(screen.getByRole("columnheader", { name: "Instance cap" })).toBeTruthy();
+		expect(screen.getByRole("columnheader", { name: "Self cap" })).toBeTruthy();
+		const row = within(firstDataRow());
+		expect(row.getByText("$25.00")).toBeTruthy();
+		expect(row.getByText("$10.00")).toBeTruthy();
+	});
+
+	it("shows how much of each cap is used, not just whether it is reached", () => {
+		renderTable([{ ...workspace, instanceMonthlyBudgetUsd: 50, pricedTotalCostUsd: 38.2 }]);
+
+		const row = within(firstDataRow());
+		expect(row.getByText("$38.20 · 76%")).toBeTruthy();
+		expect(
+			row.getByRole("progressbar", { name: "Instance cap used by Example Workspace" }),
+		).toBeTruthy();
+	});
+
+	it("warns before the cap is reached", () => {
+		renderTable([{ ...workspace, instanceMonthlyBudgetUsd: 50, pricedTotalCostUsd: 41 }]);
+
+		expect(within(firstDataRow()).getByText("Near cap — instance")).toBeTruthy();
+	});
+
+	it("names the cap that paused the workspace", () => {
+		renderTable([
+			{
+				...workspace,
+				instanceBudgetVerdict: "EXHAUSTED",
+				instanceFundedPaused: true,
+				byoMonthlyBudgetUsd: 10,
+				byoTotalCostUsd: 10,
+				byoBudgetVerdict: "EXHAUSTED",
+				byoPaused: true,
+			},
+		]);
+
+		const row = within(firstDataRow());
+		expect(row.getByText("Paused — instance cap")).toBeTruthy();
+		expect(row.getByText("Paused — self cap")).toBeTruthy();
+	});
+
+	it("reports a self-cap pause even when the instance cap is untouched", () => {
+		renderTable([
+			{
+				...workspace,
+				instanceMonthlyBudgetUsd: undefined,
+				byoMonthlyBudgetUsd: 10,
+				byoTotalCostUsd: 10,
+				byoBudgetVerdict: "EXHAUSTED",
+				byoPaused: true,
+			},
+		]);
+
+		const row = within(firstDataRow());
+		expect(row.getByText("Paused — self cap")).toBeTruthy();
+		expect(row.queryByText("Paused — instance cap")).toBeNull();
+	});
+
+	it("keeps the self cap read-only — it is the workspace's own money", () => {
+		renderTable([{ ...workspace, byoMonthlyBudgetUsd: 10, byoBudgetVerdict: "WITHIN" }]);
+
+		const buttons = within(firstDataRow())
+			.getAllByRole("button")
+			.map((button) => button.getAttribute("aria-label") ?? button.textContent);
+		expect(buttons).toEqual(["View usage details for Example Workspace", "Set instance cap"]);
 	});
 
 	it("shows daily and job-type funding breakdowns for the expanded workspace", () => {

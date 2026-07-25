@@ -51,7 +51,9 @@ function AdminInstanceUsagePage() {
 			// Prefix key (no options) invalidates every cached month.
 			queryClient.invalidateQueries({ queryKey: adminListLlmUsageQueryKey() });
 			toast.success(
-				variables.body.monthlyLlmBudgetUsd == null ? "Budget cap removed" : "Budget cap updated",
+				variables.body.monthlyLlmBudgetUsd == null
+					? "Instance cap removed"
+					: "Instance cap updated",
 			);
 			setEditing(null);
 		},
@@ -80,8 +82,10 @@ function AdminInstanceUsagePage() {
 						<h1 className="text-2xl font-semibold">LLM usage</h1>
 					</div>
 					<p className="text-sm text-muted-foreground">
-						Per-workspace AI spend for the selected month (metadata only). Set a monthly budget cap
-						to pause a workspace's practice detection and mentor turns once spend reaches it.
+						Per-workspace AI spend for the selected month (metadata only). Set an instance cap to
+						pause a workspace's AI work on shared models once the spend you fund reaches it. A
+						workspace's own self cap covers spend on its own provider — you can see it, only its
+						admins can change it. The two never add up and pause independently.
 					</p>
 				</header>
 				<MonthNavigator

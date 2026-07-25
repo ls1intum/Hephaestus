@@ -253,14 +253,31 @@ public class Workspace {
     // AI configuration
 
     /**
-     * Monthly LLM budget cap in USD (#1368). {@code null} = uncapped. When the workspace's
-     * calendar-month (UTC) spend in the {@code llm_usage_event} ledger reaches this cap, agent
-     * job submission and mentor turns pause until the month rolls over or an instance admin
-     * raises the cap. Set exclusively by instance admins — a workspace admin raising their own
-     * cap would defeat the instance-level cost backstop.
+     * Monthly cap in USD on this workspace's INSTANCE-funded spend (#1368) — the shared models the
+     * host pays for. {@code null} = uncapped. When the workspace's calendar-month (UTC)
+     * instance-funded spend in the {@code llm_usage_event} ledger reaches this cap, work running on
+     * shared models pauses until the month rolls over or an instance admin raises the cap.
+     *
+     * <p>Set exclusively by instance admins — a workspace admin raising this would defeat the
+     * host's cost backstop. Work the workspace pays for itself is governed by
+     * {@link #monthlyByoLlmBudgetUsd} instead and is unaffected by this cap.
      */
     @Column(name = "monthly_llm_budget_usd", precision = 10, scale = 2)
     private BigDecimal monthlyLlmBudgetUsd;
+
+    /**
+     * Monthly cap in USD on this workspace's OWN-provider (BYO) spend (#1368). {@code null} =
+     * uncapped. The mirror of {@link #monthlyLlmBudgetUsd} for the other purse: this is the
+     * workspace's own money, so the workspace admin sets it and only work on the workspace's own
+     * connected provider pauses when it is reached.
+     *
+     * <p>Two caps rather than one because instance-funded and own-provider spend are different
+     * people's money — they are never summed, and each cap may only be blocked by a blind spot its
+     * own owner can clear (an unpriced shared model is the host's to fix; an unpriced BYO model is
+     * the workspace's).
+     */
+    @Column(name = "monthly_byo_llm_budget_usd", precision = 10, scale = 2)
+    private BigDecimal monthlyByoLlmBudgetUsd;
 
     /**
      * Per-workspace practice-review trigger/delivery overrides; read via {@link #getReviewSettings()}.

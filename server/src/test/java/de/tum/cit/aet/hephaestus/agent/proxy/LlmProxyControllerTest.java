@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -67,7 +68,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
         void rejectsWithoutResolvingCredentialWhenWorkspaceIsOverBudget() {
             var routing = routing("openai-completions");
             authenticate(routing);
-            when(budgetGate.isBlocked(routing.workspaceId())).thenReturn(true);
+            when(budgetGate.isBlocked(routing.workspaceId(), routing.connectionScope())).thenReturn(true);
 
             var result = controller.proxy(
                 request("POST", "/internal/llm/chat/completions"),
@@ -78,6 +79,66 @@ class LlmProxyControllerTest extends BaseUnitTest {
 
             assertThat(result.getStatusCode().value()).isEqualTo(429);
             verifyNoInteractions(resolver);
+        }
+
+        /**
+         * #1368: the gate asks only the purse funding THIS call, and the 429 body names the admin who
+         * can lift it — a shared-model pause is the host's to raise.
+         */
+        @Test
+        void the429BodyNamesTheInstanceAdminForASharedModelCall() {
+            var routing = routing("openai-completions");
+            authenticate(routing);
+            when(budgetGate.isBlocked(routing.workspaceId(), FundingSource.INSTANCE)).thenReturn(true);
+
+            var result = controller.proxy(
+                request("POST", "/internal/llm/chat/completions"),
+                new MockHttpServletResponse(),
+                new HttpHeaders(),
+                jsonBody()
+            );
+
+            assertThat(result.getStatusCode().value()).isEqualTo(429);
+            assertThat(String.valueOf(result.getBody())).contains("instance admin").contains("shared-model");
+        }
+
+        @Test
+        void the429BodyNamesTheWorkspaceAdminForAnOwnProviderCall() {
+            var routing = workspaceFundedRouting();
+            authenticate(routing);
+            when(budgetGate.isBlocked(routing.workspaceId(), FundingSource.WORKSPACE)).thenReturn(true);
+
+            var result = controller.proxy(
+                request("POST", "/internal/llm/chat/completions"),
+                new MockHttpServletResponse(),
+                new HttpHeaders(),
+                jsonBody()
+            );
+
+            assertThat(result.getStatusCode().value()).isEqualTo(429);
+            assertThat(String.valueOf(result.getBody())).contains("workspace admin").contains("own-provider");
+        }
+
+        /**
+         * The asymmetry: an exhausted host budget must not 429 a call the workspace pays for. The
+         * gate answers false for the WORKSPACE purse, so the call proceeds to credential resolution
+         * (which here returns nothing, hence 502 — anything but 429 proves the gate let it through).
+         */
+        @Test
+        void doesNotRejectAnOwnProviderCallWhenOnlyTheInstancePurseIsBlocked() {
+            var routing = workspaceFundedRouting();
+            authenticate(routing);
+            when(budgetGate.isBlocked(routing.workspaceId(), FundingSource.WORKSPACE)).thenReturn(false);
+            when(resolver.resolveProxyCredential(any(), any(), any())).thenReturn(null);
+
+            var result = controller.proxy(
+                request("POST", "/internal/llm/chat/completions"),
+                new MockHttpServletResponse(),
+                new HttpHeaders(),
+                jsonBody()
+            );
+
+            assertThat(result.getStatusCode().value()).isEqualTo(502);
         }
     }
 
@@ -340,6 +401,21 @@ class LlmProxyControllerTest extends BaseUnitTest {
             protocol,
             "https://frozen.example.com/v1",
             FundingSource.INSTANCE,
+            7L,
+            8L,
+            9L,
+            null,
+            java.util.UUID.fromString("00000000-0000-0000-0000-0000000000aa")
+        );
+    }
+
+    /** The same route, but billed to the workspace's own provider rather than a shared model. */
+    private static ProxyRouting workspaceFundedRouting() {
+        return new ProxyRouting(
+            "job:test",
+            "openai-completions",
+            "https://frozen.example.com/v1",
+            FundingSource.WORKSPACE,
             7L,
             8L,
             9L,

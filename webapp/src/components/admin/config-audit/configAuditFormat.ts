@@ -22,6 +22,7 @@ export const ENTITY_TYPE_LABELS: Record<EntityType, string> = {
 	WORKSPACE_VISIBILITY: "Visibility",
 	PRACTICE_ACTIVE: "Practice active",
 	WORKSPACE_LLM_BUDGET: "AI budget",
+	WORKSPACE_BYO_LLM_BUDGET: "Own-provider AI cap",
 	WORKSPACE_LLM_CONNECTION: "Workspace AI provider",
 	WORKSPACE_LLM_MODEL: "Workspace model",
 };

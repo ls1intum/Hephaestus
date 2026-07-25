@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.config;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.ModelBindingSource;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModel;
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -111,6 +112,19 @@ public class WorkspaceAgentBinding implements ModelBindingSource {
 
     @Column(name = "updated_at")
     private Instant updatedAt;
+
+    /**
+     * Who pays for work run on this binding — the host (a shared instance-catalog model) or the
+     * workspace itself (its own connected provider). Exactly one of the two models is set, so this
+     * is total.
+     *
+     * <p>Safe on a detached binding: testing a lazy {@code @ManyToOne} field for {@code null} reads
+     * the association's presence, which Hibernate already knows from the row's foreign key — it does
+     * not dereference the proxy, so no session is required.
+     */
+    public FundingSource getFundingSource() {
+        return instanceModel != null ? FundingSource.INSTANCE : FundingSource.WORKSPACE;
+    }
 
     @PrePersist
     public void prePersist() {

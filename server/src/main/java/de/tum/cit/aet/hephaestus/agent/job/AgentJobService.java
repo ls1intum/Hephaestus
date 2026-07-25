@@ -186,20 +186,22 @@ public class AgentJobService {
             .findById(workspaceId)
             .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
 
-        // Monthly budget cap (#1368): this is THE choke point for all sandboxed LLM work —
-        // webhook detection, retrospective replays, dev/bot manual triggers, conversation
-        // reviews — so one check pauses them all. Eventually consistent: in-flight jobs that
-        // haven't been costed yet may overshoot slightly (accepted by design).
-        if (llmBudgetService.blockSubmission(workspace, jobType.name())) {
+        WorkspaceAgentBinding binding = agentBindingRepository
+            .findByWorkspaceIdAndPurposeWithModels(workspaceId, AgentPurpose.PRACTICE_DETECTION)
+            .filter(WorkspaceAgentBinding::isEnabled)
+            .orElse(null);
+        if (binding == null) {
+            log.debug("No practice-detection binding to run: workspaceId={}", workspaceId);
             return Optional.empty();
         }
 
-        boolean hasBinding = agentBindingRepository
-            .findByWorkspaceIdAndPurpose(workspaceId, AgentPurpose.PRACTICE_DETECTION)
-            .filter(WorkspaceAgentBinding::isEnabled)
-            .isPresent();
-        if (!hasBinding) {
-            log.debug("No practice-detection binding to run: workspaceId={}", workspaceId);
+        // Monthly budget cap (#1368): this is THE choke point for all sandboxed LLM work —
+        // webhook detection, retrospective replays, dev/bot manual triggers, conversation
+        // reviews — so one check pauses them all. Scoped to whoever pays for THIS binding, so an
+        // exhausted host budget never pauses work the workspace funds itself (and vice versa);
+        // that is why the binding is resolved first. Eventually consistent: in-flight jobs that
+        // haven't been costed yet may overshoot slightly (accepted by design).
+        if (llmBudgetService.blockSubmission(workspace, jobType.name(), binding.getFundingSource())) {
             return Optional.empty();
         }
 

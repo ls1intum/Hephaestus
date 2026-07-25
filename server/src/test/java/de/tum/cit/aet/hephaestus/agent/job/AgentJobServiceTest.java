@@ -115,6 +115,11 @@ class AgentJobServiceTest extends BaseUnitTest {
         enabledBinding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
         enabledBinding.setEnabled(true);
         enabledBinding.setTimeoutSeconds(600);
+        // Two lookups, deliberately: submit() discovers the binding WITH its models (it needs the
+        // funding source to pick the right cap), then re-reads it inside the write transaction.
+        lenient()
+            .when(agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_DETECTION))
+            .thenReturn(Optional.of(enabledBinding));
         lenient()
             .when(agentBindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_DETECTION))
             .thenReturn(Optional.of(enabledBinding));
@@ -180,9 +185,9 @@ class AgentJobServiceTest extends BaseUnitTest {
 
         @Test
         void shouldReturnEmptyWhenPracticeIsUnbound() {
-            when(agentBindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
-                Optional.empty()
-            );
+            when(
+                agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_DETECTION)
+            ).thenReturn(Optional.empty());
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             Optional<AgentJob> result = service.submit(
@@ -220,6 +225,85 @@ class AgentJobServiceTest extends BaseUnitTest {
             assertThat(result).isPresent();
             assertThat(result.get().getPurpose()).isEqualTo(AgentPurpose.PRACTICE_DETECTION);
             verify(agentJobRepository).saveAndFlush(any());
+        }
+
+        /**
+         * #1368: the binding is resolved BEFORE the budget check so the cap that applies is the one
+         * belonging to whoever pays for that binding — the host for a shared instance model, the
+         * workspace for its own connected provider. Getting this order wrong would let an exhausted
+         * host budget pause work the workspace pays for itself.
+         */
+        @Test
+        void shouldCheckTheBudgetOfWhoeverFundsTheBoundDetectionModel() {
+            enabledBinding.setInstanceModel(new de.tum.cit.aet.hephaestus.agent.catalog.LlmModel());
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+
+            JobTypeHandler handler = mock(JobTypeHandler.class);
+            when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
+            when(handler.createSubmission(any())).thenReturn(createSubmission());
+            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any())).thenReturn(
+                Optional.empty()
+            );
+            when(agentJobRepository.saveAndFlush(any(AgentJob.class))).thenAnswer(inv -> {
+                AgentJob j = inv.getArgument(0);
+                j.prePersist();
+                return j;
+            });
+
+            service.submit(1L, AgentJobType.PULL_REQUEST_REVIEW, mock(JobSubmissionRequest.class));
+
+            verify(llmBudgetService).blockSubmission(
+                workspace,
+                AgentJobType.PULL_REQUEST_REVIEW.name(),
+                de.tum.cit.aet.hephaestus.agent.usage.FundingSource.INSTANCE
+            );
+        }
+
+        @Test
+        void shouldCheckTheWorkspacesOwnBudgetWhenDetectionRunsOnItsOwnProvider() {
+            // No instance model on the binding = the workspace's own connected provider pays.
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+
+            JobTypeHandler handler = mock(JobTypeHandler.class);
+            when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
+            when(handler.createSubmission(any())).thenReturn(createSubmission());
+            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any())).thenReturn(
+                Optional.empty()
+            );
+            when(agentJobRepository.saveAndFlush(any(AgentJob.class))).thenAnswer(inv -> {
+                AgentJob j = inv.getArgument(0);
+                j.prePersist();
+                return j;
+            });
+
+            service.submit(1L, AgentJobType.PULL_REQUEST_REVIEW, mock(JobSubmissionRequest.class));
+
+            verify(llmBudgetService).blockSubmission(
+                workspace,
+                AgentJobType.PULL_REQUEST_REVIEW.name(),
+                de.tum.cit.aet.hephaestus.agent.usage.FundingSource.WORKSPACE
+            );
+        }
+
+        @Test
+        void shouldSubmitNothingWhenThePayersBudgetIsBlocked() {
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+            when(
+                llmBudgetService.blockSubmission(
+                    any(),
+                    any(),
+                    eq(de.tum.cit.aet.hephaestus.agent.usage.FundingSource.WORKSPACE)
+                )
+            ).thenReturn(true);
+
+            Optional<AgentJob> result = service.submit(
+                1L,
+                AgentJobType.PULL_REQUEST_REVIEW,
+                mock(JobSubmissionRequest.class)
+            );
+
+            assertThat(result).isEmpty();
+            verify(agentJobRepository, never()).saveAndFlush(any());
         }
 
         @Test
@@ -557,9 +641,9 @@ class AgentJobServiceTest extends BaseUnitTest {
                     TransactionCallback<?> callback = inv.getArgument(0);
                     return callback.doInTransaction(mock(TransactionStatus.class));
                 });
-            when(agentBindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
-                Optional.empty()
-            ); // unbound → no job
+            when(
+                agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_DETECTION)
+            ).thenReturn(Optional.empty()); // unbound → no job
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             String result = service.submitPrepared(

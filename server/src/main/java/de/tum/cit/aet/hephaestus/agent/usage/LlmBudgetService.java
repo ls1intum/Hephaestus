@@ -7,6 +7,8 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
+import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,13 +38,13 @@ import org.springframework.transaction.annotation.Transactional;
  *       SSE and Slack turns, checked before the turn persists anything.</li>
  * </ul>
  *
- * <p>{@link #blockReason} also blocks a workspace whose month is
- * {@link LlmBudgetVerdict#UNVERIFIABLE} — a budget is set, but at least one instance-funded event
- * has no resolvable price, so the true spend cannot be confirmed against the cap. A cap you cannot
- * verify is not a cap, so an unverifiable month on a capped workspace is blocked exactly like
- * {@link LlmBudgetVerdict#EXHAUSTED}. An uncapped workspace is never blocked either way (it opted
- * out of enforcement); {@link #isBudgetExhausted} stays EXHAUSTED-only for callers that want the
- * confirmed-spend signal alone.
+ * <p>{@link #decide} also blocks a purse whose month is {@link LlmBudgetVerdict#UNVERIFIABLE} — a
+ * cap is set, but at least one event funded from that purse has no resolvable price, so the true
+ * spend cannot be confirmed against the cap. A cap you cannot verify is not a cap, so an
+ * unverifiable month on a capped purse is blocked exactly like {@link LlmBudgetVerdict#EXHAUSTED}.
+ * An uncapped purse is never blocked either way (it opted out of enforcement);
+ * {@link #isBudgetExhausted} stays EXHAUSTED-only for callers that want the confirmed-spend signal
+ * alone.
  */
 @Service
 public class LlmBudgetService {
@@ -64,25 +66,34 @@ public class LlmBudgetService {
     }
 
     /**
-     * Submission-side gate: true when the workspace is blocked (cap reached, or an UNVERIFIABLE
-     * month under {@code defaultUnpricedPolicy=BLOCK} — see {@link #blockReason}), in which case
-     * the block is logged and counted ({@code llm.budget.blocked}, surface {@code agent_job}) so
+     * Submission-side gate: true when work funded by {@code fundingSource} is blocked for this
+     * workspace — its payer's cap is reached, or that payer's month is UNVERIFIABLE. The block is
+     * logged and counted ({@code llm.budget.blocked}, tagged with the surface and which cap) so
      * operators can see suppressed work. Callers just skip the submission.
+     *
+     * <p>Scoped by funding source because the two caps belong to different people: the host's
+     * exhausted budget must not pause work the workspace pays for itself, and vice versa.
      */
     @Transactional(readOnly = true)
-    public boolean blockSubmission(Workspace workspace, String jobType) {
-        LlmBudgetBlockReason reason = blockReason(workspace);
+    public boolean blockSubmission(Workspace workspace, String jobType, @Nullable FundingSource fundingSource) {
+        LlmBudgetBlockReason reason = decide(workspace).forFunding(fundingSource);
         if (reason == LlmBudgetBlockReason.NONE) {
             return false;
         }
+        String cap = fundingSource == FundingSource.WORKSPACE ? "own-provider" : "shared-model";
         log.info(
-            "Skipping agent job submission — monthly LLM budget {}: workspaceId={}, jobType={}",
-            reason == LlmBudgetBlockReason.EXHAUSTED ? "exhausted" : "unverifiable (blocked by instance policy)",
+            "Skipping agent job submission — {} monthly LLM budget {}: workspaceId={}, jobType={}",
+            cap,
+            reason == LlmBudgetBlockReason.EXHAUSTED ? "exhausted" : "unverifiable (some spend has no price)",
             workspace.getId(),
             jobType
         );
-        meterRegistry.counter("llm.budget.blocked", "surface", "agent_job").increment();
+        meterRegistry.counter("llm.budget.blocked", "surface", "agent_job", "cap", capTag(fundingSource)).increment();
         return true;
+    }
+
+    private static String capTag(@Nullable FundingSource fundingSource) {
+        return fundingSource == FundingSource.WORKSPACE ? "byo" : "instance";
     }
 
     /** True when the workspace has a cap and current-month spend has reached it. */
@@ -118,46 +129,57 @@ public class LlmBudgetService {
      * {@link #isBudgetExhausted}.
      */
     @Transactional(readOnly = true)
-    public LlmBudgetBlockReason blockReason(Workspace workspace) {
-        return blockReason(workspace.getId(), workspace.getMonthlyLlmBudgetUsd());
+    public LlmBudgetDecision decide(Workspace workspace) {
+        return decide(workspace.getId(), workspace.getMonthlyLlmBudgetUsd(), workspace.getMonthlyByoLlmBudgetUsd());
     }
 
-    /** Overload for callers holding only the id (mentor gate, claim-time recheck). */
+    /** Overload for callers holding only the id (mentor gate, claim-time recheck, proxy). */
     @Transactional(readOnly = true)
-    public LlmBudgetBlockReason blockReason(Long workspaceId) {
-        return workspaceRepository
-            .findById(workspaceId)
-            .map(w -> blockReason(w.getId(), w.getMonthlyLlmBudgetUsd()))
-            .orElse(LlmBudgetBlockReason.NONE);
+    public LlmBudgetDecision decide(Long workspaceId) {
+        return workspaceRepository.findById(workspaceId).map(this::decide).orElse(LlmBudgetDecision.ALLOWED);
     }
 
-    private LlmBudgetBlockReason blockReason(Long workspaceId, @Nullable BigDecimal monthlyBudgetUsd) {
-        if (monthlyBudgetUsd == null) {
-            return LlmBudgetBlockReason.NONE; // uncapped = never blocked, either reason
-        }
-        // Reached only for a capped workspace (uncapped returned NONE above): an unverifiable month
-        // is blocked just like an exhausted one — a cap whose true spend can't be confirmed is not a
-        // cap. Uncapped workspaces opted out of enforcement and are never blocked for either reason.
-        return switch (currentVerdict(workspaceId, monthlyBudgetUsd)) {
-            case EXHAUSTED -> LlmBudgetBlockReason.EXHAUSTED;
-            case UNVERIFIABLE -> LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED;
-            case WITHIN -> LlmBudgetBlockReason.NONE;
-        };
+    private LlmBudgetDecision decide(
+        Long workspaceId,
+        @Nullable BigDecimal instanceBudgetUsd,
+        @Nullable BigDecimal byoBudgetUsd
+    ) {
+        MonthWindow window = MonthWindow.of(YearMonth.now(ZoneOffset.UTC));
+        return new LlmBudgetDecision(
+            reasonFor(
+                instanceBudgetUsd,
+                () -> usageRepository.sumCost(workspaceId, window.from(), window.to()),
+                () -> usageRepository.existsUnpricedInstanceFunded(workspaceId, window.from(), window.to())
+            ),
+            reasonFor(
+                byoBudgetUsd,
+                () -> usageRepository.sumByoCost(workspaceId, window.from(), window.to()),
+                () -> usageRepository.existsUnpricedWorkspaceFunded(workspaceId, window.from(), window.to())
+            )
+        );
     }
 
     /**
-     * This month's verdict for one workspace. Short-circuits before the unpriced-event query when
-     * the priced sum alone already proves EXHAUSTED — no need to know about unpriced usage once the
-     * confirmed spend has already crossed the cap.
+     * One purse's blocking reason. Uncapped is never blocked (that payer opted out of enforcement);
+     * for a capped purse an unverifiable month blocks exactly like an exhausted one — a cap whose
+     * true spend can't be confirmed is not a cap.
+     *
+     * <p>The spend and unpriced-existence reads are suppliers so an uncapped purse costs no query at
+     * all, and a purse already proven EXHAUSTED never runs the unpriced probe.
      */
-    private LlmBudgetVerdict currentVerdict(Long workspaceId, BigDecimal monthlyBudgetUsd) {
-        MonthWindow window = MonthWindow.of(YearMonth.now(ZoneOffset.UTC));
-        BigDecimal pricedCost = usageRepository.sumCost(workspaceId, window.from(), window.to());
-        if (pricedCost.compareTo(monthlyBudgetUsd) >= 0) {
-            return LlmBudgetVerdict.EXHAUSTED;
+    private static LlmBudgetBlockReason reasonFor(
+        @Nullable BigDecimal budgetUsd,
+        Supplier<BigDecimal> pricedCost,
+        BooleanSupplier hasUnpriced
+    ) {
+        if (budgetUsd == null) {
+            return LlmBudgetBlockReason.NONE;
         }
-        boolean hasUnpriced = usageRepository.existsUnpricedInstanceFunded(workspaceId, window.from(), window.to());
-        return verdictFor(pricedCost, hasUnpriced, monthlyBudgetUsd);
+        BigDecimal spend = pricedCost.get();
+        if (spend.compareTo(budgetUsd) >= 0) {
+            return LlmBudgetBlockReason.EXHAUSTED;
+        }
+        return hasUnpriced.getAsBoolean() ? LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED : LlmBudgetBlockReason.NONE;
     }
 
     /**

@@ -1356,4 +1356,66 @@
         </rollback>
     </changeSet>
 
+    <!--
+        Workspace-owned cost control (#1368): a workspace can now cap its OWN-provider spend, the same
+        instrument the instance admin has over the shared-model budget. Two caps rather than one
+        because they govern different people's money and are never summed.
+    -->
+
+    <changeSet id="1784636803503-64" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace.monthly_byo_llm_budget_usd already present">
+            <not><columnExists tableName="workspace" columnName="monthly_byo_llm_budget_usd"/></not>
+        </preConditions>
+        <comment>The workspace's own monthly cap on its own-provider (BYO) LLM spend (#1368)</comment>
+        <addColumn tableName="workspace">
+            <column name="monthly_byo_llm_budget_usd" type="NUMERIC(10,2)"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="workspace" columnName="monthly_byo_llm_budget_usd"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1784636803503-65" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="agent_job.hold_reason already present">
+            <not><columnExists tableName="agent_job" columnName="hold_reason"/></not>
+        </preConditions>
+        <comment>
+            Why a QUEUED job's available_at was pushed out, when an admin can undo it (#1368). Only
+            'BUDGET' today: raising a cap releases exactly those jobs instead of also fast-forwarding a
+            crash-retry backoff into a failing upstream.
+        </comment>
+        <addColumn tableName="agent_job">
+            <column name="hold_reason" type="VARCHAR(32)"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="agent_job" columnName="hold_reason"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1784636803503-66" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="WORKSPACE_BYO_LLM_BUDGET already admitted">
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM pg_constraint
+                WHERE conname = 'ck_config_audit_event_entity_type'
+                  AND pg_get_constraintdef(oid) LIKE '%WORKSPACE_BYO_LLM_BUDGET%'
+            </sqlCheck>
+        </preConditions>
+        <comment>Admit WORKSPACE_BYO_LLM_BUDGET on the config-audit trail (#1368)</comment>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
+            ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
+                CHECK (entity_type IN (
+                    'PRACTICE_REVIEW_SETTINGS', 'AI_CONFIG_BINDING', 'AGENT_CONFIG',
+                    'WORKSPACE_ROLE', 'WORKSPACE_FEATURES', 'WORKSPACE_STATUS',
+                    'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY', 'PRACTICE_ACTIVE',
+                    'WORKSPACE_LLM_BUDGET', 'WORKSPACE_BYO_LLM_BUDGET',
+                    'WORKSPACE_LLM_CONNECTION', 'WORKSPACE_LLM_MODEL'
+                ));
+        ]]></sql>
+        <!-- Empty, as for every widening of this CHECK: once a row carries the new entity type,
+             re-adding the narrower constraint is a data-preserving downgrade that does not exist (the
+             audit trail is append-only and immutable). -->
+        <rollback/>
+    </changeSet>
+
 </databaseChangeLog>

@@ -2,9 +2,11 @@ package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetBlockReason;
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetDecision;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
 import java.time.Duration;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
@@ -26,27 +28,30 @@ class ProxyBudgetGate {
     private static final long MAX_CACHED_WORKSPACES = 10_000;
 
     private final LlmBudgetService budgetService;
-    private final Cache<Long, Boolean> blockedByWorkspace;
+    private final Cache<Long, LlmBudgetDecision> decisionByWorkspace;
 
     ProxyBudgetGate(LlmBudgetService budgetService) {
         this.budgetService = budgetService;
-        this.blockedByWorkspace = Caffeine.newBuilder()
+        this.decisionByWorkspace = Caffeine.newBuilder()
             .expireAfterWrite(TTL)
             .maximumSize(MAX_CACHED_WORKSPACES)
             .build();
     }
 
     /**
-     * True when the workspace has crossed its monthly LLM cap (or an unverifiable-and-capped month).
-     * {@code null} workspace id (legacy, unattributable route) fails open — never blocks. The
-     * per-key loader collapses a concurrent burst for one workspace into a single verdict lookup.
+     * True when calls funded by {@code fundingSource} have crossed their payer's monthly cap (or that
+     * payer's month is capped-and-unverifiable). {@code null} workspace id (legacy, unattributable
+     * route) fails open — never blocks. The per-key loader collapses a concurrent burst for one
+     * workspace into a single decision lookup.
+     *
+     * <p>Judged per funding source so an exhausted host budget cannot 429 calls the workspace pays
+     * for through its own provider — the two purses pause independently.
      */
-    boolean isBlocked(Long workspaceId) {
+    boolean isBlocked(Long workspaceId, @Nullable FundingSource fundingSource) {
         if (workspaceId == null) {
             return false;
         }
-        return Boolean.TRUE.equals(
-            blockedByWorkspace.get(workspaceId, id -> budgetService.blockReason(id) != LlmBudgetBlockReason.NONE)
-        );
+        LlmBudgetDecision decision = decisionByWorkspace.get(workspaceId, budgetService::decide);
+        return decision != null && decision.blocks(fundingSource);
     }
 }

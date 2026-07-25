@@ -3,13 +3,19 @@ import { fn } from "storybook/test";
 import type { WorkspaceLlmUsageReport } from "@/api/types.gen";
 import { AdminLlmUsagePage } from "./AdminLlmUsagePage";
 
+/** Fixed "today" so the burn-rate projections render the same shot every time. */
+const NOW = new Date("2026-07-10T12:00:00.000Z");
+
 const baseReport: WorkspaceLlmUsageReport = {
 	month: "2026-07",
-	monthlyBudgetUsd: 25,
+	instanceMonthlyBudgetUsd: 25,
+	byoMonthlyBudgetUsd: undefined,
 	pricedTotalCostUsd: 13.4821,
 	byoTotalCostUsd: 0,
-	verdict: "WITHIN",
-	usagePaused: false,
+	instanceBudgetVerdict: "WITHIN",
+	byoBudgetVerdict: "WITHIN",
+	instanceFundedPaused: false,
+	byoPaused: false,
 	unpricedEventCount: 0,
 	byJobType: [
 		{
@@ -81,9 +87,23 @@ const baseReport: WorkspaceLlmUsageReport = {
 	],
 };
 
+/** The same month with the workspace running part of its work on its own connected provider. */
+const withOwnProvider: WorkspaceLlmUsageReport = {
+	...baseReport,
+	byoMonthlyBudgetUsd: 10,
+	byoTotalCostUsd: 2.4,
+	byJobType: baseReport.byJobType.map((row, index) =>
+		index === 1 ? { ...row, byoTotalCostUsd: 2.4 } : row,
+	),
+	byDay: baseReport.byDay.map((row, index) =>
+		index === 3 ? { ...row, byoTotalCostUsd: 2.4 } : row,
+	),
+};
+
 /**
- * Workspace-admin view of one month of LLM spend: stat cards, over-budget banner,
- * by-job-type and by-day breakdowns. Pure/presentational.
+ * The workspace admin's cost-control page. Two independently owned caps — the shared-model budget
+ * the host sets, and the own-provider cap the workspace sets for itself — each with its own meter,
+ * its own pause banner, and its own pre-wall warning.
  */
 const meta = {
 	component: AdminLlmUsagePage,
@@ -92,66 +112,159 @@ const meta = {
 	args: {
 		month: "2026-07",
 		isCurrentMonth: true,
+		workspaceSlug: "acme",
 		report: baseReport,
 		isLoading: false,
 		error: null,
+		now: NOW,
 		onRetry: fn(),
 		onPrevMonth: fn(),
 		onNextMonth: fn(),
+		onEditByoCap: fn(),
 	},
 } satisfies Meta<typeof AdminLlmUsagePage>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Current month with a cap set and spend well under it. */
-export const Default: Story = {};
+/** Comfortably inside the host's budget, with no provider of the workspace's own connected yet. */
+export const WithinBudget: Story = {};
 
-/** Spend reached the cap in the current month — the destructive pause banner shows. */
-export const OverBudget: Story = {
+/** Both sides live and under their caps — the two meters never merge into one number. */
+export const BothCapsHealthy: Story = {
+	args: { report: withOwnProvider },
+};
+
+/** 84% of the workspace's own cap is gone — warned as a status, with the date the pace reaches it. */
+export const ApproachingOwnCap: Story = {
+	args: {
+		report: { ...withOwnProvider, byoTotalCostUsd: 8.4 },
+	},
+};
+
+/** 88% of the host's budget is gone. Same shape, different owner — and a different remedy. */
+export const ApproachingSharedBudget: Story = {
+	args: {
+		report: { ...withOwnProvider, pricedTotalCostUsd: 22 },
+	},
+};
+
+/**
+ * Day 2 of the month: the same warning without a projection. One busy afternoon is not a pace, so
+ * the page says nothing rather than guessing.
+ */
+export const ApproachingWithoutProjection: Story = {
+	args: {
+		now: new Date("2026-07-02T12:00:00.000Z"),
+		report: { ...withOwnProvider, byoTotalCostUsd: 8.4 },
+	},
+};
+
+/** The workspace spent its own cap — the one pause its admin can lift themselves. */
+export const OwnCapExhausted: Story = {
 	args: {
 		report: {
-			...baseReport,
-			pricedTotalCostUsd: 25.0142,
-			verdict: "EXHAUSTED",
+			...withOwnProvider,
+			byoTotalCostUsd: 10.12,
+			byoBudgetVerdict: "EXHAUSTED",
+			byoPaused: true,
 		},
 	},
 };
 
-/** A past month that ended over budget — no banner, since only the current month is paused. */
-export const OverBudgetPastMonth: Story = {
+/** Unpriced calls on the workspace's own models: the cap can't be checked, so work stops. */
+export const OwnCapUnverifiable: Story = {
+	args: {
+		report: {
+			...withOwnProvider,
+			byoBudgetVerdict: "UNVERIFIABLE",
+			byoPaused: true,
+			unpricedEventCount: 7,
+		},
+	},
+};
+
+/** The host's budget is spent. A warning, not a catastrophe — the workspace's own provider runs on. */
+export const SharedBudgetExhausted: Story = {
+	args: {
+		report: {
+			...withOwnProvider,
+			pricedTotalCostUsd: 25.0142,
+			instanceBudgetVerdict: "EXHAUSTED",
+			instanceFundedPaused: true,
+		},
+	},
+};
+
+/** Unpriced shared-model calls — only the host can fix this, and the copy never pretends otherwise. */
+export const SharedBudgetUnverifiable: Story = {
+	args: {
+		report: {
+			...withOwnProvider,
+			instanceBudgetVerdict: "UNVERIFIABLE",
+			instanceFundedPaused: true,
+			unpricedEventCount: 7,
+		},
+	},
+};
+
+/** Both caps spent: the actionable one leads. */
+export const BothPaused: Story = {
+	args: {
+		report: {
+			...withOwnProvider,
+			pricedTotalCostUsd: 25.0142,
+			byoTotalCostUsd: 10.12,
+			instanceBudgetVerdict: "EXHAUSTED",
+			instanceFundedPaused: true,
+			byoBudgetVerdict: "EXHAUSTED",
+			byoPaused: true,
+		},
+	},
+};
+
+/** No provider of their own connected — a quiet offer rather than an empty meter. */
+export const NoOwnProvider: Story = {
+	args: { report: baseReport },
+};
+
+/** Own-provider spend with no cap on it yet: the meter is absent, the offer to cap it is not. */
+export const OwnProviderUncapped: Story = {
+	args: {
+		report: { ...withOwnProvider, byoMonthlyBudgetUsd: undefined },
+	},
+};
+
+/** A $0 own cap pauses immediately — it reads 100% used, not "—". */
+export const ZeroOwnCap: Story = {
+	args: {
+		report: {
+			...withOwnProvider,
+			byoMonthlyBudgetUsd: 0,
+			byoTotalCostUsd: 0,
+			byoBudgetVerdict: "EXHAUSTED",
+			byoPaused: true,
+		},
+	},
+};
+
+/** The host set no budget at all — spend is still reported, there is simply nothing to fill. */
+export const NoSharedBudget: Story = {
+	args: {
+		report: { ...withOwnProvider, instanceMonthlyBudgetUsd: undefined },
+	},
+};
+
+/** A past month that ended over budget — nothing is paused in a month that has already closed. */
+export const PastMonth: Story = {
 	args: {
 		month: "2026-06",
 		isCurrentMonth: false,
 		report: {
-			...baseReport,
+			...withOwnProvider,
 			month: "2026-06",
 			pricedTotalCostUsd: 25.0142,
-			verdict: "EXHAUSTED",
-		},
-	},
-};
-
-/** A $0 cap pauses the workspace immediately — budget used reads 100%, not "—". */
-export const ZeroCap: Story = {
-	args: {
-		report: {
-			...baseReport,
-			monthlyBudgetUsd: 0,
-			pricedTotalCostUsd: 0,
-			verdict: "EXHAUSTED",
-			byJobType: [],
-			byDay: [],
-		},
-	},
-};
-
-/** No cap configured — spend is shown but budget progress is not applicable. */
-export const NoCap: Story = {
-	args: {
-		report: {
-			...baseReport,
-			monthlyBudgetUsd: undefined,
+			instanceBudgetVerdict: "EXHAUSTED",
 		},
 	},
 };
@@ -160,13 +273,9 @@ export const NoCap: Story = {
 export const Empty: Story = {
 	args: {
 		report: {
-			month: "2026-07",
-			monthlyBudgetUsd: 25,
+			...baseReport,
 			pricedTotalCostUsd: 0,
 			byoTotalCostUsd: 0,
-			verdict: "WITHIN",
-			usagePaused: false,
-			unpricedEventCount: 0,
 			byJobType: [],
 			byDay: [],
 		},
@@ -174,57 +283,23 @@ export const Empty: Story = {
 };
 
 /**
- * Some calls ran on a model with no pricing row, so the reported spend — and the cap that reads
- * it — under-count. A secondary warning callout explains the data-quality gap.
+ * Some calls ran on a model with no pricing row, so both reported totals — and the caps that read
+ * them — under-count. A secondary callout explains the data-quality gap and who can close it.
  */
 export const UncostedUsage: Story = {
 	args: {
-		report: {
-			...baseReport,
-			unpricedEventCount: 42,
-		},
+		report: { ...withOwnProvider, unpricedEventCount: 42 },
 	},
 };
 
 /** A single uncosted call — the callout reads "1 call", not "1 calls". */
 export const SingleUncostedCall: Story = {
 	args: {
-		report: {
-			...baseReport,
-			unpricedEventCount: 1,
-		},
+		report: { ...withOwnProvider, unpricedEventCount: 1 },
 	},
 };
 
-/**
- * A past month with uncosted calls — the callout still shows (it is a fact about that month's
- * data), even though the over-budget pause banner does not.
- */
-export const UncostedUsagePastMonth: Story = {
-	args: {
-		month: "2026-06",
-		isCurrentMonth: false,
-		report: {
-			...baseReport,
-			month: "2026-06",
-			unpricedEventCount: 42,
-		},
-	},
-};
-
-/** Both notices at once — the destructive pause banner stays above the warning callout. */
-export const OverBudgetWithUncostedUsage: Story = {
-	args: {
-		report: {
-			...baseReport,
-			pricedTotalCostUsd: 25.0142,
-			verdict: "EXHAUSTED",
-			unpricedEventCount: 42,
-		},
-	},
-};
-
-/** Report still loading — the stat cards and the by-job-type table shell are skeletoned in place. */
+/** Report still loading — both cap cards and the by-job-type table shell are skeletoned in place. */
 export const Loading: Story = {
 	args: {
 		report: undefined,

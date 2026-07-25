@@ -12,7 +12,17 @@ import {
 } from "@/components/ui/table";
 import { formatUsageDay, JOB_TYPE_LABELS } from "./usageUtils";
 
-const JOB_TYPE_SKELETON_COLUMNS = ["w-32", "w-16", "w-16", "w-16", "w-20", "w-20", "w-12", "w-12"];
+const JOB_TYPE_SKELETON_COLUMNS = [
+	"w-32",
+	"w-16",
+	"w-16",
+	"w-20",
+	"w-16",
+	"w-20",
+	"w-20",
+	"w-12",
+	"w-12",
+];
 const DAY_SKELETON_COLUMNS = ["w-16", "w-16", "w-16", "w-16", "w-12"];
 
 export interface LlmUsageByJobTypeTableProps {
@@ -33,6 +43,9 @@ export function LlmUsageByJobTypeTable({ rows }: LlmUsageByJobTypeTableProps) {
 					</TableHead>
 					<TableHead scope="col" className="text-right">
 						Workspace-owned
+					</TableHead>
+					<TableHead scope="col" className="text-right">
+						Avg per event
 					</TableHead>
 					<TableHead scope="col" className="text-right">
 						Unpriced calls
@@ -65,6 +78,9 @@ export function LlmUsageByJobTypeTable({ rows }: LlmUsageByJobTypeTableProps) {
 								{formatCostUsd(row.byoTotalCostUsd)}
 							</TableCell>
 							<TableCell className="text-right tabular-nums">
+								<AvgPerEvent row={row} />
+							</TableCell>
+							<TableCell className="text-right tabular-nums">
 								{row.unpricedEventCount.toLocaleString()}
 							</TableCell>
 							<TableCell className="text-right tabular-nums">
@@ -84,6 +100,38 @@ export function LlmUsageByJobTypeTable({ rows }: LlmUsageByJobTypeTableProps) {
 				</TableBody>
 			)}
 		</Table>
+	);
+}
+
+/**
+ * What one unit of this work costs on average — the figure people actually reason with ("a review
+ * costs me about $0.14"), which a monthly total never gives them. The two funding sources keep
+ * their own averages: they are different money and are never added together, so when both are in
+ * play the cell shows two labelled lines rather than one blended number.
+ */
+function AvgPerEvent({ row }: { row: LlmUsageByJobType }) {
+	const parts = [
+		{ key: "shared", label: "shared", total: row.pricedTotalCostUsd },
+		{ key: "own", label: "own", total: row.byoTotalCostUsd },
+	].filter((part) => part.total > 0);
+
+	if (row.events <= 0 || parts.length === 0) {
+		return <span className="text-muted-foreground">—</span>;
+	}
+	return (
+		<div className="flex flex-col items-end">
+			{parts.map((part) => (
+				<span key={part.key}>
+					≈ {formatCostUsd(part.total / row.events)}
+					{parts.length > 1 && (
+						<>
+							{" "}
+							<span className="text-xs text-muted-foreground">{part.label}</span>
+						</>
+					)}
+				</span>
+			))}
+		</div>
 	);
 }
 

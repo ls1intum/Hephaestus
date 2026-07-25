@@ -23,8 +23,10 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetBlockReason;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetDecision;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageJobType;
@@ -1101,7 +1103,11 @@ public class AgentJobExecutor {
             // promises the user. retry_count is left untouched (this is not an execution failure).
             // Only a job that has been waiting past BUDGET_HOLD_MAX_AGE is cancelled terminally:
             // month-old detection feedback is noise, and an unbounded hold would loop forever.
-            LlmBudgetBlockReason blockReason = llmBudgetService.blockReason(job.getWorkspace().getId());
+            // Scoped to who pays for this job's purpose: the host's exhausted budget must not hold
+            // work the workspace funds through its own provider, and vice versa.
+            LlmBudgetBlockReason blockReason = llmBudgetService
+                .decide(job.getWorkspace().getId())
+                .forFunding(claimedFundingSource(job));
             if (blockReason != LlmBudgetBlockReason.NONE) {
                 Instant now = Instant.now();
                 boolean expired =
@@ -1126,6 +1132,9 @@ public class AgentJobExecutor {
                     return ClaimOutcome.BUDGET_BLOCKED;
                 }
                 job.setAvailableAt(now.plus(BUDGET_HOLD_INTERVAL));
+                // Marks this as a budget hold specifically, so raising the cap can release it at once
+                // instead of leaving the admin to wait out BUDGET_HOLD_INTERVAL.
+                job.setHoldReason(AgentJob.HOLD_REASON_BUDGET);
                 jobRepository.save(job);
                 log.info(
                     "Holding claim — monthly LLM budget {}: jobId={}, workspaceId={}, retryAt={}",
@@ -1207,6 +1216,10 @@ public class AgentJobExecutor {
             job.setStatus(AgentJobStatus.RUNNING);
             job.setStartedAt(claimedAt);
             job.setExecutionStartedAt(null);
+            // The hold is over — clear its marker so it never outlives the hold it describes. A stale
+            // 'BUDGET' marker would survive onto a later crash-retry requeue, and a cap raise would
+            // then fast-forward a backoff that has nothing to do with the budget.
+            job.setHoldReason(null);
             job.setWorkerId(workerId); // owner for cancel routing, orphan recovery, and terminal-write fencing (#1138)
             job.setConfigSnapshot(snapshot.toJson(objectMapper));
             jobRepository.save(job);
@@ -1447,6 +1460,23 @@ public class AgentJobExecutor {
         private TerminalPersistenceException(Throwable cause) {
             super("Could not durably persist terminal job result and usage", cause);
         }
+    }
+
+    /**
+     * Who pays for this job — read from the binding of the purpose it runs on. A job whose purpose or
+     * binding is gone yields {@code null}, which {@link LlmBudgetDecision#forFunding} judges against
+     * BOTH caps: an unattributable job must not be a way around either one. (It is refused a few
+     * lines later for the missing binding anyway; this only decides the budget question.)
+     */
+    private @Nullable FundingSource claimedFundingSource(AgentJob job) {
+        AgentPurpose purpose = job.getPurpose();
+        if (purpose == null) {
+            return null;
+        }
+        return bindingRepository
+            .findByWorkspaceIdAndPurpose(job.getWorkspace().getId(), purpose)
+            .map(WorkspaceAgentBinding::getFundingSource)
+            .orElse(null);
     }
 
     private LlmPriceSnapshot admittedPrice(ConfigSnapshot snapshot) {
