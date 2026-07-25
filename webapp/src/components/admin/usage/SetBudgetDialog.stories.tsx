@@ -32,10 +32,10 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Editing an existing budget — the "Remove cap" action is offered. */
+/** Editing an existing budget — the "Remove budget" action is offered. */
 export const WithExistingCap: Story = {};
 
-/** Uncapped workspace — no "Remove cap" action, input starts empty. */
+/** Workspace with no budget — no "Remove budget" action, input starts empty. */
 export const Uncapped: Story = {
 	args: {
 		workspace: {

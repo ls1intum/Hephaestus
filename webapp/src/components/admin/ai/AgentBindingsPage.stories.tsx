@@ -19,7 +19,7 @@ const detectionBinding: AgentBinding = {
 /** Both purposes are turned on for the workspace, so each card offers a real binding form. */
 const workspace = { practicesEnabled: true, mentorEnabled: true };
 
-/** Workspace providers are covered by their own panel's stories, so they stay out of the way here. */
+/** The workspace's own providers have their own panel's stories, so they stay out of the way here. */
 const llmSettings = { ownProviderAllowed: false };
 
 const usage = {

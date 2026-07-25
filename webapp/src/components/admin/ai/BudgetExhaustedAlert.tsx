@@ -22,7 +22,7 @@ interface BudgetExhaustedAlertProps {
 	 * itself instead of gesturing at "next month".
 	 */
 	month?: string;
-	/** Calls with no price on record this month; names the count instead of saying "some". */
+	/** Runs with no price on record this month; names the count instead of saying "some". */
 	unpricedEventCount?: number;
 	/**
 	 * Which surface is rendering the banner. It selects the action offered — never a word of the
@@ -76,7 +76,7 @@ export function BudgetExhaustedAlert({
 							: `Paused until ${resetDay} (UTC), or until you raise or remove the cap.`
 						: noPriceSet
 							? `${unpricedSubject(scope, unpricedEventCount)} no price, so the budget can't be checked and shared models are paused. Only your host can price them.`
-							: `Paused until ${resetDay} (UTC), or until your host raises the budget.`}
+							: `Paused until ${resetDay} (UTC), or until your host raises the budget. Practice detection and Mentor can keep running on your own models.`}
 				</p>
 				<PauseAction
 					scope={scope}
@@ -90,17 +90,21 @@ export function BudgetExhaustedAlert({
 	);
 }
 
-/** "1 call on your models has" / "3 shared-model calls have" / "Some calls on your models have". */
+/**
+ * "1 run on your models has" / "3 shared-model runs have" / "Some runs on your models have".
+ *
+ * The count is `unpricedEventCount` — runs, not the model calls a run may make several of.
+ */
 function unpricedSubject(scope: "shared" | "own", count: number | undefined): string {
 	const own = scope === "own";
 	if (count === 1) {
-		return own ? "1 call on your models has" : "1 shared-model call has";
+		return own ? "1 run on your models has" : "1 shared-model run has";
 	}
 	if (count != null && count > 1) {
 		const n = count.toLocaleString();
-		return own ? `${n} calls on your models have` : `${n} shared-model calls have`;
+		return own ? `${n} runs on your models have` : `${n} shared-model runs have`;
 	}
-	return own ? "Some calls on your models have" : "Some shared-model calls have";
+	return own ? "Some runs on your models have" : "Some shared-model runs have";
 }
 
 interface PauseActionProps {
@@ -164,7 +168,7 @@ function PauseAction({
 			className="mt-2"
 			render={<Link to="/w/$workspaceSlug/admin/models" params={{ workspaceSlug }} />}
 		>
-			Switch a purpose to your provider
+			Open AI models
 		</Button>
 	);
 }

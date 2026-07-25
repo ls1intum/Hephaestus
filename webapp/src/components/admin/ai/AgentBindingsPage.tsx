@@ -195,7 +195,7 @@ export function AgentBindingsPage({ workspaceSlug }: AgentBindingsPageProps) {
 			) : (
 				<div className="space-y-6">
 					<section className="space-y-4">
-						<h2 className="text-lg font-semibold">Assignments</h2>
+						<h2 className="text-lg font-semibold">Tasks</h2>
 						{PURPOSES.map((meta) => (
 							<AgentPurposeCard
 								key={`${meta.purpose}:${bindingFor(meta.purpose)?.instanceModelId ?? bindingFor(meta.purpose)?.workspaceModelId ?? "none"}`}
@@ -210,7 +210,7 @@ export function AgentBindingsPage({ workspaceSlug }: AgentBindingsPageProps) {
 
 					{llmSettingsQuery.data?.ownProviderAllowed && (
 						<section className="space-y-4">
-							<h2 className="text-lg font-semibold">Workspace providers</h2>
+							<h2 className="text-lg font-semibold">Your AI providers</h2>
 							<WorkspaceLlmProviderPanel workspaceSlug={workspaceSlug} ownProviderAllowed />
 						</section>
 					)}
@@ -323,7 +323,7 @@ function AgentPurposeCard({
 				<CardHeader>
 					<CardTitle>{meta.title}</CardTitle>
 					<CardDescription>
-						This feature is turned off for the workspace. An instance admin enables it.
+						Turned off for this workspace. Only your host can turn it on.
 					</CardDescription>
 				</CardHeader>
 			</Card>
@@ -369,8 +369,8 @@ function AgentPurposeCard({
 							/>
 							{noModels && (
 								<FieldDescription id={modelHintId}>
-									No models are available yet. Ask an instance admin to grant one, or add your own
-									under Workspace providers.
+									No models are available yet. Ask your host to share one, or connect your own AI
+									provider below.
 								</FieldDescription>
 							)}
 							{modelError && <FieldError id={modelErrorId}>{modelError}</FieldError>}

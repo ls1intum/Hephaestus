@@ -59,8 +59,8 @@ function AdminInstanceUsagePage() {
 			// ("within a minute") rather than a hedge ("about a minute") — it is one the gate keeps.
 			toast.success(
 				variables.body.monthlyBudgetUsd == null
-					? "Cap removed. New calls resume within a minute."
-					: "Cap saved. New calls resume within a minute.",
+					? "Budget removed. New calls resume within a minute."
+					: "Budget saved. New calls resume within a minute.",
 			);
 			setEditing(null);
 		},
@@ -98,6 +98,7 @@ function AdminInstanceUsagePage() {
 
 			<AdminInstanceLlmUsageTable
 				rows={rows}
+				month={month}
 				fx={fx}
 				isCurrentMonth={month >= currentMonthUtc()}
 				isLoading={listQuery.isLoading}

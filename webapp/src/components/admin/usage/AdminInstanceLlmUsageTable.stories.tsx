@@ -8,12 +8,12 @@ import {
 
 /**
  * Mixed cap ownership, in the container's sort order (shared-model spend desc): both caps set,
- * provider cap only, instance cap only, and neither.
+ * provider cap only, shared-model budget only, and neither.
  */
 const rows: AdminWorkspaceLlmUsageRow[] = [
 	{
-		// Both caps set; the instance cap is spent, so host-funded work is paused — the workspace's
-		// own provider keeps running, because that cap is nowhere near.
+		// Both caps set; the shared-model budget is spent, so host-funded work is paused — the
+		// workspace's own provider keeps running, because that cap is nowhere near.
 		workspaceSlug: "example-workspace",
 		displayName: "Example Workspace",
 		instanceMonthlyBudgetUsd: 25,
@@ -42,8 +42,8 @@ const rows: AdminWorkspaceLlmUsageRow[] = [
 		events: 74,
 	},
 	{
-		// Instance cap only, three quarters spent, and some usage has no price on record — so the
-		// meter is a floor, which the warning line says out loud.
+		// Shared-model budget only, three quarters spent, and some usage has no price on record — so
+		// the meter is a floor, which the warning line says out loud.
 		workspaceSlug: "launchpad",
 		displayName: "Launchpad",
 		instanceMonthlyBudgetUsd: 50,
@@ -121,7 +121,7 @@ const detailReport: WorkspaceLlmUsageReport = {
 
 /**
  * Instance-admin table of every workspace's AI spend for one month, against both caps: the
- * instance cap the host pays for (editable here, via `onEditBudget`) and the workspace's own
+ * shared-model budget the host grants (editable here, via `onEditBudget`) and the workspace's own
  * provider cap (read-only — it is the workspace's money). Pure/presentational.
  */
 const meta = {
@@ -130,6 +130,9 @@ const meta = {
 	tags: ["autodocs"],
 	args: {
 		rows,
+		month: "2026-07",
+		// Pinned so the burn-rate projections in the expanded panel are the same in every snapshot.
+		now: new Date("2026-07-10T12:00:00.000Z"),
 		isCurrentMonth: true,
 		isLoading: false,
 		error: null,
@@ -148,9 +151,9 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Current month with every cap combination: both caps, instance only, provider only, neither —
- * plus a paused instance cap, a paused provider cap, a near-cap warning, and a total that can't be
- * verified.
+ * Current month with every cap combination: both caps, shared-model budget only, provider only,
+ * neither — plus a paused budget, a paused provider cap, a near-cap warning, and a total that
+ * can't be verified.
  */
 export const Default: Story = {
 	// Also the default currency state: no display currency configured, so every figure is USD.
@@ -159,11 +162,36 @@ export const Default: Story = {
 	},
 };
 
-/** One workspace expanded to show the existing by-job and daily usage rollups. */
+/** One workspace expanded to show the existing by-run-type and daily usage rollups. */
 export const Expanded: Story = {
 	args: {
 		expandedWorkspaceSlug: rows[0].workspaceSlug,
 		detailReport,
+	},
+};
+
+/**
+ * The projection the rollup row can't carry. A budget at 84% is only alarming once you know this
+ * month's pace reaches it, which is exactly what the workspace's own console has always said and
+ * this one used to stop short of.
+ */
+export const ExpandedNearCap: Story = {
+	args: {
+		expandedWorkspaceSlug: rows[1].workspaceSlug,
+		detailReport: {
+			...detailReport,
+			instanceMonthlyBudgetUsd: 50,
+			instanceTotalCostUsd: 42,
+			instanceBudgetVerdict: "WITHIN",
+			instancePaused: false,
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(
+			canvas.getByText("Hephaestus Dev has used 84% of its shared-model budget"),
+		).toBeVisible();
+		await expect(canvas.getByText(/At this pace you'll hit it around July 12\./)).toBeVisible();
 	},
 };
 
@@ -280,7 +308,7 @@ export const PausedByInstanceCap: Story = {
 	args: { rows: [rows[0]] },
 };
 
-/** Paused on the workspace's own money — raising the instance cap would change nothing. */
+/** Paused on the workspace's own money — raising the shared-model budget would change nothing. */
 export const PausedByProviderCap: Story = {
 	args: { rows: [rows[4]] },
 };
@@ -307,8 +335,8 @@ export const PausedByBothCaps: Story = {
 };
 
 /**
- * A $0 instance cap is a supported state — it reads as 100% used and pauses immediately, rather
- * than as "no cap".
+ * A $0 shared-model budget is a supported state — it reads as 100% used and pauses immediately,
+ * rather than as "no budget".
  */
 export const ZeroInstanceCap: Story = {
 	args: {

@@ -44,13 +44,16 @@ export function SetBudgetDialog({
 				workspace !== null ? (
 					<>
 						What <strong>{workspace.displayName}</strong> ({workspace.workspaceSlug}) can spend on
-						shared models each month. At the cap, shared-model work pauses until the month resets;
-						the workspace's own provider is not affected. $0 pauses now.
+						shared models each month. When the budget is reached, shared-model work pauses until the
+						month resets; the workspace's own provider is not affected. $0 pauses now.
 					</>
 				) : null
 			}
 			fieldLabel="Monthly budget (USD)"
 			submitLabel="Save budget"
+			// Otherwise this falls through to the shared dialog's "Remove cap" — and one click path
+			// would name this number four different ways.
+			removeLabel="Remove budget"
 			currentValueUsd={workspace?.instanceMonthlyBudgetUsd ?? null}
 			fx={fx}
 			isPending={isPending}

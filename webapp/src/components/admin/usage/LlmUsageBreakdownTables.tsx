@@ -66,10 +66,10 @@ export function LlmUsageByJobTypeTable({ rows, fx }: LlmUsageByJobTypeTableProps
 				};
 	return (
 		<Table containerClassName="rounded-md border">
-			<TableCaption className="sr-only">AI spend by job type</TableCaption>
+			<TableCaption className="sr-only">AI spend by run type</TableCaption>
 			<TableHeader>
 				<TableRow>
-					<TableHead scope="col">Job type</TableHead>
+					<TableHead scope="col">Run type</TableHead>
 					<TableHead scope="col" className="text-right">
 						Shared models
 					</TableHead>
@@ -77,7 +77,7 @@ export function LlmUsageByJobTypeTable({ rows, fx }: LlmUsageByJobTypeTableProps
 						Your provider
 					</TableHead>
 					<TableHead scope="col" className="text-right">
-						Avg per event
+						Avg per run
 					</TableHead>
 					<TableHead scope="col" className="text-right">
 						No price set
@@ -92,7 +92,7 @@ export function LlmUsageByJobTypeTable({ rows, fx }: LlmUsageByJobTypeTableProps
 						Calls
 					</TableHead>
 					<TableHead scope="col" className="text-right">
-						Events
+						Runs
 					</TableHead>
 				</TableRow>
 			</TableHeader>
@@ -110,7 +110,7 @@ export function LlmUsageByJobTypeTable({ rows, fx }: LlmUsageByJobTypeTableProps
 								<MoneyCell>{formatCostUsd(row.ownProviderTotalCostUsd)}</MoneyCell>
 							</TableCell>
 							<TableCell className="text-right tabular-nums">
-								<AvgPerEvent row={row} />
+								<AvgPerRun row={row} />
 							</TableCell>
 							<TableCell className="text-right tabular-nums">
 								{row.unpricedEventCount.toLocaleString()}
@@ -179,7 +179,7 @@ export function LlmUsageByJobTypeTable({ rows, fx }: LlmUsageByJobTypeTableProps
  * exists to give. And no `≈`: on this page that glyph means "converted currency" (see `fx.tsx`),
  * the header already says "Avg", and a bare `≈` is announced as "tilde operator" anyway.
  */
-function AvgPerEvent({ row }: { row: LlmUsageByJobType }) {
+function AvgPerRun({ row }: { row: LlmUsageByJobType }) {
 	const parts = [
 		{ key: "shared", label: "shared models", total: row.instanceTotalCostUsd },
 		{ key: "provider", label: "your provider", total: row.ownProviderTotalCostUsd },
@@ -241,7 +241,7 @@ export function LlmUsageByDayTable({ rows, fx }: LlmUsageByDayTableProps) {
 						No price set
 					</TableHead>
 					<TableHead scope="col" className="text-right">
-						Events
+						Runs
 					</TableHead>
 				</TableRow>
 			</TableHeader>

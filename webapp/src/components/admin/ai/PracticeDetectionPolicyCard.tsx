@@ -153,13 +153,15 @@ export function PracticeDetectionPolicyCard({
 						<Alert variant="destructive">
 							<AlertCircle />
 							<AlertTitle>
-								{detectionBinding ? "Bound model cannot run" : "No model bound"}
+								{detectionBinding
+									? "Practice detection's model is unavailable"
+									: "Practice detection has no model"}
 							</AlertTitle>
 							<AlertDescription>
 								<p>
 									{detectionBinding
-										? "The model bound to practice detection is disabled or no longer available, so no review can run."
-										: "Practice detection has no model bound, so no review can run."}
+										? "The model it runs on is turned off or was removed, so reviews can't run."
+										: "Reviews can't run until a model is chosen."}
 								</p>
 								<Button
 									variant="outline"

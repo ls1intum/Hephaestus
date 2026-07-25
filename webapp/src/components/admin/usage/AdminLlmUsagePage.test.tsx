@@ -86,9 +86,9 @@ describe("AdminLlmUsagePage", () => {
 		expect(screen.getByText("Shared-model spend so far")).toBeTruthy();
 		expect(screen.getByText("Shared-model budget · set by your host")).toBeTruthy();
 		expect(screen.getByText("Your provider spend so far")).toBeTruthy();
-		expect(screen.getByText("Billed to your own provider key.")).toBeTruthy();
+		expect(screen.getByText("Billed directly to you by your provider.")).toBeTruthy();
 
-		const byJobType = screen.getByRole("table", { name: "AI spend by job type" });
+		const byJobType = screen.getByRole("table", { name: "AI spend by run type" });
 		expect(within(byJobType).getByRole("columnheader", { name: "Shared models" })).toBeTruthy();
 		expect(within(byJobType).getByRole("columnheader", { name: "Your provider" })).toBeTruthy();
 		expect(within(byJobType).getByRole("columnheader", { name: "No price set" })).toBeTruthy();
@@ -113,17 +113,17 @@ describe("AdminLlmUsagePage", () => {
 	it("gives the right pricing owner an actionable no-price-set warning", async () => {
 		await renderPage();
 
-		expect(screen.getByText("2 calls aren't counted in these totals")).toBeTruthy();
+		expect(screen.getByText("2 runs aren't counted in these totals")).toBeTruthy();
 		expect(
 			screen.getByText(/Add prices for your own models in .*; for shared models, ask your host\./),
 		).toBeTruthy();
 	});
 
-	it("shows the per-event average alongside the untouched funding columns", async () => {
+	it("shows the per-run average alongside the untouched funding columns", async () => {
 		await renderPage();
 
-		const byJobType = screen.getByRole("table", { name: "AI spend by job type" });
-		expect(within(byJobType).getByRole("columnheader", { name: "Avg per event" })).toBeTruthy();
+		const byJobType = screen.getByRole("table", { name: "AI spend by run type" });
+		expect(within(byJobType).getByRole("columnheader", { name: "Avg per run" })).toBeTruthy();
 		// 5 events: $4.25 shared and $1.75 own, each averaged on its own — never summed. No "≈": on
 		// this page that glyph means "converted currency", and the column header already says "Avg".
 		expect(within(byJobType).getByText("$0.85")).toBeTruthy();
@@ -165,7 +165,7 @@ describe("AdminLlmUsagePage", () => {
 			expect(banner).toBeTruthy();
 			expect(
 				within(banner as HTMLElement).getByText(
-					"2 calls on your models have no price, so the cap can't be checked and your provider is paused. Add a price to resume, or remove the cap.",
+					"2 runs on your models have no price, so the cap can't be checked and your provider is paused. Add a price to resume, or remove the cap.",
 				),
 			).toBeTruthy();
 			expect(
@@ -185,9 +185,11 @@ describe("AdminLlmUsagePage", () => {
 
 			expect(screen.getByText("Shared-model budget reached")).toBeTruthy();
 			expect(
-				screen.getByText("Paused until August 1 (UTC), or until your host raises the budget."),
+				screen.getByText(
+					"Paused until August 1 (UTC), or until your host raises the budget. Practice detection and Mentor can keep running on your own models.",
+				),
 			).toBeTruthy();
-			expect(screen.getByRole("link", { name: "Switch a purpose to your provider" })).toBeTruthy();
+			expect(screen.getByRole("link", { name: "Open AI models" })).toBeTruthy();
 		});
 
 		it("never asks the workspace admin to price a shared model", async () => {
@@ -200,7 +202,7 @@ describe("AdminLlmUsagePage", () => {
 			expect(screen.getByText("Shared-model spend can't be verified")).toBeTruthy();
 			expect(
 				screen.getByText(
-					"2 shared-model calls have no price, so the budget can't be checked and shared models are paused. Only your host can price them.",
+					"2 shared-model runs have no price, so the budget can't be checked and shared models are paused. Only your host can price them.",
 				),
 			).toBeTruthy();
 		});
@@ -280,7 +282,7 @@ describe("AdminLlmUsagePage", () => {
 				{ onEditOwnProviderCap },
 			);
 
-			expect(screen.getByText(/Nothing ran on a provider of your own this month\./)).toBeTruthy();
+			expect(screen.getByText(/Nothing ran on your own provider this month\./)).toBeTruthy();
 			fireEvent.click(screen.getByRole("button", { name: "Set cap" }));
 			expect(onEditOwnProviderCap).toHaveBeenCalled();
 		});

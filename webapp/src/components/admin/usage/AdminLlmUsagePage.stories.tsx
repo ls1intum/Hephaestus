@@ -367,7 +367,7 @@ export const Empty: Story = {
 };
 
 /**
- * Some calls ran on a model with no price set, so both reported totals — and the caps that read
+ * Some runs used a model with no price set, so both reported totals — and the caps that read
  * them — under-count. A secondary callout explains the gap and who can close it.
  */
 export const CallsWithNoPriceSet: Story = {

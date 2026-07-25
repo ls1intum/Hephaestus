@@ -71,14 +71,14 @@ describe("PracticeDetectionPolicyCard model binding", () => {
 	it("explains that reviews are paused when the bound model can no longer run", async () => {
 		renderCard({ detectionBinding: { ...readyBinding, ready: false } });
 
-		expect(await screen.findByText("Bound model cannot run")).toBeTruthy();
+		expect(await screen.findByText("Practice detection's model is unavailable")).toBeTruthy();
 		expect(screen.getByRole("link", { name: "Open AI models" })).toBeTruthy();
 	});
 
 	it("explains that reviews cannot run at all when no model is bound", async () => {
 		renderCard({ detectionBinding: undefined });
 
-		expect(await screen.findByText("No model bound")).toBeTruthy();
+		expect(await screen.findByText("Practice detection has no model")).toBeTruthy();
 		expect(screen.getByRole("link", { name: "Open AI models" })).toBeTruthy();
 	});
 

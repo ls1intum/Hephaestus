@@ -53,8 +53,8 @@ export interface BudgetAmountDialogProps {
  * shared-model budget) and workspace-admin (`SetOwnProviderBudgetDialog`, the workspace's provider cap).
  * Both edit the same kind of value under the same rules (USD, >= 0, cent
  * precision, `null` removes, `0` pauses immediately), so the validation, the currency input, the
- * "Remove cap" affordance, the pending state, and server-error rendering live here once; the
- * wrappers supply only the copy.
+ * remove affordance, the pending state, and server-error rendering live here once; the wrappers
+ * supply only the copy.
  */
 export function BudgetAmountDialog({
 	open,
@@ -109,7 +109,9 @@ function BudgetAmountDialogContent({
 	const hasCentPrecision = /^\d*(\.\d{0,2})?$/.test(value.trim());
 	const isValid = !isEmpty && Number.isFinite(parsed) && parsed >= 0 && hasCentPrecision;
 	const localError = isEmpty
-		? "Enter an amount, or use Remove cap."
+		? // Names the button that is actually on screen — this dialog is also the budget editor,
+			// where it reads "Remove budget".
+			`Enter an amount, or use ${removeLabel}.`
 		: !Number.isFinite(parsed) || parsed < 0
 			? "Enter an amount of $0 or more."
 			: "Use at most two decimal places.";

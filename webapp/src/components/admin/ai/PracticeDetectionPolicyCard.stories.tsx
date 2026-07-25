@@ -49,7 +49,7 @@ type Story = StoryObj<typeof meta>;
 /** Detection is bound to a runnable model; triggers and policy populated. */
 export const RuntimeBound: Story = {};
 
-/** No model bound to practice detection — nothing can run until one is set on the AI models page. */
+/** Practice detection has no model — nothing runs until one is chosen on the AI models page. */
 export const Unbound: Story = {
 	args: { detectionBinding: undefined },
 };

@@ -1,6 +1,5 @@
-import { Progress as ProgressRoot } from "@base-ui/react/progress";
 import { Link } from "@tanstack/react-router";
-import { CircleAlert, CircleDollarSign, TrendingUp } from "lucide-react";
+import { CircleAlert, CircleDollarSign } from "lucide-react";
 import type { WorkspaceLlmUsageReport } from "@/api/types.gen";
 import { BudgetExhaustedAlert } from "@/components/admin/ai/BudgetExhaustedAlert";
 import { formatCapUsd, formatCostUsd } from "@/components/admin/ai/jobUtils";
@@ -16,8 +15,9 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
-import { ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { BudgetPaceAlert } from "./BudgetPaceAlert";
+import { CAP_STATE_LABELS, CapMeter, capState } from "./CapMeter";
 import {
 	capConversion,
 	type Fx,
@@ -29,14 +29,7 @@ import {
 } from "./fx";
 import { LlmUsageByDayTable, LlmUsageByJobTypeTable } from "./LlmUsageBreakdownTables";
 import { MonthNavigator } from "./MonthNavigator";
-import {
-	BUDGET_WARN_PERCENT,
-	type BudgetProjection,
-	budgetUsedPercent,
-	formatDayLabel,
-	formatMonthLabel,
-	projectBudget,
-} from "./usageUtils";
+import { budgetUsedPercent, formatMonthLabel, projectBudget } from "./usageUtils";
 
 export interface AdminLlmUsagePageProps {
 	/** ISO `yyyy-MM` month currently shown. */
@@ -96,17 +89,12 @@ export function AdminLlmUsagePage({
 	const providerPaused = isCurrentMonth && (report?.ownProviderPaused ?? false);
 	const sharedPaused = isCurrentMonth && (report?.instancePaused ?? false);
 	// A cap that is already at the wall is reported by its pause banner; warning "you've used 100%"
-	// underneath it would just say the same thing more quietly.
+	// underneath it would just say the same thing more quietly. `capState` is the one place that
+	// decides this, shared with the instance console.
 	const providerWarning =
-		isCurrentMonth &&
-		!providerPaused &&
-		providerPercent != null &&
-		providerPercent >= BUDGET_WARN_PERCENT;
+		capState(providerPercent, providerPaused, isCurrentMonth) === "near" ? providerPercent : null;
 	const sharedWarning =
-		isCurrentMonth &&
-		!sharedPaused &&
-		sharedPercent != null &&
-		sharedPercent >= BUDGET_WARN_PERCENT;
+		capState(sharedPercent, sharedPaused, isCurrentMonth) === "near" ? sharedPercent : null;
 	const hasUsage =
 		report != null &&
 		(report.byJobType.length > 0 ||
@@ -180,7 +168,7 @@ export function AdminLlmUsagePage({
 					</div>
 					<Card>
 						<CardHeader>
-							<CardTitle>By job type</CardTitle>
+							<CardTitle>By run type</CardTitle>
 						</CardHeader>
 						<CardContent>
 							<LlmUsageByJobTypeTable />
@@ -212,20 +200,20 @@ export function AdminLlmUsagePage({
 						/>
 					)}
 
-					{providerWarning && (
+					{providerWarning != null && (
 						<BudgetPaceAlert
 							scope="provider"
-							percent={providerPercent}
+							percent={providerWarning}
 							spendUsd={providerSpend}
 							capUsd={providerCap}
 							projection={projectBudget(providerSpend, providerCap, month, now)}
 							fx={fx}
 						/>
 					)}
-					{sharedWarning && (
+					{sharedWarning != null && (
 						<BudgetPaceAlert
 							scope="shared"
-							percent={sharedPercent}
+							percent={sharedWarning}
 							spendUsd={sharedSpend}
 							capUsd={sharedBudget}
 							projection={projectBudget(sharedSpend, sharedBudget, month, now)}
@@ -240,8 +228,8 @@ export function AdminLlmUsagePage({
 							<CircleAlert aria-hidden />
 							<AlertTitle>
 								{unpricedEventCount === 1
-									? "1 call isn't counted in these totals"
-									: `${unpricedEventCount.toLocaleString()} calls aren't counted in these totals`}
+									? "1 run isn't counted in these totals"
+									: `${unpricedEventCount.toLocaleString()} runs aren't counted in these totals`}
 							</AlertTitle>
 							<AlertDescription>
 								<p>
@@ -260,7 +248,6 @@ export function AdminLlmUsagePage({
 							capUsd={sharedBudget}
 							percent={sharedPercent}
 							paused={sharedPaused}
-							workspaceSlug={workspaceSlug}
 							titleFx={sharedTitleFx}
 						/>
 						{hasProviderSide ? (
@@ -304,7 +291,7 @@ export function AdminLlmUsagePage({
 						<>
 							<Card>
 								<CardHeader>
-									<CardTitle>By job type</CardTitle>
+									<CardTitle>By run type</CardTitle>
 								</CardHeader>
 								<CardContent>
 									<LlmUsageByJobTypeTable rows={report.byJobType} fx={fx} />
@@ -356,62 +343,12 @@ function AiModelsLink({ workspaceSlug }: { workspaceSlug: string }) {
 	);
 }
 
-interface BudgetPaceAlertProps {
-	scope: "provider" | "shared";
-	percent: number;
-	spendUsd: number;
-	capUsd: number | undefined;
-	/** `null` when the month is too young or the spend too empty for a pace to mean anything. */
-	projection: BudgetProjection | null;
-	fx: Fx;
-}
-
-/** Warn before the wall: how much of a cap is gone, and when this month's pace would reach it. */
-function BudgetPaceAlert({
-	scope,
-	percent,
-	spendUsd,
-	capUsd,
-	projection,
-	fx,
-}: BudgetPaceAlertProps) {
-	const isProvider = scope === "provider";
-	return (
-		<Alert variant="warning" role="status">
-			<TrendingUp aria-hidden />
-			<AlertTitle>
-				You've used {Math.round(percent)}% of your{" "}
-				{isProvider ? "provider cap" : "shared-model budget"}
-			</AlertTitle>
-			<AlertDescription>
-				<p>
-					{formatCostUsd(spendUsd)} of {formatCapUsd(capUsd)}
-					<FxAmount conversion={spendOfCapConversion(spendUsd, capUsd, fx)} />.
-					{projection != null &&
-						(projection.reachedOn != null ? (
-							` At this pace you'll hit it around ${formatDayLabel(projection.reachedOn)}.`
-						) : (
-							// The month-end figure converts too: one sentence that quotes "$43.90 of $50
-							// (≈ €38.59 of €44)" and then a bare "$61.20" makes the reader switch currencies
-							// mid-breath.
-							<>
-								{` At this pace you'll finish the month around ${formatCostUsd(projection.projectedMonthEndUsd)}`}
-								<FxAmount conversion={spendConversion(projection.projectedMonthEndUsd, fx)} />.
-							</>
-						))}
-				</p>
-			</AlertDescription>
-		</Alert>
-	);
-}
-
 interface SharedBudgetCardProps {
 	isCurrentMonth: boolean;
 	spendUsd: number;
 	capUsd: number | undefined;
 	percent: number | undefined;
 	paused: boolean;
-	workspaceSlug: string;
 	/** The estimate that trails the headline, or `null` when there is nothing to convert. */
 	titleFx: FxConversion | null;
 }
@@ -423,7 +360,6 @@ function SharedBudgetCard({
 	capUsd,
 	percent,
 	paused,
-	workspaceSlug,
 	titleFx,
 }: SharedBudgetCardProps) {
 	return (
@@ -458,18 +394,16 @@ function SharedBudgetCard({
 			</CardHeader>
 			<CardContent className="space-y-3">
 				{/* Whose budget this is has already been said once, in the description above. */}
-				{percent != null && (
-					<BudgetMeter
+				{percent != null && capUsd != null && (
+					<CapMeterWithCaption
 						percent={percent}
 						paused={paused}
+						isCurrentMonth={isCurrentMonth}
 						spendUsd={spendUsd}
 						capUsd={capUsd}
 						label="Shared-model budget used"
 					/>
 				)}
-				<p className="text-sm text-muted-foreground">
-					Move a purpose to your own provider in <AiModelsLink workspaceSlug={workspaceSlug} />.
-				</p>
 			</CardContent>
 		</Card>
 	);
@@ -518,13 +452,14 @@ function ProviderCapCard({
 						)
 					)}
 				</CardTitle>
-				<CardDescription>Billed to your own provider key.</CardDescription>
+				<CardDescription>Billed directly to you by your provider.</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-3">
-				{percent != null && (
-					<BudgetMeter
+				{percent != null && capUsd != null && (
+					<CapMeterWithCaption
 						percent={percent}
 						paused={paused}
+						isCurrentMonth={isCurrentMonth}
 						spendUsd={spendUsd}
 						capUsd={capUsd}
 						label="Your provider cap used"
@@ -554,8 +489,8 @@ function NoProviderCard({ workspaceSlug, onEditOwnProviderCap }: NoProviderCardP
 				<CardDescription>Your provider spend</CardDescription>
 				<CardTitle className="text-2xl tabular-nums">No spend</CardTitle>
 				<CardDescription>
-					Nothing ran on a provider of your own this month. Connect one in{" "}
-					<AiModelsLink workspaceSlug={workspaceSlug} /> to cap what it spends yourself.
+					Nothing ran on your own provider this month. Connect one in{" "}
+					<AiModelsLink workspaceSlug={workspaceSlug} />.
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-3">
@@ -568,48 +503,40 @@ function NoProviderCard({ workspaceSlug, onEditOwnProviderCap }: NoProviderCardP
 	);
 }
 
-interface BudgetMeterProps {
+interface CapMeterWithCaptionProps {
 	percent: number;
 	paused: boolean;
+	isCurrentMonth: boolean;
 	spendUsd: number;
-	capUsd: number | undefined;
-	/** Distinct per meter, so a screen reader never has to guess which cap it is on. */
+	capUsd: number;
 	label: string;
 }
 
 /**
- * One cap's consumption. Three tones, because two hid the approach: normal, amber from
- * {@link BUDGET_WARN_PERCENT} — the same threshold that raises the pace warning — and destructive
- * once the cap is reached or the pause is live. The tone never carries the state alone: the line
- * underneath names it in words too (WCAG SC 1.4.1).
+ * The shared meter plus this page's caption. The card has the width for a percentage in prose, so
+ * the amounts stay in the headline above and are not repeated here; the state word comes from
+ * {@link CAP_STATE_LABELS} so it cannot drift from the instance console's cell.
  */
-function BudgetMeter({ percent, paused, spendUsd, capUsd, label }: BudgetMeterProps) {
-	const value = Math.min(Math.max(percent, 0), 100);
-	const rounded = Math.round(percent);
-	const state = paused ? "Paused" : percent >= BUDGET_WARN_PERCENT ? "Near cap" : null;
-	// Comma, not an em-dash: screen readers render an em-dash inconsistently — some spell it out.
-	const valueText = `${rounded}% used, ${formatCostUsd(spendUsd)} of ${formatCapUsd(capUsd)}`;
-	const tone =
-		paused || percent >= 100
-			? "bg-destructive"
-			: percent >= BUDGET_WARN_PERCENT
-				? "bg-warning"
-				: "bg-primary";
-
+function CapMeterWithCaption({
+	percent,
+	paused,
+	isCurrentMonth,
+	spendUsd,
+	capUsd,
+	label,
+}: CapMeterWithCaptionProps) {
+	const state = capState(percent, paused, isCurrentMonth);
 	return (
 		<div className="space-y-1.5">
-			<ProgressRoot.Root
-				value={value}
-				className="flex w-full"
-				aria-label={label}
-				getAriaValueText={() => valueText}
-			>
-				<ProgressTrack className="h-1.5 rounded-full">
-					<ProgressIndicator className={tone} />
-				</ProgressTrack>
-			</ProgressRoot.Root>
+			<CapMeter
+				percent={percent}
+				paused={paused}
+				spendUsd={spendUsd}
+				capUsd={capUsd}
+				label={label}
+			/>
 			<p className="text-sm text-muted-foreground tabular-nums">
-				{rounded}% used{state != null && ` · ${state}`}
+				{Math.round(percent)}% used{state != null && ` · ${CAP_STATE_LABELS[state]}`}
 			</p>
 		</div>
 	);

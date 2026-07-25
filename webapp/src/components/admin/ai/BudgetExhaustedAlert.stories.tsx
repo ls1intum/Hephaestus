@@ -27,7 +27,7 @@ export const ProviderCapReached: Story = {
 };
 
 /**
- * Some calls on the workspace's own models have no price, so their cap can't be enforced. On the AI
+ * Some runs on the workspace's own models have no price, so their cap can't be enforced. On the AI
  * models page the prices are already on screen, so the banner only links to the cap.
  */
 export const ProviderCapUnenforceable: Story = {

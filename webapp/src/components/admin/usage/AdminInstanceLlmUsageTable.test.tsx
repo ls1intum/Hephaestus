@@ -64,6 +64,8 @@ function renderTable(
 	return render(
 		<AdminInstanceLlmUsageTable
 			rows={rows}
+			month="2026-07"
+			now={new Date("2026-07-10T12:00:00.000Z")}
 			fx={overrides.fx}
 			isCurrentMonth={overrides.isCurrentMonth ?? true}
 			isLoading={false}
@@ -88,6 +90,7 @@ describe("AdminInstanceLlmUsageTable", () => {
 		render(
 			<AdminInstanceLlmUsageTable
 				rows={[workspace]}
+				month="2026-07"
 				isCurrentMonth
 				isLoading={false}
 				error={null}
@@ -112,12 +115,12 @@ describe("AdminInstanceLlmUsageTable", () => {
 		expect(onToggleDetails).toHaveBeenCalledWith(workspace);
 	});
 
-	it("separates the instance cap from the workspace's own provider cap", () => {
+	it("separates the shared-model budget from the workspace's own provider cap", () => {
 		renderTable([
 			{ ...workspace, ownProviderMonthlyBudgetUsd: 10, ownProviderBudgetVerdict: "WITHIN" },
 		]);
 
-		expect(screen.getByRole("columnheader", { name: "Instance cap" })).toBeTruthy();
+		expect(screen.getByRole("columnheader", { name: "Shared-model budget" })).toBeTruthy();
 		expect(screen.getByRole("columnheader", { name: "Provider cap" })).toBeTruthy();
 		const row = within(firstDataRow());
 		// A cap renders without trailing cents — "$25", not "$25.00".
@@ -131,16 +134,17 @@ describe("AdminInstanceLlmUsageTable", () => {
 		const row = within(firstDataRow());
 		expect(row.getByText("$38.20 · 76%")).toBeTruthy();
 		expect(
-			row.getByRole("progressbar", { name: "Instance cap used by Example Workspace" }),
+			row.getByRole("progressbar", { name: "Shared-model budget used by Example Workspace" }),
 		).toBeTruthy();
-		expect(screen.getByRole("cell", { name: /Within budget/ })).toBeTruthy();
+		// Being inside both caps is not a state: the cap cells already say it, in amounts.
+		expect(screen.queryByText("Within budget")).toBeNull();
 	});
 
 	it("warns before the cap is reached", () => {
 		renderTable([{ ...workspace, instanceMonthlyBudgetUsd: 50, instanceTotalCostUsd: 41 }]);
 
 		const row = within(firstDataRow());
-		expect(row.getByText("Near cap · instance cap")).toBeTruthy();
+		expect(row.getByText("Near cap · shared models")).toBeTruthy();
 		// The tone alone must never carry the state (WCAG SC 1.4.1).
 		expect(row.getByText("$41.00 · 82% · Near cap")).toBeTruthy();
 	});
@@ -159,11 +163,11 @@ describe("AdminInstanceLlmUsageTable", () => {
 		]);
 
 		const row = within(firstDataRow());
-		expect(row.getByText("Paused · instance cap")).toBeTruthy();
-		expect(row.getByText("Paused · provider cap")).toBeTruthy();
+		expect(row.getByText("Paused · shared models")).toBeTruthy();
+		expect(row.getByText("Paused · own provider")).toBeTruthy();
 	});
 
-	it("reports a provider-cap pause even when the instance cap is untouched", () => {
+	it("reports a provider-cap pause even when the shared-model budget is untouched", () => {
 		renderTable([
 			{
 				...workspace,
@@ -176,8 +180,8 @@ describe("AdminInstanceLlmUsageTable", () => {
 		]);
 
 		const row = within(firstDataRow());
-		expect(row.getByText("Paused · provider cap")).toBeTruthy();
-		expect(row.queryByText("Paused · instance cap")).toBeNull();
+		expect(row.getByText("Paused · own provider")).toBeTruthy();
+		expect(row.queryByText("Paused · shared models")).toBeNull();
 	});
 
 	it("keeps the provider cap read-only — it is the workspace's own money", () => {
@@ -188,13 +192,18 @@ describe("AdminInstanceLlmUsageTable", () => {
 		const buttons = within(firstDataRow())
 			.getAllByRole("button")
 			.map((button) => button.getAttribute("aria-label") ?? button.textContent);
-		expect(buttons).toEqual(["View usage details for Example Workspace", "Set instance cap"]);
+		expect(buttons).toEqual([
+			"View usage details for Example Workspace",
+			"Set shared-model budget for Example Workspace",
+		]);
 	});
 
-	it("shows daily and job-type funding breakdowns for the expanded workspace", () => {
+	it("shows daily and run-type breakdowns for the expanded workspace", () => {
 		render(
 			<AdminInstanceLlmUsageTable
 				rows={[workspace]}
+				month="2026-07"
+				now={new Date("2026-07-10T12:00:00.000Z")}
 				isCurrentMonth
 				isLoading={false}
 				error={null}
@@ -212,12 +221,43 @@ describe("AdminInstanceLlmUsageTable", () => {
 				.getByRole("button", { name: "Hide usage details for Example Workspace" })
 				.getAttribute("aria-expanded"),
 		).toBe("true");
-		const byJobType = screen.getByRole("table", { name: "AI spend by job type" });
+		const byJobType = screen.getByRole("table", { name: "AI spend by run type" });
 		expect(within(byJobType).getByText("Mentor turn")).toBeTruthy();
 		expect(within(byJobType).getByText("$1.75")).toBeTruthy();
 		const byDay = screen.getByRole("table", { name: "AI spend by day" });
 		expect(within(byDay).getByText("Jul 5")).toBeTruthy();
 		expect(within(byDay).getByText("$4.25")).toBeTruthy();
+	});
+
+	it("projects a near-cap month in the panel, the way the workspace's own console does", () => {
+		render(
+			<AdminInstanceLlmUsageTable
+				rows={[workspace]}
+				month="2026-07"
+				now={new Date("2026-07-10T12:00:00.000Z")}
+				isCurrentMonth
+				isLoading={false}
+				error={null}
+				expandedWorkspaceSlug={workspace.workspaceSlug}
+				detailReport={{
+					...detailReport,
+					instanceMonthlyBudgetUsd: 50,
+					instanceTotalCostUsd: 42,
+				}}
+				isDetailLoading={false}
+				detailError={null}
+				onToggleDetails={() => {}}
+				onEditBudget={() => {}}
+			/>,
+		);
+
+		// Third person here, first person on the workspace's own page — the only word that differs.
+		expect(
+			screen.getByText("Example Workspace has used 84% of its shared-model budget"),
+		).toBeTruthy();
+		expect(screen.getByText(/At this pace you'll hit it around July 12\./)).toBeTruthy();
+		// The provider cap is nowhere near its own, so it stays quiet.
+		expect(screen.queryByText(/of its provider cap/)).toBeNull();
 	});
 
 	describe("display currency", () => {
@@ -274,6 +314,8 @@ describe("AdminInstanceLlmUsageTable", () => {
 			render(
 				<AdminInstanceLlmUsageTable
 					rows={[workspace]}
+					month="2026-07"
+					now={new Date("2026-07-10T12:00:00.000Z")}
 					fx={eur}
 					isCurrentMonth
 					isLoading={false}

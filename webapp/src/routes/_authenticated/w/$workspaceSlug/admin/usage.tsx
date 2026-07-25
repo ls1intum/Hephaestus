@@ -50,11 +50,12 @@ function AdminUsageContainer() {
 			queryClient.invalidateQueries({
 				queryKey: getLlmUsageReportQueryKey({ path: { workspaceSlug: workspaceSlug ?? "" } }),
 			});
-			// The proxy caches its answer for about 30s, so "resumes now" would be a small lie.
+			// The proxy caches its answer for about 30s, so "resumes now" would be a small lie. A bound
+			// the gate actually keeps ("within a minute"), never a hedge.
 			toast.success(
 				variables.body.monthlyBudgetUsd == null
-					? "Cap removed. New calls resume within about a minute."
-					: "Cap saved. New calls resume within about a minute.",
+					? "Cap removed. New calls resume within a minute."
+					: "Cap saved. New calls resume within a minute.",
 			);
 			setIsEditingOwnProviderCap(false);
 		},
