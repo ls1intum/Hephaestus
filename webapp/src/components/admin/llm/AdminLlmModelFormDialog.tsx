@@ -164,7 +164,7 @@ export function AdminLlmModelFormDialog({
 					<DialogHeader>
 						<DialogTitle>{isEdit ? "Edit model" : "Add model"}</DialogTitle>
 						<DialogDescription>
-							Give the model a name workspaces will recognize — the upstream id is never shown to
+							Give the model a name workspaces will recognize. The upstream id is never shown to
 							them.
 						</DialogDescription>
 					</DialogHeader>

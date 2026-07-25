@@ -133,7 +133,7 @@ export function WorkspaceLlmProviderPanel({
 				[variables.path.id]: result.reachable
 					? {
 							ok: true,
-							message: `Connected — ${result.modelCount} model${result.modelCount === 1 ? "" : "s"} available`,
+							message: `Connected. ${result.modelCount} model${result.modelCount === 1 ? "" : "s"} available.`,
 						}
 					: { ok: false, message: result.message ?? "Could not reach the provider." },
 			}));
@@ -227,8 +227,8 @@ export function WorkspaceLlmProviderPanel({
 					<CircleAlert aria-hidden />
 					<AlertTitle>New workspace providers and models are disabled</AlertTitle>
 					<AlertDescription>
-						An instance admin controls this setting. Existing providers and models remain
-						manageable: you can test or edit connections and edit, disable, or delete models.
+						An instance admin controls this setting. Providers and models you already have keep
+						working, and you can still change them.
 					</AlertDescription>
 				</Alert>
 			)}
@@ -253,14 +253,11 @@ export function WorkspaceLlmProviderPanel({
 				</Empty>
 			) : (
 				<>
-					{/* Wraps rather than squeezing "Add provider" to a few pixels: the explanatory line
-					    below the heading needs the full width of a phone on its own. */}
+					{/* Wraps rather than squeezing "Add provider" to a few pixels once the heading and
+					    the button no longer fit side by side. */}
 					<div className="flex flex-wrap items-center justify-between gap-3">
 						<div className="min-w-0 flex-1">
 							<h3 className="text-sm font-medium">Your providers</h3>
-							<p className="text-sm text-muted-foreground">
-								OpenAI-compatible endpoints paid for with this workspace's credentials.
-							</p>
 						</div>
 						{!registrationBlocked && (
 							<Button size="sm" variant="outline" onClick={openCreateConnection}>

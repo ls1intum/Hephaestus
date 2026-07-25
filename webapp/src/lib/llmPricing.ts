@@ -1,5 +1,5 @@
 import type { LlmModel } from "@/api/types.gen";
-import { formatCostUsd } from "@/components/admin/ai/jobUtils";
+import { formatRateUsd } from "@/components/admin/ai/jobUtils";
 
 export type PricingMode = "PRICED" | "NO_CHARGE" | "UNPRICED";
 
@@ -30,8 +30,11 @@ export function priceLabel(model: PriceFields, audience: "instance" | "workspace
 	if (model.pricingMode === "UNPRICED" || model.per1mInputUsd == null) {
 		return audience === "instance" ? "No price set" : "Price not set";
 	}
+	// A published price, not spend: `formatRateUsd`, never `formatCostUsd`. The spend formatter
+	// clamps to cents, so a real $0.075 rate would render as "$0.08" and $0.003 as "<$0.01" — a
+	// misstated number in the one place an admin checks ours against their provider's price list.
 	if (model.per1mOutputUsd == null) {
-		return `${formatCostUsd(model.per1mInputUsd)} / 1M input tokens`;
+		return `${formatRateUsd(model.per1mInputUsd)} / 1M input tokens`;
 	}
-	return `${formatCostUsd(model.per1mInputUsd)} input · ${formatCostUsd(model.per1mOutputUsd)} output / 1M tokens`;
+	return `${formatRateUsd(model.per1mInputUsd)} input · ${formatRateUsd(model.per1mOutputUsd)} output / 1M tokens`;
 }

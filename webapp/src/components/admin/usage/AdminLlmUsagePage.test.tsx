@@ -6,7 +6,7 @@ import {
 } from "@tanstack/react-router";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { WorkspaceLlmUsageReport } from "@/api/types.gen";
+import type { FxRateInfo, WorkspaceLlmUsageReport } from "@/api/types.gen";
 import { AdminLlmUsagePage } from "./AdminLlmUsagePage";
 
 const baseReport: WorkspaceLlmUsageReport = {
@@ -86,7 +86,7 @@ describe("AdminLlmUsagePage", () => {
 		expect(screen.getByText("Shared-model spend so far")).toBeTruthy();
 		expect(screen.getByText("Shared-model budget · set by your host")).toBeTruthy();
 		expect(screen.getByText("Your provider spend so far")).toBeTruthy();
-		expect(screen.getByText(/Your provider cap · set by you/)).toBeTruthy();
+		expect(screen.getByText("Billed to your own provider key.")).toBeTruthy();
 
 		const byJobType = screen.getByRole("table", { name: "AI spend by job type" });
 		expect(within(byJobType).getByRole("columnheader", { name: "Shared models" })).toBeTruthy();
@@ -124,11 +124,11 @@ describe("AdminLlmUsagePage", () => {
 
 		const byJobType = screen.getByRole("table", { name: "AI spend by job type" });
 		expect(within(byJobType).getByRole("columnheader", { name: "Avg per event" })).toBeTruthy();
-		// 5 events: $4.25 shared and $1.75 own, each averaged on its own — never summed.
-		// Money renders in cents, never a third decimal.
-		expect(within(byJobType).getByText("≈ $0.85")).toBeTruthy();
+		// 5 events: $4.25 shared and $1.75 own, each averaged on its own — never summed. No "≈": on
+		// this page that glyph means "converted currency", and the column header already says "Avg".
+		expect(within(byJobType).getByText("$0.85")).toBeTruthy();
 		expect(within(byJobType).getByText("shared models")).toBeTruthy();
-		expect(within(byJobType).getByText("≈ $0.35")).toBeTruthy();
+		expect(within(byJobType).getByText("$0.35")).toBeTruthy();
 		expect(within(byJobType).getByText("your provider")).toBeTruthy();
 	});
 
@@ -142,9 +142,7 @@ describe("AdminLlmUsagePage", () => {
 
 			expect(screen.getByText("Your provider cap is reached")).toBeTruthy();
 			expect(
-				screen.getByText(
-					/Work on your own provider is paused until August 1 \(UTC\), or until you raise or remove your cap\./,
-				),
+				screen.getByText("Paused until August 1 (UTC), or until you raise or remove the cap."),
 			).toBeTruthy();
 
 			fireEvent.click(screen.getByRole("button", { name: "Adjust cap" }));
@@ -157,8 +155,13 @@ describe("AdminLlmUsagePage", () => {
 			const banner = screen.getByText("Your cap can't be enforced").closest("[role='alert']");
 			expect(banner).toBeTruthy();
 			expect(
+				within(banner as HTMLElement).getByText(
+					"2 calls on your models have no price, so the cap can't be checked and your provider is paused. Add a price to resume, or remove the cap.",
+				),
+			).toBeTruthy();
+			expect(
 				within(banner as HTMLElement)
-					.getByRole("link", { name: "AI models" })
+					.getByRole("link", { name: "Open AI models" })
 					.getAttribute("href"),
 			).toBe("/w/acme/admin/models");
 		});
@@ -173,9 +176,7 @@ describe("AdminLlmUsagePage", () => {
 
 			expect(screen.getByText("Shared-model budget reached")).toBeTruthy();
 			expect(
-				screen.getByText(
-					/paused until August 1 \(UTC\) or until your host raises the budget\. Work on your own provider is not affected\./,
-				),
+				screen.getByText("Paused until August 1 (UTC), or until your host raises the budget."),
 			).toBeTruthy();
 			expect(screen.getByRole("link", { name: "Switch a purpose to your provider" })).toBeTruthy();
 		});
@@ -189,7 +190,9 @@ describe("AdminLlmUsagePage", () => {
 
 			expect(screen.getByText("Shared-model spend can't be verified")).toBeTruthy();
 			expect(
-				screen.getByText(/Only your host can price a shared model — ask them to\./),
+				screen.getByText(
+					"2 shared-model calls have no price, so the budget can't be checked and shared models are paused. Only your host can price them.",
+				),
 			).toBeTruthy();
 		});
 
@@ -223,9 +226,7 @@ describe("AdminLlmUsagePage", () => {
 
 			const warning = screen.getByText("You've used 84% of your provider cap");
 			expect(warning.closest("[role='status']")).toBeTruthy();
-			expect(
-				screen.getByText(/At this month's pace you'll reach it around July 12\./),
-			).toBeTruthy();
+			expect(screen.getByText(/At this pace you'll hit it around July 12\./)).toBeTruthy();
 		});
 
 		it("withholds the projection in the first days of the month, keeping the warning", async () => {
@@ -235,7 +236,7 @@ describe("AdminLlmUsagePage", () => {
 			);
 
 			expect(screen.getByText("You've used 84% of your provider cap")).toBeTruthy();
-			expect(screen.queryByText(/At this month's pace/)).toBeNull();
+			expect(screen.queryByText(/At this pace/)).toBeNull();
 		});
 
 		it("stays quiet below the threshold", async () => {
@@ -278,8 +279,100 @@ describe("AdminLlmUsagePage", () => {
 		it("keeps the card whenever there is provider spend, capped or not", async () => {
 			await renderPage({ ...baseReport, byoMonthlyBudgetUsd: undefined });
 
-			expect(screen.getByText("No cap")).toBeTruthy();
+			expect(screen.getByText("No cap set.")).toBeTruthy();
 			expect(screen.getByRole("button", { name: "Set cap" })).toBeTruthy();
+		});
+	});
+
+	describe("display currency", () => {
+		const eur: FxRateInfo = {
+			currencyCode: "EUR",
+			ratePerUsd: 0.878966,
+			rateDate: new Date("2026-07-24T00:00:00.000Z"),
+		};
+
+		/** Two days, so the breakdown table earns a footer — and the footer converts its total. */
+		const twoDays: WorkspaceLlmUsageReport["byDay"] = [
+			{
+				day: new Date("2026-07-05T00:00:00.000Z"),
+				pricedTotalCostUsd: 6.2,
+				byoTotalCostUsd: 0,
+				unpricedEventCount: 0,
+				events: 2,
+			},
+			{
+				day: new Date("2026-07-06T00:00:00.000Z"),
+				pricedTotalCostUsd: 6.2,
+				byoTotalCostUsd: 0,
+				unpricedEventCount: 0,
+				events: 2,
+			},
+		];
+
+		/**
+		 * Regression: the caption used to be derived from the *cards* alone. A $0 shared budget — the
+		 * supported "pause now" state — converts to nothing, and with no provider side every card
+		 * conversion was null, so the caption disappeared. The table footers convert independently and
+		 * kept rendering "≈ €10.90": euros on screen with no rate, no date and no disclosure.
+		 */
+		it("discloses the rate when only the table footers convert", async () => {
+			await renderPage({
+				...baseReport,
+				instanceMonthlyBudgetUsd: 0,
+				byoMonthlyBudgetUsd: undefined,
+				pricedTotalCostUsd: 12.4,
+				byoTotalCostUsd: 0,
+				unpricedEventCount: 0,
+				byJobType: [],
+				byDay: twoDays,
+				fx: eur,
+			});
+
+			const byDay = screen.getByRole("table", { name: "AI spend by day" });
+			const footer = within(byDay).getByRole("row", { name: /^Total/ });
+			expect(footer.textContent).toContain("≈ €10.90");
+			expect(
+				screen.getByText(/EUR amounts are estimates at the ECB reference rate for Jul 24, 2026/),
+			).toBeTruthy();
+		});
+
+		it("says nothing about a rate when nothing on the page converted", async () => {
+			await renderPage({
+				...baseReport,
+				instanceMonthlyBudgetUsd: 0,
+				byoMonthlyBudgetUsd: undefined,
+				pricedTotalCostUsd: 0,
+				byoTotalCostUsd: 0,
+				unpricedEventCount: 0,
+				byJobType: [],
+				byDay: [],
+				fx: eur,
+			});
+
+			expect(screen.queryByText(/ECB reference rate/)).toBeNull();
+		});
+
+		it("converts the projected month-end figure in the same breath as the spend it follows", async () => {
+			await renderPage(
+				{
+					...baseReport,
+					instanceMonthlyBudgetUsd: 50,
+					pricedTotalCostUsd: 43.9,
+					byoMonthlyBudgetUsd: undefined,
+					byoTotalCostUsd: 0,
+					unpricedEventCount: 0,
+					fx: eur,
+					// Late enough in the month that the pace lands under the cap, which is the branch that
+					// quotes a month-end figure instead of a date.
+				},
+				{ now: new Date("2026-07-28T12:00:00.000Z") },
+			);
+
+			const alert = screen.getByText(/At this pace/);
+			// Half a converted sentence reads as a mistake: "$43.90 of $50 (≈ €38.59 of €44) … you'll
+			// finish the month around $61.20" made the reader switch currencies mid-breath.
+			expect(alert.textContent).toContain("≈ €38.59 of €44");
+			expect(alert.textContent).toMatch(/finish the month around \$[\d.]+ \(≈ €[\d.]+\)\./);
 		});
 	});
 });

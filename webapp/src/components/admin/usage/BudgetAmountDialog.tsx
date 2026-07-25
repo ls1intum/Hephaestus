@@ -25,7 +25,8 @@ export interface BudgetAmountDialogProps {
 	title: string;
 	description: ReactNode;
 	fieldLabel: string;
-	fieldDescription: ReactNode;
+	/** Optional: only when the field needs something the label and the dialog description don't say. */
+	fieldDescription?: ReactNode;
 	/** The cap in force today, in USD; `null`/`undefined` means uncapped (no "Remove cap"). */
 	currentValueUsd?: number | null;
 	isPending: boolean;
@@ -167,7 +168,7 @@ function BudgetAmountDialogContent({
 								disabled={isPending}
 								autoFocus
 							/>
-							<FieldDescription>{fieldDescription}</FieldDescription>
+							{fieldDescription != null && <FieldDescription>{fieldDescription}</FieldDescription>}
 							{fxHint != null && (
 								<FieldDescription id={fxHintId}>
 									<FxApprox conversion={fxHint.conversion} />

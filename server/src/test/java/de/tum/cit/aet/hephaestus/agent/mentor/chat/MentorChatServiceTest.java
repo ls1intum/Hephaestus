@@ -530,8 +530,8 @@ class MentorChatServiceTest extends BaseUnitTest {
 
         assertThat(emitter.recordedTypes()).contains("error");
         assertThat(String.join("\n", emitter.rawData))
-            .contains("The monthly shared-model AI budget for this workspace is used up")
-            .doesNotContain("has no price set");
+            .contains("This workspace's monthly AI budget is reached")
+            .doesNotContain("has no price");
         verify(persistence, never()).persistInFlight(any(), any(), any(), any());
         try {
             verify(interactiveSandboxService, never()).attach(any());
@@ -552,8 +552,8 @@ class MentorChatServiceTest extends BaseUnitTest {
 
         assertThat(emitter.recordedTypes()).contains("error");
         assertThat(String.join("\n", emitter.rawData))
-            .contains("Some shared-model usage in this workspace has no price set")
-            .doesNotContain("is used up");
+            .contains("Some usage has no price, so it can't be checked against the budget")
+            .doesNotContain("is reached");
         verify(persistence, never()).persistInFlight(any(), any(), any(), any());
         try {
             verify(interactiveSandboxService, never()).attach(any());
@@ -592,7 +592,7 @@ class MentorChatServiceTest extends BaseUnitTest {
 
         assertThat(emitter.recordedTypes()).contains("error");
         assertThat(String.join("\n", emitter.rawData))
-            .contains("This workspace's monthly budget for its own AI provider is used up")
+            .contains("This workspace's monthly AI cap is reached")
             .contains("a workspace admin raises the cap");
         verify(persistence, never()).persistInFlight(any(), any(), any(), any());
         assertOutcomeRecorded(MentorChatMetrics.Outcome.ERROR);

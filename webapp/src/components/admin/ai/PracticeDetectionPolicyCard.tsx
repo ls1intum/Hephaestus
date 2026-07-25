@@ -45,7 +45,7 @@ export interface PracticeDetectionPolicyCardProps {
 	/** This workspace's PRACTICE_DETECTION binding, or undefined when the purpose is unbound. */
 	detectionBinding?: AgentBinding;
 	availableModels: AvailableLlmModel[];
-	/** Links to the AI setup page, where the model binding is owned and edited. */
+	/** Links to the AI models page, where the model binding is owned and edited. */
 	workspaceSlug: string;
 	autoTriggerEnabled: boolean;
 	manualTriggerEnabled: boolean;
@@ -91,7 +91,7 @@ export function PracticeDetectionPolicyCard({
 		);
 	}
 
-	// The model binding is owned by the AI setup page (one write path); this page only reports what
+	// The model binding is owned by the AI models page (one write path); this page only reports what
 	// detection currently runs on, because every policy knob below is meaningless while it cannot run.
 	const boundModelId = detectionBinding?.instanceModelId ?? detectionBinding?.workspaceModelId;
 	const boundModelScope = detectionBinding?.instanceModelId != null ? "SHARED" : "WORKSPACE";
@@ -144,7 +144,7 @@ export function PracticeDetectionPolicyCard({
 									params={{ workspaceSlug }}
 									className="underline underline-offset-4"
 								>
-									AI setup page
+									AI models page
 								</Link>
 								.
 							</FieldDescription>
@@ -169,7 +169,7 @@ export function PracticeDetectionPolicyCard({
 									// this is a navigation — it must keep announcing itself as a link.
 									render={<Link to="/w/$workspaceSlug/admin/models" params={{ workspaceSlug }} />}
 								>
-									Open AI setup
+									Open AI models
 								</Button>
 							</AlertDescription>
 						</Alert>
@@ -185,7 +185,6 @@ export function PracticeDetectionPolicyCard({
 					<Field orientation="horizontal">
 						<FieldContent>
 							<FieldLabel htmlFor="trigger-auto">Automatic reviews</FieldLabel>
-							<FieldDescription>Run automatically when PR/MR events arrive.</FieldDescription>
 						</FieldContent>
 						<Switch
 							id="trigger-auto"
@@ -223,7 +222,6 @@ export function PracticeDetectionPolicyCard({
 					<Field orientation="horizontal">
 						<FieldContent>
 							<FieldLabel htmlFor="policy-skip-drafts">Skip drafts</FieldLabel>
-							<FieldDescription>Don't review draft PRs/MRs.</FieldDescription>
 							{inheritHint(
 								settings.skipDraftsOverride != null,
 								"SKIP_DRAFTS",
@@ -241,7 +239,6 @@ export function PracticeDetectionPolicyCard({
 					<Field orientation="horizontal">
 						<FieldContent>
 							<FieldLabel htmlFor="policy-deliver-merged">Comment on merged PRs/MRs</FieldLabel>
-							<FieldDescription>Post feedback even after a PR/MR is merged.</FieldDescription>
 							{inheritHint(
 								settings.deliverToMergedOverride != null,
 								"DELIVER_TO_MERGED",
@@ -304,10 +301,7 @@ export function PracticeDetectionPolicyCard({
 								<SelectItem value={COVERAGE_ROLE}>Only users with the review role</SelectItem>
 							</SelectContent>
 						</Select>
-						<FieldDescription>
-							Review every contributor, or only those with the review role. Assigning that role
-							isn't self-serve in-product yet.
-						</FieldDescription>
+						<FieldDescription>Assigning that role isn't self-serve yet.</FieldDescription>
 						{inheritHint(
 							settings.runForAllUsersOverride != null,
 							"RUN_FOR_ALL_USERS",

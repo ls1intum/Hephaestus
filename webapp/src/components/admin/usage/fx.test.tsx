@@ -1,14 +1,11 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { FxRateInfo, LlmUsageByDay } from "@/api/types.gen";
-import { formatCapUsd, formatCostUsd } from "@/components/admin/ai/jobUtils";
 import {
 	capConversion,
 	FxAmount,
 	FxDisclosure,
-	formatCapWithFx,
-	formatSpendOfCapWithFx,
-	formatSpendWithFx,
+	FxSpendLine,
 	fxCapHint,
 	fxDisclosureText,
 	spendConversion,
@@ -32,83 +29,94 @@ const eurClosed: FxRateInfo = {
 /** `en-US` puts a non-breaking space between an ISO code and the number. */
 const NBSP = " ";
 
-describe("spend formatting", () => {
-	it("shows the estimate after the dollar amount", () => {
-		expect(formatSpendWithFx(4.5, eur)).toBe("$4.50 (≈ €3.96)");
+describe("spend conversion", () => {
+	it("converts a spend figure at the spend precision", () => {
+		expect(spendConversion(4.5, eur)?.text).toBe("≈ €3.96");
 	});
 
 	it("leaves zero spend unconverted", () => {
-		expect(formatSpendWithFx(0, eur)).toBe("$0");
 		expect(spendConversion(0, eur)).toBeNull();
 	});
 
 	it("leaves a sub-cent bound unconverted", () => {
-		expect(formatSpendWithFx(0.004, eur)).toBe("<$0.01");
+		// "<$0.01" is a bound, not an amount, so a converted bound would be false precision.
 		expect(spendConversion(0.004, eur)).toBeNull();
 	});
 
-	it("returns exactly the USD string when there is no rate", () => {
-		expect(formatSpendWithFx(4.5, undefined)).toBe(formatCostUsd(4.5));
-		expect(formatSpendWithFx(0, undefined)).toBe(formatCostUsd(0));
-		expect(formatSpendWithFx(undefined, undefined)).toBe(formatCostUsd(undefined));
+	it("converts nothing when there is no rate", () => {
 		expect(spendConversion(4.5, undefined)).toBeNull();
+		expect(spendConversion(undefined, eur)).toBeNull();
 	});
 });
 
-describe("cap formatting", () => {
+describe("cap conversion", () => {
 	it("rounds a converted cap to whole units", () => {
 		// 50 × 0.878966 = 43.9483 — "€43.95" beside a round "$50" would claim precision this estimate
 		// does not have.
-		expect(formatCapWithFx(50, eur)).toBe("$50 (≈ €44)");
+		expect(capConversion(50, eur)?.text).toBe("≈ €44");
 	});
 
-	it("keeps the cents the cap itself was typed with", () => {
-		expect(formatCapWithFx(49.5, eur)).toBe("$49.50 (≈ €44)");
+	it("rounds a cap with cents to whole units too", () => {
+		expect(capConversion(49.5, eur)?.text).toBe("≈ €44");
 	});
 
 	it("leaves a $0 cap unconverted", () => {
-		expect(formatCapWithFx(0, eur)).toBe("$0");
+		expect(capConversion(0, eur)).toBeNull();
 	});
 
-	it("returns exactly the USD string when there is no rate", () => {
-		expect(formatCapWithFx(50, undefined)).toBe(formatCapUsd(50));
-		expect(formatCapWithFx(undefined, undefined)).toBe(formatCapUsd(undefined));
+	it("converts nothing when there is no rate", () => {
 		expect(capConversion(50, undefined)).toBeNull();
+		expect(capConversion(undefined, eur)).toBeNull();
 	});
 });
 
 describe("ambiguous currency symbols", () => {
 	it("falls back to the ISO code when the symbol could be read as dollars", () => {
 		const cad: FxRateInfo = { ...eur, currencyCode: "CAD" };
-		expect(formatCapWithFx(50, cad)).toBe(`$50 (≈ CAD${NBSP}44)`);
+		expect(capConversion(50, cad)?.text).toBe(`≈ CAD${NBSP}44`);
 	});
 
 	it("keeps a currency's own glyph when it cannot be confused with USD", () => {
 		const gbp: FxRateInfo = { ...eur, currencyCode: "GBP" };
-		expect(formatCapWithFx(50, gbp)).toBe("$50 (≈ £44)");
+		expect(capConversion(50, gbp)?.text).toBe("≈ £44");
 	});
 
 	it("shows USD alone rather than failing on an unknown currency code", () => {
 		const nonsense: FxRateInfo = { ...eur, currencyCode: "NOTACODE" };
-		expect(formatSpendWithFx(4.5, nonsense)).toBe("$4.50");
+		expect(spendConversion(4.5, nonsense)).toBeNull();
 		expect(fxDisclosureText(nonsense, true)).toBeNull();
 	});
 
 	it("shows USD alone rather than dividing by a broken rate", () => {
-		expect(formatSpendWithFx(4.5, { ...eur, ratePerUsd: 0 })).toBe("$4.50");
-		expect(formatSpendWithFx(4.5, { ...eur, ratePerUsd: Number.NaN })).toBe("$4.50");
+		expect(spendConversion(4.5, { ...eur, ratePerUsd: 0 })).toBeNull();
+		expect(spendConversion(4.5, { ...eur, ratePerUsd: Number.NaN })).toBeNull();
 	});
 });
 
 describe("X of Y lines", () => {
 	it("converts both sides at their own precision", () => {
-		expect(formatSpendOfCapWithFx(43.9, 50, eur)).toBe("$43.90 of $50 (≈ €38.59 of €44)");
+		expect(spendOfCapConversion(43.9, 50, eur)?.text).toBe("≈ €38.59 of €44");
 	});
 
 	it("stays USD-only when either side cannot convert", () => {
-		expect(formatSpendOfCapWithFx(0, 50, eur)).toBe("$0 of $50");
-		expect(formatSpendOfCapWithFx(43.9, undefined, eur)).toBe("$43.90 of —");
 		expect(spendOfCapConversion(0, 50, eur)).toBeNull();
+		expect(spendOfCapConversion(43.9, undefined, eur)).toBeNull();
+	});
+});
+
+describe("table cells take the second-line form", () => {
+	it("puts the estimate under the figure rather than beside it", () => {
+		// A parenthetical is variable width, and in a column it shifts every row's USD figure by a
+		// different amount — the alignment is what makes a money column scannable.
+		const { container } = render(<FxSpendLine usd={4.5} fx={eur} />);
+		const line = container.firstElementChild;
+		expect(line?.tagName).toBe("DIV");
+		expect(line?.textContent).toBe("≈ €3.96");
+	});
+
+	it("renders no line at all when there is nothing to convert", () => {
+		const { container } = render(<FxSpendLine usd={0} fx={eur} />);
+		expect(container.innerHTML).toBe("");
 	});
 });
 
@@ -163,7 +171,7 @@ describe("page disclosure", () => {
 
 	it("explains why a closed month never moves", () => {
 		expect(fxDisclosureText(eurClosed, false)).toBe(
-			"EUR amounts are estimates at the ECB reference rate for Jun 30, 2026 — the last rate published that month, so past figures don't change.",
+			"EUR amounts are estimates at the ECB reference rate for Jun 30, 2026. The last rate published that month, so past figures don't change.",
 		);
 	});
 
@@ -193,9 +201,7 @@ describe("cap field hint", () => {
 	it("estimates the amount being typed", () => {
 		const hint = fxCapHint(50, eur);
 		expect(hint?.conversion.text).toBe("≈ €44");
-		expect(`${hint?.conversion.text}${hint?.tail}`).toBe(
-			"≈ €44 at the ECB reference rate for Jul 24, 2026. The cap is stored and enforced in USD.",
-		);
+		expect(`${hint?.conversion.text}${hint?.tail}`).toBe("≈ €44 at today's rate.");
 	});
 
 	it("says nothing about an empty or zero amount", () => {

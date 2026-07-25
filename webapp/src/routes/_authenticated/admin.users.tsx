@@ -27,11 +27,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/integrations/auth/AuthContext";
+import { instanceAdminHead } from "@/lib/page-title";
 import { problemDetailOf } from "@/lib/problem-detail";
 
 const PAGE_SIZE = 25;
 
 export const Route = createFileRoute("/_authenticated/admin/users")({
+	head: instanceAdminHead("Users"),
 	component: AdminUsersPage,
 });
 

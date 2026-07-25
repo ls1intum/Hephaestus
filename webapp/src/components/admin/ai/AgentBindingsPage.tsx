@@ -47,13 +47,12 @@ const PURPOSES: PurposeMeta[] = [
 	{
 		purpose: "PRACTICE_DETECTION",
 		title: "Practice detection",
-		description:
-			"The model that reviews pull requests, issues, and conversations for this workspace.",
+		description: "Reviews pull requests, issues, and conversations.",
 	},
 	{
 		purpose: "MENTOR",
 		title: "Mentor",
-		description: "The model that powers the mentor chat for this workspace.",
+		description: "Powers the mentor chat.",
 	},
 ];
 
@@ -138,11 +137,7 @@ export function AgentBindingsPage({ workspaceSlug }: AgentBindingsPageProps) {
 	return (
 		<div className="container mx-auto max-w-4xl py-6">
 			<div className="mb-6">
-				<h1 className="text-3xl font-bold tracking-tight">AI setup</h1>
-				<p className="text-muted-foreground">
-					Choose which model runs practice detection and the mentor, or connect a workspace-funded
-					provider.
-				</p>
+				<h1 className="text-3xl font-bold tracking-tight">AI models</h1>
 			</div>
 
 			{/* The two caps pause independently, so each paused side gets its own banner — the one the
@@ -150,10 +145,22 @@ export function AgentBindingsPage({ workspaceSlug }: AgentBindingsPageProps) {
 			{(usageQuery.data?.byoPaused || usageQuery.data?.instanceFundedPaused) && (
 				<div className="mb-6 space-y-3">
 					{usageQuery.data.byoPaused && (
-						<BudgetExhaustedAlert scope="own" verdict={usageQuery.data.byoBudgetVerdict} />
+						<BudgetExhaustedAlert
+							scope="own"
+							verdict={usageQuery.data.byoBudgetVerdict}
+							unpricedEventCount={usageQuery.data.unpricedEventCount}
+							context="models"
+							workspaceSlug={workspaceSlug}
+						/>
 					)}
 					{usageQuery.data.instanceFundedPaused && (
-						<BudgetExhaustedAlert scope="shared" verdict={usageQuery.data.instanceBudgetVerdict} />
+						<BudgetExhaustedAlert
+							scope="shared"
+							verdict={usageQuery.data.instanceBudgetVerdict}
+							unpricedEventCount={usageQuery.data.unpricedEventCount}
+							context="models"
+							workspaceSlug={workspaceSlug}
+						/>
 					)}
 				</div>
 			)}
@@ -393,9 +400,6 @@ function AgentPurposeCard({
 											}}
 											disabled={pending}
 										/>
-										<FieldDescription>
-											How long one run may take before it is abandoned.
-										</FieldDescription>
 										{timeoutError && <FieldError>{timeoutError}</FieldError>}
 									</Field>
 									<Field data-invalid={Boolean(concurrencyError)}>
@@ -415,9 +419,6 @@ function AgentPurposeCard({
 											}}
 											disabled={pending}
 										/>
-										<FieldDescription>
-											How many runs this workspace may have in flight at once.
-										</FieldDescription>
 										{concurrencyError && <FieldError>{concurrencyError}</FieldError>}
 									</Field>
 									<Field orientation="horizontal">

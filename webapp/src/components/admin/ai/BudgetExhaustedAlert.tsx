@@ -1,7 +1,11 @@
+import { Link } from "@tanstack/react-router";
 import { TriangleAlert } from "lucide-react";
 import type { WorkspaceLlmUsageReport } from "@/api";
 import { budgetResetDayLabel, currentMonthUtc } from "@/components/admin/usage/usageUtils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+
+type BudgetVerdict = WorkspaceLlmUsageReport["byoBudgetVerdict"];
 
 interface BudgetExhaustedAlertProps {
 	/**
@@ -11,20 +15,30 @@ interface BudgetExhaustedAlertProps {
 	 */
 	scope: "shared" | "own";
 	/** The month's verdict for that cap — selects between "reached" and "can't be checked" copy. */
-	verdict?: WorkspaceLlmUsageReport["byoBudgetVerdict"];
+	verdict?: BudgetVerdict;
 	/**
 	 * ISO `yyyy-MM` month the pause belongs to. Defaults to the current UTC month, which is the only
 	 * month a live pause can be in — it exists so the banner can name the day the pause lifts by
 	 * itself instead of gesturing at "next month".
 	 */
 	month?: string;
+	/** Calls with no price on record this month; names the count instead of saying "some". */
+	unpricedEventCount?: number;
+	/**
+	 * Which surface is rendering the banner. It selects the action offered — never a word of the
+	 * sentence: each remedy is a link from the page that doesn't own it, and nothing from the page
+	 * that does.
+	 */
+	context: "usage" | "models";
+	workspaceSlug: string;
+	/** Opens the provider-cap editor. Used by `context="usage"`, where that cap is edited. */
+	onEditByoCap?: () => void;
 }
 
 /**
- * Compact paused banner for surfaces outside the usage page. The usage page (`AdminLlmUsagePage`)
- * is where each cap is explained in full, but nothing else in the product said why practice
- * detection or the mentor stopped responding — this fills that gap on the AI models page
- * (`AgentBindingsPage`), where the affected per-purpose bindings live.
+ * The one owner of the four pause banners: provider cap reached / unenforceable, shared-model budget
+ * reached / unverifiable. The usage page and the AI models page both render it, so the sentences
+ * cannot drift apart between them.
  *
  * <p>The two caps pause independently, so this is rendered once per paused side and never merges
  * them: a spent shared-model budget leaves work on the workspace's own provider running, and saying
@@ -34,12 +48,16 @@ export function BudgetExhaustedAlert({
 	scope,
 	verdict = "EXHAUSTED",
 	month = currentMonthUtc(),
+	unpricedEventCount,
+	context,
+	workspaceSlug,
+	onEditByoCap,
 }: BudgetExhaustedAlertProps) {
 	const noPriceSet = verdict === "UNVERIFIABLE";
 	const own = scope === "own";
 	const resetDay = budgetResetDayLabel(month);
 	return (
-		<Alert variant={own ? "destructive" : "warning"}>
+		<Alert variant={own ? "destructive" : "warning"} role="alert">
 			<TriangleAlert aria-hidden />
 			<AlertTitle>
 				{own
@@ -51,14 +69,102 @@ export function BudgetExhaustedAlert({
 						: "Shared-model budget reached"}
 			</AlertTitle>
 			<AlertDescription>
-				{own
-					? noPriceSet
-						? "Some calls on your models have no price set, so spend can't be checked against your cap — work on your own provider is paused. Add a price on this page to resume, or remove the cap in AI usage."
-						: `Work on your own provider is paused until ${resetDay} (UTC), or until you raise or remove your cap in AI usage.`
-					: noPriceSet
-						? "Some shared-model calls have no price set, so spend can't be checked against the shared-model budget — work on shared models is paused. Only your host can price a shared model. Work on your own provider is not affected."
-						: `Work on shared models is paused until ${resetDay} (UTC) or until your host raises the budget. Work on your own provider is not affected — you can switch a purpose to it below.`}
+				<p>
+					{own
+						? noPriceSet
+							? `${unpricedSubject(scope, unpricedEventCount)} no price, so the cap can't be checked and your provider is paused. Add a price to resume, or remove the cap.`
+							: `Paused until ${resetDay} (UTC), or until you raise or remove the cap.`
+						: noPriceSet
+							? `${unpricedSubject(scope, unpricedEventCount)} no price, so the budget can't be checked and shared models are paused. Only your host can price them.`
+							: `Paused until ${resetDay} (UTC), or until your host raises the budget.`}
+				</p>
+				<PauseAction
+					scope={scope}
+					noPriceSet={noPriceSet}
+					context={context}
+					workspaceSlug={workspaceSlug}
+					onEditByoCap={onEditByoCap}
+				/>
 			</AlertDescription>
 		</Alert>
+	);
+}
+
+/** "1 call on your models has" / "3 shared-model calls have" / "Some calls on your models have". */
+function unpricedSubject(scope: "shared" | "own", count: number | undefined): string {
+	const own = scope === "own";
+	if (count === 1) {
+		return own ? "1 call on your models has" : "1 shared-model call has";
+	}
+	if (count != null && count > 1) {
+		const n = count.toLocaleString();
+		return own ? `${n} calls on your models have` : `${n} shared-model calls have`;
+	}
+	return own ? "Some calls on your models have" : "Some shared-model calls have";
+}
+
+interface PauseActionProps {
+	scope: "shared" | "own";
+	noPriceSet: boolean;
+	context: "usage" | "models";
+	workspaceSlug: string;
+	onEditByoCap?: () => void;
+}
+
+/**
+ * The remedy the current page can't perform itself. Prices are edited on AI models and caps on AI
+ * usage, so each surface links to the other one and offers nothing that is already on screen.
+ */
+function PauseAction({
+	scope,
+	noPriceSet,
+	context,
+	workspaceSlug,
+	onEditByoCap,
+}: PauseActionProps) {
+	if (scope === "own") {
+		if (context === "models") {
+			return (
+				<Button
+					variant="outline"
+					size="sm"
+					className="mt-2"
+					render={<Link to="/w/$workspaceSlug/admin/usage" params={{ workspaceSlug }} />}
+				>
+					Adjust cap
+				</Button>
+			);
+		}
+		return (
+			<div className="mt-2 flex flex-wrap gap-2">
+				{noPriceSet && (
+					<Button
+						variant="outline"
+						size="sm"
+						render={<Link to="/w/$workspaceSlug/admin/models" params={{ workspaceSlug }} />}
+					>
+						Open AI models
+					</Button>
+				)}
+				<Button variant="outline" size="sm" onClick={onEditByoCap}>
+					Adjust cap
+				</Button>
+			</div>
+		);
+	}
+	// Nothing the workspace admin can do about a shared model's missing price, and on the AI models
+	// page the purposes they could switch are already below the banner.
+	if (noPriceSet || context === "models") {
+		return null;
+	}
+	return (
+		<Button
+			variant="outline"
+			size="sm"
+			className="mt-2"
+			render={<Link to="/w/$workspaceSlug/admin/models" params={{ workspaceSlug }} />}
+		>
+			Switch a purpose to your provider
+		</Button>
 	);
 }

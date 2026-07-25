@@ -2,7 +2,7 @@
 "hephaestus": minor
 ---
 
-Setting up AI for a workspace is now one page. Under Administration → "AI setup", a workspace
+Setting up AI for a workspace is now one page. Under Administration → "AI models", a workspace
 administrator picks the model that runs practice detection and the model that runs the mentor
 directly — "Detection runs on ▢", "Mentor runs on ▢" — each with an active toggle, a readiness
 indicator, and optional advanced limits (timeout, concurrent runs, internet access). This replaces
@@ -27,4 +27,4 @@ Warn/Block setting has been removed; a workspace that has a cap set and unverifi
 always paused (a cap you cannot verify is not a cap), while an uncapped workspace is never paused —
 no configuration is needed. (2) Practice detection no longer runs on every configuration by default:
 if any workspace relied on that implicit behaviour, assign it a detection model under Administration
-→ AI setup for its reviews to resume.
+→ AI models for its reviews to resume.

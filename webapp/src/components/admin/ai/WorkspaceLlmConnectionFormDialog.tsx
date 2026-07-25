@@ -152,8 +152,7 @@ function WorkspaceLlmConnectionFormDialogContent({
 				<DialogHeader>
 					<DialogTitle>{isEdit ? "Edit connection" : "Add connection"}</DialogTitle>
 					<DialogDescription>
-						Connect an endpoint that implements an OpenAI API. Models are added and priced after the
-						connection is saved.
+						Connect an endpoint that implements an OpenAI API. Add and price its models next.
 					</DialogDescription>
 				</DialogHeader>
 
@@ -236,8 +235,7 @@ function WorkspaceLlmConnectionFormDialogContent({
 						/>
 						{isEdit && (
 							<FieldDescription>
-								Endpoint, API shape, and authentication are immutable. Add a connection to change
-								them.
+								Endpoint, API shape and authentication can't change. Add a connection instead.
 							</FieldDescription>
 						)}
 						{errors.baseUrl && <FieldError>{errors.baseUrl}</FieldError>}
@@ -311,7 +309,7 @@ function WorkspaceLlmConnectionFormDialogContent({
 							<FieldDescription>
 								{isEdit
 									? "Turn off to stop new requests using this connection."
-									: "New connections start inactive. Save and test this connection, add a priced model, then activate both."}
+									: "Starts inactive. Test it, add a priced model, then activate both."}
 							</FieldDescription>
 						</FieldContent>
 						<Switch
@@ -326,8 +324,8 @@ function WorkspaceLlmConnectionFormDialogContent({
 							<AlertTriangle aria-hidden />
 							<AlertTitle>All workspace models will stop immediately</AlertTitle>
 							<AlertDescription>
-								Existing Practice and Mentor configurations using this provider cannot run until the
-								connection is reactivated or another model is selected.
+								Practice detection and the mentor can't run until you reactivate this provider or
+								pick another model.
 							</AlertDescription>
 						</Alert>
 					)}

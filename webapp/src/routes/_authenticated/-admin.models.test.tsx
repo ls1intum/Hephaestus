@@ -1,15 +1,19 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
 	adminGetLlmSettingsQueryKey,
 	adminListLlmConnectionsQueryKey,
 	adminListLlmModelsQueryKey,
 	adminListWorkspacesQueryKey,
 } from "@/api/@tanstack/react-query.gen";
-import { Route } from "./admin.llm";
+import { Route } from "./admin.models";
 
 const AdminLlmPage = Route.options.component;
+
+// `preload()` lazily transforms the whole (heavy) route module; observed ~3s alone and over the 5s
+// default when the rest of the suite is competing for the box.
+vi.setConfig({ testTimeout: 15_000 });
 
 describe("AdminLlmPage", () => {
 	it("renders before a connection or provider probe has been selected", async () => {

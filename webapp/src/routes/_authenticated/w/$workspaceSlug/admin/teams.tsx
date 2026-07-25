@@ -17,8 +17,10 @@ import type {
 import { AdminTeamsTable } from "@/components/admin/AdminTeamsTable";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
+import { workspaceAdminHead } from "@/lib/page-title";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/teams")({
+	head: workspaceAdminHead("Teams"),
 	component: AdminTeamsContainer,
 });
 

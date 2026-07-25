@@ -18,9 +18,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useOutlineIntegration } from "@/hooks/use-outline-integration";
 import { useLivePushUnavailable } from "@/hooks/use-sync-liveness";
+import { workspaceAdminHead } from "@/lib/page-title";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/integrations/outline")(
 	{
+		head: workspaceAdminHead("Outline"),
 		component: OutlineIntegrationPage,
 	},
 );

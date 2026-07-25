@@ -77,11 +77,7 @@ export const WithLiveCurrencyHint: Story = {
 	},
 	play: async ({ args }) => {
 		const dialog = within(await screen.findByRole("dialog"));
-		await expect(
-			await dialog.findByText(
-				/at the ECB reference rate for Jul 24, 2026\. The cap is stored and enforced in USD\./,
-			),
-		).toBeInTheDocument();
+		await expect(await dialog.findByText(/at today's rate\./)).toBeInTheDocument();
 		await expect(dialog.getByLabelText("approximately 44 euros")).toBeInTheDocument();
 
 		// The hint tracks the field rather than the saved cap.
@@ -92,7 +88,7 @@ export const WithLiveCurrencyHint: Story = {
 
 		// Nothing to estimate about an empty field, so the hint leaves rather than showing "≈ €0".
 		await userEvent.clear(input);
-		await expect(dialog.queryByText(/ECB reference rate/)).toBeNull();
+		await expect(dialog.queryByText(/at today's rate/)).toBeNull();
 		await expect(args.onSubmit).not.toHaveBeenCalled();
 	},
 };
@@ -101,7 +97,7 @@ export const WithLiveCurrencyHint: Story = {
 export const WithoutCurrencyHint: Story = {
 	play: async () => {
 		const dialog = within(await screen.findByRole("dialog"));
-		await expect(dialog.queryByText(/ECB reference rate/)).toBeNull();
+		await expect(dialog.queryByText(/at today's rate/)).toBeNull();
 	},
 };
 

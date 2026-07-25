@@ -94,7 +94,7 @@ export function WorkspaceSwitcher({
 								<Plus className="size-4" />
 							</div>
 							<div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-								<span className="truncate font-semibold">Create Workspace</span>
+								<span className="truncate font-semibold">Create workspace</span>
 							</div>
 						</SidebarMenuButton>
 					</SidebarMenuItem>
@@ -110,7 +110,7 @@ export function WorkspaceSwitcher({
 							<ChevronsUpDown className="size-4" />
 						</div>
 						<div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-							<span className="truncate font-semibold">No Workspace</span>
+							<span className="truncate font-semibold">No workspace</span>
 						</div>
 					</SidebarMenuButton>
 				</SidebarMenuItem>

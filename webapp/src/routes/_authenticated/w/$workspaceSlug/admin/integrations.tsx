@@ -5,8 +5,10 @@ import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useSyncEvents } from "@/hooks/use-sync-events";
 import { SyncLivenessProvider } from "@/hooks/use-sync-liveness";
+import { workspaceAdminHead } from "@/lib/page-title";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/integrations")({
+	head: workspaceAdminHead("Integrations"),
 	component: IntegrationsLayout,
 });
 

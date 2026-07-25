@@ -10,8 +10,10 @@ import {
 import type { CreatePracticeRequest } from "@/api/types.gen";
 import { PracticeForm } from "@/components/admin/practices/PracticeForm";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
+import { workspaceAdminHead } from "@/lib/page-title";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/new")({
+	head: workspaceAdminHead("New practice"),
 	component: CreatePracticeContainer,
 });
 

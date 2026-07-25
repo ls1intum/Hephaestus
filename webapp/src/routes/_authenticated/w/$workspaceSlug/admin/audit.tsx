@@ -5,8 +5,10 @@ import {
 	workspaceAuditSearchSchema,
 } from "@/components/admin/audit-shared/auditSearch";
 import { WorkspaceConfigAuditPanel } from "@/components/admin/config-audit/ConfigAuditPanel";
+import { workspaceAdminHead } from "@/lib/page-title";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/audit")({
+	head: workspaceAdminHead("Audit log"),
 	component: WorkspaceAuditPage,
 	validateSearch: workspaceAuditSearchSchema,
 });

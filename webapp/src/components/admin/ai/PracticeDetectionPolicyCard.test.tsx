@@ -35,7 +35,7 @@ const settings: AiSettingsView = {
 	cooldownMinutes: 15,
 };
 
-/** The card renders TanStack `Link`s to the AI setup page, so it needs a router in scope. */
+/** The card renders TanStack `Link`s to the AI models page, so it needs a router in scope. */
 function renderCard(props: Partial<React.ComponentProps<typeof PracticeDetectionPolicyCard>> = {}) {
 	const rootRoute = createRootRoute({
 		component: () => (
@@ -68,21 +68,21 @@ describe("PracticeDetectionPolicyCard model binding", () => {
 		renderCard();
 
 		expect(await screen.findByText("GPT Test")).toBeTruthy();
-		expect(screen.getByRole("link", { name: "AI setup page" })).toBeTruthy();
+		expect(screen.getByRole("link", { name: "AI models page" })).toBeTruthy();
 	});
 
 	it("explains that reviews are paused when the bound model can no longer run", async () => {
 		renderCard({ detectionBinding: { ...readyBinding, ready: false } });
 
 		expect(await screen.findByText("Bound model cannot run")).toBeTruthy();
-		expect(screen.getByRole("link", { name: "Open AI setup" })).toBeTruthy();
+		expect(screen.getByRole("link", { name: "Open AI models" })).toBeTruthy();
 	});
 
 	it("explains that reviews cannot run at all when no model is bound", async () => {
 		renderCard({ detectionBinding: undefined });
 
 		expect(await screen.findByText("No model bound")).toBeTruthy();
-		expect(screen.getByRole("link", { name: "Open AI setup" })).toBeTruthy();
+		expect(screen.getByRole("link", { name: "Open AI models" })).toBeTruthy();
 	});
 
 	it("reports a load failure with the server's reason and no Retry when one cannot help", async () => {

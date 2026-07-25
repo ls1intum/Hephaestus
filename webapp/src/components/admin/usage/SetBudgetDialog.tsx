@@ -43,7 +43,6 @@ export function SetBudgetDialog({
 				) : null
 			}
 			fieldLabel="Monthly budget (USD)"
-			fieldDescription="Reaching this amount pauses shared-model work until the month resets."
 			submitLabel="Save budget"
 			currentValueUsd={workspace?.instanceMonthlyBudgetUsd ?? null}
 			// The rollup row carries the month's rate, so the live estimate under the field uses the

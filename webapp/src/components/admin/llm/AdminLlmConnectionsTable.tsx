@@ -234,7 +234,7 @@ export function AdminLlmConnectionsTable({
 					<AlertDialogHeader>
 						<AlertDialogTitle>Delete “{deleting?.displayName}”?</AlertDialogTitle>
 						<AlertDialogDescription>
-							A connection with models still on it can't be deleted — delete its models first. This
+							A connection with models still on it can't be deleted. Delete its models first. This
 							cannot be undone.
 						</AlertDialogDescription>
 					</AlertDialogHeader>

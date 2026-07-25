@@ -57,7 +57,7 @@ function handlers({
 }
 
 /**
- * The workspace's AI setup page: one card per agent purpose, each binding a model and — behind an
+ * The workspace's AI models page: one card per agent purpose, each binding a model and — behind an
  * "Advanced" disclosure — the run limits that binding runs under.
  */
 const meta = {
@@ -145,7 +145,7 @@ export const InvalidRunLimit: Story = {
 };
 
 /**
- * The AI setup page at the WCAG 2.2 SC 1.4.10 reflow width (320 CSS px).
+ * The AI models page at the WCAG 2.2 SC 1.4.10 reflow width (320 CSS px).
  *
  * Nothing here is tabular, so the whole page must reflow to one column with no horizontal scrolling
  * at all — the card headers wrap their "Ready" badge and the descriptions wrap rather than widening

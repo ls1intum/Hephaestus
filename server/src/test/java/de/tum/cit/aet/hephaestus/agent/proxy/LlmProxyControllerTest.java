@@ -82,11 +82,11 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         /**
-         * #1368: the gate asks only the purse funding THIS call, and the 429 body names the admin who
-         * can lift it — a shared-model pause is the host's to raise.
+         * #1368: the gate asks only the purse funding THIS call, and the 429 body names WHICH purse
+         * stopped it — the two have different remedies and different people behind them.
          */
         @Test
-        void the429BodyNamesTheInstanceAdminForASharedModelCall() {
+        void the429BodyNamesTheSharedPurseForASharedModelCall() {
             var routing = routing("openai-completions");
             authenticate(routing);
             when(budgetGate.isBlocked(routing.workspaceId(), FundingSource.INSTANCE)).thenReturn(true);
@@ -99,11 +99,13 @@ class LlmProxyControllerTest extends BaseUnitTest {
             );
 
             assertThat(result.getStatusCode().value()).isEqualTo(429);
-            assertThat(String.valueOf(result.getBody())).contains("instance admin").contains("shared-model");
+            assertThat(String.valueOf(result.getBody()))
+                .contains("Shared-model budget reached")
+                .contains("raises the budget");
         }
 
         @Test
-        void the429BodyNamesTheWorkspaceAdminForAnOwnProviderCall() {
+        void the429BodyNamesTheOwnProviderPurseForAnOwnProviderCall() {
             var routing = workspaceFundedRouting();
             authenticate(routing);
             when(budgetGate.isBlocked(routing.workspaceId(), FundingSource.WORKSPACE)).thenReturn(true);
@@ -116,7 +118,9 @@ class LlmProxyControllerTest extends BaseUnitTest {
             );
 
             assertThat(result.getStatusCode().value()).isEqualTo(429);
-            assertThat(String.valueOf(result.getBody())).contains("workspace admin").contains("own-provider");
+            assertThat(String.valueOf(result.getBody()))
+                .contains("Own-provider budget reached")
+                .contains("raises the cap");
         }
 
         /**

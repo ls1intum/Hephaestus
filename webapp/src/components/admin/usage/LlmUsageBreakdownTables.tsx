@@ -1,5 +1,10 @@
 import type { LlmUsageByDay, LlmUsageByJobType } from "@/api/types.gen";
-import { formatCostUsd, formatTokens } from "@/components/admin/ai/jobUtils";
+import {
+	formatCostUsd,
+	formatRateUsd,
+	formatTokens,
+	MoneyCell,
+} from "@/components/admin/ai/jobUtils";
 import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
 import {
 	Table,
@@ -11,14 +16,8 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { type Fx, FxSpend } from "./fx";
+import { type Fx, FxSpendLine } from "./fx";
 import { formatUsageDay, JOB_TYPE_LABELS } from "./usageUtils";
-
-/**
- * The estimate that trails a converted total. Muted and small: the USD figure is the total, this is
- * a reading aid beside it.
- */
-const TOTAL_FX_CLASS = "text-xs font-normal text-muted-foreground";
 
 function sumBy<T>(rows: T[], pick: (row: T) => number): number {
 	return rows.reduce((total, row) => total + pick(row), 0);
@@ -105,10 +104,10 @@ export function LlmUsageByJobTypeTable({ rows, fx }: LlmUsageByJobTypeTableProps
 						<TableRow key={row.jobType}>
 							<TableCell className="font-medium">{JOB_TYPE_LABELS[row.jobType]}</TableCell>
 							<TableCell className="text-right tabular-nums">
-								{formatCostUsd(row.pricedTotalCostUsd)}
+								<MoneyCell>{formatCostUsd(row.pricedTotalCostUsd)}</MoneyCell>
 							</TableCell>
 							<TableCell className="text-right tabular-nums">
-								{formatCostUsd(row.byoTotalCostUsd)}
+								<MoneyCell>{formatCostUsd(row.byoTotalCostUsd)}</MoneyCell>
 							</TableCell>
 							<TableCell className="text-right tabular-nums">
 								<AvgPerEvent row={row} />
@@ -137,12 +136,12 @@ export function LlmUsageByJobTypeTable({ rows, fx }: LlmUsageByJobTypeTableProps
 					<TableRow>
 						<TableCell>Total</TableCell>
 						<TableCell className="text-right tabular-nums">
-							{formatCostUsd(totals.priced)}
-							<FxSpend usd={totals.priced} fx={fx} className={TOTAL_FX_CLASS} />
+							<MoneyCell>{formatCostUsd(totals.priced)}</MoneyCell>
+							<FxSpendLine usd={totals.priced} fx={fx} />
 						</TableCell>
 						<TableCell className="text-right tabular-nums">
-							{formatCostUsd(totals.byo)}
-							<FxSpend usd={totals.byo} fx={fx} className={TOTAL_FX_CLASS} />
+							<MoneyCell>{formatCostUsd(totals.byo)}</MoneyCell>
+							<FxSpendLine usd={totals.byo} fx={fx} />
 						</TableCell>
 						{/* No blended average: the two money streams are different money and averaging
 						    across job types on top of that would mean nothing to anyone. */}
@@ -174,6 +173,11 @@ export function LlmUsageByJobTypeTable({ rows, fx }: LlmUsageByJobTypeTableProps
  * costs me about $0.14"), which a monthly total never gives them. The two money streams keep their
  * own averages: they are different money and are never added together, so when both are in play the
  * cell shows two labelled lines rather than one blended number.
+ *
+ * An average is a rate, not an amount spent, so it renders through `formatRateUsd`: rounding it to
+ * cents — or worse, flooring it to the `<$0.01` bound — destroys the exact number this column
+ * exists to give. And no `≈`: on this page that glyph means "converted currency" (see `fx.tsx`),
+ * the header already says "Avg", and a bare `≈` is announced as "tilde operator" anyway.
  */
 function AvgPerEvent({ row }: { row: LlmUsageByJobType }) {
 	const parts = [
@@ -188,7 +192,7 @@ function AvgPerEvent({ row }: { row: LlmUsageByJobType }) {
 		<div className="flex flex-col items-end">
 			{parts.map((part) => (
 				<span key={part.key}>
-					≈ {formatCostUsd(part.total / row.events)}
+					{formatRateUsd(part.total / row.events)}
 					{parts.length > 1 && (
 						<>
 							{" "}
@@ -249,10 +253,10 @@ export function LlmUsageByDayTable({ rows, fx }: LlmUsageByDayTableProps) {
 						<TableRow key={String(row.day)}>
 							<TableCell className="font-medium">{formatUsageDay(row.day)}</TableCell>
 							<TableCell className="text-right tabular-nums">
-								{formatCostUsd(row.pricedTotalCostUsd)}
+								<MoneyCell>{formatCostUsd(row.pricedTotalCostUsd)}</MoneyCell>
 							</TableCell>
 							<TableCell className="text-right tabular-nums">
-								{formatCostUsd(row.byoTotalCostUsd)}
+								<MoneyCell>{formatCostUsd(row.byoTotalCostUsd)}</MoneyCell>
 							</TableCell>
 							<TableCell className="text-right tabular-nums">
 								{row.unpricedEventCount.toLocaleString()}
@@ -269,12 +273,12 @@ export function LlmUsageByDayTable({ rows, fx }: LlmUsageByDayTableProps) {
 					<TableRow>
 						<TableCell>Total</TableCell>
 						<TableCell className="text-right tabular-nums">
-							{formatCostUsd(totals.priced)}
-							<FxSpend usd={totals.priced} fx={fx} className={TOTAL_FX_CLASS} />
+							<MoneyCell>{formatCostUsd(totals.priced)}</MoneyCell>
+							<FxSpendLine usd={totals.priced} fx={fx} />
 						</TableCell>
 						<TableCell className="text-right tabular-nums">
-							{formatCostUsd(totals.byo)}
-							<FxSpend usd={totals.byo} fx={fx} className={TOTAL_FX_CLASS} />
+							<MoneyCell>{formatCostUsd(totals.byo)}</MoneyCell>
+							<FxSpendLine usd={totals.byo} fx={fx} />
 						</TableCell>
 						<TableCell className="text-right tabular-nums">
 							{totals.unpriced.toLocaleString()}

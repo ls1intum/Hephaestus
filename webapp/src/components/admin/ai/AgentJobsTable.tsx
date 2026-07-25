@@ -5,13 +5,7 @@ import type { AgentJob } from "@/api/types.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-	Empty,
-	EmptyDescription,
-	EmptyHeader,
-	EmptyMedia,
-	EmptyTitle,
-} from "@/components/ui/empty";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldLabel } from "@/components/ui/field";
 import {
 	Select,
@@ -136,9 +130,6 @@ export function AgentJobsTable({
 							<Bot />
 						</EmptyMedia>
 						<EmptyTitle>No runs yet</EmptyTitle>
-						<EmptyDescription>
-							A run appears here every time AI reviews a pull request, an issue, or a conversation.
-						</EmptyDescription>
 					</EmptyHeader>
 				</Empty>
 			) : (

@@ -1,18 +1,12 @@
 import { Progress as ProgressRoot } from "@base-ui/react/progress";
 import { ChevronDown, ChevronRight, CircleDollarSign, Info } from "lucide-react";
 import type { AdminWorkspaceLlmUsage, WorkspaceLlmUsageReport } from "@/api/types.gen";
-import { formatCapUsd, formatCostUsd } from "@/components/admin/ai/jobUtils";
+import { formatCapUsd, formatCostUsd, MoneyCell } from "@/components/admin/ai/jobUtils";
 import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-	Empty,
-	EmptyDescription,
-	EmptyHeader,
-	EmptyMedia,
-	EmptyTitle,
-} from "@/components/ui/empty";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 import {
 	Table,
@@ -24,7 +18,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { type Fx, FxApprox, FxDisclosure, spendConversion } from "./fx";
+import { type Fx, FxDisclosure, FxSpendLine, spendConversion } from "./fx";
 import { LlmUsageByDayTable, LlmUsageByJobTypeTable } from "./LlmUsageBreakdownTables";
 
 /**
@@ -157,9 +151,6 @@ export function AdminInstanceLlmUsageTable({
 					</EmptyMedia>
 					{/* The rollup left-joins from workspace, so zero rows means zero workspaces. */}
 					<EmptyTitle>No workspaces on this instance yet</EmptyTitle>
-					<EmptyDescription>
-						Spend and caps appear here as soon as the first workspace is created.
-					</EmptyDescription>
 				</EmptyHeader>
 			</Empty>
 		);
@@ -175,8 +166,13 @@ export function AdminInstanceLlmUsageTable({
 	// read it off the first row rather than reconciling nine copies of it.
 	const fx: Fx = rows[0]?.fx;
 	// The caption explains estimates that are actually on screen; with every workspace at $0 there
-	// are none, and a footnote about them would be noise.
-	const hasConversion = rows.some((row) => spendConversion(row.pricedTotalCostUsd, fx) != null);
+	// are none, and a footnote about them would be noise. Both spend columns convert, so both count
+	// — a page that converted only provider spend still owes the reader its rate.
+	const hasConversion = rows.some(
+		(row) =>
+			spendConversion(row.pricedTotalCostUsd, fx) != null ||
+			spendConversion(row.byoTotalCostUsd, fx) != null,
+	);
 
 	return (
 		<div className="space-y-4">
@@ -193,15 +189,13 @@ export function AdminInstanceLlmUsageTable({
 						{/* Spend sits next to the cap it is measured against, so a row reads left to right as
 					    "this much, out of this much" without the admin holding a number in their head. */}
 						<TableHead scope="col" className="text-right">
-							<HelpHeader help="Monthly cap on the shared-model spend the host pays for. You set it.">
-								Instance cap
-							</HelpHeader>
+							<HelpHeader help="Spend you pay for. Yours to set.">Instance cap</HelpHeader>
 						</TableHead>
 						<TableHead scope="col" className="text-right">
 							Provider spend
 						</TableHead>
 						<TableHead scope="col" className="text-right">
-							<HelpHeader help="The workspace's own cap on spend through its own provider — their money, so only their admins can change it. Read-only here.">
+							<HelpHeader help="The workspace's own money. Only its admins can change this.">
 								Provider cap
 							</HelpHeader>
 						</TableHead>
@@ -242,16 +236,18 @@ export function AdminInstanceLlmUsageTable({
 											{row.workspaceSlug}
 										</div>
 									</TableCell>
-									{/* The shared-model column is the money this admin is accountable for, so it is
-									    the one that carries the estimate — on its own line, where it costs no
-									    column width. The cap columns stay USD-only for the same reason. */}
+									{/* Both spend columns carry the estimate, on a second line where it costs no
+									    column width. Converting one and not the other would read as "these two are
+									    different in kind" — they are the same physical quantity, differently funded.
+									    The cap columns stay USD-only: a cap is a number someone typed in USD. */}
 									<TableCell className="text-right tabular-nums">
-										{formatCostUsd(row.pricedTotalCostUsd)}
-										<SpendEstimateLine usd={row.pricedTotalCostUsd} fx={fx} />
+										<MoneyCell>{formatCostUsd(row.pricedTotalCostUsd)}</MoneyCell>
+										<FxSpendLine usd={row.pricedTotalCostUsd} fx={fx} />
 									</TableCell>
 									<CapCell usage={shared} label="Instance cap" workspace={row.displayName} />
 									<TableCell className="text-right tabular-nums">
-										{formatCostUsd(row.byoTotalCostUsd)}
+										<MoneyCell>{formatCostUsd(row.byoTotalCostUsd)}</MoneyCell>
+										<FxSpendLine usd={row.byoTotalCostUsd} fx={fx} />
 									</TableCell>
 									<CapCell usage={provider} label="Provider cap" workspace={row.displayName} />
 									<TableCell>
@@ -293,8 +289,6 @@ export function AdminInstanceLlmUsageTable({
 				)}
 			</Table>
 
-			{hasConversion && <FxDisclosure fx={fx} isCurrentMonth={isCurrentMonth} />}
-
 			{expandedRow != null && (
 				<WorkspaceUsageDetails
 					workspace={expandedRow}
@@ -302,29 +296,13 @@ export function AdminInstanceLlmUsageTable({
 					isLoading={isDetailLoading}
 					error={detailError}
 					onRetry={onRetryDetail}
+					fx={fx}
 				/>
 			)}
-		</div>
-	);
-}
 
-interface SpendEstimateLineProps {
-	usd: number;
-	fx: Fx;
-}
-
-/**
- * The converted spend, under the USD figure it estimates. A second line rather than a parenthetical
- * because this is a money column in a nine-column table: inline it would widen every row.
- */
-function SpendEstimateLine({ usd, fx }: SpendEstimateLineProps) {
-	const conversion = spendConversion(usd, fx);
-	if (conversion == null) {
-		return null;
-	}
-	return (
-		<div className="text-xs text-muted-foreground">
-			<FxApprox conversion={conversion} />
+			{/* Last, after every figure it qualifies — a footnote that precedes its numbers is read as a
+			    preamble to something else. */}
+			{hasConversion && <FxDisclosure fx={fx} isCurrentMonth={isCurrentMonth} />}
 		</div>
 	);
 }
@@ -335,6 +313,12 @@ interface WorkspaceUsageDetailsProps {
 	isLoading: boolean;
 	error: unknown;
 	onRetry?: () => void;
+	/**
+	 * The table's rate, handed down rather than read off the detail report. Both responses describe
+	 * the same month and so resolve to the same rate — but nothing enforces that, and two rates on
+	 * one screen is a bug nobody would spot. One page, one rate, one disclosure.
+	 */
+	fx: Fx;
 }
 
 /**
@@ -354,6 +338,7 @@ function WorkspaceUsageDetails({
 	isLoading,
 	error,
 	onRetry,
+	fx,
 }: WorkspaceUsageDetailsProps) {
 	const panelId = detailPanelId(workspace.workspaceId);
 	return (
@@ -377,16 +362,13 @@ function WorkspaceUsageDetails({
 						<h4 id={`${panelId}-job-type`} className="font-medium">
 							By job type
 						</h4>
-						<LlmUsageByJobTypeTable
-							rows={isLoading ? undefined : report?.byJobType}
-							fx={report?.fx}
-						/>
+						<LlmUsageByJobTypeTable rows={isLoading ? undefined : report?.byJobType} fx={fx} />
 					</section>
 					<section aria-labelledby={`${panelId}-day`} className="min-w-0 space-y-2">
 						<h4 id={`${panelId}-day`} className="font-medium">
 							By day
 						</h4>
-						<LlmUsageByDayTable rows={isLoading ? undefined : report?.byDay} fx={report?.fx} />
+						<LlmUsageByDayTable rows={isLoading ? undefined : report?.byDay} fx={fx} />
 					</section>
 				</div>
 			)}
@@ -445,7 +427,9 @@ function CapCell({ usage, label, workspace }: CapCellProps) {
 	return (
 		<TableCell className="text-right">
 			<div className="ml-auto flex w-24 flex-col items-end gap-1">
-				<span className="tabular-nums">{formatCapUsd(usage.cap)}</span>
+				<span className="tabular-nums">
+					<MoneyCell>{formatCapUsd(usage.cap)}</MoneyCell>
+				</span>
 				<ProgressRoot.Root
 					value={Math.min(percent, 100)}
 					className="flex w-full"
@@ -459,7 +443,8 @@ function CapCell({ usage, label, workspace }: CapCellProps) {
 					</ProgressTrack>
 				</ProgressRoot.Root>
 				<span className="text-xs text-muted-foreground tabular-nums">
-					{formatCostUsd(usage.spend)} · {rounded}%{state != null && ` · ${state}`}
+					<MoneyCell>{formatCostUsd(usage.spend)}</MoneyCell> · {rounded}%
+					{state != null && ` · ${state}`}
 				</span>
 			</div>
 		</TableCell>

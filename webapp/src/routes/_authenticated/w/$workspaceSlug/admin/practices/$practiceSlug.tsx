@@ -13,10 +13,12 @@ import type { UpdatePracticeRequest } from "@/api/types.gen";
 import { PracticeForm } from "@/components/admin/practices/PracticeForm";
 import { Spinner } from "@/components/ui/spinner";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
+import { workspaceAdminHead } from "@/lib/page-title";
 
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/admin/practices/$practiceSlug",
 )({
+	head: workspaceAdminHead("Edit practice"),
 	component: EditPracticeContainer,
 });
 

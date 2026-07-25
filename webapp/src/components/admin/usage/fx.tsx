@@ -1,5 +1,4 @@
 import type { FxRateInfo } from "@/api/types.gen";
-import { formatCapUsd, formatCostUsd } from "@/components/admin/ai/jobUtils";
 import { cn } from "@/lib/utils";
 
 /**
@@ -10,6 +9,18 @@ import { cn } from "@/lib/utils";
  * carries an {@link FxRateInfo}, and every USD figure may show a *secondary* estimate beside it —
  * `$4.50 (≈ €3.96)`. The ordering is the message: the dollar leads, the estimate follows, and the
  * `≈` marks it as approximate at every occurrence.
+ *
+ * **Where the estimate goes depends on how the figure is read:**
+ * - *Headline or prose* — inline parenthetical ({@link FxAmount} and friends): `$4.50 (≈ €3.96)`.
+ * - *Any table cell* — a second muted line under the figure ({@link FxLine}, {@link FxSpendLine}).
+ *   A column is scanned down its right edge, and a variable-width suffix shifts every row's USD
+ *   figure by a different amount, which is exactly the alignment that makes money scannable.
+ * - *Form field* — a block hint under the input ({@link fxCapHint}), read on focus.
+ * - *A meter's `aria-valuetext`* — USD only. A meter answers "how far along", and saying the same
+ *   proportion twice in two currencies is a regression for anyone listening to it.
+ *
+ * `≈` is reserved for currency conversion on these surfaces. A figure that is approximate for some
+ * other reason (an average, a projection) says so in its label, so the glyph keeps one meaning.
  *
  * `fx` absent is the default for every instance that never opted in, and is also what the server
  * sends when the stored rate is stale or missing. It is not an error state: every formatter here
@@ -173,31 +184,6 @@ export function spendOfCapConversion(
 	};
 }
 
-/** `$4.50 (≈ €3.96)` — or exactly `formatCostUsd(usd)` when there is no conversion to show. */
-export function formatSpendWithFx(usd: number | undefined, fx: Fx): string {
-	const conversion = spendConversion(usd, fx);
-	const usdText = formatCostUsd(usd);
-	return conversion == null ? usdText : `${usdText} (${conversion.text})`;
-}
-
-/** `$50 (≈ €44)` — or exactly `formatCapUsd(usd)` when there is no conversion to show. */
-export function formatCapWithFx(usd: number | undefined, fx: Fx): string {
-	const conversion = capConversion(usd, fx);
-	const usdText = formatCapUsd(usd);
-	return conversion == null ? usdText : `${usdText} (${conversion.text})`;
-}
-
-/** `$43.90 of $50 (≈ €38.59 of €44)` — or the plain USD line when either side cannot convert. */
-export function formatSpendOfCapWithFx(
-	spendUsd: number | undefined,
-	capUsd: number | undefined,
-	fx: Fx,
-): string {
-	const conversion = spendOfCapConversion(spendUsd, capUsd, fx);
-	const usdText = `${formatCostUsd(spendUsd)} of ${formatCapUsd(capUsd)}`;
-	return conversion == null ? usdText : `${usdText} (${conversion.text})`;
-}
-
 /**
  * The day the rate was published, e.g. `Jul 24, 2026`. UTC, like every other date on these pages,
  * and `en-US` for the same reason the amounts are.
@@ -234,7 +220,7 @@ function disclosureParts(fx: Fx, isCurrentMonth: boolean): DisclosureParts | nul
 		return {
 			lead,
 			rate: null,
-			tail: " — the last rate published that month, so past figures don't change.",
+			tail: ". The last rate published that month, so past figures don't change.",
 		};
 	}
 	const written = formatter(fx.currencyCode, RATE_DIGITS, displayFor(fx.currencyCode))?.format(
@@ -286,7 +272,7 @@ export function fxCapHint(valueUsd: number | null | undefined, fx: Fx): FxCapHin
 	}
 	return {
 		conversion,
-		tail: ` at the ECB reference rate for ${formatRateDate(fx.rateDate)}. The cap is stored and enforced in USD.`,
+		tail: " at today's rate.",
 	};
 }
 
@@ -339,26 +325,31 @@ export interface FxSpendProps {
 	className?: string;
 }
 
-/** ` (≈ €3.96)` after a spend figure. */
-export function FxSpend({ usd, fx, className }: FxSpendProps) {
-	return <FxAmount conversion={spendConversion(usd, fx)} className={className} />;
-}
-
 /** ` (≈ €44)` after a cap. */
 export function FxCap({ usd, fx, className }: FxSpendProps) {
 	return <FxAmount conversion={capConversion(usd, fx)} className={className} />;
 }
 
-export interface FxSpendOfCapProps {
-	spendUsd: number | null | undefined;
-	capUsd: number | null | undefined;
-	fx: Fx;
-	className?: string;
+/**
+ * The estimate *under* a figure rather than beside it — the table-cell form.
+ *
+ * Muted and small, because the USD figure above it is the amount and this is a reading aid. Renders
+ * nothing at all when there is no conversion, so a column of `$0` rows keeps its single-line height.
+ */
+export function FxLine({ conversion, className }: FxAmountProps) {
+	if (conversion == null) {
+		return null;
+	}
+	return (
+		<div className={cn("text-xs font-normal text-muted-foreground tabular-nums", className)}>
+			<FxApprox conversion={conversion} />
+		</div>
+	);
 }
 
-/** ` (≈ €38.59 of €44)` after an "X of Y" line. */
-export function FxSpendOfCap({ spendUsd, capUsd, fx, className }: FxSpendOfCapProps) {
-	return <FxAmount conversion={spendOfCapConversion(spendUsd, capUsd, fx)} className={className} />;
+/** `≈ €3.96` on its own line under a spend figure — the form every money cell uses. */
+export function FxSpendLine({ usd, fx, className }: FxSpendProps) {
+	return <FxLine conversion={spendConversion(usd, fx)} className={className} />;
 }
 
 export interface FxDisclosureProps {

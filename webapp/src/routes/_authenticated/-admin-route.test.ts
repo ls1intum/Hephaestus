@@ -54,4 +54,43 @@ describe("instance-admin route gate", () => {
 		mockAppRole("APP_ADMIN");
 		expect(await land("/admin/users")).toBe("/admin/users");
 	});
+
+	// `/admin/llm` was the old URL for the model catalogue; it is now a redirect-only stub, so a
+	// bookmark or a link in someone's runbook still lands on the page.
+	it("forwards the retired /admin/llm to /admin/models", async () => {
+		mockAppRole("APP_ADMIN");
+		expect(await land("/admin/llm")).toBe("/admin/models");
+	});
+});
+
+/**
+ * Both consoles deliberately use the same page names ("AI models", "AI usage", "Audit log"), so the
+ * tab title is the only thing that separates two open admin tabs. Guard that they actually differ.
+ */
+describe("admin tab titles", () => {
+	async function titleOf(url: string) {
+		mockAppRole("APP_ADMIN");
+		// The per-workspace console gates on membership, not on the app role.
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/members/me", () =>
+				HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
+			),
+		);
+		const router = newRouter(url);
+		await router.load();
+		// The deepest match's title wins, so read the last one the matched routes contributed.
+		const titles = router.state.matches
+			.flatMap((match) => match.meta ?? [])
+			.map((tag) => tag?.title)
+			.filter((title): title is string => typeof title === "string");
+		return titles.at(-1);
+	}
+
+	it("scopes the instance console's title", async () => {
+		expect(await titleOf("/admin/usage")).toBe("AI usage · Instance admin · Hephaestus");
+	});
+
+	it("scopes the per-workspace console's title", async () => {
+		expect(await titleOf("/w/hephaestus/admin/usage")).toBe("AI usage · Admin · Hephaestus");
+	});
 });

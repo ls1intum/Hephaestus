@@ -14,7 +14,6 @@ import {
 	DialogBody,
 	DialogClose,
 	DialogContent,
-	DialogDescription,
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
@@ -156,7 +155,6 @@ function WorkspaceLlmModelFormDialogContent({
 			<form onSubmit={handleSubmit} className="contents" noValidate>
 				<DialogHeader>
 					<DialogTitle>{isEdit ? "Edit model" : "Add model"}</DialogTitle>
-					<DialogDescription>A model on your own connected provider.</DialogDescription>
 				</DialogHeader>
 
 				{/* The tallest form on this surface — six fields plus the whole price editor, around
@@ -243,7 +241,7 @@ function WorkspaceLlmModelFormDialogContent({
 							<FieldDescription>
 								{isEdit
 									? "Only active models with a declared price can be selected."
-									: "New models start inactive. Save a price, then review and activate the model."}
+									: "Starts inactive. Add a price, then activate."}
 							</FieldDescription>
 						</FieldContent>
 						<Switch
@@ -259,8 +257,8 @@ function WorkspaceLlmModelFormDialogContent({
 							<AlertTriangle aria-hidden />
 							<AlertTitle>Existing configurations will stop immediately</AlertTitle>
 							<AlertDescription>
-								Practice detection and Mentor configurations using this model cannot run until the
-								model is reactivated or replaced.
+								Practice detection and the mentor can't run until you reactivate this model or pick
+								another.
 							</AlertDescription>
 						</Alert>
 					)}

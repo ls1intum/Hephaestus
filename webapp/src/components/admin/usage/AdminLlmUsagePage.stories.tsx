@@ -192,7 +192,7 @@ export const DisplayCurrencyClosedMonth: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(
-			canvas.getByText(/the last rate published that month, so past figures don't change/),
+			canvas.getByText(/The last rate published that month, so past figures don't change/),
 		).toBeVisible();
 	},
 };

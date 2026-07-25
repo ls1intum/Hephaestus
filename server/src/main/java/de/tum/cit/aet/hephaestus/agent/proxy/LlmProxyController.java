@@ -321,13 +321,13 @@ class LlmProxyController {
     }
 
     /**
-     * The 429 body names WHOSE cap stopped the call, because the two have different remedies: the
+     * The 429 body names WHICH purse stopped the call, because the two have different remedies: the
      * workspace can raise its own cap itself, while a shared-model cap is the host's to raise.
      */
     private static String budgetReachedMessage(@Nullable FundingSource fundingSource) {
         return fundingSource == FundingSource.WORKSPACE
-            ? "This workspace's own-provider budget is reached; new calls are paused until a workspace admin raises the cap or the month rolls over."
-            : "The shared-model budget for this workspace is reached; new calls are paused until an instance admin raises the budget or the month rolls over.";
+            ? "Own-provider budget reached. Paused until an admin raises the cap or the month rolls over."
+            : "Shared-model budget reached. Paused until an admin raises the budget or the month rolls over.";
     }
 
     private void incrementErrors(String apiProtocol) {

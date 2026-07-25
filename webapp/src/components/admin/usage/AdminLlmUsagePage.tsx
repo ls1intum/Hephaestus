@@ -1,7 +1,8 @@
 import { Progress as ProgressRoot } from "@base-ui/react/progress";
 import { Link } from "@tanstack/react-router";
-import { CircleAlert, CircleDollarSign, TrendingUp, TriangleAlert } from "lucide-react";
+import { CircleAlert, CircleDollarSign, TrendingUp } from "lucide-react";
 import type { WorkspaceLlmUsageReport } from "@/api/types.gen";
+import { BudgetExhaustedAlert } from "@/components/admin/ai/BudgetExhaustedAlert";
 import { formatCapUsd, formatCostUsd } from "@/components/admin/ai/jobUtils";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -21,7 +22,6 @@ import {
 	capConversion,
 	type Fx,
 	FxAmount,
-	FxCap,
 	type FxConversion,
 	FxDisclosure,
 	spendConversion,
@@ -32,14 +32,11 @@ import { MonthNavigator } from "./MonthNavigator";
 import {
 	BUDGET_WARN_PERCENT,
 	type BudgetProjection,
-	budgetResetDayLabel,
 	budgetUsedPercent,
 	formatDayLabel,
 	formatMonthLabel,
 	projectBudget,
 } from "./usageUtils";
-
-type BudgetVerdict = WorkspaceLlmUsageReport["byoBudgetVerdict"];
 
 export interface AdminLlmUsagePageProps {
 	/** ISO `yyyy-MM` month currently shown. */
@@ -134,7 +131,16 @@ export function AdminLlmUsagePage({
 			? spendOfCapConversion(providerSpend, providerCap, fx)
 			: spendConversion(providerSpend, fx);
 	const providerCapFx = capConversion(providerCap, fx);
-	const hasConversion = sharedTitleFx != null || providerTitleFx != null || providerCapFx != null;
+	// Every converted figure on the page, not just the cards: the breakdown tables convert their own
+	// footer totals, so deriving the caption from the cards alone put converted euros on screen with
+	// no rate behind them whenever a card happened not to convert (a $0 budget, say, which is the
+	// supported "pause now" state). Derive it from what actually renders.
+	const hasConversion =
+		sharedTitleFx != null ||
+		providerTitleFx != null ||
+		providerCapFx != null ||
+		spendConversion(sharedSpend, fx) != null ||
+		spendConversion(providerSpend, fx) != null;
 
 	return (
 		<div className="mx-auto w-full max-w-6xl space-y-6 py-6">
@@ -144,9 +150,6 @@ export function AdminLlmUsagePage({
 						<CircleDollarSign className="size-6 text-muted-foreground" aria-hidden />
 						<h1 className="text-2xl font-semibold">AI usage</h1>
 					</div>
-					<p className="text-sm text-muted-foreground">
-						What this workspace spent on AI, month by month (UTC).
-					</p>
 				</header>
 				<MonthNavigator
 					month={month}
@@ -188,19 +191,23 @@ export function AdminLlmUsagePage({
 				<>
 					{/* The provider cap comes first when both are paused: it is the one they can act on. */}
 					{providerPaused && (
-						<ProviderPauseAlert
+						<BudgetExhaustedAlert
+							scope="own"
 							verdict={report.byoBudgetVerdict}
 							month={month}
 							unpricedEventCount={unpricedEventCount}
+							context="usage"
 							workspaceSlug={workspaceSlug}
 							onEditByoCap={onEditByoCap}
 						/>
 					)}
 					{sharedPaused && (
-						<SharedPauseAlert
+						<BudgetExhaustedAlert
+							scope="shared"
 							verdict={report.instanceBudgetVerdict}
 							month={month}
 							unpricedEventCount={unpricedEventCount}
+							context="usage"
 							workspaceSlug={workspaceSlug}
 						/>
 					)}
@@ -265,16 +272,11 @@ export function AdminLlmUsagePage({
 								paused={providerPaused}
 								onEditByoCap={onEditByoCap}
 								titleFx={providerTitleFx}
-								fx={fx}
 							/>
 						) : (
 							<NoProviderCard workspaceSlug={workspaceSlug} onEditByoCap={onEditByoCap} />
 						)}
 					</div>
-
-					{/* Disclosed once, under the figures it qualifies — never beside each number, where it
-					    would bury the numbers it exists to explain. */}
-					{hasConversion && <FxDisclosure fx={fx} isCurrentMonth={isCurrentMonth} />}
 
 					{!hasUsage ? (
 						<Empty className="border">
@@ -283,9 +285,7 @@ export function AdminLlmUsagePage({
 									<CircleDollarSign />
 								</EmptyMedia>
 								<EmptyTitle>No AI usage in {formatMonthLabel(month)}</EmptyTitle>
-								<EmptyDescription>
-									Nothing ran on a shared model or on your provider this month.
-								</EmptyDescription>
+								<EmptyDescription>Nothing ran this month.</EmptyDescription>
 							</EmptyHeader>
 							<EmptyContent>
 								<Button
@@ -320,9 +320,6 @@ export function AdminLlmUsagePage({
 													<CircleDollarSign />
 												</EmptyMedia>
 												<EmptyTitle>No daily breakdown yet</EmptyTitle>
-												<EmptyDescription>
-													Days appear here as soon as a call is priced in {formatMonthLabel(month)}.
-												</EmptyDescription>
 											</EmptyHeader>
 										</Empty>
 									) : (
@@ -332,6 +329,11 @@ export function AdminLlmUsagePage({
 							</Card>
 						</>
 					)}
+
+					{/* Disclosed once, after every figure it qualifies — never beside each number, where it
+					    would bury the numbers it exists to explain, and never above them, where a footnote
+					    reads as a preamble to something else. */}
+					{hasConversion && <FxDisclosure fx={fx} isCurrentMonth={isCurrentMonth} />}
 				</>
 			)}
 		</div>
@@ -348,117 +350,6 @@ function AiModelsLink({ workspaceSlug }: { workspaceSlug: string }) {
 		>
 			AI models
 		</Link>
-	);
-}
-
-interface ProviderPauseAlertProps {
-	verdict: BudgetVerdict;
-	month: string;
-	unpricedEventCount: number;
-	workspaceSlug: string;
-	onEditByoCap: () => void;
-}
-
-/** The workspace's own cap tripped — the one pause its admin can lift themselves. */
-function ProviderPauseAlert({
-	verdict,
-	month,
-	unpricedEventCount,
-	workspaceSlug,
-	onEditByoCap,
-}: ProviderPauseAlertProps) {
-	if (verdict === "UNVERIFIABLE") {
-		return (
-			<Alert variant="destructive" role="alert">
-				<TriangleAlert aria-hidden />
-				<AlertTitle>Your cap can't be enforced</AlertTitle>
-				<AlertDescription>
-					<p>
-						{unpricedEventCount === 1
-							? "1 call on your models has"
-							: `${unpricedEventCount > 0 ? `${unpricedEventCount.toLocaleString()} calls` : "Some calls"} on your models have`}{" "}
-						no price set, so spend can't be checked against your cap. Add a price in{" "}
-						<AiModelsLink workspaceSlug={workspaceSlug} /> to resume, or remove the cap.
-					</p>
-					<Button variant="outline" size="sm" className="mt-2" onClick={onEditByoCap}>
-						Adjust cap
-					</Button>
-				</AlertDescription>
-			</Alert>
-		);
-	}
-	return (
-		<Alert variant="destructive" role="alert">
-			<TriangleAlert aria-hidden />
-			<AlertTitle>Your provider cap is reached</AlertTitle>
-			<AlertDescription>
-				<p>
-					Work on your own provider is paused until {budgetResetDayLabel(month)} (UTC), or until you
-					raise or remove your cap.
-				</p>
-				<Button variant="outline" size="sm" className="mt-2" onClick={onEditByoCap}>
-					Adjust cap
-				</Button>
-			</AlertDescription>
-		</Alert>
-	);
-}
-
-interface SharedPauseAlertProps {
-	verdict: BudgetVerdict;
-	month: string;
-	unpricedEventCount: number;
-	workspaceSlug: string;
-}
-
-/**
- * The host's shared-model budget tripped. Warning, not destructive: work on the workspace's own
- * provider keeps running, and nothing here is the workspace admin's to fix — the only move they own
- * is switching a purpose onto their provider.
- */
-function SharedPauseAlert({
-	verdict,
-	month,
-	unpricedEventCount,
-	workspaceSlug,
-}: SharedPauseAlertProps) {
-	if (verdict === "UNVERIFIABLE") {
-		return (
-			<Alert variant="warning" role="alert">
-				<TriangleAlert aria-hidden />
-				<AlertTitle>Shared-model spend can't be verified</AlertTitle>
-				<AlertDescription>
-					<p>
-						{unpricedEventCount === 1
-							? "1 shared-model call has"
-							: `${unpricedEventCount > 0 ? `${unpricedEventCount.toLocaleString()} shared-model calls` : "Some shared-model calls"} have`}{" "}
-						no price set, so spend can't be checked against the shared-model budget, and work on
-						shared models is paused. Only your host can price a shared model — ask them to. Work on
-						your own provider is not affected.
-					</p>
-				</AlertDescription>
-			</Alert>
-		);
-	}
-	return (
-		<Alert variant="warning" role="alert">
-			<TriangleAlert aria-hidden />
-			<AlertTitle>Shared-model budget reached</AlertTitle>
-			<AlertDescription>
-				<p>
-					Work on shared models is paused until {budgetResetDayLabel(month)} (UTC) or until your
-					host raises the budget. Work on your own provider is not affected.
-				</p>
-				<Button
-					variant="outline"
-					size="sm"
-					className="mt-2"
-					render={<Link to="/w/$workspaceSlug/admin/models" params={{ workspaceSlug }} />}
-				>
-					Switch a purpose to your provider
-				</Button>
-			</AlertDescription>
-		</Alert>
 	);
 }
 
@@ -492,12 +383,19 @@ function BudgetPaceAlert({
 			<AlertDescription>
 				<p>
 					{formatCostUsd(spendUsd)} of {formatCapUsd(capUsd)}
-					<FxAmount conversion={spendOfCapConversion(spendUsd, capUsd, fx)} />
-					{isProvider ? ", set by you." : ", set by your host."}
+					<FxAmount conversion={spendOfCapConversion(spendUsd, capUsd, fx)} />.
 					{projection != null &&
-						(projection.reachedOn != null
-							? ` At this month's pace you'll reach it around ${formatDayLabel(projection.reachedOn)}.`
-							: ` At this month's pace you'll finish the month around ${formatCostUsd(projection.projectedMonthEndUsd)}.`)}
+						(projection.reachedOn != null ? (
+							` At this pace you'll hit it around ${formatDayLabel(projection.reachedOn)}.`
+						) : (
+							// The month-end figure converts too: one sentence that quotes "$43.90 of $50
+							// (≈ €38.59 of €44)" and then a bare "$61.20" makes the reader switch currencies
+							// mid-breath.
+							<>
+								{` At this pace you'll finish the month around ${formatCostUsd(projection.projectedMonthEndUsd)}`}
+								<FxAmount conversion={spendConversion(projection.projectedMonthEndUsd, fx)} />.
+							</>
+						))}
 				</p>
 			</AlertDescription>
 		</Alert>
@@ -556,7 +454,8 @@ function SharedBudgetCard({
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-3">
-				{percent != null ? (
+				{/* Whose budget this is has already been said once, in the description above. */}
+				{percent != null && (
 					<BudgetMeter
 						percent={percent}
 						paused={paused}
@@ -564,14 +463,9 @@ function SharedBudgetCard({
 						capUsd={capUsd}
 						label="Shared-model budget used"
 					/>
-				) : (
-					<p className="text-sm text-muted-foreground">
-						Your host isn't capping shared-model spend for this workspace.
-					</p>
 				)}
 				<p className="text-sm text-muted-foreground">
-					Only your host can change this budget. What you can change is what runs on it — move a
-					purpose to your own provider in <AiModelsLink workspaceSlug={workspaceSlug} />.
+					Move a purpose to your own provider in <AiModelsLink workspaceSlug={workspaceSlug} />.
 				</p>
 			</CardContent>
 		</Card>
@@ -587,10 +481,9 @@ interface ProviderCapCardProps {
 	onEditByoCap: () => void;
 	/** The estimate that trails the headline, or `null` when there is nothing to convert. */
 	titleFx: FxConversion | null;
-	fx: Fx;
 }
 
-/** The workspace's own money — set, change, and remove all live here. */
+/** The workspace's own money: set, change, and remove all live here. */
 function ProviderCapCard({
 	isCurrentMonth,
 	spendUsd,
@@ -599,7 +492,6 @@ function ProviderCapCard({
 	paused,
 	onEditByoCap,
 	titleFx,
-	fx,
 }: ProviderCapCardProps) {
 	return (
 		<Card>
@@ -623,9 +515,7 @@ function ProviderCapCard({
 						)
 					)}
 				</CardTitle>
-				<CardDescription>
-					Billed to your own provider key. Never counted toward the shared-model budget.
-				</CardDescription>
+				<CardDescription>Billed to your own provider key.</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-3">
 				{percent != null && (
@@ -637,13 +527,9 @@ function ProviderCapCard({
 						label="Your provider cap used"
 					/>
 				)}
-				<p className="text-sm text-muted-foreground">
-					Your provider cap · set by you:{" "}
-					<span className="tabular-nums">
-						{capUsd != null ? formatCapUsd(capUsd) : "No cap"}
-						{capUsd != null && <FxCap usd={capUsd} fx={fx} />}
-					</span>
-				</p>
+				{/* A set cap is already the "of $50" in the headline and the meter under it; only its
+				    absence still needs saying. */}
+				{capUsd == null && <p className="text-sm text-muted-foreground">No cap set.</p>}
 				<Button variant="outline" size="sm" onClick={onEditByoCap}>
 					{capUsd != null ? "Change cap" : "Set cap"}
 				</Button>
@@ -666,14 +552,11 @@ function NoProviderCard({ workspaceSlug, onEditByoCap }: NoProviderCardProps) {
 				<CardTitle className="text-2xl tabular-nums">No spend</CardTitle>
 				<CardDescription>
 					Nothing ran on a provider of your own this month. Connect one in{" "}
-					<AiModelsLink workspaceSlug={workspaceSlug} /> and you can cap what it spends yourself —
-					separate from the shared-model budget.
+					<AiModelsLink workspaceSlug={workspaceSlug} /> to cap what it spends yourself.
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-3">
-				<p className="text-sm text-muted-foreground">
-					Your provider cap · set by you: <span className="tabular-nums">No cap</span>
-				</p>
+				<p className="text-sm text-muted-foreground">No cap set.</p>
 				<Button variant="outline" size="sm" onClick={onEditByoCap}>
 					Set cap
 				</Button>
@@ -701,7 +584,8 @@ function BudgetMeter({ percent, paused, spendUsd, capUsd, label }: BudgetMeterPr
 	const value = Math.min(Math.max(percent, 0), 100);
 	const rounded = Math.round(percent);
 	const state = paused ? "Paused" : percent >= BUDGET_WARN_PERCENT ? "Near cap" : null;
-	const valueText = `${rounded}% used — ${formatCostUsd(spendUsd)} of ${formatCapUsd(capUsd)}`;
+	// Comma, not an em-dash: screen readers render an em-dash inconsistently — some spell it out.
+	const valueText = `${rounded}% used, ${formatCostUsd(spendUsd)} of ${formatCapUsd(capUsd)}`;
 	const tone =
 		paused || percent >= 100
 			? "bg-destructive"

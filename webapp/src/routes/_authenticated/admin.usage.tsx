@@ -14,9 +14,11 @@ import { AdminInstanceLlmUsageTable } from "@/components/admin/usage/AdminInstan
 import { MonthNavigator } from "@/components/admin/usage/MonthNavigator";
 import { SetBudgetDialog } from "@/components/admin/usage/SetBudgetDialog";
 import { addMonths, currentMonthUtc } from "@/components/admin/usage/usageUtils";
+import { instanceAdminHead } from "@/lib/page-title";
 import { problemDetailOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute("/_authenticated/admin/usage")({
+	head: instanceAdminHead("AI usage"),
 	component: AdminInstanceUsagePage,
 });
 
@@ -50,19 +52,17 @@ function AdminInstanceUsagePage() {
 		onSuccess: (_data, variables) => {
 			// Prefix key (no options) invalidates every cached month.
 			queryClient.invalidateQueries({ queryKey: adminListLlmUsageQueryKey() });
-			// The proxy caches its answer for about 30s, so "resumes now" would be a small lie.
+			// The proxy caches its answer for about 30s, so "resumes now" would be a small lie. A bound
+			// ("within a minute") rather than a hedge ("about a minute") — it is one the gate keeps.
 			toast.success(
 				variables.body.monthlyLlmBudgetUsd == null
-					? "Cap removed. New calls resume within about a minute."
-					: "Cap saved. New calls resume within about a minute.",
+					? "Cap removed. New calls resume within a minute."
+					: "Cap saved. New calls resume within a minute.",
 			);
 			setEditing(null);
 		},
-		onError: (error) => {
-			toast.error("Couldn't save the budget", {
-				description: problemDetailOf(error, "Try again in a moment."),
-			});
-		},
+		// No error toast: the dialog renders the server's reason as the amount field's error, where it
+		// sits next to the value that was rejected instead of evaporating above it.
 	});
 
 	const handleSubmitBudget = (monthlyLlmBudgetUsd: number | null) => {
@@ -84,12 +84,6 @@ function AdminInstanceUsagePage() {
 						<CircleDollarSign className="size-6 text-muted-foreground" aria-hidden />
 						<h1 className="text-2xl font-semibold">AI usage</h1>
 					</div>
-					<p className="text-sm text-muted-foreground">
-						What each workspace spent on AI in the selected month (metadata only). An instance cap
-						bounds the shared-model spend you pay for; a workspace's provider cap bounds spend on
-						its own provider — you can see it, only its admins can change it. The two never add up
-						and pause independently.
-					</p>
 				</header>
 				<MonthNavigator
 					month={month}
@@ -121,9 +115,16 @@ function AdminInstanceUsagePage() {
 			<SetBudgetDialog
 				workspace={editing}
 				isPending={updateBudget.isPending}
+				serverError={
+					updateBudget.error != null
+						? problemDetailOf(updateBudget.error, "Couldn't save the budget")
+						: null
+				}
 				onOpenChange={(open) => {
 					if (!open) {
 						setEditing(null);
+						// Otherwise the next workspace's dialog opens showing this one's rejection.
+						updateBudget.reset();
 					}
 				}}
 				onSubmit={handleSubmitBudget}

@@ -77,7 +77,9 @@ export function WorkspaceLlmModelsTable({
 								<TableCell>
 									<div className="font-medium">{model.displayName}</div>
 								</TableCell>
-								<TableCell>{priceLabel(model, "workspace")}</TableCell>
+								{/* Left-aligned: `priceLabel` is a sentence, not a figure. `tabular-nums` only
+								    lines the digits inside it up down the column. */}
+								<TableCell className="tabular-nums">{priceLabel(model, "workspace")}</TableCell>
 								<TableCell>
 									<Badge variant={model.enabled ? "default" : "secondary"}>
 										{model.enabled ? "Active" : "Off"}

@@ -17,9 +17,9 @@ public class LlmUnpricedUsageBlockedException extends RuntimeException {
 
     private static String message(FundingSource fundingSource) {
         return fundingSource == FundingSource.WORKSPACE
-            ? "Some usage on this workspace's own AI provider has no price set, so spending can't be " +
-              "checked against the cap. A workspace admin can add the model's price, or remove the cap."
-            : "Some shared-model usage in this workspace has no price set, so spending can't be checked " +
-              "against the budget. An instance admin can add the model's price, or remove the budget.";
+            ? "Some usage has no price, so it can't be checked against the cap. A workspace admin can " +
+              "add the price or remove the cap."
+            : "Some usage has no price, so it can't be checked against the budget. An instance admin " +
+              "can add the price or remove the budget.";
     }
 }

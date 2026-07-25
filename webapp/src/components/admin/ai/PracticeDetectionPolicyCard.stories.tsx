@@ -14,7 +14,7 @@ const readyBinding: AgentBinding = {
 
 /**
  * Policy editor for practice-detection reviews: which model detection runs on (read-only —
- * the binding is owned by the AI setup page), automatic/manual triggers, and review policy
+ * the binding is owned by the AI models page), automatic/manual triggers, and review policy
  * (drafts, cooldown, coverage). Saves field-by-field.
  */
 const meta = {
@@ -49,7 +49,7 @@ type Story = StoryObj<typeof meta>;
 /** Detection is bound to a runnable model; triggers and policy populated. */
 export const RuntimeBound: Story = {};
 
-/** No model bound to practice detection — nothing can run until one is set on the AI setup page. */
+/** No model bound to practice detection — nothing can run until one is set on the AI models page. */
 export const Unbound: Story = {
 	args: { detectionBinding: undefined },
 };

@@ -101,6 +101,53 @@ export function formatCapUsd(value: number | undefined): string {
 	return Number.isInteger(value) ? USD_WHOLE.format(value) : USD.format(value);
 }
 
+const USD_RATE = new Intl.NumberFormat("en-US", {
+	style: "currency",
+	currency: "USD",
+	minimumFractionDigits: 2,
+	maximumFractionDigits: 4,
+});
+
+/**
+ * A published price, not an amount spent. Rates carry up to four decimals ($0.075 / 1M tokens is a
+ * real price) and are never floored to `<$0.01` — a rate the admin verifies against their provider's
+ * price list has to render as the number they will read there.
+ *
+ * Only for prices and per-unit rates. Anything that was actually spent uses {@link formatCostUsd},
+ * whose `$0` / `<$0.01` bounds are the #1368 glossary's wording for spend.
+ */
+export function formatRateUsd(value: number | undefined): string {
+	return value == null ? "—" : USD_RATE.format(value);
+}
+
+/**
+ * A money figure in a right-aligned column, padded so its decimal point lands where every other
+ * row's does.
+ *
+ * `tabular-nums` equalises glyph *width*; it does nothing about a missing `.00`, so `$0`, `<$0.01`
+ * and `$4.50` right-align with their decimal points three different distances from the edge. The
+ * copy for `$0` and `<$0.01` is fixed by the glossary, so the fix is layout: reserve the width of
+ * the cents that string doesn't have. `visibility: hidden` keeps the space (unlike `display: none`)
+ * and `aria-hidden` keeps it out of the accessible name.
+ *
+ * Headlines are not columns — don't wrap them.
+ *
+ * Note for tests: the pad is a child *element*, so `getByText("$0")` still matches the cell (Testing
+ * Library's default matcher reads direct text nodes only), but `textContent` reads `"$0.00"`.
+ */
+export function MoneyCell({ children }: { children: string }) {
+	return (
+		<>
+			{children}
+			{!children.includes(".") && (
+				<span className="invisible" aria-hidden>
+					.00
+				</span>
+			)}
+		</>
+	);
+}
+
 /**
  * The model a job ran on, read from its frozen submit-time snapshot. Populated from submission
  * onward, unlike the runner-reported `llmModel`, which only exists once the job has actually run.

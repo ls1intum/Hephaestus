@@ -17,8 +17,10 @@ import {
 	type PracticeReviewField,
 } from "@/components/admin/ai/PracticeDetectionPolicyCard";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
+import { workspaceAdminHead } from "@/lib/page-title";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/settings")({
+	head: workspaceAdminHead("Review settings"),
 	component: ReviewSettingsContainer,
 });
 

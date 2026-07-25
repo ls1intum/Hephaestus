@@ -18,9 +18,11 @@ import type {
 import { LoginProviderFormDialog } from "@/components/admin/login-providers/LoginProviderFormDialog";
 import { LoginProvidersTable } from "@/components/admin/login-providers/LoginProvidersTable";
 import { Button } from "@/components/ui/button";
+import { instanceAdminHead } from "@/lib/page-title";
 import { problemDetailOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute("/_authenticated/admin/login-providers")({
+	head: instanceAdminHead("Login providers"),
 	component: AdminLoginProvidersPage,
 });
 

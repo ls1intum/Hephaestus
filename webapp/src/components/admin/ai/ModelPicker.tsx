@@ -105,23 +105,13 @@ export function ModelPicker({
 			<SelectContent>
 				{shared.length > 0 && (
 					<SelectGroup>
-						<SelectLabel>
-							Shared models
-							<span className="block font-normal normal-case text-muted-foreground/80">
-								managed and funded by the instance
-							</span>
-						</SelectLabel>
+						<SelectLabel>Shared models</SelectLabel>
 						<ModelOptions models={shared} />
 					</SelectGroup>
 				)}
 				{own.length > 0 && (
 					<SelectGroup>
-						<SelectLabel>
-							Your models
-							<span className="block font-normal normal-case text-muted-foreground/80">
-								billed to the account that owns the credential
-							</span>
-						</SelectLabel>
+						<SelectLabel>Your models</SelectLabel>
 						<ModelOptions models={own} />
 					</SelectGroup>
 				)}

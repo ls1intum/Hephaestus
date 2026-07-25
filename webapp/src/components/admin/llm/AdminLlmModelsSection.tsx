@@ -125,7 +125,11 @@ export function AdminLlmModelsSection({
 							return (
 								<TableRow key={model.id}>
 									<TableCell className="font-medium">{model.displayName}</TableCell>
-									<TableCell>{priceLabel(priceFieldsOf(model), "instance")}</TableCell>
+									{/* Left-aligned: `priceLabel` is a sentence, not a figure. `tabular-nums` only
+									    lines the digits inside it up down the column. */}
+									<TableCell className="tabular-nums">
+										{priceLabel(priceFieldsOf(model), "instance")}
+									</TableCell>
 									<TableCell>{shareLabel(model, workspaceOptions)}</TableCell>
 									<TableCell>
 										<Badge variant={status === "Ready" ? "default" : "secondary"}>{status}</Badge>

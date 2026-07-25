@@ -39,9 +39,11 @@ export interface NavAdminProps {
 }
 
 // "Practices" nests as a collapsible sub-tree because it owns several surfaces (the catalog, review
-// settings, and the run log). "AI setup" is a separate item, shared with the mentor, rather than living
-// under Practices. Individual practices are not sidebar entries — there are dozens; the catalog is
-// their home and each drills down to its own detail page.
+// settings, and the run log). "AI models" is a separate item, shared with the mentor, rather than
+// living under Practices. Individual practices are not sidebar entries — there are dozens; the catalog
+// is their home and each drills down to its own detail page.
+// Labels are nouns, never verb phrases, and match the instance console word-for-word wherever the two
+// point at the same kind of object ("AI models", "AI usage", "Audit log"); the shell carries the scope.
 export function NavAdmin({
 	workspaceSlug,
 	achievementsEnabled = true,
@@ -82,39 +84,39 @@ export function NavAdmin({
 			<SidebarMenu>
 				<SidebarMenuItem>
 					<SidebarMenuButton
-						tooltip="Manage workspace"
+						tooltip="Workspace settings"
 						render={<Link to="/w/$workspaceSlug/admin/settings" params={{ workspaceSlug }} />}
 					>
 						<Settings2 />
-						<span>Manage workspace</span>
+						<span>Settings</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
 				<SidebarMenuItem>
 					<SidebarMenuButton
-						tooltip="Manage members"
+						tooltip="Members"
 						render={<Link to="/w/$workspaceSlug/admin/members" params={{ workspaceSlug }} />}
 					>
 						<BookUser />
-						<span>Manage members</span>
+						<span>Members</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
 				<SidebarMenuItem>
 					<SidebarMenuButton
-						tooltip="Manage teams"
+						tooltip="Teams"
 						render={<Link to="/w/$workspaceSlug/admin/teams" params={{ workspaceSlug }} />}
 					>
 						<Users />
-						<span>Manage teams</span>
+						<span>Teams</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
 				{achievementsEnabled && (
 					<SidebarMenuItem>
 						<SidebarMenuButton
-							tooltip="Manage achievements"
+							tooltip="Achievements"
 							render={<Link to="/w/$workspaceSlug/admin/achievements" params={{ workspaceSlug }} />}
 						>
 							<Trophy />
-							<span>Manage achievements</span>
+							<span>Achievements</span>
 						</SidebarMenuButton>
 					</SidebarMenuItem>
 				)}
@@ -270,20 +272,20 @@ export function NavAdmin({
 				    off, and admins should be able to configure them before enabling a feature. */}
 				<SidebarMenuItem>
 					<SidebarMenuButton
-						tooltip="AI setup"
+						tooltip="AI models"
 						render={<Link to="/w/$workspaceSlug/admin/models" params={{ workspaceSlug }} />}
 					>
 						<Bot />
-						<span>AI setup</span>
+						<span>AI models</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
 				<SidebarMenuItem>
 					<SidebarMenuButton
-						tooltip="AI usage"
+						tooltip="What this workspace spent on AI"
 						render={<Link to="/w/$workspaceSlug/admin/usage" params={{ workspaceSlug }} />}
 					>
 						<CircleDollarSign />
-						<span>Usage</span>
+						<span>AI usage</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
 				{/* Deliberately not feature-gated: a change history must stay reachable after a feature is

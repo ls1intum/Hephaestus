@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { WorkspaceLlmUsageReport } from "@/api/types.gen";
+import type { FxRateInfo, WorkspaceLlmUsageReport } from "@/api/types.gen";
 import {
 	AdminInstanceLlmUsageTable,
 	type AdminWorkspaceLlmUsageRow,
@@ -41,8 +41,10 @@ const detailReport: WorkspaceLlmUsageReport = {
 			outputTokens: 25,
 			cacheReadTokens: 0,
 			cacheWriteTokens: 0,
-			totalCalls: 2,
-			events: 1,
+			totalCalls: 4,
+			// Two events, so the per-event averages ($2.125 and $0.875) can't collide with the spend
+			// figures they are derived from and each assertion below names one cell.
+			events: 2,
 		},
 	],
 	byDay: [
@@ -212,5 +214,81 @@ describe("AdminInstanceLlmUsageTable", () => {
 		const byDay = screen.getByRole("table", { name: "AI spend by day" });
 		expect(within(byDay).getByText("Jul 5")).toBeTruthy();
 		expect(within(byDay).getByText("$4.25")).toBeTruthy();
+	});
+
+	describe("display currency", () => {
+		const eur: FxRateInfo = {
+			currencyCode: "EUR",
+			ratePerUsd: 0.878966,
+			rateDate: new Date("2026-07-24T00:00:00.000Z"),
+		};
+
+		it("converts both spend columns, not just the one the host pays for", () => {
+			renderTable([{ ...workspace, fx: eur }]);
+
+			const row = within(firstDataRow());
+			// $4.25 shared and $1.75 on the workspace's own provider — the same physical quantity,
+			// differently funded. Converting one and not the other reads as "these differ in kind".
+			expect(row.getByLabelText("approximately 3.74 euros")).toBeTruthy();
+			expect(row.getByLabelText("approximately 1.54 euros")).toBeTruthy();
+		});
+
+		it("puts the rate footnote after the figures it qualifies", () => {
+			const { container } = renderTable([{ ...workspace, fx: eur }]);
+
+			const disclosure = screen.getByText(/ECB reference rate/);
+			const table = container.querySelector("table");
+			if (table == null) {
+				throw new Error("expected the rollup table to render");
+			}
+			// A footnote that precedes its numbers reads as a preamble to something else.
+			expect(
+				table.compareDocumentPosition(disclosure) & Node.DOCUMENT_POSITION_FOLLOWING,
+			).toBeTruthy();
+		});
+
+		it("stays silent about a rate nothing on the table used", () => {
+			renderTable([{ ...workspace, pricedTotalCostUsd: 0, byoTotalCostUsd: 0, fx: eur }]);
+
+			expect(screen.queryByText(/ECB reference rate/)).toBeNull();
+		});
+
+		it("hands the table's own rate to the expanded breakdown", () => {
+			render(
+				<AdminInstanceLlmUsageTable
+					rows={[{ ...workspace, fx: eur }]}
+					isCurrentMonth
+					isLoading={false}
+					error={null}
+					expandedWorkspaceId={workspace.workspaceId}
+					// The detail response carries its own block. One month resolves to one rate, so the two
+					// agree today — but nothing enforces that, and two rates on one screen is a bug nobody
+					// would spot. The panel renders the table's.
+					detailReport={{
+						...detailReport,
+						fx: { ...eur, currencyCode: "GBP", ratePerUsd: 0.5 },
+						byDay: [
+							detailReport.byDay[0],
+							{
+								day: new Date("2026-07-06T00:00:00.000Z"),
+								pricedTotalCostUsd: 4.25,
+								byoTotalCostUsd: 1.75,
+								unpricedEventCount: 0,
+								events: 1,
+							},
+						],
+					}}
+					isDetailLoading={false}
+					detailError={null}
+					onToggleDetails={() => {}}
+					onEditBudget={() => {}}
+				/>,
+			);
+
+			const byDay = screen.getByRole("table", { name: "AI spend by day" });
+			const footer = within(byDay).getByRole("row", { name: /^Total/ });
+			expect(footer.textContent).toContain("€");
+			expect(footer.textContent).not.toContain("£");
+		});
 	});
 });

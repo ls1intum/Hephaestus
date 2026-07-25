@@ -123,9 +123,22 @@ export function AdminTeamsTable({
 		return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
 	};
 
+	// Every other admin page opens with its own <h1>; this one is reached from the sidebar's "Teams"
+	// entry, so it names itself with the same word rather than leaving the page unlabelled.
+	const heading = (
+		<div>
+			<h1 className="text-3xl font-bold tracking-tight">Teams</h1>
+			<p className="text-muted-foreground">
+				Teams synced from your provider. Hide a team or repository to leave it out of this
+				workspace.
+			</p>
+		</div>
+	);
+
 	if (isLoading) {
 		return (
-			<div className="space-y-4">
+			<div className="space-y-6">
+				{heading}
 				<div className="flex items-center justify-between">
 					<Skeleton className="h-10 w-64" />
 					<Skeleton className="h-10 w-32" />
@@ -141,6 +154,7 @@ export function AdminTeamsTable({
 
 	return (
 		<div className="space-y-6">
+			{heading}
 			<div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
 				<div className="relative w-full sm:max-w-md">
 					<Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />

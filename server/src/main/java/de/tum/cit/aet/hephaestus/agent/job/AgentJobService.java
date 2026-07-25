@@ -158,8 +158,8 @@ public class AgentJobService {
         return job
             .map(j -> "Job submitted: " + j.getId())
             .orElse(
-                "No job created — practice detection is unbound or disabled for this workspace, " +
-                    "or its monthly LLM budget is exhausted (see the workspace's LLM usage report)."
+                "No job created. Practice detection is unbound or disabled for this workspace, or its " +
+                    "monthly AI budget is reached (see the workspace's AI usage report)."
             );
     }
 

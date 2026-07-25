@@ -28,8 +28,8 @@ public final class LlmUsageDTOs {
         ) BigDecimal byoMonthlyBudgetUsd,
         @NonNull @Schema(
             description = "This month's confirmed spend on shared (instance) models, in USD — the figure the " +
-                "monthly budget compares against. When unpricedEventCount is non-zero this is a floor, not the " +
-                "full total: render it as \"at least $X\"."
+                "monthly budget compares against. A floor, not the full total, while unpricedEventCount is " +
+                "non-zero."
         ) BigDecimal pricedTotalCostUsd,
         @NonNull @Schema(
             description = "This month's confirmed spend on this workspace's own connected provider(s), in USD — " +
@@ -53,15 +53,13 @@ public final class LlmUsageDTOs {
                 "past month, which cannot pause anything."
         ) Boolean instanceFundedPaused,
         @NonNull @Schema(
-            description = "Whether work on this workspace's OWN provider is currently paused. The two pause " +
-                "independently: an exhausted shared-model budget never stops work the workspace pays for itself."
+            description = "Whether work on this workspace's OWN provider is currently paused."
         ) Boolean byoPaused,
         @NonNull List<LlmUsageByJobTypeDTO> byJobType,
         @NonNull List<LlmUsageByDayDTO> byDay,
         @Nullable @Schema(
-            description = "Display-only conversion for this month's USD amounts, when the instance has a " +
-                "display currency configured. Absent means show USD alone — never guess a rate. Every " +
-                "amount above stays USD regardless; this is presentation, not accounting."
+            description = "Display-only conversion when the instance has a display currency. " +
+                "Absent = show USD only."
         ) FxRateInfoDTO fx
     ) {}
 
@@ -72,8 +70,7 @@ public final class LlmUsageDTOs {
             description = "Confirmed spend on shared (instance) models for this job type, in USD."
         ) BigDecimal pricedTotalCostUsd,
         @NonNull @Schema(
-            description = "Spend on this workspace's own connected provider(s) for this job type, in USD. Never " +
-                "counts toward the monthly budget."
+            description = "Spend on this workspace's own connected provider(s) for this job type, in USD."
         ) BigDecimal byoTotalCostUsd,
         @NonNull @Schema(
             description = "Calls for this job type whose price is not yet known. Excluded from both totals above."
@@ -96,8 +93,7 @@ public final class LlmUsageDTOs {
             description = "Confirmed spend on shared (instance) models for this day, in USD."
         ) BigDecimal pricedTotalCostUsd,
         @NonNull @Schema(
-            description = "Spend on this workspace's own connected provider(s) for this day, in USD. Never " +
-                "counts toward the monthly budget."
+            description = "Spend on this workspace's own connected provider(s) for this day, in USD."
         ) BigDecimal byoTotalCostUsd,
         @NonNull @Schema(
             description = "Calls this day whose price is not yet known. Excluded from both totals above."
@@ -131,7 +127,7 @@ public final class LlmUsageDTOs {
         ) BigDecimal pricedTotalCostUsd,
         @NonNull @Schema(
             description = "This month's confirmed spend on the workspace's own connected provider(s), in USD — " +
-                "compared against byoMonthlyBudgetUsd. Different money: never added to pricedTotalCostUsd."
+                "compared against byoMonthlyBudgetUsd."
         ) BigDecimal byoTotalCostUsd,
         @NonNull @Schema(description = "Ledger events (jobs / mentor turns) this month, any provider") Long events,
         @NonNull @Schema(
@@ -146,13 +142,11 @@ public final class LlmUsageDTOs {
                 "only) — authoritative, mirroring the live gate."
         ) Boolean instanceFundedPaused,
         @NonNull @Schema(
-            description = "Whether work on the workspace's OWN provider is paused right now. The two pause " +
-                "independently."
+            description = "Whether work on the workspace's OWN provider is paused right now."
         ) Boolean byoPaused,
         @Nullable @Schema(
-            description = "Display-only conversion for this month's USD amounts, when the instance has a " +
-                "display currency configured. Identical on every row of one response — one month resolves " +
-                "to exactly one rate. Absent means show USD alone."
+            description = "Display-only conversion when the instance has a display currency. " +
+                "Absent = show USD only. Identical on every row of one response."
         ) FxRateInfoDTO fx
     ) {}
 

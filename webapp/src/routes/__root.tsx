@@ -1,6 +1,7 @@
 import { type QueryClient, useQuery } from "@tanstack/react-query";
 import {
 	createRootRouteWithContext,
+	HeadContent,
 	Link,
 	Outlet,
 	useLocation,
@@ -36,6 +37,10 @@ interface MyRouterContext {
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
+	// Fallback tab title; every route that sets its own `head` overrides this (the deepest match wins).
+	// React 19 hoists the rendered <title> ahead of the static one in index.html, which stays as the
+	// pre-hydration placeholder.
+	head: () => ({ meta: [{ title: "Hephaestus" }] }),
 	component: () => {
 		const { pathname } = useLocation();
 		const { isAuthenticated, isLoading } = useAuth();
@@ -77,6 +82,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 		if (isAuthRoute) {
 			return (
 				<>
+					<HeadContent />
 					<CookieConsentBanner />
 					<ProviderColorScope>
 						<Outlet />
@@ -88,6 +94,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 
 		return (
 			<>
+				<HeadContent />
 				{/* Rendered early so keyboard/AT users reach the consent region before the app chrome. */}
 				<CookieConsentBanner />
 				<ImpersonationBanner />

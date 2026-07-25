@@ -5320,12 +5320,11 @@ components:
         byoPaused:
           type: boolean
           description: Whether work on the workspace's OWN provider is paused right
-            now. The two pause independently.
+            now.
         byoTotalCostUsd:
           type: number
           description: "This month's confirmed spend on the workspace's own connected\
-            \ provider(s), in USD — compared against byoMonthlyBudgetUsd. Different\
-            \ money: never added to pricedTotalCostUsd."
+            \ provider(s), in USD — compared against byoMonthlyBudgetUsd."
         displayName:
           type: string
         events:
@@ -5334,10 +5333,8 @@ components:
           description: "Ledger events (jobs / mentor turns) this month, any provider"
         fx:
           $ref: "#/components/schemas/FxRateInfo"
-          description: "Display-only conversion for this month's USD amounts, when\
-            \ the instance has a display currency configured. Identical on every row\
-            \ of one response — one month resolves to exactly one rate. Absent means\
-            \ show USD alone."
+          description: Display-only conversion when the instance has a display currency.
+            Absent = show USD only. Identical on every row of one response.
         instanceBudgetVerdict:
           type: string
           description: "Whether shared-model spend is within the instance cap, has\
@@ -7400,7 +7397,7 @@ components:
         byoTotalCostUsd:
           type: number
           description: "Spend on this workspace's own connected provider(s) for this\
-            \ day, in USD. Never counts toward the monthly budget."
+            \ day, in USD."
         day:
           type: string
           format: date
@@ -7429,7 +7426,7 @@ components:
         byoTotalCostUsd:
           type: number
           description: "Spend on this workspace's own connected provider(s) for this\
-            \ job type, in USD. Never counts toward the monthly budget."
+            \ job type, in USD."
         cacheReadTokens:
           type: integer
           format: int64
@@ -10324,9 +10321,8 @@ components:
             admins.
         byoPaused:
           type: boolean
-          description: "Whether work on this workspace's OWN provider is currently\
-            \ paused. The two pause independently: an exhausted shared-model budget\
-            \ never stops work the workspace pays for itself."
+          description: Whether work on this workspace's OWN provider is currently
+            paused.
         byoTotalCostUsd:
           type: number
           description: "This month's confirmed spend on this workspace's own connected\
@@ -10334,10 +10330,8 @@ components:
             \ Different money from pricedTotalCostUsd: the two are never added together."
         fx:
           $ref: "#/components/schemas/FxRateInfo"
-          description: "Display-only conversion for this month's USD amounts, when\
-            \ the instance has a display currency configured. Absent means show USD\
-            \ alone — never guess a rate. Every amount above stays USD regardless;\
-            \ this is presentation, not accounting."
+          description: Display-only conversion when the instance has a display currency.
+            Absent = show USD only.
         instanceBudgetVerdict:
           type: string
           description: "Whether host-funded (shared-model) spend is within its cap,\
@@ -10365,9 +10359,8 @@ components:
         pricedTotalCostUsd:
           type: number
           description: "This month's confirmed spend on shared (instance) models,\
-            \ in USD — the figure the monthly budget compares against. When unpricedEventCount\
-            \ is non-zero this is a floor, not the full total: render it as \"at least\
-            \ $X\"."
+            \ in USD — the figure the monthly budget compares against. A floor, not\
+            \ the full total, while unpricedEventCount is non-zero."
         unpricedEventCount:
           type: integer
           format: int64

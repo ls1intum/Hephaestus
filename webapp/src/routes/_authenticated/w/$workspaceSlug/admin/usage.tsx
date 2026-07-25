@@ -12,9 +12,11 @@ import { SetByoBudgetDialog } from "@/components/admin/usage/SetByoBudgetDialog"
 import { addMonths, currentMonthUtc } from "@/components/admin/usage/usageUtils";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
+import { workspaceAdminHead } from "@/lib/page-title";
 import { problemDetailOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/usage")({
+	head: workspaceAdminHead("AI usage"),
 	component: AdminUsageContainer,
 });
 

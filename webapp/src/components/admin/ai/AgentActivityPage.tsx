@@ -120,9 +120,6 @@ export function AgentActivityPage({ workspaceSlug }: AgentActivityPageProps) {
 		<div className="container mx-auto max-w-6xl py-6">
 			<div className="mb-6">
 				<h1 className="text-3xl font-bold tracking-tight">Runs</h1>
-				<p className="text-muted-foreground">
-					Every AI run in this workspace — its model, token usage, cost, and delivery status.
-				</p>
 			</div>
 
 			<AgentJobsTable

@@ -361,7 +361,7 @@ export function AdminLlmConnectionFormDialog({
 						{probeResult?.reachable && (
 							<Alert variant="success">
 								<AlertDescription>
-									Reachable — found {probeResult.models.length} model
+									Reachable. Found {probeResult.models.length} model
 									{probeResult.models.length === 1 ? "" : "s"}.
 									{probeResult.models.length > 0 && (
 										<div className="mt-1.5 flex flex-wrap gap-1">
@@ -378,7 +378,7 @@ export function AdminLlmConnectionFormDialog({
 						{probeResult && !probeResult.reachable && (
 							<Alert variant="warning">
 								<AlertDescription>
-									Discovery unsupported — {probeResult.message ?? "the provider didn't answer."} You
+									Discovery unsupported. {probeResult.message ?? "The provider didn't answer."} You
 									can still save the connection and enter a model id.
 								</AlertDescription>
 							</Alert>
@@ -386,7 +386,7 @@ export function AdminLlmConnectionFormDialog({
 						{probeError && (
 							<Alert variant="warning">
 								<AlertDescription>
-									Discovery unsupported — {probeError} You can still save the connection and enter a
+									Discovery unsupported. {probeError} You can still save the connection and enter a
 									model id.
 								</AlertDescription>
 							</Alert>

@@ -131,7 +131,7 @@ export type WorkspaceLlmUsageReport = {
      */
     byoMonthlyBudgetUsd?: number;
     /**
-     * Whether work on this workspace's OWN provider is currently paused. The two pause independently: an exhausted shared-model budget never stops work the workspace pays for itself.
+     * Whether work on this workspace's OWN provider is currently paused.
      */
     byoPaused: boolean;
     /**
@@ -139,7 +139,7 @@ export type WorkspaceLlmUsageReport = {
      */
     byoTotalCostUsd: number;
     /**
-     * Display-only conversion for this month's USD amounts, when the instance has a display currency configured. Absent means show USD alone — never guess a rate. Every amount above stays USD regardless; this is presentation, not accounting.
+     * Display-only conversion when the instance has a display currency. Absent = show USD only.
      */
     fx?: FxRateInfo;
     /**
@@ -159,7 +159,7 @@ export type WorkspaceLlmUsageReport = {
      */
     month: string;
     /**
-     * This month's confirmed spend on shared (instance) models, in USD — the figure the monthly budget compares against. When unpricedEventCount is non-zero this is a floor, not the full total: render it as "at least $X".
+     * This month's confirmed spend on shared (instance) models, in USD — the figure the monthly budget compares against. A floor, not the full total, while unpricedEventCount is non-zero.
      */
     pricedTotalCostUsd: number;
     /**
@@ -191,7 +191,7 @@ export type FxRateInfo = {
  */
 export type LlmUsageByJobType = {
     /**
-     * Spend on this workspace's own connected provider(s) for this job type, in USD. Never counts toward the monthly budget.
+     * Spend on this workspace's own connected provider(s) for this job type, in USD.
      */
     byoTotalCostUsd: number;
     cacheReadTokens: number;
@@ -222,7 +222,7 @@ export type LlmUsageByJobType = {
  */
 export type LlmUsageByDay = {
     /**
-     * Spend on this workspace's own connected provider(s) for this day, in USD. Never counts toward the monthly budget.
+     * Spend on this workspace's own connected provider(s) for this day, in USD.
      */
     byoTotalCostUsd: number;
     day: Date;
@@ -4101,11 +4101,11 @@ export type AdminWorkspaceLlmUsage = {
      */
     byoMonthlyBudgetUsd?: number;
     /**
-     * Whether work on the workspace's OWN provider is paused right now. The two pause independently.
+     * Whether work on the workspace's OWN provider is paused right now.
      */
     byoPaused: boolean;
     /**
-     * This month's confirmed spend on the workspace's own connected provider(s), in USD — compared against byoMonthlyBudgetUsd. Different money: never added to pricedTotalCostUsd.
+     * This month's confirmed spend on the workspace's own connected provider(s), in USD — compared against byoMonthlyBudgetUsd.
      */
     byoTotalCostUsd: number;
     displayName: string;
@@ -4114,7 +4114,7 @@ export type AdminWorkspaceLlmUsage = {
      */
     events: number;
     /**
-     * Display-only conversion for this month's USD amounts, when the instance has a display currency configured. Identical on every row of one response — one month resolves to exactly one rate. Absent means show USD alone.
+     * Display-only conversion when the instance has a display currency. Absent = show USD only. Identical on every row of one response.
      */
     fx?: FxRateInfo;
     /**

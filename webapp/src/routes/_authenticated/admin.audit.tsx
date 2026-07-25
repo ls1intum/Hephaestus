@@ -6,8 +6,10 @@ import { AuthAuditPanel } from "@/components/admin/audit/AuthAuditPanel";
 import { type AuditSearch, auditSearchSchema } from "@/components/admin/audit-shared/auditSearch";
 import { AdminConfigAuditPanel } from "@/components/admin/config-audit/ConfigAuditPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { instanceAdminHead } from "@/lib/page-title";
 
 export const Route = createFileRoute("/_authenticated/admin/audit")({
+	head: instanceAdminHead("Audit log"),
 	component: AdminAuditPage,
 	validateSearch: auditSearchSchema,
 });
