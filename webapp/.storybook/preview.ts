@@ -145,6 +145,14 @@ const preview: Preview = {
 		// Better viewport defaults
 		viewport: {
 			options: {
+				// The WCAG 2.2 SC 1.4.10 (Reflow) target: 320 CSS px wide, which is also what 1280 px at
+				// 400 % zoom resolves to. Content must reflow to this without two-dimensional scrolling,
+				// so it is the width to review a layout at — not the smallest phone anyone still owns.
+				// 568 px tall is an iPhone SE in portrait, the shortest viewport worth designing for.
+				reflow: {
+					name: "Reflow (320px)",
+					styles: { width: "320px", height: "568px" },
+				},
 				mobile: {
 					name: "Mobile",
 					styles: { width: "375px", height: "667px" },

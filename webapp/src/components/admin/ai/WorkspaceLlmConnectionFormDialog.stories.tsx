@@ -1,6 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent } from "storybook/test";
 import type { WorkspaceLlmConnection } from "@/api/types.gen";
+import {
+	expectControlOnScreen,
+	expectDialogBodyScrolls,
+	expectDialogFitsViewport,
+} from "@/test/reflow";
 import { WorkspaceLlmConnectionFormDialog } from "./WorkspaceLlmConnectionFormDialog";
 
 const mockConnection: WorkspaceLlmConnection = {
@@ -43,6 +48,26 @@ export const Edit: Story = {
 
 export const Submitting: Story = {
 	args: { isSubmitting: true },
+};
+
+/**
+ * Reviewed at the WCAG 2.2 SC 1.4.10 reflow width (320 px). The create form is the taller of the
+ * two variants — preset, protocol checkbox, base URL, auth mode, key, and the active switch — and
+ * used to run off both ends of a phone viewport with no way to scroll it back.
+ */
+export const MobileReflow: Story = {
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320, 375, 768] },
+	},
+	play: async () => {
+		const submit = await screen.findByRole("button", { name: /connect inactive provider/i });
+		await expectDialogFitsViewport();
+		await expectDialogBodyScrolls();
+		await expectControlOnScreen(submit);
+		await expectControlOnScreen(screen.getByRole("button", { name: /^cancel$/i }));
+		await expectControlOnScreen(screen.getByRole("button", { name: /^close$/i }));
+	},
 };
 
 /** Submitting without a display name surfaces validation. */

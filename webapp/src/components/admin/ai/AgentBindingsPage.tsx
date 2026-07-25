@@ -308,8 +308,10 @@ function AgentPurposeCard({
 	return (
 		<Card>
 			<CardHeader>
-				<div className="flex items-start justify-between gap-4">
-					<div>
+				{/* `min-w-0` lets the description wrap instead of forcing the row wider than the card;
+				    `flex-wrap` drops the badge onto its own line once there is no room for both. */}
+				<div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+					<div className="min-w-0 flex-1">
 						<CardTitle>{meta.title}</CardTitle>
 						<CardDescription>{meta.description}</CardDescription>
 					</div>

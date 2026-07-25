@@ -82,7 +82,11 @@ export function AgentJobsTable({
 			<div className="flex flex-wrap items-center gap-3">
 				{/* The visible "Status" text *is* the control's label, so the accessible name can never
 				    drift from what a speech-control user reads out loud (WCAG SC 2.5.3). */}
-				<Field orientation="horizontal" className="w-auto text-sm">
+				{/* `w-40` is 10rem, which under SC 1.4.4 text-only zoom at 200 % becomes 320 px — the
+				    entire reflow viewport — so the label beside it pushed the page sideways. `max-w-full`
+				    caps the control against the row and `flex-wrap` lets it drop below its label instead
+				    of overflowing once the two no longer fit side by side. */}
+				<Field orientation="horizontal" className="w-auto max-w-full flex-wrap text-sm">
 					<FieldLabel htmlFor={statusFilterId} className="text-muted-foreground">
 						Status
 					</FieldLabel>
@@ -93,7 +97,7 @@ export function AgentJobsTable({
 							onStatusFilterChange(value === FILTER_ALL ? "ALL" : (value as JobStatus))
 						}
 					>
-						<SelectTrigger id={statusFilterId} size="sm" className="w-40">
+						<SelectTrigger id={statusFilterId} size="sm" className="w-40 max-w-full">
 							<SelectValue />
 						</SelectTrigger>
 						<SelectContent>
@@ -138,7 +142,11 @@ export function AgentJobsTable({
 					</EmptyHeader>
 				</Empty>
 			) : (
-				<Table>
+				// Seven `whitespace-nowrap` columns cannot reflow to 320 px, so this table is the documented
+				// SC 1.4.10 exception: it scrolls horizontally *inside its own container* while the page
+				// around it does not. The border makes that container — and therefore the fact that there
+				// is more table off to the right — visible instead of invisible.
+				<Table containerClassName="rounded-md border">
 					<TableCaption className="sr-only">AI runs for this workspace, newest first</TableCaption>
 					<TableHeader>
 						<TableRow>

@@ -1,6 +1,5 @@
 import { Progress as ProgressRoot } from "@base-ui/react/progress";
 import { ChevronDown, ChevronRight, CircleDollarSign, Info } from "lucide-react";
-import { Fragment } from "react";
 import type { AdminWorkspaceLlmUsage, WorkspaceLlmUsageReport } from "@/api/types.gen";
 import { formatCapUsd, formatCostUsd } from "@/components/admin/ai/jobUtils";
 import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
@@ -70,7 +69,10 @@ export interface AdminInstanceLlmUsageTableProps {
 /** One entry per header column — the trailing action slot promises nothing. */
 const SKELETON_COLUMNS = ["w-32", "w-16", "w-24", "w-16", "w-24", "w-28", "w-12", null];
 
-const COLUMN_COUNT = SKELETON_COLUMNS.length;
+/** Stable target for the toggle's `aria-controls` and the panel's own `id`. */
+function detailPanelId(workspaceId: number): string {
+	return `workspace-usage-details-${workspaceId}`;
+}
 
 /**
  * Where a cap stops being a background fact and becomes something an admin may want to act on
@@ -162,65 +164,71 @@ export function AdminInstanceLlmUsageTable({
 		);
 	}
 
+	// Only one workspace can be expanded at a time, so the detail lives *beside* the table rather than
+	// in a `colSpan` row inside it. Nested in the table it inherited the table's ~1100 px width and
+	// its own two tables each opened a second horizontal scroller inside the first — two-dimensional
+	// scrolling to read a breakdown, which is exactly what WCAG 2.2 SC 1.4.10 rules out. Out here it
+	// reflows to the page width at any viewport and the `aria-controls` relationship is unchanged.
+	const expandedRow = rows.find((row) => row.workspaceId === expandedWorkspaceId);
+
 	return (
-		<Table containerClassName="rounded-md border">
-			<TableCaption className="sr-only">
-				Per-workspace AI spend for the selected month, most expensive first
-			</TableCaption>
-			<TableHeader>
-				<TableRow>
-					<TableHead scope="col">Workspace</TableHead>
-					<TableHead scope="col" className="text-right">
-						Shared-model spend
-					</TableHead>
-					{/* Spend sits next to the cap it is measured against, so a row reads left to right as
+		<div className="space-y-4">
+			<Table containerClassName="rounded-md border">
+				<TableCaption className="sr-only">
+					Per-workspace AI spend for the selected month, most expensive first
+				</TableCaption>
+				<TableHeader>
+					<TableRow>
+						<TableHead scope="col">Workspace</TableHead>
+						<TableHead scope="col" className="text-right">
+							Shared-model spend
+						</TableHead>
+						{/* Spend sits next to the cap it is measured against, so a row reads left to right as
 					    "this much, out of this much" without the admin holding a number in their head. */}
-					<TableHead scope="col" className="text-right">
-						<HelpHeader help="Monthly cap on the shared-model spend the host pays for. You set it.">
-							Instance cap
-						</HelpHeader>
-					</TableHead>
-					<TableHead scope="col" className="text-right">
-						Provider spend
-					</TableHead>
-					<TableHead scope="col" className="text-right">
-						<HelpHeader help="The workspace's own cap on spend through its own provider — their money, so only their admins can change it. Read-only here.">
-							Provider cap
-						</HelpHeader>
-					</TableHead>
-					<TableHead scope="col">Status</TableHead>
-					<TableHead scope="col" className="text-right">
-						Events
-					</TableHead>
-					<TableHead scope="col">
-						<span className="sr-only">Actions</span>
-					</TableHead>
-				</TableRow>
-			</TableHeader>
-			{isLoading ? (
-				<TableRowsSkeleton columns={SKELETON_COLUMNS} rows={5} />
-			) : (
-				<TableBody>
-					{rows.map((row) => {
-						const isExpanded = expandedWorkspaceId === row.workspaceId;
-						const detailId = `workspace-usage-details-${row.workspaceId}`;
-						const shared = capUsage({
-							cap: row.instanceMonthlyBudgetUsd,
-							spend: row.pricedTotalCostUsd,
-							verdict: row.instanceBudgetVerdict,
-							paused: row.instanceFundedPaused,
-							isCurrentMonth,
-						});
-						const provider = capUsage({
-							cap: row.byoMonthlyBudgetUsd,
-							spend: row.byoTotalCostUsd,
-							verdict: row.byoBudgetVerdict,
-							paused: row.byoPaused,
-							isCurrentMonth,
-						});
-						return (
-							<Fragment key={row.workspaceId}>
-								<TableRow>
+						<TableHead scope="col" className="text-right">
+							<HelpHeader help="Monthly cap on the shared-model spend the host pays for. You set it.">
+								Instance cap
+							</HelpHeader>
+						</TableHead>
+						<TableHead scope="col" className="text-right">
+							Provider spend
+						</TableHead>
+						<TableHead scope="col" className="text-right">
+							<HelpHeader help="The workspace's own cap on spend through its own provider — their money, so only their admins can change it. Read-only here.">
+								Provider cap
+							</HelpHeader>
+						</TableHead>
+						<TableHead scope="col">Status</TableHead>
+						<TableHead scope="col" className="text-right">
+							Events
+						</TableHead>
+						<TableHead scope="col">
+							<span className="sr-only">Actions</span>
+						</TableHead>
+					</TableRow>
+				</TableHeader>
+				{isLoading ? (
+					<TableRowsSkeleton columns={SKELETON_COLUMNS} rows={5} />
+				) : (
+					<TableBody>
+						{rows.map((row) => {
+							const isExpanded = expandedWorkspaceId === row.workspaceId;
+							const shared = capUsage({
+								cap: row.instanceMonthlyBudgetUsd,
+								spend: row.pricedTotalCostUsd,
+								verdict: row.instanceBudgetVerdict,
+								paused: row.instanceFundedPaused,
+								isCurrentMonth,
+							});
+							const provider = capUsage({
+								cap: row.byoMonthlyBudgetUsd,
+								spend: row.byoTotalCostUsd,
+								verdict: row.byoBudgetVerdict,
+								paused: row.byoPaused,
+								isCurrentMonth,
+							});
+							return (
+								<TableRow key={row.workspaceId}>
 									<TableCell>
 										<div className="font-medium">{row.displayName}</div>
 										<div className="font-mono text-xs text-muted-foreground">
@@ -251,9 +259,9 @@ export function AdminInstanceLlmUsageTable({
 												variant="outline"
 												size="sm"
 												aria-expanded={isExpanded}
-												// The detail row only exists while expanded, so pointing at it
+												// The detail panel only exists while expanded, so pointing at it
 												// beforehand would be a dangling IDREF.
-												aria-controls={isExpanded ? detailId : undefined}
+												aria-controls={isExpanded ? detailPanelId(row.workspaceId) : undefined}
 												aria-label={`${isExpanded ? "Hide" : "View"} usage details for ${row.displayName}`}
 												onClick={() => onToggleDetails(row)}
 											>
@@ -268,44 +276,84 @@ export function AdminInstanceLlmUsageTable({
 										</div>
 									</TableCell>
 								</TableRow>
-								{isExpanded && (
-									<TableRow id={detailId} className="hover:bg-transparent">
-										<TableCell colSpan={COLUMN_COUNT} className="whitespace-normal bg-muted/20 p-4">
-											{detailError != null ? (
-												<QueryErrorAlert
-													error={detailError}
-													title={`Couldn't load usage details for ${row.displayName}`}
-													onRetry={onRetryDetail}
-												/>
-											) : (
-												<div className="grid gap-4 xl:grid-cols-2">
-													<section aria-labelledby={`${detailId}-job-type`} className="space-y-2">
-														<h3 id={`${detailId}-job-type`} className="font-medium">
-															By job type
-														</h3>
-														<LlmUsageByJobTypeTable
-															rows={isDetailLoading ? undefined : detailReport?.byJobType}
-														/>
-													</section>
-													<section aria-labelledby={`${detailId}-day`} className="space-y-2">
-														<h3 id={`${detailId}-day`} className="font-medium">
-															By day
-														</h3>
-														<LlmUsageByDayTable
-															rows={isDetailLoading ? undefined : detailReport?.byDay}
-														/>
-													</section>
-												</div>
-											)}
-										</TableCell>
-									</TableRow>
-								)}
-							</Fragment>
-						);
-					})}
-				</TableBody>
+							);
+						})}
+					</TableBody>
+				)}
+			</Table>
+
+			{expandedRow != null && (
+				<WorkspaceUsageDetails
+					workspace={expandedRow}
+					report={detailReport}
+					isLoading={isDetailLoading}
+					error={detailError}
+					onRetry={onRetryDetail}
+				/>
 			)}
-		</Table>
+		</div>
+	);
+}
+
+interface WorkspaceUsageDetailsProps {
+	workspace: AdminWorkspaceLlmUsageRow;
+	report?: WorkspaceLlmUsageReport;
+	isLoading: boolean;
+	error: unknown;
+	onRetry?: () => void;
+}
+
+/**
+ * The expanded workspace's breakdowns, rendered under the table rather than inside it.
+ *
+ * It names the workspace in its own heading because it is no longer visually attached to the row
+ * that opened it — the `aria-expanded`/`aria-controls` pair on that row's toggle is what still ties
+ * the two together for assistive tech.
+ *
+ * The two breakdown tables stack until `xl`: side by side they would each be too narrow to avoid a
+ * horizontal scroller of their own, and two scrollers on one screen is the thing that made this
+ * unusable on a phone.
+ */
+function WorkspaceUsageDetails({
+	workspace,
+	report,
+	isLoading,
+	error,
+	onRetry,
+}: WorkspaceUsageDetailsProps) {
+	const panelId = detailPanelId(workspace.workspaceId);
+	return (
+		<section
+			id={panelId}
+			aria-labelledby={`${panelId}-heading`}
+			className="space-y-4 rounded-md border bg-muted/20 p-4"
+		>
+			<h3 id={`${panelId}-heading`} className="font-medium">
+				Usage details · {workspace.displayName}
+			</h3>
+			{error != null ? (
+				<QueryErrorAlert
+					error={error}
+					title={`Couldn't load usage details for ${workspace.displayName}`}
+					onRetry={onRetry}
+				/>
+			) : (
+				<div className="grid gap-4 xl:grid-cols-2">
+					<section aria-labelledby={`${panelId}-job-type`} className="min-w-0 space-y-2">
+						<h4 id={`${panelId}-job-type`} className="font-medium">
+							By job type
+						</h4>
+						<LlmUsageByJobTypeTable rows={isLoading ? undefined : report?.byJobType} />
+					</section>
+					<section aria-labelledby={`${panelId}-day`} className="min-w-0 space-y-2">
+						<h4 id={`${panelId}-day`} className="font-medium">
+							By day
+						</h4>
+						<LlmUsageByDayTable rows={isLoading ? undefined : report?.byDay} />
+					</section>
+				</div>
+			)}
+		</section>
 	);
 }
 

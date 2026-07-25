@@ -1,6 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent } from "storybook/test";
 import type { WorkspaceLlmModel } from "@/api/types.gen";
+import {
+	expectControlOnScreen,
+	expectDialogBodyScrolls,
+	expectDialogFitsViewport,
+} from "@/test/reflow";
 import { WorkspaceLlmModelFormDialog } from "./WorkspaceLlmModelFormDialog";
 
 const mockModel: WorkspaceLlmModel = {
@@ -46,6 +51,30 @@ export const EditModel: Story = {
 
 export const FreeModel: Story = {
 	args: { editing: { ...mockModel, pricingMode: "NO_CHARGE", priceNote: "self-hosted, no cost" } },
+};
+
+/**
+ * The tallest dialog on this surface, reviewed at the WCAG 2.2 SC 1.4.10 reflow width (320 px).
+ *
+ * Six fields plus the whole price editor come to roughly 950 px. Before `DialogBody` the popup was
+ * unbounded and `position: fixed`, so it hung off the top and the bottom of every phone at once and
+ * neither the title nor "Add inactive model" could be scrolled back into view — the reported bug.
+ */
+export const MobileReflow: Story = {
+	args: { editing: mockModel },
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320, 375, 768] },
+	},
+	play: async () => {
+		// The dialog is a portal, so it is on `document`, not in the story canvas.
+		const submit = await screen.findByRole("button", { name: /save changes/i });
+		await expectDialogFitsViewport();
+		await expectDialogBodyScrolls();
+		// The whole point: the action stays on screen no matter how tall the form is.
+		await expectControlOnScreen(submit);
+		await expectControlOnScreen(screen.getByRole("button", { name: /^close$/i }));
+	},
 };
 
 /** Submitting without a display name or upstream id surfaces validation. */

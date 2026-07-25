@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "storybook/test";
+import { expect, fn, within } from "storybook/test";
 import type { WorkspaceLlmUsageReport } from "@/api/types.gen";
 import {
 	AdminInstanceLlmUsageTable,
@@ -163,6 +163,49 @@ export const Expanded: Story = {
 	args: {
 		expandedWorkspaceId: rows[0].workspaceId,
 		detailReport,
+	},
+};
+
+/**
+ * The expanded breakdown at the WCAG 2.2 SC 1.4.10 reflow width (320 px).
+ *
+ * The eight-column rollup is the documented data-table exception: it may scroll horizontally inside
+ * its own container. The breakdown that opens underneath it may not inherit that — nested in a
+ * `colSpan` row it took the table's ~1100 px width and opened a second horizontal scroller inside
+ * the first, which is two-dimensional scrolling to read a number. This asserts the panel is a
+ * sibling of the scroll container rather than a descendant, and that it fits the page width.
+ */
+export const ExpandedMobileReflow: Story = {
+	args: {
+		expandedWorkspaceId: rows[0].workspaceId,
+		detailReport,
+	},
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320, 375, 1024] },
+	},
+	play: async ({ canvasElement }) => {
+		const scroller = canvasElement.querySelector<HTMLElement>('[data-slot="table-container"]');
+		const panel = canvasElement.querySelector<HTMLElement>(
+			`#workspace-usage-details-${rows[0].workspaceId}`,
+		);
+		await expect(scroller).not.toBeNull();
+		await expect(panel).not.toBeNull();
+		if (scroller == null || panel == null) return;
+
+		// The defect in one assertion: the breakdown must not live inside the table's scroller.
+		await expect(scroller.contains(panel)).toBe(false);
+		// And it reflows to the page rather than to the table's intrinsic width.
+		await expect(panel.scrollWidth).toBeLessThanOrEqual(canvasElement.clientWidth + 1);
+
+		// The toggle still owns the panel for assistive tech even though they are no longer adjacent.
+		const toggle = await within(canvasElement).findByRole("button", {
+			name: /hide usage details for Example Workspace/i,
+		});
+		await expect(toggle).toHaveAttribute(
+			"aria-controls",
+			`workspace-usage-details-${rows[0].workspaceId}`,
+		);
 	},
 };
 

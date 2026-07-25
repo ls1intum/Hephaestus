@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { HttpResponse, http } from "msw";
 import { expect, screen, userEvent, within } from "storybook/test";
 import type { AgentBinding, AiSettingsView, AvailableLlmModel } from "@/api/types.gen";
+import { expectControlOnScreen, expectPageReflows } from "@/test/reflow";
 import { AgentBindingsPage } from "./AgentBindingsPage";
 import { mockAvailableModels } from "./storyMockData";
 
@@ -140,5 +141,27 @@ export const InvalidRunLimit: Story = {
 		await expect(timeout).toHaveAttribute("aria-invalid", "true");
 		// Field-level validation stays in the field: no toast is raised.
 		await expect(screen.queryByRole("status")).toBeNull();
+	},
+};
+
+/**
+ * The AI setup page at the WCAG 2.2 SC 1.4.10 reflow width (320 CSS px).
+ *
+ * Nothing here is tabular, so the whole page must reflow to one column with no horizontal scrolling
+ * at all — the card headers wrap their "Ready" badge and the descriptions wrap rather than widening
+ * the row.
+ */
+export const MobileReflow: Story = {
+	parameters: {
+		layout: "fullscreen",
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320, 375, 768] },
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		// Wait for the queries to land, so the assertion measures the real page and not a spinner.
+		await canvas.findByText("Practice detection");
+		await expectPageReflows();
+		await expectControlOnScreen(canvas.getAllByRole("button", { name: "Save" })[0]);
 	},
 };

@@ -2,6 +2,7 @@ import { type FormEvent, type ReactNode, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
+	DialogBody,
 	DialogClose,
 	DialogContent,
 	DialogDescription,
@@ -128,30 +129,35 @@ function BudgetAmountDialogContent({
 					<DialogTitle>{title}</DialogTitle>
 					<DialogDescription>{description}</DialogDescription>
 				</DialogHeader>
-				<FieldGroup>
-					<Field data-invalid={isInvalid}>
-						<FieldLabel htmlFor={fieldId}>{fieldLabel}</FieldLabel>
-						<Input
-							id={fieldId}
-							type="number"
-							inputMode="decimal"
-							min={0}
-							step={0.01}
-							placeholder="e.g. 25.00"
-							value={value}
-							aria-invalid={isInvalid}
-							onChange={(event) => {
-								setValue(event.target.value);
-								setShowError(false);
-								setDismissedServerError(serverError ?? null);
-							}}
-							disabled={isPending}
-							autoFocus
-						/>
-						<FieldDescription>{fieldDescription}</FieldDescription>
-						{errorMessage != null && <FieldError>{errorMessage}</FieldError>}
-					</Field>
-				</FieldGroup>
+				{/* Short in portrait, but the three stacked footer buttons plus the header already exceed a
+				    phone in landscape (~320 px tall). Scrolling the field rather than the whole popup keeps
+				    "Save cap" on screen there. */}
+				<DialogBody className="py-1">
+					<FieldGroup>
+						<Field data-invalid={isInvalid}>
+							<FieldLabel htmlFor={fieldId}>{fieldLabel}</FieldLabel>
+							<Input
+								id={fieldId}
+								type="number"
+								inputMode="decimal"
+								min={0}
+								step={0.01}
+								placeholder="e.g. 25.00"
+								value={value}
+								aria-invalid={isInvalid}
+								onChange={(event) => {
+									setValue(event.target.value);
+									setShowError(false);
+									setDismissedServerError(serverError ?? null);
+								}}
+								disabled={isPending}
+								autoFocus
+							/>
+							<FieldDescription>{fieldDescription}</FieldDescription>
+							{errorMessage != null && <FieldError>{errorMessage}</FieldError>}
+						</Field>
+					</FieldGroup>
+				</DialogBody>
 				<DialogFooter>
 					{currentValueUsd != null && (
 						<Button

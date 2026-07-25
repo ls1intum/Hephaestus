@@ -140,7 +140,13 @@ export function AgentActivityPage({ workspaceSlug }: AgentActivityPageProps) {
 
 			{totalPages > 1 && (
 				<Pagination className="mt-6">
-					<PaginationContent>
+					{/* The windowed pager fits one line at default text size (~206 px at a 320 px
+					    viewport), so this is not about the reflow width. It is about SC 1.4.4 Resize
+					    Text: the targets are `rem`-sized, so text-only zoom grows them while the viewport
+					    stays put, and past ~150 % they no longer fit. Wrapping absorbs that instead of
+					    pushing the page into horizontal scrolling. `justify-center` keeps the wrapped
+					    rows aligned with the nav. */}
+					<PaginationContent className="flex-wrap justify-center gap-y-1">
 						<PaginationItem>
 							<PaginationPrevious
 								onClick={() => setPage((p) => Math.max(0, p - 1))}

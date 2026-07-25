@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
 	Dialog,
+	DialogBody,
 	DialogClose,
 	DialogContent,
 	DialogDescription,
@@ -144,7 +145,10 @@ function WorkspaceLlmConnectionFormDialogContent({
 
 	return (
 		<DialogContent className="sm:max-w-lg">
-			<form onSubmit={handleSubmit} className="space-y-4" noValidate>
+			{/* `contents`: the form has to wrap header, body and footer so submit works, but it must not
+			    become a layout box between them — the popup's own column is what pins the header and the
+			    footer while `DialogBody` scrolls. */}
+			<form onSubmit={handleSubmit} className="contents" noValidate>
 				<DialogHeader>
 					<DialogTitle>{isEdit ? "Edit connection" : "Add connection"}</DialogTitle>
 					<DialogDescription>
@@ -153,177 +157,181 @@ function WorkspaceLlmConnectionFormDialogContent({
 					</DialogDescription>
 				</DialogHeader>
 
-				<Field data-invalid={Boolean(errors.displayName)}>
-					<FieldLabel htmlFor="llm-conn-display-name">Display name</FieldLabel>
-					<Input
-						id="llm-conn-display-name"
-						value={displayName}
-						onChange={(event) => setDisplayName(event.target.value)}
-						placeholder="e.g. Production OpenAI"
-						aria-invalid={Boolean(errors.displayName)}
-					/>
-					{errors.displayName && <FieldError>{errors.displayName}</FieldError>}
-				</Field>
+				{/* This form is ~700 px tall — taller than a phone in portrait and far taller than one in
+				    landscape. It scrolls here so "Connect inactive provider" is always on screen. */}
+				<DialogBody className="space-y-4 py-1">
+					<Field data-invalid={Boolean(errors.displayName)}>
+						<FieldLabel htmlFor="llm-conn-display-name">Display name</FieldLabel>
+						<Input
+							id="llm-conn-display-name"
+							value={displayName}
+							onChange={(event) => setDisplayName(event.target.value)}
+							placeholder="e.g. Production OpenAI"
+							aria-invalid={Boolean(errors.displayName)}
+						/>
+						{errors.displayName && <FieldError>{errors.displayName}</FieldError>}
+					</Field>
 
-				{!isEdit && (
-					<FieldGroup className="gap-3">
+					{!isEdit && (
+						<FieldGroup className="gap-3">
+							<Field>
+								<FieldLabel htmlFor="llm-conn-provider-preset">Endpoint preset</FieldLabel>
+								<Select
+									items={PROVIDER_PRESET_SELECT_ITEMS}
+									value={preset}
+									onValueChange={(value) => {
+										if (!value) return;
+										const next = value as ProviderPreset;
+										if (!baseUrl || baseUrl === baseUrlDefaultFor(preset)) {
+											setBaseUrl(baseUrlDefaultFor(next));
+										}
+										setAuthMode(authModeDefaultFor(next));
+										setPreset(next);
+									}}
+								>
+									<SelectTrigger id="llm-conn-provider-preset" className="w-full">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										{PROVIDER_PRESET_ORDER.map((item) => (
+											<SelectItem key={item} value={item}>
+												{PROVIDER_PRESET_LABELS[item]}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+								{preset === "AZURE_OPENAI_V1" && (
+									<FieldDescription>
+										Replace RESOURCE below with your Azure resource name. The v1 API does not need
+										an api-version parameter.
+									</FieldDescription>
+								)}
+							</Field>
+
+							<Field orientation="horizontal">
+								<Checkbox
+									id="llm-conn-responses-api"
+									checked={useResponsesApi}
+									onCheckedChange={(checked) => setUseResponsesApi(checked === true)}
+								/>
+								<FieldContent>
+									<FieldLabel htmlFor="llm-conn-responses-api" className="font-normal">
+										Use the Responses API instead of Chat Completions
+									</FieldLabel>
+								</FieldContent>
+							</Field>
+						</FieldGroup>
+					)}
+
+					<Field data-invalid={Boolean(errors.baseUrl)}>
+						<FieldLabel htmlFor="llm-conn-base-url">Base URL</FieldLabel>
+						<Input
+							id="llm-conn-base-url"
+							type="url"
+							value={baseUrl}
+							onChange={(event) => setBaseUrl(event.target.value)}
+							disabled={isEdit}
+							placeholder="https://api.openai.com/v1"
+							aria-invalid={Boolean(errors.baseUrl)}
+						/>
+						{isEdit && (
+							<FieldDescription>
+								Endpoint, API shape, and authentication are immutable. Add a connection to change
+								them.
+							</FieldDescription>
+						)}
+						{errors.baseUrl && <FieldError>{errors.baseUrl}</FieldError>}
+					</Field>
+
+					{!isEdit && preset === "OTHER" && (
 						<Field>
-							<FieldLabel htmlFor="llm-conn-provider-preset">Endpoint preset</FieldLabel>
+							<FieldLabel htmlFor="llm-conn-auth-mode">Authentication</FieldLabel>
 							<Select
-								items={PROVIDER_PRESET_SELECT_ITEMS}
-								value={preset}
-								onValueChange={(value) => {
-									if (!value) return;
-									const next = value as ProviderPreset;
-									if (!baseUrl || baseUrl === baseUrlDefaultFor(preset)) {
-										setBaseUrl(baseUrlDefaultFor(next));
-									}
-									setAuthMode(authModeDefaultFor(next));
-									setPreset(next);
-								}}
+								items={[
+									{ value: "BEARER", label: "Bearer token" },
+									{ value: "API_KEY", label: "api-key header" },
+								]}
+								value={authMode}
+								onValueChange={(value) => value && setAuthMode(value as LlmAuthMode)}
 							>
-								<SelectTrigger id="llm-conn-provider-preset" className="w-full">
+								<SelectTrigger id="llm-conn-auth-mode" className="w-full">
 									<SelectValue />
 								</SelectTrigger>
 								<SelectContent>
-									{PROVIDER_PRESET_ORDER.map((item) => (
-										<SelectItem key={item} value={item}>
-											{PROVIDER_PRESET_LABELS[item]}
-										</SelectItem>
-									))}
+									<SelectItem value="BEARER">Bearer token</SelectItem>
+									<SelectItem value="API_KEY">api-key header</SelectItem>
 								</SelectContent>
 							</Select>
-							{preset === "AZURE_OPENAI_V1" && (
-								<FieldDescription>
-									Replace RESOURCE below with your Azure resource name. The v1 API does not need an
-									api-version parameter.
-								</FieldDescription>
-							)}
+						</Field>
+					)}
+
+					<FieldGroup className="gap-3">
+						<Field>
+							<FieldLabel htmlFor="llm-conn-api-key">API key</FieldLabel>
+							<Input
+								id="llm-conn-api-key"
+								type="password"
+								value={apiKey}
+								onChange={(event) => setApiKey(event.target.value)}
+								disabled={clearApiKey}
+								placeholder={
+									editing?.hasApiKey
+										? `Configured · ends in ····${editing.apiKeyLast4 ?? "····"}`
+										: "Enter API key"
+								}
+								autoComplete="off"
+							/>
+							<FieldDescription>
+								{editing?.hasApiKey ? "Leave blank to keep the current key." : "Stored encrypted."}
+							</FieldDescription>
 						</Field>
 
-						<Field orientation="horizontal">
-							<Checkbox
-								id="llm-conn-responses-api"
-								checked={useResponsesApi}
-								onCheckedChange={(checked) => setUseResponsesApi(checked === true)}
-							/>
-							<FieldContent>
-								<FieldLabel htmlFor="llm-conn-responses-api" className="font-normal">
-									Use the Responses API instead of Chat Completions
-								</FieldLabel>
-							</FieldContent>
-						</Field>
+						{editing?.hasApiKey && (
+							<Field orientation="horizontal">
+								<Checkbox
+									id="llm-conn-clear-api-key"
+									checked={clearApiKey}
+									onCheckedChange={(checked) => {
+										setClearApiKey(checked === true);
+										if (checked === true) setApiKey("");
+									}}
+								/>
+								<FieldContent>
+									<FieldLabel htmlFor="llm-conn-clear-api-key" className="font-normal">
+										Remove stored API key
+									</FieldLabel>
+								</FieldContent>
+							</Field>
+						)}
 					</FieldGroup>
-				)}
 
-				<Field data-invalid={Boolean(errors.baseUrl)}>
-					<FieldLabel htmlFor="llm-conn-base-url">Base URL</FieldLabel>
-					<Input
-						id="llm-conn-base-url"
-						type="url"
-						value={baseUrl}
-						onChange={(event) => setBaseUrl(event.target.value)}
-						disabled={isEdit}
-						placeholder="https://api.openai.com/v1"
-						aria-invalid={Boolean(errors.baseUrl)}
-					/>
-					{isEdit && (
-						<FieldDescription>
-							Endpoint, API shape, and authentication are immutable. Add a connection to change
-							them.
-						</FieldDescription>
-					)}
-					{errors.baseUrl && <FieldError>{errors.baseUrl}</FieldError>}
-				</Field>
-
-				{!isEdit && preset === "OTHER" && (
-					<Field>
-						<FieldLabel htmlFor="llm-conn-auth-mode">Authentication</FieldLabel>
-						<Select
-							items={[
-								{ value: "BEARER", label: "Bearer token" },
-								{ value: "API_KEY", label: "api-key header" },
-							]}
-							value={authMode}
-							onValueChange={(value) => value && setAuthMode(value as LlmAuthMode)}
-						>
-							<SelectTrigger id="llm-conn-auth-mode" className="w-full">
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="BEARER">Bearer token</SelectItem>
-								<SelectItem value="API_KEY">api-key header</SelectItem>
-							</SelectContent>
-						</Select>
-					</Field>
-				)}
-
-				<FieldGroup className="gap-3">
-					<Field>
-						<FieldLabel htmlFor="llm-conn-api-key">API key</FieldLabel>
-						<Input
-							id="llm-conn-api-key"
-							type="password"
-							value={apiKey}
-							onChange={(event) => setApiKey(event.target.value)}
-							disabled={clearApiKey}
-							placeholder={
-								editing?.hasApiKey
-									? `Configured · ends in ····${editing.apiKeyLast4 ?? "····"}`
-									: "Enter API key"
-							}
-							autoComplete="off"
+					<Field orientation="horizontal">
+						<FieldContent>
+							<FieldLabel htmlFor="llm-conn-enabled">Active</FieldLabel>
+							<FieldDescription>
+								{isEdit
+									? "Turn off to stop new requests using this connection."
+									: "New connections start inactive. Save and test this connection, add a priced model, then activate both."}
+							</FieldDescription>
+						</FieldContent>
+						<Switch
+							id="llm-conn-enabled"
+							checked={enabled}
+							disabled={!isEdit}
+							onCheckedChange={setEnabled}
 						/>
-						<FieldDescription>
-							{editing?.hasApiKey ? "Leave blank to keep the current key." : "Stored encrypted."}
-						</FieldDescription>
 					</Field>
-
-					{editing?.hasApiKey && (
-						<Field orientation="horizontal">
-							<Checkbox
-								id="llm-conn-clear-api-key"
-								checked={clearApiKey}
-								onCheckedChange={(checked) => {
-									setClearApiKey(checked === true);
-									if (checked === true) setApiKey("");
-								}}
-							/>
-							<FieldContent>
-								<FieldLabel htmlFor="llm-conn-clear-api-key" className="font-normal">
-									Remove stored API key
-								</FieldLabel>
-							</FieldContent>
-						</Field>
+					{editing?.enabled && !enabled && (
+						<Alert variant="warning">
+							<AlertTriangle aria-hidden />
+							<AlertTitle>All workspace models will stop immediately</AlertTitle>
+							<AlertDescription>
+								Existing Practice and Mentor configurations using this provider cannot run until the
+								connection is reactivated or another model is selected.
+							</AlertDescription>
+						</Alert>
 					)}
-				</FieldGroup>
-
-				<Field orientation="horizontal">
-					<FieldContent>
-						<FieldLabel htmlFor="llm-conn-enabled">Active</FieldLabel>
-						<FieldDescription>
-							{isEdit
-								? "Turn off to stop new requests using this connection."
-								: "New connections start inactive. Save and test this connection, add a priced model, then activate both."}
-						</FieldDescription>
-					</FieldContent>
-					<Switch
-						id="llm-conn-enabled"
-						checked={enabled}
-						disabled={!isEdit}
-						onCheckedChange={setEnabled}
-					/>
-				</Field>
-				{editing?.enabled && !enabled && (
-					<Alert variant="warning">
-						<AlertTriangle aria-hidden />
-						<AlertTitle>All workspace models will stop immediately</AlertTitle>
-						<AlertDescription>
-							Existing Practice and Mentor configurations using this provider cannot run until the
-							connection is reactivated or another model is selected.
-						</AlertDescription>
-					</Alert>
-				)}
+				</DialogBody>
 				<DialogFooter>
 					<DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
 					<Button type="submit" disabled={isSubmitting}>

@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, userEvent, within } from "storybook/test";
+import { expectPageReflows, expectTablesScrollInPlace, expectTargetSize } from "@/test/reflow";
 import { AgentJobsTable } from "./AgentJobsTable";
 import { mockJobs } from "./storyMockData";
 
@@ -75,4 +76,35 @@ export const FilteredEmpty: Story = {
 /** Query failed — destructive alert with a Retry affordance. */
 export const LoadError: Story = {
 	args: { isError: true, jobs: [], onRetry: fn() },
+};
+
+/**
+ * The runs table at the WCAG 2.2 SC 1.4.10 reflow width (320 CSS px).
+ *
+ * Seven `whitespace-nowrap` columns cannot reflow, so this is the standard's documented data-table
+ * exception: the table scrolls horizontally *inside its own bordered container* while the surface
+ * around it stays one-dimensional. The row action is also checked against SC 2.5.8's 24x24 px
+ * minimum, since icon-only buttons are where that limit is usually missed.
+ */
+export const MobileReflow: Story = {
+	parameters: {
+		layout: "fullscreen",
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320, 375, 768] },
+	},
+	play: async ({ canvasElement }) => {
+		await expectPageReflows();
+		await expectTablesScrollInPlace(canvasElement);
+		// The table really is wider than the viewport — otherwise the assertion above proves nothing.
+		const container = canvasElement.querySelector<HTMLElement>('[data-slot="table-container"]');
+		await expect(container).not.toBeNull();
+		if (container == null) return;
+		await expect(container.scrollWidth).toBeGreaterThan(container.clientWidth);
+
+		// Size only, not position: this action legitimately sits off to the right until the table is
+		// scrolled to it. That is the sanctioned data-table exception, not an unreachable control.
+		await expectTargetSize(
+			within(canvasElement).getAllByRole("button", { name: /^View details for/ })[0],
+		);
+	},
 };

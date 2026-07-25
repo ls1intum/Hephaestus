@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
 import type { WorkspaceLlmUsageReport } from "@/api/types.gen";
+import { expectPageReflows, expectTablesScrollInPlace } from "@/test/reflow";
 import { AdminLlmUsagePage } from "./AdminLlmUsagePage";
 
 /** Fixed "today" so the burn-rate projections render the same shot every time. */
@@ -320,5 +321,36 @@ export const ForbiddenError: Story = {
 	args: {
 		report: undefined,
 		error: { status: 403, detail: "Workspace admin access is required." },
+	},
+};
+
+/**
+ * The whole page at the WCAG 2.2 SC 1.4.10 reflow width (320 CSS px ≙ 1280 px at 400 % zoom).
+ *
+ * The page must reflow to a single column with no horizontal scrolling of its own. The two
+ * breakdown tables are the documented data-table exception: they may scroll sideways, but only
+ * inside their own container — which is what `expectTablesScrollInPlace` pins down.
+ */
+export const MobileReflow: Story = {
+	// The densest state the page has: two pause banners, both cap cards, and both breakdown tables.
+	args: {
+		report: {
+			...withOwnProvider,
+			pricedTotalCostUsd: 25.0142,
+			byoTotalCostUsd: 10.12,
+			instanceBudgetVerdict: "EXHAUSTED",
+			instanceFundedPaused: true,
+			byoBudgetVerdict: "EXHAUSTED",
+			byoPaused: true,
+		},
+	},
+	parameters: {
+		layout: "fullscreen",
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320, 375, 768, 1024] },
+	},
+	play: async ({ canvasElement }) => {
+		await expectPageReflows();
+		await expectTablesScrollInPlace(canvasElement);
 	},
 };

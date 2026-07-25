@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { expectControlOnScreen, expectDialogFitsViewport } from "@/test/reflow";
 import { SetByoBudgetDialog } from "./SetByoBudgetDialog";
 
 /**
@@ -71,6 +72,25 @@ export const InvalidSubCentValue: Story = {
 
 		await expect(dialog.getByRole("alert")).toHaveTextContent(/two decimal places/i);
 		await expect(args.onSubmit).not.toHaveBeenCalled();
+	},
+};
+
+/**
+ * Reviewed at the WCAG 2.2 SC 1.4.10 reflow width (320 px). Short in portrait, but with a cap in
+ * force the footer stacks three buttons, which together with the header already exceeds a phone
+ * held in landscape — so the height bound and the reachable footer matter here too.
+ */
+export const MobileReflow: Story = {
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320, 375, 768] },
+	},
+	play: async () => {
+		const dialog = within(await screen.findByRole("dialog"));
+		await expectDialogFitsViewport();
+		for (const name of [/save cap/i, /remove cap/i, /^cancel$/i, /^close$/i]) {
+			await expectControlOnScreen(dialog.getByRole("button", { name }));
+		}
 	},
 };
 

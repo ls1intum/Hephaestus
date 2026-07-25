@@ -50,9 +50,12 @@ interface AgentJobDetailsPanelProps {
  */
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
 	return (
+		// `min-w-0` + `break-words` on the value: model ids and error strings are unbroken tokens, and a
+		// flex item won't shrink below its content without it — at phone widths the value used to push
+		// the row past the panel edge instead of wrapping.
 		<div className="flex items-baseline justify-between gap-4 py-1.5">
-			<dt className="text-sm text-muted-foreground">{label}</dt>
-			<dd className="text-sm font-medium text-right">{value}</dd>
+			<dt className="shrink-0 text-sm text-muted-foreground">{label}</dt>
+			<dd className="min-w-0 text-right text-sm font-medium break-words">{value}</dd>
 		</div>
 	);
 }
@@ -77,7 +80,13 @@ export function AgentJobDetailsPanel({
 }: AgentJobDetailsPanelProps) {
 	return (
 		<Sheet open={open} onOpenChange={onOpenChange}>
-			<SheetContent side="right" className="w-full sm:max-w-lg">
+			{/* The width overrides have to repeat `data-[side=right]:` to land at all. `SheetContent`'s own
+			    widths are written as `data-[side=right]:w-3/4` / `data-[side=right]:sm:max-w-sm`, which are
+			    attribute-qualified and so outrank a plain `w-full` / `sm:max-w-lg` on specificity —
+			    tailwind-merge only drops the base class when the variant chain matches exactly. Spelled
+			    this way the panel really is full-width on a phone (it was rendering at 75%, leaving the
+			    label/value rows ~240 px wide) and really is `lg` from `sm` up. */}
+			<SheetContent side="right" className="data-[side=right]:w-full data-[side=right]:sm:max-w-lg">
 				{job ? (
 					<>
 						<SheetHeader>

@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "storybook/test";
+import { fn, within } from "storybook/test";
 import type { AgentBinding } from "@/api/types.gen";
+import { expectPageReflows, expectTargetSpacing, expectWithinViewport } from "@/test/reflow";
 import { PracticeDetectionPolicyCard } from "./PracticeDetectionPolicyCard";
 import { mockAiSettings, mockAvailableModels } from "./storyMockData";
 
@@ -102,5 +103,34 @@ export const LoadForbidden: Story = {
 		settings: undefined,
 		error: { status: 403, detail: "You are not an admin of this workspace." },
 		onRetry: fn(),
+	},
+};
+
+/**
+ * The policy editor at the WCAG 2.2 SC 1.4.10 reflow width (320 CSS px).
+ *
+ * Nothing here is tabular, so it must reflow to one column with no horizontal scrolling at all —
+ * each `Field` keeps its switch beside a description that wraps, and the numeric input stays inside
+ * the card.
+ *
+ * The switches are the smallest targets on the page at 32 x 18 px, which is the size shadcn (and the
+ * platform convention behind it) draws a switch. That is under SC 2.5.8's 24 px floor, so what makes
+ * them conformant is the criterion's *Spacing* exception — the rows are far enough apart that the
+ * 24 px circles never meet. This asserts that spacing, which is the thing a denser layout would
+ * actually break.
+ */
+export const MobileReflow: Story = {
+	parameters: {
+		layout: "fullscreen",
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320, 375, 768] },
+	},
+	play: async ({ canvasElement }) => {
+		await expectPageReflows();
+		const switches = within(canvasElement).getAllByRole("switch");
+		for (const control of switches) {
+			await expectWithinViewport(control);
+		}
+		await expectTargetSpacing(switches);
 	},
 };

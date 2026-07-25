@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import type { WorkspaceLlmModel } from "@/api/types.gen";
+import { expectControlOnScreen, expectDialogFitsViewport, openDialogPopup } from "@/test/reflow";
 import { WorkspaceLlmModelsTable } from "./WorkspaceLlmModelsTable";
 
 const mockModels: WorkspaceLlmModel[] = [
@@ -61,5 +62,31 @@ export const DeleteConfirm: Story = {
 		await userEvent.click(canvas.getByRole("button", { name: /delete gpt-5 mini/i }));
 		const dialog = await screen.findByRole("alertdialog");
 		await expect(within(dialog).getByText(/stop working/i)).toBeInTheDocument();
+	},
+};
+
+/**
+ * The delete confirmation at the WCAG 2.2 SC 1.4.10 reflow width (320 CSS px).
+ *
+ * `AlertDialogContent`'s `max-w-xs` is 20rem — exactly a 320 px viewport — and it had no
+ * `calc(100% - 2rem)` clamp of its own, so the popup ran edge to edge here and past the edge as
+ * soon as the root font size was bumped. It now keeps a 1rem gutter at any width.
+ */
+export const DeleteConfirmMobileReflow: Story = {
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320, 375] },
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await userEvent.click(canvas.getByRole("button", { name: /delete gpt-5 mini/i }));
+		await screen.findByRole("alertdialog");
+
+		await expectDialogFitsViewport();
+		// A real 1rem gutter on each side, not merely "no wider than the screen". Layout width, so the
+		// `zoom-in-95` enter animation cannot flatter the measurement.
+		await expect(openDialogPopup().offsetWidth).toBeLessThanOrEqual(window.innerWidth - 32);
+		await expectControlOnScreen(screen.getByRole("button", { name: /^cancel$/i }));
+		await expectControlOnScreen(screen.getByRole("button", { name: /^delete$/i }));
 	},
 };

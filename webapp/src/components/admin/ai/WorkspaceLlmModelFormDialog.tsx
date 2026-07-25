@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
 	Dialog,
+	DialogBody,
 	DialogClose,
 	DialogContent,
 	DialogDescription,
@@ -150,124 +151,131 @@ function WorkspaceLlmModelFormDialogContent({
 
 	return (
 		<DialogContent className="sm:max-w-lg">
-			<form onSubmit={handleSubmit} className="space-y-4" noValidate>
+			{/* `contents`: the form wraps header, body and footer so submit works, without becoming a
+			    layout box that would defeat the popup's pinned-header/scrolling-body column. */}
+			<form onSubmit={handleSubmit} className="contents" noValidate>
 				<DialogHeader>
 					<DialogTitle>{isEdit ? "Edit model" : "Add model"}</DialogTitle>
 					<DialogDescription>A model on your own connected provider.</DialogDescription>
 				</DialogHeader>
 
-				<Field data-invalid={Boolean(errors.displayName)}>
-					<FieldLabel htmlFor="wm-display-name">Display name</FieldLabel>
-					<Input
-						id="wm-display-name"
-						value={displayName}
-						onChange={(e) => setDisplayName(e.target.value)}
-						placeholder="e.g. GPT-5 mini"
-						required
-						aria-invalid={Boolean(errors.displayName)}
-					/>
-					{errors.displayName && <FieldError>{errors.displayName}</FieldError>}
-				</Field>
-
-				<Field data-invalid={Boolean(errors.upstreamModelId)}>
-					<FieldLabel htmlFor="wm-upstream-id">Upstream model id</FieldLabel>
-					<Input
-						id="wm-upstream-id"
-						value={upstreamModelId}
-						onChange={(e) => setUpstreamModelId(e.target.value)}
-						disabled={isEdit}
-						placeholder="e.g. openai/gpt-5-mini"
-						required
-						autoComplete="off"
-						aria-invalid={Boolean(errors.upstreamModelId)}
-					/>
-					<FieldDescription>
-						{isEdit
-							? "Create a new model to use a different upstream id."
-							: "The exact id your provider expects. Slashes are part of the id."}
-					</FieldDescription>
-					{errors.upstreamModelId && <FieldError>{errors.upstreamModelId}</FieldError>}
-				</Field>
-
-				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-					<Field>
-						<FieldLabel htmlFor="wm-context-window">
-							Context window <span className="font-normal text-muted-foreground">(optional)</span>
-						</FieldLabel>
+				{/* The tallest form on this surface — six fields plus the whole price editor, around
+				    950 px. Without an internal scroll region it overflowed every phone viewport in both
+				    directions and neither the title nor the submit button could be reached. */}
+				<DialogBody className="space-y-4 py-1">
+					<Field data-invalid={Boolean(errors.displayName)}>
+						<FieldLabel htmlFor="wm-display-name">Display name</FieldLabel>
 						<Input
-							id="wm-context-window"
-							type="number"
-							min={0}
-							value={contextWindow}
-							onChange={(e) => setContextWindow(e.target.value)}
+							id="wm-display-name"
+							value={displayName}
+							onChange={(e) => setDisplayName(e.target.value)}
+							placeholder="e.g. GPT-5 mini"
+							required
+							aria-invalid={Boolean(errors.displayName)}
 						/>
+						{errors.displayName && <FieldError>{errors.displayName}</FieldError>}
 					</Field>
-					<Field>
-						<FieldLabel htmlFor="wm-max-output">
-							Max output tokens{" "}
-							<span className="font-normal text-muted-foreground">(optional)</span>
-						</FieldLabel>
+
+					<Field data-invalid={Boolean(errors.upstreamModelId)}>
+						<FieldLabel htmlFor="wm-upstream-id">Upstream model id</FieldLabel>
 						<Input
-							id="wm-max-output"
-							type="number"
-							min={0}
-							value={maxOutputTokens}
-							onChange={(e) => setMaxOutputTokens(e.target.value)}
+							id="wm-upstream-id"
+							value={upstreamModelId}
+							onChange={(e) => setUpstreamModelId(e.target.value)}
+							disabled={isEdit}
+							placeholder="e.g. openai/gpt-5-mini"
+							required
+							autoComplete="off"
+							aria-invalid={Boolean(errors.upstreamModelId)}
 						/>
-					</Field>
-				</div>
-
-				<Field orientation="horizontal">
-					<Checkbox
-						id="wm-supports-reasoning"
-						checked={supportsReasoning}
-						onCheckedChange={(checked) => setSupportsReasoning(checked === true)}
-					/>
-					<FieldContent>
-						<FieldLabel htmlFor="wm-supports-reasoning" className="font-normal">
-							Supports a reasoning mode
-						</FieldLabel>
-					</FieldContent>
-				</Field>
-
-				<Field orientation="horizontal">
-					<FieldContent>
-						<FieldLabel htmlFor="wm-enabled">Active</FieldLabel>
 						<FieldDescription>
 							{isEdit
-								? "Only active models with a declared price can be selected."
-								: "New models start inactive. Save a price, then review and activate the model."}
+								? "Create a new model to use a different upstream id."
+								: "The exact id your provider expects. Slashes are part of the id."}
 						</FieldDescription>
-					</FieldContent>
-					<Switch
-						id="wm-enabled"
-						checked={enabled}
-						disabled={!isEdit || price.pricingMode === "UNPRICED"}
-						onCheckedChange={setEnabled}
+						{errors.upstreamModelId && <FieldError>{errors.upstreamModelId}</FieldError>}
+					</Field>
+
+					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+						<Field>
+							<FieldLabel htmlFor="wm-context-window">
+								Context window <span className="font-normal text-muted-foreground">(optional)</span>
+							</FieldLabel>
+							<Input
+								id="wm-context-window"
+								type="number"
+								min={0}
+								value={contextWindow}
+								onChange={(e) => setContextWindow(e.target.value)}
+							/>
+						</Field>
+						<Field>
+							<FieldLabel htmlFor="wm-max-output">
+								Max output tokens{" "}
+								<span className="font-normal text-muted-foreground">(optional)</span>
+							</FieldLabel>
+							<Input
+								id="wm-max-output"
+								type="number"
+								min={0}
+								value={maxOutputTokens}
+								onChange={(e) => setMaxOutputTokens(e.target.value)}
+							/>
+						</Field>
+					</div>
+
+					<Field orientation="horizontal">
+						<Checkbox
+							id="wm-supports-reasoning"
+							checked={supportsReasoning}
+							onCheckedChange={(checked) => setSupportsReasoning(checked === true)}
+						/>
+						<FieldContent>
+							<FieldLabel htmlFor="wm-supports-reasoning" className="font-normal">
+								Supports a reasoning mode
+							</FieldLabel>
+						</FieldContent>
+					</Field>
+
+					<Field orientation="horizontal">
+						<FieldContent>
+							<FieldLabel htmlFor="wm-enabled">Active</FieldLabel>
+							<FieldDescription>
+								{isEdit
+									? "Only active models with a declared price can be selected."
+									: "New models start inactive. Save a price, then review and activate the model."}
+							</FieldDescription>
+						</FieldContent>
+						<Switch
+							id="wm-enabled"
+							checked={enabled}
+							disabled={!isEdit || price.pricingMode === "UNPRICED"}
+							onCheckedChange={setEnabled}
+						/>
+					</Field>
+
+					{editing?.enabled && !enabled && (
+						<Alert variant="warning">
+							<AlertTriangle aria-hidden />
+							<AlertTitle>Existing configurations will stop immediately</AlertTitle>
+							<AlertDescription>
+								Practice detection and Mentor configurations using this model cannot run until the
+								model is reactivated or replaced.
+							</AlertDescription>
+						</Alert>
+					)}
+
+					<PriceModeEditor
+						audience="workspace"
+						idPrefix="wm-price"
+						value={price}
+						onChange={(next) => {
+							setPrice(next);
+							if (next.pricingMode === "UNPRICED") setEnabled(false);
+						}}
+						errors={errors}
 					/>
-				</Field>
-
-				{editing?.enabled && !enabled && (
-					<Alert variant="warning">
-						<AlertTriangle aria-hidden />
-						<AlertTitle>Existing configurations will stop immediately</AlertTitle>
-						<AlertDescription>
-							Practice detection and Mentor configurations using this model cannot run until the
-							model is reactivated or replaced.
-						</AlertDescription>
-					</Alert>
-				)}
-
-				<PriceModeEditor
-					audience="workspace"
-					idPrefix="wm-price"
-					value={price}
-					onChange={(next) => {
-						setPrice(next);
-						if (next.pricingMode === "UNPRICED") setEnabled(false);
-					}}
-					errors={errors}
-				/>
+				</DialogBody>
 
 				<DialogFooter>
 					<DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>

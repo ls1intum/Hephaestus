@@ -253,8 +253,10 @@ export function WorkspaceLlmProviderPanel({
 				</Empty>
 			) : (
 				<>
-					<div className="flex items-center justify-between gap-3">
-						<div>
+					{/* Wraps rather than squeezing "Add provider" to a few pixels: the explanatory line
+					    below the heading needs the full width of a phone on its own. */}
+					<div className="flex flex-wrap items-center justify-between gap-3">
+						<div className="min-w-0 flex-1">
 							<h3 className="text-sm font-medium">Your providers</h3>
 							<p className="text-sm text-muted-foreground">
 								OpenAI-compatible endpoints paid for with this workspace's credentials.
