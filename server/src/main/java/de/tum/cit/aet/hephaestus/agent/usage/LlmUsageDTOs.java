@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.usage;
 
+import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateInfoDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
@@ -56,7 +57,12 @@ public final class LlmUsageDTOs {
                 "independently: an exhausted shared-model budget never stops work the workspace pays for itself."
         ) Boolean byoPaused,
         @NonNull List<LlmUsageByJobTypeDTO> byJobType,
-        @NonNull List<LlmUsageByDayDTO> byDay
+        @NonNull List<LlmUsageByDayDTO> byDay,
+        @Nullable @Schema(
+            description = "Display-only conversion for this month's USD amounts, when the instance has a " +
+                "display currency configured. Absent means show USD alone — never guess a rate. Every " +
+                "amount above stays USD regardless; this is presentation, not accounting."
+        ) FxRateInfoDTO fx
     ) {}
 
     @Schema(description = "Month spend aggregated by job type")
@@ -99,6 +105,14 @@ public final class LlmUsageDTOs {
         @NonNull Long events
     ) {}
 
+    /**
+     * <p><b>Why {@code fx} rides on the row.</b> {@code GET /admin/llm-usage} returns a bare array, so
+     * a month-level fact has nowhere else to go. Wrapping the array in an envelope would change the
+     * response shape for every instance — including the overwhelming majority that never configure a
+     * display currency — and the zero-regression rule for this feature is that an unconfigured
+     * instance keeps serving byte-identical responses. The value is identical on every row of one
+     * response (one month resolves to exactly one rate), so a client may read it from any row.
+     */
     @Schema(description = "Instance-admin per-workspace month rollup (metadata only, no tenant content)")
     public record AdminWorkspaceLlmUsageDTO(
         @NonNull Long workspaceId,
@@ -134,7 +148,12 @@ public final class LlmUsageDTOs {
         @NonNull @Schema(
             description = "Whether work on the workspace's OWN provider is paused right now. The two pause " +
                 "independently."
-        ) Boolean byoPaused
+        ) Boolean byoPaused,
+        @Nullable @Schema(
+            description = "Display-only conversion for this month's USD amounts, when the instance has a " +
+                "display currency configured. Identical on every row of one response — one month resolves " +
+                "to exactly one rate. Absent means show USD alone."
+        ) FxRateInfoDTO fx
     ) {}
 
     @Schema(description = "Set or clear a workspace's monthly LLM budget cap")

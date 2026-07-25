@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.agent.usage;
 
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageDTOs.AdminWorkspaceLlmUsageDTO;
+import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateInfoDTO;
+import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateLookup;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
@@ -35,26 +37,34 @@ public class LlmUsageAdminService {
     private final ConfigAuditPort configAudit;
     private final AgentJobRepository jobRepository;
 
+    /** Display-only (see {@link LlmUsageService}); never an input to a cap comparison. */
+    private final FxRateLookup fxRateLookup;
+
     public LlmUsageAdminService(
         LlmUsageEventRepository usageRepository,
         WorkspaceRepository workspaceRepository,
         ConfigAuditPort configAudit,
-        AgentJobRepository jobRepository
+        AgentJobRepository jobRepository,
+        FxRateLookup fxRateLookup
     ) {
         this.usageRepository = usageRepository;
         this.workspaceRepository = workspaceRepository;
         this.configAudit = configAudit;
         this.jobRepository = jobRepository;
+        this.fxRateLookup = fxRateLookup;
     }
 
     @Transactional(readOnly = true)
     public List<AdminWorkspaceLlmUsageDTO> getWorkspaceRollups(YearMonth month) {
         LlmBudgetService.MonthWindow window = LlmBudgetService.MonthWindow.of(month);
         boolean isCurrentMonth = month.equals(YearMonth.now(ZoneOffset.UTC));
+        // Resolved once for the whole response: one month has exactly one rate, and repeating the
+        // same value on every row is what keeps the endpoint's array shape unchanged.
+        FxRateInfoDTO fx = fxRateLookup.forMonth(month).orElse(null);
         return usageRepository
             .aggregateByWorkspace(window.from(), window.to())
             .stream()
-            .map(row -> toRollup(row, isCurrentMonth))
+            .map(row -> toRollup(row, isCurrentMonth, fx))
             .toList();
     }
 
@@ -95,7 +105,8 @@ public class LlmUsageAdminService {
      */
     private static AdminWorkspaceLlmUsageDTO toRollup(
         LlmUsageEventRepository.WorkspaceAggregate row,
-        boolean isCurrentMonth
+        boolean isCurrentMonth,
+        @Nullable FxRateInfoDTO fx
     ) {
         LlmBudgetVerdict instanceVerdict = LlmBudgetService.verdictFor(
             row.getPricedTotalCostUsd(),
@@ -119,7 +130,8 @@ public class LlmUsageAdminService {
             instanceVerdict,
             byoVerdict,
             isCurrentMonth && instanceVerdict != LlmBudgetVerdict.WITHIN,
-            isCurrentMonth && byoVerdict != LlmBudgetVerdict.WITHIN
+            isCurrentMonth && byoVerdict != LlmBudgetVerdict.WITHIN,
+            fx
         );
     }
 

@@ -6,11 +6,23 @@ import {
 	TableBody,
 	TableCaption,
 	TableCell,
+	TableFooter,
 	TableHead,
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { type Fx, FxSpend } from "./fx";
 import { formatUsageDay, JOB_TYPE_LABELS } from "./usageUtils";
+
+/**
+ * The estimate that trails a converted total. Muted and small: the USD figure is the total, this is
+ * a reading aid beside it.
+ */
+const TOTAL_FX_CLASS = "text-xs font-normal text-muted-foreground";
+
+function sumBy<T>(rows: T[], pick: (row: T) => number): number {
+	return rows.reduce((total, row) => total + pick(row), 0);
+}
 
 const JOB_TYPE_SKELETON_COLUMNS = [
 	"w-32",
@@ -28,10 +40,31 @@ const DAY_SKELETON_COLUMNS = ["w-16", "w-16", "w-16", "w-16", "w-12"];
 export interface LlmUsageByJobTypeTableProps {
 	/** Omit while the report is loading to keep the table shell stable. */
 	rows?: LlmUsageByJobType[];
+	/**
+	 * Display-only conversion for the totals row. Body cells stay USD-only: they are sub-dollar
+	 * figures in an already wide table, and an estimate on each would cost the column width that
+	 * makes the table readable at all.
+	 */
+	fx?: Fx;
 }
 
 /** Per-job-type usage with spend split by who pays for the model. */
-export function LlmUsageByJobTypeTable({ rows }: LlmUsageByJobTypeTableProps) {
+export function LlmUsageByJobTypeTable({ rows, fx }: LlmUsageByJobTypeTableProps) {
+	// Convert the total, never the sum of converted rows — rounding each row first and adding those
+	// up produces a figure that disagrees with the USD total sitting right next to it.
+	// One row needs no footer: its "total" would restate the line directly above it.
+	const totals =
+		rows == null || rows.length < 2
+			? null
+			: {
+					priced: sumBy(rows, (row) => row.pricedTotalCostUsd),
+					byo: sumBy(rows, (row) => row.byoTotalCostUsd),
+					unpriced: sumBy(rows, (row) => row.unpricedEventCount),
+					inputTokens: sumBy(rows, (row) => row.inputTokens),
+					outputTokens: sumBy(rows, (row) => row.outputTokens),
+					calls: sumBy(rows, (row) => row.totalCalls),
+					events: sumBy(rows, (row) => row.events),
+				};
 	return (
 		<Table containerClassName="rounded-md border">
 			<TableCaption className="sr-only">AI spend by job type</TableCaption>
@@ -99,6 +132,39 @@ export function LlmUsageByJobTypeTable({ rows }: LlmUsageByJobTypeTableProps) {
 					))}
 				</TableBody>
 			)}
+			{totals != null && (
+				<TableFooter>
+					<TableRow>
+						<TableCell>Total</TableCell>
+						<TableCell className="text-right tabular-nums">
+							{formatCostUsd(totals.priced)}
+							<FxSpend usd={totals.priced} fx={fx} className={TOTAL_FX_CLASS} />
+						</TableCell>
+						<TableCell className="text-right tabular-nums">
+							{formatCostUsd(totals.byo)}
+							<FxSpend usd={totals.byo} fx={fx} className={TOTAL_FX_CLASS} />
+						</TableCell>
+						{/* No blended average: the two money streams are different money and averaging
+						    across job types on top of that would mean nothing to anyone. */}
+						<TableCell className="text-right text-muted-foreground">—</TableCell>
+						<TableCell className="text-right tabular-nums">
+							{totals.unpriced.toLocaleString()}
+						</TableCell>
+						<TableCell className="text-right tabular-nums">
+							{formatTokens(totals.inputTokens)}
+						</TableCell>
+						<TableCell className="text-right tabular-nums">
+							{formatTokens(totals.outputTokens)}
+						</TableCell>
+						<TableCell className="text-right tabular-nums">
+							{totals.calls.toLocaleString()}
+						</TableCell>
+						<TableCell className="text-right tabular-nums">
+							{totals.events.toLocaleString()}
+						</TableCell>
+					</TableRow>
+				</TableFooter>
+			)}
 		</Table>
 	);
 }
@@ -138,10 +204,23 @@ function AvgPerEvent({ row }: { row: LlmUsageByJobType }) {
 export interface LlmUsageByDayTableProps {
 	/** Omit while the report is loading to keep the table shell stable. */
 	rows?: LlmUsageByDay[];
+	/** Display-only conversion for the totals row; per-day cells stay USD-only. */
+	fx?: Fx;
 }
 
 /** Daily usage with the same two money streams as the job-type rollup. */
-export function LlmUsageByDayTable({ rows }: LlmUsageByDayTableProps) {
+export function LlmUsageByDayTable({ rows, fx }: LlmUsageByDayTableProps) {
+	// Same rule as the job-type rollup: one conversion applied to the USD total, and no footer for a
+	// single row.
+	const totals =
+		rows == null || rows.length < 2
+			? null
+			: {
+					priced: sumBy(rows, (row) => row.pricedTotalCostUsd),
+					byo: sumBy(rows, (row) => row.byoTotalCostUsd),
+					unpriced: sumBy(rows, (row) => row.unpricedEventCount),
+					events: sumBy(rows, (row) => row.events),
+				};
 	return (
 		<Table containerClassName="rounded-md border">
 			<TableCaption className="sr-only">AI spend by day</TableCaption>
@@ -184,6 +263,27 @@ export function LlmUsageByDayTable({ rows }: LlmUsageByDayTableProps) {
 						</TableRow>
 					))}
 				</TableBody>
+			)}
+			{totals != null && (
+				<TableFooter>
+					<TableRow>
+						<TableCell>Total</TableCell>
+						<TableCell className="text-right tabular-nums">
+							{formatCostUsd(totals.priced)}
+							<FxSpend usd={totals.priced} fx={fx} className={TOTAL_FX_CLASS} />
+						</TableCell>
+						<TableCell className="text-right tabular-nums">
+							{formatCostUsd(totals.byo)}
+							<FxSpend usd={totals.byo} fx={fx} className={TOTAL_FX_CLASS} />
+						</TableCell>
+						<TableCell className="text-right tabular-nums">
+							{totals.unpriced.toLocaleString()}
+						</TableCell>
+						<TableCell className="text-right tabular-nums">
+							{totals.events.toLocaleString()}
+						</TableCell>
+					</TableRow>
+				</TableFooter>
 			)}
 		</Table>
 	);

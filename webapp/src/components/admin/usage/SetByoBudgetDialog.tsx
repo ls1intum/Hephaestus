@@ -1,9 +1,12 @@
 import { BudgetAmountDialog } from "./BudgetAmountDialog";
+import type { Fx } from "./fx";
 
 export interface SetByoBudgetDialogProps {
 	open: boolean;
 	/** The cap in force today, in USD; `null`/`undefined` means the workspace is uncapped. */
 	currentCapUsd?: number | null;
+	/** The month's display-currency rate, so the field hints in the same currency as the page. */
+	fx?: Fx;
 	isPending: boolean;
 	/** A server-side rejection, rendered as a field error instead of a toast. */
 	serverError?: string | null;
@@ -21,6 +24,7 @@ export interface SetByoBudgetDialogProps {
 export function SetByoBudgetDialog({
 	open,
 	currentCapUsd,
+	fx,
 	isPending,
 	serverError,
 	onOpenChange,
@@ -34,6 +38,7 @@ export function SetByoBudgetDialog({
 			fieldLabel="Monthly cap (USD)"
 			fieldDescription="Applies only to spend on your own provider. Shared models are not affected."
 			currentValueUsd={currentCapUsd ?? null}
+			fx={fx}
 			isPending={isPending}
 			serverError={serverError}
 			submitLabel="Save cap"

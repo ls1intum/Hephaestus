@@ -3,6 +3,8 @@ package de.tum.cit.aet.hephaestus.agent.usage;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageDTOs.WorkspaceLlmUsageReportDTO;
+import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRate;
+import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateRepository;
 import de.tum.cit.aet.hephaestus.core.audit.ConfigAuditEvent;
 import de.tum.cit.aet.hephaestus.core.audit.ConfigAuditEventRepository;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
@@ -16,6 +18,9 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.util.Map;
@@ -45,6 +50,9 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
     @Autowired
     private ConfigAuditEventRepository configAuditEventRepository;
+
+    @Autowired
+    private FxRateRepository fxRateRepository;
 
     private static final YearMonth CURRENT = YearMonth.now(ZoneOffset.UTC);
     private static final YearMonth PREVIOUS = CURRENT.minusMonths(1);
@@ -635,6 +643,42 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             .expectStatus()
             .isForbidden();
         assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getMonthlyLlmBudgetUsd()).isNull();
+    }
+
+    /**
+     * Zero-regression guard for the display-currency feature (#1368). An instance that has not set
+     * {@code hephaestus.llm.display-currency} — the default, and the overwhelming majority — must get
+     * back exactly the response it got before the feature existed. The fixture stores a perfectly
+     * fresh rate first, so the only thing that can be suppressing {@code fx} is the unset property.
+     */
+    @Test
+    @WithAdminUser
+    void reportOmitsFxEntirelyWhenNoDisplayCurrencyConfigured() {
+        Workspace workspace = setupWorkspaceWithAdmin("usage-no-fx");
+        seedEvent(workspace, LlmUsageJobType.PULL_REQUEST_REVIEW, "1.00", CURRENT, 5);
+        FxRate rate = new FxRate();
+        rate.setRateDate(LocalDate.now(ZoneOffset.UTC));
+        rate.setUsdPerEur(new BigDecimal("1.1377"));
+        rate.setFetchedAt(Instant.now());
+        fxRateRepository.save(rate);
+
+        byte[] body = webTestClient
+            .get()
+            .uri("/workspaces/{slug}/llm-usage", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$.fx")
+            .doesNotExist()
+            .jsonPath("$.pricedTotalCostUsd")
+            .isEqualTo(1.00)
+            .returnResult()
+            .getResponseBody();
+
+        // Not even as an explicit null: the key is absent from the wire bytes.
+        assertThat(new String(body, StandardCharsets.UTF_8)).doesNotContain("\"fx\"");
     }
 
     @Test

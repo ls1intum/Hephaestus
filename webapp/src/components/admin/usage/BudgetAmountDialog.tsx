@@ -13,6 +13,7 @@ import {
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { type Fx, FxApprox, fxCapHint } from "./fx";
 
 export interface BudgetAmountDialogProps {
 	open: boolean;
@@ -36,6 +37,11 @@ export interface BudgetAmountDialogProps {
 	serverError?: string | null;
 	submitLabel?: string;
 	removeLabel?: string;
+	/**
+	 * Display-only conversion for the amount being typed. Absent — the default for any instance
+	 * without a display currency — means no hint at all, exactly as before.
+	 */
+	fx?: Fx;
 	onOpenChange: (open: boolean) => void;
 	/** `null` removes the cap; a number (USD, >= 0, at most 2 decimals) sets it. */
 	onSubmit: (valueUsd: number | null) => void;
@@ -84,9 +90,11 @@ function BudgetAmountDialogContent({
 	serverError,
 	submitLabel = "Save cap",
 	removeLabel = "Remove cap",
+	fx,
 	onSubmit,
 }: BudgetAmountDialogContentProps) {
 	const fieldId = useId();
+	const fxHintId = useId();
 	const [value, setValue] = useState(currentValueUsd != null ? String(currentValueUsd) : "");
 	// Withheld until the first submit so the field isn't red before anything was attempted.
 	const [showError, setShowError] = useState(false);
@@ -108,6 +116,9 @@ function BudgetAmountDialogContent({
 		serverError != null && serverError !== dismissedServerError ? serverError : null;
 	const errorMessage = showError && !isValid ? localError : liveServerError;
 	const isInvalid = errorMessage != null;
+	// What the amount on screen is worth in the display currency, recomputed as they type. Absent
+	// while the field is empty, unparseable or $0 — there is nothing useful to estimate there.
+	const fxHint = fxCapHint(isValid ? parsed : null, fx);
 
 	const handleSubmit = (event: FormEvent) => {
 		event.preventDefault();
@@ -145,6 +156,9 @@ function BudgetAmountDialogContent({
 								placeholder="e.g. 25.00"
 								value={value}
 								aria-invalid={isInvalid}
+								// Read on focus rather than announced on every keystroke: a live region here
+								// would interrupt typing with a new estimate per digit.
+								aria-describedby={fxHint != null ? fxHintId : undefined}
 								onChange={(event) => {
 									setValue(event.target.value);
 									setShowError(false);
@@ -154,6 +168,12 @@ function BudgetAmountDialogContent({
 								autoFocus
 							/>
 							<FieldDescription>{fieldDescription}</FieldDescription>
+							{fxHint != null && (
+								<FieldDescription id={fxHintId}>
+									<FxApprox conversion={fxHint.conversion} />
+									{fxHint.tail}
+								</FieldDescription>
+							)}
 							{errorMessage != null && <FieldError>{errorMessage}</FieldError>}
 						</Field>
 					</FieldGroup>

@@ -77,6 +77,9 @@ public class WorkspaceScopedTables {
         "llm_model_workspace_grant",
         // Instance LLM settings singleton (egress allowlist + BYO enable + default policy); global
         "instance_llm_settings",
+        // ECB daily reference rates for display-only currency conversion (#1368); an exchange rate is
+        // a property of the world, not of a tenant
+        "fx_rate",
         // Liquibase machinery
         "databasechangelog",
         "databasechangeloglock"

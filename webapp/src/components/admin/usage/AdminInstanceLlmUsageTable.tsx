@@ -24,6 +24,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { type Fx, FxApprox, FxDisclosure, spendConversion } from "./fx";
 import { LlmUsageByDayTable, LlmUsageByJobTypeTable } from "./LlmUsageBreakdownTables";
 
 /**
@@ -170,6 +171,12 @@ export function AdminInstanceLlmUsageTable({
 	// scrolling to read a breakdown, which is exactly what WCAG 2.2 SC 1.4.10 rules out. Out here it
 	// reflows to the page width at any viewport and the `aria-controls` relationship is unchanged.
 	const expandedRow = rows.find((row) => row.workspaceId === expandedWorkspaceId);
+	// One month resolves to exactly one rate, so every row of a response carries the same block —
+	// read it off the first row rather than reconciling nine copies of it.
+	const fx: Fx = rows[0]?.fx;
+	// The caption explains estimates that are actually on screen; with every workspace at $0 there
+	// are none, and a footnote about them would be noise.
+	const hasConversion = rows.some((row) => spendConversion(row.pricedTotalCostUsd, fx) != null);
 
 	return (
 		<div className="space-y-4">
@@ -235,8 +242,12 @@ export function AdminInstanceLlmUsageTable({
 											{row.workspaceSlug}
 										</div>
 									</TableCell>
+									{/* The shared-model column is the money this admin is accountable for, so it is
+									    the one that carries the estimate — on its own line, where it costs no
+									    column width. The cap columns stay USD-only for the same reason. */}
 									<TableCell className="text-right tabular-nums">
 										{formatCostUsd(row.pricedTotalCostUsd)}
+										<SpendEstimateLine usd={row.pricedTotalCostUsd} fx={fx} />
 									</TableCell>
 									<CapCell usage={shared} label="Instance cap" workspace={row.displayName} />
 									<TableCell className="text-right tabular-nums">
@@ -282,6 +293,8 @@ export function AdminInstanceLlmUsageTable({
 				)}
 			</Table>
 
+			{hasConversion && <FxDisclosure fx={fx} isCurrentMonth={isCurrentMonth} />}
+
 			{expandedRow != null && (
 				<WorkspaceUsageDetails
 					workspace={expandedRow}
@@ -291,6 +304,27 @@ export function AdminInstanceLlmUsageTable({
 					onRetry={onRetryDetail}
 				/>
 			)}
+		</div>
+	);
+}
+
+interface SpendEstimateLineProps {
+	usd: number;
+	fx: Fx;
+}
+
+/**
+ * The converted spend, under the USD figure it estimates. A second line rather than a parenthetical
+ * because this is a money column in a nine-column table: inline it would widen every row.
+ */
+function SpendEstimateLine({ usd, fx }: SpendEstimateLineProps) {
+	const conversion = spendConversion(usd, fx);
+	if (conversion == null) {
+		return null;
+	}
+	return (
+		<div className="text-xs text-muted-foreground">
+			<FxApprox conversion={conversion} />
 		</div>
 	);
 }
@@ -343,13 +377,16 @@ function WorkspaceUsageDetails({
 						<h4 id={`${panelId}-job-type`} className="font-medium">
 							By job type
 						</h4>
-						<LlmUsageByJobTypeTable rows={isLoading ? undefined : report?.byJobType} />
+						<LlmUsageByJobTypeTable
+							rows={isLoading ? undefined : report?.byJobType}
+							fx={report?.fx}
+						/>
 					</section>
 					<section aria-labelledby={`${panelId}-day`} className="min-w-0 space-y-2">
 						<h4 id={`${panelId}-day`} className="font-medium">
 							By day
 						</h4>
-						<LlmUsageByDayTable rows={isLoading ? undefined : report?.byDay} />
+						<LlmUsageByDayTable rows={isLoading ? undefined : report?.byDay} fx={report?.fx} />
 					</section>
 				</div>
 			)}

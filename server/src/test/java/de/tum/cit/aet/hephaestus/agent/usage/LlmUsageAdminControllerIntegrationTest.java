@@ -3,13 +3,18 @@ package de.tum.cit.aet.hephaestus.agent.usage;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageDTOs.AdminWorkspaceLlmUsageDTO;
+import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRate;
+import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -38,6 +43,9 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
 
     @Autowired
     private WorkspaceRepository workspaceRepository;
+
+    @Autowired
+    private FxRateRepository fxRateRepository;
 
     private Workspace setupWorkspace(String slug) {
         User owner = persistUser(slug + "-owner");
@@ -191,6 +199,36 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
             .exchange()
             .expectStatus()
             .isBadRequest();
+    }
+
+    /**
+     * Zero-regression guard, mirroring the workspace-scoped one: with no display currency configured
+     * the rollup rows carry no {@code fx} key at all, even though a fresh rate is stored.
+     */
+    @Test
+    void rollupOmitsFxEntirelyWhenNoDisplayCurrencyConfigured() {
+        Workspace workspace = setupWorkspace("adm-no-fx");
+        seedEvent(workspace, "3.00");
+        FxRate rate = new FxRate();
+        rate.setRateDate(LocalDate.now(ZoneOffset.UTC));
+        rate.setUsdPerEur(new BigDecimal("1.1377"));
+        rate.setFetchedAt(Instant.now());
+        fxRateRepository.save(rate);
+
+        byte[] body = webTestClient
+            .get()
+            .uri("/admin/llm-usage")
+            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$[0].fx")
+            .doesNotExist()
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(new String(body, StandardCharsets.UTF_8)).doesNotContain("\"fx\"");
     }
 
     @Test

@@ -139,6 +139,10 @@ export type WorkspaceLlmUsageReport = {
      */
     byoTotalCostUsd: number;
     /**
+     * Display-only conversion for this month's USD amounts, when the instance has a display currency configured. Absent means show USD alone — never guess a rate. Every amount above stays USD regardless; this is presentation, not accounting.
+     */
+    fx?: FxRateInfo;
+    /**
      * Whether host-funded (shared-model) spend is within its cap, has reached it, or can't be confirmed because some shared-model usage has no price set.
      */
     instanceBudgetVerdict: 'WITHIN' | 'EXHAUSTED' | 'UNVERIFIABLE';
@@ -162,6 +166,24 @@ export type WorkspaceLlmUsageReport = {
      * Calls this month (any provider) whose price is not yet known. They are excluded from both totals above, so a non-zero value means the real spend may be higher than shown.
      */
     unpricedEventCount: number;
+};
+
+/**
+ * Display-only currency conversion for the USD amounts in this response. Multiply a USD amount by ratePerUsd to get the display-currency estimate; always label it as an estimate and show rateDate, which is the date the rate was actually published on (not necessarily today).
+ */
+export type FxRateInfo = {
+    /**
+     * ISO 4217 code of the display currency
+     */
+    currencyCode: string;
+    /**
+     * The date the underlying reference rate was published. A closed month always reports a date inside that month, so its converted figure never changes once the month ends.
+     */
+    rateDate: Date;
+    /**
+     * Units of the display currency per 1 USD, at 6 decimal places
+     */
+    ratePerUsd: number;
 };
 
 /**
@@ -4091,6 +4113,10 @@ export type AdminWorkspaceLlmUsage = {
      * Ledger events (jobs / mentor turns) this month, any provider
      */
     events: number;
+    /**
+     * Display-only conversion for this month's USD amounts, when the instance has a display currency configured. Identical on every row of one response — one month resolves to exactly one rate. Absent means show USD alone.
+     */
+    fx?: FxRateInfo;
     /**
      * Whether shared-model spend is within the instance cap, has reached it, or can't be confirmed because some shared-model usage has no price set.
      */

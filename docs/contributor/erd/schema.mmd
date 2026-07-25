@@ -328,6 +328,13 @@ erDiagram
         UUID chat_message_id FK
     }
 
+    FxRate {
+        BIGINT id PK
+        DATE rate_date UK "NOT NULL"
+        NUMERIC(12,6) usd_per_eur "NOT NULL"
+        TIMESTAMPTZ fetched_at "NOT NULL"
+    }
+
     GitCommit {
         BIGINT id PK
         VARCHAR(40) sha UK "NOT NULL"

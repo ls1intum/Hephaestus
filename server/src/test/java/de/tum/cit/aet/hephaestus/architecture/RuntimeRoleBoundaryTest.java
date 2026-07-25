@@ -78,6 +78,9 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
             RuntimeRole.WORKER_PROPERTY
         ),
         Map.entry("de.tum.cit.aet.hephaestus.core.runtime.hub.HubConfiguration", RuntimeRole.SERVER_PROPERTY),
+        // Display-currency rate fetcher (#1368) — the only egress this feature has. Server-only so the
+        // worker and webhook pods never acquire an outbound dependency on ecb.europa.eu.
+        Map.entry("de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateFetchScheduler", RuntimeRole.SERVER_PROPERTY),
         Map.entry(
             "de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerTokenExchangeController",
             RuntimeRole.SERVER_PROPERTY

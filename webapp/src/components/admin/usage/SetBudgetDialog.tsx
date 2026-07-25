@@ -46,6 +46,9 @@ export function SetBudgetDialog({
 			fieldDescription="Reaching this amount pauses shared-model work until the month resets."
 			submitLabel="Save budget"
 			currentValueUsd={workspace?.instanceMonthlyBudgetUsd ?? null}
+			// The rollup row carries the month's rate, so the live estimate under the field uses the
+			// same rate as the figures the admin is looking at behind the dialog.
+			fx={workspace?.fx}
 			isPending={isPending}
 			serverError={serverError}
 			onOpenChange={onOpenChange}

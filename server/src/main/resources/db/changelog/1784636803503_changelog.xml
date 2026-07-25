@@ -1418,4 +1418,30 @@
         <rollback/>
     </changeSet>
 
+    <!-- ECB daily euro reference rates, for DISPLAY ONLY (#1368). USD remains the sole unit of
+         record, pricing and enforcement: nothing in this table is ever read by a budget gate, an
+         admission decision or the usage ledger (LlmBudgetFxIsolationArchTest pins that).
+         usd_per_eur is stored in the ECB's own direction — US dollars per ONE euro, e.g. 1.1377 —
+         so the historical record is exactly what was published; the inversion clients need happens
+         once, at read time. GLOBAL: an exchange rate is a property of the world, not of a tenant,
+         hence no workspace_id (registered in WorkspaceScopedTables.GLOBAL_TABLES). -->
+    <changeSet id="1784636803503-67" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="fx_rate already exists">
+            <not><tableExists tableName="fx_rate"/></not>
+        </preConditions>
+        <comment>Daily ECB EUR reference rates backing display-only currency conversion (#1368)</comment>
+        <createTable tableName="fx_rate">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" primaryKeyName="pk_fx_rate" nullable="false"/>
+            </column>
+            <column name="rate_date" type="DATE"><constraints nullable="false"/></column>
+            <column name="usd_per_eur" type="NUMERIC(12,6)"><constraints nullable="false"/></column>
+            <column name="fetched_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <!-- One row per published day. Also the arbiter when two server replicas fetch at once:
+             the loser's insert fails and is swallowed, rather than duplicating the day. -->
+        <addUniqueConstraint tableName="fx_rate" columnNames="rate_date" constraintName="ux_fx_rate_date"/>
+        <rollback><dropTable tableName="fx_rate"/></rollback>
+    </changeSet>
+
 </databaseChangeLog>

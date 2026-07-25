@@ -156,13 +156,65 @@ type Story = StoryObj<typeof meta>;
  * plus a paused instance cap, a paused provider cap, a near-cap warning, and a total that can't be
  * verified.
  */
-export const Default: Story = {};
+export const Default: Story = {
+	// Also the default currency state: no display currency configured, so every figure is USD.
+	play: async ({ canvasElement }) => {
+		await expect(within(canvasElement).queryByText(/ECB reference rate/)).toBeNull();
+	},
+};
 
 /** One workspace expanded to show the existing by-job and daily usage rollups. */
 export const Expanded: Story = {
 	args: {
 		expandedWorkspaceId: rows[0].workspaceId,
 		detailReport,
+	},
+};
+
+/**
+ * The same month on an instance that displays EUR. One month resolves to exactly one rate, so
+ * every row carries the same block and the estimate sits under the shared-model spend — the column
+ * the instance admin is accountable for — where a second line costs no width.
+ */
+export const DisplayCurrencyThisMonth: Story = {
+	args: {
+		rows: rows.map((row) => ({
+			...row,
+			fx: {
+				currencyCode: "EUR",
+				ratePerUsd: 0.878966,
+				rateDate: new Date("2026-07-24T00:00:00.000Z"),
+			},
+		})),
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(
+			canvas.getByText(/EUR amounts are estimates at the ECB reference rate for Jul 24, 2026/),
+		).toBeVisible();
+		await expect(canvas.getByLabelText("approximately 21.99 euros")).toBeInTheDocument();
+	},
+};
+
+/** A closed month on a EUR instance: the rate is dated inside it, so the figures never move. */
+export const DisplayCurrencyClosedMonth: Story = {
+	args: {
+		isCurrentMonth: false,
+		rows: rows.map((row) => ({
+			...row,
+			fx: {
+				currencyCode: "EUR",
+				ratePerUsd: 0.874312,
+				rateDate: new Date("2026-06-30T00:00:00.000Z"),
+			},
+		})),
+	},
+	play: async ({ canvasElement }) => {
+		await expect(
+			within(canvasElement).getByText(
+				/the last rate published that month, so past figures don't change/,
+			),
+		).toBeVisible();
 	},
 };
 

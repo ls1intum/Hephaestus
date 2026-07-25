@@ -83,6 +83,7 @@ function AdminUsageContainer() {
 			<SetByoBudgetDialog
 				open={isEditingByoCap}
 				currentCapUsd={report?.byoMonthlyBudgetUsd ?? null}
+				fx={report?.fx}
 				isPending={updateByoCap.isPending}
 				serverError={
 					updateByoCap.error != null

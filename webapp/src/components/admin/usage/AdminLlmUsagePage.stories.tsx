@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "storybook/test";
-import type { WorkspaceLlmUsageReport } from "@/api/types.gen";
+import { expect, fn, within } from "storybook/test";
+import type { FxRateInfo, WorkspaceLlmUsageReport } from "@/api/types.gen";
 import { expectPageReflows, expectTablesScrollInPlace } from "@/test/reflow";
 import { AdminLlmUsagePage } from "./AdminLlmUsagePage";
 
@@ -102,6 +102,16 @@ const withOwnProvider: WorkspaceLlmUsageReport = {
 };
 
 /**
+ * The rate an instance with a EUR display currency reports for the running month. Already
+ * inverted: multiply a USD amount by it to get the estimate.
+ */
+const eurToday: FxRateInfo = {
+	currencyCode: "EUR",
+	ratePerUsd: 0.878966,
+	rateDate: new Date("2026-07-24T00:00:00.000Z"),
+};
+
+/**
  * The workspace admin's cost-control page. Two independently owned caps — the shared-model budget
  * the host sets, and the provider cap the workspace sets for itself — each with its own meter, its
  * own pause banner, and its own pre-wall warning.
@@ -128,8 +138,81 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Comfortably inside the shared-model budget, with no provider of the workspace's own yet. */
-export const WithinBudget: Story = {};
+/**
+ * Comfortably inside the shared-model budget, with no provider of the workspace's own yet.
+ *
+ * Also the default currency state: no instance has a display currency until someone configures
+ * one, so every figure here is USD and nothing explains itself.
+ */
+export const WithinBudget: Story = {
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.queryByText(/ECB reference rate/)).toBeNull();
+		await expect(canvasElement.querySelectorAll('[role="img"]')).toHaveLength(0);
+	},
+};
+
+/**
+ * The same month on an instance that displays EUR. USD stays the headline figure and the estimate
+ * trails it, marked `≈` at every occurrence; the caption underneath explains all of them at once
+ * and names the rate.
+ */
+export const DisplayCurrencyThisMonth: Story = {
+	args: {
+		report: { ...withOwnProvider, fx: eurToday },
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(
+			canvas.getByText(/EUR amounts are estimates at the ECB reference rate for Jul 24, 2026/),
+		).toBeVisible();
+		// Symbols would be announced as "tilde operator" or dropped — every estimate says words.
+		await expect(canvas.getAllByLabelText(/^approximately /).length).toBeGreaterThan(0);
+	},
+};
+
+/**
+ * A closed month. Its rate is the last one published inside that month, so the figures are frozen
+ * — the caption says so instead of quoting a live rate that would drift under a past total.
+ */
+export const DisplayCurrencyClosedMonth: Story = {
+	args: {
+		month: "2026-06",
+		isCurrentMonth: false,
+		report: {
+			...withOwnProvider,
+			month: "2026-06",
+			fx: {
+				currencyCode: "EUR",
+				ratePerUsd: 0.874312,
+				rateDate: new Date("2026-06-30T00:00:00.000Z"),
+			},
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(
+			canvas.getByText(/the last rate published that month, so past figures don't change/),
+		).toBeVisible();
+	},
+};
+
+/**
+ * A currency whose symbol would read as dollars beside the USD figure it estimates — CAD, AUD and
+ * friends — falls back to the ISO code rather than putting two `$` in one line.
+ */
+export const DisplayCurrencyWithAmbiguousSymbol: Story = {
+	args: {
+		report: {
+			...withOwnProvider,
+			fx: {
+				currencyCode: "CAD",
+				ratePerUsd: 1.3642,
+				rateDate: new Date("2026-07-24T00:00:00.000Z"),
+			},
+		},
+	},
+};
 
 /** Both sides live and under their caps — the two meters never merge into one number. */
 export const BothCapsHealthy: Story = {

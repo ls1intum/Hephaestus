@@ -17,6 +17,16 @@ import {
 } from "@/components/ui/empty";
 import { ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+	capConversion,
+	type Fx,
+	FxAmount,
+	FxCap,
+	type FxConversion,
+	FxDisclosure,
+	spendConversion,
+	spendOfCapConversion,
+} from "./fx";
 import { LlmUsageByDayTable, LlmUsageByJobTypeTable } from "./LlmUsageBreakdownTables";
 import { MonthNavigator } from "./MonthNavigator";
 import {
@@ -109,6 +119,23 @@ export function AdminLlmUsagePage({
 	// A cap with no visible meter is a trap, so the provider card shows whenever either exists.
 	const hasProviderSide = providerCap != null || providerSpend > 0;
 
+	// Display-only conversion, absent unless the instance opted into a display currency. USD is the
+	// number this page is really about — the estimates are secondary everywhere they appear, and the
+	// caption below the cards is the one place they are explained.
+	const fx: Fx = report?.fx;
+	// The exact conversion each card headline will render, resolved here so the caption appears if
+	// and only if something on the page actually converted — never as a footnote to nothing.
+	const sharedTitleFx =
+		sharedBudget != null
+			? spendOfCapConversion(sharedSpend, sharedBudget, fx)
+			: spendConversion(sharedSpend, fx);
+	const providerTitleFx =
+		providerCap != null
+			? spendOfCapConversion(providerSpend, providerCap, fx)
+			: spendConversion(providerSpend, fx);
+	const providerCapFx = capConversion(providerCap, fx);
+	const hasConversion = sharedTitleFx != null || providerTitleFx != null || providerCapFx != null;
+
 	return (
 		<div className="mx-auto w-full max-w-6xl space-y-6 py-6">
 			<div className="flex flex-wrap items-center justify-between gap-4">
@@ -185,6 +212,7 @@ export function AdminLlmUsagePage({
 							spendUsd={providerSpend}
 							capUsd={providerCap}
 							projection={projectBudget(providerSpend, providerCap, month, now)}
+							fx={fx}
 						/>
 					)}
 					{sharedWarning && (
@@ -194,6 +222,7 @@ export function AdminLlmUsagePage({
 							spendUsd={sharedSpend}
 							capUsd={sharedBudget}
 							projection={projectBudget(sharedSpend, sharedBudget, month, now)}
+							fx={fx}
 						/>
 					)}
 
@@ -225,6 +254,7 @@ export function AdminLlmUsagePage({
 							percent={sharedPercent}
 							paused={sharedPaused}
 							workspaceSlug={workspaceSlug}
+							titleFx={sharedTitleFx}
 						/>
 						{hasProviderSide ? (
 							<ProviderCapCard
@@ -234,11 +264,17 @@ export function AdminLlmUsagePage({
 								percent={providerPercent}
 								paused={providerPaused}
 								onEditByoCap={onEditByoCap}
+								titleFx={providerTitleFx}
+								fx={fx}
 							/>
 						) : (
 							<NoProviderCard workspaceSlug={workspaceSlug} onEditByoCap={onEditByoCap} />
 						)}
 					</div>
+
+					{/* Disclosed once, under the figures it qualifies — never beside each number, where it
+					    would bury the numbers it exists to explain. */}
+					{hasConversion && <FxDisclosure fx={fx} isCurrentMonth={isCurrentMonth} />}
 
 					{!hasUsage ? (
 						<Empty className="border">
@@ -268,7 +304,7 @@ export function AdminLlmUsagePage({
 									<CardTitle>By job type</CardTitle>
 								</CardHeader>
 								<CardContent>
-									<LlmUsageByJobTypeTable rows={report.byJobType} />
+									<LlmUsageByJobTypeTable rows={report.byJobType} fx={fx} />
 								</CardContent>
 							</Card>
 
@@ -290,7 +326,7 @@ export function AdminLlmUsagePage({
 											</EmptyHeader>
 										</Empty>
 									) : (
-										<LlmUsageByDayTable rows={report.byDay} />
+										<LlmUsageByDayTable rows={report.byDay} fx={fx} />
 									)}
 								</CardContent>
 							</Card>
@@ -433,10 +469,18 @@ interface BudgetPaceAlertProps {
 	capUsd: number | undefined;
 	/** `null` when the month is too young or the spend too empty for a pace to mean anything. */
 	projection: BudgetProjection | null;
+	fx: Fx;
 }
 
 /** Warn before the wall: how much of a cap is gone, and when this month's pace would reach it. */
-function BudgetPaceAlert({ scope, percent, spendUsd, capUsd, projection }: BudgetPaceAlertProps) {
+function BudgetPaceAlert({
+	scope,
+	percent,
+	spendUsd,
+	capUsd,
+	projection,
+	fx,
+}: BudgetPaceAlertProps) {
 	const isProvider = scope === "provider";
 	return (
 		<Alert variant="warning" role="status">
@@ -448,6 +492,7 @@ function BudgetPaceAlert({ scope, percent, spendUsd, capUsd, projection }: Budge
 			<AlertDescription>
 				<p>
 					{formatCostUsd(spendUsd)} of {formatCapUsd(capUsd)}
+					<FxAmount conversion={spendOfCapConversion(spendUsd, capUsd, fx)} />
 					{isProvider ? ", set by you." : ", set by your host."}
 					{projection != null &&
 						(projection.reachedOn != null
@@ -466,6 +511,8 @@ interface SharedBudgetCardProps {
 	percent: number | undefined;
 	paused: boolean;
 	workspaceSlug: string;
+	/** The estimate that trails the headline, or `null` when there is nothing to convert. */
+	titleFx: FxConversion | null;
 }
 
 /** Read-only by design: only the host can move this number. */
@@ -476,6 +523,7 @@ function SharedBudgetCard({
 	percent,
 	paused,
 	workspaceSlug,
+	titleFx,
 }: SharedBudgetCardProps) {
 	return (
 		<Card>
@@ -485,11 +533,20 @@ function SharedBudgetCard({
 				</CardDescription>
 				<CardTitle className="text-2xl tabular-nums">
 					{formatCostUsd(spendUsd)}
-					{capUsd != null && (
+					{capUsd != null ? (
 						<span className="text-base font-normal text-muted-foreground">
 							{" "}
 							of {formatCapUsd(capUsd)}
+							<FxAmount conversion={titleFx} />
 						</span>
+					) : (
+						// Without a cap there is no muted "of …" tail to hang the estimate on, so the wrapper
+						// only exists when there is actually an estimate to put in it.
+						titleFx != null && (
+							<span className="text-base font-normal text-muted-foreground">
+								<FxAmount conversion={titleFx} />
+							</span>
+						)
 					)}
 				</CardTitle>
 				<CardDescription>
@@ -528,6 +585,9 @@ interface ProviderCapCardProps {
 	percent: number | undefined;
 	paused: boolean;
 	onEditByoCap: () => void;
+	/** The estimate that trails the headline, or `null` when there is nothing to convert. */
+	titleFx: FxConversion | null;
+	fx: Fx;
 }
 
 /** The workspace's own money — set, change, and remove all live here. */
@@ -538,6 +598,8 @@ function ProviderCapCard({
 	percent,
 	paused,
 	onEditByoCap,
+	titleFx,
+	fx,
 }: ProviderCapCardProps) {
 	return (
 		<Card>
@@ -547,11 +609,18 @@ function ProviderCapCard({
 				</CardDescription>
 				<CardTitle className="text-2xl tabular-nums">
 					{formatCostUsd(spendUsd)}
-					{capUsd != null && (
+					{capUsd != null ? (
 						<span className="text-base font-normal text-muted-foreground">
 							{" "}
 							of {formatCapUsd(capUsd)}
+							<FxAmount conversion={titleFx} />
 						</span>
+					) : (
+						titleFx != null && (
+							<span className="text-base font-normal text-muted-foreground">
+								<FxAmount conversion={titleFx} />
+							</span>
+						)
 					)}
 				</CardTitle>
 				<CardDescription>
@@ -570,7 +639,10 @@ function ProviderCapCard({
 				)}
 				<p className="text-sm text-muted-foreground">
 					Your provider cap · set by you:{" "}
-					<span className="tabular-nums">{capUsd != null ? formatCapUsd(capUsd) : "No cap"}</span>
+					<span className="tabular-nums">
+						{capUsd != null ? formatCapUsd(capUsd) : "No cap"}
+						{capUsd != null && <FxCap usd={capUsd} fx={fx} />}
+					</span>
 				</p>
 				<Button variant="outline" size="sm" onClick={onEditByoCap}>
 					{capUsd != null ? "Change cap" : "Set cap"}

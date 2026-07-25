@@ -112,6 +112,7 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "LlmModelPrice", // Instance model price history; global pricing authority
         "LlmModelWorkspaceGrant", // Grant allowlist by reference (which workspaces may use a GRANTED model); global admin table
         "InstanceLlmSettings", // Instance LLM settings singleton (egress allowlist + BYO enable + default policy); global
+        "FxRate", // ECB daily reference rate for display-only conversion; a world fact, not tenant data
         "WorkerTokenDenylist", // Fleet-wide JWT revocation; worker JWTs are not workspace-scoped
         // core.auth (ADR 0017) — identity is user/system-scoped, not workspace-scoped.
         // Account ↔ Workspace association lives on WorkspaceMembership, not on these rows.

@@ -5332,6 +5332,12 @@ components:
           type: integer
           format: int64
           description: "Ledger events (jobs / mentor turns) this month, any provider"
+        fx:
+          $ref: "#/components/schemas/FxRateInfo"
+          description: "Display-only conversion for this month's USD amounts, when\
+            \ the instance has a display currency configured. Identical on every row\
+            \ of one response — one month resolves to exactly one rate. Absent means\
+            \ show USD alone."
         instanceBudgetVerdict:
           type: string
           description: "Whether shared-model spend is within the instance cap, has\
@@ -6742,6 +6748,32 @@ components:
         RUN_PRACTICE_REVIEW:
           type: boolean
           description: User's PRs trigger practice review
+    FxRateInfo:
+      type: object
+      description: "Display-only currency conversion for the USD amounts in this response.\
+        \ Multiply a USD amount by ratePerUsd to get the display-currency estimate;\
+        \ always label it as an estimate and show rateDate, which is the date the\
+        \ rate was actually published on (not necessarily today)."
+      properties:
+        currencyCode:
+          type: string
+          description: ISO 4217 code of the display currency
+          example: EUR
+        rateDate:
+          type: string
+          format: date
+          description: "The date the underlying reference rate was published. A closed\
+            \ month always reports a date inside that month, so its converted figure\
+            \ never changes once the month ends."
+          example: 2026-07-24
+        ratePerUsd:
+          type: number
+          description: "Units of the display currency per 1 USD, at 6 decimal places"
+          example: 0.878966
+      required:
+      - currencyCode
+      - rateDate
+      - ratePerUsd
     GitHubProvider:
       type: object
       description: GitHub provider configuration
@@ -10300,6 +10332,12 @@ components:
           description: "This month's confirmed spend on this workspace's own connected\
             \ provider(s), in USD — the figure byoMonthlyBudgetUsd compares against.\
             \ Different money from pricedTotalCostUsd: the two are never added together."
+        fx:
+          $ref: "#/components/schemas/FxRateInfo"
+          description: "Display-only conversion for this month's USD amounts, when\
+            \ the instance has a display currency configured. Absent means show USD\
+            \ alone — never guess a rate. Every amount above stays USD regardless;\
+            \ this is presentation, not accounting."
         instanceBudgetVerdict:
           type: string
           description: "Whether host-funded (shared-model) spend is within its cap,\

@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageDTOs.LlmUsageByDayDTO;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageDTOs.LlmUsageByJobTypeDTO;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageDTOs.WorkspaceLlmUsageReportDTO;
+import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateLookup;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
@@ -34,18 +35,26 @@ public class LlmUsageService {
     private final ConfigAuditPort configAudit;
     private final AgentJobRepository jobRepository;
 
+    /**
+     * Display-only: the rate attached to the response so a UI can show a euro estimate beside the
+     * USD figures. Read-side only — no number it produces is ever compared against a budget.
+     */
+    private final FxRateLookup fxRateLookup;
+
     public LlmUsageService(
         LlmUsageEventRepository usageRepository,
         WorkspaceRepository workspaceRepository,
         LlmBudgetService llmBudgetService,
         ConfigAuditPort configAudit,
-        AgentJobRepository jobRepository
+        AgentJobRepository jobRepository,
+        FxRateLookup fxRateLookup
     ) {
         this.usageRepository = usageRepository;
         this.workspaceRepository = workspaceRepository;
         this.llmBudgetService = llmBudgetService;
         this.configAudit = configAudit;
         this.jobRepository = jobRepository;
+        this.fxRateLookup = fxRateLookup;
     }
 
     @Transactional(readOnly = true)
@@ -124,7 +133,8 @@ public class LlmUsageService {
             decision.blocks(FundingSource.INSTANCE),
             decision.blocks(FundingSource.WORKSPACE),
             byJobType,
-            byDay
+            byDay,
+            fxRateLookup.forMonth(month).orElse(null)
         );
     }
 
