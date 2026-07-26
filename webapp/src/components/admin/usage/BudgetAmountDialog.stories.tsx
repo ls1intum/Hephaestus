@@ -1,6 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import { BudgetAmountDialog } from "./BudgetAmountDialog";
+import type { Fx } from "./fx";
+
+const EUR: Fx = {
+	currencyCode: "EUR",
+	ratePerUsd: 0.878966,
+	rateDate: new Date("2026-07-24T00:00:00.000Z"),
+	source: "ECB",
+};
 
 /**
  * The money-cap editor behind both budget dialogs — `SetBudgetDialog` (the shared-model budget)
@@ -17,7 +25,6 @@ const meta = {
 		title: "Set monthly cap",
 		description: "At the cap, that work pauses until the month resets. $0 pauses now.",
 		fieldLabel: "Monthly cap (USD)",
-		fieldDescription: "Reaching this amount pauses the capped work until the month resets.",
 		currentValueUsd: 25,
 		isPending: false,
 		serverError: null,
@@ -69,11 +76,10 @@ export const InvalidNegativeValue: Story = {
 export const WithLiveCurrencyHint: Story = {
 	args: {
 		currentValueUsd: 50,
-		fx: {
-			currencyCode: "EUR",
-			ratePerUsd: 0.878966,
-			rateDate: new Date("2026-07-24T00:00:00.000Z"),
-		},
+		fx: EUR,
+		// The rate quoted is the latest published one only while the surface behind the dialog is on
+		// the current month; the story below says what happens when it is not.
+		isCurrentMonth: true,
 	},
 	play: async ({ args }) => {
 		const dialog = within(await screen.findByRole("dialog"));
@@ -90,6 +96,22 @@ export const WithLiveCurrencyHint: Story = {
 		await userEvent.clear(input);
 		await expect(dialog.queryByText(/at today's rate/)).toBeNull();
 		await expect(args.onSubmit).not.toHaveBeenCalled();
+	},
+};
+
+/**
+ * The same dialog over a closed month. A cap applies from the moment it is saved, but a closed
+ * month's rate is frozen inside it, so "at today's rate" would be quoting a rate the page behind
+ * this dialog says no longer changes. The editors are withheld on a closed month — this covers the
+ * dialog outliving that check: `open` is plain React state, so browser Back steps the month behind
+ * an already-open dialog, and a UTC month can roll over while it sits there.
+ */
+export const OnAClosedMonthTheHintIsWithdrawn: Story = {
+	args: { currentValueUsd: 50, fx: EUR, isCurrentMonth: false },
+	play: async () => {
+		const dialog = within(await screen.findByRole("dialog"));
+		await expect(dialog.queryByText(/at today's rate/)).toBeNull();
+		await expect(dialog.queryByLabelText(/approximately 44 euros/)).toBeNull();
 	},
 };
 
@@ -110,6 +132,12 @@ export const ZeroPausesImmediately: Story = {
 		await userEvent.type(input, "0");
 		await userEvent.click(dialog.getByRole("button", { name: /save cap/i }));
 
+		// Legal means the field never turns red and never explains itself: `0` is treated as an amount,
+		// not as the empty field it superficially resembles. "Remove cap" is still the separate action
+		// beside it, and it is still offered — `0` did not become the way to remove one.
+		await expect(input).toHaveAttribute("aria-invalid", "false");
+		await expect(dialog.queryByRole("alert")).toBeNull();
+		await expect(dialog.getByRole("button", { name: /remove cap/i })).toBeInTheDocument();
 		await expect(args.onSubmit).toHaveBeenCalledWith(0);
 	},
 };

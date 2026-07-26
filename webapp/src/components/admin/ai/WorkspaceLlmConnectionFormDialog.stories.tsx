@@ -61,7 +61,7 @@ export const MobileReflow: Story = {
 		chromatic: { viewports: [320, 375, 768] },
 	},
 	play: async () => {
-		const submit = await screen.findByRole("button", { name: /connect inactive provider/i });
+		const submit = await screen.findByRole("button", { name: /^connect provider$/i });
 		await expectDialogFitsViewport();
 		await expectDialogBodyScrolls();
 		await expectControlOnScreen(submit);
@@ -75,9 +75,7 @@ export const ValidationError: Story = {
 	play: async () => {
 		// Dialog renders in a portal → query the document. `toBeInTheDocument` (not `toBeVisible`):
 		// the popup's enter transition can still be animating opacity when this assertion runs.
-		await userEvent.click(
-			await screen.findByRole("button", { name: /connect inactive provider/i }),
-		);
+		await userEvent.click(await screen.findByRole("button", { name: /^connect provider$/i }));
 		await expect(await screen.findByText(/display name is required/i)).toBeInTheDocument();
 	},
 };

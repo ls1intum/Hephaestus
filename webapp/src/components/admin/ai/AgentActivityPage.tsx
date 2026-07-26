@@ -8,40 +8,13 @@ import {
 	retryAgentJobDeliveryMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { AgentJob } from "@/api/types.gen";
-import {
-	Pagination,
-	PaginationContent,
-	PaginationEllipsis,
-	PaginationItem,
-	PaginationLink,
-	PaginationNext,
-	PaginationPrevious,
-} from "@/components/ui/pagination";
+import { TablePagination } from "@/components/common/TablePagination";
 import { problemDetailOf } from "@/lib/problem-detail";
 import { AgentJobDetailsPanel } from "./AgentJobDetailsPanel";
 import { AgentJobsTable } from "./AgentJobsTable";
-import type { JobStatus } from "./jobUtils";
+import type { JobStatus } from "./job-utils";
 
 const PAGE_SIZE = 20;
-
-/** Windowed page tokens: first, last, current ±1, with "ellipsis" gaps between. */
-function paginationItems(current: number, total: number): (number | "ellipsis")[] {
-	if (total <= 7) {
-		return Array.from({ length: total }, (_, i) => i);
-	}
-	const pages = new Set<number>([0, total - 1, current, current - 1, current + 1]);
-	const sorted = [...pages].filter((p) => p >= 0 && p < total).sort((a, b) => a - b);
-	const items: (number | "ellipsis")[] = [];
-	let previous: number | undefined;
-	for (const page of sorted) {
-		if (previous !== undefined && page - previous > 1) {
-			items.push("ellipsis");
-		}
-		items.push(page);
-		previous = page;
-	}
-	return items;
-}
 
 interface AgentActivityPageProps {
 	workspaceSlug: string;
@@ -66,17 +39,12 @@ export function AgentActivityPage({ workspaceSlug }: AgentActivityPageProps) {
 		enabled: Boolean(workspaceSlug),
 	});
 
-	// Prefix-invalidate every job-list page so the current filter/page refetches regardless of its
-	// exact query params. The operation id is read off the generated key helper rather than spelled
-	// out here: a literal would keep compiling after the operation is renamed and silently stop
-	// matching anything, leaving the table stale after a cancel or a retry.
-	const jobsQueryId = listAgentJobsQueryKey({ path: { workspaceSlug } })[0]._id;
+	// A key without the `query` part, which the generated helper then omits from the key entirely.
+	// Invalidation matches keys partially, so this reaches every page and status filter of *this*
+	// workspace's job list — and nothing outside it.
 	const invalidateJobs = () => {
 		queryClient.invalidateQueries({
-			predicate: (query) => {
-				const first = query.queryKey[0] as { _id?: string } | undefined;
-				return first?._id === jobsQueryId;
-			},
+			queryKey: listAgentJobsQueryKey({ path: { workspaceSlug } }),
 		});
 	};
 
@@ -139,45 +107,12 @@ export function AgentActivityPage({ workspaceSlug }: AgentActivityPageProps) {
 				onRetry={() => jobsQuery.refetch()}
 			/>
 
-			{totalPages > 1 && (
-				<Pagination className="mt-6">
-					{/* The windowed pager fits one line at default text size (~206 px at a 320 px
-					    viewport), so this is not about the reflow width. It is about SC 1.4.4 Resize
-					    Text: the targets are `rem`-sized, so text-only zoom grows them while the viewport
-					    stays put, and past ~150 % they no longer fit. Wrapping absorbs that instead of
-					    pushing the page into horizontal scrolling. `justify-center` keeps the wrapped
-					    rows aligned with the nav. */}
-					<PaginationContent className="flex-wrap justify-center gap-y-1">
-						<PaginationItem>
-							<PaginationPrevious
-								onClick={() => setPage((p) => Math.max(0, p - 1))}
-								className={currentPage <= 0 ? "pointer-events-none opacity-50" : undefined}
-							/>
-						</PaginationItem>
-						{paginationItems(currentPage, totalPages).map((item, index) =>
-							item === "ellipsis" ? (
-								<PaginationItem key={`ellipsis-${index}`}>
-									<PaginationEllipsis />
-								</PaginationItem>
-							) : (
-								<PaginationItem key={item}>
-									<PaginationLink isActive={item === currentPage} onClick={() => setPage(item)}>
-										{item + 1}
-									</PaginationLink>
-								</PaginationItem>
-							),
-						)}
-						<PaginationItem>
-							<PaginationNext
-								onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-								className={
-									currentPage >= totalPages - 1 ? "pointer-events-none opacity-50" : undefined
-								}
-							/>
-						</PaginationItem>
-					</PaginationContent>
-				</Pagination>
-			)}
+			<TablePagination
+				className="mt-6"
+				page={currentPage}
+				totalPages={totalPages}
+				onPageChange={setPage}
+			/>
 
 			<AgentJobDetailsPanel
 				job={selectedJob}

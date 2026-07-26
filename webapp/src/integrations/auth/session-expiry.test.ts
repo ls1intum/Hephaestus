@@ -1,10 +1,10 @@
 import { QueryClient } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { __resetSessionRecoveryForTests, handlePossibleSessionExpiry } from "./sessionExpiry";
-import { refreshAccessToken } from "./sessionRefresh";
+import { __resetSessionRecoveryForTests, handlePossibleSessionExpiry } from "./session-expiry";
+import { refreshAccessToken } from "./session-refresh";
 
 // The recovery path calls the shared single-flight refresh; mock it to drive both outcomes.
-vi.mock("./sessionRefresh", () => ({ refreshAccessToken: vi.fn() }));
+vi.mock("./session-refresh", () => ({ refreshAccessToken: vi.fn() }));
 const refreshMock = vi.mocked(refreshAccessToken);
 
 // Prod serves the API under /api (Traefik strips it); pin a base path so the exemptions are exercised

@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { expectAmountRejected } from "@/test/budget-amount-field";
 import { expectControlOnScreen, expectDialogFitsViewport } from "@/test/reflow";
 import { SetOwnProviderBudgetDialog } from "./SetOwnProviderBudgetDialog";
 
@@ -49,31 +50,23 @@ export const ServerRejection: Story = {
 	},
 };
 
-/** Submitting a cleared field surfaces *why* it was rejected instead of silently doing nothing. */
-export const InvalidEmptyValue: Story = {
-	play: async ({ args }) => {
-		const dialog = within(await screen.findByRole("dialog"));
-		await userEvent.clear(dialog.getByLabelText(/monthly cap/i));
-		await userEvent.click(dialog.getByRole("button", { name: /save cap/i }));
+/** The amounts this form must refuse, and the reason each one is given. */
+const rejects =
+	(typed: string, reason: RegExp): Story["play"] =>
+	async ({ args }) =>
+		await expectAmountRejected({
+			fieldLabel: /monthly cap/i,
+			submitLabel: /save cap/i,
+			typed,
+			reason,
+			onSubmit: args.onSubmit,
+		});
 
-		await expect(dialog.getByRole("alert")).toHaveTextContent(/enter an amount/i);
-		await expect(args.onSubmit).not.toHaveBeenCalled();
-	},
-};
+/** Submitting a cleared field surfaces *why* it was rejected instead of silently doing nothing. */
+export const InvalidEmptyValue: Story = { play: rejects("", /enter an amount/i) };
 
 /** Sub-cent precision is rejected in the field rather than by a native browser bubble. */
-export const InvalidSubCentValue: Story = {
-	play: async ({ args }) => {
-		const dialog = within(await screen.findByRole("dialog"));
-		const input = dialog.getByLabelText(/monthly cap/i);
-		await userEvent.clear(input);
-		await userEvent.type(input, "25.005");
-		await userEvent.click(dialog.getByRole("button", { name: /save cap/i }));
-
-		await expect(dialog.getByRole("alert")).toHaveTextContent(/two decimal places/i);
-		await expect(args.onSubmit).not.toHaveBeenCalled();
-	},
-};
+export const InvalidSubCentValue: Story = { play: rejects("25.005", /two decimal places/i) };
 
 /**
  * Reviewed at the WCAG 2.2 SC 1.4.10 reflow width (320 px). Short in portrait, but with a cap in
@@ -98,8 +91,23 @@ export const MobileReflow: Story = {
 export const RemoveCap: Story = {
 	play: async ({ args }) => {
 		const dialog = within(await screen.findByRole("dialog"));
+
+		// The action exists only because a cap is in force, and the field is showing that cap — which
+		// is what makes `null` below "remove the $25 they can see" rather than "submit an empty form".
+		await expect(dialog.getByLabelText(/monthly cap/i)).toHaveValue(25);
+
 		await userEvent.click(dialog.getByRole("button", { name: /remove cap/i }));
 
 		await expect(args.onSubmit).toHaveBeenCalledWith(null);
+	},
+};
+
+/** With no cap in force there is nothing to remove, so the action is not offered at all. */
+export const UncappedOffersNoRemoval: Story = {
+	args: { currentCapUsd: null },
+	play: async () => {
+		const dialog = within(await screen.findByRole("dialog"));
+		await expect(dialog.getByLabelText(/monthly cap/i)).toHaveValue(null);
+		await expect(dialog.queryByRole("button", { name: /remove cap/i })).toBeNull();
 	},
 };

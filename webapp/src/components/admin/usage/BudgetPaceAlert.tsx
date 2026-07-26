@@ -1,8 +1,8 @@
 import { TrendingUp } from "lucide-react";
-import { formatCapUsd, formatCostUsd } from "@/components/admin/ai/jobUtils";
+import { formatCapUsd, formatCostUsd } from "@/components/admin/ai/job-utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { type Fx, FxAmount, spendConversion, spendOfCapConversion } from "./fx";
-import { type BudgetProjection, formatDayLabel } from "./usageUtils";
+import { type BudgetProjection, formatDayLabel } from "./usage-utils";
 
 export interface BudgetPaceAlertProps {
 	scope: "provider" | "shared";

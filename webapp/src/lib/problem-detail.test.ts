@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import { problemDetailOf, problemStatusOf } from "./problem-detail";
 
 // `problemDetailOf` turns whatever the generated client throws into a human-readable string
-// for toasts/inline errors. Precedence (detail -> title -> legacy error -> message) is the
-// contract the UI relies on, so it must not silently drift.
+// for toasts/inline errors. Precedence (detail -> title -> legacy error -> caller's fallback) is
+// the contract the UI relies on, so it must not silently drift — and a thrown Error's own `message`
+// is deliberately outside it.
 describe("problemDetailOf", () => {
 	it("prefers RFC 9457 `detail` over everything else", () => {
 		expect(
@@ -30,16 +31,34 @@ describe("problemDetailOf", () => {
 		);
 	});
 
-	it("falls back to `message` last among object keys", () => {
-		expect(problemDetailOf({ message: "boom" })).toBe("boom");
-	});
-
 	it("returns a plain string error as-is", () => {
 		expect(problemDetailOf("network down")).toBe("network down");
 	});
 
-	it("reads Error.message when the thrown value is an Error", () => {
-		expect(problemDetailOf(new Error("kaboom"))).toBe("kaboom");
+	it("never shows a thrown Error's own message, however it was produced", () => {
+		// A bug inside a save handler reaches this the same way a network rejection does — both are a
+		// thrown `TypeError` — so reading `message` would put a stack-trace fragment under a toast
+		// about saving a model. Only wording the server chose is ever shown.
+		expect(
+			problemDetailOf(
+				new TypeError("Cannot read properties of undefined (reading 'id')"),
+				"Could not save the model",
+			),
+		).toBe("Could not save the model");
+		expect(problemDetailOf(new TypeError("Failed to fetch"), "Could not save the model")).toBe(
+			"Could not save the model",
+		);
+		expect(problemDetailOf({ message: "boom" })).toBe(
+			"An unexpected error occurred. Please try again.",
+		);
+	});
+
+	it("still prefers the server's wording when the body carries both", () => {
+		// A ProblemDetail thrown as an Error subclass keeps its `detail`; dropping `message` must not
+		// have cost that.
+		expect(problemDetailOf({ detail: "Model still bound to an agent", message: "boom" })).toBe(
+			"Model still bound to an agent",
+		);
 	});
 
 	it("ignores blank/whitespace-only string fields and continues the precedence chain", () => {

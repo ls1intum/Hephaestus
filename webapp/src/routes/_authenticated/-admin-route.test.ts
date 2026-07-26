@@ -37,12 +37,15 @@ async function land(url: string) {
 /**
  * The instance-admin twin of `w/$workspaceSlug/admin/-route.test.ts`: same bypass class (a route
  * mapping to an /admin URL without nesting under the gated layout), same enumerate-and-drive shape.
- * Instance-admin *features* are #1386's; keeping its gate honest is this suite's.
  */
 describe("instance-admin route gate", () => {
-	it("enumerates the instance-admin routes", () => {
-		// A filter that matched nothing would leave every case below vacuously green.
+	it("enumerates the instance-admin routes rather than trusting a hand-written list", () => {
+		// A filter that matched nothing would leave every case below vacuously green, and one that
+		// matched a subset would quietly shrink the coverage this suite exists for. Raise the floor
+		// when routes are added; never lower it (`webapp/AGENTS.md`, "do not weaken it").
 		expect(adminUrls.length).toBeGreaterThanOrEqual(6);
+		expect(adminUrls).toContain("/admin/users");
+		expect(adminUrls).toContain("/admin/usage");
 	});
 
 	it.each(adminUrls)("redirects a non-admin away from %s", async (url) => {
@@ -79,11 +82,10 @@ describe("admin tab titles", () => {
 		return titles.at(-1);
 	}
 
-	it("scopes the instance console's title", async () => {
-		expect(await titleOf("/admin/usage")).toBe("AI usage · Instance admin · Hephaestus");
-	});
-
-	it("scopes the per-workspace console's title", async () => {
-		expect(await titleOf("/w/hephaestus/admin/usage")).toBe("AI usage · Admin · Hephaestus");
+	it.each([
+		["/admin/usage", "AI usage · Instance admin · Hephaestus"],
+		["/w/hephaestus/admin/usage", "AI usage · Admin · Hephaestus"],
+	])("distinguishes %s in the tab title", async (url, title) => {
+		expect(await titleOf(url)).toBe(title);
 	});
 });

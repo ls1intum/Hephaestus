@@ -5,6 +5,13 @@ import type * as React from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+/**
+ * ⚠️ Diverges from the shadcn registry, in `AlertDialogContent` only: a `w-[calc(100%-2rem)]` gutter
+ * (upstream's `w-full` runs edge to edge at exactly 320 px, where `max-w-xs` stops clamping) and the
+ * same height bound `DialogContent` carries, for the same reason (WCAG 2.2 SC 1.4.10). No new API —
+ * alert dialogs are short by contract, so the whole popup scrolls and there is no body to pin.
+ * Re-vendoring drops both; re-apply them.
+ */
 function AlertDialog({ ...props }: AlertDialogPrimitive.Root.Props) {
 	return <AlertDialogPrimitive.Root data-slot="alert-dialog" {...props} />;
 }
@@ -45,16 +52,8 @@ function AlertDialogContent({
 				data-size={size}
 				className={cn(
 					"data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 bg-background ring-foreground/10 gap-4 rounded-xl p-4 ring-1 duration-100 data-[size=default]:max-w-xs data-[size=sm]:max-w-xs data-[size=default]:sm:max-w-sm group/alert-dialog-content fixed top-1/2 left-1/2 z-50 grid -translate-x-1/2 -translate-y-1/2 outline-none",
-					// `w-[calc(100%-2rem)]` rather than `w-full`: `max-w-xs` is 20rem, which is *exactly* a
-					// 320 CSS px viewport, so the popup used to run edge to edge there (and past the edge
-					// as soon as the root font size is bumped). This keeps a 1rem gutter at every width
-					// without fighting the `data-[size=…]` max-widths on specificity, and mirrors the
-					// `max-w-[calc(100%-2rem)]` clamp `DialogContent` already had.
+					// A gutter at every width, without fighting the `data-[size=…]` max-widths on specificity.
 					"w-[calc(100%-2rem)]",
-					// Same reflow fix as `DialogContent`: a fixed, viewport-centred popup that outgrows the
-					// viewport is unreachable at both ends, because the page cannot scroll it back into
-					// view. Alert dialogs are short by contract, so the whole popup scrolls — there is no
-					// header/footer worth pinning (WCAG 2.2 SC 1.4.10).
 					"max-h-[calc(100svh-2rem)] overflow-y-auto overscroll-contain",
 					className,
 				)}

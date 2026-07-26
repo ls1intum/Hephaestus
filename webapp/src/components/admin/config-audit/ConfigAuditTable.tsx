@@ -1,8 +1,8 @@
 import { Bot, History, UserCog } from "lucide-react";
 import { useState } from "react";
 import type { ConfigAuditEntryView } from "@/api/types.gen";
-import { RelativeTime } from "@/components/admin/integrations/RelativeTime";
 import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
+import { RelativeTime } from "@/components/common/RelativeTime";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,7 +31,7 @@ import {
 	actorDisplay,
 	changeSummary,
 	subjectLabel,
-} from "./configAuditFormat";
+} from "./config-audit-format";
 
 export interface ConfigAuditTableProps {
 	entries: ConfigAuditEntryView[];

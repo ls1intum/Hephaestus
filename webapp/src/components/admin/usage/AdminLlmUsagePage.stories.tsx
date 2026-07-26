@@ -109,6 +109,7 @@ const eurToday: FxRateInfo = {
 	currencyCode: "EUR",
 	ratePerUsd: 0.878966,
 	rateDate: new Date("2026-07-24T00:00:00.000Z"),
+	source: "ECB",
 };
 
 /**
@@ -123,6 +124,7 @@ const meta = {
 	args: {
 		month: "2026-07",
 		isCurrentMonth: true,
+		canGoNext: false,
 		workspaceSlug: "acme",
 		report: baseReport,
 		isLoading: false,
@@ -147,7 +149,7 @@ type Story = StoryObj<typeof meta>;
 export const WithinBudget: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.queryByText(/ECB reference rate/)).toBeNull();
+		await expect(canvas.queryByText(/reference rate published on/)).toBeNull();
 		await expect(canvasElement.querySelectorAll('[role="img"]')).toHaveLength(0);
 	},
 };
@@ -164,7 +166,9 @@ export const DisplayCurrencyThisMonth: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(
-			canvas.getByText(/EUR amounts are estimates at the ECB reference rate for Jul 24, 2026/),
+			canvas.getByText(
+				/EUR amounts are estimates at the European Central Bank reference rate published on Jul 24, 2026/,
+			),
 		).toBeVisible();
 		// Symbols would be announced as "tilde operator" or dropped — every estimate says words.
 		await expect(canvas.getAllByLabelText(/^approximately /).length).toBeGreaterThan(0);
@@ -179,6 +183,7 @@ export const DisplayCurrencyClosedMonth: Story = {
 	args: {
 		month: "2026-06",
 		isCurrentMonth: false,
+		canGoNext: true,
 		report: {
 			...withOwnProvider,
 			month: "2026-06",
@@ -186,13 +191,14 @@ export const DisplayCurrencyClosedMonth: Story = {
 				currencyCode: "EUR",
 				ratePerUsd: 0.874312,
 				rateDate: new Date("2026-06-30T00:00:00.000Z"),
+				source: "ECB",
 			},
 		},
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(
-			canvas.getByText(/The last rate published that month, so past figures don't change/),
+			canvas.getByText(/last rate published in the month shown, so these figures no longer change/),
 		).toBeVisible();
 	},
 };
@@ -209,6 +215,7 @@ export const DisplayCurrencyWithAmbiguousSymbol: Story = {
 				currencyCode: "CAD",
 				ratePerUsd: 1.3642,
 				rateDate: new Date("2026-07-24T00:00:00.000Z"),
+				source: "ECB",
 			},
 		},
 	},
@@ -339,17 +346,30 @@ export const NoSharedBudget: Story = {
 	},
 };
 
-/** A past month that ended over budget — nothing is paused in a month that has already closed. */
+/**
+ * A past month that ended over budget — nothing is paused in a month that has already closed, and
+ * the cap editor is not offered: a cap applies from the moment it is saved, so changing one from a
+ * closed month would move what runs today while the reader is looking at history.
+ */
 export const PastMonth: Story = {
 	args: {
 		month: "2026-06",
 		isCurrentMonth: false,
+		canGoNext: true,
 		report: {
 			...withOwnProvider,
 			month: "2026-06",
 			instanceTotalCostUsd: 25.0142,
 			instanceBudgetVerdict: "EXHAUSTED",
 		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.queryByRole("button", { name: /^(Change|Set) cap$/ })).toBeNull();
+		await expect(
+			canvas.getByText(
+				"A cap applies from the moment it is saved, not to the month you are reading. Step forward to this month to change it.",
+			),
+		).toBeInTheDocument();
 	},
 };
 

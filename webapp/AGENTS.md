@@ -62,6 +62,26 @@ src/
 └── styles.css       # Tailwind design tokens
 ```
 
+### File naming
+
+Two cases, and which one a file gets is decided by what it exports:
+
+- **`PascalCase.tsx`** — a file whose export is a React component. The filename is the component
+  name, so `AdminLlmUsagePage.tsx` exports `AdminLlmUsagePage`. Its `.test.tsx` and `.stories.tsx`
+  siblings inherit the name.
+- **`kebab-case.ts`** — everything else: helpers, schemas, formatters, hooks, fixtures. `usageUtils.ts`
+  is `usage-utils.ts`, `jobUtils.tsx` is `job-utils.tsx` (a `.tsx` that exports a small helper
+  component alongside its formatters is still a helper module).
+
+Colocation does not change the rule: a helper next to the component that uses it is named the same
+way as one in `src/lib/`.
+
+Biome enforces this (`style/useFilenamingConvention`) over `src/components/**`, `src/lib/**`,
+`src/hooks/**` and `src/integrations/**` — every directory whose files this repo writes by hand.
+`src/routes/**` is exempt: TanStack Router derives URL segments from the filenames there, so the
+router owns that naming (`$workspaceSlug.tsx`, `-route.test.ts`), not this rule. `src/api/**` and
+`routeTree.gen.ts` are generated and are excluded from Biome entirely.
+
 ## TypeScript Conventions
 
 ```typescript

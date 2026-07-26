@@ -1,4 +1,4 @@
-import type { AuditRef } from "./refLabel";
+import type { AuditRef } from "./ref-label";
 
 /**
  * The display name for an account id, taken from the rows already on screen — the audit rows embed

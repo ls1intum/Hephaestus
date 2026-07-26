@@ -1,16 +1,7 @@
 import { Bot, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { WorkspaceLlmModel } from "@/api/types.gen";
-import {
-	AlertDialog,
-	AlertDialogAction,
-	AlertDialogCancel,
-	AlertDialogContent,
-	AlertDialogDescription,
-	AlertDialogFooter,
-	AlertDialogHeader,
-	AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
@@ -23,11 +14,16 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { priceLabel } from "@/lib/llmPricing";
+import { priceLabel } from "@/lib/llm-pricing";
 
 export interface WorkspaceLlmModelsTableProps {
 	models: WorkspaceLlmModel[];
-	mutatingId: number | null;
+	/**
+	 * Every model with a write in flight, not just the most recent one. Deleting two rows without
+	 * waiting is normal here, and a single "which row is busy" id re-enables the first row's Delete
+	 * the moment the second settles.
+	 */
+	mutatingIds: ReadonlySet<number>;
 	onEdit: (model: WorkspaceLlmModel) => void;
 	onDelete: (model: WorkspaceLlmModel) => void;
 }
@@ -35,12 +31,11 @@ export interface WorkspaceLlmModelsTableProps {
 /** Models on the workspace's own connected provider (#1368) — price framing uses workspace wording. */
 export function WorkspaceLlmModelsTable({
 	models,
-	mutatingId,
+	mutatingIds,
 	onEdit,
 	onDelete,
 }: WorkspaceLlmModelsTableProps) {
 	const [deleting, setDeleting] = useState<WorkspaceLlmModel | null>(null);
-	const isDeletePending = deleting != null && mutatingId === deleting.id;
 
 	if (models.length === 0) {
 		return (
@@ -71,7 +66,7 @@ export function WorkspaceLlmModelsTable({
 				</TableHeader>
 				<TableBody>
 					{models.map((model) => {
-						const busy = mutatingId === model.id;
+						const busy = mutatingIds.has(model.id);
 						return (
 							<TableRow key={model.id}>
 								<TableCell>
@@ -115,35 +110,14 @@ export function WorkspaceLlmModelsTable({
 				</TableBody>
 			</Table>
 
-			<AlertDialog
-				open={deleting != null}
-				onOpenChange={(open) => {
-					if (!open && !isDeletePending) setDeleting(null);
-				}}
-			>
-				<AlertDialogContent>
-					<AlertDialogHeader>
-						<AlertDialogTitle>Delete “{deleting?.displayName}”?</AlertDialogTitle>
-						<AlertDialogDescription>
-							Any agent bound to this model will stop working until it's rebound. This cannot be
-							undone.
-						</AlertDialogDescription>
-					</AlertDialogHeader>
-					<AlertDialogFooter>
-						<AlertDialogCancel disabled={isDeletePending}>Cancel</AlertDialogCancel>
-						<AlertDialogAction
-							variant="destructive"
-							disabled={isDeletePending}
-							onClick={() => {
-								if (deleting) onDelete(deleting);
-								setDeleting(null);
-							}}
-						>
-							{isDeletePending ? "Deleting…" : "Delete"}
-						</AlertDialogAction>
-					</AlertDialogFooter>
-				</AlertDialogContent>
-			</AlertDialog>
+			<ConfirmDialog
+				subject={deleting}
+				onClose={() => setDeleting(null)}
+				title={(model) => `Delete “${model.displayName}”?`}
+				description="Any agent bound to this model will stop working until it's rebound. This cannot be undone."
+				confirmLabel="Delete"
+				onConfirm={onDelete}
+			/>
 		</>
 	);
 }

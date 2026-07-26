@@ -6,7 +6,7 @@ import {
 	fromDayParam,
 	narrowToEnum,
 	toDateRange,
-} from "./auditSearch";
+} from "./audit-search";
 
 describe("day bounds", () => {
 	it("sends the next midnight as the exclusive upper bound", () => {

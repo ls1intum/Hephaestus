@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, userEvent, within } from "storybook/test";
 import { expectPageReflows, expectTablesScrollInPlace, expectTargetSize } from "@/test/reflow";
 import { AgentJobsTable } from "./AgentJobsTable";
-import { mockJobs } from "./storyMockData";
+import { mockJobs } from "./story-mock-data";
 
 /**
  * Paginated table of AI runs with a status filter. The Details button in each row is the single
@@ -33,12 +33,21 @@ export const Default: Story = {};
  */
 export const DetailsButtonIsTheOnlyAffordance: Story = {
 	play: async ({ args, canvas }) => {
-		await userEvent.click(
-			within(canvas.getAllByRole("row")[1]).getByRole("cell", { name: /—|\$/ }),
-		);
+		// The first cell of the first data row — it holds only the status badge, so clicking it is a
+		// click on the row and nothing else. Anchoring on position rather than on a rendered value
+		// keeps this about the row being inert, not about what any column happens to display.
+		const row = canvas.getAllByRole("row")[1];
+		const [statusCell] = within(row).getAllByRole("cell");
+		await userEvent.click(statusCell);
 		await expect(args.onSelectJob).not.toHaveBeenCalled();
 
-		await userEvent.click(canvas.getAllByRole("button", { name: /^View details for/ })[0]);
+		// "The one way in" is a claim about what the row contains, not just about what a click did:
+		// the whole row holds exactly one control, and it is the Details button.
+		const controls = within(row).getAllByRole("button");
+		await expect(controls).toHaveLength(1);
+		await expect(controls[0]).toHaveAccessibleName(/^View details for/);
+
+		await userEvent.click(controls[0]);
 		await expect(args.onSelectJob).toHaveBeenCalledWith(mockJobs[0]);
 	},
 };
@@ -96,10 +105,9 @@ export const MobileReflow: Story = {
 		await expectPageReflows();
 		await expectTablesScrollInPlace(canvasElement);
 		// The table really is wider than the viewport — otherwise the assertion above proves nothing.
-		const container = canvasElement.querySelector<HTMLElement>('[data-slot="table-container"]');
-		await expect(container).not.toBeNull();
-		if (container == null) return;
-		await expect(container.scrollWidth).toBeGreaterThan(container.clientWidth);
+		await expect(within(canvasElement).getByRole("table").scrollWidth).toBeGreaterThan(
+			window.innerWidth,
+		);
 
 		// Size only, not position: this action legitimately sits off to the right until the table is
 		// scrolled to it. That is the sanctioned data-table exception, not an unreachable control.

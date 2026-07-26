@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { AlertCircle, BrainCircuit, Plus } from "lucide-react";
+import { BrainCircuit, Plus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
@@ -36,14 +36,15 @@ import { AdminLlmModelAccessDialog } from "@/components/admin/llm/AdminLlmModelA
 import { AdminLlmModelFormDialog } from "@/components/admin/llm/AdminLlmModelFormDialog";
 import { AdminLlmModelsSection } from "@/components/admin/llm/AdminLlmModelsSection";
 import { InstanceLlmSettingsCard } from "@/components/admin/llm/InstanceLlmSettingsCard";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { filedUnder, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import {
 	type AdminLlmModelSaveBody,
 	AdminLlmModelSaveError,
 	saveAdminLlmModelSafely,
-} from "@/lib/adminLlmModelSave";
+} from "@/lib/admin-llm-model-save";
 import { instanceAdminHead } from "@/lib/page-title";
 import { problemDetailOf } from "@/lib/problem-detail";
 
@@ -52,13 +53,22 @@ export const Route = createFileRoute("/_authenticated/admin/models")({
 	component: AdminLlmPage,
 });
 
+/**
+ * Enabling and deleting a connection share one prefix, so one lookup answers "is this row busy" for
+ * both. A single `useState("which row is busy")` id cannot: toggle one connection off, delete
+ * another, and whichever settles first clears the flag for both — the still-running row goes back to
+ * looking idle and accepts a second click. Creation is not filed here; it has no row to disable.
+ */
+const CONNECTION_WRITE_MUTATION_KEY = ["adminWriteLlmConnection"];
+/** Same reason for models: deleting one must not un-disable the row whose access is still saving. */
+const MODEL_WRITE_MUTATION_KEY = ["adminWriteLlmModel"];
+
 function AdminLlmPage() {
 	const queryClient = useQueryClient();
 
 	const [selectedConnectionId, setSelectedConnectionId] = useState<number | null>(null);
 	const [connectionDialogOpen, setConnectionDialogOpen] = useState(false);
 	const [editingConnection, setEditingConnection] = useState<LlmConnection | null>(null);
-	const [mutatingConnectionId, setMutatingConnectionId] = useState<number | null>(null);
 	const [probedModels, setProbedModels] = useState<{
 		connectionId: number | null;
 		models: string[];
@@ -67,7 +77,6 @@ function AdminLlmPage() {
 	const [modelDialogOpen, setModelDialogOpen] = useState(false);
 	const [editingModel, setEditingModel] = useState<LlmModel | null>(null);
 	const [accessModel, setAccessModel] = useState<LlmModel | null>(null);
-	const [mutatingModelId, setMutatingModelId] = useState<number | null>(null);
 
 	const connectionsQuery = useQuery(adminListLlmConnectionsOptions());
 	const connections = connectionsQuery.data ?? [];
@@ -115,26 +124,29 @@ function AdminLlmPage() {
 	});
 
 	const updateConnection = useMutation({
-		...adminUpdateLlmConnectionMutation(),
+		...filedUnder(CONNECTION_WRITE_MUTATION_KEY, adminUpdateLlmConnectionMutation()),
 		onSuccess: () => {
 			invalidateConnections();
 			setConnectionDialogOpen(false);
 			toast.success("Connection updated");
 		},
 		onError: (error) => toast.error(problemDetailOf(error, "Could not update the connection")),
-		onSettled: () => setMutatingConnectionId(null),
 	});
 
 	const deleteConnection = useMutation({
-		...adminDeleteLlmConnectionMutation(),
+		...filedUnder(CONNECTION_WRITE_MUTATION_KEY, adminDeleteLlmConnectionMutation()),
 		onSuccess: (_data, variables) => {
 			invalidateConnections();
 			if (variables.path.id === selectedConnectionId) setSelectedConnectionId(null);
 			toast.success("Connection deleted");
 		},
 		onError: (error) => toast.error(problemDetailOf(error, "Could not delete the connection")),
-		onSettled: () => setMutatingConnectionId(null),
 	});
+
+	const mutatingConnectionIds = usePendingMutationIds<{ path: { id: number } }>(
+		CONNECTION_WRITE_MUTATION_KEY,
+		(variables) => variables.path.id,
+	);
 
 	const probeDraft = useMutation({ ...adminProbeLlmConnectionDraftMutation() });
 	const probeSaved = useMutation({ ...adminProbeLlmConnectionMutation() });
@@ -142,16 +154,22 @@ function AdminLlmPage() {
 	const createModel = useMutation({ ...adminCreateLlmModelMutation() });
 	const updateModel = useMutation({ ...adminUpdateLlmModelMutation() });
 	const updatePrice = useMutation({ ...adminUpdateLlmModelPriceMutation() });
-	const updateSharing = useMutation({ ...adminUpdateLlmModelSharingMutation() });
+	const updateSharing = useMutation({
+		...filedUnder(MODEL_WRITE_MUTATION_KEY, adminUpdateLlmModelSharingMutation()),
+	});
 	const deleteModel = useMutation({
-		...adminDeleteLlmModelMutation(),
+		...filedUnder(MODEL_WRITE_MUTATION_KEY, adminDeleteLlmModelMutation()),
 		onSuccess: () => {
 			invalidateModels();
 			toast.success("Model deleted");
 		},
 		onError: (error) => toast.error(problemDetailOf(error, "Could not delete the model")),
-		onSettled: () => setMutatingModelId(null),
 	});
+
+	const mutatingModelIds = usePendingMutationIds<{ path: { id: number } }>(
+		MODEL_WRITE_MUTATION_KEY,
+		(variables) => variables.path.id,
+	);
 
 	const updateSettings = useMutation({
 		...adminUpdateLlmSettingsMutation(),
@@ -233,7 +251,7 @@ function AdminLlmPage() {
 				isError={connectionsQuery.isError}
 				error={connectionsQuery.error}
 				onRetry={() => connectionsQuery.refetch()}
-				mutatingId={mutatingConnectionId}
+				mutatingIds={mutatingConnectionIds}
 				selectedId={selectedConnection?.id ?? null}
 				onSelect={(connection) => {
 					setSelectedConnectionId(connection.id);
@@ -244,11 +262,9 @@ function AdminLlmPage() {
 					setConnectionDialogOpen(true);
 				}}
 				onToggleEnabled={(connection, enabled) => {
-					setMutatingConnectionId(connection.id);
 					updateConnection.mutate({ path: { id: connection.id }, body: { enabled } });
 				}}
 				onDelete={(connection) => {
-					setMutatingConnectionId(connection.id);
 					deleteConnection.mutate({ path: { id: connection.id } });
 				}}
 				onAdd={() => {
@@ -260,21 +276,11 @@ function AdminLlmPage() {
 
 			{selectedConnection &&
 				(modelsQuery.isError ? (
-					<Alert variant="destructive">
-						<AlertCircle aria-hidden />
-						<AlertTitle>Could not load models</AlertTitle>
-						<AlertDescription>
-							The catalog could not be loaded. Retry before changing this connection.
-							<Button
-								variant="outline"
-								size="sm"
-								className="mt-2"
-								onClick={() => modelsQuery.refetch()}
-							>
-								Retry
-							</Button>
-						</AlertDescription>
-					</Alert>
+					<QueryErrorAlert
+						error={modelsQuery.error}
+						title="Could not load models"
+						onRetry={() => modelsQuery.refetch()}
+					/>
 				) : modelsQuery.isLoading ? (
 					<div
 						className="flex h-32 items-center justify-center"
@@ -289,7 +295,7 @@ function AdminLlmPage() {
 						connectionEnabled={selectedConnection.enabled}
 						workspaceOptions={workspaceOptions}
 						models={modelsForSelectedConnection}
-						mutatingId={mutatingModelId}
+						mutatingIds={mutatingModelIds}
 						onAdd={() => {
 							setEditingModel(null);
 							setModelDialogOpen(true);
@@ -300,28 +306,17 @@ function AdminLlmPage() {
 						}}
 						onManageAccess={setAccessModel}
 						onDelete={(model) => {
-							setMutatingModelId(model.id);
 							deleteModel.mutate({ path: { id: model.id } });
 						}}
 					/>
 				))}
 
 			{settingsQuery.isError ? (
-				<Alert variant="destructive">
-					<AlertCircle aria-hidden />
-					<AlertTitle>Could not load AI policy</AlertTitle>
-					<AlertDescription>
-						Retry before changing instance-wide AI settings.
-						<Button
-							variant="outline"
-							size="sm"
-							className="mt-2"
-							onClick={() => settingsQuery.refetch()}
-						>
-							Retry
-						</Button>
-					</AlertDescription>
-				</Alert>
+				<QueryErrorAlert
+					error={settingsQuery.error}
+					title="Could not load AI policy"
+					onRetry={() => settingsQuery.refetch()}
+				/>
 			) : (
 				<InstanceLlmSettingsCard
 					settings={settingsQuery.data}
@@ -341,7 +336,6 @@ function AdminLlmPage() {
 				isSubmitting={createConnection.isPending || updateConnection.isPending}
 				onCreate={(body: CreateLlmConnectionRequest) => createConnection.mutate({ body })}
 				onUpdate={(id, body: UpdateLlmConnectionRequest) => {
-					setMutatingConnectionId(id);
 					updateConnection.mutate({ path: { id }, body });
 				}}
 				isProbing={probeDraft.isPending || probeSaved.isPending}
@@ -386,18 +380,22 @@ function AdminLlmPage() {
 
 			<AdminLlmModelAccessDialog
 				open={accessModel != null}
+				// Dismissal is always allowed, including while the PUT is in flight. Refusing it made
+				// Escape, the close button and Cancel inert with focus held inside the popup, and `fetch`
+				// has no timeout of its own — against a black-holed connection there was no way out. The
+				// request is not cancelled: its toast reports the outcome, and the row it belongs to
+				// stays disabled until it settles, so the dialog cannot be reopened onto a second save.
 				onOpenChange={(open) => {
-					if (!open && !updateSharing.isPending) setAccessModel(null);
+					if (!open) setAccessModel(null);
 				}}
 				model={accessModel}
 				workspaceOptions={workspaceOptions}
 				isLoadingWorkspaces={workspacesQuery.isLoading}
-				isWorkspaceError={workspacesQuery.isError}
+				workspacesError={workspacesQuery.error}
 				onRetryWorkspaces={() => workspacesQuery.refetch()}
 				isSubmitting={updateSharing.isPending}
 				onSave={(body) => {
 					if (!accessModel) return;
-					setMutatingModelId(accessModel.id);
 					updateSharing.mutate(
 						{ path: { id: accessModel.id }, body },
 						{
@@ -408,7 +406,6 @@ function AdminLlmPage() {
 							},
 							onError: (error) =>
 								toast.error(problemDetailOf(error, "Could not update workspace access")),
-							onSettled: () => setMutatingModelId(null),
 						},
 					);
 				}}

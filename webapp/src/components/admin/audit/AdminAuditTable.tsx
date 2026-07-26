@@ -1,8 +1,8 @@
 import { ScrollText } from "lucide-react";
 import { useState } from "react";
 import type { AuthEventView } from "@/api/types.gen";
-import { RelativeTime } from "@/components/admin/integrations/RelativeTime";
 import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
+import { RelativeTime } from "@/components/common/RelativeTime";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,14 +24,9 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { FilterLink } from "../audit-shared/FilterLink";
+import { refLabel } from "../audit-shared/ref-label";
 import { AuditEventDetailSheet } from "./AuditEventDetailSheet";
-import {
-	type AuditSeverity,
-	accountLabel,
-	eventLabel,
-	eventSeverity,
-	resultLabel,
-} from "./auditFormat";
+import { type AuditSeverity, eventLabel, eventSeverity, resultLabel } from "./audit-format";
 
 export interface AdminAuditTableProps {
 	events: AuthEventView[];
@@ -146,8 +141,8 @@ export function AdminAuditTable({
 					<TableBody>
 						{events.map((e) => {
 							const severity = eventSeverity(e.eventType, e.result);
-							const account = accountLabel(e.account, e.accountId);
-							const actor = accountLabel(e.actor, e.actingAccountId);
+							const account = refLabel(e.account, e.accountId);
+							const actor = refLabel(e.actor, e.actingAccountId);
 							return (
 								<TableRow key={e.id}>
 									<TableCell className="whitespace-nowrap text-sm text-muted-foreground">

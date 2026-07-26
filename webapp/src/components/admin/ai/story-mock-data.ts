@@ -55,7 +55,6 @@ export const mockJobCompleted: AgentJob = {
 	llmTotalOutputTokens: 914,
 	llmTotalReasoningTokens: 120,
 	llmTotalCalls: 7,
-	llmCostUsd: 0.116,
 	retryCount: 0,
 	exitCode: 0,
 };
@@ -83,7 +82,6 @@ export const mockJobFailedDelivery: AgentJob = {
 	llmModel: "openai/gpt-oss-120b",
 	llmTotalInputTokens: 31_000,
 	llmTotalOutputTokens: 1_200,
-	llmCostUsd: 0.18,
 	retryCount: 1,
 	exitCode: 0,
 };

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { InstanceLlmSettings, UpdateInstanceLlmSettingsRequest } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +17,11 @@ export interface InstanceLlmSettingsCardProps {
  * Instance-wide LLM governance (#1368): the provider-host allowlist and whether workspaces may
  * connect their own AI provider at all. Never surfaces egress/routing — the key always stays
  * server-side and traffic always goes through the in-app proxy, with no toggle for that.
+ *
+ * The form is mounted only once its settings exist, so its fields seed from them directly instead of
+ * being copied in by an effect. An effect would fire again on every background refetch — a second
+ * admin's change, or just this tab regaining focus past the query's `staleTime` — and silently
+ * overwrite whatever the admin had typed but not yet saved.
  */
 export function InstanceLlmSettingsCard({
 	settings,
@@ -24,17 +29,6 @@ export function InstanceLlmSettingsCard({
 	isSubmitting,
 	onSave,
 }: InstanceLlmSettingsCardProps) {
-	const [allowedHosts, setAllowedHosts] = useState("");
-	const [allowWorkspaceConnections, setAllowWorkspaceConnections] = useState(false);
-	const [dirty, setDirty] = useState(false);
-
-	useEffect(() => {
-		if (!settings) return;
-		setAllowedHosts(settings.allowedEgressHosts ?? "");
-		setAllowWorkspaceConnections(settings.allowWorkspaceConnections);
-		setDirty(false);
-	}, [settings]);
-
 	if (isLoading || !settings) {
 		return (
 			<Card>
@@ -44,6 +38,33 @@ export function InstanceLlmSettingsCard({
 			</Card>
 		);
 	}
+
+	return (
+		<InstanceLlmSettingsForm settings={settings} isSubmitting={isSubmitting} onSave={onSave} />
+	);
+}
+
+interface InstanceLlmSettingsFormProps {
+	settings: InstanceLlmSettings;
+	isSubmitting: boolean;
+	onSave: (body: UpdateInstanceLlmSettingsRequest) => void;
+}
+
+function InstanceLlmSettingsForm({ settings, isSubmitting, onSave }: InstanceLlmSettingsFormProps) {
+	const [allowedHosts, setAllowedHosts] = useState(settings.allowedEgressHosts ?? "");
+	const [allowWorkspaceConnections, setAllowWorkspaceConnections] = useState(
+		settings.allowWorkspaceConnections,
+	);
+
+	// Derived, never stored: "is there anything to save" is a comparison against what the server holds
+	// right now, and the server's answer moves. Stored in a `dirty` flag it had to be reset by the same
+	// effect that clobbered the fields — which greyed out Save on a form the admin had typed into.
+	// Trimmed on the host list because that is the form the payload below is sent in, so a lone
+	// trailing newline is not offered as a change.
+	const savedHosts = (settings.allowedEgressHosts ?? "").trim();
+	const dirty =
+		allowedHosts.trim() !== savedHosts ||
+		allowWorkspaceConnections !== settings.allowWorkspaceConnections;
 
 	return (
 		<Card>
@@ -57,10 +78,7 @@ export function InstanceLlmSettingsCard({
 					<Textarea
 						id="llm-settings-allowed-hosts"
 						value={allowedHosts}
-						onChange={(e) => {
-							setAllowedHosts(e.target.value);
-							setDirty(true);
-						}}
+						onChange={(e) => setAllowedHosts(e.target.value)}
 						placeholder="api.openai.com&#10;llm.example.com"
 						rows={4}
 					/>
@@ -82,10 +100,7 @@ export function InstanceLlmSettingsCard({
 					<Switch
 						id="llm-settings-allow-own-provider"
 						checked={allowWorkspaceConnections}
-						onCheckedChange={(checked) => {
-							setAllowWorkspaceConnections(checked);
-							setDirty(true);
-						}}
+						onCheckedChange={setAllowWorkspaceConnections}
 					/>
 				</Field>
 

@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { expect, within } from "storybook/test";
 import type { TeamInfo } from "@/api/types.gen";
+import { expectGenuinelyDisabled } from "@/test/controls";
 import type { ExtendedUserTeams } from "./types";
 import { UsersTable } from "./UsersTable";
 
@@ -196,15 +198,22 @@ export const UsersWithoutTeams: Story = {
 	},
 };
 
+/**
+ * Fifty users at ten a page, so the pager is on screen. Its boundary control is a real
+ * `<button disabled>`, not an anchor dimmed with `pointer-events-none` — the dimmed anchor stays in
+ * the tab order and is announced as an available control (WCAG 2.2 SC 4.1.2).
+ */
 export const ManyUsers: Story = {
 	args: {
+		// Deterministic team assignment: this story is a Chromatic snapshot, and `Math.random()` here
+		// would repaint the Teams column on every run.
 		users: Array.from({ length: 50 }, (_, i) => ({
 			id: i + 10,
 			login: `user${i + 1}`,
 			name: `User ${i + 1}`,
 			hidden: false,
 			url: `https://github.com/user${i + 1}`,
-			teams: mockTeams.filter(() => Math.random() > 0.5),
+			teams: mockTeams.filter((_team, teamIndex) => (i + teamIndex) % 3 === 0),
 			user: {
 				id: `user-${i + 10}`,
 				name: `User ${i + 1}`,
@@ -212,5 +221,10 @@ export const ManyUsers: Story = {
 				email: `user${i + 1}@example.com`,
 			},
 		})),
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expectGenuinelyDisabled(canvas.getByRole("button", { name: "Go to previous page" }));
+		await expect(canvas.getByRole("button", { name: "Go to next page" })).toBeEnabled();
 	},
 };

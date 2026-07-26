@@ -61,6 +61,20 @@ export function formatTokens(value: number | undefined): string {
 	return value.toLocaleString();
 }
 
+/**
+ * Money rendering for every AI surface.
+ *
+ * The amounts arriving here are exact decimals on the server (`NUMERIC`, `BigDecimal`) and JSON
+ * numbers on the wire, declared `format: decimal` — see the "Money and exact decimals" section of
+ * the API description. JavaScript has no decimal type, so they land as binary64; that is lossless
+ * for everything this API produces, with the guarantee stated and tested server-side
+ * (`MoneyWirePrecisionTest`).
+ *
+ * The rule that margin buys is narrow: **format these, do not do sums with them.** Totals, remaining
+ * budget and cap verdicts are computed exactly on the server and shipped as their own fields.
+ * Re-deriving one by adding up rows here trades an exact number for an approximate one and can only
+ * disagree with the figure printed above it.
+ */
 const USD = new Intl.NumberFormat("en-US", {
 	style: "currency",
 	currency: "USD",
@@ -131,9 +145,6 @@ export function formatRateUsd(value: number | undefined): string {
  * and `aria-hidden` keeps it out of the accessible name.
  *
  * Headlines are not columns — don't wrap them.
- *
- * Note for tests: the pad is a child *element*, so `getByText("$0")` still matches the cell (Testing
- * Library's default matcher reads direct text nodes only), but `textContent` reads `"$0.00"`.
  */
 export function MoneyCell({ children }: { children: string }) {
 	return (

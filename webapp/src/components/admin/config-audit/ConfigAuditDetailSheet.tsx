@@ -1,4 +1,5 @@
 import type { ConfigAuditEntryView } from "@/api/types.gen";
+import { DetailRow } from "@/components/common/DetailRow";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -9,9 +10,8 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from "@/components/ui/sheet";
-import { DetailRow } from "../audit-shared/DetailRow";
-import { prettyJson } from "../audit-shared/prettyJson";
-import { formatTimestamp } from "../audit-shared/timeFormat";
+import { prettyJson } from "../audit-shared/pretty-json";
+import { formatTimestamp } from "../audit-shared/time-format";
 import {
 	ACTION_BADGE,
 	actionLabel,
@@ -19,9 +19,9 @@ import {
 	entityTypeLabel,
 	fieldChanges,
 	subjectLabel,
-} from "./configAuditFormat";
+} from "./config-audit-format";
 
-interface ConfigAuditDetailSheetProps {
+export interface ConfigAuditDetailSheetProps {
 	entry: ConfigAuditEntryView | null;
 	open: boolean;
 	onOpenChange: (open: boolean) => void;

@@ -1,10 +1,21 @@
 /**
  * Extract a human-readable message from a thrown request error.
  *
- * The generated client (with `throwOnError`) throws the parsed response body on a
- * non-2xx. For RFC 9457 problem+json failures the server returns
- * `{ type, title, status, detail }`; we prefer `detail`, then `title`,
- * then the controller's legacy `{ error }` shape, then the caller's `fallback`.
+ * The generated client (with `throwOnError`) throws the parsed response body on a non-2xx. For
+ * RFC 9457 problem+json failures the server returns `{ type, title, status, detail }`; we prefer
+ * `detail`, then `title`, then the controller's legacy `{ error }` shape, then the caller's
+ * `fallback`.
+ *
+ * **`message` is deliberately not in that list**, which means only wording the server chose is ever
+ * shown to a user. `message` would read every thrown `Error`, and nothing distinguishes a network
+ * rejection's "Failed to fetch" from a null-deref inside our own code: `fetch` rejects with a
+ * `TypeError`, and so does a bug. Reading it put runtime internals in front of an admin under a
+ * toast about saving a model, and at its best it contributed browser wording that names no operation
+ * and suggests no action.
+ *
+ * The signal it used to carry is not lost: `undefined` from {@link problemStatusOf} is exactly "the
+ * request never got an HTTP answer", so a caller that wants to say so can — in its own copy, naming
+ * its own operation. `QueryErrorAlert` already does ("Check your connection, then try again").
  */
 export function problemDetailOf(
 	err: unknown,
@@ -15,15 +26,12 @@ export function problemDetailOf(
 	}
 	if (err && typeof err === "object") {
 		const record = err as Record<string, unknown>;
-		for (const key of ["detail", "title", "error", "message"] as const) {
+		for (const key of ["detail", "title", "error"] as const) {
 			const value = record[key];
 			if (typeof value === "string" && value.trim().length > 0) {
 				return value;
 			}
 		}
-	}
-	if (err instanceof Error && err.message) {
-		return err.message;
 	}
 	return fallback;
 }

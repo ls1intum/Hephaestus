@@ -1,6 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent } from "storybook/test";
 import type { LlmConnection } from "@/api/types.gen";
+import {
+	expectControlOnScreen,
+	expectDialogBodyScrolls,
+	expectDialogFitsViewport,
+} from "@/test/reflow";
 import { AdminLlmConnectionFormDialog } from "./AdminLlmConnectionFormDialog";
 
 const mockConnection: LlmConnection = {
@@ -65,5 +70,28 @@ export const ValidationError: Story = {
 	play: async () => {
 		await userEvent.click(await screen.findByRole("button", { name: /save inactive connection/i }));
 		await expect(await screen.findByText(/display name is required/i)).toBeInTheDocument();
+	},
+};
+
+/**
+ * The tallest dialog on the instance console, at the WCAG 2.2 SC 1.4.10 reflow width (320 px).
+ *
+ * Preset, endpoint, auth mode, credential and the probe result come to ~900 px. Without
+ * `DialogBody` the popup is unbounded and `position: fixed`, so it hangs off the top and the bottom
+ * of every phone at once and neither the title nor "Save inactive connection" can be scrolled back
+ * into view.
+ */
+export const MobileReflow: Story = {
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320, 375, 768] },
+	},
+	play: async () => {
+		// The dialog is a portal, so it is on `document`, not in the story canvas.
+		const submit = await screen.findByRole("button", { name: /save inactive connection/i });
+		await expectDialogFitsViewport();
+		await expectDialogBodyScrolls();
+		await expectControlOnScreen(submit);
+		await expectControlOnScreen(screen.getByRole("button", { name: /^close$/i }));
 	},
 };

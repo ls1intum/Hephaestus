@@ -27,6 +27,11 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import {
+	type FieldErrors,
+	type LlmModelFormField,
+	validateLlmModelForm,
+} from "@/lib/llm-form-validation";
 
 export interface WorkspaceLlmModelFormDialogProps {
 	open: boolean;
@@ -96,26 +101,17 @@ function WorkspaceLlmModelFormDialogContent({
 	const [supportsReasoning, setSupportsReasoning] = useState(editing?.supportsReasoning ?? false);
 	const [enabled, setEnabled] = useState(editing?.enabled ?? false);
 	const [price, setPrice] = useState<PriceModeValue>(() => priceValueOf(editing));
-	const [errors, setErrors] = useState<{
-		displayName?: string;
-		upstreamModelId?: string;
-		per1mInputUsd?: string;
-		per1mOutputUsd?: string;
-		note?: string;
-	}>({});
+	const [errors, setErrors] = useState<FieldErrors<LlmModelFormField>>({});
 
 	const validate = (): boolean => {
-		const next: typeof errors = {};
-		if (!displayName.trim()) next.displayName = "A display name is required.";
-		if (!upstreamModelId.trim()) next.upstreamModelId = "The upstream model id is required.";
-		if (price.pricingMode === "PRICED") {
-			if (price.per1mInputUsd == null) next.per1mInputUsd = "Required when the model has a price.";
-			if (price.per1mOutputUsd == null)
-				next.per1mOutputUsd = "Required when the model has a price.";
-		}
-		if (price.pricingMode === "NO_CHARGE" && !price.note?.trim()) {
-			next.note = "Explain why no metered API rate applies.";
-		}
+		const next = validateLlmModelForm({
+			displayName,
+			// Immutable once created, so an edit neither sends an upstream id nor validates one.
+			upstreamModelId: isEdit ? undefined : upstreamModelId,
+			contextWindow,
+			maxOutputTokens,
+			...price,
+		});
 		setErrors(next);
 		return Object.keys(next).length === 0;
 	};
@@ -195,7 +191,7 @@ function WorkspaceLlmModelFormDialogContent({
 					</Field>
 
 					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-						<Field>
+						<Field data-invalid={Boolean(errors.contextWindow)}>
 							<FieldLabel htmlFor="wm-context-window">
 								Context window <span className="font-normal text-muted-foreground">(optional)</span>
 							</FieldLabel>
@@ -203,11 +199,14 @@ function WorkspaceLlmModelFormDialogContent({
 								id="wm-context-window"
 								type="number"
 								min={0}
+								step={1}
 								value={contextWindow}
 								onChange={(e) => setContextWindow(e.target.value)}
+								aria-invalid={Boolean(errors.contextWindow)}
 							/>
+							{errors.contextWindow && <FieldError>{errors.contextWindow}</FieldError>}
 						</Field>
-						<Field>
+						<Field data-invalid={Boolean(errors.maxOutputTokens)}>
 							<FieldLabel htmlFor="wm-max-output">
 								Max output tokens{" "}
 								<span className="font-normal text-muted-foreground">(optional)</span>
@@ -216,9 +215,12 @@ function WorkspaceLlmModelFormDialogContent({
 								id="wm-max-output"
 								type="number"
 								min={0}
+								step={1}
 								value={maxOutputTokens}
 								onChange={(e) => setMaxOutputTokens(e.target.value)}
+								aria-invalid={Boolean(errors.maxOutputTokens)}
 							/>
+							{errors.maxOutputTokens && <FieldError>{errors.maxOutputTokens}</FieldError>}
 						</Field>
 					</div>
 
@@ -255,7 +257,7 @@ function WorkspaceLlmModelFormDialogContent({
 					{editing?.enabled && !enabled && (
 						<Alert variant="warning">
 							<AlertTriangle aria-hidden />
-							<AlertTitle>Existing configurations will stop immediately</AlertTitle>
+							<AlertTitle>Work on this model stops immediately</AlertTitle>
 							<AlertDescription>
 								Practice detection and the mentor can't run until you reactivate this model or pick
 								another.

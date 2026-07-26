@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { priceLabel } from "./llmPricing";
+import { priceLabel } from "./llm-pricing";
 
 describe("priceLabel", () => {
 	/**

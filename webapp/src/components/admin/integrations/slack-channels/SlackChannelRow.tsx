@@ -7,6 +7,7 @@ import {
 	Trash2Icon,
 } from "lucide-react";
 import type { SlackMonitoredChannel } from "@/api/types.gen";
+import { RelativeTime } from "@/components/common/RelativeTime";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -17,7 +18,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { RelativeTime } from "../RelativeTime";
 import { ConsentStateBadge } from "./consent-terms";
 
 export interface SlackChannelRowProps {

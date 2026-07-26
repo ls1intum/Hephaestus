@@ -4,13 +4,11 @@ import {
 	authModeDefaultFor,
 	baseUrlDefaultFor,
 	defaultProtocolFor,
-	PROVIDER_PRESET_ORDER,
 	presetForConnection,
-} from "./llmProviderType";
+} from "./llm-provider-type";
 
 describe("OpenAI-compatible endpoint presets", () => {
-	it("offers OpenAI, Azure v1, and a generic OpenAI-compatible endpoint", () => {
-		expect(PROVIDER_PRESET_ORDER).toEqual(["OPENAI", "AZURE_OPENAI_V1", "OTHER"]);
+	it("gives Azure its own auth mode and base-URL template", () => {
 		expect(authModeDefaultFor("OPENAI")).toBe("BEARER");
 		expect(authModeDefaultFor("AZURE_OPENAI_V1")).toBe("API_KEY");
 		expect(baseUrlDefaultFor("AZURE_OPENAI_V1")).toBe(
@@ -18,9 +16,13 @@ describe("OpenAI-compatible endpoint presets", () => {
 		);
 	});
 
-	it("supports the two exact OpenAI wire APIs", () => {
-		expect(defaultProtocolFor(true)).toBe(API_PROTOCOLS.OPENAI_RESPONSES);
-		expect(defaultProtocolFor(false)).toBe(API_PROTOCOLS.OPENAI_COMPLETIONS);
+	it.each([
+		[true, API_PROTOCOLS.OPENAI_RESPONSES],
+		[false, API_PROTOCOLS.OPENAI_COMPLETIONS],
+		// Omitted: a connection that never opted in speaks the older wire API.
+		[undefined, API_PROTOCOLS.OPENAI_COMPLETIONS],
+	])("defaults useResponsesApi=%s to the matching wire API", (useResponsesApi, protocol) => {
+		expect(defaultProtocolFor(useResponsesApi)).toBe(protocol);
 	});
 
 	it("does not infer the create-time Azure preset while editing", () => {

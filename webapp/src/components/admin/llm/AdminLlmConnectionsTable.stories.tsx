@@ -38,7 +38,7 @@ const meta = {
 		modelCounts: { 1: 3, 2: 0 },
 		isLoading: false,
 		isError: false,
-		mutatingId: null,
+		mutatingIds: new Set<number>(),
 		selectedId: null,
 		onSelect: fn(),
 		onEdit: fn(),

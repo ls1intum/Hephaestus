@@ -1,6 +1,6 @@
 import { ChevronDown, ChevronRight, CircleDollarSign, Info } from "lucide-react";
 import type { AdminWorkspaceLlmUsage, WorkspaceLlmUsageReport } from "@/api/types.gen";
-import { formatCapUsd, formatCostUsd, MoneyCell } from "@/components/admin/ai/jobUtils";
+import { formatCapUsd, formatCostUsd, MoneyCell } from "@/components/admin/ai/job-utils";
 import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Badge } from "@/components/ui/badge";
@@ -17,35 +17,31 @@ import {
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { BudgetPaceAlert } from "./BudgetPaceAlert";
+import { CapIsNotMonthScoped } from "./CapIsNotMonthScoped";
 import { CAP_STATE_LABELS, CapMeter, type CapState, capState } from "./CapMeter";
 import { type Fx, FxDisclosure, FxSpendLine, spendConversion } from "./fx";
 import { LlmUsageByDayTable, LlmUsageByJobTypeTable } from "./LlmUsageBreakdownTables";
-import { budgetUsedPercent, projectBudget } from "./usageUtils";
-
-/**
- * The admin rollup row, widened with the workspace's provider-cap fields.
- *
- * The two caps are different people's money and are never summed: `instanceMonthlyBudgetUsd` is the
- * *shared-model budget* an instance admin grants over host-funded spend, while the `ownProvider*`
- * fields below describe the *provider cap* the workspace's own admins set over spend on their own
- * provider. They pause independently.
- *
- * The admin rollup reports both caps with the same names and meanings the per-workspace report
- * uses, so a row renders identically on either surface.
- */
-export type AdminWorkspaceLlmUsageRow = AdminWorkspaceLlmUsage;
+import { budgetUsedPercent, projectBudget } from "./usage-utils";
 
 export interface AdminInstanceLlmUsageTableProps {
-	/** Per-workspace month rollups, already sorted by the container (cost desc). */
-	rows: AdminWorkspaceLlmUsageRow[];
+	/**
+	 * Per-workspace month rollups, already sorted by the container (cost desc).
+	 *
+	 * Each row carries both caps, which are different people's money and are never summed:
+	 * `instanceMonthlyBudgetUsd` is the *shared-model budget* an instance admin grants over
+	 * host-funded spend, and the `ownProvider*` fields are the *provider cap* the workspace's own
+	 * admins set over spend on their own provider. They pause independently. The names and meanings
+	 * are the per-workspace report's, so a row renders identically on either surface.
+	 */
+	rows: AdminWorkspaceLlmUsage[];
 	/** ISO `yyyy-MM` month shown; the burn-rate projections in the detail panel are scoped to it. */
 	month: string;
 	/** Injected so those projections are deterministic in tests and stories. */
 	now?: Date;
 	/**
 	 * The month's display-currency rate, from the report envelope rather than from any row. One month
-	 * resolves to exactly one rate, and it applies to a month with no workspaces in it just as much as
-	 * to a busy one — which is what reading it off `rows[0]` used to get wrong.
+	 * resolves to exactly one rate, and it applies to a month with no workspaces in it — where there
+	 * is no `rows[0]` to read it off — just as much as to a busy one.
 	 */
 	fx?: Fx;
 	/**
@@ -67,9 +63,13 @@ export interface AdminInstanceLlmUsageTableProps {
 	detailError: unknown;
 	/** Retry the expanded workspace report. */
 	onRetryDetail?: () => void;
-	onToggleDetails: (workspace: AdminWorkspaceLlmUsageRow) => void;
-	/** Edit the *shared-model budget*. There is deliberately no counterpart for the provider cap. */
-	onEditBudget: (workspace: AdminWorkspaceLlmUsageRow) => void;
+	onToggleDetails: (workspace: AdminWorkspaceLlmUsage) => void;
+	/**
+	 * Edit the *shared-model budget*. There is deliberately no counterpart for the provider cap.
+	 *
+	 * Offered on the current month only — see the action cell for why.
+	 */
+	onEditBudget: (workspace: AdminWorkspaceLlmUsage) => void;
 }
 
 /** One entry per header column — the trailing action slot promises nothing. */
@@ -164,10 +164,10 @@ export function AdminInstanceLlmUsageTable({
 	}
 
 	// Only one workspace can be expanded at a time, so the detail lives *beside* the table rather than
-	// in a `colSpan` row inside it. Nested in the table it inherited the table's ~1100 px width and
-	// its own two tables each opened a second horizontal scroller inside the first — two-dimensional
-	// scrolling to read a breakdown, which is exactly what WCAG 2.2 SC 1.4.10 rules out. Out here it
-	// reflows to the page width at any viewport and the `aria-controls` relationship is unchanged.
+	// in a `colSpan` row inside it. A nested panel inherits the table's ~1100 px width, and its own two
+	// tables then each open a second horizontal scroller inside the first — two-dimensional scrolling
+	// to read a breakdown, which is exactly what WCAG 2.2 SC 1.4.10 rules out. Out here it reflows to
+	// the page width at any viewport and the `aria-controls` relationship is unchanged.
 	const expandedRow = rows.find((row) => row.workspaceSlug === expandedWorkspaceSlug);
 	// The caption explains estimates that are actually on screen; with every workspace at $0 there
 	// are none, and a footnote about them would be noise. Both spend columns convert, so both count
@@ -180,6 +180,10 @@ export function AdminInstanceLlmUsageTable({
 
 	return (
 		<div className="space-y-4">
+			{/* Every row loses its "Set budget" button on a closed month. Said once above the table
+			    rather than fifty times inside it — but said, because a control that is simply absent
+			    explains nothing. */}
+			{!isCurrentMonth && <CapIsNotMonthScoped subject="budget" />}
 			<Table containerClassName="rounded-md border">
 				<TableCaption className="sr-only">
 					Per-workspace AI spend for the selected month, most expensive first
@@ -193,7 +197,9 @@ export function AdminInstanceLlmUsageTable({
 						{/* Spend sits next to the cap it is measured against, so a row reads left to right as
 					    "this much, out of this much" without the admin holding a number in their head. */}
 						<TableHead scope="col" className="text-right">
-							<HelpHeader help="Spend you pay for. Yours to set.">Shared-model budget</HelpHeader>
+							<HelpHeader help="The monthly cap you set on the spend you pay for.">
+								Shared-model budget
+							</HelpHeader>
 						</TableHead>
 						<TableHead scope="col" className="text-right">
 							Provider spend
@@ -282,15 +288,20 @@ export function AdminInstanceLlmUsageTable({
 											{/* Only the shared-model budget gets an edit control — the provider cap is the
 											    workspace's own money and its own admins' call. The visible label stays
 											    short for the column; the accessible name says which workspace it edits,
-											    since every row's button reads the same otherwise. */}
-											<Button
-												variant="outline"
-												size="sm"
-												aria-label={`Set shared-model budget for ${row.displayName}`}
-												onClick={() => onEditBudget(row)}
-											>
-												Set budget
-											</Button>
+											    since every row's button reads the same otherwise.
+											    Current month only: a budget is not month-scoped, so editing one from a
+											    closed month would quietly change what runs today while the reader is
+											    looking at history. Why it is gone is said once above the table. */}
+											{isCurrentMonth && (
+												<Button
+													variant="outline"
+													size="sm"
+													aria-label={`Set shared-model budget for ${row.displayName}`}
+													onClick={() => onEditBudget(row)}
+												>
+													Set budget
+												</Button>
+											)}
 										</div>
 									</TableCell>
 								</TableRow>
@@ -322,7 +333,7 @@ export function AdminInstanceLlmUsageTable({
 }
 
 interface WorkspaceUsageDetailsProps {
-	workspace: AdminWorkspaceLlmUsageRow;
+	workspace: AdminWorkspaceLlmUsage;
 	report?: WorkspaceLlmUsageReport;
 	isLoading: boolean;
 	error: unknown;
@@ -423,13 +434,13 @@ function WorkspaceUsageDetails({
 							<h4 id={`${panelId}-run-type`} className="font-medium">
 								By run type
 							</h4>
-							<LlmUsageByJobTypeTable rows={isLoading ? undefined : report?.byJobType} fx={fx} />
+							<LlmUsageByJobTypeTable report={isLoading ? undefined : report} fx={fx} />
 						</section>
 						<section aria-labelledby={`${panelId}-day`} className="min-w-0 space-y-2">
 							<h4 id={`${panelId}-day`} className="font-medium">
 								By day
 							</h4>
-							<LlmUsageByDayTable rows={isLoading ? undefined : report?.byDay} fx={fx} />
+							<LlmUsageByDayTable report={isLoading ? undefined : report} fx={fx} />
 						</section>
 					</div>
 				</>
@@ -447,11 +458,15 @@ interface HelpHeaderProps {
 /**
  * A column header that explains itself on hover/focus. The header text is the trigger rather than a
  * separate icon button, so the column's accessible name stays exactly the visible label.
+ *
+ * `min-h-6` is 24 px: the trigger is an interactive target, and at the header's ~20 px line height
+ * it would otherwise conform to WCAG 2.2 SC 2.5.8 only through the Spacing exception — which holds
+ * today but depends on nothing here, so a row of narrower columns would silently break it.
  */
 function HelpHeader({ children, help }: HelpHeaderProps) {
 	return (
 		<Tooltip>
-			<TooltipTrigger className="inline-flex cursor-help items-center gap-1 font-medium">
+			<TooltipTrigger className="inline-flex min-h-6 cursor-help items-center gap-1 font-medium">
 				{children}
 				<Info className="size-3 text-muted-foreground" aria-hidden />
 			</TooltipTrigger>

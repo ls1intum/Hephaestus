@@ -11,8 +11,8 @@ import { StrictMode, useEffect } from "react";
 
 import environment from "@/environment";
 import { AuthProvider, applyStateChangingHeaders, useAuth } from "@/integrations/auth";
-import { handlePossibleSessionExpiry } from "@/integrations/auth/sessionExpiry";
-import { SessionKeepAlive } from "@/integrations/auth/useSessionKeepAlive";
+import { handlePossibleSessionExpiry } from "@/integrations/auth/session-expiry";
+import { SessionKeepAlive } from "@/integrations/auth/use-session-keep-alive";
 import { useCookieConsent } from "@/integrations/consent";
 import { TanstackDevtools } from "@/integrations/devtools/TanstackDevtools";
 import { PostHogIdentity } from "@/integrations/posthog";

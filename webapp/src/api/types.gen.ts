@@ -169,7 +169,7 @@ export type WorkspaceLlmUsageReport = {
 };
 
 /**
- * Display-only currency conversion for the USD amounts in this response. Multiply a USD amount by ratePerUsd to get the display-currency estimate; always label it as an estimate and show rateDate, which is the date the rate was actually published on (not necessarily today).
+ * Display-only currency conversion for the USD amounts in this response. Multiply a USD amount by ratePerUsd to get the display-currency estimate; always label it as an estimate and show rateDate, which is the date the rate was actually published on (not necessarily today), and attribute it to source.
  */
 export type FxRateInfo = {
     /**
@@ -184,6 +184,10 @@ export type FxRateInfo = {
      * Units of the display currency per 1 USD, at 6 decimal places
      */
     ratePerUsd: number;
+    /**
+     * Who published the rate, so a disclosure can name it instead of saying "a reference rate". ECB = the European Central Bank's daily euro foreign-exchange reference rates.
+     */
+    source: 'ECB';
 };
 
 /**
@@ -1110,7 +1114,7 @@ export type UpdateLlmConnectionRequest = {
  */
 export type UpdateLlmBudgetRequest = {
     /**
-     * Cap in USD; 0 pauses the affected work immediately, null removes the cap
+     * Cap in USD; 0 pauses the affected work immediately, null removes the cap. The purse it governs is the one the path names, and only that one: /admin/workspaces/{workspaceSlug}/llm/budget caps spend on shared (instance) models, /workspaces/{workspaceSlug}/llm/budget caps the workspace's spend on its own connected provider. The two are never added together.
      */
     monthlyBudgetUsd?: number;
 };
@@ -2498,10 +2502,6 @@ export type AgentJob = {
      */
     configSnapshot: unknown;
     /**
-     * Docker container ID
-     */
-    containerId?: string;
-    /**
      * Timestamp when the job was created
      */
     createdAt: Date;
@@ -2537,10 +2537,6 @@ export type AgentJob = {
      * Tokens written to prompt cache
      */
     llmCacheWriteTokens?: number;
-    /**
-     * Deprecated, always null (#1368 slice 6): the runner no longer reports cost. See the workspace's LLM usage rollup for the authoritative, catalog-derived per-job cost.
-     */
-    llmCostUsd?: number;
     /**
      * LLM model used (e.g. gpt-5.4-mini, openai/gpt-oss-120b)
      */
@@ -4090,7 +4086,7 @@ export type AdminWorkspaceLlmUsage = {
      */
     instanceBudgetVerdict: 'WITHIN' | 'EXHAUSTED' | 'UNVERIFIABLE';
     /**
-     * Monthly cap in USD on spend this instance pays for; null = uncapped. Yours to set.
+     * Monthly cap in USD on this workspace's spend on shared (instance) models — the money this instance pays for; null = uncapped. Yours to set.
      */
     instanceMonthlyBudgetUsd?: number;
     /**
@@ -4810,10 +4806,12 @@ export type AdminUpdateWorkspaceLlmBudgetData = {
 
 export type AdminUpdateWorkspaceLlmBudgetResponses = {
     /**
-     * OK
+     * Cap updated
      */
-    200: unknown;
+    204: void;
 };
+
+export type AdminUpdateWorkspaceLlmBudgetResponse = AdminUpdateWorkspaceLlmBudgetResponses[keyof AdminUpdateWorkspaceLlmBudgetResponses];
 
 export type ImpersonateData = {
     body: ImpersonateRequest;

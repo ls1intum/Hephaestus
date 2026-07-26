@@ -1,9 +1,9 @@
 import { ClockIcon, GitBranchIcon, GitCommitIcon } from "@primer/octicons-react";
 import { Link } from "@tanstack/react-router";
 
+import { RelativeTime } from "@/components/common/RelativeTime";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { optionalIntegrationsAvailable, requestConsentReopen } from "@/integrations/consent";
-import { formatRelativeTime } from "@/lib/relative-time";
 import { cn } from "@/lib/utils";
 
 export interface FooterProps {
@@ -146,16 +146,14 @@ export default function Footer({ className, isProduction, buildInfo }: FooterPro
 								</Tooltip>
 							)}
 
+							{/* The same ticking, shared-clock relative time every other timestamp in the app uses —
+							    the deploy age is the one reading here that must not freeze mid-session, and it
+							    brings its own absolute-instant tooltip. */}
 							{buildInfo?.deployedAt && (
-								<Tooltip>
-									<TooltipTrigger className="flex items-center gap-1 cursor-help">
-										<ClockIcon size={12} />
-										<span>{formatRelativeTime(buildInfo.deployedAt)}</span>
-									</TooltipTrigger>
-									<TooltipContent>
-										Deployed {buildInfo.deployedAt.replace("T", " ").substring(0, 16)} UTC
-									</TooltipContent>
-								</Tooltip>
+								<span className="flex items-center gap-1">
+									<ClockIcon size={12} aria-hidden />
+									<RelativeTime value={buildInfo.deployedAt} />
+								</span>
 							)}
 						</div>
 					)}

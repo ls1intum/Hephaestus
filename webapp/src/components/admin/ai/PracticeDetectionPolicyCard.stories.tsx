@@ -3,7 +3,7 @@ import { fn, within } from "storybook/test";
 import type { AgentBinding } from "@/api/types.gen";
 import { expectPageReflows, expectTargetSpacing, expectWithinViewport } from "@/test/reflow";
 import { PracticeDetectionPolicyCard } from "./PracticeDetectionPolicyCard";
-import { mockAvailableModels, mockPracticeReviewSettings } from "./storyMockData";
+import { mockAvailableModels, mockPracticeReviewSettings } from "./story-mock-data";
 
 const readyBinding: AgentBinding = {
 	purpose: "PRACTICE_DETECTION",

@@ -36,13 +36,11 @@ describe("AdminLlmModelAccessDialog", () => {
 		);
 
 		fireEvent.click(screen.getByRole("radio", { name: /^Selected workspaces/i }));
-		expect(
-			screen.getByText(/existing configurations in removed workspaces will stop running/i),
-		).toBeTruthy();
+		expect(screen.getByText(/stop in the workspaces you removed/i)).toBeTruthy();
 		expect(screen.getByText(/no workspace will be able to use this model/i)).toBeTruthy();
 	});
 
-	it("saves the selected workspace allowlist", () => {
+	it("saves the selected workspace allowlist", async () => {
 		const onSave = vi.fn();
 		render(
 			<AdminLlmModelAccessDialog
@@ -55,14 +53,62 @@ describe("AdminLlmModelAccessDialog", () => {
 			/>,
 		);
 
-		fireEvent.click(screen.getByRole("button", { name: "Alpha" }));
-		fireEvent.click(screen.getByRole("checkbox", { name: /beta/i }));
+		fireEvent.click(screen.getByRole("combobox", { name: "Workspaces" }));
+		fireEvent.click(await screen.findByRole("option", { name: /beta/i }));
+
+		// What the admin can see before committing: both workspaces are ticked in the list, and the
+		// trigger summarises the same two. Without this the payload below could be right by accident
+		// while the control the admin reads showed something else.
+		expect(screen.getByRole("option", { name: /alpha/i }).getAttribute("aria-selected")).toBe(
+			"true",
+		);
+		expect(screen.getByRole("option", { name: /beta/i }).getAttribute("aria-selected")).toBe(
+			"true",
+		);
+		expect(screen.getByRole("combobox", { name: "Workspaces" }).textContent).toContain(
+			"2 selected",
+		);
+
 		fireEvent.click(screen.getByRole("button", { name: "Save access" }));
 
 		expect(onSave).toHaveBeenCalledWith({ visibility: "GRANTED", workspaceIds: [10, 11] });
 	});
 
-	it("distinguishes future restrictions from removing current workspace access", () => {
+	it("keeps an unsaved selection when the model is refetched underneath it", async () => {
+		const granted = { ...model, visibility: "GRANTED" as const, grantedWorkspaceIds: [10, 11] };
+		const props = {
+			open: true as const,
+			onOpenChange: vi.fn(),
+			workspaceOptions: workspaces,
+			isSubmitting: false,
+			onSave: vi.fn(),
+		};
+		const { rerender } = render(<AdminLlmModelAccessDialog {...props} model={granted} />);
+
+		// The admin revokes Beta and has not saved yet.
+		fireEvent.click(screen.getByRole("combobox", { name: "Workspaces" }));
+		fireEvent.click(await screen.findByRole("option", { name: /beta/i }));
+		expect(screen.getByRole("option", { name: /beta/i }).getAttribute("aria-selected")).toBe(
+			"false",
+		);
+
+		// A background refetch lands — same model, a fresh object, and another admin has since granted
+		// it more broadly. Mirroring props into state through an effect silently reinstated Beta here,
+		// so Save went on to revoke nothing.
+		rerender(
+			<AdminLlmModelAccessDialog
+				{...props}
+				model={{ ...granted, grantedWorkspaceIds: [10, 11] }}
+			/>,
+		);
+
+		expect(screen.getByRole("option", { name: /beta/i }).getAttribute("aria-selected")).toBe(
+			"false",
+		);
+		expect(screen.getByRole("combobox", { name: "Workspaces" }).textContent).toContain("Alpha");
+	});
+
+	it("distinguishes future restrictions from removing current workspace access", async () => {
 		render(
 			<AdminLlmModelAccessDialog
 				open
@@ -75,12 +121,12 @@ describe("AdminLlmModelAccessDialog", () => {
 		);
 
 		fireEvent.click(screen.getByRole("radio", { name: /^Selected workspaces/i }));
-		fireEvent.click(screen.getByRole("button", { name: "Select workspaces…" }));
-		fireEvent.click(screen.getByRole("checkbox", { name: /alpha/i }));
-		fireEvent.click(screen.getByRole("checkbox", { name: /beta/i }));
+		fireEvent.click(screen.getByRole("combobox", { name: "Workspaces" }));
+		fireEvent.click(await screen.findByRole("option", { name: /alpha/i }));
+		fireEvent.click(await screen.findByRole("option", { name: /beta/i }));
 
 		expect(screen.getByText("Future workspaces will need an explicit grant")).toBeTruthy();
-		expect(screen.queryByText(/existing configurations in removed workspaces/i)).toBeNull();
+		expect(screen.queryByText(/stop in the workspaces you removed/i)).toBeNull();
 	});
 
 	it("can grant public access even when the workspace directory is unavailable", () => {
@@ -91,14 +137,24 @@ describe("AdminLlmModelAccessDialog", () => {
 				onOpenChange={vi.fn()}
 				model={{ ...model, visibility: "GRANTED", grantedWorkspaceIds: [10] }}
 				workspaceOptions={[]}
-				isWorkspaceError
+				workspacesError={{ status: 503, detail: "Directory unavailable." }}
 				isSubmitting={false}
 				onSave={onSave}
 			/>,
 		);
 
+		// The premise: the directory is down, so the selected-workspace list cannot be saved.
+		expect(screen.getByText("Could not load workspaces")).toBeTruthy();
+		expect(
+			(screen.getByRole("button", { name: "Save access" }) as HTMLButtonElement).disabled,
+		).toBe(true);
+
+		// "All workspaces" needs no directory, so it is still reachable.
 		fireEvent.click(screen.getByRole("radio", { name: /^All workspaces/i }));
-		fireEvent.click(screen.getByRole("button", { name: "Save access" }));
+		const save = screen.getByRole("button", { name: "Save access" }) as HTMLButtonElement;
+		expect(save.disabled).toBe(false);
+
+		fireEvent.click(save);
 		expect(onSave).toHaveBeenCalledWith({ visibility: "PUBLIC" });
 	});
 });

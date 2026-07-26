@@ -17,44 +17,35 @@ import { type Fx, FxApprox, fxCapHint } from "./fx";
 
 export interface BudgetAmountDialogProps {
 	open: boolean;
-	/**
-	 * Changing this remounts the form, so the input never carries a stale amount from the
-	 * previously edited subject (e.g. another workspace).
-	 */
+	/** Changing this remounts the form, so the input never carries the previous subject's amount. */
 	resetKey?: string | number;
 	title: string;
 	description: ReactNode;
 	fieldLabel: string;
-	/** Optional: only when the field needs something the label and the dialog description don't say. */
-	fieldDescription?: ReactNode;
 	/** The cap in force today, in USD; `null`/`undefined` means uncapped (no "Remove cap"). */
 	currentValueUsd?: number | null;
 	isPending: boolean;
-	/**
-	 * A server-side rejection (RFC 9457 `detail`). Rendered as this field's error rather than a
-	 * toast: the value that was rejected is on screen, and a toast would evaporate before it can
-	 * be compared against it.
-	 */
+	/** Rendered as this field's error, not a toast: the value that was rejected is still on screen. */
 	serverError?: string | null;
 	submitLabel?: string;
 	removeLabel?: string;
-	/**
-	 * Display-only conversion for the amount being typed. Absent — the default for any instance
-	 * without a display currency — means no hint at all, exactly as before.
-	 */
 	fx?: Fx;
+	/**
+	 * Whether the surface behind this dialog is showing the current month. A cap is not month-scoped,
+	 * so only the current month's rate can be quoted "at today's rate" under the amount — see
+	 * {@link fxCapHint}. Defaults to `false`: a caller that has not thought about it gets no estimate
+	 * rather than a possibly frozen one.
+	 */
+	isCurrentMonth?: boolean;
 	onOpenChange: (open: boolean) => void;
 	/** `null` removes the cap; a number (USD, >= 0, at most 2 decimals) sets it. */
 	onSubmit: (valueUsd: number | null) => void;
 }
 
 /**
- * The money-cap editor shared by both budget dialogs — instance-admin (`SetBudgetDialog`, the
- * shared-model budget) and workspace-admin (`SetOwnProviderBudgetDialog`, the workspace's provider cap).
- * Both edit the same kind of value under the same rules (USD, >= 0, cent
- * precision, `null` removes, `0` pauses immediately), so the validation, the currency input, the
- * remove affordance, the pending state, and server-error rendering live here once; the wrappers
- * supply only the copy.
+ * The money-cap editor shared by `SetBudgetDialog` and `SetOwnProviderBudgetDialog`. Both edit the
+ * same value under the same rules — USD, >= 0, cent precision, `null` removes, `0` pauses
+ * immediately — so the wrappers supply only the copy.
  */
 export function BudgetAmountDialog({
 	open,
@@ -85,13 +76,13 @@ function BudgetAmountDialogContent({
 	title,
 	description,
 	fieldLabel,
-	fieldDescription,
 	currentValueUsd,
 	isPending,
 	serverError,
 	submitLabel = "Save cap",
 	removeLabel = "Remove cap",
 	fx,
+	isCurrentMonth = false,
 	onSubmit,
 }: BudgetAmountDialogContentProps) {
 	const fieldId = useId();
@@ -99,8 +90,8 @@ function BudgetAmountDialogContent({
 	const [value, setValue] = useState(currentValueUsd != null ? String(currentValueUsd) : "");
 	// Withheld until the first submit so the field isn't red before anything was attempted.
 	const [showError, setShowError] = useState(false);
-	// The server error stays on screen until the amount is edited — clearing it on the next
-	// keystroke is what makes it read as "this value was rejected" rather than ambient noise.
+	// The server error stays until the amount is edited, so it reads as "this value was rejected"
+	// rather than as ambient noise.
 	const [dismissedServerError, setDismissedServerError] = useState<string | null>(null);
 
 	const parsed = Number.parseFloat(value);
@@ -109,8 +100,7 @@ function BudgetAmountDialogContent({
 	const hasCentPrecision = /^\d*(\.\d{0,2})?$/.test(value.trim());
 	const isValid = !isEmpty && Number.isFinite(parsed) && parsed >= 0 && hasCentPrecision;
 	const localError = isEmpty
-		? // Names the button that is actually on screen — this dialog is also the budget editor,
-			// where it reads "Remove budget".
+		? // Names the button actually on screen; the budget editor labels it "Remove budget".
 			`Enter an amount, or use ${removeLabel}.`
 		: !Number.isFinite(parsed) || parsed < 0
 			? "Enter an amount of $0 or more."
@@ -119,9 +109,7 @@ function BudgetAmountDialogContent({
 		serverError != null && serverError !== dismissedServerError ? serverError : null;
 	const errorMessage = showError && !isValid ? localError : liveServerError;
 	const isInvalid = errorMessage != null;
-	// What the amount on screen is worth in the display currency, recomputed as they type. Absent
-	// while the field is empty, unparseable or $0 — there is nothing useful to estimate there.
-	const fxHint = fxCapHint(isValid ? parsed : null, fx);
+	const fxHint = fxCapHint(isValid ? parsed : null, fx, isCurrentMonth);
 
 	const handleSubmit = (event: FormEvent) => {
 		event.preventDefault();
@@ -135,17 +123,15 @@ function BudgetAmountDialogContent({
 
 	return (
 		<DialogContent>
-			{/* noValidate: this form validates itself so every rejection surfaces through `FieldError`.
-			    Left to the browser, `min`/`step` would silently block submit with a native bubble and the
-			    field's own explanation would never render. */}
+			{/* noValidate: left to the browser, `min`/`step` block submit with a native bubble and the
+			    field's own `FieldError` explanation never renders. */}
 			<form onSubmit={handleSubmit} className="contents" noValidate>
 				<DialogHeader>
 					<DialogTitle>{title}</DialogTitle>
 					<DialogDescription>{description}</DialogDescription>
 				</DialogHeader>
-				{/* Short in portrait, but the three stacked footer buttons plus the header already exceed a
-				    phone in landscape (~320 px tall). Scrolling the field rather than the whole popup keeps
-				    "Save cap" on screen there. */}
+				{/* Short in portrait, but header plus three stacked footer buttons already exceed a phone in
+				    landscape (~320 px tall), where scrolling the field keeps "Save cap" on screen. */}
 				<DialogBody className="py-1">
 					<FieldGroup>
 						<Field data-invalid={isInvalid}>
@@ -159,8 +145,7 @@ function BudgetAmountDialogContent({
 								placeholder="e.g. 25.00"
 								value={value}
 								aria-invalid={isInvalid}
-								// Read on focus rather than announced on every keystroke: a live region here
-								// would interrupt typing with a new estimate per digit.
+								// Described-by, not a live region: the latter would interrupt typing once per digit.
 								aria-describedby={fxHint != null ? fxHintId : undefined}
 								onChange={(event) => {
 									setValue(event.target.value);
@@ -170,7 +155,6 @@ function BudgetAmountDialogContent({
 								disabled={isPending}
 								autoFocus
 							/>
-							{fieldDescription != null && <FieldDescription>{fieldDescription}</FieldDescription>}
 							{fxHint != null && (
 								<FieldDescription id={fxHintId}>
 									<FxApprox conversion={fxHint.conversion} />

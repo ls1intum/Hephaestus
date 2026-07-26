@@ -1,16 +1,7 @@
 import { Bot, Pencil, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { LlmModel } from "@/api/types.gen";
-import {
-	AlertDialog,
-	AlertDialogAction,
-	AlertDialogCancel,
-	AlertDialogContent,
-	AlertDialogDescription,
-	AlertDialogFooter,
-	AlertDialogHeader,
-	AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,15 +20,20 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { priceFieldsOf, priceLabel } from "@/lib/llmPricing";
-import type { WorkspaceMultiSelectOption } from "./WorkspaceMultiSelect";
+import { priceFieldsOf, priceLabel } from "@/lib/llm-pricing";
+import type { WorkspaceOption } from "./workspace-options";
 
 export interface AdminLlmModelsSectionProps {
 	connectionDisplayName: string;
 	connectionEnabled: boolean;
-	workspaceOptions: WorkspaceMultiSelectOption[];
+	workspaceOptions: WorkspaceOption[];
 	models: LlmModel[];
-	mutatingId: number | null;
+	/**
+	 * Ids of the rows with a write in flight, read from the mutation cache by the container. A set,
+	 * not one id: deleting one model and saving another's access overlap, and a single id re-enables
+	 * the still-running row as soon as the other settles.
+	 */
+	mutatingIds: ReadonlySet<number>;
 	onAdd: () => void;
 	onEdit: (model: LlmModel) => void;
 	onManageAccess: (model: LlmModel) => void;
@@ -54,7 +50,7 @@ function readinessLabel(model: LlmModel, connectionEnabled: boolean): string {
 	return "Ready";
 }
 
-function shareLabel(model: LlmModel, workspaces: WorkspaceMultiSelectOption[]): string {
+function shareLabel(model: LlmModel, workspaces: WorkspaceOption[]): string {
 	if (model.visibility === "PUBLIC") return "All workspaces";
 	if (model.grantedWorkspaceIds.length === 0) return "No workspaces";
 	const firstName = workspaces.find(
@@ -72,14 +68,13 @@ export function AdminLlmModelsSection({
 	connectionEnabled,
 	workspaceOptions,
 	models,
-	mutatingId,
+	mutatingIds,
 	onAdd,
 	onEdit,
 	onManageAccess,
 	onDelete,
 }: AdminLlmModelsSectionProps) {
 	const [deleting, setDeleting] = useState<LlmModel | null>(null);
-	const isDeletePending = deleting != null && mutatingId === deleting.id;
 
 	return (
 		<div className="space-y-3">
@@ -120,7 +115,7 @@ export function AdminLlmModelsSection({
 					</TableHeader>
 					<TableBody>
 						{models.map((model) => {
-							const busy = mutatingId === model.id;
+							const busy = mutatingIds.has(model.id);
 							const status = readinessLabel(model, connectionEnabled);
 							return (
 								<TableRow key={model.id}>
@@ -176,31 +171,14 @@ export function AdminLlmModelsSection({
 				</Table>
 			)}
 
-			<AlertDialog
-				open={deleting != null}
-				onOpenChange={(open) => {
-					if (!open && !isDeletePending) setDeleting(null);
-				}}
-			>
-				<AlertDialogContent>
-					<AlertDialogHeader>
-						<AlertDialogTitle>Delete “{deleting?.displayName}”?</AlertDialogTitle>
-						<AlertDialogDescription>
-							A model still bound to a workspace's agent can't be deleted. This cannot be undone.
-						</AlertDialogDescription>
-					</AlertDialogHeader>
-					<AlertDialogFooter>
-						<AlertDialogCancel disabled={isDeletePending}>Cancel</AlertDialogCancel>
-						<AlertDialogAction
-							variant="destructive"
-							disabled={isDeletePending}
-							onClick={() => deleting && onDelete(deleting)}
-						>
-							{isDeletePending ? "Deleting…" : "Delete"}
-						</AlertDialogAction>
-					</AlertDialogFooter>
-				</AlertDialogContent>
-			</AlertDialog>
+			<ConfirmDialog
+				subject={deleting}
+				onClose={() => setDeleting(null)}
+				title={(model) => `Delete “${model.displayName}”?`}
+				description="A model still bound to a workspace's agent can't be deleted. This cannot be undone."
+				confirmLabel="Delete"
+				onConfirm={onDelete}
+			/>
 		</div>
 	);
 }

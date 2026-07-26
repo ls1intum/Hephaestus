@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { userEvent } from "storybook/test";
 import { describe, expect, it, vi } from "vitest";
 import type { LlmConnection } from "@/api/types.gen";
@@ -25,7 +25,7 @@ describe("AdminLlmConnectionsTable", () => {
 				modelCounts={{ 1: 2 }}
 				isLoading={false}
 				isError={false}
-				mutatingId={null}
+				mutatingIds={new Set<number>()}
 				selectedId={null}
 				onSelect={onSelect}
 				onEdit={vi.fn()}
@@ -36,19 +36,25 @@ describe("AdminLlmConnectionsTable", () => {
 
 		const manage = screen.getByRole("button", { name: "Manage models for OpenAI production" });
 		manage.focus();
+		// Focusability is the claim: a clickable row or a bare <div> takes no focus, so the keystroke
+		// below would land on <body> and the assertion after it would pass for the wrong reason.
+		expect(document.activeElement).toBe(manage);
+
 		await userEvent.keyboard("{Enter}");
 		expect(onSelect).toHaveBeenCalledWith(connection);
 	});
 
-	it("confirms before turning off every model on a connection", async () => {
-		const onToggleEnabled = vi.fn();
+	function renderTable(
+		modelCounts: Record<number, number>,
+		onToggleEnabled = vi.fn(),
+	): { onToggleEnabled: ReturnType<typeof vi.fn> } {
 		render(
 			<AdminLlmConnectionsTable
 				connections={[connection]}
-				modelCounts={{ 1: 2 }}
+				modelCounts={modelCounts}
 				isLoading={false}
 				isError={false}
-				mutatingId={null}
+				mutatingIds={new Set<number>()}
 				selectedId={null}
 				onSelect={vi.fn()}
 				onEdit={vi.fn()}
@@ -56,10 +62,47 @@ describe("AdminLlmConnectionsTable", () => {
 				onDelete={vi.fn()}
 			/>,
 		);
+		return { onToggleEnabled };
+	}
+
+	it("confirms before turning off every model on a connection", async () => {
+		const { onToggleEnabled } = renderTable({ 1: 2 });
 
 		fireEvent.click(screen.getByRole("switch", { name: "Turn off OpenAI production" }));
+
+		// The confirmation is the point of the test, so it is the confirmation that gets read: it names
+		// the connection and how many models stop with it, which is the number the admin is deciding on.
+		const confirm = screen.getByRole("alertdialog");
+		expect(within(confirm).getByRole("heading").textContent).toBe("Turn off “OpenAI production”?");
+		expect(confirm.textContent).toContain(
+			"This immediately stops requests through all 2 models on this connection.",
+		);
 		expect(onToggleEnabled).not.toHaveBeenCalled();
+
 		fireEvent.click(screen.getByRole("button", { name: "Turn off connection" }));
+		expect(onToggleEnabled).toHaveBeenCalledWith(connection, false);
+	});
+
+	it("counts one model as one", () => {
+		// Two was the one arity that reads correctly whatever the sentence does with the number, so it
+		// hid this: the same wording renders "all 1 models on this connection".
+		renderTable({ 1: 1 });
+
+		fireEvent.click(screen.getByRole("switch", { name: "Turn off OpenAI production" }));
+
+		expect(screen.getByRole("alertdialog").textContent).toContain(
+			"This immediately stops requests through the model on this connection.",
+		);
+	});
+
+	it("turns off a connection with no models without asking", () => {
+		// The confirm exists to name what stops. With no models on the connection it names nothing,
+		// and the sentence it would render is about nothing.
+		const { onToggleEnabled } = renderTable({});
+
+		fireEvent.click(screen.getByRole("switch", { name: "Turn off OpenAI production" }));
+
+		expect(screen.queryByRole("alertdialog")).toBeNull();
 		expect(onToggleEnabled).toHaveBeenCalledWith(connection, false);
 	});
 
@@ -71,7 +114,7 @@ describe("AdminLlmConnectionsTable", () => {
 				modelCountsAvailable={false}
 				isLoading={false}
 				isError={false}
-				mutatingId={null}
+				mutatingIds={new Set<number>()}
 				selectedId={null}
 				onSelect={vi.fn()}
 				onEdit={vi.fn()}

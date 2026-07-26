@@ -3,7 +3,7 @@ import { HttpResponse, http } from "msw";
 import { expect, within } from "storybook/test";
 import { expectPageReflows, expectTablesScrollInPlace, expectTargetSize } from "@/test/reflow";
 import { AgentActivityPage } from "./AgentActivityPage";
-import { mockJobs } from "./storyMockData";
+import { mockJobs } from "./story-mock-data";
 
 /** Enough pages that the pagination windows (first, last, current ±1, ellipsis gaps). */
 const TOTAL_PAGES = 12;
@@ -73,9 +73,10 @@ export const MobileReflow: Story = {
 		await expectTablesScrollInPlace(canvasElement);
 
 		// Every pager target is inside the viewport and still meets SC 2.5.8's 24 x 24 px minimum.
-		// Queried by slot, not by role "link": these are `<a>` elements without an `href`, which Base
-		// UI correctly exposes as `role="button"` with a tabindex rather than as links.
-		const targets = canvasElement.querySelectorAll<HTMLElement>('[data-slot="pagination-link"]');
+		// By role: the pager's controls change the page by calling back, so they are real buttons —
+		// including the boundary ones, which are `disabled` rather than dimmed anchors.
+		const pager = canvas.getByRole("navigation", { name: "pagination" });
+		const targets = within(pager).getAllByRole("button");
 		await expect(targets.length).toBeGreaterThan(2);
 		for (const target of targets) {
 			await expect(target.getBoundingClientRect().right).toBeLessThanOrEqual(window.innerWidth + 1);

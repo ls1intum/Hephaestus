@@ -1,12 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { useState } from "react";
-import { expect, screen, userEvent, within } from "storybook/test";
+import { expect, screen, userEvent, waitFor, within } from "storybook/test";
 import {
 	ACTION_LABELS,
 	ENTITY_TYPE_LABELS,
-} from "@/components/admin/config-audit/configAuditFormat";
+} from "@/components/admin/config-audit/config-audit-format";
+import { FacetMultiSelect } from "@/components/common/FacetMultiSelect";
 import { AuditDateFacet } from "./AuditDateFacet";
-import { AuditFacetFilter } from "./AuditFacetFilter";
 import { AuditToolbar } from "./AuditToolbar";
 
 // The production label maps, not retyped copies — a story asserting a label the app never renders
@@ -45,13 +45,13 @@ function ToolbarHarness({
 				setRange(undefined);
 			}}
 		>
-			<AuditFacetFilter
+			<FacetMultiSelect
 				title="Setting"
 				options={ENTITY_OPTIONS}
 				selected={entityTypes}
 				onChange={setEntityTypes}
 			/>
-			<AuditFacetFilter
+			<FacetMultiSelect
 				title="Action"
 				options={ACTION_OPTIONS}
 				selected={actions}
@@ -141,8 +141,12 @@ export const ClearsOneFacetOnly: Story = {
 		const canvas = within(canvasElement);
 		await userEvent.click(canvas.getByRole("combobox", { name: /^Setting/i }));
 		// Tabbed to, not clicked: Base UI's own Combobox.Clear carries tabIndex -1, so a mouse-only
-		// story passed while the control was unreachable for keyboard users.
+		// story passed while the control was unreachable for keyboard users. The popup moves focus to
+		// its search field asynchronously, so wait for that first — tabbing before it lands would
+		// measure the wrong starting point.
 		const clear = await screen.findByRole("button", { name: /clear selection/i });
+		const search = await screen.findByPlaceholderText("Search…");
+		await waitFor(() => expect(search).toHaveFocus());
 		await userEvent.tab();
 		await expect(clear).toHaveFocus();
 		await userEvent.keyboard("{Enter}");

@@ -1,10 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { formatCapUsd, formatCostUsd, formatRateUsd, MoneyCell } from "./jobUtils";
+import { formatCapUsd, formatCostUsd, formatRateUsd, MoneyCell } from "./job-utils";
 
 describe("formatCostUsd", () => {
 	it("renders nothing spent as $0, not a stray third decimal", () => {
-		// Regression: the old formatter used 3 decimals below $1, so zero rendered as "$0.000".
+		// Three decimals below $1 would render zero as "$0.000", which reads as a measured amount.
 		expect(formatCostUsd(0)).toBe("$0");
 	});
 
@@ -67,35 +67,52 @@ describe("formatRateUsd", () => {
 });
 
 describe("MoneyCell", () => {
-	/** One rendered cell, scoped to its own container so a test can render several. */
-	function cellText(value: string) {
-		const { container } = render(
-			<span data-testid="cell">
-				<MoneyCell>{value}</MoneyCell>
-			</span>,
+	it("announces the figure without the cents it pads the column with", () => {
+		render(
+			<table>
+				<tbody>
+					<tr>
+						<td>
+							<MoneyCell>$0</MoneyCell>
+						</td>
+					</tr>
+				</tbody>
+			</table>,
 		);
-		return container.firstElementChild as HTMLElement;
-	}
 
-	it("reserves the width of the cents a whole-dollar figure doesn't print", () => {
-		// `tabular-nums` equalises glyph width but not a missing ".00", so "$0" and "$4.50" would
-		// right-align with their decimal points in different places.
-		const cell = cellText("$0");
-		const pad = cell.querySelector("span");
-		expect(pad?.textContent).toBe(".00");
-		expect(pad?.className).toContain("invisible");
-		expect(pad?.getAttribute("aria-hidden")).toBe("true");
+		// The pad is `aria-hidden`, so it is absent from the accessible name — announcing "$0.00"
+		// would be a different amount of money.
+		expect(screen.getByRole("row", { name: "$0" })).toBeTruthy();
 	});
 
-	it("adds nothing to a figure that already prints its decimals", () => {
-		expect(cellText("$4.50").querySelector("span")).toBeNull();
-		// "<$0.01" already ends in cents, so its decimal point lands where "$4.50"'s does.
-		expect(cellText("<$0.01").querySelector("span")).toBeNull();
-	});
+	it("pads only the figures that are missing their cents", () => {
+		// The column alignment this exists for: "$0" is widened to "$4.50"'s width, and a figure that
+		// already prints its decimals is left alone rather than rendered "$4.50.00".
+		render(
+			<table>
+				<tbody>
+					<tr>
+						<td>
+							<MoneyCell>$0</MoneyCell>
+						</td>
+						<td>
+							<MoneyCell>$4.50</MoneyCell>
+						</td>
+						<td>
+							<MoneyCell>{"<$0.01"}</MoneyCell>
+						</td>
+					</tr>
+				</tbody>
+			</table>,
+		);
 
-	it("keeps the padding out of what is read and announced", () => {
-		const cell = cellText("$0");
-		// Testing Library reads direct text nodes, so the cell still answers to its visible figure.
-		expect(screen.getByText("$0")).toBe(cell);
+		// The three cells in the order they were written. Read by role rather than by test id, and by
+		// `textContent` rather than by accessible name, because the pad is `aria-hidden` — it is exactly
+		// the part of the cell that is seen and not announced.
+		const [whole, cents, bound] = screen.getAllByRole("cell");
+		expect(whole.textContent).toBe("$0.00");
+		expect(cents.textContent).toBe("$4.50");
+		// Already ends in cents, so its decimal point already lands where "$4.50"'s does.
+		expect(bound.textContent).toBe("<$0.01");
 	});
 });

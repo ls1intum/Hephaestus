@@ -1,5 +1,5 @@
 import { AlertTriangle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type {
 	CreateLlmModelRequest,
 	LlmModel,
@@ -7,11 +7,13 @@ import type {
 	UpdateLlmModelRequest,
 	UpdateLlmModelSharingRequest,
 } from "@/api/types.gen";
+import { FacetMultiSelect } from "@/components/common/FacetMultiSelect";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
 	Dialog,
+	DialogBody,
 	DialogContent,
 	DialogDescription,
 	DialogFooter,
@@ -34,9 +36,14 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import type { AdminLlmModelSaveBody } from "@/lib/adminLlmModelSave";
+import type { AdminLlmModelSaveBody } from "@/lib/admin-llm-model-save";
+import {
+	type FieldErrors,
+	type LlmModelFormField,
+	validateLlmModelForm,
+} from "@/lib/llm-form-validation";
 import { PriceModeEditor, type PriceModeValue } from "./PriceModeEditor";
-import { WorkspaceMultiSelect, type WorkspaceMultiSelectOption } from "./WorkspaceMultiSelect";
+import { type WorkspaceOption, workspaceFacetOptions } from "./workspace-options";
 
 // Passed as `items` so the trigger can render the selected label before the popup has ever opened
 // (Base UI Select otherwise has no label to show until the matching item has mounted once).
@@ -49,77 +56,93 @@ export interface AdminLlmModelFormDialogProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	editing: LlmModel | null;
-	workspaceOptions: WorkspaceMultiSelectOption[];
+	workspaceOptions: WorkspaceOption[];
 	/** Model ids discovered by the connection's last successful probe, offered as a datalist. */
 	probedModelIds: string[];
 	isSubmitting: boolean;
 	onSave: (body: AdminLlmModelSaveBody) => void;
 }
 
+function priceValueOf(model: LlmModel | null): PriceModeValue {
+	return {
+		pricingMode: model?.currentPrice?.pricingMode ?? "UNPRICED",
+		per1mInputUsd: model?.currentPrice?.per1mInputUsd,
+		per1mOutputUsd: model?.currentPrice?.per1mOutputUsd,
+		per1mCacheReadUsd: model?.currentPrice?.per1mCacheReadUsd,
+		per1mCacheWriteUsd: model?.currentPrice?.per1mCacheWriteUsd,
+		note: model?.currentPrice?.note,
+	};
+}
+
 /**
  * Create/edit an instance catalog model (#1368). Creation includes initial access; later access
  * changes use the dedicated access dialog so their immediate impact cannot be bypassed.
+ *
+ * The body is a separate component keyed on the edited model, so switching which model is edited
+ * remounts it with fresh initial state instead of copying props into state from an effect — the same
+ * seeding rule as the workspace-scoped form. An effect would leave a window, between the prop change
+ * and the effect running, in which the dialog shows the *previous* model's price and sharing under
+ * the new model's title.
  */
 export function AdminLlmModelFormDialog({
 	open,
+	onOpenChange,
+	editing,
+	...contentProps
+}: AdminLlmModelFormDialogProps) {
+	return (
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			{open && (
+				<AdminLlmModelFormDialogContent
+					key={editing?.id ?? "new"}
+					editing={editing}
+					onOpenChange={onOpenChange}
+					{...contentProps}
+				/>
+			)}
+		</Dialog>
+	);
+}
+
+type AdminLlmModelFormDialogContentProps = Omit<AdminLlmModelFormDialogProps, "open">;
+
+function AdminLlmModelFormDialogContent({
 	onOpenChange,
 	editing,
 	workspaceOptions,
 	probedModelIds,
 	isSubmitting,
 	onSave,
-}: AdminLlmModelFormDialogProps) {
+}: AdminLlmModelFormDialogContentProps) {
 	const isEdit = editing !== null;
-	const [displayName, setDisplayName] = useState("");
-	const [upstreamModelId, setUpstreamModelId] = useState("");
-	const [contextWindow, setContextWindow] = useState("");
-	const [maxOutputTokens, setMaxOutputTokens] = useState("");
-	const [supportsReasoning, setSupportsReasoning] = useState(false);
-	const [enabled, setEnabled] = useState(false);
-	const [price, setPrice] = useState<PriceModeValue>({ pricingMode: "UNPRICED" });
-	const [shareAll, setShareAll] = useState(false);
-	const [sharedWorkspaceIds, setSharedWorkspaceIds] = useState<number[]>([]);
-	const [errors, setErrors] = useState<{
-		displayName?: string;
-		upstreamModelId?: string;
-		per1mInputUsd?: string;
-		per1mOutputUsd?: string;
-		note?: string;
-	}>({});
+	const [displayName, setDisplayName] = useState(editing?.displayName ?? "");
+	const [upstreamModelId, setUpstreamModelId] = useState(editing?.upstreamModelId ?? "");
+	const [contextWindow, setContextWindow] = useState(
+		editing?.contextWindow != null ? String(editing.contextWindow) : "",
+	);
+	const [maxOutputTokens, setMaxOutputTokens] = useState(
+		editing?.maxOutputTokens != null ? String(editing.maxOutputTokens) : "",
+	);
+	const [supportsReasoning, setSupportsReasoning] = useState(editing?.supportsReasoning ?? false);
+	const [enabled, setEnabled] = useState(editing?.enabled ?? false);
+	const [price, setPrice] = useState<PriceModeValue>(() => priceValueOf(editing));
+	const [shareAll, setShareAll] = useState(editing ? editing.visibility === "PUBLIC" : false);
+	const [sharedWorkspaceIds, setSharedWorkspaceIds] = useState<number[]>(
+		editing?.grantedWorkspaceIds ?? [],
+	);
+	const [errors, setErrors] = useState<FieldErrors<LlmModelFormField>>({});
 
-	useEffect(() => {
-		if (!open) return;
-		setDisplayName(editing?.displayName ?? "");
-		setUpstreamModelId(editing?.upstreamModelId ?? "");
-		setContextWindow(editing?.contextWindow != null ? String(editing.contextWindow) : "");
-		setMaxOutputTokens(editing?.maxOutputTokens != null ? String(editing.maxOutputTokens) : "");
-		setSupportsReasoning(editing?.supportsReasoning ?? false);
-		setEnabled(editing?.enabled ?? false);
-		setPrice({
-			pricingMode: editing?.currentPrice?.pricingMode ?? "UNPRICED",
-			per1mInputUsd: editing?.currentPrice?.per1mInputUsd,
-			per1mOutputUsd: editing?.currentPrice?.per1mOutputUsd,
-			per1mCacheReadUsd: editing?.currentPrice?.per1mCacheReadUsd,
-			per1mCacheWriteUsd: editing?.currentPrice?.per1mCacheWriteUsd,
-			note: editing?.currentPrice?.note,
-		});
-		setShareAll(editing ? editing.visibility === "PUBLIC" : false);
-		setSharedWorkspaceIds(editing?.grantedWorkspaceIds ?? []);
-		setErrors({});
-	}, [open, editing]);
-
+	// The shared rules, not this form's own: a rule the workspace console enforces and the instance
+	// console does not is a rule an admin discovers from a 400.
 	const validate = (): boolean => {
-		const next: typeof errors = {};
-		if (!displayName.trim()) next.displayName = "A display name is required.";
-		if (!upstreamModelId.trim()) next.upstreamModelId = "The upstream model id is required.";
-		if (price.pricingMode === "PRICED") {
-			if (price.per1mInputUsd == null) next.per1mInputUsd = "Required when the model has a price.";
-			if (price.per1mOutputUsd == null)
-				next.per1mOutputUsd = "Required when the model has a price.";
-		}
-		if (price.pricingMode === "NO_CHARGE" && !price.note?.trim()) {
-			next.note = "Explain why no metered API rate applies.";
-		}
+		const next = validateLlmModelForm({
+			displayName,
+			// The upstream id is immutable, so an edit neither sends nor validates one.
+			...(isEdit ? {} : { upstreamModelId }),
+			contextWindow,
+			maxOutputTokens,
+			...price,
+		});
 		setErrors(next);
 		return Object.keys(next).length === 0;
 	};
@@ -158,17 +181,21 @@ export function AdminLlmModelFormDialog({
 	};
 
 	return (
-		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="sm:max-w-lg">
-				<form onSubmit={handleSubmit} className="space-y-4" noValidate>
-					<DialogHeader>
-						<DialogTitle>{isEdit ? "Edit model" : "Add model"}</DialogTitle>
-						<DialogDescription>
-							Give the model a name workspaces will recognize. The upstream id is never shown to
-							them.
-						</DialogDescription>
-					</DialogHeader>
+		<DialogContent className="sm:max-w-lg">
+			{/* `contents`, so the header/body/footer are the popup's own flex children: a `<form>` with a
+			    layout box of its own would defeat the pinned-header/scrolling-body column. */}
+			<form onSubmit={handleSubmit} className="contents" noValidate>
+				<DialogHeader>
+					<DialogTitle>{isEdit ? "Edit model" : "Add model"}</DialogTitle>
+					<DialogDescription>
+						Give the model a name workspaces will recognize. The upstream id is never shown to them.
+					</DialogDescription>
+				</DialogHeader>
 
+				{/* The tallest form on the instance console — seven fields, the price editor and the
+				    workspace picker, past 1000 px. Only the body scrolls, so the title and "Add model"
+				    stay reachable. */}
+				<DialogBody className="space-y-4 py-1">
 					<Field data-invalid={Boolean(errors.displayName)}>
 						<FieldLabel htmlFor="llm-model-display-name">Display name</FieldLabel>
 						<Input
@@ -236,14 +263,18 @@ export function AdminLlmModelFormDialog({
 						</Field>
 					</div>
 
-					<div className="flex items-center gap-2 text-sm">
+					<Field orientation="horizontal">
 						<Checkbox
 							id="llm-model-supports-reasoning"
 							checked={supportsReasoning}
 							onCheckedChange={(checked) => setSupportsReasoning(checked === true)}
 						/>
-						<label htmlFor="llm-model-supports-reasoning">Supports a reasoning mode</label>
-					</div>
+						<FieldContent>
+							<FieldLabel htmlFor="llm-model-supports-reasoning" className="font-normal">
+								Supports a reasoning mode
+							</FieldLabel>
+						</FieldContent>
+					</Field>
 
 					<Field orientation="horizontal">
 						<FieldContent>
@@ -265,10 +296,10 @@ export function AdminLlmModelFormDialog({
 					{editing?.enabled && !enabled && (
 						<Alert variant="warning">
 							<AlertTriangle aria-hidden />
-							<AlertTitle>Existing configurations will stop immediately</AlertTitle>
+							<AlertTitle>Work on this model stops immediately, in every workspace</AlertTitle>
 							<AlertDescription>
-								Practice detection and Mentor configurations using this model cannot run until the
-								model is reactivated or replaced.
+								Practice detection and Mentor can't run on it until you reactivate it, or until each
+								workspace picks another model.
 							</AlertDescription>
 						</Alert>
 					)}
@@ -304,12 +335,15 @@ export function AdminLlmModelFormDialog({
 							</Select>
 							{!shareAll && (
 								<>
-									<WorkspaceMultiSelect
+									<FacetMultiSelect
+										variant="field"
 										id="llm-model-share-workspaces"
+										title="Workspaces"
 										className="mt-2"
-										options={workspaceOptions}
-										selectedIds={sharedWorkspaceIds}
+										options={workspaceFacetOptions(workspaceOptions)}
+										selected={sharedWorkspaceIds}
 										onChange={setSharedWorkspaceIds}
+										emptyLabel="No workspaces yet"
 									/>
 									{sharedWorkspaceIds.length === 0 && (
 										<FieldDescription>
@@ -321,17 +355,17 @@ export function AdminLlmModelFormDialog({
 							)}
 						</Field>
 					)}
+				</DialogBody>
 
-					<DialogFooter>
-						<Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-							Cancel
-						</Button>
-						<Button type="submit" disabled={isSubmitting}>
-							{isEdit ? "Save changes" : "Add model"}
-						</Button>
-					</DialogFooter>
-				</form>
-			</DialogContent>
-		</Dialog>
+				<DialogFooter>
+					<Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+						Cancel
+					</Button>
+					<Button type="submit" disabled={isSubmitting}>
+						{isEdit ? "Save changes" : "Add model"}
+					</Button>
+				</DialogFooter>
+			</form>
+		</DialogContent>
 	);
 }

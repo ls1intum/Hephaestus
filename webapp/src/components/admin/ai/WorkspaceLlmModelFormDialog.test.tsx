@@ -90,7 +90,7 @@ describe("WorkspaceLlmModelFormDialog", () => {
 		expect(screen.getByRole("switch", { name: "Active" }).getAttribute("aria-checked")).toBe(
 			"false",
 		);
-		expect(screen.getByText("Existing configurations will stop immediately")).toBeTruthy();
+		expect(screen.getByText("Work on this model stops immediately")).toBeTruthy();
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 		expect(onUpdate.mock.calls[0]?.[1]).toEqual(expect.objectContaining({ enabled: false }));
 	});

@@ -1,4 +1,5 @@
 import type { LlmUsageByDay, LlmUsageByJobType } from "@/api/types.gen";
+import { asDate } from "@/lib/dates";
 
 export type LlmJobType = LlmUsageByJobType["jobType"];
 
@@ -12,6 +13,25 @@ export const JOB_TYPE_LABELS: Record<LlmJobType, string> = {
 /** Current calendar month in UTC as ISO `yyyy-MM` — matches the server's month bucketing. */
 export function currentMonthUtc(): string {
 	return new Date().toISOString().slice(0, 7);
+}
+
+/**
+ * Whether `month` *is* this month — the question the cap editors and the "at today's rate" hint turn
+ * on. Equality, never `>=`: those two ask different things and only one of them is about now.
+ * A month past this one is not the current month by any reading, and treating it as one would put a
+ * live cap editor and a live rate over a report that cannot exist.
+ */
+export function isCurrentMonthUtc(month: string): boolean {
+	return month === currentMonthUtc();
+}
+
+/**
+ * Whether the stepper may move forward from `month`. ISO `yyyy-MM` compares lexicographically, so
+ * this is a real "earlier than now" — and it stays false past it, which {@link isCurrentMonthUtc}
+ * negated would not.
+ */
+export function canStepForwardFrom(month: string): boolean {
+	return month < currentMonthUtc();
 }
 
 /** Shift an ISO `yyyy-MM` month by `delta` months (UTC-safe). */
@@ -30,13 +50,10 @@ export function formatMonthLabel(month: string): string {
 	);
 }
 
-/**
- * The generated client types date fields as `Date`, but the response transformers aren't wired
- * into the SDK calls, so at runtime they arrive as ISO strings — coerce defensively (the
- * established pattern in AdminWorkspacesTable / SessionsSection).
- */
+/** A day bucket as `Jul 22`. An unparseable day renders a dash rather than `Invalid Date`. */
 export function formatUsageDay(value: LlmUsageByDay["day"]): string {
-	const date = value instanceof Date ? value : new Date(value);
+	const date = asDate(value);
+	if (!date) return "–";
 	return date.toLocaleDateString(undefined, {
 		month: "short",
 		day: "numeric",
@@ -67,6 +84,12 @@ export function budgetResetDayLabel(month: string): string {
  * Share of a cap consumed, in percent, or `undefined` when there is no cap to compare against.
  * A $0 cap is a supported state ("paused immediately") and reads as 100% used — only an absent
  * cap has no percentage to show.
+ *
+ * Display only, and that is a rule rather than a description. Money is exact decimal on the server
+ * and a binary64 `number` here (see the API description's "Money and exact decimals"), so nothing
+ * this returns may decide anything: whether work is actually held back is `paused` on the payload,
+ * and whether spend is within its cap is the server's verdict. A meter that read 99.9997% while the
+ * gate was shut would be a rendering wart; a meter that *decided* would be a bug.
  */
 export function budgetUsedPercent(
 	spendUsd: number,

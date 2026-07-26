@@ -9,10 +9,6 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import type { ConfigAuditEntryView, PageConfigAuditEntryView } from "@/api/types.gen";
 import { AuditDateFacet } from "@/components/admin/audit-shared/AuditDateFacet";
-import {
-	AuditFacetFilter,
-	type AuditFacetOption,
-} from "@/components/admin/audit-shared/AuditFacetFilter";
 import { AuditRefFilterPill } from "@/components/admin/audit-shared/AuditRefFilterPill";
 import { AuditToolbar } from "@/components/admin/audit-shared/AuditToolbar";
 import {
@@ -23,15 +19,16 @@ import {
 	narrowToEnum,
 	nonEmpty,
 	toDateRange,
-} from "@/components/admin/audit-shared/auditSearch";
-import { dedupeById } from "@/components/admin/audit-shared/dedupeById";
-import { nameForRef } from "@/components/admin/audit-shared/nameForRef";
-import { springPageParams } from "@/components/admin/audit-shared/springPage";
+} from "@/components/admin/audit-shared/audit-search";
+import { dedupeById } from "@/components/admin/audit-shared/dedupe-by-id";
+import { nameForRef } from "@/components/admin/audit-shared/name-for-ref";
+import { springPageParams } from "@/components/admin/audit-shared/spring-page";
 import { ConfigAuditTable } from "@/components/admin/config-audit/ConfigAuditTable";
 import {
 	ACTION_LABELS,
 	ENTITY_TYPE_LABELS,
-} from "@/components/admin/config-audit/configAuditFormat";
+} from "@/components/admin/config-audit/config-audit-format";
+import { FacetMultiSelect, type FacetOption } from "@/components/common/FacetMultiSelect";
 
 const PAGE_SIZE = 50;
 
@@ -40,10 +37,10 @@ type Action = NonNullable<ConfigAuditEntryView["action"]>;
 
 // Facet options come from the shared label maps, so a new server enum value reaches both the filter
 // and the table's labels in one edit. Object.entries keeps the maps' declaration order.
-const ENTITY_TYPE_OPTIONS: AuditFacetOption[] = Object.entries(ENTITY_TYPE_LABELS).map(
+const ENTITY_TYPE_OPTIONS: FacetOption[] = Object.entries(ENTITY_TYPE_LABELS).map(
 	([value, label]) => ({ value, label }),
 );
-const ACTION_OPTIONS: AuditFacetOption[] = Object.entries(ACTION_LABELS).map(([value, label]) => ({
+const ACTION_OPTIONS: FacetOption[] = Object.entries(ACTION_LABELS).map(([value, label]) => ({
 	value,
 	label,
 }));
@@ -154,13 +151,13 @@ function ConfigAuditView({
 	return (
 		<div className="space-y-4">
 			<AuditToolbar hasFilter={hasFilter} onReset={reset}>
-				<AuditFacetFilter
+				<FacetMultiSelect
 					title="Setting"
 					options={ENTITY_TYPE_OPTIONS}
 					selected={search.entityType ?? []}
 					onChange={(values) => onSearchChange({ entityType: nonEmpty(values) })}
 				/>
-				<AuditFacetFilter
+				<FacetMultiSelect
 					title="Action"
 					options={ACTION_OPTIONS}
 					selected={search.action ?? []}

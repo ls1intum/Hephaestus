@@ -72,7 +72,7 @@ const meta = {
 			{ id: 11, displayName: "Research team", workspaceSlug: "research" },
 		],
 		models: mockModels,
-		mutatingId: null,
+		mutatingIds: new Set<number>(),
 		onAdd: fn(),
 		onEdit: fn(),
 		onManageAccess: fn(),

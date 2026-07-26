@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { saveAdminLlmModelSafely } from "./adminLlmModelSave";
+import { saveAdminLlmModelSafely } from "./admin-llm-model-save";
 
 const body = {
 	metadata: {

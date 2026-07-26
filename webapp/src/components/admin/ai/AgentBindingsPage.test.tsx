@@ -1,10 +1,7 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { HttpResponse, http } from "msw";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import type { AgentBinding, AvailableLlmModel } from "@/api/types.gen";
-import { server } from "@/mocks/server";
-import { AgentBindingsPage } from "./AgentBindingsPage";
+import { AgentBindingsPage, type AgentBindingsPageProps } from "./AgentBindingsPage";
 
 const model: AvailableLlmModel = {
 	id: 20,
@@ -25,74 +22,80 @@ const detectionBinding: AgentBinding = {
 	allowInternet: false,
 };
 
-/** Whether a purpose may run at all is a property of the workspace, not of the AI config. */
-const workspace = { practicesEnabled: true, mentorEnabled: true };
-
-/** Registering providers of your own is an instance-level permission, asked for separately. */
-const llmSettings = { ownProviderAllowed: false };
-
-function renderPage(bindings: AgentBinding[] = [detectionBinding], captured?: { body?: unknown }) {
-	server.use(
-		http.get("*/workspaces/demo/agents", () => HttpResponse.json(bindings)),
-		http.get("*/workspaces/demo/llm/settings", () => HttpResponse.json(llmSettings)),
-		http.get("*/workspaces/demo/llm/available-models", () => HttpResponse.json([model])),
-		http.get("*/workspaces/demo", () => HttpResponse.json(workspace)),
-		http.get("*/workspaces/demo/llm/usage", () =>
-			HttpResponse.json({
-				month: "2026-07",
-				instanceTotalCostUsd: 0,
-				ownProviderTotalCostUsd: 0,
-				unpricedEventCount: 0,
-				instancePaused: false,
-				ownProviderPaused: false,
-				instanceBudgetVerdict: "WITHIN",
-				ownProviderBudgetVerdict: "WITHIN",
-				byDay: [],
-				byJobType: [],
-			}),
-		),
-		http.put("*/workspaces/demo/agents/PRACTICE_DETECTION", async ({ request }) => {
-			if (captured) captured.body = await request.json();
-			return HttpResponse.json({ ...detectionBinding, ready: true });
-		}),
+/**
+ * The page takes everything it renders as a prop, so a test states the situation directly instead of
+ * standing up a QueryClient and five request mocks to arrive at the same screen.
+ */
+function renderPage(overrides: Partial<AgentBindingsPageProps> = {}) {
+	const onSave = vi.fn();
+	const onTurnOff = vi.fn();
+	render(
+		<AgentBindingsPage
+			workspaceSlug="demo"
+			bindings={[detectionBinding]}
+			availableModels={[model]}
+			// Whether a purpose may run at all is a property of the workspace, not of the AI config.
+			practicesEnabled
+			mentorEnabled
+			// Registering providers of your own is an instance-level permission, asked for separately.
+			ownProviderAllowed={false}
+			isLoading={false}
+			isError={false}
+			loadError={null}
+			pendingPurposes={new Set()}
+			onRetry={vi.fn()}
+			onSave={onSave}
+			onTurnOff={onTurnOff}
+			{...overrides}
+		/>,
 	);
-	const queryClient = new QueryClient({
-		defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-	});
-	return render(
-		<QueryClientProvider client={queryClient}>
-			<AgentBindingsPage workspaceSlug="demo" />
-		</QueryClientProvider>,
-	);
+	return { onSave, onTurnOff };
+}
+
+/**
+ * One card per purpose, each with its own "Active" switch and model picker, so an assertion about
+ * practice detection has to be scoped to its card rather than to the first match on the page.
+ */
+function practiceDetectionCard(): HTMLElement {
+	const field = screen.getByLabelText("Practice detection runs on");
+	const form = field.closest("form");
+	if (form == null) throw new Error("practice-detection card has no form");
+	return form;
 }
 
 describe("AgentBindingsPage", () => {
-	it("renders an assignment card for each purpose", async () => {
+	it("renders an assignment card for each purpose", () => {
 		renderPage();
-		expect(await screen.findByText("Practice detection")).toBeTruthy();
+		expect(screen.getByText("Practice detection")).toBeTruthy();
 		expect(screen.getByText("Mentor")).toBeTruthy();
 	});
 
-	it("shows a Not ready badge when the bound model cannot run", async () => {
+	it("shows a Not ready badge when the bound model cannot run", () => {
 		renderPage();
-		expect(await screen.findByText("Not ready")).toBeTruthy();
+		expect(screen.getByText("Not ready")).toBeTruthy();
 	});
 
-	it("saves the bound model id when the admin clicks Save", async () => {
-		const captured: { body?: unknown } = {};
-		renderPage([detectionBinding], captured);
+	it("saves the bound model id when the admin clicks Save", () => {
+		const { onSave } = renderPage();
 
-		const saveButtons = await screen.findAllByRole("button", { name: "Save" });
-		fireEvent.click(saveButtons[0]);
+		// The card shows the binding it is about to send back: the bound model by name, and Active on.
+		// Without this the payload could be right while the controls the admin reads showed otherwise.
+		const card = within(practiceDetectionCard());
+		expect(card.getByLabelText("Practice detection runs on").textContent).toContain("GPT Test");
+		expect(card.getByRole("switch", { name: "Active" }).getAttribute("aria-checked")).toBe("true");
 
-		await waitFor(() => expect(captured.body).toBeDefined());
-		expect(captured.body).toMatchObject({ instanceModelId: 20, enabled: true });
+		fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
+
+		expect(onSave).toHaveBeenCalledWith(
+			"PRACTICE_DETECTION",
+			expect.objectContaining({ instanceModelId: 20, enabled: true }),
+		);
 	});
 
-	it("exposes the advanced settings as a disclosure", async () => {
+	it("exposes the advanced settings as a disclosure", () => {
 		renderPage();
 
-		const trigger = (await screen.findAllByRole("button", { name: /Advanced/ }))[0];
+		const trigger = screen.getAllByRole("button", { name: /Advanced/ })[0];
 		expect(trigger.getAttribute("aria-expanded")).toBe("false");
 		expect(screen.queryByLabelText("Timeout (seconds)")).toBeNull();
 
@@ -106,43 +109,44 @@ describe("AgentBindingsPage", () => {
 		expect(panelId && document.getElementById(panelId)?.contains(timeout)).toBe(true);
 	});
 
-	it("refuses to save a cleared timeout instead of sending a zero", async () => {
-		const captured: { body?: unknown } = {};
-		renderPage([detectionBinding], captured);
+	it("refuses to save a cleared timeout instead of sending a zero", () => {
+		const { onSave } = renderPage();
 
-		fireEvent.click((await screen.findAllByRole("button", { name: /Advanced/ }))[0]);
+		fireEvent.click(screen.getAllByRole("button", { name: /Advanced/ })[0]);
 		fireEvent.change(screen.getByLabelText("Timeout (seconds)"), { target: { value: "" } });
 		fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
 
-		expect(await screen.findByText("Enter a number of seconds.")).toBeTruthy();
+		expect(screen.getByText("Enter a number of seconds.")).toBeTruthy();
 		expect(screen.getByLabelText("Timeout (seconds)").getAttribute("aria-invalid")).toBe("true");
-		// Nothing was sent — the old code PUT `timeoutSeconds: 0` here.
-		await waitFor(() => expect(captured.body).toBeUndefined());
+		// Nothing is sent: an empty field is a field left blank, never a `timeoutSeconds: 0` that would
+		// time every run out instantly.
+		expect(onSave).not.toHaveBeenCalled();
 	});
 
-	it("rejects a timeout below the floor and only saves once it is corrected", async () => {
-		const captured: { body?: unknown } = {};
-		renderPage([detectionBinding], captured);
+	it("rejects a timeout below the floor and only saves once it is corrected", () => {
+		const { onSave } = renderPage();
 
-		fireEvent.click((await screen.findAllByRole("button", { name: /Advanced/ }))[0]);
+		fireEvent.click(screen.getAllByRole("button", { name: /Advanced/ })[0]);
 		const timeout = screen.getByLabelText("Timeout (seconds)");
 		fireEvent.change(timeout, { target: { value: "5" } });
 		fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
 
-		expect(await screen.findByText("Enter a whole number of seconds, 30 or more.")).toBeTruthy();
-		expect(captured.body).toBeUndefined();
+		expect(screen.getByText("Enter a whole number of seconds, 30 or more.")).toBeTruthy();
+		expect(onSave).not.toHaveBeenCalled();
 
 		fireEvent.change(timeout, { target: { value: "45" } });
 		fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
 
-		await waitFor(() => expect(captured.body).toBeDefined());
-		expect(captured.body).toMatchObject({ timeoutSeconds: 45 });
+		expect(onSave).toHaveBeenCalledWith(
+			"PRACTICE_DETECTION",
+			expect.objectContaining({ timeoutSeconds: 45 }),
+		);
 	});
 
-	it("reopens the advanced disclosure when the field that blocked the save is inside it", async () => {
+	it("reopens the advanced disclosure when the field that blocked the save is inside it", () => {
 		renderPage();
 
-		fireEvent.click((await screen.findAllByRole("button", { name: /Advanced/ }))[0]);
+		fireEvent.click(screen.getAllByRole("button", { name: /Advanced/ })[0]);
 		fireEvent.change(screen.getByLabelText("Max concurrent runs"), { target: { value: "0" } });
 		// Collapse it again, so the invalid field is out of sight when Save is pressed.
 		fireEvent.click(screen.getAllByRole("button", { name: /Advanced/ })[0]);
@@ -150,6 +154,21 @@ describe("AgentBindingsPage", () => {
 
 		fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
 
-		expect(await screen.findByText("Enter a whole number of runs, 1 or more.")).toBeTruthy();
+		expect(screen.getByText("Enter a whole number of runs, 1 or more.")).toBeTruthy();
+	});
+
+	it("offers Turn off only for a purpose that is actually bound", () => {
+		const { onTurnOff } = renderPage();
+
+		// Two cards are on screen and only practice detection has a binding, so only it has something
+		// to turn off — Mentor's card offers Save alone. `getByRole` (singular) is the assertion: a
+		// second Turn off anywhere on the page fails it.
+		const turnOff = screen.getByRole("button", { name: "Turn off" });
+		expect(screen.getAllByRole("button", { name: "Save" })).toHaveLength(2);
+		expect(turnOff.closest("form")?.textContent).toContain("Practice detection");
+
+		fireEvent.click(turnOff);
+
+		expect(onTurnOff).toHaveBeenCalledWith("PRACTICE_DETECTION");
 	});
 });

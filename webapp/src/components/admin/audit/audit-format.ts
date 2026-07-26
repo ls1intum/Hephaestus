@@ -66,10 +66,6 @@ export function resultLabel(result: string): string {
 	return result === "FAILURE" ? "Failure" : "Success";
 }
 
-export { refLabel as accountLabel } from "../audit-shared/refLabel";
-
-export { formatTimestamp } from "../audit-shared/timeFormat";
-
 /**
  * Turn the JSONB `details` blob into a human sentence where we can — `{"from":"USER","to":"APP_ADMIN"}`
  * → `USER → APP_ADMIN`, other objects → `key: value` pairs — and fall back to the raw string when it is
@@ -98,5 +94,3 @@ function stringify(value: unknown): string {
 	if (typeof value === "object") return JSON.stringify(value);
 	return String(value);
 }
-
-export { prettyJson as prettyDetails } from "../audit-shared/prettyJson";

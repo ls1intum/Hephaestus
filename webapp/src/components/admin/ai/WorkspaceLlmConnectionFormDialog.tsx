@@ -36,6 +36,11 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
+	type FieldErrors,
+	type LlmConnectionFormField,
+	validateLlmConnectionForm,
+} from "@/lib/llm-form-validation";
+import {
 	authModeDefaultFor,
 	baseUrlDefaultFor,
 	defaultProtocolFor,
@@ -46,7 +51,7 @@ import {
 	type ProviderPreset,
 	presetForConnection,
 	usesResponsesApi,
-} from "@/lib/llmProviderType";
+} from "@/lib/llm-provider-type";
 
 export interface WorkspaceLlmConnectionFormDialogProps {
 	open: boolean;
@@ -106,14 +111,13 @@ function WorkspaceLlmConnectionFormDialogContent({
 	const [apiKey, setApiKey] = useState("");
 	const [clearApiKey, setClearApiKey] = useState(false);
 	const [enabled, setEnabled] = useState(editing?.enabled ?? false);
-	const [errors, setErrors] = useState<{ displayName?: string; baseUrl?: string }>({});
+	const [errors, setErrors] = useState<FieldErrors<LlmConnectionFormField>>({});
 
 	const apiProtocol = defaultProtocolFor(useResponsesApi);
 
 	const validate = (): boolean => {
-		const next: typeof errors = {};
-		if (!displayName.trim()) next.displayName = "A display name is required.";
-		if (!isEdit && !baseUrl.trim()) next.baseUrl = "A base URL is required.";
+		// Immutable once connected, so an edit neither sends a base URL nor validates one.
+		const next = validateLlmConnectionForm({ displayName, baseUrl: isEdit ? undefined : baseUrl });
 		setErrors(next);
 		return Object.keys(next).length === 0;
 	};
@@ -157,7 +161,7 @@ function WorkspaceLlmConnectionFormDialogContent({
 				</DialogHeader>
 
 				{/* This form is ~700 px tall — taller than a phone in portrait and far taller than one in
-				    landscape. It scrolls here so "Connect inactive provider" is always on screen. */}
+				    landscape. It scrolls here so the submit button is always on screen. */}
 				<DialogBody className="space-y-4 py-1">
 					<Field data-invalid={Boolean(errors.displayName)}>
 						<FieldLabel htmlFor="llm-conn-display-name">Display name</FieldLabel>
@@ -166,6 +170,7 @@ function WorkspaceLlmConnectionFormDialogContent({
 							value={displayName}
 							onChange={(event) => setDisplayName(event.target.value)}
 							placeholder="e.g. Production OpenAI"
+							required
 							aria-invalid={Boolean(errors.displayName)}
 						/>
 						{errors.displayName && <FieldError>{errors.displayName}</FieldError>}
@@ -231,6 +236,8 @@ function WorkspaceLlmConnectionFormDialogContent({
 							onChange={(event) => setBaseUrl(event.target.value)}
 							disabled={isEdit}
 							placeholder="https://api.openai.com/v1"
+							required={!isEdit}
+							autoComplete="off"
 							aria-invalid={Boolean(errors.baseUrl)}
 						/>
 						{isEdit && (
@@ -333,7 +340,7 @@ function WorkspaceLlmConnectionFormDialogContent({
 				<DialogFooter>
 					<DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
 					<Button type="submit" disabled={isSubmitting}>
-						{isEdit ? "Save changes" : "Connect inactive provider"}
+						{isEdit ? "Save changes" : "Connect provider"}
 					</Button>
 				</DialogFooter>
 			</form>

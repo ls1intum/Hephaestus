@@ -1,7 +1,15 @@
-import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
+import {
+	Field,
+	FieldDescription,
+	FieldError,
+	FieldGroup,
+	FieldLabel,
+	FieldLegend,
+	FieldSet,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import type { PricingMode } from "@/lib/llmPricing";
+import type { PricingMode } from "@/lib/llm-pricing";
 
 export interface PriceModeValue {
 	pricingMode: PricingMode;
@@ -84,9 +92,18 @@ export function PriceModeEditor({
 		);
 	};
 
+	const modes: { value: PricingMode; id: string; label: string }[] = [
+		{ value: "PRICED", id: `${idPrefix}-mode-priced`, label: "Price per 1M tokens" },
+		{ value: "NO_CHARGE", id: `${idPrefix}-mode-no-charge`, label: noChargeLabel },
+		{ value: "UNPRICED", id: `${idPrefix}-mode-unpriced`, label: unpricedLabel },
+	];
+
 	return (
-		<Field>
-			<FieldLabel>Price</FieldLabel>
+		// A fieldset, not a Field: these are one question with several answers and then the answer's own
+		// inputs, which is what a legend is for. The RadioGroup still carries its own name — a
+		// `role="radiogroup"` element is not named by the enclosing legend.
+		<FieldSet>
+			<FieldLegend variant="label">Price</FieldLegend>
 			<FieldDescription>
 				Enter the rate billed by the provider. OpenAI-compatible usage responses report tokens, not
 				your account's dollar charge.
@@ -99,22 +116,18 @@ export function PriceModeEditor({
 				disabled={disabled}
 				aria-label="Price"
 			>
-				<div className="flex items-center gap-2 text-sm font-normal">
-					<RadioGroupItem value="PRICED" id={`${idPrefix}-mode-priced`} />
-					<label htmlFor={`${idPrefix}-mode-priced`}>Price per 1M tokens</label>
-				</div>
-				<div className="flex items-center gap-2 text-sm font-normal">
-					<RadioGroupItem value="NO_CHARGE" id={`${idPrefix}-mode-no-charge`} />
-					<label htmlFor={`${idPrefix}-mode-no-charge`}>{noChargeLabel}</label>
-				</div>
-				<div className="flex items-center gap-2 text-sm font-normal">
-					<RadioGroupItem value="UNPRICED" id={`${idPrefix}-mode-unpriced`} />
-					<label htmlFor={`${idPrefix}-mode-unpriced`}>{unpricedLabel}</label>
-				</div>
+				{modes.map((mode) => (
+					<Field key={mode.value} orientation="horizontal">
+						<RadioGroupItem value={mode.value} id={mode.id} />
+						<FieldLabel htmlFor={mode.id} className="font-normal">
+							{mode.label}
+						</FieldLabel>
+					</Field>
+				))}
 			</RadioGroup>
 
 			{value.pricingMode === "PRICED" && (
-				<div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+				<FieldGroup className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
 					{numberField("per1mInputUsd", "Input (USD)", true)}
 					{numberField("per1mOutputUsd", "Output (USD)", true)}
 					{numberField("per1mCacheReadUsd", "Cache read (USD)", false)}
@@ -122,7 +135,7 @@ export function PriceModeEditor({
 					<FieldDescription className="sm:col-span-2">
 						Reasoning tokens are included in output tokens and are not priced a second time.
 					</FieldDescription>
-				</div>
+				</FieldGroup>
 			)}
 
 			{value.pricingMode === "NO_CHARGE" && (
@@ -148,6 +161,6 @@ export function PriceModeEditor({
 					{errors?.note && <FieldError>{errors.note}</FieldError>}
 				</Field>
 			)}
-		</Field>
+		</FieldSet>
 	);
 }

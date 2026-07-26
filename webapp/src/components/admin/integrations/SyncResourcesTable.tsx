@@ -11,6 +11,7 @@ import {
 import { Fragment, useState } from "react";
 import type { SyncResourceCount, SyncResourceState } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { RelativeTime } from "@/components/common/RelativeTime";
 import { Button } from "@/components/ui/button";
 import {
 	Empty,
@@ -33,9 +34,9 @@ import {
 } from "@/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { asDate } from "@/lib/dates";
 import { cn } from "@/lib/utils";
-import { RelativeTime } from "./RelativeTime";
-import { asDate, freshnessTone, stateLabel } from "./sync-format";
+import { freshnessTone, stateLabel } from "./sync-format";
 import { TableRowsSkeleton } from "./TableRowsSkeleton";
 
 type ClassKey = SyncResourceCount["key"];

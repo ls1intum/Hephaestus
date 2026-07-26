@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router";
 import { CircleDollarSign } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -13,18 +13,33 @@ import type { AdminWorkspaceLlmUsage } from "@/api/types.gen";
 import { AdminInstanceLlmUsageTable } from "@/components/admin/usage/AdminInstanceLlmUsageTable";
 import { MonthNavigator } from "@/components/admin/usage/MonthNavigator";
 import { SetBudgetDialog } from "@/components/admin/usage/SetBudgetDialog";
-import { addMonths, currentMonthUtc } from "@/components/admin/usage/usageUtils";
+import {
+	monthOf,
+	USAGE_SEARCH_PARAMS,
+	usageSearchSchema,
+} from "@/components/admin/usage/usage-search";
+import {
+	addMonths,
+	canStepForwardFrom,
+	isCurrentMonthUtc,
+} from "@/components/admin/usage/usage-utils";
 import { instanceAdminHead } from "@/lib/page-title";
 import { problemDetailOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute("/_authenticated/admin/usage")({
 	head: instanceAdminHead("AI usage"),
 	component: AdminInstanceUsagePage,
+	validateSearch: usageSearchSchema,
+	search: { middlewares: [retainSearchParams(USAGE_SEARCH_PARAMS)] },
 });
 
 function AdminInstanceUsagePage() {
 	const queryClient = useQueryClient();
-	const [month, setMonth] = useState(currentMonthUtc);
+	const month = monthOf(Route.useSearch());
+	const navigate = useNavigate({ from: Route.fullPath });
+	// Stepping a month is a navigation, so the month on screen is always the month in the address bar
+	// and always forwardable. `replace` is deliberately not used: Back stepping months is the point.
+	const goToMonth = (next: string) => navigate({ search: (prev) => ({ ...prev, month: next }) });
 	const [editing, setEditing] = useState<AdminWorkspaceLlmUsage | null>(null);
 	const [expanded, setExpanded] = useState<AdminWorkspaceLlmUsage | null>(null);
 
@@ -39,8 +54,8 @@ function AdminInstanceUsagePage() {
 		(a, b) =>
 			b.instanceTotalCostUsd - a.instanceTotalCostUsd || a.displayName.localeCompare(b.displayName),
 	);
-	// The rate belongs to the month, not to any row: it survives a month with no workspaces in it,
-	// where reading it off the first row used to leave the page silently USD-only.
+	// The rate belongs to the month, not to any row, so it is read off the envelope: a month with no
+	// workspaces in it has no first row to take it from, and still has a rate.
 	const fx = listQuery.data?.fx;
 	const detailQuery = useQuery({
 		...getLlmUsageReportOptions({
@@ -68,6 +83,12 @@ function AdminInstanceUsagePage() {
 		// sits next to the value that was rejected instead of evaporating above it.
 	});
 
+	// Two questions, not one: whether the stepper may move forward, and whether this *is* the current
+	// month — which is what the budget editors and the "at today's rate" hint turn on. A month later
+	// than this one answers no to both, so neither may be the other's negation.
+	const canGoNext = canStepForwardFrom(month);
+	const isCurrentMonth = isCurrentMonthUtc(month);
+
 	const handleSubmitBudget = (monthlyBudgetUsd: number | null) => {
 		if (!editing) {
 			return;
@@ -90,9 +111,11 @@ function AdminInstanceUsagePage() {
 				</header>
 				<MonthNavigator
 					month={month}
-					canGoNext={month < currentMonthUtc()}
-					onPrevMonth={() => setMonth((m) => addMonths(m, -1))}
-					onNextMonth={() => setMonth((m) => (m < currentMonthUtc() ? addMonths(m, 1) : m))}
+					canGoNext={canGoNext}
+					onPrevMonth={() => goToMonth(addMonths(month, -1))}
+					onNextMonth={() => {
+						if (canGoNext) goToMonth(addMonths(month, 1));
+					}}
 				/>
 			</div>
 
@@ -100,7 +123,7 @@ function AdminInstanceUsagePage() {
 				rows={rows}
 				month={month}
 				fx={fx}
-				isCurrentMonth={month >= currentMonthUtc()}
+				isCurrentMonth={isCurrentMonth}
 				isLoading={listQuery.isLoading}
 				error={listQuery.error}
 				onRetry={() => listQuery.refetch()}
@@ -120,6 +143,7 @@ function AdminInstanceUsagePage() {
 			<SetBudgetDialog
 				workspace={editing}
 				fx={fx}
+				isCurrentMonth={isCurrentMonth}
 				isPending={updateBudget.isPending}
 				serverError={
 					updateBudget.error != null

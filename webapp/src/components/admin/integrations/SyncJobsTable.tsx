@@ -3,6 +3,8 @@ import { formatDistanceStrict } from "date-fns";
 import { AlertCircleIcon, ChevronDownIcon, HistoryIcon } from "lucide-react";
 import type { SyncJob } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { RelativeTime } from "@/components/common/RelativeTime";
+import { TablePagination } from "@/components/common/TablePagination";
 import { Badge, type badgeVariants } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -14,17 +16,9 @@ import {
 	EmptyTitle,
 } from "@/components/ui/empty";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import {
-	Pagination,
-	PaginationContent,
-	PaginationItem,
-	PaginationNext,
-	PaginationPrevious,
-} from "@/components/ui/pagination";
 import { Table, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { RelativeTime } from "./RelativeTime";
+import { asDate } from "@/lib/dates";
 import {
-	asDate,
 	JOB_STATUS_LABEL,
 	JOB_TRIGGER_LABEL,
 	JOB_TYPE_LABEL,
@@ -296,10 +290,6 @@ export function SyncJobsTable({
 		);
 	}
 
-	const showFooter = page != null && totalPages != null && onPageChange != null && totalPages > 1;
-	const isFirstPage = page === 0;
-	const isLastPage = totalPages != null && page != null && page >= totalPages - 1;
-
 	return (
 		<div className="space-y-3">
 			<Table>
@@ -309,36 +299,13 @@ export function SyncJobsTable({
 				))}
 			</Table>
 
-			{showFooter && (
-				<Pagination className="justify-end">
-					<PaginationContent>
-						<PaginationItem>
-							<PaginationPrevious
-								aria-disabled={isFirstPage}
-								className={isFirstPage ? "pointer-events-none opacity-50" : "cursor-pointer"}
-								onClick={() => {
-									// `pointer-events-none` is presentation, not a guard — keyboard activation still
-									// reaches the handler, so the bound is enforced here too.
-									if (!isFirstPage) onPageChange(page - 1);
-								}}
-							/>
-						</PaginationItem>
-						<PaginationItem>
-							<span className="px-2 text-muted-foreground text-sm tabular-nums">
-								Page {page + 1} of {totalPages}
-							</span>
-						</PaginationItem>
-						<PaginationItem>
-							<PaginationNext
-								aria-disabled={isLastPage}
-								className={isLastPage ? "pointer-events-none opacity-50" : "cursor-pointer"}
-								onClick={() => {
-									if (!isLastPage) onPageChange(page + 1);
-								}}
-							/>
-						</PaginationItem>
-					</PaginationContent>
-				</Pagination>
+			{page != null && totalPages != null && onPageChange != null && (
+				<TablePagination
+					className="justify-end"
+					page={page}
+					totalPages={totalPages}
+					onPageChange={onPageChange}
+				/>
 			)}
 		</div>
 	);

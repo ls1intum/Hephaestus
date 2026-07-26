@@ -1,6 +1,6 @@
 import { Folder, Package, Rocket } from "lucide-react";
 import { describe, expect, it } from "vitest";
-import { getAreaVisual, ICON_NAMES, iconSearchText, PILL, SEEDED_AREA_SLUGS } from "./areaVisuals";
+import { getAreaVisual, ICON_NAMES, iconSearchText, PILL, SEEDED_AREA_SLUGS } from "./area-visuals";
 
 /**
  * The 11 seeded practice-area slugs (mirror of default-catalog.json). If a slug is renamed in the

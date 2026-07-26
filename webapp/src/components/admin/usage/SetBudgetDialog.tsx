@@ -3,15 +3,16 @@ import { BudgetAmountDialog } from "./BudgetAmountDialog";
 import type { Fx } from "./fx";
 
 export interface SetBudgetDialogProps {
-	/** The workspace whose cap is being edited; `null` keeps the dialog closed. */
+	/** `null` keeps the dialog closed. */
 	workspace: AdminWorkspaceLlmUsage | null;
 	/**
-	 * The month's display-currency rate, from the report envelope. Passed in rather than read off the
-	 * row so the live estimate under the field uses the same rate as the table behind the dialog.
+	 * From the report envelope rather than the row, so the estimate under the field uses the same
+	 * rate as the table behind the dialog.
 	 */
 	fx?: Fx;
+	/** Passed straight through to the shared editor; see its `isCurrentMonth`. */
+	isCurrentMonth?: boolean;
 	isPending: boolean;
-	/** A server-side rejection, rendered as a field error instead of a toast. */
 	serverError?: string | null;
 	onOpenChange: (open: boolean) => void;
 	/** `null` removes the cap; a number (USD, >= 0, 2 decimals) sets it. */
@@ -19,16 +20,14 @@ export interface SetBudgetDialogProps {
 }
 
 /**
- * Instance-admin dialog to set or remove a workspace's monthly shared-model budget — the spend the
- * *host* pays for. A budget of $0 pauses shared-model work immediately; removing it leaves that
- * spend uncapped. Spend on the workspace's own provider is separate money and is never affected —
- * that cap is the workspace's own (`SetOwnProviderBudgetDialog`).
- *
- * The field, validation, and error rendering come from `BudgetAmountDialog`; only the copy is here.
+ * Instance-admin dialog for a workspace's monthly shared-model budget — the spend the *host* pays
+ * for. $0 pauses shared-model work immediately; removing it leaves that spend uncapped. Spend on
+ * the workspace's own provider is separate money, capped by `SetOwnProviderBudgetDialog`.
  */
 export function SetBudgetDialog({
 	workspace,
 	fx,
+	isCurrentMonth,
 	isPending,
 	serverError,
 	onOpenChange,
@@ -37,7 +36,6 @@ export function SetBudgetDialog({
 	return (
 		<BudgetAmountDialog
 			open={workspace !== null}
-			// Keyed so the input state resets whenever a different workspace is edited.
 			resetKey={workspace?.workspaceSlug}
 			title="Set shared-model budget"
 			description={
@@ -51,11 +49,11 @@ export function SetBudgetDialog({
 			}
 			fieldLabel="Monthly budget (USD)"
 			submitLabel="Save budget"
-			// Otherwise this falls through to the shared dialog's "Remove cap" — and one click path
-			// would name this number four different ways.
+			// Otherwise this falls through to the shared dialog's "Remove cap", naming one number twice.
 			removeLabel="Remove budget"
 			currentValueUsd={workspace?.instanceMonthlyBudgetUsd ?? null}
 			fx={fx}
+			isCurrentMonth={isCurrentMonth}
 			isPending={isPending}
 			serverError={serverError}
 			onOpenChange={onOpenChange}

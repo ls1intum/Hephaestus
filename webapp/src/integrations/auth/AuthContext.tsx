@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { createContext, useContext } from "react";
-import { authClient, toUserProfile, type UserProfile } from "./authClient";
+import { authClient, toUserProfile, type UserProfile } from "./auth-client";
 import { isAppAdmin as computeIsAppAdmin, currentUserQueryOptions } from "./guard";
 
-export type { UserProfile } from "./authClient";
+export type { UserProfile } from "./auth-client";
 
 export interface AuthContextType {
 	isAuthenticated: boolean;

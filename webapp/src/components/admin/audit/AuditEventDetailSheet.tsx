@@ -1,4 +1,5 @@
 import type { AuthEventView } from "@/api/types.gen";
+import { DetailRow } from "@/components/common/DetailRow";
 import { Badge } from "@/components/ui/badge";
 import {
 	Sheet,
@@ -7,14 +8,10 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from "@/components/ui/sheet";
-import { DetailRow } from "../audit-shared/DetailRow";
-import {
-	accountLabel,
-	eventLabel,
-	formatTimestamp,
-	prettyDetails,
-	resultLabel,
-} from "./auditFormat";
+import { prettyJson } from "../audit-shared/pretty-json";
+import { refLabel } from "../audit-shared/ref-label";
+import { formatTimestamp } from "../audit-shared/time-format";
+import { eventLabel, resultLabel } from "./audit-format";
 
 interface AuditEventDetailSheetProps {
 	event: AuthEventView | null;
@@ -36,9 +33,9 @@ export function AuditEventDetailSheet({
 	resolveWorkspaceName,
 }: AuditEventDetailSheetProps) {
 	const ts = event ? formatTimestamp(event.occurredAt) : null;
-	const account = event ? accountLabel(event.account, event.accountId) : null;
-	const actor = event ? accountLabel(event.actor, event.actingAccountId) : null;
-	const pretty = event ? prettyDetails(event.details) : null;
+	const account = event ? refLabel(event.account, event.accountId) : null;
+	const actor = event ? refLabel(event.actor, event.actingAccountId) : null;
+	const pretty = event ? prettyJson(event.details) : null;
 	const workspaceName =
 		event?.workspaceId != null ? resolveWorkspaceName?.(event.workspaceId) : undefined;
 

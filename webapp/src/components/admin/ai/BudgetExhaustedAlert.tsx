@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { TriangleAlert } from "lucide-react";
 import type { WorkspaceLlmUsageReport } from "@/api";
-import { budgetResetDayLabel, currentMonthUtc } from "@/components/admin/usage/usageUtils";
+import { budgetResetDayLabel, currentMonthUtc } from "@/components/admin/usage/usage-utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 
@@ -62,7 +62,7 @@ export function BudgetExhaustedAlert({
 			<AlertTitle>
 				{own
 					? noPriceSet
-						? "Your cap can't be enforced"
+						? "Your provider cap can't be enforced"
 						: "Your provider cap is reached"
 					: noPriceSet
 						? "Shared-model spend can't be verified"

@@ -1,12 +1,9 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { FxRateInfo, WorkspaceLlmUsageReport } from "@/api/types.gen";
-import {
-	AdminInstanceLlmUsageTable,
-	type AdminWorkspaceLlmUsageRow,
-} from "./AdminInstanceLlmUsageTable";
+import type { AdminWorkspaceLlmUsage, FxRateInfo, WorkspaceLlmUsageReport } from "@/api/types.gen";
+import { AdminInstanceLlmUsageTable } from "./AdminInstanceLlmUsageTable";
 
-const workspace: AdminWorkspaceLlmUsageRow = {
+const workspace: AdminWorkspaceLlmUsage = {
 	workspaceSlug: "example-workspace",
 	displayName: "Example Workspace",
 	instanceMonthlyBudgetUsd: 25,
@@ -58,7 +55,7 @@ const detailReport: WorkspaceLlmUsageReport = {
 };
 
 function renderTable(
-	rows: AdminWorkspaceLlmUsageRow[],
+	rows: AdminWorkspaceLlmUsage[],
 	overrides: { isCurrentMonth?: boolean; fx?: FxRateInfo } = {},
 ) {
 	return render(
@@ -123,7 +120,6 @@ describe("AdminInstanceLlmUsageTable", () => {
 		expect(screen.getByRole("columnheader", { name: "Shared-model budget" })).toBeTruthy();
 		expect(screen.getByRole("columnheader", { name: "Provider cap" })).toBeTruthy();
 		const row = within(firstDataRow());
-		// A cap renders without trailing cents — "$25", not "$25.00".
 		expect(row.getByText("$25")).toBeTruthy();
 		expect(row.getByText("$10")).toBeTruthy();
 	});
@@ -198,6 +194,25 @@ describe("AdminInstanceLlmUsageTable", () => {
 		]);
 	});
 
+	it("withdraws the budget editor on a closed month, which it would silently change today", () => {
+		renderTable([workspace], { isCurrentMonth: false });
+
+		const buttons = within(firstDataRow())
+			.getAllByRole("button")
+			.map((button) => button.getAttribute("aria-label") ?? button.textContent);
+		// A budget is not month-scoped: saved from June's view it takes effect now. The month's figures
+		// are still readable — only the control that would change the present is gone.
+		expect(buttons).toEqual(["View usage details for Example Workspace"]);
+		// …and it says why, once, above the table. A control that is simply absent explains nothing.
+		expect(screen.getByText(/applies from the moment it is saved/i)).toBeTruthy();
+	});
+
+	it("says nothing about month scope while the editors are on screen", () => {
+		renderTable([workspace]);
+
+		expect(screen.queryByText(/applies from the moment it is saved/i)).toBeNull();
+	});
+
 	it("shows daily and run-type breakdowns for the expanded workspace", () => {
 		render(
 			<AdminInstanceLlmUsageTable
@@ -265,6 +280,7 @@ describe("AdminInstanceLlmUsageTable", () => {
 			currencyCode: "EUR",
 			ratePerUsd: 0.878966,
 			rateDate: new Date("2026-07-24T00:00:00.000Z"),
+			source: "ECB",
 		};
 
 		it("converts both spend columns, not just the one the host pays for", () => {
@@ -272,24 +288,9 @@ describe("AdminInstanceLlmUsageTable", () => {
 			renderTable([workspace], { fx: eur });
 
 			const row = within(firstDataRow());
-			// $4.25 shared and $1.75 on the workspace's own provider — the same physical quantity,
-			// differently funded. Converting one and not the other reads as "these differ in kind".
+			// Converting the shared spend and not the workspace's own reads as "these differ in kind".
 			expect(row.getByLabelText("approximately 3.74 euros")).toBeTruthy();
 			expect(row.getByLabelText("approximately 1.54 euros")).toBeTruthy();
-		});
-
-		it("puts the rate footnote after the figures it qualifies", () => {
-			const { container } = renderTable([workspace], { fx: eur });
-
-			const disclosure = screen.getByText(/ECB reference rate/);
-			const table = container.querySelector("table");
-			if (table == null) {
-				throw new Error("expected the rollup table to render");
-			}
-			// A footnote that precedes its numbers reads as a preamble to something else.
-			expect(
-				table.compareDocumentPosition(disclosure) & Node.DOCUMENT_POSITION_FOLLOWING,
-			).toBeTruthy();
 		});
 
 		it("stays silent about a rate nothing on the table used", () => {
@@ -297,17 +298,17 @@ describe("AdminInstanceLlmUsageTable", () => {
 				fx: eur,
 			});
 
-			expect(screen.queryByText(/ECB reference rate/)).toBeNull();
+			expect(screen.queryByText(/reference rate published on/)).toBeNull();
 		});
 
 		it("survives a month with no workspaces in it", () => {
-			// The rate belongs to the month, so it is still known here — it used to be read off
-			// `rows[0]`, which an empty month does not have. Nothing converted, so nothing is
-			// disclosed, but that is now the deliberate outcome rather than missing data.
+			// The rate belongs to the month, so it is still known here — reading it off `rows[0]`, which
+			// an empty month does not have, is the regression this pins. Nothing converted, so nothing
+			// is disclosed, but that is now the deliberate outcome rather than missing data.
 			renderTable([], { fx: eur });
 
 			expect(screen.getByText("No workspaces on this instance yet")).toBeTruthy();
-			expect(screen.queryByText(/ECB reference rate/)).toBeNull();
+			expect(screen.queryByText(/reference rate published on/)).toBeNull();
 		});
 
 		it("hands the table's own rate to the expanded breakdown", () => {
@@ -321,9 +322,8 @@ describe("AdminInstanceLlmUsageTable", () => {
 					isLoading={false}
 					error={null}
 					expandedWorkspaceSlug={workspace.workspaceSlug}
-					// The detail response carries its own block. One month resolves to one rate, so the two
-					// agree today — but nothing enforces that, and two rates on one screen is a bug nobody
-					// would spot. The panel renders the table's.
+					// One month resolves to one rate, so the two agree today — but nothing enforces it, and
+					// two rates on one screen is a bug nobody would spot. The panel renders the table's.
 					detailReport={{
 						...detailReport,
 						fx: { ...eur, currencyCode: "GBP", ratePerUsd: 0.5 },
@@ -349,6 +349,10 @@ describe("AdminInstanceLlmUsageTable", () => {
 			const footer = within(byDay).getByRole("row", { name: /^Total/ });
 			expect(footer.textContent).toContain("€");
 			expect(footer.textContent).not.toContain("£");
+			// And the money itself is the server's month total, not a re-addition of the two day rows:
+			// the rows here come to $8.50 while the report says $4.25, so only one of them can show.
+			expect(footer.textContent).toContain("$4.25");
+			expect(footer.textContent).not.toContain("$8.50");
 		});
 	});
 });

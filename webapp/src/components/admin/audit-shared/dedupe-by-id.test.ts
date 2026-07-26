@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dedupeById } from "./dedupeById";
+import { dedupeById } from "./dedupe-by-id";
 
 describe("dedupeById", () => {
 	it("drops a row an earlier page already served, keeping order", () => {

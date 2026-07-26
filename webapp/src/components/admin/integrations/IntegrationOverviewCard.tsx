@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { ArrowRightIcon, PlugZapIcon } from "lucide-react";
 import type { ConnectionSyncStatus, IntegrationCatalogEntry } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { RelativeTime } from "@/components/common/RelativeTime";
 import { GithubIcon, GitlabIcon, OutlineIcon, SlackIcon } from "@/components/icons/brand";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
@@ -10,7 +11,6 @@ import { ActiveJobProgress } from "./ActiveJobProgress";
 import { ConnectionHealthBadge } from "./ConnectionHealthBadge";
 import { ConnectionStateNotice } from "./ConnectionStateNotice";
 import { IntegrationCardHeading } from "./IntegrationCardHeading";
-import { RelativeTime } from "./RelativeTime";
 import { SyncNowButton } from "./SyncNowButton";
 import { freshnessTone } from "./sync-format";
 

@@ -27,13 +27,12 @@ import {
 import {
 	DELIVERY_STATUS_LABELS,
 	deliveryBadgeVariant,
-	formatCostUsd,
 	formatTokens,
 	type JobStatus,
 	modelLabel,
 	STATUS_LABELS,
 	statusBadgeVariant,
-} from "./jobUtils";
+} from "./job-utils";
 
 const FILTER_ALL = "ALL";
 
@@ -133,10 +132,8 @@ export function AgentJobsTable({
 					</EmptyHeader>
 				</Empty>
 			) : (
-				// Seven `whitespace-nowrap` columns cannot reflow to 320 px, so this table is the documented
-				// SC 1.4.10 exception: it scrolls horizontally *inside its own container* while the page
-				// around it does not. The border makes that container — and therefore the fact that there
-				// is more table off to the right — visible instead of invisible.
+				// Seven nowrap columns cannot reflow to 320 px, so this table takes the SC 1.4.10 data
+				// exception: it scrolls inside its own bordered container while the page around it does not.
 				<Table containerClassName="rounded-md border">
 					<TableCaption className="sr-only">AI runs for this workspace, newest first</TableCaption>
 					<TableHeader>
@@ -183,7 +180,6 @@ export function AgentJobsTable({
 											{formatTokens(job.llmTotalInputTokens)} /{" "}
 											{formatTokens(job.llmTotalOutputTokens)}
 										</span>
-										<span className="ml-2 tabular-nums">{formatCostUsd(job.llmCostUsd)}</span>
 									</TableCell>
 									<TableCell className="text-right">
 										{/* The button is the only affordance: a click handler on the row itself is

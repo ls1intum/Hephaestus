@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { fn } from "storybook/test";
+import { expectAmountRejected } from "@/test/budget-amount-field";
 import { SetBudgetDialog } from "./SetBudgetDialog";
 
 /**
@@ -58,44 +59,26 @@ export const Pending: Story = {
 };
 
 /**
- * Submitting a cleared field surfaces *why* it was rejected instead of silently doing nothing.
- * The dialog is portalled, so the play queries the document rather than the story canvas.
+ * Each amount the form must refuse, and the reason it gives — separate stories because each is a
+ * different thing on screen. The dialog is portalled, so {@link expectAmountRejected} queries the
+ * document rather than the story canvas.
  */
-export const InvalidEmptyValue: Story = {
-	play: async ({ args }) => {
-		const dialog = within(await screen.findByRole("dialog"));
-		await userEvent.clear(dialog.getByLabelText(/monthly budget/i));
-		await userEvent.click(dialog.getByRole("button", { name: /save budget/i }));
+const rejects =
+	(typed: string, reason: RegExp): Story["play"] =>
+	async ({ args }) =>
+		await expectAmountRejected({
+			fieldLabel: /monthly budget/i,
+			submitLabel: /save budget/i,
+			typed,
+			reason,
+			onSubmit: args.onSubmit,
+		});
 
-		await expect(dialog.getByRole("alert")).toHaveTextContent(/enter an amount/i);
-		await expect(args.onSubmit).not.toHaveBeenCalled();
-	},
-};
+/** Submitting a cleared field surfaces *why* it was rejected instead of silently doing nothing. */
+export const InvalidEmptyValue: Story = { play: rejects("", /enter an amount/i) };
 
 /** Sub-cent precision is rejected in the field rather than by a native browser bubble. */
-export const InvalidSubCentValue: Story = {
-	play: async ({ args }) => {
-		const dialog = within(await screen.findByRole("dialog"));
-		const input = dialog.getByLabelText(/monthly budget/i);
-		await userEvent.clear(input);
-		await userEvent.type(input, "25.005");
-		await userEvent.click(dialog.getByRole("button", { name: /save budget/i }));
-
-		await expect(dialog.getByRole("alert")).toHaveTextContent(/two decimal places/i);
-		await expect(args.onSubmit).not.toHaveBeenCalled();
-	},
-};
+export const InvalidSubCentValue: Story = { play: rejects("25.005", /two decimal places/i) };
 
 /** A negative amount is rejected with its own reason, and nothing is submitted. */
-export const InvalidNegativeValue: Story = {
-	play: async ({ args }) => {
-		const dialog = within(await screen.findByRole("dialog"));
-		const input = dialog.getByLabelText(/monthly budget/i);
-		await userEvent.clear(input);
-		await userEvent.type(input, "-5");
-		await userEvent.click(dialog.getByRole("button", { name: /save budget/i }));
-
-		await expect(dialog.getByRole("alert")).toHaveTextContent(/\$0 or more/i);
-		await expect(args.onSubmit).not.toHaveBeenCalled();
-	},
-};
+export const InvalidNegativeValue: Story = { play: rejects("-5", /\$0 or more/i) };

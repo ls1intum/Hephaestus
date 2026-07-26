@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { getCurrentUserOptions, getCurrentUserQueryKey } from "@/api/@tanstack/react-query.gen";
-import { refreshAccessToken } from "./sessionRefresh";
+import { refreshAccessToken } from "./session-refresh";
 
 /**
  * Proactive, activity-gated session keep-alive (ADR 0017).

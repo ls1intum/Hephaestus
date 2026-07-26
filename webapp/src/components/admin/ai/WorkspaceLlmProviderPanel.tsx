@@ -23,18 +23,9 @@ import type {
 	WorkspaceLlmConnection,
 	WorkspaceLlmModel,
 } from "@/api/types.gen";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-	AlertDialog,
-	AlertDialogAction,
-	AlertDialogCancel,
-	AlertDialogContent,
-	AlertDialogDescription,
-	AlertDialogFooter,
-	AlertDialogHeader,
-	AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,6 +37,7 @@ import {
 	EmptyTitle,
 } from "@/components/ui/empty";
 import { Spinner } from "@/components/ui/spinner";
+import { filedUnder, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
 import { WorkspaceLlmConnectionFormDialog } from "./WorkspaceLlmConnectionFormDialog";
 import { WorkspaceLlmModelFormDialog } from "./WorkspaceLlmModelFormDialog";
@@ -58,6 +50,21 @@ export interface WorkspaceLlmProviderPanelProps {
 
 type TestResult = { ok: boolean; message: string };
 
+/**
+ * Filed under a key of its own so the panel can ask the cache which connections are being probed.
+ * Probes are slow network round-trips with no confirmation step, and testing two providers one after
+ * the other without waiting is the normal way to use this screen.
+ */
+const PROBE_MUTATION_KEY = ["workspaceProbeLlmConnection"];
+/**
+ * Update and delete of a model share one prefix, so one lookup answers "is this row busy" for both.
+ * A row's controls must stay disabled until *its own* write settles, not until whichever write
+ * settles first.
+ */
+const MODEL_WRITE_MUTATION_KEY = ["workspaceWriteLlmModel"];
+/** Same reason, for connections: disconnecting one provider must not disable the others' buttons. */
+const CONNECTION_DELETE_MUTATION_KEY = ["workspaceDeleteLlmConnection"];
+
 /** Workspace-owned OpenAI-compatible connections and the models grouped under each connection. */
 export function WorkspaceLlmProviderPanel({
 	workspaceSlug,
@@ -69,9 +76,7 @@ export function WorkspaceLlmProviderPanel({
 	const [modelDialogOpen, setModelDialogOpen] = useState(false);
 	const [modelConnectionId, setModelConnectionId] = useState<number | null>(null);
 	const [editingModel, setEditingModel] = useState<WorkspaceLlmModel | null>(null);
-	const [mutatingModelId, setMutatingModelId] = useState<number | null>(null);
 	const [registrationDisabled, setRegistrationDisabled] = useState(false);
-	const [probingConnectionId, setProbingConnectionId] = useState<number | null>(null);
 	const [testResults, setTestResults] = useState<Record<number, TestResult>>({});
 	const [deletingConnection, setDeletingConnection] = useState<WorkspaceLlmConnection | null>(null);
 	const registrationBlocked = !ownProviderAllowed || registrationDisabled;
@@ -117,7 +122,10 @@ export function WorkspaceLlmProviderPanel({
 		onError: (error) => toast.error(problemDetailOf(error, "Could not update your provider")),
 	});
 	const deleteConnection = useMutation({
-		...workspaceDeleteLlmConnectionMutation(),
+		...filedUnder(
+			[...CONNECTION_DELETE_MUTATION_KEY, workspaceSlug],
+			workspaceDeleteLlmConnectionMutation(),
+		),
 		onSuccess: () => {
 			invalidateConnections();
 			invalidateModels();
@@ -126,7 +134,7 @@ export function WorkspaceLlmProviderPanel({
 		onError: (error) => toast.error(problemDetailOf(error, "Could not disconnect your provider")),
 	});
 	const probeConnection = useMutation({
-		...workspaceProbeLlmConnectionMutation(),
+		...filedUnder([...PROBE_MUTATION_KEY, workspaceSlug], workspaceProbeLlmConnectionMutation()),
 		onSuccess: (result, variables) => {
 			setTestResults((current) => ({
 				...current,
@@ -147,8 +155,15 @@ export function WorkspaceLlmProviderPanel({
 				},
 			}));
 		},
-		onSettled: () => setProbingConnectionId(null),
 	});
+	const probingConnectionIds = usePendingMutationIds<{ path: { id: number } }>(
+		[...PROBE_MUTATION_KEY, workspaceSlug],
+		(variables) => variables.path.id,
+	);
+	const disconnectingConnectionIds = usePendingMutationIds<{ path: { id: number } }>(
+		[...CONNECTION_DELETE_MUTATION_KEY, workspaceSlug],
+		(variables) => variables.path.id,
+	);
 
 	const createModel = useMutation({
 		...workspaceCreateLlmModelMutation(),
@@ -163,24 +178,26 @@ export function WorkspaceLlmProviderPanel({
 		},
 	});
 	const updateModel = useMutation({
-		...workspaceUpdateLlmModelMutation(),
+		...filedUnder([...MODEL_WRITE_MUTATION_KEY, workspaceSlug], workspaceUpdateLlmModelMutation()),
 		onSuccess: () => {
 			invalidateModels();
 			setModelDialogOpen(false);
 			toast.success("Model updated");
 		},
 		onError: (error) => toast.error(problemDetailOf(error, "Could not update the model")),
-		onSettled: () => setMutatingModelId(null),
 	});
 	const deleteModel = useMutation({
-		...workspaceDeleteLlmModelMutation(),
+		...filedUnder([...MODEL_WRITE_MUTATION_KEY, workspaceSlug], workspaceDeleteLlmModelMutation()),
 		onSuccess: () => {
 			invalidateModels();
 			toast.success("Model deleted");
 		},
 		onError: (error) => toast.error(problemDetailOf(error, "Could not delete the model")),
-		onSettled: () => setMutatingModelId(null),
 	});
+	const mutatingModelIds = usePendingMutationIds<{ path: { id: number } }>(
+		[...MODEL_WRITE_MUTATION_KEY, workspaceSlug],
+		(variables) => variables.path.id,
+	);
 
 	if (connectionsQuery.isError) {
 		return (
@@ -257,7 +274,7 @@ export function WorkspaceLlmProviderPanel({
 					    the button no longer fit side by side. */}
 					<div className="flex flex-wrap items-center justify-between gap-3">
 						<div className="min-w-0 flex-1">
-							<h3 className="text-sm font-medium">Your providers</h3>
+							<h2 className="text-lg font-semibold">Your AI providers</h2>
 						</div>
 						{!registrationBlocked && (
 							<Button size="sm" variant="outline" onClick={openCreateConnection}>
@@ -301,9 +318,8 @@ export function WorkspaceLlmProviderPanel({
 										<Button
 											variant="outline"
 											size="sm"
-											disabled={probingConnectionId === connection.id}
+											disabled={probingConnectionIds.has(connection.id)}
 											onClick={() => {
-												setProbingConnectionId(connection.id);
 												setTestResults((current) => {
 													const next = { ...current };
 													delete next[connection.id];
@@ -312,13 +328,13 @@ export function WorkspaceLlmProviderPanel({
 												probeConnection.mutate({ path: { workspaceSlug, id: connection.id } });
 											}}
 										>
-											{probingConnectionId === connection.id ? "Testing…" : "Test connection"}
+											{probingConnectionIds.has(connection.id) ? "Testing…" : "Test connection"}
 										</Button>
 										<Button
 											variant="outline"
 											size="sm"
 											className="text-destructive"
-											disabled={deleteConnection.isPending}
+											disabled={disconnectingConnectionIds.has(connection.id)}
 											onClick={() => setDeletingConnection(connection)}
 										>
 											Disconnect
@@ -348,16 +364,15 @@ export function WorkspaceLlmProviderPanel({
 										</div>
 										<WorkspaceLlmModelsTable
 											models={connectionModels}
-											mutatingId={mutatingModelId}
+											mutatingIds={mutatingModelIds}
 											onEdit={(model) => {
 												setEditingModel(model);
 												setModelConnectionId(model.connectionId);
 												setModelDialogOpen(true);
 											}}
-											onDelete={(model) => {
-												setMutatingModelId(model.id);
-												deleteModel.mutate({ path: { workspaceSlug, id: model.id } });
-											}}
+											onDelete={(model) =>
+												deleteModel.mutate({ path: { workspaceSlug, id: model.id } })
+											}
 										/>
 									</div>
 								</CardContent>
@@ -388,44 +403,21 @@ export function WorkspaceLlmProviderPanel({
 					if (modelConnectionId == null) return;
 					createModel.mutate({ path: { workspaceSlug, connectionId: modelConnectionId }, body });
 				}}
-				onUpdate={(id, body: UpdateWorkspaceLlmModelRequest) => {
-					setMutatingModelId(id);
-					updateModel.mutate({ path: { workspaceSlug, id }, body });
-				}}
+				onUpdate={(id, body: UpdateWorkspaceLlmModelRequest) =>
+					updateModel.mutate({ path: { workspaceSlug, id }, body })
+				}
 			/>
 
-			<AlertDialog
-				open={deletingConnection != null}
-				onOpenChange={(open) => {
-					if (!open && !deleteConnection.isPending) setDeletingConnection(null);
-				}}
-			>
-				<AlertDialogContent>
-					<AlertDialogHeader>
-						<AlertDialogTitle>Disconnect “{deletingConnection?.displayName}”?</AlertDialogTitle>
-						<AlertDialogDescription>
-							The stored credential will be permanently removed. A connection with models still on
-							it cannot be disconnected.
-						</AlertDialogDescription>
-					</AlertDialogHeader>
-					<AlertDialogFooter>
-						<AlertDialogCancel disabled={deleteConnection.isPending}>Cancel</AlertDialogCancel>
-						<AlertDialogAction
-							variant="destructive"
-							disabled={deleteConnection.isPending}
-							onClick={() => {
-								if (!deletingConnection) return;
-								deleteConnection.mutate(
-									{ path: { workspaceSlug, id: deletingConnection.id } },
-									{ onSuccess: () => setDeletingConnection(null) },
-								);
-							}}
-						>
-							{deleteConnection.isPending ? "Disconnecting…" : "Disconnect provider"}
-						</AlertDialogAction>
-					</AlertDialogFooter>
-				</AlertDialogContent>
-			</AlertDialog>
+			<ConfirmDialog
+				subject={deletingConnection}
+				onClose={() => setDeletingConnection(null)}
+				title={(connection) => `Disconnect “${connection.displayName}”?`}
+				description="The stored credential will be permanently removed. A connection with models still on it cannot be disconnected."
+				confirmLabel="Disconnect provider"
+				onConfirm={(connection) =>
+					deleteConnection.mutate({ path: { workspaceSlug, id: connection.id } })
+				}
+			/>
 		</div>
 	);
 }

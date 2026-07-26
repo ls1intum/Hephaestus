@@ -7,7 +7,7 @@ import {
 	mockJobFailedDelivery,
 	mockJobRunning,
 	mockJobTimedOut,
-} from "./storyMockData";
+} from "./story-mock-data";
 
 /**
  * Slide-over panel with a run's overview, usage, error, and config snapshot, plus

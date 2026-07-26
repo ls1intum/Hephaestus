@@ -40,7 +40,7 @@ import { useChat } from "@ai-sdk/react";
 import { getThreadQueryKey } from "@/api/@tanstack/react-query.gen";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import type { ChatMessage } from "@/lib/types";
-import { useMentorChat } from "./useMentorChat";
+import { useMentorChat } from "./use-mentor-chat";
 
 // Type the mocks for better intellisense
 const mockUseChat = useChat as Mock;

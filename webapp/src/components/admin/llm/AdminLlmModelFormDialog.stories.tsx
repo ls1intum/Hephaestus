@@ -1,8 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent } from "storybook/test";
 import type { LlmModel } from "@/api/types.gen";
+import {
+	expectControlOnScreen,
+	expectDialogBodyScrolls,
+	expectDialogFitsViewport,
+} from "@/test/reflow";
 import { AdminLlmModelFormDialog } from "./AdminLlmModelFormDialog";
-import type { WorkspaceMultiSelectOption } from "./WorkspaceMultiSelect";
+import type { WorkspaceOption } from "./workspace-options";
 
 const mockModel: LlmModel = {
 	id: 1,
@@ -26,7 +31,7 @@ const mockModel: LlmModel = {
 	createdAt: new Date("2026-05-01T10:00:00Z"),
 };
 
-const mockWorkspaces: WorkspaceMultiSelectOption[] = [
+const mockWorkspaces: WorkspaceOption[] = [
 	{ id: 1, displayName: "Example Workspace", workspaceSlug: "example-workspace" },
 	{ id: 2, displayName: "Acme Corp", workspaceSlug: "acme" },
 ];
@@ -68,5 +73,24 @@ export const ValidationError: Story = {
 		await userEvent.click(await screen.findByRole("button", { name: /add model/i }));
 		await expect(await screen.findByText(/display name is required/i)).toBeInTheDocument();
 		await expect(await screen.findByText(/upstream model id is required/i)).toBeInTheDocument();
+	},
+};
+
+/**
+ * Seven fields, the price editor and the workspace picker — past 1000 px — at the WCAG 2.2
+ * SC 1.4.10 reflow width (320 px). Only the body scrolls, so the title stays pinned and "Add model"
+ * stays reachable.
+ */
+export const MobileReflow: Story = {
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320, 375, 768] },
+	},
+	play: async () => {
+		const submit = await screen.findByRole("button", { name: /^add model$/i });
+		await expectDialogFitsViewport();
+		await expectDialogBodyScrolls();
+		await expectControlOnScreen(submit);
+		await expectControlOnScreen(screen.getByRole("button", { name: /^close$/i }));
 	},
 };

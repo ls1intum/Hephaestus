@@ -1,62 +1,39 @@
 import type { FxRateInfo } from "@/api/types.gen";
+import { asDate } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 
 /**
  * Display-only currency conversion for the AI-usage surfaces.
  *
- * USD is the real number everywhere: spend is metered, capped and enforced in USD, and the server
- * only ever sends USD amounts. When the instance has opted into a display currency the response
- * carries an {@link FxRateInfo}, and every USD figure may show a *secondary* estimate beside it —
- * `$4.50 (≈ €3.96)`. The ordering is the message: the dollar leads, the estimate follows, and the
- * `≈` marks it as approximate at every occurrence.
+ * USD stays authoritative — spend is metered, capped and enforced in USD, and the server only sends
+ * USD. A converted figure is a secondary estimate beside it: `$4.50 (≈ €3.96)`. Absent `fx` is the
+ * norm rather than an error: every formatter returns the plain USD string and every component
+ * renders `null`, so an instance that never opted in shows no footnote and no empty slot.
  *
- * **Where the estimate goes depends on how the figure is read:**
- * - *Headline or prose* — inline parenthetical ({@link FxAmount} and friends): `$4.50 (≈ €3.96)`.
- * - *Any table cell* — a second muted line under the figure ({@link FxLine}, {@link FxSpendLine}).
- *   A column is scanned down its right edge, and a variable-width suffix shifts every row's USD
- *   figure by a different amount, which is exactly the alignment that makes money scannable.
- * - *Form field* — a block hint under the input ({@link fxCapHint}), read on focus.
- * - *A meter's `aria-valuetext`* — USD only. A meter answers "how far along", and saying the same
- *   proportion twice in two currencies is a regression for anyone listening to it.
- *
- * `≈` is reserved for currency conversion on these surfaces. A figure that is approximate for some
- * other reason (an average, a projection) says so in its label, so the glyph keeps one meaning.
- *
- * `fx` absent is the default for every instance that never opted in, and is also what the server
- * sends when the stored rate is stale or missing. It is not an error state: every formatter here
- * returns the plain USD string it would have returned before this feature existed, and every
- * component renders `null`. No footnote, no empty slot, no layout shift.
+ * Table cells take the estimate on a second line, not as an inline suffix: a variable-width suffix
+ * shifts each row's USD figure differently and breaks the right-edge alignment a money column is
+ * scanned by. A meter's `aria-valuetext` stays USD-only — it answers "how far along", and saying
+ * the same proportion twice is a regression for anyone listening to it.
  */
 
-/** No conversion below this: `formatCostUsd` renders it as the bound `<$0.01`, not as a figure. */
+/** Below this, `formatCostUsd` renders the bound `<$0.01`, which is not a figure to convert. */
 const SUB_CENT_USD = 0.005;
 
-/** Cents for spend — the same precision the USD figure it sits beside is shown at. */
 const SPEND_DIGITS = 2;
-/**
- * Whole units for a cap. `€43.95` beside a round `$50` claims a precision the estimate does not
- * have; `€44` says "about this much", which is all a converted cap can honestly say.
- */
+/** Whole units: `€43.95` beside a round `$50` claims a precision the estimate does not have. */
 const CAP_DIGITS = 0;
-/** The rate itself, in the one place it is quoted: `1 USD ≈ €0.879`. */
 const RATE_DIGITS = 3;
 
-/** The conversion block a response may carry, in every shape a caller might hold it in. */
 export type Fx = FxRateInfo | null | undefined;
 
 type CurrencyDisplay = "symbol" | "code" | "name";
 
-/**
- * `Intl.NumberFormat` construction is expensive and these run per table cell, so formatters are
- * built once per (currency, precision, display). A `null` entry records a currency code the
- * platform rejects — cached too, so a bad code costs one throw rather than one per render.
- */
+/** Keyed by (currency, digits, display); a `null` entry caches a code the platform rejected. */
 const formatters = new Map<string, Intl.NumberFormat | null>();
 
 /**
- * Deliberately `en-US`, not the viewer's locale: `de-DE` renders `3,96 €`, and a comma decimal
- * inside a parenthetical hanging off `$4.50` puts two number grammars in one line. Full i18n is a
- * separate effort — until then one grammar, consistently.
+ * `en-US` deliberately, not the viewer's locale: `de-DE` renders `3,96 €`, and a comma decimal in a
+ * parenthetical hanging off `$4.50` puts two number grammars on one line.
  */
 function formatter(
 	currencyCode: string,
@@ -89,11 +66,8 @@ function formatter(
 const usesIsoCode = new Map<string, boolean>();
 
 /**
- * Which currency notation this code renders in.
- *
- * A `$` in the secondary amount would be read as dollars — which is exactly what the primary
- * amount right next to it is. Any currency whose `en-US` symbol contains a dollar sign (CAD, AUD
- * and friends, rendered `CA$`/`A$` by some ICU builds and a bare `$` by others) therefore shows its
+ * A dollar-like symbol beside the primary USD figure would read as dollars, so any currency whose
+ * `en-US` symbol contains `$` (CAD, AUD — `CA$` on some ICU builds, a bare `$` on others) shows its
  * ISO code instead: `$50 (≈ CAD 44)`. Currencies with their own glyph — €, £, ¥ — keep it.
  */
 function displayFor(currencyCode: string): CurrencyDisplay {
@@ -110,11 +84,14 @@ function displayFor(currencyCode: string): CurrencyDisplay {
 }
 
 /**
- * One converted amount, written and spoken.
+ * The spoken form comes from `currencyDisplay: "name"`, so currency words are `Intl`'s, not ours.
  *
- * Both forms come out of `Intl` — the spoken one from `currencyDisplay: "name"`, so "euros" /
- * "Japanese yen" / "pounds sterling" are the platform's words rather than an English table we would
- * have to keep per currency.
+ * An amount below one unit of the requested precision converts to nothing at all. `SUB_CENT_USD`
+ * bounds the *USD* side only, and at {@link CAP_DIGITS} that leaves the estimate free to be wrong by
+ * most of itself: a $0.40 cap is €0.35, which whole units render as `≈ €0` — free, which it is not —
+ * and $0.60 is €0.53, rendered `≈ €1`, nearly double. Neither is a rounding wobble a reader can
+ * discount, so below the first whole unit there is no figure rather than a misleading one. One
+ * guard, in the one place both precisions pass through.
  */
 function amountIn(
 	usd: number | null | undefined,
@@ -128,12 +105,14 @@ function amountIn(
 		return null;
 	}
 	const value = usd * fx.ratePerUsd;
+	if (value < 10 ** -digits) {
+		return null;
+	}
 	const written = formatter(fx.currencyCode, digits, displayFor(fx.currencyCode))?.format(value);
 	const spoken = formatter(fx.currencyCode, digits, "name")?.format(value);
 	return written != null && spoken != null ? { written, spoken } : null;
 }
 
-/** A secondary amount, ready to render: what it looks like and what it should sound like. */
 export interface FxConversion {
 	/** As it renders, without surrounding punctuation: `≈ €3.96`. */
 	text: string;
@@ -147,26 +126,18 @@ function conversionOf(amount: { written: string; spoken: string } | null): FxCon
 		: { text: `≈ ${amount.written}`, label: `approximately ${amount.spoken}` };
 }
 
-/**
- * The estimate beside a spend figure, or `null` when there must not be one.
- *
- * Nothing spent converts to nothing worth reading — `$0 (≈ €0)` is noise — and `<$0.01` is a bound
- * rather than an amount, so a converted bound would be false precision. Both stay USD-only.
- */
+/** `$0` and the `<$0.01` bound stay USD-only: a converted bound would be false precision. */
 export function spendConversion(usd: number | null | undefined, fx: Fx): FxConversion | null {
 	return conversionOf(amountIn(usd, fx, SPEND_DIGITS));
 }
 
-/** The estimate beside a cap, rounded to whole units. */
 export function capConversion(usd: number | null | undefined, fx: Fx): FxConversion | null {
 	return conversionOf(amountIn(usd, fx, CAP_DIGITS));
 }
 
 /**
- * The estimate beside an "X of Y" line: `≈ €38.59 of €44`.
- *
- * All or nothing — if either side has no conversion (a $0 spend, an absent cap) the line stays USD
- * only, because half a parenthetical reads as a mistake. The page footnote covers those lines.
+ * `≈ €38.59 of €44` — all or nothing. If either side has no conversion the line stays USD-only,
+ * because half a parenthetical reads as a mistake.
  */
 export function spendOfCapConversion(
 	spendUsd: number | null | undefined,
@@ -184,14 +155,10 @@ export function spendOfCapConversion(
 	};
 }
 
-/**
- * The day the rate was published, e.g. `Jul 24, 2026`. UTC, like every other date on these pages,
- * and `en-US` for the same reason the amounts are.
- */
+/** UTC, like every other date on these pages, and `en-US` for the same reason the amounts are. */
 function formatRateDate(value: FxRateInfo["rateDate"]): string {
-	// The generated client types this as `Date`, but the response transformers aren't wired into the
-	// SDK calls, so at runtime it arrives as an ISO string — coerce defensively, as `usageUtils` does.
-	const date = value instanceof Date ? value : new Date(value);
+	const date = asDate(value);
+	if (!date) return "–";
 	return date.toLocaleDateString("en-US", {
 		month: "short",
 		day: "numeric",
@@ -200,28 +167,28 @@ function formatRateDate(value: FxRateInfo["rateDate"]): string {
 	});
 }
 
+/**
+ * Who published the rate, spelled out for the disclosure.
+ *
+ * Keyed by the server's `source`, so the sentence can only ever name a publisher the payload
+ * actually claims. An unknown key — a client older than the server, once a second feed exists —
+ * falls back to the unattributed wording rather than naming the wrong bank.
+ */
+const SOURCE_NAMES: Record<FxRateInfo["source"], string> = {
+	ECB: "European Central Bank",
+};
+
 interface DisclosureParts {
-	/** `EUR amounts are estimates at the ECB reference rate for Jul 24, 2026` */
+	/** `EUR amounts are estimates at the European Central Bank reference rate published on Jul 24, 2026` */
 	lead: string;
-	/** `1 USD ≈ €0.879`, or `null` for a closed month, whose sentence quotes no live rate. */
-	rate: FxConversion | null;
-	/** The sentence that closes the caption, punctuation included. */
+	/** The rate itself: `1 USD ≈ €0.879`. */
+	rate: FxConversion;
 	tail: string;
 }
 
 function disclosureParts(fx: Fx, isCurrentMonth: boolean): DisclosureParts | null {
 	if (fx == null) {
 		return null;
-	}
-	const lead = `${fx.currencyCode} amounts are estimates at the ECB reference rate for ${formatRateDate(fx.rateDate)}`;
-	if (!isCurrentMonth) {
-		// A closed month resolves to a rate dated inside it, so its figures are frozen. Saying so is
-		// the whole point of the variant: nobody should wonder why last month moved overnight.
-		return {
-			lead,
-			rate: null,
-			tail: ". The last rate published that month, so past figures don't change.",
-		};
 	}
 	const written = formatter(fx.currencyCode, RATE_DIGITS, displayFor(fx.currencyCode))?.format(
 		fx.ratePerUsd,
@@ -230,30 +197,22 @@ function disclosureParts(fx: Fx, isCurrentMonth: boolean): DisclosureParts | nul
 	if (written == null || spoken == null) {
 		return null;
 	}
+	const publisher = SOURCE_NAMES[fx.source] as string | undefined;
 	return {
-		lead,
+		lead: `${fx.currencyCode} amounts are estimates at the ${publisher == null ? "" : `${publisher} `}reference rate published on ${formatRateDate(fx.rateDate)}`,
 		rate: {
 			text: `1 USD ≈ ${written}`,
-			// "USD" is the fixed base of this whole feature, so its English name is spelled out here
-			// rather than derived; only the display currency varies, and that word comes from `Intl`.
 			label: `1 US dollar is approximately ${spoken}`,
 		},
-		tail: ". Spend is metered and enforced in USD.",
+		// A closed month resolves to a rate dated inside it, so its figures are frozen. Say so, or a
+		// reader wonders why last month moved overnight — and quote the frozen rate, which is the one
+		// number that makes the claim checkable.
+		tail: isCurrentMonth
+			? ". Spend is metered and enforced in USD."
+			: ". That is the last rate published in the month shown, so these figures no longer change.",
 	};
 }
 
-/** The page footnote as plain text — the same sentence {@link FxDisclosure} renders. */
-export function fxDisclosureText(fx: Fx, isCurrentMonth: boolean): string | null {
-	const parts = disclosureParts(fx, isCurrentMonth);
-	if (parts == null) {
-		return null;
-	}
-	return parts.rate == null
-		? `${parts.lead}${parts.tail}`
-		: `${parts.lead} (${parts.rate.text})${parts.tail}`;
-}
-
-/** The live hint under a cap field: `≈ €44` plus the sentence that qualifies it. */
 export interface FxCapHint {
 	conversion: FxConversion;
 	/** The rest of the sentence, leading space included. */
@@ -261,13 +220,29 @@ export interface FxCapHint {
 }
 
 /**
- * What the amount someone is typing into a cap field is worth, at today's rate — `null` while
- * there is nothing meaningful to convert (empty, unparseable, or zero), so the hint simply is not
- * there rather than flickering a `≈ €0`.
+ * The live hint under a cap field. `null` while there is nothing meaningful to convert (empty,
+ * unparseable, or too small to reach one whole unit), so the hint is absent rather than flickering
+ * `≈ €0` as someone types.
+ *
+ * `isCurrentMonth` is what makes "at today's rate" true, and it is checked here rather than trusted
+ * of the caller. Only the current month resolves to the latest published rate; a closed month
+ * resolves to a rate frozen inside it, and the same sentence over that rate would contradict the
+ * page behind the dialog, which says in so many words that those figures no longer change. Today's
+ * rate is not in this payload, so there is no honest figure to put in its place — the hint is
+ * withdrawn instead.
+ *
+ * The editors are already withheld on a closed month, but that is a fact about two components and
+ * the dialog outlives it: `open` is plain React state that survives stepping the month behind it
+ * (browser Back, in particular), and `isCurrentMonth` can flip under an already-open dialog when a
+ * UTC month rolls over. The guard has to sit where the sentence is written.
  */
-export function fxCapHint(valueUsd: number | null | undefined, fx: Fx): FxCapHint | null {
+export function fxCapHint(
+	valueUsd: number | null | undefined,
+	fx: Fx,
+	isCurrentMonth: boolean,
+): FxCapHint | null {
 	const conversion = capConversion(valueUsd, fx);
-	if (conversion == null || fx == null) {
+	if (conversion == null || fx == null || !isCurrentMonth) {
 		return null;
 	}
 	return {
@@ -282,13 +257,9 @@ export interface FxApproxProps {
 }
 
 /**
- * A converted amount, spoken as words.
- *
- * `role="img"` is load-bearing: `aria-label` on a bare `<span>` has no `generic` role to attach to
- * and is dropped by conforming assistive tech, and left to read the text itself a screen reader
- * announces "≈" as "tilde operator" or skips it — either way the "estimate" the glyph carries is
- * lost. `role="img"` is the same treatment this codebase already gives symbol-only content, and it
- * replaces the node's text with the label outright.
+ * `role="img"` is load-bearing: `aria-label` on a bare `<span>` has no role to attach to and is
+ * dropped by conforming assistive tech, and read literally "≈" is announced as "tilde operator" or
+ * skipped — either way the "estimate" the glyph carries is lost.
  */
 export function FxApprox({ conversion, className }: FxApproxProps) {
 	return (
@@ -299,7 +270,6 @@ export function FxApprox({ conversion, className }: FxApproxProps) {
 }
 
 export interface FxAmountProps {
-	/** `null` renders nothing at all — no wrapper, no space, no punctuation. */
 	conversion: FxConversion | null;
 	className?: string;
 }
@@ -325,18 +295,12 @@ export interface FxSpendProps {
 	className?: string;
 }
 
-/** ` (≈ €44)` after a cap. */
-export function FxCap({ usd, fx, className }: FxSpendProps) {
-	return <FxAmount conversion={capConversion(usd, fx)} className={className} />;
-}
-
 /**
- * The estimate *under* a figure rather than beside it — the table-cell form.
- *
- * Muted and small, because the USD figure above it is the amount and this is a reading aid. Renders
- * nothing at all when there is no conversion, so a column of `$0` rows keeps its single-line height.
+ * `≈ €3.96` on its own line under a spend figure — the form every money cell uses. Renders nothing
+ * when there is no conversion, so a column of `$0` rows keeps its single-line height.
  */
-export function FxLine({ conversion, className }: FxAmountProps) {
+export function FxSpendLine({ usd, fx, className }: FxSpendProps) {
+	const conversion = spendConversion(usd, fx);
 	if (conversion == null) {
 		return null;
 	}
@@ -347,11 +311,6 @@ export function FxLine({ conversion, className }: FxAmountProps) {
 	);
 }
 
-/** `≈ €3.96` on its own line under a spend figure — the form every money cell uses. */
-export function FxSpendLine({ usd, fx, className }: FxSpendProps) {
-	return <FxLine conversion={spendConversion(usd, fx)} className={className} />;
-}
-
 export interface FxDisclosureProps {
 	fx: Fx;
 	/** A closed month's rate is frozen inside it, which changes what the caption promises. */
@@ -359,12 +318,7 @@ export interface FxDisclosureProps {
 	className?: string;
 }
 
-/**
- * The one place a page explains its converted amounts.
- *
- * Once per page, under the figures it covers — never per number, where it would drown the numbers
- * it is meant to qualify. Renders nothing when there is no conversion on the page.
- */
+/** Once per page, under the figures it covers — never per number, where it would drown them. */
 export function FxDisclosure({ fx, isCurrentMonth, className }: FxDisclosureProps) {
 	const parts = disclosureParts(fx, isCurrentMonth);
 	if (parts == null) {
@@ -373,13 +327,9 @@ export function FxDisclosure({ fx, isCurrentMonth, className }: FxDisclosureProp
 	return (
 		<p className={cn("text-sm text-muted-foreground", className)}>
 			{parts.lead}
-			{parts.rate != null && (
-				<>
-					{" ("}
-					<FxApprox conversion={parts.rate} />
-					{")"}
-				</>
-			)}
+			{" ("}
+			<FxApprox conversion={parts.rate} />
+			{")"}
 			{parts.tail}
 		</p>
 	);

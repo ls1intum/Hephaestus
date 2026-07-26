@@ -2,7 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { getCurrentUserQueryKey } from "@/api/@tanstack/react-query.gen";
 import environment from "@/environment";
 import { safeReturnTo } from "@/integrations/auth/guard";
-import { refreshAccessToken } from "@/integrations/auth/sessionRefresh";
+import { refreshAccessToken } from "@/integrations/auth/session-refresh";
 
 /**
  * The API client prefixes every request with `environment.serverUrl` (`/api` in prod where Traefik

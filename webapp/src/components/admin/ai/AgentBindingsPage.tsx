@@ -1,19 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
 import { type FormEvent, useState } from "react";
-import { toast } from "sonner";
-import {
-	configureAgentMutation,
-	deleteAgentMutation,
-	getLlmUsageReportOptions,
-	getWorkspaceOptions,
-	listAgentsOptions,
-	listAgentsQueryKey,
-	workspaceGetLlmSettingsOptions,
-	workspaceListAvailableLlmModelsOptions,
-} from "@/api/@tanstack/react-query.gen";
-import type { AgentBinding, AvailableLlmModel } from "@/api/types.gen";
-import { currentMonthUtc } from "@/components/admin/usage/usageUtils";
+import type {
+	AgentBinding,
+	AgentBindingRequest,
+	AvailableLlmModel,
+	WorkspaceLlmUsageReport,
+} from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,7 +23,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
-import { problemDetailOf } from "@/lib/problem-detail";
 import { BudgetExhaustedAlert } from "./BudgetExhaustedAlert";
 import { ModelPicker, type ModelSelection } from "./ModelPicker";
 import { WorkspaceLlmProviderPanel } from "./WorkspaceLlmProviderPanel";
@@ -56,6 +47,11 @@ const PURPOSES: PurposeMeta[] = [
 		description: "Powers the mentor chat.",
 	},
 ];
+
+/** The purpose vocabulary as words, for anything that has to name a purpose outside this page. */
+export const PURPOSE_TITLES: Record<Purpose, string> = Object.fromEntries(
+	PURPOSES.map((meta) => [meta.purpose, meta.title]),
+) as Record<Purpose, string>;
 
 const MIN_TIMEOUT_SECONDS = 30;
 const MIN_CONCURRENT_JOBS = 1;
@@ -90,70 +86,61 @@ function parseWholeNumber(raw: string, min: number, unit: string): ParsedNumber 
 	return { value: parsed, error: null };
 }
 
-interface AgentBindingsPageProps {
+export interface AgentBindingsPageProps {
 	workspaceSlug: string;
+	bindings: AgentBinding[];
+	availableModels: AvailableLlmModel[];
+	practicesEnabled: boolean;
+	mentorEnabled: boolean;
+	/** Whether the instance lets this workspace register providers of its own. */
+	ownProviderAllowed: boolean;
+	/** This month's spend, for the paused-budget banners. Absent while it loads. */
+	usage?: WorkspaceLlmUsageReport;
+	isLoading: boolean;
+	isError: boolean;
+	loadError: unknown;
+	/**
+	 * Every purpose with a save/turn-off in flight — a set, not one purpose: both cards submit
+	 * independently and an admin does not wait for the first to settle before saving the second.
+	 */
+	pendingPurposes: ReadonlySet<Purpose>;
+	/**
+	 * How many writes *this admin* has completed against each purpose. A card is keyed on its purpose
+	 * plus this counter, so it reseeds from the server binding exactly when they save or turn it off —
+	 * and never when someone else's change arrives on a background refetch, which would silently
+	 * discard the timeout, concurrency and internet-access edits they have open.
+	 */
+	saveRevisions?: Partial<Record<Purpose, number>>;
+	onRetry: () => void;
+	onSave: (purpose: Purpose, body: AgentBindingRequest) => void;
+	onTurnOff: (purpose: Purpose) => void;
 }
 
-export function AgentBindingsPage({ workspaceSlug }: AgentBindingsPageProps) {
-	const bindingsQuery = useQuery({
-		...listAgentsOptions({ path: { workspaceSlug } }),
-		enabled: Boolean(workspaceSlug),
-	});
-	// Whether a purpose may run at all is a property of the workspace, not of any AI settings blob —
-	// it is the same flag the sidebar and the practices pages read.
-	const workspaceQuery = useQuery({
-		...getWorkspaceOptions({ path: { workspaceSlug } }),
-		enabled: Boolean(workspaceSlug),
-	});
-	// Whether this workspace may register providers of its own is set by the instance, so it is a
-	// separate question from anything the workspace itself configures.
-	const llmSettingsQuery = useQuery({
-		...workspaceGetLlmSettingsOptions({ path: { workspaceSlug } }),
-		enabled: Boolean(workspaceSlug),
-	});
-	const availableModelsQuery = useQuery({
-		...workspaceListAvailableLlmModelsOptions({ path: { workspaceSlug } }),
-		enabled: Boolean(workspaceSlug),
-	});
-	const usageQuery = useQuery({
-		...getLlmUsageReportOptions({ path: { workspaceSlug }, query: { month: currentMonthUtc() } }),
-		enabled: Boolean(workspaceSlug),
-		staleTime: 60_000,
-	});
-
-	const bindings = bindingsQuery.data ?? [];
-	const availableModels: AvailableLlmModel[] = availableModelsQuery.data ?? [];
+/**
+ * What each AI task runs on, one card per purpose. Purely presentational: the route owns every
+ * query and mutation, so this page's data dependencies are readable from the route file and its
+ * stories need no request mocking.
+ */
+export function AgentBindingsPage({
+	workspaceSlug,
+	bindings,
+	availableModels,
+	practicesEnabled,
+	mentorEnabled,
+	ownProviderAllowed,
+	usage,
+	isLoading,
+	isError,
+	loadError,
+	pendingPurposes,
+	saveRevisions,
+	onRetry,
+	onSave,
+	onTurnOff,
+}: AgentBindingsPageProps) {
 	const bindingFor = (purpose: Purpose) => bindings.find((b) => b.purpose === purpose);
-
 	const featureEnabled = (purpose: Purpose): boolean =>
-		purpose === "MENTOR"
-			? (workspaceQuery.data?.mentorEnabled ?? false)
-			: (workspaceQuery.data?.practicesEnabled ?? false);
-
-	const isLoading =
-		bindingsQuery.isLoading ||
-		workspaceQuery.isLoading ||
-		llmSettingsQuery.isLoading ||
-		availableModelsQuery.isLoading;
-	const isError =
-		bindingsQuery.isError ||
-		workspaceQuery.isError ||
-		llmSettingsQuery.isError ||
-		availableModelsQuery.isError;
-	// Whichever of the four failed first supplies the ProblemDetail and the status the alert
-	// classifies on — a 403 must not offer a Retry that would be refused identically.
-	const loadError =
-		bindingsQuery.error ??
-		workspaceQuery.error ??
-		llmSettingsQuery.error ??
-		availableModelsQuery.error;
-
-	const handleRetry = () => {
-		bindingsQuery.refetch();
-		workspaceQuery.refetch();
-		llmSettingsQuery.refetch();
-		availableModelsQuery.refetch();
-	};
+		purpose === "MENTOR" ? mentorEnabled : practicesEnabled;
 
 	return (
 		<div className="container mx-auto max-w-4xl py-6">
@@ -163,22 +150,22 @@ export function AgentBindingsPage({ workspaceSlug }: AgentBindingsPageProps) {
 
 			{/* The two caps pause independently, so each paused side gets its own banner — the one the
 			    workspace can act on first. */}
-			{(usageQuery.data?.ownProviderPaused || usageQuery.data?.instancePaused) && (
+			{(usage?.ownProviderPaused || usage?.instancePaused) && (
 				<div className="mb-6 space-y-3">
-					{usageQuery.data.ownProviderPaused && (
+					{usage.ownProviderPaused && (
 						<BudgetExhaustedAlert
 							scope="own"
-							verdict={usageQuery.data.ownProviderBudgetVerdict}
-							unpricedEventCount={usageQuery.data.unpricedEventCount}
+							verdict={usage.ownProviderBudgetVerdict}
+							unpricedEventCount={usage.unpricedEventCount}
 							context="models"
 							workspaceSlug={workspaceSlug}
 						/>
 					)}
-					{usageQuery.data.instancePaused && (
+					{usage.instancePaused && (
 						<BudgetExhaustedAlert
 							scope="shared"
-							verdict={usageQuery.data.instanceBudgetVerdict}
-							unpricedEventCount={usageQuery.data.unpricedEventCount}
+							verdict={usage.instanceBudgetVerdict}
+							unpricedEventCount={usage.unpricedEventCount}
 							context="models"
 							workspaceSlug={workspaceSlug}
 						/>
@@ -187,7 +174,7 @@ export function AgentBindingsPage({ workspaceSlug }: AgentBindingsPageProps) {
 			)}
 
 			{isError ? (
-				<QueryErrorAlert error={loadError} title="Couldn't load AI models" onRetry={handleRetry} />
+				<QueryErrorAlert error={loadError} title="Couldn't load AI models" onRetry={onRetry} />
 			) : isLoading ? (
 				<div className="flex h-40 items-center justify-center">
 					<Spinner className="size-6" />
@@ -198,19 +185,26 @@ export function AgentBindingsPage({ workspaceSlug }: AgentBindingsPageProps) {
 						<h2 className="text-lg font-semibold">Tasks</h2>
 						{PURPOSES.map((meta) => (
 							<AgentPurposeCard
-								key={`${meta.purpose}:${bindingFor(meta.purpose)?.instanceModelId ?? bindingFor(meta.purpose)?.workspaceModelId ?? "none"}`}
-								workspaceSlug={workspaceSlug}
+								// The purpose is the card's identity; the revision is this admin's own writes. A
+								// key over the bound model id instead would remount — discarding whatever they have
+								// typed — the moment *another* admin repointed the purpose.
+								key={`${meta.purpose}:${saveRevisions?.[meta.purpose] ?? 0}`}
 								meta={meta}
 								binding={bindingFor(meta.purpose)}
 								availableModels={availableModels}
 								featureEnabled={featureEnabled(meta.purpose)}
+								pending={pendingPurposes.has(meta.purpose)}
+								onSave={onSave}
+								onTurnOff={onTurnOff}
 							/>
 						))}
 					</section>
 
-					{llmSettingsQuery.data?.ownProviderAllowed && (
+					{ownProviderAllowed && (
 						<section className="space-y-4">
-							<h2 className="text-lg font-semibold">Your AI providers</h2>
+							{/* The panel owns this section's heading: it sits in a row with "Add provider", and
+							    two headings two lines apart said the same thing twice. This panel still fetches
+							    and mutates on its own — the remaining nested data layer on this surface. */}
 							<WorkspaceLlmProviderPanel workspaceSlug={workspaceSlug} ownProviderAllowed />
 						</section>
 					)}
@@ -221,21 +215,24 @@ export function AgentBindingsPage({ workspaceSlug }: AgentBindingsPageProps) {
 }
 
 interface AgentPurposeCardProps {
-	workspaceSlug: string;
 	meta: PurposeMeta;
 	binding?: AgentBinding;
 	availableModels: AvailableLlmModel[];
 	featureEnabled: boolean;
+	pending: boolean;
+	onSave: (purpose: Purpose, body: AgentBindingRequest) => void;
+	onTurnOff: (purpose: Purpose) => void;
 }
 
 function AgentPurposeCard({
-	workspaceSlug,
 	meta,
 	binding,
 	availableModels,
 	featureEnabled,
+	pending,
+	onSave,
+	onTurnOff,
 }: AgentPurposeCardProps) {
-	const queryClient = useQueryClient();
 	const [selection, setSelection] = useState<ModelSelection | null>(bindingToSelection(binding));
 	const [enabled, setEnabled] = useState(binding?.enabled ?? true);
 	const [timeoutSeconds, setTimeoutSeconds] = useState(String(binding?.timeoutSeconds ?? 600));
@@ -247,37 +244,7 @@ function AgentPurposeCard({
 	// Withheld until the first submit, so nothing is marked invalid before anything was attempted.
 	const [showErrors, setShowErrors] = useState(false);
 
-	const invalidate = () =>
-		queryClient.invalidateQueries({ queryKey: listAgentsQueryKey({ path: { workspaceSlug } }) });
-
-	const upsert = useMutation({
-		...configureAgentMutation(),
-		onSuccess: () => {
-			invalidate();
-			toast.success(`${meta.title} saved`);
-		},
-		onError: (error) => {
-			toast.error(`Couldn't save ${meta.title.toLowerCase()}`, {
-				description: problemDetailOf(error),
-			});
-		},
-	});
-
-	const remove = useMutation({
-		...deleteAgentMutation(),
-		onSuccess: () => {
-			invalidate();
-			toast.success(`${meta.title} turned off`);
-		},
-		onError: (error) => {
-			toast.error(`Couldn't turn off ${meta.title.toLowerCase()}`, {
-				description: problemDetailOf(error),
-			});
-		},
-	});
-
 	const noModels = availableModels.length === 0;
-	const pending = upsert.isPending || remove.isPending;
 
 	const timeout = parseWholeNumber(timeoutSeconds, MIN_TIMEOUT_SECONDS, "seconds");
 	const concurrency = parseWholeNumber(maxConcurrentJobs, MIN_CONCURRENT_JOBS, "runs");
@@ -300,21 +267,14 @@ function AgentPurposeCard({
 			if (timeout.value == null || concurrency.value == null) setShowAdvanced(true);
 			return;
 		}
-		upsert.mutate({
-			path: { workspaceSlug, purpose: meta.purpose },
-			body: {
-				instanceModelId: selection.scope === "SHARED" ? selection.id : undefined,
-				workspaceModelId: selection.scope === "WORKSPACE" ? selection.id : undefined,
-				timeoutSeconds: timeout.value,
-				maxConcurrentJobs: concurrency.value,
-				allowInternet,
-				enabled,
-			},
+		onSave(meta.purpose, {
+			instanceModelId: selection.scope === "SHARED" ? selection.id : undefined,
+			workspaceModelId: selection.scope === "WORKSPACE" ? selection.id : undefined,
+			timeoutSeconds: timeout.value,
+			maxConcurrentJobs: concurrency.value,
+			allowInternet,
+			enabled,
 		});
-	};
-
-	const handleTurnOff = () => {
-		remove.mutate({ path: { workspaceSlug, purpose: meta.purpose } });
 	};
 
 	if (!featureEnabled) {
@@ -459,7 +419,7 @@ function AgentPurposeCard({
 								type="button"
 								variant="outline"
 								size="sm"
-								onClick={handleTurnOff}
+								onClick={() => onTurnOff(meta.purpose)}
 								disabled={pending}
 							>
 								Turn off

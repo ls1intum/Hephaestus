@@ -56,9 +56,9 @@ export const FreeModel: Story = {
 /**
  * The tallest dialog on this surface, reviewed at the WCAG 2.2 SC 1.4.10 reflow width (320 px).
  *
- * Six fields plus the whole price editor come to roughly 950 px. Before `DialogBody` the popup was
- * unbounded and `position: fixed`, so it hung off the top and the bottom of every phone at once and
- * neither the title nor "Add inactive model" could be scrolled back into view — the reported bug.
+ * Six fields plus the whole price editor come to roughly 950 px. `DialogBody` is what bounds the
+ * height and scrolls the middle: an unbounded `position: fixed` popup this tall hangs off the top and
+ * the bottom of every phone at once, leaving neither the title nor "Add inactive model" reachable.
  */
 export const MobileReflow: Story = {
 	args: { editing: mockModel },

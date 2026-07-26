@@ -1,10 +1,10 @@
-import type { LlmUsageByDay, LlmUsageByJobType } from "@/api/types.gen";
+import type { LlmUsageByJobType, WorkspaceLlmUsageReport } from "@/api/types.gen";
 import {
 	formatCostUsd,
 	formatRateUsd,
 	formatTokens,
 	MoneyCell,
-} from "@/components/admin/ai/jobUtils";
+} from "@/components/admin/ai/job-utils";
 import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
 import {
 	Table,
@@ -17,11 +17,29 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { type Fx, FxSpendLine } from "./fx";
-import { formatUsageDay, JOB_TYPE_LABELS } from "./usageUtils";
+import { formatUsageDay, JOB_TYPE_LABELS } from "./usage-utils";
 
+/**
+ * Only ever applied to counts — events, calls, tokens, unpriced rows. Those are integers well inside
+ * `Number.MAX_SAFE_INTEGER`, so adding them is exact. Money never goes through here: see the footers.
+ */
 function sumBy<T>(rows: T[], pick: (row: T) => number): number {
 	return rows.reduce((total, row) => total + pick(row), 0);
 }
+
+/**
+ * The month's two spend figures, as the server computed them in SQL.
+ *
+ * The client does no money arithmetic. Re-adding the row costs in float would drift from the exact
+ * figure the server already put on the same payload — invisible at two decimal places today, and a
+ * second source of truth for a number the budget gate enforces against. Passing the report rather
+ * than a bare `rows` array is what makes that impossible to forget: there is no way to render a
+ * total the server did not send.
+ */
+export type LlmUsageMonthTotals = Pick<
+	WorkspaceLlmUsageReport,
+	"instanceTotalCostUsd" | "ownProviderTotalCostUsd"
+>;
 
 const JOB_TYPE_SKELETON_COLUMNS = [
 	"w-32",
@@ -38,7 +56,7 @@ const DAY_SKELETON_COLUMNS = ["w-16", "w-16", "w-16", "w-16", "w-12"];
 
 export interface LlmUsageByJobTypeTableProps {
 	/** Omit while the report is loading to keep the table shell stable. */
-	rows?: LlmUsageByJobType[];
+	report?: WorkspaceLlmUsageReport;
 	/**
 	 * Display-only conversion for the totals row. Body cells stay USD-only: they are sub-dollar
 	 * figures in an already wide table, and an estimate on each would cost the column width that
@@ -48,16 +66,18 @@ export interface LlmUsageByJobTypeTableProps {
 }
 
 /** Per-job-type usage with spend split by who pays for the model. */
-export function LlmUsageByJobTypeTable({ rows, fx }: LlmUsageByJobTypeTableProps) {
-	// Convert the total, never the sum of converted rows — rounding each row first and adding those
-	// up produces a figure that disagrees with the USD total sitting right next to it.
+export function LlmUsageByJobTypeTable({ report, fx }: LlmUsageByJobTypeTableProps) {
+	const rows = report?.byJobType;
+	// Money comes off the report; only the counts are added up here. And convert the total, never the
+	// sum of converted rows — rounding each row first and adding those up produces a figure that
+	// disagrees with the USD total sitting right next to it.
 	// One row needs no footer: its "total" would restate the line directly above it.
 	const totals =
-		rows == null || rows.length < 2
+		report == null || rows == null || rows.length < 2
 			? null
 			: {
-					priced: sumBy(rows, (row) => row.instanceTotalCostUsd),
-					ownProvider: sumBy(rows, (row) => row.ownProviderTotalCostUsd),
+					priced: report.instanceTotalCostUsd,
+					ownProvider: report.ownProviderTotalCostUsd,
 					unpriced: sumBy(rows, (row) => row.unpricedEventCount),
 					inputTokens: sumBy(rows, (row) => row.inputTokens),
 					outputTokens: sumBy(rows, (row) => row.outputTokens),
@@ -207,21 +227,22 @@ function AvgPerRun({ row }: { row: LlmUsageByJobType }) {
 
 export interface LlmUsageByDayTableProps {
 	/** Omit while the report is loading to keep the table shell stable. */
-	rows?: LlmUsageByDay[];
+	report?: WorkspaceLlmUsageReport;
 	/** Display-only conversion for the totals row; per-day cells stay USD-only. */
 	fx?: Fx;
 }
 
 /** Daily usage with the same two money streams as the job-type rollup. */
-export function LlmUsageByDayTable({ rows, fx }: LlmUsageByDayTableProps) {
-	// Same rule as the job-type rollup: one conversion applied to the USD total, and no footer for a
-	// single row.
+export function LlmUsageByDayTable({ report, fx }: LlmUsageByDayTableProps) {
+	const rows = report?.byDay;
+	// Same rules as the job-type rollup: the server's month totals, one conversion applied to the USD
+	// total, and no footer for a single row.
 	const totals =
-		rows == null || rows.length < 2
+		report == null || rows == null || rows.length < 2
 			? null
 			: {
-					priced: sumBy(rows, (row) => row.instanceTotalCostUsd),
-					ownProvider: sumBy(rows, (row) => row.ownProviderTotalCostUsd),
+					priced: report.instanceTotalCostUsd,
+					ownProvider: report.ownProviderTotalCostUsd,
 					unpriced: sumBy(rows, (row) => row.unpricedEventCount),
 					events: sumBy(rows, (row) => row.events),
 				};

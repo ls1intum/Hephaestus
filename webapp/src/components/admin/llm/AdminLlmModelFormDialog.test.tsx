@@ -69,6 +69,25 @@ describe("AdminLlmModelFormDialog", () => {
 		expect(onSave.mock.calls[0]?.[0]).not.toHaveProperty("sharing");
 	});
 
+	it("refuses an all-zero price, which the free option is for", () => {
+		// The server refuses it too: an all-zero PRICED model records verified $0 spend forever.
+		const onSave = renderDialog();
+		fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "GPT-5" } });
+		fireEvent.change(screen.getByLabelText("Upstream model id"), { target: { value: "gpt-5" } });
+		fireEvent.click(screen.getByRole("radio", { name: "Price per 1M tokens" }));
+		fireEvent.change(screen.getByLabelText(/^Input \(USD\)/), { target: { value: "0" } });
+		fireEvent.change(screen.getByLabelText(/^Output \(USD\)/), { target: { value: "0" } });
+
+		fireEvent.click(screen.getByRole("button", { name: "Add model" }));
+
+		expect(
+			screen.getByText(
+				"At least one rate must be above zero. For a free model, pick the free option.",
+			),
+		).toBeTruthy();
+		expect(onSave).not.toHaveBeenCalled();
+	});
+
 	it("turns an active model off when its price becomes unknown", () => {
 		const onSave = vi.fn();
 		const editing: LlmModel = {
@@ -108,7 +127,9 @@ describe("AdminLlmModelFormDialog", () => {
 		expect(screen.getByRole("switch", { name: "Active" }).getAttribute("aria-checked")).toBe(
 			"false",
 		);
-		expect(screen.getByText("Existing configurations will stop immediately")).toBeTruthy();
+		expect(
+			screen.getByText("Work on this model stops immediately, in every workspace"),
+		).toBeTruthy();
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 		expect(onSave.mock.calls[0]?.[0].metadata).toEqual(expect.objectContaining({ enabled: false }));
 	});

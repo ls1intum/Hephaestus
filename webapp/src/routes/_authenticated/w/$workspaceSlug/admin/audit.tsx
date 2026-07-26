@@ -3,7 +3,7 @@ import { ScrollTextIcon } from "lucide-react";
 import {
 	type ConfigAuditSearch,
 	workspaceAuditSearchSchema,
-} from "@/components/admin/audit-shared/auditSearch";
+} from "@/components/admin/audit-shared/audit-search";
 import { WorkspaceConfigAuditPanel } from "@/components/admin/config-audit/ConfigAuditPanel";
 import { workspaceAdminHead } from "@/lib/page-title";
 

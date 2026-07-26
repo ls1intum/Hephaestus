@@ -23,8 +23,8 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { Toaster } from "@/components/ui/sonner";
 import environment from "@/environment";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
+import { useMentorChat } from "@/hooks/use-mentor-chat";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
-import { useMentorChat } from "@/hooks/useMentorChat";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
 import { FeatureFlagDevTools, useFeatureFlag } from "@/integrations/feature-flags";
 import { isPosthogEnabled } from "@/integrations/posthog/config";

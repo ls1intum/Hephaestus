@@ -1,10 +1,13 @@
 import { AlertTriangle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { LlmModel, UpdateLlmModelSharingRequest } from "@/api/types.gen";
+import { FacetMultiSelect } from "@/components/common/FacetMultiSelect";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
+	DialogBody,
 	DialogContent,
 	DialogDescription,
 	DialogFooter,
@@ -12,42 +15,75 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { WorkspaceMultiSelect, type WorkspaceMultiSelectOption } from "./WorkspaceMultiSelect";
+import { type WorkspaceOption, workspaceFacetOptions } from "./workspace-options";
 
 export interface AdminLlmModelAccessDialogProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	model: LlmModel | null;
-	workspaceOptions: WorkspaceMultiSelectOption[];
+	workspaceOptions: WorkspaceOption[];
 	isLoadingWorkspaces?: boolean;
-	isWorkspaceError?: boolean;
+	/** The workspace-directory query's error, when it failed; its ProblemDetail is shown to the admin. */
+	workspacesError?: unknown;
 	onRetryWorkspaces?: () => void;
 	isSubmitting: boolean;
 	onSave: (body: UpdateLlmModelSharingRequest) => void;
 }
 
-/** Dedicated access editor for an instance model. Access changes take effect at request time. */
+/**
+ * Dedicated access editor for an instance model. Access changes take effect at request time.
+ *
+ * The form is mounted only while the dialog is open and keyed by the model, so its selection seeds
+ * from that model exactly once — at open — rather than being copied in by an effect. An effect
+ * re-ran on every background refetch: an admin who had deselected two workspaces and not yet saved
+ * lost that edit, with no visual signal, the moment another admin touched the model or the tab
+ * regained focus past the query's `staleTime`. Save then revoked nothing.
+ */
 export function AdminLlmModelAccessDialog({
 	open,
 	onOpenChange,
 	model,
+	...contentProps
+}: AdminLlmModelAccessDialogProps) {
+	if (!model) return null;
+
+	return (
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			{open && (
+				<AdminLlmModelAccessDialogContent
+					key={model.id}
+					model={model}
+					onCancel={() => onOpenChange(false)}
+					{...contentProps}
+				/>
+			)}
+		</Dialog>
+	);
+}
+
+type AdminLlmModelAccessDialogContentProps = Omit<
+	AdminLlmModelAccessDialogProps,
+	"open" | "onOpenChange" | "model"
+> & {
+	model: LlmModel;
+	onCancel: () => void;
+};
+
+function AdminLlmModelAccessDialogContent({
+	model,
 	workspaceOptions,
 	isLoadingWorkspaces = false,
-	isWorkspaceError = false,
+	workspacesError,
 	onRetryWorkspaces,
 	isSubmitting,
 	onSave,
-}: AdminLlmModelAccessDialogProps) {
-	const [scope, setScope] = useState<"ALL" | "SELECTED">("SELECTED");
-	const [workspaceIds, setWorkspaceIds] = useState<number[]>([]);
-
-	useEffect(() => {
-		if (!open || !model) return;
-		setScope(model.visibility === "PUBLIC" ? "ALL" : "SELECTED");
-		setWorkspaceIds(model.grantedWorkspaceIds);
-	}, [open, model]);
-
-	if (!model) return null;
+	onCancel,
+}: AdminLlmModelAccessDialogContentProps) {
+	const [scope, setScope] = useState<"ALL" | "SELECTED">(
+		model.visibility === "PUBLIC" ? "ALL" : "SELECTED",
+	);
+	const [workspaceIds, setWorkspaceIds] = useState<number[]>(model.grantedWorkspaceIds);
+	const isWorkspaceError = workspacesError != null;
 
 	const removesCurrentWorkspace =
 		scope === "SELECTED" &&
@@ -58,20 +94,23 @@ export function AdminLlmModelAccessDialog({
 	const noWorkspaceHasAccess = scope === "SELECTED" && workspaceIds.length === 0;
 
 	return (
-		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="sm:max-w-lg">
-				<DialogHeader>
-					<DialogTitle>Manage access to {model.displayName}</DialogTitle>
-					<DialogDescription>
-						Choose which workspaces can discover and use this model. Provider credentials remain
-						hidden from workspace admins.
-					</DialogDescription>
-				</DialogHeader>
+		<DialogContent className="sm:max-w-lg">
+			<DialogHeader>
+				<DialogTitle>Manage access to {model.displayName}</DialogTitle>
+				<DialogDescription>
+					Choose which workspaces can discover and use this model. Provider credentials remain
+					hidden from workspace admins.
+				</DialogDescription>
+			</DialogHeader>
 
+			{/* Two option cards, the workspace picker and up to one consequence alert — enough to
+			    overflow a phone in landscape. Only the body scrolls. */}
+			<DialogBody className="space-y-4 py-1">
 				<RadioGroup
 					value={scope}
 					onValueChange={(value) => setScope(value as "ALL" | "SELECTED")}
 					className="gap-3"
+					aria-label="Who can use this model"
 				>
 					<label
 						htmlFor="llm-model-access-all"
@@ -103,29 +142,26 @@ export function AdminLlmModelAccessDialog({
 					<div className="space-y-2">
 						<p className="text-sm font-medium">Workspaces</p>
 						{isWorkspaceError ? (
-							<Alert variant="destructive">
-								<AlertTitle>Could not load workspaces</AlertTitle>
-								<AlertDescription>
-									Do not save until the workspace list is available.
-									{onRetryWorkspaces && (
-										<Button
-											size="sm"
-											variant="outline"
-											className="mt-2"
-											onClick={onRetryWorkspaces}
-										>
-											Retry
-										</Button>
-									)}
-								</AlertDescription>
-							</Alert>
+							<>
+								<QueryErrorAlert
+									error={workspacesError}
+									title="Could not load workspaces"
+									onRetry={onRetryWorkspaces}
+								/>
+								<p className="text-muted-foreground text-xs">
+									Saving a workspace list stays disabled until the directory loads.
+								</p>
+							</>
 						) : (
-							<WorkspaceMultiSelect
+							<FacetMultiSelect
+								variant="field"
 								id="llm-model-access-workspaces"
-								options={workspaceOptions}
-								selectedIds={workspaceIds}
+								title="Workspaces"
+								options={workspaceFacetOptions(workspaceOptions)}
+								selected={workspaceIds}
 								onChange={setWorkspaceIds}
 								disabled={isLoadingWorkspaces || isSubmitting}
+								emptyLabel="No workspaces yet"
 							/>
 						)}
 						{isLoadingWorkspaces && (
@@ -148,8 +184,8 @@ export function AdminLlmModelAccessDialog({
 						<AlertTriangle aria-hidden />
 						<AlertTitle>Access is reduced immediately</AlertTitle>
 						<AlertDescription>
-							Existing configurations in removed workspaces will stop running until an available
-							model is selected.
+							Practice detection and Mentor stop in the workspaces you removed, until each of them
+							picks another model.
 						</AlertDescription>
 					</Alert>
 				)}
@@ -157,32 +193,30 @@ export function AdminLlmModelAccessDialog({
 					<Alert>
 						<AlertTitle>Future workspaces will need an explicit grant</AlertTitle>
 						<AlertDescription>
-							Every current workspace remains selected, so existing configurations keep running.
+							Every workspace using it today keeps it, so nothing stops running.
 						</AlertDescription>
 					</Alert>
 				)}
+			</DialogBody>
 
-				<DialogFooter>
-					<Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-						Cancel
-					</Button>
-					<Button
-						type="button"
-						disabled={
-							isSubmitting || (scope === "SELECTED" && (isLoadingWorkspaces || isWorkspaceError))
-						}
-						onClick={() =>
-							onSave(
-								scope === "ALL"
-									? { visibility: "PUBLIC" }
-									: { visibility: "GRANTED", workspaceIds },
-							)
-						}
-					>
-						{isSubmitting ? "Saving…" : "Save access"}
-					</Button>
-				</DialogFooter>
-			</DialogContent>
-		</Dialog>
+			<DialogFooter>
+				<Button type="button" variant="outline" onClick={onCancel}>
+					Cancel
+				</Button>
+				<Button
+					type="button"
+					disabled={
+						isSubmitting || (scope === "SELECTED" && (isLoadingWorkspaces || isWorkspaceError))
+					}
+					onClick={() =>
+						onSave(
+							scope === "ALL" ? { visibility: "PUBLIC" } : { visibility: "GRANTED", workspaceIds },
+						)
+					}
+				>
+					{isSubmitting ? "Saving…" : "Save access"}
+				</Button>
+			</DialogFooter>
+		</DialogContent>
 	);
 }

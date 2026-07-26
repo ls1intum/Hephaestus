@@ -8,7 +8,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { priceLabel } from "@/lib/llmPricing";
+import { priceLabel } from "@/lib/llm-pricing";
 
 export interface ModelSelection {
 	scope: "SHARED" | "WORKSPACE";

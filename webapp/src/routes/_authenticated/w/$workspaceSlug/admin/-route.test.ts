@@ -49,21 +49,23 @@ async function land(url: string) {
 }
 
 /**
- * Drives admin URLs through the real router as each role. This is what makes the gate structural
- * rather than a convention: a route file that maps to an /admin URL without nesting under the
- * layout (a sibling of it, a dot-notation path, an `admin_` un-nesting suffix) skips the guard
- * silently, and `achievement-designer.tsx` shipped exactly that way.
+ * Drives admin URLs through the real router as each role, which makes the gate structural rather
+ * than a convention: a route mapping to an /admin URL without nesting under the layout (a sibling,
+ * a dot-notation path, an `admin_` un-nesting suffix) skips the guard silently, and
+ * `achievement-designer.tsx` shipped exactly that way.
  */
 describe("workspace-admin route gate", () => {
-	it("enumerates the admin routes", () => {
+	it("enumerates the admin routes rather than trusting a hand-written list", () => {
 		// A filter that matched nothing would leave every case below vacuously green, and one that
-		// matched a subset would quietly shrink the coverage this suite exists for.
+		// matched a subset would quietly shrink the coverage this suite exists for. Raise the floor
+		// when routes are added; never lower it (`webapp/AGENTS.md`, "do not weaken it").
 		expect(adminUrls.length).toBeGreaterThanOrEqual(19);
+		expect(adminUrls).toContain("/w/acme/admin/settings");
+		expect(adminUrls).toContain("/w/acme/admin/achievement-designer");
 	});
 
-	// Per route, because each route's nesting is a separate fact: an un-nested one fails only its
-	// own case. The allow path needs no such loop — an ungated route admits an ADMIN just as
-	// happily as a gated one, so it would prove nothing per route.
+	// Per route, because each route's nesting is a separate fact. The allow path needs no such loop:
+	// an ungated route admits an ADMIN just as happily as a gated one.
 	it.each(adminUrls)("redirects a MEMBER away from %s", async (url) => {
 		mockMembership("MEMBER");
 		expect(await land(url)).toBe(WORKSPACE_HOME);

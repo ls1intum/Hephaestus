@@ -2,24 +2,17 @@ import { Link } from "@tanstack/react-router";
 import { CircleAlert, CircleDollarSign } from "lucide-react";
 import type { WorkspaceLlmUsageReport } from "@/api/types.gen";
 import { BudgetExhaustedAlert } from "@/components/admin/ai/BudgetExhaustedAlert";
-import { formatCapUsd, formatCostUsd } from "@/components/admin/ai/jobUtils";
+import { formatCapUsd, formatCostUsd } from "@/components/admin/ai/job-utils";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-	Empty,
-	EmptyContent,
-	EmptyDescription,
-	EmptyHeader,
-	EmptyMedia,
-	EmptyTitle,
-} from "@/components/ui/empty";
+import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BudgetPaceAlert } from "./BudgetPaceAlert";
+import { CapIsNotMonthScoped } from "./CapIsNotMonthScoped";
 import { CAP_STATE_LABELS, CapMeter, capState } from "./CapMeter";
 import {
-	capConversion,
 	type Fx,
 	FxAmount,
 	type FxConversion,
@@ -29,13 +22,18 @@ import {
 } from "./fx";
 import { LlmUsageByDayTable, LlmUsageByJobTypeTable } from "./LlmUsageBreakdownTables";
 import { MonthNavigator } from "./MonthNavigator";
-import { budgetUsedPercent, formatMonthLabel, projectBudget } from "./usageUtils";
+import { budgetUsedPercent, formatMonthLabel, projectBudget } from "./usage-utils";
 
 export interface AdminLlmUsagePageProps {
 	/** ISO `yyyy-MM` month currently shown. */
 	month: string;
 	/** Whether `month` is the current calendar month (UTC) — gates every pause/pace banner. */
 	isCurrentMonth: boolean;
+	/**
+	 * Whether the stepper may move forward. Separate from {@link isCurrentMonth} rather than its
+	 * negation: both are false on a month later than this one, and only the route knows the difference.
+	 */
+	canGoNext: boolean;
 	/** Slug of the workspace being viewed; used for the in-product links to its AI models page. */
 	workspaceSlug: string;
 	report?: WorkspaceLlmUsageReport;
@@ -46,7 +44,11 @@ export interface AdminLlmUsagePageProps {
 	onRetry?: () => void;
 	onPrevMonth: () => void;
 	onNextMonth: () => void;
-	/** Open the provider-cap editor. The dialog itself lives in the route container. */
+	/**
+	 * Open the provider-cap editor. The dialog itself lives in the route container.
+	 *
+	 * Reachable on the current month only — see {@link CapIsNotMonthScoped}.
+	 */
 	onEditOwnProviderCap: () => void;
 	/** Injected so burn-rate projections are deterministic in tests and stories. */
 	now?: Date;
@@ -66,6 +68,7 @@ export interface AdminLlmUsagePageProps {
 export function AdminLlmUsagePage({
 	month,
 	isCurrentMonth,
+	canGoNext,
 	workspaceSlug,
 	report,
 	isLoading,
@@ -118,15 +121,13 @@ export function AdminLlmUsagePage({
 		providerCap != null
 			? spendOfCapConversion(providerSpend, providerCap, fx)
 			: spendConversion(providerSpend, fx);
-	const providerCapFx = capConversion(providerCap, fx);
 	// Every converted figure on the page, not just the cards: the breakdown tables convert their own
-	// footer totals, so deriving the caption from the cards alone put converted euros on screen with
-	// no rate behind them whenever a card happened not to convert (a $0 budget, say, which is the
-	// supported "pause now" state). Derive it from what actually renders.
+	// footer totals, and a card can convert nothing (a $0 budget, say — the supported "pause now"
+	// state). Only figures that actually render count — a cap conversion computed and shown nowhere
+	// once put the whole "EUR amounts are estimates…" footnote under a page with no estimates on it.
 	const hasConversion =
 		sharedTitleFx != null ||
 		providerTitleFx != null ||
-		providerCapFx != null ||
 		spendConversion(sharedSpend, fx) != null ||
 		spendConversion(providerSpend, fx) != null;
 
@@ -141,7 +142,7 @@ export function AdminLlmUsagePage({
 				</header>
 				<MonthNavigator
 					month={month}
-					canGoNext={!isCurrentMonth}
+					canGoNext={canGoNext}
 					onPrevMonth={onPrevMonth}
 					onNextMonth={onNextMonth}
 				/>
@@ -262,6 +263,7 @@ export function AdminLlmUsagePage({
 							/>
 						) : (
 							<NoProviderCard
+								isCurrentMonth={isCurrentMonth}
 								workspaceSlug={workspaceSlug}
 								onEditOwnProviderCap={onEditOwnProviderCap}
 							/>
@@ -275,7 +277,6 @@ export function AdminLlmUsagePage({
 									<CircleDollarSign />
 								</EmptyMedia>
 								<EmptyTitle>No AI usage in {formatMonthLabel(month)}</EmptyTitle>
-								<EmptyDescription>Nothing ran this month.</EmptyDescription>
 							</EmptyHeader>
 							<EmptyContent>
 								<Button
@@ -294,7 +295,7 @@ export function AdminLlmUsagePage({
 									<CardTitle>By run type</CardTitle>
 								</CardHeader>
 								<CardContent>
-									<LlmUsageByJobTypeTable rows={report.byJobType} fx={fx} />
+									<LlmUsageByJobTypeTable report={report} fx={fx} />
 								</CardContent>
 							</Card>
 
@@ -313,7 +314,7 @@ export function AdminLlmUsagePage({
 											</EmptyHeader>
 										</Empty>
 									) : (
-										<LlmUsageByDayTable rows={report.byDay} fx={fx} />
+										<LlmUsageByDayTable report={report} fx={fx} />
 									)}
 								</CardContent>
 							</Card>
@@ -468,21 +469,30 @@ function ProviderCapCard({
 				{/* A set cap is already the "of $50" in the headline and the meter under it; only its
 				    absence still needs saying. */}
 				{capUsd == null && <p className="text-sm text-muted-foreground">No cap set.</p>}
-				<Button variant="outline" size="sm" onClick={onEditOwnProviderCap}>
-					{capUsd != null ? "Change cap" : "Set cap"}
-				</Button>
+				{isCurrentMonth ? (
+					<Button variant="outline" size="sm" onClick={onEditOwnProviderCap}>
+						{capUsd != null ? "Change cap" : "Set cap"}
+					</Button>
+				) : (
+					<CapIsNotMonthScoped subject="cap" />
+				)}
 			</CardContent>
 		</Card>
 	);
 }
 
 interface NoProviderCardProps {
+	isCurrentMonth: boolean;
 	workspaceSlug: string;
 	onEditOwnProviderCap: () => void;
 }
 
 /** Quiet call-to-action: no provider cap and nothing has run on a provider of their own. */
-function NoProviderCard({ workspaceSlug, onEditOwnProviderCap }: NoProviderCardProps) {
+function NoProviderCard({
+	isCurrentMonth,
+	workspaceSlug,
+	onEditOwnProviderCap,
+}: NoProviderCardProps) {
 	return (
 		<Card>
 			<CardHeader>
@@ -495,9 +505,13 @@ function NoProviderCard({ workspaceSlug, onEditOwnProviderCap }: NoProviderCardP
 			</CardHeader>
 			<CardContent className="space-y-3">
 				<p className="text-sm text-muted-foreground">No cap set.</p>
-				<Button variant="outline" size="sm" onClick={onEditOwnProviderCap}>
-					Set cap
-				</Button>
+				{isCurrentMonth ? (
+					<Button variant="outline" size="sm" onClick={onEditOwnProviderCap}>
+						Set cap
+					</Button>
+				) : (
+					<CapIsNotMonthScoped subject="cap" />
+				)}
 			</CardContent>
 		</Card>
 	);

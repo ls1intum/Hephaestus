@@ -8,7 +8,7 @@ import {
 	fieldChanges,
 	formatLeaf,
 	subjectLabel,
-} from "./configAuditFormat";
+} from "./config-audit-format";
 
 function entry(over: Partial<ConfigAuditEntryView>): ConfigAuditEntryView {
 	return {
@@ -28,8 +28,21 @@ describe("label mapping", () => {
 		expect(entityTypeLabel("AGENT_CONFIG")).toBe("Agent config");
 		expect(actionLabel("CREATED")).toBe("Created");
 	});
+	it("names which purse a budget row is about, under either spelling", () => {
+		// The two caps are different people's money and are never summed, and this column is the one
+		// place both appear together — a label that said only "AI budget" named neither. The pre-rename
+		// keys are the same purse, so they read the same: the trail is append-only, its labels are not.
+		expect(entityTypeLabel("WORKSPACE_INSTANCE_LLM_BUDGET")).toBe("Shared-model AI budget");
+		expect(entityTypeLabel("WORKSPACE_LLM_BUDGET")).toBe("Shared-model AI budget");
+		expect(entityTypeLabel("WORKSPACE_OWN_PROVIDER_LLM_BUDGET")).toBe("Own-provider AI cap");
+		expect(entityTypeLabel("WORKSPACE_BYO_LLM_BUDGET")).toBe("Own-provider AI cap");
+	});
+
 	it("falls back to the raw value for anything unknown", () => {
+		// A server enum added ahead of the client should still name the thing that changed; only a
+		// genuinely absent value has nothing to show.
 		expect(entityTypeLabel("FUTURE_TYPE")).toBe("FUTURE_TYPE");
+		expect(entityTypeLabel(undefined)).toBe("Unknown");
 		expect(actionLabel(undefined)).toBe("—");
 	});
 });
@@ -93,29 +106,21 @@ describe("fieldChanges", () => {
 		).toEqual([{ path: "publicKey", before: "false", after: "true" }]);
 	});
 
-	it("has no before side for a CREATED row", () => {
+	it.each<["CREATED" | "DELETED", "before" | "after"]>([
+		["CREATED", "before"],
+		["DELETED", "after"],
+	])("gives a %s row no %s side", (action, absentSide) => {
+		const snapshot = '{"name":"Primary","enabled":true}';
 		const changes = fieldChanges(
 			entry({
-				action: "CREATED",
+				action,
 				changedKeys: ["name", "enabled"],
-				oldValue: undefined,
-				newValue: '{"name":"Primary","enabled":true}',
+				oldValue: action === "DELETED" ? snapshot : undefined,
+				newValue: action === "CREATED" ? snapshot : undefined,
 			}),
 		);
-		expect(changes.every((c) => c.before === null)).toBe(true);
-		expect(changes.map((c) => c.path).sort()).toEqual(["enabled", "name"]);
-	});
-
-	it("has no after side for a DELETED row", () => {
-		const changes = fieldChanges(
-			entry({
-				action: "DELETED",
-				changedKeys: ["name"],
-				oldValue: '{"name":"Primary"}',
-				newValue: undefined,
-			}),
-		);
-		expect(changes.every((c) => c.after === null)).toBe(true);
+		expect(changes.every((change) => change[absentSide] === null)).toBe(true);
+		expect(changes.map((change) => change.path).sort()).toEqual(["enabled", "name"]);
 	});
 });
 
@@ -124,14 +129,14 @@ describe("formatLeaf", () => {
 		expect(formatLeaf(true, "llmApiKeySet")).toBe("••••••");
 		expect(formatLeaf(false, "llmApiKeySet")).toBe("not set");
 	});
-	it("renders ordinary scalars literally", () => {
-		expect(formatLeaf(true, "enabled")).toBe("true");
-		expect(formatLeaf(42, "timeoutSeconds")).toBe("42");
-		expect(formatLeaf("gpt-5", "modelName")).toBe("gpt-5");
-	});
-	it("renders null/undefined as 'not set'", () => {
-		expect(formatLeaf(null)).toBe("not set");
-		expect(formatLeaf(undefined)).toBe("not set");
+	it.each<[unknown, string | undefined, string]>([
+		[true, "enabled", "true"],
+		[42, "timeoutSeconds", "42"],
+		["gpt-5", "modelName", "gpt-5"],
+		[null, undefined, "not set"],
+		[undefined, undefined, "not set"],
+	])("renders %s as %s", (value, key, expected) => {
+		expect(formatLeaf(value, key)).toBe(expected);
 	});
 });
 
@@ -237,12 +242,5 @@ describe("degrading on unusable data", () => {
 		const broken = entry({ action: "UPDATED", oldValue: "{not json", newValue: "{also not json" });
 		expect(fieldChanges(broken)).toEqual([]);
 		expect(changeSummary(broken)).toBe("");
-	});
-
-	it("falls back to the raw enum for an entity type the client does not know yet", () => {
-		// A server enum added ahead of the client should still name the thing that changed; only a
-		// genuinely absent value has nothing to show.
-		expect(entityTypeLabel("SOMETHING_NEW")).toBe("SOMETHING_NEW");
-		expect(entityTypeLabel(undefined)).toBe("Unknown");
 	});
 });

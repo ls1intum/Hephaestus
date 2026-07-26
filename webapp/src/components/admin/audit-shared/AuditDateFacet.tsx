@@ -20,7 +20,7 @@ function rangeLabel(range: DateRange): string {
 }
 
 /**
- * The date facet of the audit toolbar. Same dashed-trigger shape as {@link AuditFacetFilter} so the
+ * The date facet of the audit toolbar. Same dashed-trigger shape as {@link FacetMultiSelect} so the
  * row reads as one control set rather than a calendar bolted onto a filter bar.
  */
 export function AuditDateFacet({ value, onChange }: AuditDateFacetProps) {

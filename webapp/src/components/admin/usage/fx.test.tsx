@@ -1,33 +1,58 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { describe, expect, it } from "vitest";
-import type { FxRateInfo, LlmUsageByDay } from "@/api/types.gen";
+import type { FxRateInfo, LlmUsageByDay, WorkspaceLlmUsageReport } from "@/api/types.gen";
 import {
 	capConversion,
+	type Fx,
 	FxAmount,
 	FxDisclosure,
 	FxSpendLine,
 	fxCapHint,
-	fxDisclosureText,
 	spendConversion,
 	spendOfCapConversion,
 } from "./fx";
 import { LlmUsageByDayTable } from "./LlmUsageBreakdownTables";
 
-/** The rate the server sends: already inverted, so USD × rate is the display amount. */
+/** Already inverted by the server, so USD × rate is the display amount. */
 const eur: FxRateInfo = {
 	currencyCode: "EUR",
 	ratePerUsd: 0.878966,
 	rateDate: new Date("2026-07-24T00:00:00.000Z"),
+	source: "ECB",
 };
 
-/** A closed month resolves to a rate dated inside it, which freezes that month's figures. */
 const eurClosed: FxRateInfo = {
 	...eur,
 	rateDate: new Date("2026-06-30T00:00:00.000Z"),
 };
 
+/**
+ * The month's spend as the server computed it, alongside the day rows. The totals are arguments
+ * rather than a sum of `byDay`, because that is exactly the coupling the table must not have: the
+ * footer prints what the server sent, not what the client can re-derive.
+ */
+function dayReport(
+	byDay: LlmUsageByDay[],
+	instanceTotalCostUsd: number,
+	ownProviderTotalCostUsd = 0,
+): WorkspaceLlmUsageReport {
+	return {
+		month: "2026-07",
+		byDay,
+		byJobType: [],
+		instanceTotalCostUsd,
+		ownProviderTotalCostUsd,
+		unpricedEventCount: 0,
+		instanceBudgetVerdict: "WITHIN",
+		instancePaused: false,
+		ownProviderBudgetVerdict: "WITHIN",
+		ownProviderPaused: false,
+	};
+}
+
 /** `en-US` puts a non-breaking space between an ISO code and the number. */
-const NBSP = " ";
+const NBSP = "\u00a0";
 
 describe("spend conversion", () => {
 	it("converts a spend figure at the spend precision", () => {
@@ -56,12 +81,19 @@ describe("cap conversion", () => {
 		expect(capConversion(50, eur)?.text).toBe("≈ €44");
 	});
 
-	it("rounds a cap with cents to whole units too", () => {
-		expect(capConversion(49.5, eur)?.text).toBe("≈ €44");
-	});
-
 	it("leaves a $0 cap unconverted", () => {
 		expect(capConversion(0, eur)).toBeNull();
+	});
+
+	it.each<[string, number, string]>([
+		["free", 0.4, "≈ €0"],
+		["nearly double", 0.6, "≈ €1"],
+	])("says nothing rather than call a small cap %s", (_name, capUsd, wrongText) => {
+		// $0.40 is €0.35 and $0.60 is €0.53; at whole units those render as the amounts named here,
+		// neither of which a reader can discount as a rounding wobble. Below the first whole unit there
+		// is no honest figure at this precision, so there is no figure.
+		expect(capConversion(capUsd, eur)?.text).not.toBe(wrongText);
+		expect(capConversion(capUsd, eur)).toBeNull();
 	});
 
 	it("converts nothing when there is no rate", () => {
@@ -84,7 +116,8 @@ describe("ambiguous currency symbols", () => {
 	it("shows USD alone rather than failing on an unknown currency code", () => {
 		const nonsense: FxRateInfo = { ...eur, currencyCode: "NOTACODE" };
 		expect(spendConversion(4.5, nonsense)).toBeNull();
-		expect(fxDisclosureText(nonsense, true)).toBeNull();
+		const { container } = render(<FxDisclosure fx={nonsense} isCurrentMonth />);
+		expect(container.innerHTML).toBe("");
 	});
 
 	it("shows USD alone rather than dividing by a broken rate", () => {
@@ -94,8 +127,10 @@ describe("ambiguous currency symbols", () => {
 });
 
 describe("X of Y lines", () => {
-	it("converts both sides at their own precision", () => {
-		expect(spendOfCapConversion(43.9, 50, eur)?.text).toBe("≈ €38.59 of €44");
+	it("converts both sides at their own precision, written and spoken", () => {
+		const conversion = spendOfCapConversion(43.9, 50, eur);
+		expect(conversion?.text).toBe("≈ €38.59 of €44");
+		expect(conversion?.label).toBe("approximately 38.59 euros of 44 euros");
 	});
 
 	it("stays USD-only when either side cannot convert", () => {
@@ -104,40 +139,12 @@ describe("X of Y lines", () => {
 	});
 });
 
-describe("table cells take the second-line form", () => {
-	it("puts the estimate under the figure rather than beside it", () => {
-		// A parenthetical is variable width, and in a column it shifts every row's USD figure by a
-		// different amount — the alignment is what makes a money column scannable.
-		const { container } = render(<FxSpendLine usd={4.5} fx={eur} />);
-		const line = container.firstElementChild;
-		expect(line?.tagName).toBe("DIV");
-		expect(line?.textContent).toBe("≈ €3.96");
-	});
-
-	it("renders no line at all when there is nothing to convert", () => {
-		const { container } = render(<FxSpendLine usd={0} fx={eur} />);
-		expect(container.innerHTML).toBe("");
-	});
-});
-
-describe("never sums conversions", () => {
+describe("totals convert the USD sum", () => {
 	/**
-	 * Each row converts to a figure that rounds up on its own; the total must be `convert(Σ USD)`,
-	 * not `Σ convert(row)`. The two differ by a cent here, which is exactly the discrepancy that
-	 * makes a footer disagree with the column above it.
+	 * Each row rounds up on its own, so `Σ convert(row)` is €2.04 while `convert(Σ USD)` is €2.02 —
+	 * the cent that would make a footer disagree with the column above it.
 	 */
 	const rows = [0.575, 0.575, 0.575, 0.575];
-
-	it("converts the total rather than adding up converted rows", () => {
-		const totalUsd = rows.reduce((sum, value) => sum + value, 0);
-		const summedConversions = rows
-			.map((value) => Number((value * eur.ratePerUsd).toFixed(2)))
-			.reduce((sum, value) => sum + value, 0);
-
-		// The naive path really is different — otherwise this test would pass by coincidence.
-		expect(summedConversions).not.toBeCloseTo(totalUsd * eur.ratePerUsd, 2);
-		expect(spendConversion(totalUsd, eur)?.text).toBe("≈ €2.02");
-	});
 
 	it("renders the breakdown footer from the USD total", () => {
 		const day = (costUsd: number, iso: string): LlmUsageByDay => ({
@@ -147,37 +154,43 @@ describe("never sums conversions", () => {
 			unpricedEventCount: 0,
 			events: 1,
 		});
-		render(
-			<LlmUsageByDayTable
-				rows={rows.map((value, index) => day(value, `2026-07-0${index + 1}T00:00:00.000Z`))}
-				fx={eur}
-			/>,
-		);
+		const byDay = rows.map((value, index) => day(value, `2026-07-0${index + 1}T00:00:00.000Z`));
+		render(<LlmUsageByDayTable report={dayReport(byDay, 2.3)} fx={eur} />);
 
 		const footer = screen.getByRole("row", { name: /^Total/ });
 		expect(footer.textContent).toContain("$2.30");
-		// convert(2.30) = €2.02, while Σ convert(0.575) would be €2.04.
 		expect(footer.textContent).toContain("≈ €2.02");
 		expect(footer.textContent).not.toContain("€2.04");
 	});
 });
 
 describe("page disclosure", () => {
-	it("quotes the live rate for the current month", () => {
-		expect(fxDisclosureText(eur, true)).toBe(
-			"EUR amounts are estimates at the ECB reference rate for Jul 24, 2026 (1 USD ≈ €0.879). Spend is metered and enforced in USD.",
+	/** The sentence as a reader sees it, with the parenthetical rate spliced back in. */
+	function disclosureText(fx: Fx, isCurrentMonth: boolean): string | null {
+		const { container } = render(<FxDisclosure fx={fx} isCurrentMonth={isCurrentMonth} />);
+		return container.textContent === "" ? null : container.textContent;
+	}
+
+	it("quotes the live rate for the current month, and names who published it", () => {
+		expect(disclosureText(eur, true)).toBe(
+			"EUR amounts are estimates at the European Central Bank reference rate published on Jul 24, 2026 (1 USD ≈ €0.879). Spend is metered and enforced in USD.",
 		);
 	});
 
 	it("explains why a closed month never moves", () => {
-		expect(fxDisclosureText(eurClosed, false)).toBe(
-			"EUR amounts are estimates at the ECB reference rate for Jun 30, 2026. The last rate published that month, so past figures don't change.",
+		expect(disclosureText(eurClosed, false)).toBe(
+			"EUR amounts are estimates at the European Central Bank reference rate published on Jun 30, 2026 (1 USD ≈ €0.879). That is the last rate published in the month shown, so these figures no longer change.",
 		);
 	});
 
-	it("renders the sentence it reports", () => {
-		const { container } = render(<FxDisclosure fx={eur} isCurrentMonth />);
-		expect(container.textContent).toBe(fxDisclosureText(eur, true));
+	// The attribution is the payload's claim, not ours. A source this build has no name for — an older
+	// client meeting a newer server — drops back to the unattributed wording rather than crediting the
+	// ECB for someone else's rate.
+	it("declines to name a publisher it does not recognise", () => {
+		const unknownSource = { ...eur, source: "SNB" as FxRateInfo["source"] };
+		expect(disclosureText(unknownSource, true)).toBe(
+			"EUR amounts are estimates at the reference rate published on Jul 24, 2026 (1 USD ≈ €0.879). Spend is metered and enforced in USD.",
+		);
 	});
 
 	it("says the rate in words", () => {
@@ -185,29 +198,55 @@ describe("page disclosure", () => {
 		expect(screen.getByLabelText("1 US dollar is approximately 0.879 euros")).not.toBeNull();
 	});
 
-	it("renders nothing at all without a rate", () => {
-		const { container } = render(<FxDisclosure fx={undefined} isCurrentMonth />);
-		expect(container.innerHTML).toBe("");
-		expect(fxDisclosureText(undefined, true)).toBeNull();
+	it("reports nothing without a rate", () => {
+		expect(disclosureText(undefined, true)).toBeNull();
 	});
 
 	it("coerces the ISO date the SDK actually returns", () => {
 		const asString = { ...eur, rateDate: "2026-07-24" as unknown as Date };
-		expect(fxDisclosureText(asString, true)).toContain("Jul 24, 2026");
+		expect(disclosureText(asString, true)).toContain("Jul 24, 2026");
 	});
 });
 
-describe("cap field hint", () => {
-	it("estimates the amount being typed", () => {
-		const hint = fxCapHint(50, eur);
-		expect(hint?.conversion.text).toBe("≈ €44");
-		expect(`${hint?.conversion.text}${hint?.tail}`).toBe("≈ €44 at today's rate.");
+describe("nothing to convert renders no node", () => {
+	it.each<[string, ReactElement]>([
+		["an inline amount", <FxAmount key="a" conversion={spendConversion(0, eur)} />],
+		["a table cell's second line", <FxSpendLine key="b" usd={0} fx={eur} />],
+		["the page disclosure", <FxDisclosure key="c" fx={undefined} isCurrentMonth />],
+	])("leaves no wrapper behind for %s", (_label, element) => {
+		const { container } = render(element);
+		expect(container.innerHTML).toBe("");
+	});
+});
+
+describe("the live hint under a cap field", () => {
+	it("rounds to whole units, like every other cap figure", () => {
+		// `€43.95` beside a round `$50` claims a precision the estimate does not have.
+		expect(fxCapHint(50, eur, true)).toEqual({
+			conversion: { text: "≈ €44", label: "approximately 44 euros" },
+			tail: " at today's rate.",
+		});
 	});
 
-	it("says nothing about an empty or zero amount", () => {
-		expect(fxCapHint(null, eur)).toBeNull();
-		expect(fxCapHint(0, eur)).toBeNull();
-		expect(fxCapHint(50, undefined)).toBeNull();
+	it.each<[string, number | null | undefined]>([
+		["the field is empty", null],
+		["the field has not been touched", undefined],
+		["the amount is zero", 0],
+		["the amount is unparseable", Number.NaN],
+	])("stays absent rather than flickering an estimate while %s", (_name, value) => {
+		expect(fxCapHint(value, eur, true)).toBeNull();
+	});
+
+	it("stays absent when the instance configured no display currency", () => {
+		expect(fxCapHint(50, undefined, true)).toBeNull();
+	});
+
+	it("withdraws the estimate on a closed month rather than dating it wrong", () => {
+		// A closed month's `fx` is frozen inside that month, and a cap applies from the moment it is
+		// saved — so "≈ €44 at today's rate" over that rate contradicts the page behind the dialog,
+		// which says those figures no longer change. Today's rate is not in the payload, so there is
+		// no honest figure to substitute.
+		expect(fxCapHint(50, eur, false)).toBeNull();
 	});
 });
 
@@ -219,45 +258,23 @@ describe("screen-reader wording", () => {
 		// `aria-label` is dropped on a bare generic span, so the wrapper must carry a role.
 		expect(amount.getAttribute("role")).toBe("img");
 	});
-
-	it("derives the currency's spoken name from Intl rather than a hand-written table", () => {
-		const jpy: FxRateInfo = { ...eur, currencyCode: "JPY", ratePerUsd: 157 };
-		expect(spendConversion(1, jpy)?.label).toBe("approximately 157.00 Japanese yen");
-	});
-
-	it("speaks both sides of an X of Y estimate", () => {
-		expect(spendOfCapConversion(43.9, 50, eur)?.label).toBe(
-			"approximately 38.59 euros of 44 euros",
-		);
-	});
-
-	it("renders no node at all when there is nothing to convert", () => {
-		const { container } = render(<FxAmount conversion={spendConversion(0, eur)} />);
-		expect(container.innerHTML).toBe("");
-	});
 });
 
 describe("without a configured currency", () => {
-	const rows: LlmUsageByDay[] = [
-		{
-			day: new Date("2026-07-05T00:00:00.000Z"),
-			instanceTotalCostUsd: 4.25,
-			ownProviderTotalCostUsd: 1.75,
-			unpricedEventCount: 0,
-			events: 3,
-		},
-	];
+	it("leaves no trace of the feature in the markup", () => {
+		const rows: LlmUsageByDay[] = [
+			{
+				day: new Date("2026-07-05T00:00:00.000Z"),
+				instanceTotalCostUsd: 4.25,
+				ownProviderTotalCostUsd: 1.75,
+				unpricedEventCount: 0,
+				events: 3,
+			},
+		];
+		const { container } = render(<LlmUsageByDayTable report={dayReport(rows, 4.25, 1.75)} />);
 
-	it("renders byte-identically to the pre-conversion markup", () => {
-		const withFxProp = render(<LlmUsageByDayTable rows={rows} fx={undefined} />).container
-			.innerHTML;
-		cleanup();
-		const withoutFxProp = render(<LlmUsageByDayTable rows={rows} />).container.innerHTML;
-
-		expect(withFxProp).toBe(withoutFxProp);
-		// No estimate, no wrapper left behind for one, no caption promising one.
-		expect(withFxProp).not.toContain('role="img"');
-		expect(withFxProp).not.toContain("€");
-		expect(withFxProp).not.toContain("ECB");
+		expect(container.innerHTML).not.toContain('role="img"');
+		expect(container.innerHTML).not.toContain("€");
+		expect(container.innerHTML).not.toContain("reference rate");
 	});
 });

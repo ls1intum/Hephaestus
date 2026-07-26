@@ -65,7 +65,13 @@ describe("AdminLlmConnectionFormDialog", () => {
 		const onProbe = vi.fn();
 		const onProbeSaved = vi.fn();
 		renderDialog({ editing: connection, onProbe, onProbeSaved });
+
+		// Typing a key relabels the one test control, so the admin is told which credential is about to
+		// be tried before pressing it. The label is the whole affordance — without it the two probes
+		// are indistinguishable on screen.
+		expect(screen.getByRole("button", { name: "Test saved connection" })).toBeTruthy();
 		fireEvent.change(screen.getByLabelText("API key"), { target: { value: "replacement-key" } });
+		expect(screen.queryByRole("button", { name: "Test saved connection" })).toBeNull();
 
 		fireEvent.click(screen.getByRole("button", { name: "Test changes" }));
 
@@ -74,6 +80,24 @@ describe("AdminLlmConnectionFormDialog", () => {
 			expect.any(Object),
 		);
 		expect(onProbeSaved).not.toHaveBeenCalled();
+	});
+
+	it("refuses an endpoint that smuggles a credential into the URL", () => {
+		// `noValidate` makes `type="url"` inert, so nothing native catches this; a query string on a
+		// gateway URL is how an API key ends up in logs and snapshots, and the server rejects it.
+		const onCreate = vi.fn();
+		renderDialog({ onCreate });
+		fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "Gateway" } });
+		fireEvent.change(screen.getByLabelText("Base URL"), {
+			target: { value: "https://gw.example.com/v1?api-key=SECRET" },
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Save inactive connection" }));
+
+		expect(
+			screen.getByText("Remove any credentials, query string or fragment from the URL."),
+		).toBeTruthy();
+		expect(onCreate).not.toHaveBeenCalled();
 	});
 
 	it("ignores an in-flight probe after its connection inputs change", () => {

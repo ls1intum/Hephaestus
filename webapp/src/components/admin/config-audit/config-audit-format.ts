@@ -1,5 +1,5 @@
 import type { ConfigAuditEntryView } from "@/api/types.gen";
-import { refLabel } from "../audit-shared/refLabel";
+import { refLabel } from "../audit-shared/ref-label";
 
 /**
  * Formatting for the config-audit surface: turning the server's `changedKeys` + `oldValue`/`newValue`
@@ -25,10 +25,14 @@ export const ENTITY_TYPE_LABELS: Record<EntityType, string> = {
 	WORKSPACE_TOKEN: "Access token",
 	WORKSPACE_VISIBILITY: "Visibility",
 	PRACTICE_ACTIVE: "Practice active",
-	WORKSPACE_INSTANCE_LLM_BUDGET: "AI budget",
+	// Two caps, different people's money, never summed — so each label says whose. "AI budget" alone
+	// named neither, on the one surface where both appear in the same column. The stored key is
+	// append-only; the label is not, and every row for a purse reads the same regardless of which
+	// spelling it was written under.
+	WORKSPACE_INSTANCE_LLM_BUDGET: "Shared-model AI budget",
 	WORKSPACE_OWN_PROVIDER_LLM_BUDGET: "Own-provider AI cap",
 	// Pre-rename spellings of the two above; same meaning, so the same label.
-	WORKSPACE_LLM_BUDGET: "AI budget",
+	WORKSPACE_LLM_BUDGET: "Shared-model AI budget",
 	WORKSPACE_BYO_LLM_BUDGET: "Own-provider AI cap",
 	WORKSPACE_LLM_CONNECTION: "Workspace AI provider",
 	WORKSPACE_LLM_MODEL: "Workspace model",

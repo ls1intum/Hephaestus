@@ -11,13 +11,20 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
 	Dialog,
+	DialogBody,
 	DialogContent,
 	DialogDescription,
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
+import {
+	Field,
+	FieldContent,
+	FieldDescription,
+	FieldError,
+	FieldLabel,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
 	Select,
@@ -26,6 +33,11 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import {
+	type FieldErrors,
+	type LlmConnectionFormField,
+	validateLlmConnectionForm,
+} from "@/lib/llm-form-validation";
 import {
 	authModeDefaultFor,
 	baseUrlDefaultFor,
@@ -37,7 +49,7 @@ import {
 	type ProviderPreset,
 	presetForConnection,
 	usesResponsesApi,
-} from "@/lib/llmProviderType";
+} from "@/lib/llm-provider-type";
 
 export interface AdminLlmConnectionFormDialogProps {
 	open: boolean;
@@ -63,9 +75,38 @@ export interface AdminLlmConnectionFormDialogProps {
 	onProbed?: (models: string[]) => void;
 }
 
-/** Create or update an instance OpenAI-compatible connection. */
+/**
+ * Create or update an instance OpenAI-compatible connection.
+ *
+ * The body is a separate component keyed on the edited connection, so switching which connection is
+ * edited remounts it with fresh initial state instead of copying props into state from an effect —
+ * the same seeding rule as the workspace-scoped form. An effect would leave a window, between the
+ * prop change and the effect running, in which the dialog shows the *previous* connection's secrets
+ * and endpoint under the new connection's title.
+ */
 export function AdminLlmConnectionFormDialog({
 	open,
+	onOpenChange,
+	editing,
+	...contentProps
+}: AdminLlmConnectionFormDialogProps) {
+	return (
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			{open && (
+				<AdminLlmConnectionFormDialogContent
+					key={editing?.id ?? "new"}
+					editing={editing}
+					onOpenChange={onOpenChange}
+					{...contentProps}
+				/>
+			)}
+		</Dialog>
+	);
+}
+
+type AdminLlmConnectionFormDialogContentProps = Omit<AdminLlmConnectionFormDialogProps, "open">;
+
+function AdminLlmConnectionFormDialogContent({
 	onOpenChange,
 	editing,
 	isSubmitting,
@@ -75,36 +116,35 @@ export function AdminLlmConnectionFormDialog({
 	onProbeSaved,
 	isProbing,
 	onProbed,
-}: AdminLlmConnectionFormDialogProps) {
+}: AdminLlmConnectionFormDialogContentProps) {
 	const isEdit = editing !== null;
-	const [displayName, setDisplayName] = useState("");
-	const [baseUrl, setBaseUrl] = useState("");
-	const [preset, setPreset] = useState<ProviderPreset>("OPENAI");
-	const [useResponsesApi, setUseResponsesApi] = useState(false);
-	const [authMode, setAuthMode] = useState<LlmAuthMode>("BEARER");
+	const [displayName, setDisplayName] = useState(editing?.displayName ?? "");
+	const [baseUrl, setBaseUrl] = useState(editing?.baseUrl ?? baseUrlDefaultFor("OPENAI"));
+	const [preset, setPreset] = useState<ProviderPreset>(
+		editing ? presetForConnection(editing) : "OPENAI",
+	);
+	const [useResponsesApi, setUseResponsesApi] = useState(
+		editing ? usesResponsesApi(editing.apiProtocol) : false,
+	);
+	const [authMode, setAuthMode] = useState<LlmAuthMode>(editing?.authMode ?? "BEARER");
 	const [apiKey, setApiKey] = useState("");
 	const [clearApiKey, setClearApiKey] = useState(false);
 	const [probeResult, setProbeResult] = useState<LlmProbeResult | null>(null);
 	const [probeError, setProbeError] = useState<string | null>(null);
-	const [errors, setErrors] = useState<{ displayName?: string; baseUrl?: string }>({});
+	const [errors, setErrors] = useState<FieldErrors<LlmConnectionFormField>>({});
+	// Invalidates an in-flight probe whose inputs have since changed, so a slow answer about the old
+	// endpoint cannot land as if it were about the new one.
 	const probeGeneration = useRef(0);
-	const openRef = useRef(open);
-	openRef.current = open;
-
+	// A probe answer that arrives after the dialog closed must not reach `onProbed`, which would seed
+	// the model form's datalist from a discovery the admin walked away from. Closing unmounts this
+	// component, so "still open" is exactly "still mounted".
+	const isMounted = useRef(true);
 	useEffect(() => {
-		if (!open) return;
-		probeGeneration.current += 1;
-		setDisplayName(editing?.displayName ?? "");
-		setBaseUrl(editing?.baseUrl ?? baseUrlDefaultFor("OPENAI"));
-		setPreset(editing ? presetForConnection(editing) : "OPENAI");
-		setUseResponsesApi(editing ? usesResponsesApi(editing.apiProtocol) : false);
-		setAuthMode(editing?.authMode ?? "BEARER");
-		setApiKey("");
-		setClearApiKey(false);
-		setProbeResult(null);
-		setProbeError(null);
-		setErrors({});
-	}, [open, editing]);
+		isMounted.current = true;
+		return () => {
+			isMounted.current = false;
+		};
+	}, []);
 
 	const apiProtocol = defaultProtocolFor(useResponsesApi);
 	const clearProbe = () => {
@@ -114,10 +154,15 @@ export function AdminLlmConnectionFormDialog({
 		onProbed?.([]);
 	};
 
+	// The shared rules, not a presence check of this form's own: `noValidate` makes `type="url"`
+	// inert, and an endpoint carrying a credential or a query string is rejected by the server
+	// whichever console pasted it.
 	const validate = (): boolean => {
-		const next: typeof errors = {};
-		if (!displayName.trim()) next.displayName = "A display name is required.";
-		if (!isEdit && !baseUrl.trim()) next.baseUrl = "A base URL is required.";
+		const next = validateLlmConnectionForm({
+			displayName,
+			// The endpoint is immutable, so an edit neither sends nor validates one.
+			...(isEdit ? {} : { baseUrl }),
+		});
 		setErrors(next);
 		return Object.keys(next).length === 0;
 	};
@@ -130,12 +175,12 @@ export function AdminLlmConnectionFormDialog({
 		onProbed?.([]);
 		const callbacks = {
 			onSuccess: (result: LlmProbeResult) => {
-				if (probeGeneration.current !== generation || !openRef.current) return;
+				if (probeGeneration.current !== generation || !isMounted.current) return;
 				setProbeResult(result);
 				if (result.reachable) onProbed?.(result.models);
 			},
 			onError: (message: string) => {
-				if (probeGeneration.current === generation && openRef.current) setProbeError(message);
+				if (probeGeneration.current === generation && isMounted.current) setProbeError(message);
 			},
 		};
 		if (editing && !apiKey.trim() && !clearApiKey) {
@@ -176,17 +221,21 @@ export function AdminLlmConnectionFormDialog({
 	};
 
 	return (
-		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="sm:max-w-lg">
-				<form onSubmit={handleSubmit} className="space-y-4" noValidate>
-					<DialogHeader>
-						<DialogTitle>{isEdit ? "Edit connection" : "Add connection"}</DialogTitle>
-						<DialogDescription>
-							Connect an endpoint that implements an OpenAI API. Models are added and priced after
-							the connection is saved.
-						</DialogDescription>
-					</DialogHeader>
+		<DialogContent className="sm:max-w-lg">
+			{/* `contents`, so the header/body/footer are the popup's own flex children: a `<form>` with a
+			    layout box of its own would defeat the pinned-header/scrolling-body column. */}
+			<form onSubmit={handleSubmit} className="contents" noValidate>
+				<DialogHeader>
+					<DialogTitle>{isEdit ? "Edit connection" : "Add connection"}</DialogTitle>
+					<DialogDescription>
+						Connect an endpoint that implements an OpenAI API. Models are added and priced after the
+						connection is saved.
+					</DialogDescription>
+				</DialogHeader>
 
+				{/* Preset, endpoint, auth mode, credential and the probe result run to ~900 px, which
+				    overflows every phone in both directions; only the body scrolls. */}
+				<DialogBody className="space-y-4 py-1">
 					<Field data-invalid={Boolean(errors.displayName)}>
 						<FieldLabel htmlFor="llm-conn-display-name">Display name</FieldLabel>
 						<Input
@@ -227,7 +276,7 @@ export function AdminLlmConnectionFormDialog({
 									))}
 								</SelectContent>
 							</Select>
-							<div className="mt-2 flex items-center gap-2 text-sm font-normal text-muted-foreground">
+							<Field orientation="horizontal" className="mt-2">
 								<Checkbox
 									id="llm-conn-responses-api"
 									checked={useResponsesApi}
@@ -236,10 +285,12 @@ export function AdminLlmConnectionFormDialog({
 										clearProbe();
 									}}
 								/>
-								<label htmlFor="llm-conn-responses-api">
-									Use the Responses API instead of Chat Completions
-								</label>
-							</div>
+								<FieldContent>
+									<FieldLabel htmlFor="llm-conn-responses-api" className="font-normal">
+										Use the Responses API instead of Chat Completions
+									</FieldLabel>
+								</FieldContent>
+							</Field>
 							{preset === "AZURE_OPENAI_V1" && (
 								<FieldDescription>
 									Replace RESOURCE below with your Azure resource name. The v1 API does not need an
@@ -320,7 +371,7 @@ export function AdminLlmConnectionFormDialog({
 							{editing?.hasApiKey ? "Leave blank to keep the current key." : "Stored encrypted."}
 						</FieldDescription>
 						{editing?.hasApiKey && (
-							<div className="flex items-center gap-2 text-sm text-muted-foreground">
+							<Field orientation="horizontal">
 								<Checkbox
 									id="llm-conn-clear-api-key"
 									checked={clearApiKey}
@@ -330,8 +381,12 @@ export function AdminLlmConnectionFormDialog({
 										clearProbe();
 									}}
 								/>
-								<label htmlFor="llm-conn-clear-api-key">Remove stored API key</label>
-							</div>
+								<FieldContent>
+									<FieldLabel htmlFor="llm-conn-clear-api-key" className="font-normal">
+										Remove stored API key
+									</FieldLabel>
+								</FieldContent>
+							</Field>
 						)}
 					</Field>
 
@@ -392,17 +447,17 @@ export function AdminLlmConnectionFormDialog({
 							</Alert>
 						)}
 					</div>
+				</DialogBody>
 
-					<DialogFooter>
-						<Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-							Cancel
-						</Button>
-						<Button type="submit" disabled={isSubmitting}>
-							{isEdit ? "Save changes" : "Save inactive connection"}
-						</Button>
-					</DialogFooter>
-				</form>
-			</DialogContent>
-		</Dialog>
+				<DialogFooter>
+					<Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+						Cancel
+					</Button>
+					<Button type="submit" disabled={isSubmitting}>
+						{isEdit ? "Save changes" : "Save inactive connection"}
+					</Button>
+				</DialogFooter>
+			</form>
+		</DialogContent>
 	);
 }

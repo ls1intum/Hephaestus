@@ -1,6 +1,7 @@
-import { formatDistanceToNow } from "date-fns";
 import type { AgentJob } from "@/api/types.gen";
-import { JOB_TYPE_LABELS } from "@/components/admin/usage/usageUtils";
+import { JOB_TYPE_LABELS } from "@/components/admin/usage/usage-utils";
+import { DetailRow } from "@/components/common/DetailRow";
+import { RelativeTime } from "@/components/common/RelativeTime";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -25,14 +26,13 @@ import {
 import {
 	DELIVERY_STATUS_LABELS,
 	deliveryBadgeVariant,
-	formatCostUsd,
 	formatTokens,
 	isCancellable,
 	isDeliveryRetryable,
 	modelLabel,
 	STATUS_LABELS,
 	statusBadgeVariant,
-} from "./jobUtils";
+} from "./job-utils";
 
 interface AgentJobDetailsPanelProps {
 	job: AgentJob | null;
@@ -42,22 +42,6 @@ interface AgentJobDetailsPanelProps {
 	isRetrying: boolean;
 	onCancel: (job: AgentJob) => void;
 	onRetryDelivery: (job: AgentJob) => void;
-}
-
-/**
- * One label/value pair of a `<dl>`. `dt`/`dd` is what associates the two programmatically — a pair
- * of neighbouring spans reads as two unrelated strings to a screen reader.
- */
-function Row({ label, value }: { label: string; value: React.ReactNode }) {
-	return (
-		// `min-w-0` + `break-words` on the value: model ids and error strings are unbroken tokens, and a
-		// flex item won't shrink below its content without it — at phone widths the value used to push
-		// the row past the panel edge instead of wrapping.
-		<div className="flex items-baseline justify-between gap-4 py-1.5">
-			<dt className="shrink-0 text-sm text-muted-foreground">{label}</dt>
-			<dd className="min-w-0 text-right text-sm font-medium break-words">{value}</dd>
-		</div>
-	);
 }
 
 function snapshotText(snapshot: unknown): string {
@@ -93,7 +77,9 @@ export function AgentJobDetailsPanel({
 							<SheetTitle>Run details</SheetTitle>
 							<SheetDescription>
 								{JOB_TYPE_LABELS[job.jobType]} ·{" "}
-								{formatDistanceToNow(new Date(job.createdAt), { addSuffix: true })}
+								{/* The "Created" row below carries the same instant with its absolute-time
+								    tooltip; a second hover target for one value would be noise. */}
+								<RelativeTime value={job.createdAt} tooltip={false} />
 							</SheetDescription>
 						</SheetHeader>
 
@@ -104,42 +90,36 @@ export function AgentJobDetailsPanel({
 										Overview
 									</h3>
 									<dl className="divide-y">
-										<Row
-											label="Status"
-											value={
-												<Badge variant={statusBadgeVariant(job.status)}>
-													{STATUS_LABELS[job.status]}
-												</Badge>
-											}
-										/>
-										<Row label="Model" value={modelLabel(job)} />
-										<Row label="Model name" value={job.llmModel ?? job.llmModelVersion ?? "—"} />
-										<Row
-											label="Created"
-											value={formatDistanceToNow(new Date(job.createdAt), { addSuffix: true })}
-										/>
+										<DetailRow label="Status">
+											<Badge variant={statusBadgeVariant(job.status)}>
+												{STATUS_LABELS[job.status]}
+											</Badge>
+										</DetailRow>
+										<DetailRow label="Model">{modelLabel(job)}</DetailRow>
+										<DetailRow label="Model name">
+											{job.llmModel ?? job.llmModelVersion ?? "—"}
+										</DetailRow>
+										<DetailRow label="Created">
+											<RelativeTime value={job.createdAt} />
+										</DetailRow>
 										{job.completedAt && (
-											<Row
-												label="Completed"
-												value={formatDistanceToNow(new Date(job.completedAt), {
-													addSuffix: true,
-												})}
-											/>
+											<DetailRow label="Completed">
+												<RelativeTime value={job.completedAt} />
+											</DetailRow>
 										)}
-										<Row
-											label="Delivery"
-											value={
-												job.deliveryStatus ? (
-													<Badge variant={deliveryBadgeVariant(job.deliveryStatus)}>
-														{DELIVERY_STATUS_LABELS[job.deliveryStatus]}
-													</Badge>
-												) : (
-													"—"
-												)
-											}
-										/>
-										{job.exitCode != null && <Row label="Exit code" value={job.exitCode} />}
-										{job.retryCount > 0 && <Row label="Retries" value={job.retryCount} />}
+										<DetailRow label="Delivery">
+											{job.deliveryStatus ? (
+												<Badge variant={deliveryBadgeVariant(job.deliveryStatus)}>
+													{DELIVERY_STATUS_LABELS[job.deliveryStatus]}
+												</Badge>
+											) : (
+												"—"
+											)}
+										</DetailRow>
+										{job.exitCode != null && (
+											<DetailRow label="Exit code">{job.exitCode}</DetailRow>
+										)}
+										{job.retryCount > 0 && <DetailRow label="Retries">{job.retryCount}</DetailRow>}
 									</dl>
 								</section>
 
@@ -159,14 +139,16 @@ export function AgentJobDetailsPanel({
 										Usage
 									</h3>
 									<dl className="divide-y">
-										<Row label="Input tokens" value={formatTokens(job.llmTotalInputTokens)} />
-										<Row label="Output tokens" value={formatTokens(job.llmTotalOutputTokens)} />
-										<Row
-											label="Reasoning tokens"
-											value={formatTokens(job.llmTotalReasoningTokens)}
-										/>
-										<Row label="Model calls" value={formatTokens(job.llmTotalCalls)} />
-										<Row label="Cost" value={formatCostUsd(job.llmCostUsd)} />
+										<DetailRow label="Input tokens">
+											{formatTokens(job.llmTotalInputTokens)}
+										</DetailRow>
+										<DetailRow label="Output tokens">
+											{formatTokens(job.llmTotalOutputTokens)}
+										</DetailRow>
+										<DetailRow label="Reasoning tokens">
+											{formatTokens(job.llmTotalReasoningTokens)}
+										</DetailRow>
+										<DetailRow label="Model calls">{formatTokens(job.llmTotalCalls)}</DetailRow>
 									</dl>
 								</section>
 

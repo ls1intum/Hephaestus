@@ -1,50 +1,98 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import type { InstanceLlmSettings } from "@/api/types.gen";
 import { InstanceLlmSettingsCard } from "./InstanceLlmSettingsCard";
 
+const saved: InstanceLlmSettings = {
+	allowedEgressHosts: "api.openai.com",
+	allowWorkspaceConnections: true,
+};
+
+const hostsField = () => screen.getByLabelText("Allowed provider hosts") as HTMLTextAreaElement;
+const ownProviderSwitch = () =>
+	screen.getByRole("switch", { name: /Let workspaces add providers and models/ });
+const saveButton = () => screen.getByRole("button", { name: "Save settings" }) as HTMLButtonElement;
+
+function renderCard(settings: InstanceLlmSettings = saved) {
+	const onSave = vi.fn();
+	const view = render(
+		<InstanceLlmSettingsCard
+			settings={settings}
+			isLoading={false}
+			isSubmitting={false}
+			onSave={onSave}
+		/>,
+	);
+	return { onSave, ...view };
+}
+
 describe("InstanceLlmSettingsCard", () => {
+	it("offers nothing to save until something differs from the settings on record", () => {
+		renderCard();
+
+		expect(saveButton().disabled).toBe(true);
+
+		fireEvent.change(hostsField(), { target: { value: "llm.example.com" } });
+		expect(saveButton().disabled).toBe(false);
+
+		// Typed back to what the server holds: there is again nothing to send.
+		fireEvent.change(hostsField(), { target: { value: "api.openai.com" } });
+		expect(saveButton().disabled).toBe(true);
+	});
+
 	it("sends an explicit empty host list so an admin can clear the allowlist", () => {
-		const onSave = vi.fn();
-		render(
-			<InstanceLlmSettingsCard
-				settings={{
-					allowedEgressHosts: "api.openai.com",
-					allowWorkspaceConnections: true,
-				}}
-				isLoading={false}
-				isSubmitting={false}
-				onSave={onSave}
-			/>,
-		);
-		fireEvent.change(screen.getByLabelText("Allowed provider hosts"), { target: { value: "" } });
-		fireEvent.click(screen.getByRole("button", { name: "Save settings" }));
+		const { onSave } = renderCard();
+
+		fireEvent.change(hostsField(), { target: { value: "" } });
+
+		expect(hostsField().value).toBe("");
+		expect(saveButton().disabled).toBe(false);
+
+		fireEvent.click(saveButton());
+
 		expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ allowedEgressHosts: "" }));
 	});
 
-	it("saves the workspace-provider toggle alongside the host allowlist", () => {
-		const onSave = vi.fn();
-		render(
-			<InstanceLlmSettingsCard
-				settings={{
-					allowedEgressHosts: "api.openai.com",
-					allowWorkspaceConnections: true,
-				}}
-				isLoading={false}
-				isSubmitting={false}
-				onSave={onSave}
-			/>,
-		);
+	it("saves the workspace-provider toggle the admin actually flipped", () => {
+		// Starts off, so `true` below can only come from operating the switch. Pre-set to `true`, this
+		// passed just as well with the control deleted and the field hard-coded into the payload.
+		const { onSave } = renderCard({ ...saved, allowWorkspaceConnections: false });
 
-		fireEvent.change(screen.getByLabelText("Allowed provider hosts"), {
-			target: { value: "llm.example.com" },
-		});
-		fireEvent.click(screen.getByRole("button", { name: "Save settings" }));
+		expect(ownProviderSwitch().getAttribute("aria-checked")).toBe("false");
+
+		fireEvent.click(ownProviderSwitch());
+
+		expect(ownProviderSwitch().getAttribute("aria-checked")).toBe("true");
+		expect(saveButton().disabled).toBe(false);
+
+		fireEvent.click(saveButton());
 
 		expect(onSave).toHaveBeenCalledWith(
 			expect.objectContaining({
-				allowedEgressHosts: "llm.example.com",
+				allowedEgressHosts: "api.openai.com",
 				allowWorkspaceConnections: true,
 			}),
 		);
+	});
+
+	it("keeps an unsaved edit when the settings are refetched underneath it", () => {
+		const { rerender } = renderCard();
+
+		fireEvent.change(hostsField(), { target: { value: "llm.example.com" } });
+
+		// A background refetch lands — this tab regaining focus past the query's `staleTime` is enough
+		// — and a second admin has since changed the toggle. Copying props into state through an effect
+		// threw the typed host away and reset `dirty`, greying out Save on a form mid-edit.
+		rerender(
+			<InstanceLlmSettingsCard
+				settings={{ allowedEgressHosts: "api.openai.com", allowWorkspaceConnections: false }}
+				isLoading={false}
+				isSubmitting={false}
+				onSave={vi.fn()}
+			/>,
+		);
+
+		expect(hostsField().value).toBe("llm.example.com");
+		expect(saveButton().disabled).toBe(false);
 	});
 });

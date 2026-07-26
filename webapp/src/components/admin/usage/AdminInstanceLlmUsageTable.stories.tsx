@@ -1,16 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, within } from "storybook/test";
-import type { WorkspaceLlmUsageReport } from "@/api/types.gen";
-import {
-	AdminInstanceLlmUsageTable,
-	type AdminWorkspaceLlmUsageRow,
-} from "./AdminInstanceLlmUsageTable";
+import type { AdminWorkspaceLlmUsage, WorkspaceLlmUsageReport } from "@/api/types.gen";
+import { expectTargetSize } from "@/test/reflow";
+import { AdminInstanceLlmUsageTable } from "./AdminInstanceLlmUsageTable";
 
 /**
  * Mixed cap ownership, in the container's sort order (shared-model spend desc): both caps set,
  * provider cap only, shared-model budget only, and neither.
  */
-const rows: AdminWorkspaceLlmUsageRow[] = [
+const rows: AdminWorkspaceLlmUsage[] = [
 	{
 		// Both caps set; the shared-model budget is spent, so host-funded work is paused — the
 		// workspace's own provider keeps running, because that cap is nowhere near.
@@ -158,7 +156,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
 	// Also the default currency state: no display currency configured, so every figure is USD.
 	play: async ({ canvasElement }) => {
-		await expect(within(canvasElement).queryByText(/ECB reference rate/)).toBeNull();
+		await expect(within(canvasElement).queryByText(/reference rate published on/)).toBeNull();
 	},
 };
 
@@ -206,12 +204,15 @@ export const DisplayCurrencyThisMonth: Story = {
 			currencyCode: "EUR",
 			ratePerUsd: 0.878966,
 			rateDate: new Date("2026-07-24T00:00:00.000Z"),
+			source: "ECB",
 		},
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(
-			canvas.getByText(/EUR amounts are estimates at the ECB reference rate for Jul 24, 2026/),
+			canvas.getByText(
+				/EUR amounts are estimates at the European Central Bank reference rate published on Jul 24, 2026/,
+			),
 		).toBeVisible();
 		await expect(canvas.getByLabelText("approximately 21.99 euros")).toBeInTheDocument();
 	},
@@ -225,12 +226,13 @@ export const DisplayCurrencyClosedMonth: Story = {
 			currencyCode: "EUR",
 			ratePerUsd: 0.874312,
 			rateDate: new Date("2026-06-30T00:00:00.000Z"),
+			source: "ECB",
 		},
 	},
 	play: async ({ canvasElement }) => {
 		await expect(
 			within(canvasElement).getByText(
-				/The last rate published that month, so past figures don't change/,
+				/last rate published in the month shown, so these figures no longer change/,
 			),
 		).toBeVisible();
 	},
@@ -276,6 +278,26 @@ export const ExpandedMobileReflow: Story = {
 			"aria-controls",
 			`workspace-usage-details-${rows[0].workspaceSlug}`,
 		);
+	},
+};
+
+/**
+ * The two "whose money is this" column headers are the only interactive targets in the header row,
+ * and they sit at the header's ~20 px line height.
+ *
+ * WCAG 2.2 SC 2.5.8 wants 24 x 24 px. Conforming through the Spacing exception instead would rest
+ * on how far apart these two columns happen to render, which nothing here controls — so they carry
+ * their own height, and this measures it.
+ */
+export const HelpHeaderTargetSize: Story = {
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		for (const name of ["Shared-model budget", "Provider cap"]) {
+			const header = canvas.getByRole("columnheader", { name });
+			const trigger = header.querySelector<HTMLElement>("button");
+			await expect(trigger).not.toBeNull();
+			if (trigger != null) await expectTargetSize(trigger);
+		}
 	},
 };
 
@@ -374,10 +396,19 @@ export const NoProviderCapsSet: Story = {
 
 /**
  * A past month. The verdicts are computed from the workspace's *current* caps, so they can't say
- * anything about a finished month — every status reads as a neutral dash.
+ * anything about a finished month — every status reads as a neutral dash, and the budget editor is
+ * withdrawn along with them: a budget is not month-scoped, so saving one from here would change what
+ * runs today.
  */
 export const PastMonth: Story = {
 	args: { isCurrentMonth: false },
+	play: async ({ canvas }) => {
+		await expect(canvas.queryByRole("button", { name: /^Set shared-model budget/ })).toBeNull();
+		// Every row is otherwise unchanged — the month is still fully readable.
+		await expect(canvas.getAllByRole("button", { name: /^View usage details for/ })).toHaveLength(
+			rows.length,
+		);
+	},
 };
 
 /** The rollup left-joins from workspace, so zero rows means the instance has no workspaces. */
@@ -387,8 +418,8 @@ export const Empty: Story = {
 
 /**
  * A EUR instance whose month has no workspaces in it. The rate belongs to the month, so it is still
- * known here — it used to be read off `rows[0]`, which this month does not have. Nothing on screen
- * converted, so nothing is disclosed.
+ * known here — it comes from the report envelope rather than from `rows[0]`, which this month does
+ * not have. Nothing on screen converted, so nothing is disclosed.
  */
 export const EmptyOnDisplayCurrencyInstance: Story = {
 	args: {
@@ -397,12 +428,13 @@ export const EmptyOnDisplayCurrencyInstance: Story = {
 			currencyCode: "EUR",
 			ratePerUsd: 0.878966,
 			rateDate: new Date("2026-07-24T00:00:00.000Z"),
+			source: "ECB",
 		},
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByText("No workspaces on this instance yet")).toBeVisible();
-		await expect(canvas.queryByText(/ECB reference rate/)).toBeNull();
+		await expect(canvas.queryByText(/reference rate published on/)).toBeNull();
 	},
 };
 

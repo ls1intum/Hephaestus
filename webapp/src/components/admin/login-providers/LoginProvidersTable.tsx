@@ -46,8 +46,12 @@ interface LoginProvidersTableProps {
 	error?: unknown;
 	/** Refetch the provider list after a failure. */
 	onRetry?: () => void;
-	/** Registration id of the row with a mutation in flight (toggle / edit / delete). */
-	mutatingId: string | null;
+	/**
+	 * Registration ids of the rows with a write in flight (toggle / edit / delete), read from the
+	 * mutation cache by the container. A set, not one id: two rows can be mid-write at once, and a
+	 * single id re-enables the still-running row as soon as the other settles.
+	 */
+	mutatingIds: ReadonlySet<string>;
 	onEdit: (provider: LoginProviderView) => void;
 	onToggleEnabled: (provider: LoginProviderView, enabled: boolean) => void;
 	onDelete: (provider: LoginProviderView) => void;
@@ -63,7 +67,7 @@ export function LoginProvidersTable({
 	isError,
 	error,
 	onRetry,
-	mutatingId,
+	mutatingIds,
 	onEdit,
 	onToggleEnabled,
 	onDelete,
@@ -72,7 +76,7 @@ export function LoginProvidersTable({
 	// ONE delete dialog for the whole table, driven by the row it targets — a dialog per row means N
 	// portals mounted for a single, rare action.
 	const [deleting, setDeleting] = useState<LoginProviderView | null>(null);
-	const isDeletePending = deleting != null && mutatingId === deleting.registrationId;
+	const isDeletePending = deleting != null && mutatingIds.has(deleting.registrationId);
 
 	// The delete succeeded exactly when the row leaves the list; close on that, so a *failed* delete
 	// (row still present, mutation settled) keeps the dialog open to retry.
@@ -142,7 +146,7 @@ export function LoginProvidersTable({
 				</TableHeader>
 				<TableBody>
 					{providers.map((provider) => {
-						const busy = mutatingId === provider.registrationId;
+						const busy = mutatingIds.has(provider.registrationId);
 						const redirectInputId = `lp-redirect-${provider.registrationId}`;
 						return (
 							<TableRow key={provider.registrationId}>
@@ -230,8 +234,13 @@ export function LoginProvidersTable({
 
 			<AlertDialog
 				open={deleting != null}
+				// Dismissal is always allowed, including while the DELETE is in flight. Refusing it left
+				// Escape and a disabled Cancel with no way out of a popup whose only other control was also
+				// disabled — a keyboard trap (WCAG 2.2 SC 2.1.2), unbounded against a connection that never
+				// answers. The request is not cancelled; the row it belongs to stays disabled until it
+				// settles, and a failure still toasts.
 				onOpenChange={(open) => {
-					if (!open && !isDeletePending) setDeleting(null);
+					if (!open) setDeleting(null);
 				}}
 			>
 				<AlertDialogContent>
@@ -243,7 +252,7 @@ export function LoginProvidersTable({
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
-						<AlertDialogCancel disabled={isDeletePending}>Cancel</AlertDialogCancel>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
 						<AlertDialogAction
 							variant="destructive"
 							disabled={isDeletePending}

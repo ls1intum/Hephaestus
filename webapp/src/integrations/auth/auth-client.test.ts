@@ -4,7 +4,7 @@ import {
 	authClient,
 	type CurrentUser,
 	toUserProfile,
-} from "./authClient";
+} from "./auth-client";
 
 // Object-mother for a CurrentUser (server CurrentUserView). Tests override only what they assert.
 function makeCurrentUser(overrides: Partial<CurrentUser> = {}): CurrentUser {

@@ -1,8 +1,8 @@
-import { Progress as ProgressRoot } from "@base-ui/react/progress";
 import type { ReactNode } from "react";
-import { formatCapUsd, formatCostUsd } from "@/components/admin/ai/jobUtils";
-import { ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
-import { BUDGET_WARN_PERCENT } from "./usageUtils";
+import { formatCapUsd, formatCostUsd } from "@/components/admin/ai/job-utils";
+import { Progress } from "@/components/ui/progress";
+import { cn } from "@/lib/utils";
+import { BUDGET_WARN_PERCENT } from "./usage-utils";
 
 /** Whether a cap is worth naming as a state, and which one. `null` means "just a number". */
 export type CapState = "paused" | "near" | null;
@@ -67,23 +67,22 @@ export function CapMeter({ spendUsd, capUsd, percent, paused, label }: CapMeterP
 	// Percent first: it is the answer to "how close am I", and the amounts qualify it. Comma, not an
 	// em-dash — screen readers render an em-dash inconsistently, and some spell it out.
 	const valueText = `${rounded}% used, ${formatCostUsd(spendUsd)} of ${formatCapUsd(capUsd)}`;
+	// Styled through the kit's slots rather than by composing the primitive by hand: `Progress` owns
+	// which parts exist and how they nest, and this only overrides the two declarations that carry
+	// meaning here — the bar's height and its tone.
 	const tone =
 		paused || percent >= 100
-			? "bg-destructive"
+			? "**:data-[slot=progress-indicator]:bg-destructive"
 			: percent >= BUDGET_WARN_PERCENT
-				? "bg-warning"
-				: "bg-primary";
+				? "**:data-[slot=progress-indicator]:bg-warning"
+				: "**:data-[slot=progress-indicator]:bg-primary";
 
 	return (
-		<ProgressRoot.Root
+		<Progress
 			value={value}
-			className="flex w-full"
 			aria-label={label}
 			getAriaValueText={() => valueText}
-		>
-			<ProgressTrack className="h-1.5 rounded-full">
-				<ProgressIndicator className={tone} />
-			</ProgressTrack>
-		</ProgressRoot.Root>
+			className={cn("w-full *:data-[slot=progress-track]:h-1.5", tone)}
+		/>
 	);
 }

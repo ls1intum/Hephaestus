@@ -6,9 +6,8 @@ import { adminListAuthEventsInfiniteOptions } from "@/api/@tanstack/react-query.
 import { adminExportAuthEvents } from "@/api/sdk.gen";
 import type { AuthEventView } from "@/api/types.gen";
 import { AdminAuditTable } from "@/components/admin/audit/AdminAuditTable";
-import { type AuthEventType, EVENT_TYPE_LABELS } from "@/components/admin/audit/auditFormat";
+import { type AuthEventType, EVENT_TYPE_LABELS } from "@/components/admin/audit/audit-format";
 import { AuditDateFacet } from "@/components/admin/audit-shared/AuditDateFacet";
-import { AuditFacetFilter } from "@/components/admin/audit-shared/AuditFacetFilter";
 import { AuditRefFilterPill } from "@/components/admin/audit-shared/AuditRefFilterPill";
 import { AuditToolbar } from "@/components/admin/audit-shared/AuditToolbar";
 import {
@@ -19,10 +18,11 @@ import {
 	narrowToEnum,
 	nonEmpty,
 	toDateRange,
-} from "@/components/admin/audit-shared/auditSearch";
-import { dedupeById } from "@/components/admin/audit-shared/dedupeById";
-import { nameForRef } from "@/components/admin/audit-shared/nameForRef";
-import { springPageParams } from "@/components/admin/audit-shared/springPage";
+} from "@/components/admin/audit-shared/audit-search";
+import { dedupeById } from "@/components/admin/audit-shared/dedupe-by-id";
+import { nameForRef } from "@/components/admin/audit-shared/name-for-ref";
+import { springPageParams } from "@/components/admin/audit-shared/spring-page";
+import { FacetMultiSelect } from "@/components/common/FacetMultiSelect";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -141,13 +141,13 @@ export function AuthAuditPanel({
 					</Button>
 				}
 			>
-				<AuditFacetFilter
+				<FacetMultiSelect
 					title="Event"
 					options={EVENT_TYPE_OPTIONS}
 					selected={search.eventType ?? []}
 					onChange={(values) => onSearchChange({ eventType: nonEmpty(values) })}
 				/>
-				<AuditFacetFilter
+				<FacetMultiSelect
 					title="Result"
 					options={OUTCOME_OPTIONS}
 					selected={search.outcome ?? []}

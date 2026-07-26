@@ -31,7 +31,8 @@ describe("resolveHeaderBadge", () => {
 		});
 	});
 
-	it("falls back to an environment pill if production somehow lacks a semver", () => {
+	it("shows a pill, not a dead release link, when a build injected no version", () => {
+		// A source build that never set the version would otherwise link to /releases/tag/vnightly.
 		expect(resolveHeaderBadge("nightly", "Production", true).kind).toBe("environment");
 	});
 });

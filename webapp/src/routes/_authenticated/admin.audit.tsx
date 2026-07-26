@@ -3,7 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ScrollTextIcon } from "lucide-react";
 import { adminListWorkspacesOptions } from "@/api/@tanstack/react-query.gen";
 import { AuthAuditPanel } from "@/components/admin/audit/AuthAuditPanel";
-import { type AuditSearch, auditSearchSchema } from "@/components/admin/audit-shared/auditSearch";
+import { type AuditSearch, auditSearchSchema } from "@/components/admin/audit-shared/audit-search";
 import { AdminConfigAuditPanel } from "@/components/admin/config-audit/ConfigAuditPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { instanceAdminHead } from "@/lib/page-title";

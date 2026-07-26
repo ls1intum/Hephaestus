@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { formatMonthLabel } from "./usageUtils";
+import { formatMonthLabel } from "./usage-utils";
 
 export interface MonthNavigatorProps {
 	/** ISO `yyyy-MM` month currently shown. */
