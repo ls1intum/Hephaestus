@@ -206,6 +206,17 @@ services:
       # Agent job queue (practice review). The queue runs on PostgreSQL — no NATS involved. NATS
       # stays required elsewhere on this pod for webhook-driven sync consumption (NATS_ENABLED above).
       AGENT_ENABLED: ${AGENT_ENABLED:-false}
+      # Instance-wide LLM knobs. Providers, models, prices and credentials are NOT here — they are
+      # runtime catalog data an instance admin registers in the UI. These three are the deploy-time
+      # facts that cannot be.
+      # Second display currency for spend figures (empty = USD only; only EUR is honoured today).
+      # The reports and the FX fetcher are server-role, so this belongs on this pod.
+      HEPHAESTUS_LLM_DISPLAY_CURRENCY: ${HEPHAESTUS_LLM_DISPLAY_CURRENCY:-}
+      HEPHAESTUS_LLM_FX_DAILY_URL: ${HEPHAESTUS_LLM_FX_DAILY_URL:-https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml}
+      # SSRF guard. Set on BOTH this pod and the worker or the two disagree: this pod decides whether
+      # a loopback provider URL may be SAVED, the worker's proxy decides whether it may be DIALLED.
+      # Leave false in production.
+      HEPHAESTUS_LLM_EGRESS_ALLOW_LOOPBACK: ${HEPHAESTUS_LLM_EGRESS_ALLOW_LOOPBACK:-false}
       # Git checkout (bind-mount repos into agent containers)
       GIT_CHECKOUT_ENABLED: ${GIT_CHECKOUT_ENABLED:-false}
       GIT_STORAGE_PATH: /data/git-repos
@@ -310,6 +321,10 @@ services:
       SANDBOX_MAX_CONCURRENT: ${SANDBOX_MAX_CONCURRENT:-5}
       SANDBOX_MEMORY_BYTES: ${SANDBOX_MEMORY_BYTES:-4294967296}
       SANDBOX_CPUS: ${SANDBOX_CPUS:-2.0}
+      # SSRF guard for the in-process LLM proxy. Must match application-server's value: that pod
+      # decides whether a loopback provider URL may be SAVED, this one whether it may be DIALLED, and
+      # a split between them shows up as connections that save fine and then fail at call time.
+      HEPHAESTUS_LLM_EGRESS_ALLOW_LOOPBACK: ${HEPHAESTUS_LLM_EGRESS_ALLOW_LOOPBACK:-false}
       # No LLM credential passthrough needed: the proxy runs in-process on this pod (it follows
       # the worker/sandbox capability) and reads providers
       # from the same instance/workspace catalog as application-server.

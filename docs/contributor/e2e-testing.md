@@ -73,7 +73,7 @@ The agent runs in a Docker sandbox (`ghcr.io/ls1intum/hephaestus/agent-pi`) and 
 the in-app proxy — the only path a sandbox has to a provider key, never injected directly. The sandbox
 gets an explicit route to that proxy even when general internet access is disabled; the proxy alone
 connects to the configured upstream. Findings are posted back to the MR and shown under the
-workspace's AI → Activity view.
+workspace's **Practices → Runs** view.
 
 The live runner JUnit tests are useful component checks, but they point the runner directly at the
 upstream endpoint. They do **not** replace this loop: only a real queued job and mentor turn through the

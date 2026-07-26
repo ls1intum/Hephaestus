@@ -6,6 +6,13 @@
 > in a body-of-knowledge **standards anchor** and assigns each practice a **credibility tier**, so the
 > catalogue's claims can be defended source-by-source. Uses the canonical vocabulary throughout —
 > *area*, never *goal*.
+>
+> **Known gap:** the shipped catalogue is 12 areas / 37 practices. Sections 2 and 3 below still
+> enumerate the earlier 11 / 32. Missing entries: the whole `communication` area
+> (`asks-answerable-questions`, `gives-actionable-answers`,
+> `posts-clear-status-and-blocker-updates`) and two practices under `decisions-and-documentation`
+> (`change-keeps-linked-docs-consistent`, `issue-points-to-relevant-context`). Those five ship
+> without a standards anchor or credibility tier here — do not read the enumeration as complete.
 
 ---
 
@@ -54,7 +61,7 @@ orphan; that remap is the gating step (the SCD-2 `practice_revision` history —
 
 ---
 
-## 2. The 11 areas and their standards anchors
+## 2. The 12 areas and their standards anchors
 
 Each area carries a `standardsAnchor` — the body of knowledge that grounds the *grouping*. Anchors are
 attached as metadata (citations), not as renames: the R9 doctrine is "keep the slug, add the citation".
@@ -149,7 +156,7 @@ one 2025 preprint).
 
 ---
 
-## 3. The 32 practices — grounding + credibility tier
+## 3. The 37 practices — grounding + credibility tier
 
 Each row: the practice's one-line grounding (study/standard + author/year) and its credibility tier.
 "PR" = `PULL_REQUEST` artifact, "ISSUE" = `ISSUE` artifact.
@@ -253,7 +260,7 @@ or metadata — never a slug (identity key), a stored enum, or a DB CHECK.
 5. **Metadata adds**: ASVS V1/V2 tags on the two injection-adjacent practices; ISO 25010 / SWEBOK KA4 /
    DORA tags on `code-craftsmanship`; `credibilityTier` labels on `merged-past-unresolved-review-threads`
    (practitioner-norm) and `excludes-generated-and-build-artifacts`.
-6. **Developer-facing learner copy (all 32 practices)**: every practice now carries seeded `whyItMatters`
+6. **Developer-facing learner copy (all 37 practices)**: every practice now carries seeded `whyItMatters`
    (a learner-facing *explanation* — why the practice matters) and `whatGoodLooksLike` (a concrete
    **exemplar** — what good looks like). These feed the developer-facing layer served through
    `LearnerPracticeDTO` / `GET /practices/learner`; that projection is **criteria-free by construction**

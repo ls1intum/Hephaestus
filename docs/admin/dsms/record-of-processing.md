@@ -89,7 +89,7 @@ U.S. recipients are covered by the EU-US Data Privacy Framework (Commission Impl
 **Where stored**
 
 ```text
-Self-hosted by AET at https://hephaestus.aet.cit.tum.de on AET-administered infrastructure at TUM. Application data — including authentication state (accounts, federated identity links, the cookie-session revocation list, and the auth-event log) — in PostgreSQL; webhook events and the practice-review job queue in NATS JetStream. Local working copies of monitored repositories may be stored on the host filesystem when practice-review code execution is enabled. Container stdout is rotated by the container runtime (Docker json-file driver, 50 MiB per file × 5 files retained per service). The application-server access log is retained for at most 14 days.
+Self-hosted by AET at https://hephaestus.aet.cit.tum.de on AET-administered infrastructure at TUM. Application data — including authentication state (accounts, federated identity links, the cookie-session revocation list, and the auth-event log) — in PostgreSQL, which also holds the practice-review job queue; webhook and integration-sync events in NATS JetStream. Local working copies of monitored repositories may be stored on the host filesystem when practice-review code execution is enabled. Container stdout goes to the Docker json-file driver. Rotation is set per service in the compose files: 50 MiB per file × 5 files for the webapp, application server and worker; 10 MiB × 3 for the webhook receiver and NATS. The remaining services (PostgreSQL, the reverse proxy, the maintenance page, the release-pin init job) set no rotation of their own and inherit whatever the host Docker daemon's default is — bringing those under an explicit cap is an open AET-ops item. No component writes an HTTP access log: Tomcat's is explicitly disabled in the production profile and the Traefik reverse proxy is not started with `--accesslog` (Traefik's default is off), so no per-request IP/URL record is created at either layer, and none of these stdout streams is a request-level log.
 
 Application and authentication data reside on TUM infrastructure within the EU. AI-assisted features additionally forward code snippets and surrounding discussion to the workspace-configured LLM provider (default for the TUM-operated deployment: Microsoft Azure OpenAI in an EU region).
 ```
@@ -105,8 +105,7 @@ Mixed retention by category:
 - Removal on disconnect / purge is an application of storage limitation (Art. 5(1)(e) GDPR): the integration is the sole purpose for which the mirror is held, so once it is severed there is no basis to retain the copy. It is a workspace-administrator action and is **not** the fulfilment path for a data subject's erasure request under Art. 17 — that remains the operator-executed process described under "Deletion responsibility" below, which also covers account-bound rows that no single workspace owns.
 - LLM-provider-side prompts: according to the chosen provider's terms. For the TUM-operated default (Microsoft Azure OpenAI in an EU region), within the enterprise abuse-monitoring window published in Microsoft's Azure OpenAI data-privacy documentation; eligible customers may apply for Microsoft's modified abuse monitoring (Limited Access program) to suppress prompt storage and human review.
 - Slack event transport buffer (NATS JetStream `slack` stream, carrying verified inbound Slack event payloads including message text): expires automatically after at most 72 hours; the PostgreSQL substrate is the system of record and all consent/erasure controls apply there.
-- Application-server access log: at most 14 days; longer only for the duration of an active security incident, then deleted on closure.
-- Container stdout: rotated by size by the container runtime (50 MiB × 5 files per service).
+- Container stdout (no HTTP access log is written at any layer, so there is no request-level log at all): rotated by size by the container runtime, per the per-service caps described under "Where stored" above.
 ```
 
 **Reasoning**
@@ -124,7 +123,7 @@ Routine retention-driven deletion (logs, container stdout): handled automaticall
 **Access and portability fulfilment (Art. 15, Art. 20)**
 
 ```text
-Hephaestus provides a self-service data export (Art. 20): a signed-in contributor requests an export from the in-app settings (account "Danger Zone"), the platform compiles a JSON archive of the personal data it holds about that contributor — the Hephaestus account, federated identity links, workspace memberships, account preferences, and the contributor's own authentication-event history — and the contributor downloads it from the app. The archive deliberately excludes credentials and session/signing-key material. Anything outside that scope (e.g. access-log entries within the 14-day retention window, or the analytics identity where PostHog is activated) is added by AET operators on a verified Art. 15 request. Source-side content on GitHub or gitlab.lrz.de is exported by those source platforms, not by Hephaestus. Identity verification, response timeframe, and contact path are the same as for erasure.
+Hephaestus provides a self-service data export (Art. 20): a signed-in contributor requests an export from the in-app settings (account "Danger Zone"), the platform compiles a JSON archive of the personal data it holds about that contributor — the Hephaestus account, federated identity links, workspace memberships, account preferences, and the contributor's own authentication-event history — and the contributor downloads it from the app. The archive deliberately excludes credentials and session/signing-key material. Anything outside that scope is added by AET operators on a verified Art. 15 request: the workspace-scoped records the export omits (AI conversations, practice findings and their feedback, recognition signals, mirrored repository artefacts), the analytics identity where PostHog is activated, and whatever of the requester's data still sits in the container-stdout rotation window. There are no HTTP access-log entries to disclose — Tomcat's access log is disabled in the production profile, so no per-request IP/URL record is created at all; the IP addresses Hephaestus does hold are the ones on authentication events, which the self-service export already covers. Source-side content on GitHub or gitlab.lrz.de is exported by those source platforms, not by Hephaestus. Identity verification, response timeframe, and contact path are the same as for erasure.
 ```
 
 **Deletion guarantee**
@@ -138,8 +137,7 @@ Hephaestus provides a self-service data export (Art. 20): a signed-in contributo
     - Outline: documents, collections, and the document event log.
 - Retained after disconnection / purge, for all four integrations: the operational sync history (`sync_job`, `connection_activity`, `connection_audit`) — job kind, type, status and timestamps only, capped per connection, carrying no third-party content — so that the disconnection itself remains auditable. Connection credentials are cleared atomically as part of the same transition. Cross-tenant identity rows (accounts, organisations, identity providers) are not touched by a disconnection; they are covered by the account-deletion and erasure-request paths above.
 - Source-side content on GitHub or gitlab.lrz.de: not modified by deletion in Hephaestus.
-- Container stdout: rotated by size by the container runtime.
-- Application-server access log: pruned by Tomcat's native 14-day retention.
+- Container stdout: rotated by size by the container runtime (per-service caps under "Where stored"). No HTTP access log is written at any layer, so there is none to prune.
 - Off-host backups: not configured at the time of submission. Any VM-level snapshots taken by AET infrastructure operations are governed by their separate retention policy at the infrastructure layer.
 ```
 
@@ -151,7 +149,7 @@ Pseudonymisation and encryption (Art. 32(1)(a))
 - Internal service-to-service traffic stays within the Docker network.
 - Outbound calls to GitHub, gitlab.lrz.de, the LLM provider, and Slack are HTTPS-only.
 - Federated identity links to GitHub user ID / gitlab.lrz.de `sub` minimise collected identifiers; surrogate primary keys are used internally.
-- PostgreSQL data at rest relies on the host's filesystem and access-control protections; application-level at-rest encryption of the general store is not currently enabled. Workspace-level secrets (LLM API keys, Slack tokens, OAuth client secrets) and upstream OAuth tokens are encrypted with a platform-level secret key held only on the application server; the JWT signing keys are sealed under a separate system key.
+- PostgreSQL data at rest relies on the host's filesystem and access-control protections; application-level at-rest encryption of the general store is not currently enabled. Workspace-level secrets (LLM API keys, Slack tokens, OAuth client secrets), upstream OAuth tokens, and the JWT signing keys are all sealed with AES-256-GCM under the **same** platform-level master key (`HEPHAESTUS_SECURITY_ENCRYPTION_KEY`). There is no second key: compromise of that one key is the blast radius for both workspace secrets and session-token signing. The key is not confined to the application-server container. It is injected into every container that reads an encrypted column through the JPA attribute converter — `application-server`, `application-worker` (the practice-review worker decrypts the workspace's LLM-provider credential to serve its in-process LLM proxy), and `webhook-server` (it verifies inbound Slack and Outline deliveries against the per-connection secret stored on the encrypted credential row) — as a container environment variable, so all three are in scope for key-compromise assessment. The key is not persisted to disk by the application and is not written to any log.
 
 Confidentiality (Art. 32(1)(b))
 - SSH key-only host access; password authentication disabled.
@@ -159,12 +157,14 @@ Confidentiality (Art. 32(1)(b))
 - Workspace-scoped membership and role checks enforced at the application layer (`@PreAuthorize` and dedicated workspace-membership filters).
 - Least-privilege source-system access via per-workspace GitHub App installation or scoped access token.
 - Reverse proxy exposes only required routes; everything else returns 404.
-- Practice-review sandbox runs as non-root inside isolated Docker containers on per-job `--internal` networks with no DNS and no general egress; the only outbound path is a per-job, token-authenticated LLM proxy. Sandbox is off by default (`SANDBOX_ENABLED=false`) and is workspace opt-in.
+- Practice-review sandbox runs as non-root inside isolated Docker containers on per-job `--internal` networks with no DNS and no general egress; the only outbound path is a per-job, token-authenticated LLM proxy. Sandbox execution is off in the TUM-operated deployment unless the operator sets `AGENT_ENABLED=true` (the deployment's compose files pass that variable to both the application server and the worker, defaulting it to `false`; note that a worker started outside those compose files, on the `worker` Spring profile, defaults it to `true` instead) and is additionally workspace opt-in: a workspace must have an enabled practice-detection model binding before any job is submitted.
 - Audit records produced for high-value writes (workspace creation, role assignment, LLM-provider credential changes, account deletion).
 
 Integrity (Art. 32(1)(b))
 - Git is the authoritative source of all application code; signed commits and PR review.
-- Production images are pinned by sha256 digest, cosign-signed (Sigstore keyless), and provenance-attested via `actions/attest-build-provenance`; verification recipe in [Agent image digests](../agent-image-digests.md).
+- Every production image is built by the release workflow, cosign-signed (Sigstore keyless) and provenance-attested via `actions/attest-build-provenance`, so any deployed image can be verified back to this repository's release run.
+- The practice-review sandbox image (`agent-pi`) — the only image that executes contributor repository content — is additionally referenced by **sha256 digest**, not by tag: the digest arrives in a cosign-verified release asset at deploy time and `AgentImagePinGuard` refuses to start the application if it is not digest-pinned. Verification recipe in [Agent image digests](../agent-image-digests.md).
+- The platform's own service images (application server, worker, webhook receiver, webapp, PostgreSQL) are referenced by release tag rather than digest in the compose files, and third-party infrastructure images (Traefik, NATS, nginx) by upstream tag; signature verification of those is a manual pre-deploy step, not enforced at container start. Extending digest pinning to them is an open AET-ops item.
 
 Availability and resilience (Art. 32(1)(b))
 - Containers restart on failure (`restart: unless-stopped`); per-service health checks.
@@ -214,7 +214,7 @@ DSMS multi-select: tick `Data received from third parties` and `Directly from th
 ```text
 - From GitHub and gitlab.lrz.de: identity at sign-in (GitHub OAuth, gitlab.lrz.de OIDC, federated directly by the application server); repository activity via the GitHub App installation or workspace-configured access token; webhook events delivered to the platform's /webhooks endpoint.
 - Directly from the data subject: account preferences, AI-assistant messages, the Art. 21 objection switch.
-- From the HTTP connection: the application server's access log records IP address, timestamp, HTTP method, URL, HTTP version, status, response size, and processing time. No User-Agent, no Referer, no cookies, no other request headers.
+- From the HTTP connection: no HTTP access log is written in production, so no per-request IP/URL record is created at this layer. The source IP address and user agent are collected only for authentication events, and are retained under the auth-event log's own 12-month window described above.
 ```
 
 ## Information duty (Art. 13)

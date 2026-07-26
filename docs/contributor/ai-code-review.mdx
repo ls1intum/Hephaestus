@@ -15,16 +15,17 @@ sequenceDiagram
     participant WH as Webhook Server
     participant NATS as NATS JetStream
     participant AS as Application Server
+    participant DB as PostgreSQL (agent_job)
     participant SB as Sandbox Container
     participant LLM as LLM Provider
 
     GL->>WH: MR webhook event
     WH->>NATS: Publish event
     NATS->>AS: Consume event
-    AS->>AS: Detection gate (8 checks)
-    AS->>NATS: Submit agent_job to job stream
-    Note over AS,NATS: Job persisted as QUEUED
-    NATS->>AS: Pull consumer claims job
+    AS->>AS: Detection gate (10 checks)
+    AS->>DB: INSERT agent_job (QUEUED)
+    Note over AS,DB: The agent_job table IS the queue
+    DB->>AS: Poll + claim FOR UPDATE SKIP LOCKED
     AS->>AS: Prepare context files + bind-mount repo
     AS->>SB: Create Docker container
     SB->>LLM: Evaluate practices (via LLM proxy)
@@ -39,14 +40,14 @@ sequenceDiagram
 
 | Component         | Class                           | Responsibility                                                                                                                                                             |
 | ----------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Detection gate    | `PracticeReviewDetectionGate`   | 8-check gate: draft skip, workspace resolution, agent config, practice matching, `runForAllUsers` bypass, assignee presence, role-checker health, assignee role                |
+| Detection gate    | `PracticeReviewDetectionGate`   | 10-check gate, ordered cheap-to-expensive: workspace resolution, draft skip, `practicesEnabled` flag, trigger mode, runnable practice binding, practice matching, `runForAllUsers` bypass, assignee presence, role-checker health, assignee role |
 | Review handler    | `PullRequestReviewHandler`      | Context assembly (diff, metadata, practices), diff summary computation, post-execution delivery orchestration                                                              |
 | Result parser     | `PracticeDetectionResultParser` | Parses agent JSON, validates and normalizes slugs, deduplicates by practice (highest confidence wins). Never throws -- failures go to `discarded` list                     |
 | Delivery composer | `DeliveryComposer`              | Inline-first rendering: inlinable findings (with file locations) become compact MR summary entries + full diff notes; non-inlinable findings get full detail in MR summary |
 | Diff validator    | `DiffHunkValidator`             | Validates diff note line positions against actual diff hunks. Snaps invalid positions to nearest valid line (`TreeSet.floor`/`ceiling`)                                    |
 | Feedback service  | `FeedbackDeliveryService`       | Posts MR summary comment and diff notes to the git provider. Suppresses delivery for closed, merged, draft, or opted-out PRs                                               |
 | Bot command       | `BotCommandProcessor`           | Listens for `/hephaestus review` comments (via Spring `@TransactionalEventListener`) to retrigger reviews                                                                  |
-| Job executor      | `AgentJobExecutor`              | NATS pull consumer: claims jobs with `SKIP LOCKED`, dispatches to sandbox executor pool, persists results in micro-transactions                                            |
+| Job executor      | `AgentJobExecutor`              | Polls the `agent_job` table for `QUEUED` work — the table is the queue — claiming with `FOR UPDATE SKIP LOCKED`, dispatching to the sandbox executor pool, and persisting results in micro-transactions. See [ADR 0025](../decisions/0025-agent-job-queue-on-postgresql.md) for why this is not NATS |
 
 ## Agent architecture
 
@@ -58,7 +59,7 @@ The runner (`.run-pi.mjs`) drives the Pi SDK in-process: initial analysis with a
 
 Every agent container gets this file structure (agent-specific files noted):
 
-The layout is split by **location**, not lore (ADR 0020): `inputs/` is read-only (the path-guard whitelists exactly this subtree), `work/` is writable scratch that is never collected, and `out/` is the only directory collected back into SQL. The constants live in `SandboxLayout`; see `docs/developer/agent/workspace-abi.mdx` for the full ABI.
+The layout is split by **location**, not lore (ADR 0020): `inputs/` is read-only (the path-guard whitelists exactly this subtree), `work/` is writable scratch that is never collected, and `out/` is the only directory collected back into SQL. The constants live in `SandboxLayout`; see `docs/contributor/agent/workspace-abi.mdx` for the full ABI.
 
 ```
 /workspace/
@@ -135,7 +136,7 @@ Practices are stored in the database (`practice` table, `criteria` column). At r
 - Severity classification rules
 - False-positive exclusions
 
-The current deployment uses 32 practices across 11 practice areas. Practices are fully configurable per workspace and can be added or modified without code changes.
+The current deployment uses 37 practices across 12 practice areas. Practices are fully configurable per workspace and can be added or modified without code changes.
 
 ## Delivery pipeline
 
@@ -172,7 +173,7 @@ Key tables for code review:
 | Table              | Key Columns                                                                                                               | Purpose                                                                                      |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | `workspace_agent_binding` | `workspace_id`, `purpose` (`PRACTICE_DETECTION` or `MENTOR`), `enabled`, `instance_model_id` XOR `workspace_model_id` (binds to the instance catalog or the workspace's own BYO connection), `timeout_seconds`, `max_concurrent_jobs`, `allow_internet` | Which model each purpose runs on, at most one row per `(workspace, purpose)`. Credentials never live here: they sit on the connection row and the LLM proxy resolves them live at call time, so a rotated key takes effect immediately |
-| `agent_job`        | `status`, `idempotency_key`, `job_token` (encrypted), `config_snapshot` (JSONB), `delivery_status`, `llm_*` usage columns | Job lifecycle: QUEUED → RUNNING → COMPLETED/FAILED. Tracks container ID, exit code, LLM cost |
+| `agent_job`        | `status`, `available_at`, `idempotency_key`, `job_token` (encrypted), `config_snapshot` (JSONB), `delivery_status`, `llm_*` token columns | Job lifecycle: QUEUED → RUNNING → COMPLETED/FAILED, and the queue itself. Tracks exit code and per-attempt token usage; cost is not stored here — it is priced once into `llm_usage_event` when the attempt ends |
 | `practice`         | `slug`, `name`, `criteria` (TEXT), `trigger_events` (JSONB), `precompute_script` (TEXT), `practice_area_id` (FK → `practice_area`), `artifact_type`, `why_it_matters`, `what_good_looks_like`, `is_active`, `workspace_id` | Practice definitions, each linked to a practice area. Unique constraint on `(workspace_id, slug)` |
 | `observation`      | `occurrence_key`, `title`, `presence`, `assessment`, `severity`, `confidence`, `evidence` (JSONB), `reasoning`, `recurrence_key`, `agent_job_id`, `practice_id`, `artifact_type`, `artifact_id`, `about_user_id`, `observed_at` | Individual observations per target (PR) per practice                                          |
 
@@ -187,9 +188,7 @@ hephaestus:
       reference: ghcr.io/ls1intum/hephaestus/agent-pi:latest # dev; prod injected by release-pin-fetcher init service
       pull-policy: IF_NOT_PRESENT
       # require-digest: true # set only in application-prod.yml
-    nats:
-      enabled: true # Enable agent job processing
-      server: nats://localhost:4222
+    enabled: false # AGENT_ENABLED — turns on agent job processing (the queue is the agent_job table)
   sandbox:
     llm-proxy-port: 8080 # Must match server port
     docker-host: unix:///var/run/docker.sock

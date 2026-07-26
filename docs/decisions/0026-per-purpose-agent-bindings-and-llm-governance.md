@@ -1,9 +1,15 @@
 # ADR 0026: Per-purpose agent bindings and governed OpenAI-compatible LLM catalog
 
-**Status:** Accepted
+**Status:** Accepted (amended 2026-07-26 — named-agent-config model deleted)
 **Date:** 2026-07-24
 **Authors:** Felix T.J. Dietrich
 **Builds on:** [ADR 0006](0006-llm-proxy-on-coordinator-trust-model.md) (in-app LLM proxy as the sole credential path), [ADR 0025](0025-agent-job-queue-on-postgresql.md) (PostgreSQL agent job queue)
+
+> **Amendment (2026-07-26):** the transitional `agent_config` mirror described below is gone. The
+> table, the `practice_config_id` / `mentor_config_id` scalar pointers on `Workspace`, and the
+> write-through `sync` are deleted; `WorkspaceAgentBinding` is the sole `ModelBindingSource` and the
+> practice-review settings page reads bindings directly. Text below that describes the mirror as
+> present is retained as the record of the decision, not as a description of the current code.
 
 ## Context
 
@@ -46,8 +52,8 @@ three job types (pull-request, issue, conversation review) share one binding; a 
 needs its own model is a new purpose value, not a schema change.
 
 **One resolve/admit seam.** A `ModelBindingSource` interface (instance/workspace model + workspace +
-enabled + limits) is implemented by both the binding and, transitionally, the legacy config, so the
-resolver and admission service work on either without branching. Admission row-locks the binding by
+enabled + limits) is implemented by the binding, so the
+resolver and admission service work through one shape without branching. Admission row-locks the binding by
 `(workspace, purpose)` before freezing its price, exactly as it locked a config by id.
 
 **One pricing authority.** Cost is derived from the admission-frozen `LlmPriceSnapshot` for both
@@ -62,9 +68,9 @@ an uncapped workspace is never paused — the `WARN`/`BLOCK` knob is removed.
 
 ## Consequences
 
-- The runtime resolves a model only from a binding. `agent_config` and the scalar pointers are
-  demoted to a transitional write-through mirror (`AgentBindingService.sync`) and will be removed once
-  the last config-based surface (the practice-review settings page) moves to bindings.
+- The runtime resolves a model only from a binding. `agent_config` and the scalar pointers were
+  demoted to a transitional write-through mirror and have **since been deleted** (see the amendment
+  note below); `WorkspaceAgentBinding` is now the sole `ModelBindingSource`.
 - **Operators:** a workspace that relied on the implicit fan-out must explicitly assign a detection
   model; the instance `WARN`/`BLOCK` "usage without a known price" setting is gone (its column is
   dropped automatically).

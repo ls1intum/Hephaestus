@@ -63,16 +63,13 @@ erDiagram
         JSONB config_snapshot "NOT NULL"
         TEXT job_token UK "NOT NULL"
         VARCHAR(255) idempotency_key
-        VARCHAR(64) container_id
         INTEGER exit_code
         TEXT error_message
         INTEGER retry_count "NOT NULL"
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ started_at
         TIMESTAMPTZ completed_at
-        VARCHAR(64) network_id
         VARCHAR(64) job_token_hash
-        TEXT llm_api_key
         VARCHAR(20) delivery_status
         VARCHAR(255) delivery_comment_id
         TEXT container_logs
@@ -83,7 +80,6 @@ erDiagram
         INTEGER llm_total_reasoning_tokens
         INTEGER llm_cache_read_tokens
         INTEGER llm_cache_write_tokens
-        DOUBLE llm_cost_usd
         VARCHAR(50) llm_model_version
         VARCHAR(32) cancellation_reason
         VARCHAR(255) worker_id
@@ -130,6 +126,11 @@ erDiagram
         JSONB parts "NOT NULL"
         BIGINT version "NOT NULL"
         VARCHAR(16) status "NOT NULL"
+        INTEGER llm_total_calls "NOT NULL"
+        BIGINT llm_total_input_tokens "NOT NULL"
+        BIGINT llm_total_output_tokens "NOT NULL"
+        BIGINT llm_total_reasoning_tokens "NOT NULL"
+        BIGINT llm_cache_read_tokens "NOT NULL"
     }
 
     ChatMessageVote {
@@ -570,17 +571,18 @@ erDiagram
         UUID id PK
         BIGINT workspace_id FK "NOT NULL"
         VARCHAR(40) job_type "NOT NULL"
+        VARCHAR(20) source_type UK "NOT NULL"
         UUID source_id UK "NOT NULL"
+        INTEGER source_attempt UK "NOT NULL"
         VARCHAR(128) model
         BIGINT input_tokens "NOT NULL"
         BIGINT output_tokens "NOT NULL"
         BIGINT cache_read_tokens "NOT NULL"
         BIGINT cache_write_tokens "NOT NULL"
+        BIGINT reasoning_tokens "NOT NULL"
         INTEGER total_calls "NOT NULL"
         NUMERIC(18,6) cost_usd
-        TIMESTAMPTZ occurred_at "NOT NULL"
         VARCHAR(16) pricing_state "NOT NULL"
-        BIGINT reasoning_tokens "NOT NULL"
         VARCHAR(16) funding_source "NOT NULL"
         BIGINT applied_price_id
         BIGINT applied_workspace_model_id
@@ -588,8 +590,7 @@ erDiagram
         NUMERIC(18,8) applied_per_1m_output_usd
         NUMERIC(18,8) applied_per_1m_cache_read_usd
         NUMERIC(18,8) applied_per_1m_cache_write_usd
-        VARCHAR(20) source_type UK "NOT NULL"
-        INTEGER source_attempt UK "NOT NULL"
+        TIMESTAMPTZ occurred_at "NOT NULL"
     }
 
     LoginProvider {

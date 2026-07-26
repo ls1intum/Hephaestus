@@ -71,10 +71,41 @@ Entries exist only for releases that need operator action. Everything else is in
    `HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED`, and every `AGENT_DEFAULT_CONFIG_*` variable from your
    deployment. They are silently ignored, not an error, but keeping them is misleading.
 2. Register your OpenAI-compatible endpoint(s) under Instance admin → AI models (or have a workspace admin connect their own under the workspace's AI settings).
-3. Rebind each legacy agent configuration to a catalog model through the admin console, then
-   re-enable it. The migration deliberately disables every enabled configuration without exactly one
-   catalog binding; it never guesses which connection, credential owner, model, or price an old row
-   should use.
+3. **Review and re-enable each workspace's carried-over AI configuration.** The upgrade copies every
+   agent configuration that was in use — endpoint, model name, encrypted API key, timeout,
+   concurrent-run limit and internet setting — into that workspace's AI models page, named after the
+   old configuration. "In use" means one a workspace explicitly pointed at **or** any configuration
+   that was simply switched on: an unset pointer never meant unused, it meant *fall back*, and the
+   mentor fell back to the workspace's oldest enabled configuration while practice detection ran on
+   every enabled one. Configurations created from `AGENT_DEFAULT_CONFIG_*` are exactly that shape.
+   No key you were using has to be re-issued. Everything arrives **disabled**, so practice detection
+   and the mentor stay stopped until an administrator opens the page and switches them on. That is
+   deliberate: in the default PROXY credential mode the endpoint a configuration actually called came
+   from an instance-wide environment variable rather than from the configuration row, so re-enabling
+   automatically could silently re-point a workspace's traffic — and its key — at a different host.
+4. **Fix what the upgrade could not determine.** These cases need a value typed in before they will
+   work, and the deploy log names the affected workspaces (`AI configuration carried over with a
+   placeholder endpoint, model id or non-OpenAI protocol in these workspaces: …`):
+   - A configuration whose provider was **Azure OpenAI** with no base URL recorded: no
+     instance-independent endpoint exists for it, so the carried-over connection holds the
+     placeholder `https://endpoint-not-migrated.invalid/v1`. Replace it with your Azure resource URL.
+   - A configuration whose provider was **Anthropic**: the new catalog speaks the OpenAI Chat
+     Completions and Responses contracts only. Its key is preserved, but you need an
+     OpenAI-compatible endpoint (or a gateway in front of Anthropic) for it to run.
+   - A configuration that **never named a model**: the model carries the placeholder id
+     `model-not-migrated`, which keeps the configuration's timeout, concurrency and internet limits
+     attached to a real binding. Replace it with the model id you want. Such a configuration could
+     not run before the upgrade either.
+5. **Check any workspace where detection ran on several configurations at once.** A workspace with no
+   explicit practice-detection pointer ran detection on *every* enabled configuration. The new model
+   binds one model per purpose, so detection is bound to the oldest of them and the deploy log names
+   the workspace (`practice detection ran on SEVERAL configurations at once in these workspaces: …`).
+   Nothing is lost — the other configurations are all there as connections and models — but pick the
+   one you want, or delete the rest.
+6. **Revoke the keys of configurations that are dropped.** A configuration that was both switched off
+   *and* unreferenced is not carried over: nothing could reach it, so it configured nothing. It is
+   dropped with the old table, and the deploy log lists each one as `workspace/name` so you can
+   revoke its API key at the provider if you want to.
 
 #### 🔴 Agent job queue moved from NATS to PostgreSQL
 

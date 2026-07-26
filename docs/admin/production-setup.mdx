@@ -188,7 +188,7 @@ Practice review is not enabled by a single flag. The following settings must be 
 
 | Variable | Purpose |
 | --- | --- |
-| `PRACTICE_REVIEW_FOR_ALL` | Enables the feature flag and the detection gate for all users |
+| `PRACTICE_REVIEW_FOR_ALL` | Enables the feature flag and the detection gate for all users. **Compose-file alias only:** it fans out to the two variables the server actually reads, `PRACTICE_REVIEW_RUN_FOR_ALL` and `HEPHAESTUS_FEATURES_FLAGS_PRACTICE_REVIEW_FOR_ALL`. Outside these compose files, set those two directly. |
 | `PRACTICE_REVIEW_SKIP_DRAFTS` | Skips draft PRs and draft merge requests |
 | `PRACTICE_REVIEW_DELIVER_TO_MERGED` | Allows delivery after merge |
 | `PRACTICE_REVIEW_COOLDOWN_MINUTES` | Minimum delay between repeated reviews of the same PR/MR |
@@ -231,7 +231,15 @@ Staging and production both use the production compose files. The difference sho
 
 ### AI model configuration
 
-The mentor's interactive sandbox uses the application-server replica's LLM proxy; a queued practice review uses the proxy beside the worker that claimed it. That proxy is the only path a sandbox has to a provider key, which is never injected directly. There is no separate intelligence service to configure, and there are no LLM env vars to set.
+The mentor's interactive sandbox uses the application-server replica's LLM proxy; a queued practice review uses the proxy beside the worker that claimed it. That proxy is the only path a sandbox has to a provider key, which is never injected directly. There is no separate intelligence service to configure, and no provider, model, price, or credential is ever set through the environment — all of that is runtime catalog data, described below.
+
+Three instance-wide LLM knobs *are* env vars, because they are deploy-time facts rather than catalog data. All three are optional and every one of them defaults to off or to the standard value:
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `HEPHAESTUS_LLM_DISPLAY_CURRENCY` | *(empty)* | ISO 4217 code to show spend in **alongside** USD. Empty turns the second currency off entirely. Only `EUR` is honoured today; any other well-formed code logs a warning and falls back to USD-only. A value that is not shaped like a currency code fails startup, so a typo cannot hide as a missing feature. |
+| `HEPHAESTUS_LLM_EGRESS_ALLOW_LOOPBACK` | `false` | Whether `http://localhost` provider base URLs may be saved and dialled. **Never set this in production** — it is an SSRF hole that lets a workspace admin aim a "provider" at host-local services. The private/link-local/CGNAT check is unconditional and this flag does not relax it. |
+| `HEPHAESTUS_LLM_FX_DAILY_URL` | ECB daily reference feed | Override only on an air-gapped instance mirroring the ECB file internally. |
 
 OpenAI and other OpenAI-compatible endpoints, including Azure OpenAI v1 and self-hosted gateways such
 as vLLM, are registered at runtime rather than through `.env`. Each connection declares the exact
@@ -247,31 +255,44 @@ The intended administration flow is deliberately small:
    Hephaestus never guesses or silently treats an unknown price as zero.
 3. The admin enables the connection and model, then either makes the shared model public or grants it
    to selected workspaces.
-4. A workspace admin selects an available model for each agent configuration. If the instance admin
-   permits bring-your-own connections, the workspace admin may instead create and price a
-   workspace-owned connection and model through the same staged flow.
+4. A workspace admin binds an available model to each purpose — **practice detection** and **mentor**.
+   If the instance admin permits bring-your-own connections, the workspace admin may instead create
+   and price a workspace-owned connection and model through the same staged flow.
 
 Connection routing identity (base URL, wire API, and authentication mode) and a model's upstream ID
-are immutable. To change either, create a replacement, test it, rebind configurations, then disable
+are immutable. To change either, create a replacement, test it, move the bindings over, then disable
 the old entry. Display names, credentials, prices, grants, and enabled state remain editable.
 
 The proxy resolves the upstream base URL, auth header, and key per model from whichever connection it is bound to, so nothing needs to be pinned at the process level. On a split-pod deployment the worker pod resolves providers from the same catalog as the app pod — no LLM credential passthrough between pods. Warm mentor sandboxes are reused only while their complete non-secret runtime identity still matches; changing the bound model/route, image, prompt/runtime files, or limits replaces the sandbox before the next prompt. Per-turn context is refreshed inside a compatible warm sandbox rather than forcing a restart.
 
 #### Workspace budgets and alerting
 
-Every workspace has an optional monthly LLM budget, set by an instance admin under **Instance admin → AI usage → Set budget** (per-workspace, per calendar month, UTC). Clearing the field removes the cap (**No cap** — uncapped, the default); setting it to exactly `0` pauses the workspace immediately, which is the supported way to hard-stop a workspace mid-month. The cap protects instance-funded spend, so its total includes shared models only. Workspace-owned usage is reported separately because it is paid through the workspace's own provider account. Once the instance cap is exhausted, however, all new LLM work for the workspace is paused so the workspace has one predictable operational state.
+There are two monthly LLM budgets, and **they are never added together**:
 
-Once the month's confirmed spend reaches the cap, the workspace's budget verdict flips to **EXHAUSTED**. New agent jobs are refused at submission, queued jobs are checked again immediately before claim, and mentor turns are refused before starting a sandbox. Practice detection and the mentor both go silent at that point; nothing crashes or errors visibly to the end user. Work resumes automatically at the next UTC calendar month, or immediately if an instance admin raises or clears the cap. A workspace admin sees the pause explained on their workspace's **AI usage** page and, so it isn't only visible on that one screen, on the **AI models** page too.
+- **The instance budget** caps a workspace's spend on **shared** models — your money, on connections you registered. An instance admin sets it under **Instance admin → AI usage → Set budget** (per-workspace, per calendar month, UTC).
+- **The workspace's own budget** caps that workspace's spend on **its own connected provider** — their money, billed to their provider account. A workspace admin sets it on their own **AI usage** page.
 
-Some started attempts may not return trustworthy usage counters, and migrated legacy attempts may not have an admission price snapshot. While such usage exists, the workspace's reported monthly total renders as "at least $X" — a floor, not the confirmed total — and the verdict reads **UNVERIFIABLE** instead of **WITHIN** (**EXHAUSTED** still takes priority). New models cannot be enabled until an administrator declares either a price or **No metered API cost**; the latter counts as confirmed $0 spend, not unpriced.
+For either cap: clearing the field removes it (**No cap** — uncapped, the default); setting it to exactly `0` pauses that purse immediately, which is the supported way to hard-stop spending mid-month.
 
-The instance-wide **Unpriced usage policy** decides how an UNVERIFIABLE month affects new work.
-**Warn** keeps work running while clearly reporting a cost floor. **Block** pauses new practice
-reviews and mentor turns for affected workspaces until the usage is reconciled or the next UTC month
-begins. Warn is the default so an accounting anomaly cannot unexpectedly take every affected
-workspace offline; choose Block when fail-closed cost control matters more than availability.
+**Each cap pauses only the work it funds.** Exhausting the instance budget stops shared-model work and leaves the workspace's own-provider work running; exhausting the workspace's own budget does the reverse. This is deliberate — an instance budget that also paused work you are not billed for would be stopping spending you cannot see the price of. If you need to stop *all* AI work in a workspace, change the workspace's status or its feature switches; a budget is not that instrument.
 
-**Alerting hook:** there is no built-in push notification when a workspace crosses its cap — wire your own alert off the Micrometer counters the budget service already emits: `llm.budget.exhausted` (incremented once per usage event whose confirmed contribution pushes a capped workspace's month-to-date spend across the cap) and `llm.budget.blocked` (tagged by admission surface, including `agent_job` and `mentor`). Each EXHAUSTED transition also logs a WARN, visible in Sentry if configured.
+Once a month's confirmed spend reaches a cap, that purse's budget verdict flips to **EXHAUSTED**. New agent jobs funded from it are refused at submission, queued jobs are checked again immediately before claim, and mentor turns are refused before starting a sandbox. Work resumes automatically at the next UTC calendar month, or within about a minute of the cap being raised or cleared. A workspace admin sees the pause explained on their workspace's **AI usage** page and, so it isn't only visible on that one screen, on the **AI models** page too.
+
+**The two surfaces fail differently, and you should staff for the difference.** Practice detection goes silent — a queued job is refused before it runs and nothing is posted, so no end user sees an error. The **mentor does not go silent**: a user who sends a message into an exhausted purse gets a reply in the chat saying the monthly cap is reached and naming who can lift it (a workspace admin for the workspace's own-provider cap, an instance admin for the shared budget). That is deliberate — silently dropping a turn someone is waiting on reads as a broken product — but it does mean **users will see and report a cap being hit**, so expect the support contact rather than only a dashboard change.
+
+Some started attempts may not return trustworthy usage counters, and migrated legacy attempts may not have an admission price snapshot. Such events are recorded but carry no price, and are **excluded from the monthly totals** — so the reported total is a floor, not the confirmed spend. The UI does not fold them into the number; it shows the confirmed total alongside a separate count of unpriced calls, and the purse's verdict reads **UNVERIFIABLE** instead of **WITHIN** (**EXHAUSTED** still takes priority). A non-zero unpriced count is your signal that real spend may be higher than displayed. New models cannot be enabled until an administrator declares either a price or **No metered API cost**; the latter counts as confirmed $0 spend, not unpriced.
+
+There is deliberately **no setting** for what an UNVERIFIABLE month does, because the answer follows
+from the cap itself. An **uncapped** purse is never paused by unpriced usage — with no cap to enforce,
+there is nothing the missing price could breach. A **capped** purse whose month is UNVERIFIABLE is
+paused exactly like an exhausted one, because a cap you cannot verify is not a cap. It clears when the
+usage is reconciled or the next UTC month begins.
+
+Rather than a policy knob, the guard is structural: a model cannot be enabled at all until someone
+declares its price or marks it **No metered API cost**, so a correctly administered instance does not
+reach an UNVERIFIABLE month in the first place.
+
+**Alerting hook:** there is no built-in push notification when a workspace crosses its cap — wire your own alert off the Micrometer counters the budget service already emits: `llm.budget.exhausted` (incremented once per usage event whose confirmed contribution pushes a workspace's month-to-date spend across the **instance** cap — the purse you fund, so the one you are alerted on) and `llm.budget.blocked` (tagged `surface` by admission point, including `agent_job` and `mentor`; the agent-job tag also carries `cap`, naming which purse refused the work). Each EXHAUSTED transition also logs a WARN, visible in Sentry if configured.
 
 Reasoning tokens are retained as telemetry when the compatible endpoint reports them. They are not
 priced separately: OpenAI-compatible usage includes reasoning tokens in billable output tokens, so a
@@ -317,7 +338,7 @@ The sync scheduler fetches recent GitHub activity (issues, PRs, reviews) for mon
 
 ## Global admin privileges
 
-Accounts with `app_role = 'APP_ADMIN'` carry the `admin` authority in their JWT. This grants them:
+Accounts with `app_role = 'APP_ADMIN'` carry the `app_admin` authority in their JWT (`admin` is a reserved string that is actively stripped — it is the per-workspace role name, never an instance authority). This grants them:
 
 - Automatic workspace ADMIN privileges for workspaces where they have membership (they are auto-elevated to workspace ADMIN level)
 - Ability to manage workspace settings, members, and repositories in their member workspaces

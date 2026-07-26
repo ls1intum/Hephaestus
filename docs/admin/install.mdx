@@ -147,10 +147,16 @@ in `.env` and `docker compose up -d`. Each is documented in
 | AI practice review | Automated PR feedback from the coding agent | [Practice review bundle](./production-setup#practice-review-rollout-bundle) |
 
 **AI practice review needs two things, not one:** the environment bundle above
-(`AGENT_ENABLED`, `GIT_CHECKOUT_ENABLED`, `PRACTICE_REVIEW_FOR_ALL` — set together; the job
-queue itself runs on PostgreSQL, no NATS setup needed for this bundle), **and** a model with an
-API key configured per workspace in the UI under **Workspace settings → AI**. With the flags on
-but no workspace model, nothing is reviewed and no error explains why.
+(`AGENT_ENABLED`, `GIT_CHECKOUT_ENABLED`, `PRACTICE_REVIEW_FOR_ALL` — set together; the last is a
+compose-file alias that fans out to `PRACTICE_REVIEW_RUN_FOR_ALL` and
+`HEPHAESTUS_FEATURES_FLAGS_PRACTICE_REVIEW_FOR_ALL`, which is what the server reads; the job
+queue itself runs on PostgreSQL, no NATS setup needed for this bundle), **and** a model that the
+workspace can actually run on. There are two ways to supply one, and either is enough: an instance
+admin registers a connection and model under **Instance admin → AI models** and grants it to the
+workspace, or — if instance settings permit bring-your-own connections — a workspace admin adds their
+own connection and model under the workspace's **Administration → AI models**. Either way, a workspace
+admin must then bind a model to the **practice detection** purpose on that same page. With the flags
+on but nothing bound, nothing is reviewed and no error explains why.
 
 ## 8. Legal pages (public instances)
 

@@ -60,7 +60,7 @@ previous `@PreDestroy` never awaited the sandbox executor (latent bug); this fix
   worker overlay still loads JPA because the executor reads job rows. Removing that dependency is
   a follow-up.
 - JWT signing keys default to an ephemeral keypair when unset; production must set
-  `hephaestus.worker.hub.token.signing-key` or the `keys[]` ring. Logged at WARN if ephemeral.
+  `hephaestus.worker.hub.token.keys[*].private-key` or the `keys[]` ring. Logged at WARN if ephemeral.
 - The registration token is fleet-wide until per-worker minting lands; rate-limited by source-IP
   to bound brute-force noise.
 - The mentor session bridge sits on the same WSS connection. If the hub-side bridge module is

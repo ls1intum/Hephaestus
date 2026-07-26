@@ -200,9 +200,9 @@ noted as a documented residual:
   `feedback_placement`, and `reaction` — append-only research/product data. The 90-day row-delete
   pass would have silently destroyed it. `deleteTerminalRowsOlderThan` now excludes any job still
   referenced by `feedback` (`NOT EXISTS`); those rows already shed their heavy payload at 14 days,
-  so they stay lightweight, not unbounded. `1784636803503-40` also hardens the FK itself from
-  CASCADE to RESTRICT so this class of bug cannot regress silently — verified no application code
-  deletes `agent_job` rows outside the retention service.
+  so they stay lightweight, not unbounded. The FK is also `ON DELETE RESTRICT` rather than CASCADE,
+  so this class of bug cannot regress silently — verified no application code deletes `agent_job`
+  rows outside the retention service.
 - **Retention vs. in-flight delivery.** Both the strip and delete passes now exclude
   `delivery_status = 'PENDING'` — a job whose delivery has not landed yet needs its `output` for a
   delivery-recovery retry to compose from, and must not be deleted out from under that retry.
@@ -289,8 +289,8 @@ noted as a documented residual:
   extreme operator-set value. The cap is now enforced AFTER jitter, and `n` is clamped to a safe
   ceiling before the power is computed (a value far past where the cap would apply anyway, so
   behaviour is unchanged for every realistic `max-retries`).
-- **Autovacuum preconditions too loose.** The `-36`/`-37` changesets' preconditions checked only
-  whether *any* `autovacuum_vacuum_scale_factor` option was present, not the specific value this
-  release sets — a stale or partially-applied option would silently skip the changeset. `ALTER TABLE
-  ... SET (...)` is inherently idempotent, so the corrective changesets (`1784636803503-47`/`-48`)
-  reapply it unconditionally rather than trying to precondition-match an exact prior state.
+- **Autovacuum settings are applied unconditionally.** Preconditioning on "does an
+  `autovacuum_vacuum_scale_factor` option exist" would let a stale or partially-applied value
+  silently skip the change, since the check cannot see *which* value is set. `ALTER TABLE ... SET
+  (...)` is inherently idempotent, so the changesets reapply the intended value outright rather than
+  trying to precondition-match an exact prior state.
