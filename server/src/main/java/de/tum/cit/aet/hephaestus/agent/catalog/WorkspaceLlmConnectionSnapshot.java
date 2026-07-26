@@ -6,7 +6,7 @@ import java.net.URISyntaxException;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Audit snapshot of a workspace's "bring your own" LLM connection (#1368) — "who rotated the key",
+ * Audit snapshot of a workspace's "bring your own" LLM connection — "who rotated the key",
  * "who repointed the endpoint". A connection row is the one place a credential lives, so the snapshot
  * records only non-secret facts about it:
  *

@@ -17,18 +17,79 @@ public record LlmPriceSnapshot(
     @Nullable BigDecimal per1mCacheWriteUsd
 ) {
     private static final BigDecimal PER_1M = BigDecimal.valueOf(1_000_000L);
+
+    /**
+     * The smallest amount the ledger column can hold: {@code NUMERIC(18,6)} keeps six decimal places.
+     */
     private static final BigDecimal MIN_COST = new BigDecimal("0.000001");
-    private static final BigDecimal MAX_COST = new BigDecimal("999999999999.999999");
+
+    /**
+     * The largest amount that survives the whole trip, which is NOT the column's own maximum.
+     *
+     * <p>{@code NUMERIC(18,6)} stops at {@code 999999999999.999999} (twelve integer digits), but a cost
+     * leaves this server as a JSON number and is read into a binary64 by the browser, which reproduces
+     * at most fifteen significant digits exactly. At scale 6 that is everything below
+     * {@code 1_000_000_000} — a thousandfold inside the column. Clamping to the column maximum instead
+     * would store amounts the API cannot state without changing them, so the clamp is set to the bound
+     * that actually holds end to end. {@code MoneyWirePrecisionTest} pins that bound and the cliff just
+     * past it; {@code LlmPriceSnapshotTest} pins that this constant sits on it.
+     *
+     * <p>Nothing legitimate reaches either bound: a billion dollars of tokens in one unit of work means
+     * a price or a token count is wrong, which is why crossing it is WARNed and counted rather than
+     * quietly stored.
+     */
+    private static final BigDecimal EXACT_ON_WIRE_CEILING = BigDecimal.valueOf(1_000_000_000L);
+
+    private static final BigDecimal MAX_COST = new BigDecimal("999999999.999999");
+
+    /**
+     * The price of an attempt whose real price cannot be recovered — a job frozen before admission
+     * pricing existed, or a terminal path that must never throw. Instance-funded because the host's
+     * shared models are what an unattributed run consumed; UNPRICED so the month reads unverifiable
+     * rather than free.
+     */
+    public static LlmPriceSnapshot unpricedInstance() {
+        return new LlmPriceSnapshot(FundingSource.INSTANCE, PricingState.UNPRICED, null, null, null, null, null, null);
+    }
+
+    /**
+     * Whether the stored cost is the computed one, and if not, which way it was moved. Money is never
+     * altered silently: {@link LlmUsageRecorder} logs and counts every non-{@code null} value here
+     * under {@code llm.usage.cost.clamped}, so an operator can find the events whose ledger amount is
+     * not what the frozen rates produced.
+     */
+    public enum CostClamp {
+        /**
+         * A positive cost smaller than one micro-dollar, rounded up to {@link #MIN_COST} rather than
+         * to zero. Over-bills by less than $0.000001, and keeps "we made a paid call" distinguishable
+         * from "this was free" in the ledger.
+         */
+        ROUNDED_UP_TO_MINIMUM,
+        /**
+         * A cost at or beyond {@link #EXACT_ON_WIRE_CEILING}, capped at {@link #MAX_COST}. Under-bills,
+         * and a budget computed from it therefore understates real spend. Reaching this means a price
+         * or a token count is almost certainly wrong — a billion dollars of tokens in one unit of work
+         * is not a thing that happens.
+         */
+        CAPPED_AT_MAXIMUM,
+    }
+
+    /**
+     * A computed cost together with any adjustment made to fit it into the ledger column.
+     *
+     * @param usd the amount to store; {@code null} only when no price was resolved at all
+     * @param clamp {@code null} when {@code usd} is exactly what the frozen rates produced
+     */
+    public record Cost(@Nullable BigDecimal usd, @Nullable CostClamp clamp) {
+        static Cost exact(@Nullable BigDecimal usd) {
+            return new Cost(usd, null);
+        }
+    }
 
     /** Computes the authoritative ledger/UI cost. Reasoning is already included in output tokens. */
-    public @Nullable BigDecimal calculateCost(
-        long inputTokens,
-        long outputTokens,
-        long cacheReadTokens,
-        long cacheWriteTokens
-    ) {
-        if (pricingState == PricingState.UNPRICED) return null;
-        if (pricingState == PricingState.NO_CHARGE) return BigDecimal.ZERO.setScale(6);
+    public Cost calculateCost(long inputTokens, long outputTokens, long cacheReadTokens, long cacheWriteTokens) {
+        if (pricingState == PricingState.UNPRICED) return Cost.exact(null);
+        if (pricingState == PricingState.NO_CHARGE) return Cost.exact(BigDecimal.ZERO.setScale(6));
         MathContext mc = new MathContext(20, RoundingMode.HALF_EVEN);
         BigDecimal raw = bucket(inputTokens, per1mInputUsd, mc)
             .add(bucket(outputTokens, per1mOutputUsd, mc), mc)
@@ -36,8 +97,13 @@ public record LlmPriceSnapshot(
             .add(bucket(cacheWriteTokens, per1mCacheWriteUsd, mc), mc);
         if (raw.signum() < 0) throw new IllegalStateException("Frozen LLM price produced a negative cost");
         BigDecimal rounded = raw.setScale(6, RoundingMode.HALF_EVEN);
-        if (raw.signum() > 0 && rounded.signum() == 0) return MIN_COST;
-        return rounded.compareTo(BigDecimal.valueOf(1_000_000_000_000L)) >= 0 ? MAX_COST : rounded;
+        if (raw.signum() > 0 && rounded.signum() == 0) {
+            return new Cost(MIN_COST, CostClamp.ROUNDED_UP_TO_MINIMUM);
+        }
+        if (rounded.compareTo(EXACT_ON_WIRE_CEILING) >= 0) {
+            return new Cost(MAX_COST, CostClamp.CAPPED_AT_MAXIMUM);
+        }
+        return Cost.exact(rounded);
     }
 
     private static BigDecimal bucket(long tokens, @Nullable BigDecimal rate, MathContext mc) {

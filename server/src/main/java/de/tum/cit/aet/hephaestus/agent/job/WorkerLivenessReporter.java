@@ -22,7 +22,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * Self-reports this worker's liveness into {@code worker_registry} on a timer (#1138).
  *
- * <p>Liveness must track the JVM that actually executes jobs (NATS pull + Docker sandbox), not the
+ * <p>Liveness must track the JVM that actually executes jobs (queue poll + Docker sandbox), not the
  * WSS control channel — a worker can lose WSS while still running jobs, and orphaning those would
  * double-execute them. Driving the heartbeat from the worker itself makes "stale heartbeat" mean
  * "this executor is gone", which is the only safe trigger for {@link AgentJobZombieSweeper} to requeue

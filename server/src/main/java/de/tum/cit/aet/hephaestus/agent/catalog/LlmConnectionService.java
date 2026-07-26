@@ -12,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 /**
- * CRUD for instance-owned LLM connections (#1368). GLOBAL, {@code app_admin}-owned, so this service is
+ * CRUD for instance-owned LLM connections. GLOBAL, {@code app_admin}-owned, so this service is
  * {@link WorkspaceAgnostic}; access is gated by {@code hasAuthority('app_admin')} on
  * {@link LlmConnectionAdminController}. Every persisted base URL is vetted by {@link EgressPolicy}.
  *

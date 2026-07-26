@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.usage;
 
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -28,18 +27,15 @@ public class LlmUsageRecorder {
     private static final Logger log = LoggerFactory.getLogger(LlmUsageRecorder.class);
 
     private final LlmUsageEventRepository usageRepository;
-    private final WorkspaceRepository workspaceRepository;
     private final LlmBudgetService budgetService;
     private final MeterRegistry meterRegistry;
 
     public LlmUsageRecorder(
         LlmUsageEventRepository usageRepository,
-        WorkspaceRepository workspaceRepository,
         LlmBudgetService budgetService,
         MeterRegistry meterRegistry
     ) {
         this.usageRepository = usageRepository;
-        this.workspaceRepository = workspaceRepository;
         this.budgetService = budgetService;
         this.meterRegistry = meterRegistry;
     }
@@ -102,12 +98,14 @@ public class LlmUsageRecorder {
                 price.per1mCacheWriteUsd()
             );
         }
-        BigDecimal cost = price.calculateCost(
+        LlmPriceSnapshot.Cost computed = price.calculateCost(
             sample.inputTokens(),
             sample.outputTokens(),
             sample.cacheReadTokens(),
             sample.cacheWriteTokens()
         );
+        BigDecimal cost = computed.usd();
+        reportClamp(sample, computed);
         int inserted = usageRepository.insertIfAbsent(
             new LlmUsageInsert(
                 UUID.randomUUID(),
@@ -151,6 +149,33 @@ public class LlmUsageRecorder {
         return true;
     }
 
+    /**
+     * A ledger amount that is not what the frozen rates produced is stated out loud. Both directions
+     * are rare enough to be worth a WARN: the low one over-bills by a fraction of a cent, the high one
+     * under-bills without limit and would make every budget check downstream read low.
+     *
+     * <p>Emitted before the insert, so the signal survives a failed write — a clamp is a fact about the
+     * price and the token counts, not about whether the row landed.
+     */
+    private void reportClamp(LlmUsageSample sample, LlmPriceSnapshot.Cost computed) {
+        if (computed.clamp() == null) {
+            return;
+        }
+        log.warn(
+            "LLM cost clamped to fit the ledger column: clamp={}, storedUsd={}, sourceType={}, sourceId={}, sourceAttempt={}",
+            computed.clamp(),
+            computed.usd(),
+            sample.sourceType(),
+            sample.sourceId(),
+            sample.sourceAttempt()
+        );
+        meterRegistry.counter("llm.usage.cost.clamped", "direction", clampTag(computed.clamp())).increment();
+    }
+
+    private static String clampTag(LlmPriceSnapshot.CostClamp clamp) {
+        return clamp == LlmPriceSnapshot.CostClamp.ROUNDED_UP_TO_MINIMUM ? "up_to_minimum" : "down_to_maximum";
+    }
+
     private void registerBudgetAlert(Long workspaceId, LlmPriceSnapshot price, @Nullable BigDecimal cost) {
         if (
             price.fundingSource() != FundingSource.INSTANCE ||
@@ -178,21 +203,32 @@ public class LlmUsageRecorder {
         );
     }
 
+    /**
+     * WARN once, on the event that took the instance-funded purse over its cap — the crossing, not the
+     * state, so a month that stays exhausted does not log on every subsequent event.
+     *
+     * <p>Reads the same {@link LlmBudgetService#headroom} the gates read rather than summing the month
+     * itself: an uncapped workspace then costs no query at all, and the amount named in the log is by
+     * construction the amount that paused the workspace.
+     */
     private void alertIfBudgetCrossed(Long workspaceId, BigDecimal eventCost) {
-        workspaceRepository
-            .findById(workspaceId)
-            .map(workspace -> workspace.getMonthlyLlmBudgetUsd())
-            .ifPresent(budget -> {
-                BigDecimal monthToDate = budgetService.monthToDateCost(workspaceId);
-                if (monthToDate.compareTo(budget) >= 0 && monthToDate.subtract(eventCost).compareTo(budget) < 0) {
-                    log.warn(
-                        "Workspace LLM budget exhausted: workspaceId={}, budgetUsd={}, monthToDateUsd={}",
-                        workspaceId,
-                        budget,
-                        monthToDate
-                    );
-                    meterRegistry.counter("llm.budget.exhausted").increment();
-                }
-            });
+        LlmBudgetHeadroom headroom = budgetService.headroom(workspaceId);
+        BigDecimal budget = headroom.instanceBudgetUsd();
+        BigDecimal monthToDate = headroom.instanceSpentUsd();
+        if (budget == null || monthToDate == null) {
+            return;
+        }
+        boolean crossedNow =
+            LlmBudgetService.capReached(monthToDate, budget) &&
+            !LlmBudgetService.capReached(monthToDate.subtract(eventCost), budget);
+        if (crossedNow) {
+            log.warn(
+                "Workspace LLM budget exhausted: workspaceId={}, budgetUsd={}, monthToDateUsd={}",
+                workspaceId,
+                budget,
+                monthToDate
+            );
+            meterRegistry.counter("llm.budget.exhausted").increment();
+        }
     }
 }

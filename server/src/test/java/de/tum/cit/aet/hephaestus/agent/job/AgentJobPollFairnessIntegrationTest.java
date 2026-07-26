@@ -7,11 +7,11 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
-import de.tum.cit.aet.hephaestus.agent.catalog.ModelVisibility;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -28,8 +28,8 @@ import org.springframework.test.context.DynamicPropertySource;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Head-of-line starvation fix for the poll candidate query (#1368): {@code findQueuedIdsOldestFirst}
- * used to be a plain {@code WHERE status='QUEUED' ORDER BY created_at LIMIT n} with no awareness of
+ * Head-of-line starvation fix for the poll candidate query: {@code findQueuedIdsOldestFirst}
+ * is not a plain {@code WHERE status='QUEUED' ORDER BY created_at LIMIT n}, which has no awareness of
  * per-bucket concurrency caps. If the oldest {@code n} QUEUED rows all belonged to a {@code
  * (workspace, purpose)} already saturated on RUNNING jobs, every claim attempt in that batch
  * correctly skipped them (the concurrency-full outcome), but a younger, immediately-runnable job
@@ -39,7 +39,7 @@ import tools.jackson.databind.ObjectMapper;
  * at its RUNNING cap (the cap lives on {@code workspace_agent_binding} since the per-purpose binding
  * redesign; a job whose binding row is gone is treated as uncapped and stays a candidate).
  */
-@DisplayName("Poll candidate fairness (#1368)")
+@DisplayName("Poll candidate fairness")
 class AgentJobPollFairnessIntegrationTest extends BaseIntegrationTest {
 
     @DynamicPropertySource
@@ -76,22 +76,10 @@ class AgentJobPollFairnessIntegrationTest extends BaseIntegrationTest {
     void setUp() {
         databaseTestUtils.cleanDatabase();
 
-        LlmConnection connection = new LlmConnection();
-        connection.setSlug("poll-fairness");
-        connection.setDisplayName("Poll fairness");
-        connection.setBaseUrl("https://api.openai.example/v1");
-        connection.setApiProtocol("openai-completions");
-        connection.setEnabled(true);
-        connection = llmConnectionRepository.save(connection);
-
-        LlmModel model = new LlmModel();
-        model.setConnection(connection);
-        model.setSlug("poll-fairness-model");
-        model.setDisplayName("Poll fairness model");
-        model.setUpstreamModelId("gpt-poll-fairness");
-        model.setVisibility(ModelVisibility.PUBLIC);
-        model.setEnabled(true);
-        instanceModel = llmModelRepository.save(model);
+        LlmConnection connection = llmConnectionRepository.save(LlmCatalogTestFixtures.connection("poll-fairness"));
+        instanceModel = llmModelRepository.save(
+            LlmCatalogTestFixtures.model(connection, "poll-fairness-model", "gpt-poll-fairness")
+        );
     }
 
     @Test

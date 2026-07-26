@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
 import de.tum.cit.aet.hephaestus.core.Audited;
-import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -16,15 +16,18 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Instance-admin management of the instance-wide LLM governance settings (#1368): the egress
+ * Instance-admin management of the instance-wide LLM governance settings: the egress
  * allowlist and the workspace-provider-connection flag. GLOBAL —
  * gated by {@code app_admin}, not workspace context.
+ *
+ * <p>No {@code @WorkspaceAgnostic} here. A class-level tenancy bypass on a controller opens for every
+ * statement any handler reaches, including future ones; the singleton's repository carries its own.
  */
 @RestController
 @RequestMapping("/admin/llm/settings")
 @Tag(name = "Admin LLM", description = "Instance-admin LLM connection and settings management")
 @PreAuthorize("hasAuthority('app_admin')")
-@WorkspaceAgnostic("Instance-admin LLM settings; authorized by app_admin, not workspace context")
+@ConditionalOnServerRole
 @RequiredArgsConstructor
 @Validated
 public class InstanceLlmSettingsController {

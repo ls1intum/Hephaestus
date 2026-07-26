@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -39,13 +40,7 @@ class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
     private LlmModelRepository llmModelRepository;
 
     private LlmConnection seedConnection() {
-        LlmConnection connection = new LlmConnection();
-        connection.setSlug("conn-" + System.nanoTime());
-        connection.setDisplayName("Test Connection");
-        connection.setBaseUrl("https://api.openai.com");
-        connection.setApiProtocol("openai-completions");
-        connection.setEnabled(true);
-        return llmConnectionRepository.save(connection);
+        return llmConnectionRepository.save(LlmCatalogTestFixtures.connection("conn-" + System.nanoTime()));
     }
 
     private LlmModelDTO createModel(Long connectionId, String slug) {
@@ -285,6 +280,41 @@ class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
             .exchange()
             .expectStatus()
             .isEqualTo(409);
+    }
+
+    @Test
+    void aDuplicateUpstreamModelIdOnTheSameConnectionIs409WithAProblemDetail() {
+        // The uniqueness this defends is a billing invariant: two catalog rows for one upstream id let
+        // LlmUsageRecorder match either, so a NO_CHARGE sibling can silently shadow a PRICED one.
+        //
+        // The status is also the thing that regressed. LlmModelUpstreamIdConflictException carries
+        // @ResponseStatus(CONFLICT), but that is inert behind GlobalControllerAdvice's
+        // @ExceptionHandler(Exception.class) — ExceptionHandlerExceptionResolver wins and
+        // ResponseStatusExceptionResolver never runs — so without an explicit handler in
+        // AgentControllerAdvice this returned 500 while the OpenAPI contract promised 409.
+        LlmConnection connection = seedConnection();
+        createModel(connection.getId(), "dup-first");
+
+        webTestClient
+            .post()
+            .uri("/admin/llm/connections/{connectionId}/models", connection.getId())
+            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+            .contentType(MediaType.APPLICATION_JSON)
+            // Different slug, SAME upstream model id as "dup-first" — only the upstream-id guard can
+            // reject this, so a pass cannot be the slug-conflict handler answering by accident.
+            .bodyValue(new CreateLlmModelRequestDTO("dup-second", "Test Model", "gpt-5", null, null, null, false))
+            .exchange()
+            .expectStatus()
+            .isEqualTo(409)
+            .expectHeader()
+            .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
+            .expectBody()
+            .jsonPath("$.status")
+            .isEqualTo(409)
+            .jsonPath("$.title")
+            .isEqualTo("LLM model upstream id conflict")
+            .jsonPath("$.detail")
+            .value(detail -> assertThat((String) detail).contains("gpt-5"));
     }
 
     @Test

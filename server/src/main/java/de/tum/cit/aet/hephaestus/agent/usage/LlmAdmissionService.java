@@ -134,10 +134,18 @@ public class LlmAdmissionService {
         @Nullable BigDecimal cacheRead,
         @Nullable BigDecimal cacheWrite
     ) {
-        PricingState state = PricingState.valueOf(mode.name());
-        if (state == PricingState.UNPRICED) {
-            throw new IllegalStateException("The configured OpenAI-compatible model has no usable price");
-        }
+        // Exhaustive switch, not valueOf(mode.name()): the declared intent (PricingMode) and the
+        // recorded outcome (PricingState) are separate enums that evolve on their own schedules, and
+        // a name-identity translation would turn a new PricingMode constant into an
+        // IllegalArgumentException inside this @Transactional admission. Here the compiler refuses to
+        // build until the new constant has an answer.
+        PricingState state = switch (mode) {
+            case PRICED -> PricingState.PRICED;
+            case NO_CHARGE -> PricingState.NO_CHARGE;
+            case UNPRICED -> throw new IllegalStateException(
+                "The configured OpenAI-compatible model has no usable price"
+            );
+        };
         return new LlmPriceSnapshot(source, state, priceId, workspaceModelId, input, output, cacheRead, cacheWrite);
     }
 }

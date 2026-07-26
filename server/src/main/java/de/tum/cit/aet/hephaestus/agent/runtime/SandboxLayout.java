@@ -101,7 +101,7 @@ public final class SandboxLayout {
     public static final String RUNNER_SCRIPT_FILENAME = ".run-pi.mjs";
 
     /**
-     * Workspace-relative filename of the shared LLM-provider spec (#1368 slice 5): a single JSON file
+     * Workspace-relative filename of the shared LLM-provider spec: a single JSON file
      * the server writes from the job's {@code ConfigSnapshot} — wire protocol, the PROXY url the
      * sandbox must call, the upstream model id, and its capability envelope. Both
      * {@code pi-runner.mjs} and {@code pi-mentor-runner.mjs} read it through the shared

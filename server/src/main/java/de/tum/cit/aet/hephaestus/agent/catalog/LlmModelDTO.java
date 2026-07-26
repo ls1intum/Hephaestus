@@ -7,7 +7,7 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Instance catalog model projection (#1368). {@code grantedWorkspaceIds} is only populated when
+ * Instance catalog model projection. {@code grantedWorkspaceIds} is only populated when
  * {@code visibility} is {@code GRANTED}; it is empty for a model shared with all workspaces.
  */
 @Schema(description = "Instance catalog model")

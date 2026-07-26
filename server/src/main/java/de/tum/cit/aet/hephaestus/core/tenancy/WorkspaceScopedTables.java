@@ -67,17 +67,18 @@ public class WorkspaceScopedTables {
         "worker_registry",
         // Instance-scoped OAuth login providers (sign-in options); shared across all workspaces
         "login_provider",
-        // Instance LLM-config catalog (#1368) — app_admin-owned, curated, shared across all workspaces
+        // Instance LLM-config catalog — app_admin-owned, curated, shared across all workspaces
         "llm_connection",
         // Instance-curated models behind a catalog connection; global, not tenant-scoped
         "llm_model",
         // Instance model price history; global pricing authority, not tenant-scoped
         "llm_model_price",
-        // Grant allowlist by reference (which workspaces may use a GRANTED model); global admin table
-        "llm_model_workspace_grant",
-        // Instance LLM settings singleton (egress allowlist + BYO enable + default policy); global
+        // NOTE: llm_model_workspace_grant is deliberately NOT here. It carries a workspace_id, so the
+        // inspector can and should watch it; the handful of genuinely cross-tenant admin reads carry
+        // a method-level @WorkspaceAgnostic on LlmModelWorkspaceGrantRepository instead.
+        // Instance LLM settings singleton (egress allowlist + BYO enable); global
         "instance_llm_settings",
-        // ECB daily reference rates for display-only currency conversion (#1368); an exchange rate is
+        // ECB daily reference rates for display-only currency conversion; an exchange rate is
         // a property of the world, not of a tenant
         "fx_rate",
         // Liquibase machinery

@@ -1,26 +1,44 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.agent.proxy.ProxyRouting.BilledAttempt;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.databind.JsonNode;
 
 /**
- * Adds one proxied call's token usage to the owning {@code agent_job} row (#1368), so a detection
+ * Adds one proxied call's token usage to the owning {@code agent_job} row, so a detection
  * job that crashes mid-run still has the calls it made on record and can be billed for them instead
  * of recording zero. Runs in its own {@code REQUIRES_NEW} transaction — the proxy servlet thread has
  * no ambient transaction, and the accounting write must commit independently of the passthrough.
  *
- * <p>Best-effort by design: a malformed or absent usage block simply records nothing. The happy path
- * is unaffected because the job's terminal write overwrites these running totals with the
- * runner-reported authoritative usage, so there is still exactly one ledger writer and no
- * double-count.
+ * <p>The {@code agent_job} sink only. A mentor turn has no such row and accumulates into a
+ * {@link MentorTurnMeter} instead; {@link ProxyAccounting} routes a served call to whichever of the
+ * two its {@code BilledAttempt} names.
+ *
+ * <p>Never breaks the proxied response: an absent usage block records nothing, and a failed write is
+ * caught rather than propagated.
+ *
+ * <p><b>Fenced to the attempt the call belongs to.</b> A provider call can outlive the attempt that
+ * made it: orphan recovery requeues a job whose worker merely LOOKS dead, and that requeue zeroes
+ * these very columns so the next attempt bills only its own calls. The write therefore carries the
+ * attempt number read when the token was authenticated, and matches nothing once the row has moved
+ * on — see {@link #recordSuperseded}.
+ *
+ * <p><b>But a failed write is money lost, not a no-op.</b> These running totals are not merely a
+ * duplicate of the runner's report — {@code TerminalUsage.resolve} falls back to them precisely when
+ * the runner produced no {@code usage.json}, which is the crashed-run case this class exists for. A
+ * dropped accumulate on a run that then dies books a zero-token UNPRICED ledger event over calls that
+ * really went out. So every failure is WARN-logged and counted as
+ * {@code llm.proxy.usage.accumulate.failure}; a non-zero rate on that counter means the ledger is
+ * under-billing.
  */
 @Service
 @ConditionalOnProperty(name = RuntimeRole.WORKER_PROPERTY, havingValue = "true", matchIfMissing = true)
@@ -29,51 +47,72 @@ public class ProxyUsageAccumulator {
     private static final Logger log = LoggerFactory.getLogger(ProxyUsageAccumulator.class);
 
     private final AgentJobRepository agentJobRepository;
+    private final MeterRegistry meterRegistry;
 
-    ProxyUsageAccumulator(AgentJobRepository agentJobRepository) {
+    ProxyUsageAccumulator(AgentJobRepository agentJobRepository, MeterRegistry meterRegistry) {
         this.agentJobRepository = agentJobRepository;
+        this.meterRegistry = meterRegistry;
     }
 
     /**
-     * Parse the {@code usage} block of a non-streaming upstream response and add it to the job's
-     * totals. Never throws — parse/DB failures are logged and swallowed so accounting can never break
-     * the proxied response.
+     * Add one served call's tokens to the attempt's running totals on its {@code agent_job} row.
+     * Never throws — DB failures are warned, counted, and swallowed so accounting can never break the
+     * proxied response.
      *
-     * @param jobId the billing target ({@code ProxyRouting.sourceId}); no-op when null (mentor route)
-     * @param responseBody the full upstream JSON response
-     * @param responsesProtocol true for the {@code /responses} shape, false for chat-completions
+     * @param attempt the billing target, resolved when this call's token was authenticated; no-op when
+     *     null (no live execution behind the call)
+     * @param usage the call's tokens, already read off the upstream {@code usage} block; no-op when
+     *     null (the provider reported none)
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void accumulate(UUID jobId, JsonNode responseBody, boolean responsesProtocol) {
-        if (jobId == null || responseBody == null) {
+    public void accumulate(@Nullable BilledAttempt attempt, @Nullable ProxyTokenUsage usage) {
+        if (attempt == null || usage == null) {
             return;
         }
+        UUID jobId = attempt.sourceId();
         try {
-            JsonNode usage = responseBody.get("usage");
-            if (usage == null || !usage.isObject()) {
-                return;
+            int rows = agentJobRepository.accumulateLlmUsage(
+                jobId,
+                attempt.number(),
+                usage.billableInputTokens(),
+                usage.outputTokens(),
+                usage.reasoningTokens(),
+                usage.cacheReadTokens()
+            );
+            if (rows == 0) {
+                recordSuperseded(attempt);
             }
-            int input;
-            int output;
-            int reasoning;
-            int cacheRead;
-            if (responsesProtocol) {
-                input = usage.path("input_tokens").asInt(0);
-                output = usage.path("output_tokens").asInt(0);
-                cacheRead = usage.path("input_tokens_details").path("cached_tokens").asInt(0);
-                reasoning = usage.path("output_tokens_details").path("reasoning_tokens").asInt(0);
-            } else {
-                input = usage.path("prompt_tokens").asInt(0);
-                output = usage.path("completion_tokens").asInt(0);
-                cacheRead = usage.path("prompt_tokens_details").path("cached_tokens").asInt(0);
-                reasoning = usage.path("completion_tokens_details").path("reasoning_tokens").asInt(0);
-            }
-            // Upstream reports the prompt-token count inclusive of cached tokens; the ledger's input
-            // bucket is the non-cached remainder so cache reads are not billed twice.
-            int billableInput = Math.max(0, input - cacheRead);
-            agentJobRepository.accumulateLlmUsage(jobId, billableInput, output, reasoning, cacheRead, 0);
         } catch (RuntimeException e) {
-            log.debug("Could not accumulate proxy usage for job {}: {}", jobId, e.getMessage());
+            // Swallowed so the proxied response still reaches the runner, but never quietly: if this
+            // job dies without a usage.json, these are the only tokens anyone would have billed.
+            log.warn("Lost proxy usage accounting for job {} — this call may go unbilled", jobId, e);
+            meterRegistry.counter("llm.proxy.usage.accumulate.failure").increment();
         }
+    }
+
+    /**
+     * The attempt fence rejected this write: the row has moved on (requeued to a later attempt, or
+     * already terminal) since the token was authenticated, so these tokens belong to a run that no
+     * longer owns the row.
+     *
+     * <p>Dropping them under-bills by one call. Adding them anyway would be worse than under-billing:
+     * the row's accumulators are what the NEXT attempt's terminal write bills, at the NEXT attempt's
+     * frozen price and possibly from the other purse — so a late write would charge one attempt's
+     * tokens to a different attempt, and potentially the instance for what a workspace's own provider
+     * served. The ledger's {@code UNIQUE(source_type, source_id, source_attempt)} keeps attempts apart
+     * once a row exists; this is the same rule applied one step earlier, to the mutable accumulator.
+     *
+     * <p>Counted rather than swallowed for the same reason the failure path is: a non-zero rate means
+     * the ledger is under-billing, and a sustained one means orphan recovery is firing on workers that
+     * are alive.
+     */
+    private void recordSuperseded(BilledAttempt attempt) {
+        log.warn(
+            "Dropping proxy usage from a superseded attempt — job {} is no longer running attempt {}; " +
+                "this call goes unbilled rather than being charged to whoever owns the row now",
+            attempt.sourceId(),
+            attempt.number()
+        );
+        meterRegistry.counter("llm.proxy.usage.accumulate.superseded").increment();
     }
 }

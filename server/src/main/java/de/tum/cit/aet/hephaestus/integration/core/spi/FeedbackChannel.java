@@ -40,7 +40,7 @@ public interface FeedbackChannel {
      * post embeds, e.g. {@code PullRequestCommentPoster.SUMMARY_MARKER_PREFIX + jobId}), so a
      * delivery-recovery retry can record the already-posted comment's id instead of posting a duplicate.
      *
-     * <p><b>Tri-state, not a boolean (#1368 fix wave, finding #6).</b> A prior {@link Optional}-based
+     * <p><b>Tri-state, not a boolean.</b> A prior {@link Optional}-based
      * signature collapsed "confirmed absent" and "could not determine" into the same empty value — every
      * lookup failure (rate limit, transport error, GraphQL error) or unsupported channel silently fell
      * through to "proceed and post", which is only safe for a CONFIRMED absence. On an actual error, that
@@ -96,7 +96,7 @@ public interface FeedbackChannel {
     record SummaryHandle(String externalId) {}
 
     /**
-     * Tri-state result of {@link #findExistingSummary} (#1368 fix wave, finding #6) — see that method's
+     * Tri-state result of {@link #findExistingSummary} — see that method's
      * javadoc for why this is not a boolean/{@link Optional}.
      */
     record ExistingSummaryLookup(Kind kind, SummaryHandle handle) {

@@ -17,6 +17,8 @@ import de.tum.cit.aet.hephaestus.agent.mentor.chat.exception.TurnAlreadyInFlight
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.PiEventToUiChunkTranslator;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.TranslatorState;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
+import de.tum.cit.aet.hephaestus.agent.proxy.MentorProxyCredentialRegistry;
+import de.tum.cit.aet.hephaestus.agent.proxy.MentorTurnMeter;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.AttachedSandbox;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
@@ -91,6 +93,7 @@ public class MentorChatService implements MentorTurnRunner {
     private final MentorChatMetrics metrics;
     private final LlmBudgetService llmBudgetService;
     private final LlmAdmissionService llmAdmissionService;
+    private final MentorProxyCredentialRegistry proxyCredentialRegistry;
 
     /**
      * Submit a turn to the virtual-thread executor and return. {@code clientHolder} lets the
@@ -232,7 +235,7 @@ public class MentorChatService implements MentorTurnRunner {
         // partial mentor turn and never warms/attaches a sandbox.
         MentorLlmConfig llmConfig = resolveLlmConfig(request.workspaceId());
 
-        // Monthly budget cap (#1368): transport-neutral gate covering web SSE and Slack turns. Runs
+        // Monthly budget cap: transport-neutral gate covering web SSE and Slack turns. Runs
         // AFTER admission because the cap that applies depends on who pays for the bound model — a
         // workspace on its own provider is governed by its own cap, not the host's. Still before
         // ANYTHING persists, so a blocked turn leaves no user message or in-flight assistant row
@@ -242,11 +245,11 @@ public class MentorChatService implements MentorTurnRunner {
         LlmBudgetBlockReason blockReason = llmBudgetService.decide(request.workspaceId()).forFunding(mentorFunding);
         if (blockReason == LlmBudgetBlockReason.EXHAUSTED) {
             metrics.recordBudgetBlocked();
-            throw new LlmBudgetExhaustedException(request.workspaceId(), mentorFunding);
+            throw new LlmBudgetExhaustedException(mentorFunding);
         }
         if (blockReason == LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED) {
             metrics.recordBudgetBlocked();
-            throw new LlmUnpricedUsageBlockedException(request.workspaceId(), mentorFunding);
+            throw new LlmUnpricedUsageBlockedException(mentorFunding);
         }
         User user = userRepository.getCurrentUserElseThrow();
         ChatThread thread = persistence.ensureThread(
@@ -258,6 +261,11 @@ public class MentorChatService implements MentorTurnRunner {
         Optional<byte[]> priorSessionBytes = chatThreadRepository.findSessionJsonl(thread.getId());
 
         UUID assistantMessageId = UUID.randomUUID();
+        // The budget gate's read model for this turn: it makes the turn's own completed calls visible
+        // to the gate WHILE the turn is still running. What actually gets billed is the turn's row,
+        // which the proxy writes per served call; this is bound to the sandbox session below for
+        // exactly as long as this turn owns that sandbox.
+        MentorTurnMeter proxyMeter = new MentorTurnMeter(assistantMessageId, llmConfig.priceSnapshot());
         MentorTurnPersistence.TurnPersistenceCookie cookie = persistence.persistInFlight(
             thread,
             request.userMessage(),
@@ -267,7 +275,7 @@ public class MentorChatService implements MentorTurnRunner {
         );
         TranslatorState state = new TranslatorState(assistantMessageId);
         // Freeze the catalog binding onto the turn state so MentorTurnPersistence's ledger write
-        // resolves the SAME price the runner actually used (#1368 slice 6) — mirrors ConfigSnapshot
+        // resolves the SAME price the runner actually used — mirrors ConfigSnapshot
         // doing the same for detection jobs.
         state.bindConnection(llmConfig.connectionScope(), llmConfig.connectionId());
         state.bindAdmission(llmConfig.upstreamModelId(), llmConfig.priceSnapshot());
@@ -362,18 +370,44 @@ public class MentorChatService implements MentorTurnRunner {
                     client = runner.client();
                     client.openThread(request.threadId()).get(10, TimeUnit.SECONDS);
                 }
-                var prompt = client.prompt(
-                    request.threadId(),
-                    MentorTurnPromptFactory.forRunner(request, contextInputs)
-                );
-                state.markLlmCallStarted();
-                prompt.whenComplete((result, ex) -> {
-                    if (ex != null && !turnComplete.isDone()) {
-                        turnComplete.completeExceptionally(ex);
-                    }
-                });
+                // Meter this turn for exactly the window in which it owns the sandbox. Binding and
+                // unbinding INSIDE the sandbox lock is what makes the window exclusive: the next turn
+                // on this sandbox cannot bind until this one has released, so no call can ever be
+                // attributed to the wrong turn. The cost is that calls made after the lock is released
+                // (the client-disconnect drain) are not metered here — the runner's own usage report
+                // covers those, and it is what billTurn prefers anyway.
+                UUID sandboxSessionId = sandbox.identity().sessionId();
+                if (!proxyCredentialRegistry.bindTurn(sandboxSessionId, proxyMeter)) {
+                    // The turn still gets BILLED — the proxy writes its calls to the turn's row, fenced on
+                    // the row's status, not on this binding. Only the in-flight gate goes blind.
+                    log.warn(
+                        "Mentor sandbox session {} has no live proxy credential; this turn's spend will be " +
+                            "invisible to the in-flight budget gate",
+                        sandboxSessionId
+                    );
+                }
+                try {
+                    var prompt = client.prompt(
+                        request.threadId(),
+                        MentorTurnPromptFactory.forRunner(request, contextInputs)
+                    );
+                    state.markLlmCallStarted();
+                    prompt.whenComplete((result, ex) -> {
+                        if (ex != null && !turnComplete.isDone()) {
+                            turnComplete.completeExceptionally(ex);
+                        }
+                    });
 
-                turnComplete.get(MentorRunnerClient.DEFAULT_PROMPT_TIMEOUT.toMillis() + 30_000, TimeUnit.MILLISECONDS);
+                    turnComplete.get(
+                        MentorRunnerClient.DEFAULT_PROMPT_TIMEOUT.toMillis() + 30_000,
+                        TimeUnit.MILLISECONDS
+                    );
+                } finally {
+                    // Stops NEW calls landing on this meter. Nothing reads it afterwards: the terminal
+                    // write bills from the turn's row, which is durable and does not depend on this
+                    // process still being alive.
+                    proxyCredentialRegistry.unbindTurn(sandboxSessionId, proxyMeter);
+                }
             }
             // Natural-finish path: Pi emitted `agent_end` → handleEvent sent the `finish` chunk
             // already. Close the wire with AI-SDK's `[DONE]` sentinel.

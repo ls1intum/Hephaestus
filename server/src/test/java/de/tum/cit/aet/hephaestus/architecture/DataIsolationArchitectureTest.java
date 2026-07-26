@@ -91,7 +91,10 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "SlackMessage", // direct workspace_id scalar
         "SlackThread", // direct workspace_id scalar
         "SlackMonitoredChannel", // direct workspace_id scalar
-        "MentorSlackThread" // direct workspace_id scalar
+        "MentorSlackThread", // direct workspace_id scalar
+        // Grant allowlist: workspace_id lives inside the composite @EmbeddedId, so the direct-field
+        // probe below cannot see it. Scoped, not global — the row names the tenant it grants.
+        "LlmModelWorkspaceGrant"
     );
 
     /**
@@ -106,11 +109,10 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "WorkspaceSlugHistory", // Tracks workspace slug changes
         "IssueType", // GitHub issue types are workspace-scoped through issue
         "IdentityProvider", // Global provider instances (e.g., github.com, gitlab.com)
-        // Instance LLM-config catalog (#1368) — app_admin-owned, curated, shared across all workspaces
+        // Instance LLM-config catalog — app_admin-owned, curated, shared across all workspaces
         "LlmConnection", // Instance-owned provider connection; global, not tenant-scoped
         "LlmModel", // Instance-curated model behind a connection; global
         "LlmModelPrice", // Instance model price history; global pricing authority
-        "LlmModelWorkspaceGrant", // Grant allowlist by reference (which workspaces may use a GRANTED model); global admin table
         "InstanceLlmSettings", // Instance LLM settings singleton (egress allowlist + BYO enable + default policy); global
         "FxRate", // ECB daily reference rate for display-only conversion; a world fact, not tenant data
         "WorkerTokenDenylist", // Fleet-wide JWT revocation; worker JWTs are not workspace-scoped

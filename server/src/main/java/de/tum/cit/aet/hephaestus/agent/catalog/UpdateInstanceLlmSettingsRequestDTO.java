@@ -4,7 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Partial update of the instance LLM settings singleton (#1368). Every field is optional; an absent
+ * Partial update of the instance LLM settings singleton. Every field is optional; an absent
  * (null) field keeps its current value.
  */
 @Schema(description = "Update instance-wide LLM governance settings (all fields optional)")

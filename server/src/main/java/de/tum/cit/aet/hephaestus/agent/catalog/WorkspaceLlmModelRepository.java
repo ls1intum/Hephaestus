@@ -25,16 +25,16 @@ public interface WorkspaceLlmModelRepository extends JpaRepository<WorkspaceLlmM
     List<WorkspaceLlmModel> findByConnectionId(Long connectionId);
 
     /**
-     * Ledger price-resolution lookup (#1368 slice 6): mirrors {@code LlmModelRepository}'s method of
+     * Ledger price-resolution lookup: mirrors {@code LlmModelRepository}'s method of
      * the same name — see its Javadoc for why this returns a {@link List} rather than an
      * {@link Optional}.
      */
     List<WorkspaceLlmModel> findByConnectionIdAndUpstreamModelId(Long connectionId, String upstreamModelId);
 
-    /** Create-path conflict guard for {@code ux_ws_llm_model_connection_upstream} (#1368). */
+    /** Create-path conflict guard for {@code ux_ws_llm_model_connection_upstream}. */
     boolean existsByConnectionIdAndUpstreamModelId(Long connectionId, String upstreamModelId);
 
-    /** Update-path conflict guard: same uniqueness, excluding the row being updated (#1368). */
+    /** Update-path conflict guard: same uniqueness, excluding the row being updated. */
     boolean existsByConnectionIdAndUpstreamModelIdAndIdNot(Long connectionId, String upstreamModelId, Long id);
 
     Optional<WorkspaceLlmModel> findByWorkspaceIdAndSlug(Long workspaceId, String slug);

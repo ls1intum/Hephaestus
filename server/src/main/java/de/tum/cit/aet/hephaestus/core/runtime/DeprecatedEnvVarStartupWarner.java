@@ -84,11 +84,7 @@ public class DeprecatedEnvVarStartupWarner {
     public void warnOnRetiredProperties() {
         RETIRED_PROPERTIES.forEach((property, replacement) -> {
             if (environment.getProperty(property) != null) {
-                log.warn(
-                    "{} is set but no longer read (#1368) — {}. Remove it from your deployment.",
-                    property,
-                    replacement
-                );
+                log.warn("{} is set but no longer read — {}. Remove it from your deployment.", property, replacement);
             }
         });
     }

@@ -8,6 +8,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.function.Consumer;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -128,6 +130,28 @@ public final class ProxyStreamingUtils {
         HttpServletResponse response,
         int statusCode
     ) {
+        streamSseToResponse(dataFlux, respHeaders, response, statusCode, null);
+    }
+
+    /**
+     * As {@link #streamSseToResponse(Flux, HttpHeaders, HttpServletResponse, int)}, but also hands
+     * each chunk's bytes to {@code tap} as they go past.
+     *
+     * <p>A tee, not a buffer: the client still receives every chunk written-then-flushed exactly as
+     * before, and nothing is held back waiting for the stream to end. The tap runs AFTER the flush,
+     * on the same {@code boundedElastic} worker, so it can add no latency to what the client sees; a
+     * tap that throws is logged and ignored rather than terminating the stream, because a passthrough
+     * proxy must never fail a response over its own bookkeeping.
+     *
+     * @param tap receives a copy of each chunk's bytes; {@code null} to stream without observing
+     */
+    public static void streamSseToResponse(
+        Flux<DataBuffer> dataFlux,
+        HttpHeaders respHeaders,
+        HttpServletResponse response,
+        int statusCode,
+        @Nullable Consumer<byte[]> tap
+    ) {
         try {
             response.setStatus(statusCode);
             response.setContentType(MediaType.TEXT_EVENT_STREAM_VALUE);
@@ -167,6 +191,15 @@ public final class ProxyStreamingUtils {
                         buffer.read(bytes);
                         outputStream.write(bytes);
                         outputStream.flush();
+                        if (tap != null) {
+                            try {
+                                tap.accept(bytes);
+                            } catch (RuntimeException tapFailure) {
+                                // The client already has these bytes. Observing them is bookkeeping,
+                                // and bookkeeping never gets to break a response.
+                                log.warn("SSE tap failed; stream continues: {}", tapFailure.toString());
+                            }
+                        }
                     } catch (IOException e) {
                         log.debug("Client disconnected during SSE streaming: {}", e.getMessage());
                         throw new StreamingException("Client disconnected", e);

@@ -7,7 +7,7 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A model on a workspace's own AI provider connection (#1368). Unlike the instance catalog, price is
+ * A model on a workspace's own AI provider connection. Unlike the instance catalog, price is
  * inline on the model — no history — since a workspace's own spend has no separate temporal audit.
  */
 @Schema(description = "A model on your AI provider")

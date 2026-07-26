@@ -94,7 +94,7 @@ class SsrfGuardedResolverGroupTest extends BaseUnitTest {
     }
 
     /**
-     * #1368 fix wave: the loopback-exempt variant (used by the LLM proxy/probe when
+     * the loopback-exempt variant (used by the LLM proxy/probe when
      * {@code hephaestus.llm.egress.allow-loopback=true}) lets a resolved loopback address through but
      * still blocks every other private/reserved range — a rebind to a non-loopback private address must
      * not be laundered through the exemption.

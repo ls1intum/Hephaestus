@@ -88,7 +88,7 @@ public class PiResultParser {
                 ? usageNode.path("cacheWriteTokens").asInt(0)
                 : null;
             // Populated from the responses-path shape's `output_tokens_details.reasoning_tokens` when the
-            // upstream model reports it; absent for chat/completions-only models (#1368 slice 5).
+            // upstream model reports it; absent for chat/completions-only models.
             Integer reasoningTokens = usageNode.has("reasoningTokens")
                 ? usageNode.path("reasoningTokens").asInt(0)
                 : null;

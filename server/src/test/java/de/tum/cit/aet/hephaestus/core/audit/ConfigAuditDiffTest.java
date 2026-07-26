@@ -5,100 +5,90 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
+import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
- * {@code changed_keys} is what per-control history (#1357) filters on, so its shape is an API
- * contract, not an implementation detail. Each test below pins one property that a plausible wrong
- * implementation would break.
+ * {@code changed_keys} is what per-control history filters on, so its shape is an API contract, not an
+ * implementation detail. Each row pins one property that a plausible wrong implementation would break.
  */
 @Tag("unit")
 class ConfigAuditDiffTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    @Test
-    void reportsOnlyTheKeysThatDiffer() {
-        // Fails if the diff returns every key rather than the changed ones — which would make the
-        // per-control filter match every row and render the History panel useless.
-        assertThat(changedKeys("{\"a\":1,\"b\":2}", "{\"a\":1,\"b\":3}")).containsExactly("b");
-    }
-
-    @Test
-    void identicalSnapshotsYieldNoKeys() {
-        // Drives no-op suppression: an idempotent PATCH must leave no row.
-        assertThat(changedKeys("{\"a\":1}", "{\"a\":1}")).isEmpty();
-    }
-
-    @Test
-    void clearingAnOverrideBackToInheritIsAChange() {
-        // A cleared override is a real change, not an absent key. (That the mapper actually emits the
-        // null is ConfigAuditIntegrationTest's job; this pins only that the diff treats it as a change.)
-        assertThat(changedKeys("{\"cooldownMinutes\":30}", "{\"cooldownMinutes\":null}")).containsExactly(
-            "cooldownMinutes"
+    static Stream<Arguments> diffs() {
+        return Stream.of(
+            // Returning every key rather than the changed ones would make the per-control filter match
+            // every row and render the History panel useless.
+            Arguments.of("{\"a\":1,\"b\":2}", "{\"a\":1,\"b\":3}", List.of("b"), "only the keys that differ"),
+            // Drives no-op suppression: an idempotent PATCH must leave no row.
+            Arguments.of("{\"a\":1}", "{\"a\":1}", List.of(), "identical snapshots yield no keys"),
+            // A cleared override is a real change, not an absent key. (That the mapper actually emits
+            // the null is ConfigAuditIntegrationTest's job.)
+            Arguments.of(
+                "{\"cooldownMinutes\":30}",
+                "{\"cooldownMinutes\":null}",
+                List.of("cooldownMinutes"),
+                "clearing an override back to inherit is a change"
+            ),
+            // A top-level-only implementation would report "volumeCaps", leaving
+            // changedKey=volumeCaps.perPullRequest matching nothing — the column's whole purpose.
+            Arguments.of(
+                "{\"volumeCaps\":{\"perPullRequest\":5,\"perDay\":9}}",
+                "{\"volumeCaps\":{\"perPullRequest\":3,\"perDay\":9}}",
+                List.of("volumeCaps.perPullRequest"),
+                "a nested change yields the leaf path, not the container"
+            ),
+            // Index paths would make the filter's value space depend on list order, which is not stable.
+            Arguments.of(
+                "{\"slugs\":[\"a\",\"b\"]}",
+                "{\"slugs\":[\"a\",\"c\"]}",
+                List.of("slugs"),
+                "arrays compare whole rather than by index"
+            ),
+            // Snapshot shapes evolve; a field that appeared or vanished is what a reader needs.
+            Arguments.of("{\"a\":1}", "{\"a\":1,\"b\":2}", List.of("b"), "a key on one side only is a change"),
+            // Returning empty on create would let the recorder suppress it as a no-op, losing the event.
+            Arguments.of(
+                null,
+                "{\"a\":1,\"b\":{\"c\":2}}",
+                List.of("a", "b.c"),
+                "create lists every leaf of the new state"
+            ),
+            Arguments.of("{\"a\":1}", null, List.of("a"), "delete lists every leaf of the old state"),
+            Arguments.of(
+                "{\"b\":1,\"a\":1}",
+                "{\"b\":2,\"a\":2}",
+                List.of("a", "b"),
+                "keys are sorted, so the stored array is stable"
+            ),
+            // ConfigAuditRecorder drops an UPDATE whose diff is empty, so a credential snapshot built
+            // only from presence flags would record nothing when a token that was already set is
+            // rotated. The rotation instant is what keeps the row from being suppressed.
+            Arguments.of(
+                "{\"tokenSet\":true,\"providerKind\":\"GITHUB\",\"rotatedAt\":null}",
+                "{\"tokenSet\":true,\"providerKind\":\"GITHUB\",\"rotatedAt\":\"2026-07-19T10:00:00Z\"}",
+                List.of("rotatedAt"),
+                "rotating an already-set credential still counts as a change"
+            )
         );
     }
 
-    @Test
-    void nestedChangeYieldsTheLeafPathNotTheContainer() {
-        // Fails on a top-level-only implementation, which would report "volumeCaps" and leave
-        // changedKey=volumeCaps.perPullRequest matching nothing — the column's whole purpose.
-        assertThat(
-            changedKeys(
-                "{\"volumeCaps\":{\"perPullRequest\":5,\"perDay\":9}}",
-                "{\"volumeCaps\":{\"perPullRequest\":3,\"perDay\":9}}"
-            )
-        ).containsExactly("volumeCaps.perPullRequest");
+    @ParameterizedTest(name = "{3}")
+    @MethodSource("diffs")
+    void reportsTheChangedKeys(@Nullable String before, @Nullable String after, List<String> expected, String why) {
+        assertThat(ConfigAuditDiff.changedKeys(node(before), node(after))).as(why).containsExactlyElementsOf(expected);
     }
 
-    @Test
-    void arraysCompareWholeRatherThanByIndex() {
-        // Index paths would make the filter's value space depend on list order, which is not stable.
-        assertThat(changedKeys("{\"slugs\":[\"a\",\"b\"]}", "{\"slugs\":[\"a\",\"c\"]}")).containsExactly("slugs");
-    }
-
-    @Test
-    void aKeyAppearingOnOneSideOnlyIsAChange() {
-        // Snapshot shapes evolve; a field that appeared or vanished is exactly what a reader needs.
-        assertThat(changedKeys("{\"a\":1}", "{\"a\":1,\"b\":2}")).containsExactly("b");
-    }
-
-    @Test
-    void createdListsEveryLeafOfTheNewState() {
-        // Fails if create returns empty, which the recorder would then suppress as a no-op — losing
-        // the creation event entirely.
-        assertThat(ConfigAuditDiff.changedKeys(null, node("{\"a\":1,\"b\":{\"c\":2}}"))).containsExactly("a", "b.c");
-    }
-
-    @Test
-    void deletedListsEveryLeafOfTheOldState() {
-        assertThat(ConfigAuditDiff.changedKeys(node("{\"a\":1}"), null)).containsExactly("a");
-    }
-
-    @Test
-    void keysAreSortedSoTheStoredArrayIsStable() {
-        assertThat(changedKeys("{\"b\":1,\"a\":1}", "{\"b\":2,\"a\":2}")).containsExactly("a", "b");
-    }
-
-    @Test
-    void rotatingAnAlreadySetCredentialStillCountsAsAChange() {
-        // ConfigAuditRecorder drops an UPDATE whose diff is empty, so a credential snapshot built only
-        // from presence flags records nothing on the common path — rotating a token that was already
-        // set. The rotation instant is what keeps the row from being suppressed.
-        assertThat(
-            changedKeys(
-                "{\"tokenSet\":true,\"providerKind\":\"GITHUB\",\"rotatedAt\":null}",
-                "{\"tokenSet\":true,\"providerKind\":\"GITHUB\",\"rotatedAt\":\"2026-07-19T10:00:00Z\"}"
-            )
-        ).containsExactly("rotatedAt");
-    }
-
-    private static List<String> changedKeys(String before, String after) {
-        return ConfigAuditDiff.changedKeys(node(before), node(after));
-    }
-
-    private static JsonNode node(String json) {
+    private static @Nullable JsonNode node(@Nullable String json) {
+        if (json == null) {
+            return null;
+        }
         try {
             return MAPPER.readTree(json);
         } catch (Exception e) {

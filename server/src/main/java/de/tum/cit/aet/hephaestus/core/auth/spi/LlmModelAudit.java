@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.spi;
 
 /**
- * Cross-module port: record instance LLM model changes on the auth-event trail (#1368). Same reasoning
+ * Cross-module port: record instance LLM model changes on the auth-event trail. Same reasoning
  * as {@link LlmConnectionAudit} (GLOBAL catalog, {@code config_audit_event.workspace_id} is NOT NULL).
  *
  * <p>{@code core.auth} implements this (over its {@code AuthEventLogger}, in

@@ -7,7 +7,6 @@ import jakarta.validation.constraints.Size;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-/** Connect your own AI provider (#1368): a workspace-owned, tenant-scoped LLM connection. */
 @Schema(description = "Connect your own AI provider")
 public record CreateWorkspaceLlmConnectionRequestDTO(
     @Nullable

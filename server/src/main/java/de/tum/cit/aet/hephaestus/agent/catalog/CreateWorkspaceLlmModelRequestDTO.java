@@ -8,11 +8,7 @@ import java.math.BigDecimal;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Create a model on a workspace's own AI provider connection (#1368). Pricing is inline (no separate
- * reprice endpoint — a BYO model has no price history): {@code pricingMode} defaults to
- * {@code UNPRICED} when omitted and is validated by {@link LlmPriceValidation}.
- */
+/** Omitted {@code pricingMode} defaults to {@code UNPRICED}. */
 @Schema(description = "Create a model on your AI provider")
 public record CreateWorkspaceLlmModelRequestDTO(
     @Nullable

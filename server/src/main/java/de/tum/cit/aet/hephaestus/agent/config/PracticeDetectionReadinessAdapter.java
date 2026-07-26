@@ -5,7 +5,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.PracticeDetectionReadiness;
 import org.springframework.stereotype.Component;
 
 /**
- * Implementation of {@link PracticeDetectionReadiness} backed by the per-purpose binding table (#1368).
+ * Implementation of {@link PracticeDetectionReadiness} backed by the per-purpose binding table.
  */
 @Component
 public class PracticeDetectionReadinessAdapter implements PracticeDetectionReadiness {

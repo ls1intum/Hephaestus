@@ -12,10 +12,14 @@ import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletResponse;
+import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
@@ -427,7 +431,118 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
     }
 
+    /**
+     * What the budget gate and the usage accumulator are handed about the caller. Both answers come
+     * from the row this filter already loads, so neither costs an extra query — and both are read in
+     * the same instant, so they cannot describe different attempts.
+     */
+    @Nested
+    @DisplayName("the billed attempt resolved from the row")
+    class BilledAttempt {
+
+        @Test
+        @DisplayName("carries the row's retry_count, so a later attempt's write can be told apart")
+        void theRoutingCarriesTheAttemptNumber() throws Exception {
+            var job = createRunningJob();
+            job.setRetryCount(3);
+
+            ProxyRouting routing = authenticateAndCaptureRouting(job);
+
+            assertThat(routing.attempt()).isNotNull();
+            assertThat(routing.attempt().number()).isEqualTo(3);
+            assertThat(routing.attempt().sourceId()).isEqualTo(job.getId());
+        }
+
+        /**
+         * The number the budget gate bounds a run with. Kills the mutation "report zero in-flight
+         * spend": 1M input at $10/1M plus 100k output at $30/1M is $13, and a run that has spent $13
+         * against a $10 cap must not be allowed to make call fourteen.
+         */
+        @Test
+        @DisplayName("prices the calls the attempt has already made with the rates frozen at admission")
+        void theRoutingPricesWhatTheAttemptHasAlreadySpent() throws Exception {
+            var job = createRunningJob(
+                new LlmPriceSnapshot(
+                    FundingSource.INSTANCE,
+                    PricingState.PRICED,
+                    1L,
+                    null,
+                    new BigDecimal("10"),
+                    new BigDecimal("30"),
+                    new BigDecimal("1"),
+                    new BigDecimal("2")
+                )
+            );
+            job.setLlmTotalInputTokens(1_000_000);
+            job.setLlmTotalOutputTokens(100_000);
+
+            ProxyRouting routing = authenticateAndCaptureRouting(job);
+
+            assertThat(routing.inFlightSpendUsd()).isEqualByComparingTo("13");
+        }
+
+        @Test
+        @DisplayName("an attempt that has made no call yet has spent nothing")
+        void anAttemptWithNoCallsYetSpendsNothing() throws Exception {
+            var job = createRunningJob(
+                new LlmPriceSnapshot(
+                    FundingSource.INSTANCE,
+                    PricingState.PRICED,
+                    1L,
+                    null,
+                    new BigDecimal("10"),
+                    new BigDecimal("30"),
+                    null,
+                    null
+                )
+            );
+
+            ProxyRouting routing = authenticateAndCaptureRouting(job);
+
+            assertThat(routing.inFlightSpendUsd()).isEqualByComparingTo("0");
+        }
+
+        /**
+         * Only reachable for a job that never went through {@code LlmAdmissionService}, which refuses
+         * to start an unpriced model. Reported as zero rather than guessed at.
+         */
+        @Test
+        @DisplayName("a snapshot with no frozen price contributes no in-flight spend")
+        void aSnapshotWithoutAPriceContributesNothing() throws Exception {
+            var job = createRunningJob();
+            job.setLlmTotalInputTokens(1_000_000);
+
+            ProxyRouting routing = authenticateAndCaptureRouting(job);
+
+            assertThat(routing.inFlightSpendUsd()).isEqualByComparingTo("0");
+        }
+
+        private ProxyRouting authenticateAndCaptureRouting(AgentJob job) throws Exception {
+            when(
+                agentJobRepository.findByJobTokenHashAndStatus(eq(VALID_TOKEN_HASH), eq(AgentJobStatus.RUNNING))
+            ).thenReturn(Optional.of(job));
+            var authCapture = new AtomicReference<Authentication>();
+            doAnswer(invocation -> {
+                authCapture.set(SecurityContextHolder.getContext().getAuthentication());
+                return null;
+            })
+                .when(filterChain)
+                .doFilter(any(), any());
+
+            var request = new MockHttpServletRequest();
+            request.setRemoteAddr("10.0.0.2");
+            request.addHeader("Authorization", "Bearer " + VALID_TOKEN);
+            filter.doFilterInternal(request, new MockHttpServletResponse(), filterChain);
+
+            return (ProxyRouting) ((JobTokenAuthentication) authCapture.get()).getPrincipal();
+        }
+    }
+
     private AgentJob createRunningJob() {
+        return createRunningJob(null);
+    }
+
+    private AgentJob createRunningJob(LlmPriceSnapshot price) {
         var job = new AgentJob();
         job.setJobToken(VALID_TOKEN);
         ConfigSnapshot snapshot = new ConfigSnapshot(
@@ -445,7 +560,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             null,
             600,
             false,
-            null
+            price
         );
         job.setConfigSnapshot(snapshot.toJson(objectMapper));
         job.setId(java.util.UUID.randomUUID());

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.LlmProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -22,12 +23,21 @@ class EgressPolicyTest extends BaseUnitTest {
     @Mock
     private InstanceLlmSettingsRepository settingsRepository;
 
+    /** Defaults except for the one knob under test — the shape an unset {@code hephaestus.llm} binds to. */
+    private static LlmProperties properties(boolean allowLoopback) {
+        return new LlmProperties(
+            "",
+            new LlmProperties.Egress(allowLoopback),
+            new LlmProperties.Fx(LlmProperties.ECB_DAILY_URL)
+        );
+    }
+
     private EgressPolicy loopbackBlocked() {
-        return new EgressPolicy(settingsRepository, false);
+        return new EgressPolicy(settingsRepository, properties(false));
     }
 
     private EgressPolicy loopbackAllowed() {
-        return new EgressPolicy(settingsRepository, true);
+        return new EgressPolicy(settingsRepository, properties(true));
     }
 
     private void stubNoSettingsRow() {
@@ -70,7 +80,7 @@ class EgressPolicyTest extends BaseUnitTest {
 
         @ParameterizedTest
         @DisplayName(
-            "#1368 fix wave: IANA special-purpose ranges (via PrivateAddressGuard) are blocked too — " +
+            "IANA special-purpose ranges (via PrivateAddressGuard) are blocked too — " +
                 "multicast, CGNAT, NAT64, and the benchmarking/TEST-NET ranges routinely front internal services"
         )
         @ValueSource(

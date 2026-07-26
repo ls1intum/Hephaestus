@@ -26,6 +26,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -34,6 +35,7 @@ import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import jakarta.persistence.Convert;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
@@ -43,6 +45,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -62,9 +66,6 @@ class AgentJobServiceTest extends BaseUnitTest {
 
     @Mock
     private WorkspaceRepository workspaceRepository;
-
-    @Mock
-    private ReviewableArtifactLoader artifactLoader;
 
     @Mock
     private ConnectionService connectionService;
@@ -94,7 +95,6 @@ class AgentJobServiceTest extends BaseUnitTest {
             agentJobRepository,
             agentBindingRepository,
             workspaceRepository,
-            artifactLoader,
             connectionService,
             handlerRegistry,
             objectMapper,
@@ -108,7 +108,7 @@ class AgentJobServiceTest extends BaseUnitTest {
         workspace.setId(1L);
         workspace.setWorkspaceSlug("test-ws");
 
-        // Detection runs exactly the workspace's PRACTICE_DETECTION binding (no fan-out, #1368).
+        // Detection runs exactly the workspace's PRACTICE_DETECTION binding — one job, no fan-out.
         enabledBinding = new WorkspaceAgentBinding();
         enabledBinding.setId(10L);
         enabledBinding.setWorkspace(workspace);
@@ -141,7 +141,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             );
         lenient()
             .when(llmModelResolver.connectionRef(any()))
-            .thenReturn(new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 99L));
+            .thenReturn(new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 99L, null, null));
     }
 
     private JobSubmission createSubmission() {
@@ -228,61 +228,55 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         /**
-         * #1368: the binding is resolved BEFORE the budget check so the cap that applies is the one
+         * The binding is resolved BEFORE the budget check so the cap that applies is the one
          * belonging to whoever pays for that binding — the host for a shared instance model, the
          * workspace for its own connected provider. Getting this order wrong would let an exhausted
          * host budget pause work the workspace pays for itself.
+         *
+         * <p>Asserted through the outcome, not through a {@code verify}: only the payer named here is
+         * given an exhausted cap, so the job survives if and only if the service consulted the OTHER
+         * purse. A run that reaches the right purse returns empty and writes no row; a run that reaches
+         * the wrong one sails past a cap that is not exhausted and persists a job.
          */
-        @Test
-        void shouldCheckTheBudgetOfWhoeverFundsTheBoundDetectionModel() {
-            enabledBinding.setInstanceModel(new de.tum.cit.aet.hephaestus.agent.catalog.LlmModel());
+        @ParameterizedTest(name = "a binding on {1}''s model is paused by {1}''s exhausted cap, and only by it")
+        @CsvSource({ "true, INSTANCE, WORKSPACE", "false, WORKSPACE, INSTANCE" })
+        void shouldCheckTheBudgetOfWhoeverFundsTheBoundDetectionModel(
+            boolean boundToAnInstanceModel,
+            FundingSource payer,
+            FundingSource otherPurse
+        ) {
+            // An instance model on the binding = the host's shared models pay; none = the workspace's
+            // own connected provider does.
+            if (boundToAnInstanceModel) {
+                enabledBinding.setInstanceModel(new de.tum.cit.aet.hephaestus.agent.catalog.LlmModel());
+            }
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+            // Exactly one purse is out of money. Mockito's default for the other is `false` (not blocked).
+            when(llmBudgetService.blockSubmission(any(), any(), eq(payer))).thenReturn(true);
 
             JobTypeHandler handler = mock(JobTypeHandler.class);
-            when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
-            when(handler.createSubmission(any())).thenReturn(createSubmission());
-            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any())).thenReturn(
-                Optional.empty()
+            lenient().when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
+            lenient().when(handler.createSubmission(any())).thenReturn(createSubmission());
+            lenient()
+                .when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any()))
+                .thenReturn(Optional.empty());
+            lenient()
+                .when(agentJobRepository.saveAndFlush(any(AgentJob.class)))
+                .thenAnswer(inv -> {
+                    AgentJob j = inv.getArgument(0);
+                    j.prePersist();
+                    return j;
+                });
+
+            Optional<AgentJob> result = service.submit(
+                1L,
+                AgentJobType.PULL_REQUEST_REVIEW,
+                mock(JobSubmissionRequest.class)
             );
-            when(agentJobRepository.saveAndFlush(any(AgentJob.class))).thenAnswer(inv -> {
-                AgentJob j = inv.getArgument(0);
-                j.prePersist();
-                return j;
-            });
 
-            service.submit(1L, AgentJobType.PULL_REQUEST_REVIEW, mock(JobSubmissionRequest.class));
-
-            verify(llmBudgetService).blockSubmission(
-                workspace,
-                AgentJobType.PULL_REQUEST_REVIEW.name(),
-                de.tum.cit.aet.hephaestus.agent.usage.FundingSource.INSTANCE
-            );
-        }
-
-        @Test
-        void shouldCheckTheWorkspacesOwnBudgetWhenDetectionRunsOnItsOwnProvider() {
-            // No instance model on the binding = the workspace's own connected provider pays.
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-
-            JobTypeHandler handler = mock(JobTypeHandler.class);
-            when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
-            when(handler.createSubmission(any())).thenReturn(createSubmission());
-            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any())).thenReturn(
-                Optional.empty()
-            );
-            when(agentJobRepository.saveAndFlush(any(AgentJob.class))).thenAnswer(inv -> {
-                AgentJob j = inv.getArgument(0);
-                j.prePersist();
-                return j;
-            });
-
-            service.submit(1L, AgentJobType.PULL_REQUEST_REVIEW, mock(JobSubmissionRequest.class));
-
-            verify(llmBudgetService).blockSubmission(
-                workspace,
-                AgentJobType.PULL_REQUEST_REVIEW.name(),
-                de.tum.cit.aet.hephaestus.agent.usage.FundingSource.WORKSPACE
-            );
+            assertThat(result).as("the payer's cap is exhausted, so no job may be created").isEmpty();
+            verify(agentJobRepository, never()).saveAndFlush(any(AgentJob.class));
+            verify(llmBudgetService, never()).blockSubmission(any(), any(), eq(otherPurse));
         }
 
         @Test
@@ -391,37 +385,28 @@ class AgentJobServiceTest extends BaseUnitTest {
             assertThat(job.getJobType()).isEqualTo(AgentJobType.PULL_REQUEST_REVIEW);
             assertThat(job.getIdempotencyKey()).isEqualTo("pr_review:owner/repo:42:authoring:abc123:detection");
             assertThat(job.getConfigSnapshot()).isNotNull();
-            // #1368 NATS→Postgres cutover: the QUEUED insert IS the enqueue — AgentJobExecutor's poll
-            // loop discovers it directly from the agent_job table, no publish event to verify anymore.
+            // The QUEUED insert IS the enqueue: AgentJobExecutor's poll loop discovers it directly
+            // from the agent_job table, so there is no publish event to verify.
             assertThat(job.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
         }
 
         @Test
-        @DisplayName("the credential is NEVER frozen onto the job (#1368 slice 5 — ONE credential path, resolved live)")
+        @DisplayName("the credential is NEVER frozen onto the job — one path, resolved live by the proxy")
         void neverCopiesTheCredentialOntoTheJob() {
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-
-            JobTypeHandler handler = mock(JobTypeHandler.class);
-            when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
-            when(handler.createSubmission(any())).thenReturn(createSubmission());
-
-            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any())).thenReturn(
-                Optional.empty()
-            );
-            when(agentJobRepository.saveAndFlush(any())).thenAnswer(inv -> {
-                AgentJob j = inv.getArgument(0);
-                j.prePersist();
-                return j;
-            });
-
-            Optional<AgentJob> result = service.submit(
-                1L,
-                AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class)
-            );
-
-            assertThat(result).isPresent();
-            assertThat(result.get().getLlmApiKey()).isNull();
+            // Asserted on the entity's shape rather than on one submitted job's field being null: the
+            // job now has nowhere to put a provider credential at all, which is the stronger guarantee
+            // and the one a future write path cannot undo by forgetting to leave a field unset. The
+            // proxy resolves the provider key live from the frozen snapshot's connection reference; a
+            // SECOND encrypted column here would mean a second place that key comes to rest.
+            assertThat(AgentJob.class.getDeclaredFields())
+                .filteredOn(
+                    field ->
+                        field.isAnnotationPresent(Convert.class) &&
+                        field.getAnnotation(Convert.class).converter() == EncryptedStringConverter.class
+                )
+                .describedAs("the job's own bearer token is the ONLY secret an agent_job row may carry")
+                .extracting(java.lang.reflect.Field::getName)
+                .containsExactly("jobToken");
         }
 
         @Test

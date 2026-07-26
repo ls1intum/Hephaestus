@@ -11,27 +11,28 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 /**
- * Property-driven boot-matrix proof for a split-pod, worker-only deployment (#1368 fix wave,
- * adversarial review findings 1 + 3) — no Docker, no real WSS hub: this is entirely about which
+ * Property-driven boot-matrix proof for a split-pod, worker-only deployment — no Docker, no real
+ * WSS hub: this is entirely about which
  * BEANS wire under {@code hephaestus.runtime.server.enabled=false, hephaestus.runtime.worker.enabled
  * =true, hephaestus.agent.enabled=true}, mirroring the {@code prod,worker} production profile
  * (application-worker.yml) plus {@code AGENT_ENABLED=true}.
  *
- * <p><b>Finding 1 (worker can't serve the LLM proxy):</b> {@code application-worker.yml} used to set
- * {@code server.port=-1}, which disables the HTTP connector entirely — {@code LlmProxyController} and
- * its {@code llmProxyFilterChain} security chain existed as beans but could never actually be reached
- * over the network, so every sandboxed job this pod claimed would fail to reach its LLM. The profile
- * now sets a real {@code server.port}; this test proves the proxy chain's BEANS wire under the
- * property set the profile produces (a real TCP bind is an infra/Docker-Compose concern, out of scope
- * for a unit-tier Spring context test).
+ * <p><b>The worker must be able to serve the LLM proxy.</b> {@code application-worker.yml} must not
+ * set {@code server.port=-1}: that disables the HTTP connector entirely, leaving
+ * {@code LlmProxyController} and its {@code llmProxyFilterChain} security chain wired as beans but
+ * unreachable over the network, so every sandboxed job this pod claimed would fail to reach its LLM.
+ * This test proves the proxy chain's BEANS wire under the property set the profile produces (a real
+ * TCP bind is an infra/Docker-Compose concern, out of scope for a unit-tier Spring context test).
  *
- * <p><b>Finding 3 (split-role gating):</b> the job-submission listeners and the orphan-recovery
- * sweeper gate on {@code hephaestus.agent.enabled} alone — NOT on the worker role — so they wire here
- * even with {@code runtime.server.enabled=false}. This is what makes "set AGENT_ENABLED on every role
- * that needs it" (MIGRATION.md) actually correct: the flag alone, independent of which runtime role(s)
- * are on, is what the submission/recovery beans key on.
+ * <p><b>Split-role gating.</b> The job-submission listeners gate on {@code hephaestus.agent.enabled}
+ * alone — NOT on the worker role — so they wire here even with {@code runtime.server.enabled=false}.
+ * This is what makes "set AGENT_ENABLED on every role that needs it" (MIGRATION.md) actually correct:
+ * for submission the flag alone, independent of which runtime role(s) are on, is what the beans key
+ * on. Orphan recovery is the exception and is gated the other way — {@code AgentJobZombieSweeper} is
+ * {@code @ConditionalOnServerRole} and so is absent here; see
+ * {@link #recoverySweeperIsAbsentWithoutServerRole} for why.
  */
-@DisplayName("Worker-only role gating (#1368 fix wave)")
+@DisplayName("Worker-only role gating")
 class AgentRoleGatingIntegrationTest extends BaseIntegrationTest {
 
     @DynamicPropertySource
@@ -71,19 +72,32 @@ class AgentRoleGatingIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName(
-        "submission listeners and the orphan-recovery sweeper wire on agent.enabled alone, independent of the server role"
-    )
-    void submissionAndRecoveryBeansWireWithoutServerRole() {
+    @DisplayName("submission listeners wire on agent.enabled alone, independent of the server role")
+    void submissionBeansWireWithoutServerRole() {
         assertThat(context.getBeansOfType(AgentJobEventListener.class))
             .as("PR/review event listener — must submit jobs on any agent.enabled pod, not just server-role ones")
             .isNotEmpty();
         assertThat(context.getBeansOfType(IssueAgentJobEventListener.class)).isNotEmpty();
         assertThat(context.getBeansOfType(BotCommandProcessor.class)).isNotEmpty();
+    }
+
+    /**
+     * The counterpart to the test above, and the line between them is the point: <b>submitting</b> a
+     * job is an event-driven capability that follows {@code AGENT_ENABLED}, while <b>sweeping</b> for
+     * dead ones is a scheduled duty that follows the server role.
+     *
+     * <p>This assertion was previously inverted — it demanded the sweeper on a worker-only pod, on the
+     * reasoning that a pod running only {@code AGENT_ENABLED} must still recover dead workers' jobs.
+     * That reasoning does not hold: {@code @EnableScheduling} lives on the SERVER-gated
+     * {@code ServerSchedulingConfig}, so on this pod the sweeper's {@code @Scheduled} methods could
+     * never fire even when the bean exists. Keeping it here bought nothing and cost the meters it
+     * registers, which would sit at a permanent zero on a pod that never sweeps.
+     */
+    @Test
+    @DisplayName("the zombie sweeper does NOT wire on a worker-only pod — sweeping is a server-role duty")
+    void recoverySweeperIsAbsentWithoutServerRole() {
         assertThat(context.getBeansOfType(AgentJobZombieSweeper.class))
-            .as(
-                "orphan-recovery sweeper — must be present so a server pod running only AGENT_ENABLED still recovers dead workers' jobs"
-            )
-            .isNotEmpty();
+            .as("orphan/zombie sweeper is @ConditionalOnServerRole; its @Scheduled ticks cannot fire here anyway")
+            .isEmpty();
     }
 }

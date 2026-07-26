@@ -17,18 +17,13 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * One day's ECB euro foreign-exchange reference rate, stored exactly as the ECB publishes it:
- * {@code usdPerEur} is US dollars per ONE euro (e.g. {@code 1.1377}). GLOBAL — an exchange rate is
- * a property of the world, not of a tenant.
- *
- * <p>Display-only. Nothing in this table ever reaches a budget gate, an admission decision or the
- * usage ledger: USD stays the sole unit of record, pricing and enforcement, and the euro figure the
- * API reports is a clearly-labelled estimate carrying the exact date of the rate it used.
- * {@code LlmBudgetFxIsolationArchTest} pins that separation.
- *
- * <p>The stored direction is deliberately the published one. Inverting on write would bake a
- * rounding step into the historical record; instead the single inversion happens on read, in
+ * One day's ECB euro foreign-exchange reference rate, stored in the published direction:
+ * {@code usdPerEur} is US dollars per ONE euro (e.g. {@code 1.1377}). Inverting on write would bake a
+ * rounding step into the historical record, so the single inversion happens on read, in
  * {@link FxRateInfoDTO#fromEcbRate}.
+ *
+ * <p>Display-only: nothing in this table ever reaches a budget gate, an admission decision or the
+ * usage ledger. {@code LlmBudgetFxIsolationArchTest} pins that separation.
  */
 @Entity
 @Table(name = "fx_rate", uniqueConstraints = @UniqueConstraint(name = "ux_fx_rate_date", columnNames = { "rate_date" }))
@@ -44,15 +39,13 @@ public class FxRate {
     @EqualsAndHashCode.Include
     private Long id;
 
-    /** The ECB publication date this rate belongs to. Unique — one row per published day. */
+    /** The ECB publication date, not the date we fetched it on. */
     @Column(name = "rate_date", nullable = false)
     private LocalDate rateDate;
 
-    /** US dollars per 1 EUR, as published by the ECB. */
     @Column(name = "usd_per_eur", nullable = false, precision = 12, scale = 6)
     private BigDecimal usdPerEur;
 
-    /** When this instance retrieved the rate — provenance for a stale-table diagnosis. */
     @Column(name = "fetched_at", nullable = false)
     private Instant fetchedAt;
 }

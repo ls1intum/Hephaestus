@@ -9,11 +9,14 @@ import de.tum.cit.aet.hephaestus.core.AuditExempt;
 import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -29,6 +32,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 class AuditByDefaultArchTest extends HephaestusArchitectureTest {
 
     private static final String INSTANCE_ADMIN_AUTHORITY = "app_admin";
+
+    /** The one ledger whose rows this test can follow back through the call graph. */
+    private static final String CONFIG_AUDIT_LEDGER = "config_audit";
 
     @Test
     void everyAdminMutationEndpointDeclaresItsAuditStatus() {
@@ -48,7 +54,7 @@ class AuditByDefaultArchTest extends HephaestusArchitectureTest {
                 """
                 These admin mutation endpoints declare neither @Audited nor @AuditExempt. Decide: if the \
                 action changes configuration or access, record it on the audit trail and mark it \
-                @Audited("<entity type or ledger>"); if it genuinely should not be recorded, mark it \
+                @Audited("<ledger> <TOKEN>"); if it genuinely should not be recorded, mark it \
                 @AuditExempt(reason="…"). An undeclared admin action is how an audit trail silently \
                 develops holes."""
             )
@@ -56,13 +62,89 @@ class AuditByDefaultArchTest extends HephaestusArchitectureTest {
     }
 
     /**
+     * Every {@code @Audited} value parses as {@code "<ledger>[ <TOKEN>]"} — see {@link Audited}.
+     *
+     * <p>This is what keeps the grammar from splitting again. It shipped three ways at once
+     * ({@code "WORKSPACE_LLM_CONNECTION"}, {@code "connection_audit"},
+     * {@code "auth_event LLM_CONNECTION_CREATED"}), which meant a reader could not tell from the
+     * annotation which trail to go read. It also makes the entity-type spelling load-bearing: a typo'd
+     * token used to be indistinguishable from "names some other ledger", which silently opted the
+     * endpoint out of {@link #auditDeclarationsMatchTheCallGraph()}.
+     */
+    @Test
+    void everyAuditedValueNamesAKnownLedgerAndRecord() {
+        List<String> malformed = classes
+            .stream()
+            .filter(AuditByDefaultArchTest::isController)
+            .flatMap(c -> c.getMethods().stream())
+            .flatMap(m ->
+                m
+                    .tryGetAnnotationOfType(Audited.class)
+                    .stream()
+                    .flatMap(a ->
+                        malformedReason(a.value())
+                            .map(reason -> m.getOwner().getSimpleName() + "." + m.getName() + ": " + reason)
+                            .stream()
+                    )
+            )
+            .sorted()
+            .toList();
+
+        assertThat(malformed)
+            .as(
+                """
+                These @Audited values do not parse as "<ledger>[ <TOKEN>]". The value must start with the \
+                table the row lands in (config_audit / auth_event / connection_audit); an optional second \
+                token must be a real constant of that ledger's enum. See the Audited javadoc."""
+            )
+            .isEmpty();
+    }
+
+    private static Optional<String> malformedReason(String value) {
+        String[] parts = value.split(" ");
+        if (parts.length > 2) {
+            return Optional.of("'" + value + "' has more than a ledger and one token");
+        }
+        Set<String> vocabulary = LEDGER_VOCABULARIES.get(parts[0]);
+        if (vocabulary == null) {
+            return Optional.of("'" + parts[0] + "' is not a known ledger " + LEDGER_VOCABULARIES.keySet());
+        }
+        if (parts.length == 1) {
+            // A bare ledger is only legal where that ledger has no fixed vocabulary to name.
+            return vocabulary.isEmpty()
+                ? Optional.empty()
+                : Optional.of("'" + parts[0] + "' rows are typed — name the constant, e.g. \"" + parts[0] + " X\"");
+        }
+        return vocabulary.contains(parts[1])
+            ? Optional.empty()
+            : Optional.of("'" + parts[1] + "' is not a constant of the " + parts[0] + " vocabulary");
+    }
+
+    /**
+     * Ledger name → the enum constants that ledger types its rows with. {@code connection_audit} maps
+     * to an empty set on purpose: its {@code event_type} column is a free string composed at write
+     * time, so there is no constant an annotation could name.
+     */
+    private static final Map<String, Set<String>> LEDGER_VOCABULARIES = Map.of(
+        CONFIG_AUDIT_LEDGER,
+        constantsOf(ConfigAuditEntityType.values()),
+        "auth_event",
+        constantsOf(AuthEvent.EventType.values()),
+        "connection_audit",
+        Set.of()
+    );
+
+    private static Set<String> constantsOf(Enum<?>[] constants) {
+        return Arrays.stream(constants).map(Enum::name).collect(Collectors.toUnmodifiableSet());
+    }
+
+    /**
      * An {@code @Audited} endpoint that reaches no recorder is a promise nothing keeps; an
      * {@code @AuditExempt} one that records anyway invites the next reader to delete a working audit
      * call. Both of those shipped here before the build checked them.
      *
-     * <p>Only {@code @Audited("<ENTITY_TYPE>")} is checked — a value naming another ledger
-     * ({@code connection_audit}, {@code auth_event}) points outside this port and cannot be resolved
-     * from the call graph.
+     * <p>Only {@code config_audit} values are checked — the other two ledgers point outside
+     * {@link ConfigAuditPort} and cannot be resolved from the call graph.
      */
     @Test
     void auditDeclarationsMatchTheCallGraph() {
@@ -92,17 +174,13 @@ class AuditByDefaultArchTest extends HephaestusArchitectureTest {
         }
         boolean namesEntityType = method
             .tryGetAnnotationOfType(Audited.class)
-            .map(a -> ENTITY_TYPES.contains(a.value()))
+            .map(a -> a.value().startsWith(CONFIG_AUDIT_LEDGER + " "))
             .orElse(false);
         if (namesEntityType && !records) {
             return Optional.of(name + " is @Audited but reaches no recorder");
         }
         return Optional.empty();
     }
-
-    private static final Set<String> ENTITY_TYPES = Arrays.stream(ConfigAuditEntityType.values())
-        .map(Enum::name)
-        .collect(java.util.stream.Collectors.toUnmodifiableSet());
 
     /** Depth-bounded so a cyclic service graph terminates; audit writes sit shallow behind a handler. */
     private static boolean reachesRecorder(JavaMethod method, Set<String> seen, int depth) {

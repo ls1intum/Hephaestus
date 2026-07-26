@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * In-{@code core.auth} implementation of {@link LlmConnectionAudit}, {@link LlmModelAudit} and
- * {@link LlmSettingsAudit} (#1368) — mirrors {@link ResearchConsentAuditAdapter}'s role, but for the
+ * {@link LlmSettingsAudit} — mirrors {@link ResearchConsentAuditAdapter}'s role, but for the
  * instance LLM catalog rather than research consent. One adapter class for all three ports (they share
  * the {@link AuthEventLogger} plumbing and the JSON-escaping helper below); the ports themselves stay
  * split by consumer so each interface stays under the SPI method-count ceiling

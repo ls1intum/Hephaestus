@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 /**
- * CRUD (plus "test connection") for a workspace's own "bring your own" LLM connection (#1368):
+ * CRUD (plus "test connection") for a workspace's own "bring your own" LLM connection:
  * tenant-scoped, workspace-admin-owned, self-funded. Every mutation is gated on the instance-wide
  * {@code allow_workspace_connections} switch — an instance admin can turn this feature off entirely.
  * Every persisted base URL is vetted by {@link EgressPolicy}, same rule as the instance catalog.
@@ -119,7 +119,12 @@ public class WorkspaceLlmConnectionService {
         Long id,
         UpdateWorkspaceLlmConnectionRequestDTO request
     ) {
-        WorkspaceLlmConnection connection = get(workspaceContext, id);
+        // Locked read: a PATCH writes back every column, so an unlocked read-modify-write lets a
+        // concurrent PATCH that only toggles `enabled` revert this one's key clearing — leaving a
+        // credential live that the admin was told was deleted.
+        WorkspaceLlmConnection connection = connectionRepository
+            .findByIdAndWorkspaceIdForUpdate(id, workspaceContext.id())
+            .orElseThrow(() -> new EntityNotFoundException("WorkspaceLlmConnection", id));
         WorkspaceLlmConnectionSnapshot before = WorkspaceLlmConnectionSnapshot.of(connection);
 
         if (request.displayName() != null) {
@@ -161,16 +166,19 @@ public class WorkspaceLlmConnectionService {
         );
     }
 
-    /** "Test connection": workspace-framed (reachable + model count only, never the raw model list). */
-    @Transactional(readOnly = true)
+    /**
+     * "Test connection": workspace-framed (reachable + model count only, never the raw model list).
+     *
+     * <p>Deliberately NOT {@code @Transactional} — see {@link LlmConnectionProbeService#probeStored}.
+     * The credential is read as an immutable projection in the repository's own short transaction, so
+     * the multi-second outbound request runs with no JDBC connection held.
+     */
     public WorkspaceLlmProbeResultDTO probe(WorkspaceContext workspaceContext, Long id) {
-        WorkspaceLlmConnection connection = get(workspaceContext, id);
-        egressPolicy.validate(connection.getBaseUrl());
-        LlmProbeResultDTO raw = probeService.probeCredential(
-            connection.getBaseUrl(),
-            connection.getAuthMode(),
-            connection.getApiKey()
-        );
+        LlmProbeTarget target = connectionRepository
+            .findProbeTargetByIdAndWorkspaceId(id, workspaceContext.id())
+            .orElseThrow(() -> new EntityNotFoundException("WorkspaceLlmConnection", id));
+        egressPolicy.validate(target.baseUrl());
+        LlmProbeResultDTO raw = probeService.probeCredential(target.baseUrl(), target.authMode(), target.apiKey());
         return WorkspaceLlmProbeResultDTO.from(raw);
     }
 

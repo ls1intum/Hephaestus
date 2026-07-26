@@ -23,7 +23,7 @@ import reactor.netty.resources.LoopResources;
  * <p>Pool settings follow the pattern established by {@code GitHubGraphQlConfig} and
  * {@code GitLabGraphQlConfig} in this codebase.
  *
- * <p><b>Connect-time SSRF guard (#1368 fix wave):</b> {@code EgressPolicy} only validates the
+ * <p><b>Connect-time SSRF guard:</b> {@code EgressPolicy} only validates the
  * upstream host at snapshot-write / call-entry time; without a guarded resolver here, a DNS-rebind
  * target (public answer during validation, private answer at connect time) would sail straight
  * through this WebClient. {@link WebClientConnectors#resolverGroup} pins the SAME check to the

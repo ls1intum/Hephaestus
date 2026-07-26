@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ForeignKey;
@@ -27,7 +28,7 @@ import org.hibernate.annotations.ColumnDefault;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Workspace-owned BYO LLM connection (#1368): same shape as {@link LlmConnection}, but tenant-scoped
+ * Workspace-owned BYO LLM connection: same shape as {@link LlmConnection}, but tenant-scoped
  * and self-funded — the workspace admin owns the key and the bill.
  */
 @Entity
@@ -73,7 +74,7 @@ public class WorkspaceLlmConnection {
     private String apiProtocol;
 
     @ColumnDefault("'BEARER'")
-    @Enumerated(jakarta.persistence.EnumType.STRING)
+    @Enumerated(EnumType.STRING)
     @Column(name = "auth_mode", nullable = false, length = 16, updatable = false)
     private LlmAuthMode authMode = LlmAuthMode.BEARER;
 

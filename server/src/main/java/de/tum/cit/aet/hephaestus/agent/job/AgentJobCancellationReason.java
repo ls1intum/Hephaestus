@@ -11,9 +11,10 @@ public enum AgentJobCancellationReason {
     /** Worker drain mode set to immediate (timeout=0); jobs are cancelled without waiting. */
     DRAIN_IMMEDIATE,
     /**
-     * Claim-time budget recheck (#1368 fix wave): the workspace's monthly LLM budget was
-     * EXHAUSTED, or the month was UNVERIFIABLE under {@code defaultUnpricedPolicy=BLOCK}, by the
-     * time this pre-queued job reached the front of the queue. Refused before it ever ran.
+     * Claim-time budget recheck: by the time this pre-queued job reached the front of the queue, the
+     * capped purse that funds it was EXHAUSTED, or its month was UNVERIFIABLE — which a capped purse
+     * treats the same way, since a cap that cannot be verified is not a cap. Refused before it ever
+     * ran.
      */
     BUDGET_EXHAUSTED,
     /** The config's catalog binding was revoked or changed before this queued job was claimed. */

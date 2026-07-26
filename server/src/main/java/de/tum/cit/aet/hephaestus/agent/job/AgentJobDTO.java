@@ -25,7 +25,6 @@ public record AgentJobDTO(
         description = "Upstream model this job was admitted on, frozen at submit time (e.g. gpt-5.4-mini). Available from submission, unlike llmModel, which the runner reports only once the job has run."
     )
     String model,
-    @Schema(description = "Docker container ID") String containerId,
     @Schema(description = "Container exit code") Integer exitCode,
     @Schema(description = "Human-readable error message") String errorMessage,
     @Schema(
@@ -44,12 +43,7 @@ public record AgentJobDTO(
     @Schema(description = "Total output tokens generated") Integer llmTotalOutputTokens,
     @Schema(description = "Total reasoning/thinking tokens") Integer llmTotalReasoningTokens,
     @Schema(description = "Tokens read from prompt cache") Integer llmCacheReadTokens,
-    @Schema(description = "Tokens written to prompt cache") Integer llmCacheWriteTokens,
-    @Schema(
-        description = "Deprecated, always null (#1368 slice 6): the runner no longer reports cost. See the " +
-            "workspace's LLM usage rollup for the authoritative, catalog-derived per-job cost."
-    )
-    Double llmCostUsd
+    @Schema(description = "Tokens written to prompt cache") Integer llmCacheWriteTokens
 ) {
     public static AgentJobDTO from(AgentJob job) {
         JsonNode snapshot = job.getConfigSnapshot();
@@ -61,7 +55,6 @@ public record AgentJobDTO(
             job.getOutput(),
             redactInstanceBaseUrl(snapshot),
             snapshotString(snapshot, "upstreamModelId"),
-            job.getContainerId(),
             job.getExitCode(),
             job.getErrorMessage(),
             job.getDeliveryStatus(),
@@ -77,8 +70,7 @@ public record AgentJobDTO(
             job.getLlmTotalOutputTokens(),
             job.getLlmTotalReasoningTokens(),
             job.getLlmCacheReadTokens(),
-            job.getLlmCacheWriteTokens(),
-            job.getLlmCostUsd()
+            job.getLlmCacheWriteTokens()
         );
     }
 

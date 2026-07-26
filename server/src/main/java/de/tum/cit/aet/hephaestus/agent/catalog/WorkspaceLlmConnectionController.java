@@ -27,12 +27,15 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /**
  * Workspace-admin management of "your AI provider" — a workspace's own, tenant-scoped LLM connection
- * (#1368). Mutations are gated on the instance-wide {@code allow_workspace_connections} switch inside
+ *. Mutations are gated on the instance-wide {@code allow_workspace_connections} switch inside
  * {@link WorkspaceLlmConnectionService}.
  */
 @WorkspaceScopedController
 @RequestMapping("/llm/connections")
-@Tag(name = "Workspace LLM", description = "Workspace-scoped \"bring your own\" AI provider connections")
+@Tag(
+    name = "Workspace LLM",
+    description = "Workspace-scoped \"bring your own\" AI provider connections, models and settings"
+)
 @RequiredArgsConstructor
 @Validated
 public class WorkspaceLlmConnectionController {
@@ -74,7 +77,7 @@ public class WorkspaceLlmConnectionController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @Audited("WORKSPACE_LLM_CONNECTION")
+    @Audited("config_audit WORKSPACE_LLM_CONNECTION")
     public ResponseEntity<WorkspaceLlmConnectionDTO> create(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody CreateWorkspaceLlmConnectionRequestDTO request
@@ -100,7 +103,7 @@ public class WorkspaceLlmConnectionController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @Audited("WORKSPACE_LLM_CONNECTION")
+    @Audited("config_audit WORKSPACE_LLM_CONNECTION")
     public ResponseEntity<WorkspaceLlmConnectionDTO> update(
         WorkspaceContext workspaceContext,
         @PathVariable Long id,
@@ -125,7 +128,7 @@ public class WorkspaceLlmConnectionController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @Audited("WORKSPACE_LLM_CONNECTION")
+    @Audited("config_audit WORKSPACE_LLM_CONNECTION")
     public ResponseEntity<Void> delete(WorkspaceContext workspaceContext, @PathVariable Long id) {
         connectionService.delete(workspaceContext, id);
         return ResponseEntity.noContent().build();

@@ -1,9 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.usage;
 
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageDTOs.LlmUsageByDayDTO;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageDTOs.LlmUsageByJobTypeDTO;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageDTOs.WorkspaceLlmUsageReportDTO;
 import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateLookup;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
@@ -22,7 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Workspace-scoped read-side of the LLM usage ledger (#1368): the month rollup a workspace
+ * Workspace-scoped read-side of the LLM usage ledger: the month rollup a workspace
  * admin sees. The cross-tenant admin rollup + budget write live on {@link LlmUsageAdminService}.
  */
 @Service
@@ -120,7 +117,7 @@ public class LlmUsageService {
         // always evaluates against "now", so reporting it for a past month would misleadingly imply a
         // closed month is still pausing new work.
         boolean isCurrentMonth = month.equals(YearMonth.now(ZoneOffset.UTC));
-        LlmBudgetDecision decision = isCurrentMonth ? llmBudgetService.decide(workspace) : LlmBudgetDecision.ALLOWED;
+        LlmBudgetDecision decision = isCurrentMonth ? llmBudgetService.decide(workspaceId) : LlmBudgetDecision.ALLOWED;
         return new WorkspaceLlmUsageReportDTO(
             month.toString(),
             instanceBudget,
@@ -139,7 +136,7 @@ public class LlmUsageService {
     }
 
     /**
-     * Set or clear this workspace's own monthly cap on its own-provider spend (#1368).
+     * Set or clear this workspace's own monthly cap on its own-provider spend.
      *
      * <p>The workspace-side mirror of {@code LlmUsageAdminService#updateBudget}: same instrument,
      * same audit trail, different purse. A workspace admin owns this one because it governs money the
@@ -151,8 +148,11 @@ public class LlmUsageService {
      */
     @Transactional
     public void updateOwnProviderBudget(Long workspaceId, @Nullable BigDecimal monthlyBudgetUsd) {
+        // Locked read — see LlmUsageAdminService#updateBudget: the two caps share one workspace row,
+        // and Hibernate's all-columns UPDATE would otherwise let this write revert the instance
+        // admin's cap (or be reverted by it).
         Workspace workspace = workspaceRepository
-            .findById(workspaceId)
+            .findByIdForUpdate(workspaceId)
             .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
         BigDecimal before = workspace.getMonthlyByoLlmBudgetUsd();
         workspace.setMonthlyByoLlmBudgetUsd(monthlyBudgetUsd);

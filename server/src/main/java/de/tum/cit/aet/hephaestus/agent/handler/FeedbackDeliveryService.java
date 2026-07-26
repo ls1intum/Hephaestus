@@ -499,7 +499,7 @@ class FeedbackDeliveryService {
 
     static String formatPracticeNote(String sanitizedBody, AgentJob job) {
         var sb = new StringBuilder(sanitizedBody.length() + 512);
-        // #1368 fix wave, finding #4: the canonical marker helper — shared with
+        // the canonical marker helper — shared with
         // PullRequestCommentPoster#findExistingSummaryComment's dedup lookup so a delivery-recovery
         // retry's marker scan can actually match what this method just posted. See
         // PullRequestCommentPoster#SUMMARY_MARKER_PREFIX's javadoc for the incident this fixes.

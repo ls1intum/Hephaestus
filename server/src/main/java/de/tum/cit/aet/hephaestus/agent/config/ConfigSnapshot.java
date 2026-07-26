@@ -68,7 +68,7 @@ public record ConfigSnapshot(
      * thanks to {@code @JsonIgnoreProperties(ignoreUnknown = true)} on read and Jackson's
      * default null-fill on missing fields — those do NOT need a bump.
      *
-     * <p>v4 (#1368 slice 5) replaced {@code llmProvider}/{@code credentialMode}/{@code llmBaseUrl}/
+     * <p>v4 replaced {@code llmProvider}/{@code credentialMode}/{@code llmBaseUrl}/
      * {@code modelName} with the resolver's non-secret behaviour shape + a connection reference — a
      * genuine reshape, not an additive change, so {@link #fromJson} translates v1-v3 payloads
      * explicitly instead of relying on Jackson's default-null fill (see {@link #fromLegacyJson}).

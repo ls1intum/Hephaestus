@@ -9,7 +9,6 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
-import de.tum.cit.aet.hephaestus.agent.catalog.ModelVisibility;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
@@ -18,6 +17,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobService;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -27,6 +27,7 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
@@ -138,6 +139,19 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         transactionTemplate.executeWithoutResult(status -> recorder.recordUnverifiable(workspaceId, sample));
     }
 
+    /**
+     * The individual rows one workspace owns. Production never reads the ledger row by row — every
+     * caller goes through one of the aggregates — so the filter lives here rather than as a finder
+     * on the repository.
+     */
+    private List<LlmUsageEvent> eventsOf(Workspace workspace) {
+        return usageRepository
+            .findAll()
+            .stream()
+            .filter(event -> workspace.getId().equals(event.getWorkspace().getId()))
+            .toList();
+    }
+
     private LlmPriceSnapshot pricedInstance(String perMInput, String perMOutput) {
         return new LlmPriceSnapshot(
             FundingSource.INSTANCE,
@@ -186,22 +200,8 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     private LlmModel instanceModel(String slug) {
-        LlmConnection connection = new LlmConnection();
-        connection.setSlug(slug + "-conn");
-        connection.setDisplayName("Ledger " + slug);
-        connection.setBaseUrl("https://api.openai.example/v1");
-        connection.setApiProtocol("openai-completions");
-        connection.setEnabled(true);
-        connection = llmConnectionRepository.save(connection);
-
-        LlmModel model = new LlmModel();
-        model.setConnection(connection);
-        model.setSlug(slug + "-model");
-        model.setDisplayName("Ledger model " + slug);
-        model.setUpstreamModelId("gpt-ledger");
-        model.setVisibility(ModelVisibility.PUBLIC);
-        model.setEnabled(true);
-        return llmModelRepository.save(model);
+        LlmConnection connection = llmConnectionRepository.save(LlmCatalogTestFixtures.connection(slug + "-conn"));
+        return llmModelRepository.save(LlmCatalogTestFixtures.model(connection, slug + "-model", "gpt-ledger"));
     }
 
     /** A QUEUED job whose availability was pushed out, with the given hold reason. */
@@ -221,6 +221,8 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Test
     void recordAppendsOneLedgerRowUsingTheAdmissionPriceSnapshot() {
         Workspace workspace = setupWorkspace("ledger-instance-priced");
+        workspace.setMonthlyLlmBudgetUsd(new BigDecimal("100.00"));
+        workspaceRepository.save(workspace);
         UUID sourceId = UUID.randomUUID();
 
         record(
@@ -237,7 +239,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
             )
         );
 
-        var events = usageRepository.findByWorkspaceId(workspace.getId());
+        var events = eventsOf(workspace);
         assertThat(events).hasSize(1);
         var event = events.getFirst();
         assertThat(event.getSourceId()).isEqualTo(sourceId);
@@ -247,7 +249,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(event.getPricingState()).isEqualTo(PricingState.PRICED);
         assertThat(event.getFundingSource()).isEqualTo(FundingSource.INSTANCE);
         assertThat(event.getAppliedPriceId()).isEqualTo(42L);
-        assertThat(budgetService.monthToDateCost(workspace.getId())).isEqualByComparingTo("12.00");
+        assertThat(budgetService.headroom(workspace.getId()).instanceSpentUsd()).isEqualByComparingTo("12.00");
     }
 
     @Test
@@ -281,11 +283,11 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
             )
         );
 
-        var event = usageRepository.findByWorkspaceId(workspace.getId()).getFirst();
+        var event = eventsOf(workspace).getFirst();
         assertThat(event.getPricingState()).isEqualTo(PricingState.NO_CHARGE);
         assertThat(event.getCostUsd()).isEqualByComparingTo("0");
-        assertThat(budgetService.monthToDateCost(workspace.getId())).isEqualByComparingTo("0");
-        assertThat(budgetService.isBudgetExhausted(workspace.getId())).isFalse();
+        assertThat(budgetService.headroom(workspace.getId()).instanceSpentUsd()).isEqualByComparingTo("0");
+        assertThat(budgetService.decide(workspace.getId()).blocks(FundingSource.INSTANCE)).isFalse();
         assertThat(meterRegistry.counter("llm.budget.exhausted").count()).isEqualTo(before);
     }
 
@@ -319,12 +321,12 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
             )
         );
 
-        var event = usageRepository.findByWorkspaceId(workspace.getId()).getFirst();
+        var event = eventsOf(workspace).getFirst();
         assertThat(event.getCostUsd()).isEqualByComparingTo("200.00");
         assertThat(event.getFundingSource()).isEqualTo(FundingSource.WORKSPACE);
         assertThat(event.getAppliedWorkspaceModelId()).isEqualTo(84L);
-        assertThat(budgetService.monthToDateCost(workspace.getId())).isEqualByComparingTo("0");
-        assertThat(budgetService.isBudgetExhausted(workspace.getId())).isFalse();
+        assertThat(budgetService.headroom(workspace.getId()).instanceSpentUsd()).isEqualByComparingTo("0");
+        assertThat(budgetService.decide(workspace.getId()).blocks(FundingSource.INSTANCE)).isFalse();
     }
 
     @Test
@@ -337,9 +339,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         record(workspace.getId(), agentSample(sourceId, 0, 1000, price));
         record(workspace.getId(), agentSample(sourceId, 1, 1000, price));
 
-        assertThat(usageRepository.findByWorkspaceId(workspace.getId()))
-            .extracting(LlmUsageEvent::getSourceAttempt)
-            .containsExactlyInAnyOrder(0, 1);
+        assertThat(eventsOf(workspace)).extracting(LlmUsageEvent::getSourceAttempt).containsExactlyInAnyOrder(0, 1);
     }
 
     @Test
@@ -355,7 +355,9 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         record(workspace.getId(), agentSample(UUID.randomUUID(), 0, 1000, price));
 
         assertThat(meterRegistry.counter("llm.budget.exhausted").count()).isEqualTo(before + 1);
-        assertThat(budgetService.isBudgetExhausted(workspace.getId())).isTrue();
+        assertThat(budgetService.decide(workspace.getId()).forFunding(FundingSource.INSTANCE)).isEqualTo(
+            LlmBudgetBlockReason.EXHAUSTED
+        );
     }
 
     @Test
@@ -375,7 +377,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     /**
-     * #1368: an exhausted shared-model budget is the host's problem, not the workspace's. Detection
+     * an exhausted shared-model budget is the host's problem, not the workspace's. Detection
      * bound to the workspace's own provider is a different purse and keeps running — it is refused
      * only later, for lack of a resolvable model in this fixture, never by the host's cap.
      */
@@ -389,10 +391,16 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         double instanceBlockedBefore = blockedCount("instance");
         double byoBlockedBefore = blockedCount("byo");
 
-        // Past the gate the fixture has no reviewable subject, so submission fails downstream — that
-        // is exactly the point: it got past the gate rather than being refused by the host's cap.
-        catchThrowable(() -> agentJobService.submit(workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, null));
+        Throwable thrown = catchThrowable(() ->
+            agentJobService.submit(workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, null)
+        );
 
+        // A budget refusal is a QUIET return of Optional.empty(), never a throw. So a non-null
+        // throwable is the proof that execution reached past the gate — the fixture then has no
+        // reviewable subject and fails downstream, which is a different failure entirely. Without this
+        // assertion the test would still pass if the host's cap HAD refused the submission.
+        assertThat(thrown).as("submission ran past the budget gate and failed downstream instead").isNotNull();
+        assertThat(thrown).isNotInstanceOf(LlmBudgetExhaustedException.class);
         assertThat(blockedCount("instance")).isEqualTo(instanceBlockedBefore);
         assertThat(blockedCount("byo")).isEqualTo(byoBlockedBefore);
     }
@@ -422,8 +430,14 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         double instanceBlockedBefore = blockedCount("instance");
         double byoBlockedBefore = blockedCount("byo");
 
-        catchThrowable(() -> agentJobService.submit(workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, null));
+        Throwable thrown = catchThrowable(() ->
+            agentJobService.submit(workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, null)
+        );
 
+        // As above: a throw means the gate let this through. A zero BYO cap that reached across would
+        // instead have returned Optional.empty() with no throwable at all.
+        assertThat(thrown).as("the workspace's own cap did not pause shared-model work").isNotNull();
+        assertThat(thrown).isNotInstanceOf(LlmBudgetExhaustedException.class);
         assertThat(blockedCount("instance")).isEqualTo(instanceBlockedBefore);
         assertThat(blockedCount("byo")).isEqualTo(byoBlockedBefore);
     }
@@ -442,7 +456,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         // An unpriced INSTANCE-funded event: it makes the host's month unverifiable, nothing more.
         recordUnverifiable(workspace.getId(), agentSample(UUID.randomUUID(), 0, 1000, pricedInstance("3.00", "9.00")));
 
-        LlmBudgetDecision decision = budgetService.decide(workspace);
+        LlmBudgetDecision decision = budgetService.decide(workspace.getId());
 
         assertThat(decision.instanceFunded()).isEqualTo(LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED);
         assertThat(decision.workspaceFunded()).isEqualTo(LlmBudgetBlockReason.NONE);
@@ -456,7 +470,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         workspaceRepository.save(workspace);
         recordUnverifiable(workspace.getId(), agentSample(UUID.randomUUID(), 0, 1000, workspacePriced("3.00", "9.00")));
 
-        LlmBudgetDecision decision = budgetService.decide(workspace);
+        LlmBudgetDecision decision = budgetService.decide(workspace.getId());
 
         assertThat(decision.instanceFunded()).isEqualTo(LlmBudgetBlockReason.NONE);
         assertThat(decision.workspaceFunded()).isEqualTo(LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED);
@@ -469,7 +483,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         recordUnverifiable(workspace.getId(), agentSample(UUID.randomUUID(), 3, 0, pricedInstance("3.00", "9.00")));
 
-        var event = usageRepository.findByWorkspaceId(workspace.getId()).getFirst();
+        var event = eventsOf(workspace).getFirst();
         assertThat(event.getCostUsd()).isNull();
         assertThat(event.getPricingState()).isEqualTo(PricingState.UNPRICED);
         assertThat(event.getSourceAttempt()).isEqualTo(3);
@@ -505,12 +519,15 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(hasUnpriced).isTrue();
         assertThat(
             LlmBudgetService.verdictFor(
-                budgetService.monthToDateCost(workspace.getId()),
+                budgetService.headroom(workspace.getId()).instanceSpentUsd(),
                 hasUnpriced,
                 workspace.getMonthlyLlmBudgetUsd()
             )
         ).isEqualTo(LlmBudgetVerdict.UNVERIFIABLE);
-        assertThat(budgetService.isBudgetExhausted(workspace.getId())).isFalse();
+        // Blocked because the month cannot be verified, NOT because confirmed spend reached the cap.
+        assertThat(budgetService.decide(workspace.getId()).forFunding(FundingSource.INSTANCE)).isEqualTo(
+            LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED
+        );
     }
 
     @Test
@@ -524,13 +541,13 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     /**
-     * #1368: raising or clearing either cap releases exactly the jobs the claim loop parked on that
+     * raising or clearing either cap releases exactly the jobs the claim loop parked on that
      * cap, so the flagship self-serve action ("I raised my cap") takes effect on the next poll rather
      * than up to an hour later. Its precision is the point — it must not fast-forward a crash-retry
      * backoff, which is a different kind of future {@code available_at} entirely.
      */
     @Nested
-    @DisplayName("Raising a cap releases the jobs it held (#1368)")
+    @DisplayName("Raising a cap releases the jobs it held")
     class BudgetHoldRelease {
 
         @Test

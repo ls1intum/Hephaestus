@@ -278,7 +278,7 @@ public class GithubFeedbackChannel implements FeedbackChannel {
     private static final int EXISTING_SUMMARY_SEARCH_PAGE_SIZE = 100;
 
     /**
-     * Bounded page budget for {@link #findExistingSummary} (#1368 fix wave, finding #6): 3 pages of
+     * Bounded page budget for {@link #findExistingSummary}: 3 pages of
      * {@link #EXISTING_SUMMARY_SEARCH_PAGE_SIZE} (300 comments) covers the overwhelming majority of
      * PRs/issues this bot comments on without an unbounded scan; beyond that, {@code UNKNOWN} is the
      * correct (conservative) answer rather than guessing absence.

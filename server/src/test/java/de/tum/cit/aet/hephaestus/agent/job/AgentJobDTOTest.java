@@ -6,21 +6,45 @@ import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
+import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * {@link AgentJobDTO#from}'s base-URL redaction (#1368 fix wave): a workspace admin must never see the
- * full path/query of a base URL they don't own end-to-end — that previously covered only
- * {@code connectionScope=INSTANCE}, leaving a legacy (pre-catalog, {@code connectionScope=null})
- * config's {@code llmBaseUrl} to echo verbatim even though it is exactly as operator-sensitive.
+ * A workspace admin must never see the full path/query of a base URL they do not own end-to-end. A
+ * legacy (pre-catalog, {@code connectionScope=null}) config is exactly as operator-sensitive as an
+ * INSTANCE one, so it redacts too.
  */
 class AgentJobDTOTest extends BaseUnitTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final String FULL_URL = "https://gateway.example.com/v1/openai?tenant=secret-project";
+    private static final String REDACTED_URL = "https://gateway.example.com";
+
+    static Stream<Arguments> scopes() {
+        return Stream.of(
+            Arguments.of(FundingSource.INSTANCE, REDACTED_URL, "an instance connection is redacted"),
+            Arguments.of(null, REDACTED_URL, "a legacy null-scope config is redacted too"),
+            Arguments.of(FundingSource.WORKSPACE, FULL_URL, "a BYO connection is the workspace's own config")
+        );
+    }
+
+    @ParameterizedTest(name = "{2}")
+    @MethodSource("scopes")
+    void redactsBaseUrlUnlessTheWorkspaceOwnsTheConnection(
+        @Nullable FundingSource scope,
+        String expectedBaseUrl,
+        String why
+    ) {
+        AgentJobDTO dto = AgentJobDTO.from(jobWithSnapshot(snapshotWithScope(scope)));
+
+        ObjectNode snapshot = (ObjectNode) dto.configSnapshot();
+        assertThat(snapshot.path("baseUrl").asString()).as(why).isEqualTo(expectedBaseUrl);
+    }
 
     private static AgentJob jobWithSnapshot(ConfigSnapshot snapshot) {
         AgentJob job = new AgentJob();
@@ -31,11 +55,11 @@ class AgentJobDTOTest extends BaseUnitTest {
         return job;
     }
 
-    private static ConfigSnapshot snapshotWithScope(FundingSource scope) {
+    private static ConfigSnapshot snapshotWithScope(@Nullable FundingSource scope) {
         return new ConfigSnapshot(
             ConfigSnapshot.SCHEMA_VERSION,
             "openai-completions",
-            "https://gateway.example.com/v1/openai?tenant=secret-project",
+            FULL_URL,
             "gpt-5",
             null,
             null,
@@ -49,41 +73,5 @@ class AgentJobDTOTest extends BaseUnitTest {
             false,
             null
         );
-    }
-
-    @Nested
-    class Redaction {
-
-        @Test
-        @DisplayName("an INSTANCE-scoped connection's baseUrl is reduced to scheme://host")
-        void redactsInstanceScoped() {
-            AgentJobDTO dto = AgentJobDTO.from(jobWithSnapshot(snapshotWithScope(FundingSource.INSTANCE)));
-
-            ObjectNode snapshot = (ObjectNode) dto.configSnapshot();
-            assertThat(snapshot.path("baseUrl").asString()).isEqualTo("https://gateway.example.com");
-        }
-
-        @Test
-        @DisplayName(
-            "#1368 fix wave: a legacy (connectionScope=null) config's baseUrl is ALSO reduced to " +
-                "scheme://host — it is operator-sensitive routing detail exactly like an INSTANCE connection's"
-        )
-        void redactsLegacyNullScope() {
-            AgentJobDTO dto = AgentJobDTO.from(jobWithSnapshot(snapshotWithScope(null)));
-
-            ObjectNode snapshot = (ObjectNode) dto.configSnapshot();
-            assertThat(snapshot.path("baseUrl").asString()).isEqualTo("https://gateway.example.com");
-        }
-
-        @Test
-        @DisplayName("a WORKSPACE-scoped (BYO) connection's baseUrl is left intact — it's the workspace's own config")
-        void leavesWorkspaceScopedIntact() {
-            AgentJobDTO dto = AgentJobDTO.from(jobWithSnapshot(snapshotWithScope(FundingSource.WORKSPACE)));
-
-            ObjectNode snapshot = (ObjectNode) dto.configSnapshot();
-            assertThat(snapshot.path("baseUrl").asString()).isEqualTo(
-                "https://gateway.example.com/v1/openai?tenant=secret-project"
-            );
-        }
     }
 }

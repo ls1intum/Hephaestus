@@ -81,7 +81,7 @@ public final class TranslatorState {
 
     /**
      * Which connection funds this turn's LLM calls, frozen at turn start from the resolved
-     * {@code MentorLlmConfig} (#1368 slice 6) — mirrors {@code ConfigSnapshot.connectionScope}/
+     * {@code MentorLlmConfig} — mirrors {@code ConfigSnapshot.connectionScope}/
      * {@code connectionId} for detection jobs. Read by {@code MentorTurnPersistence} to resolve the
      * ledger's server-side cost for the same catalog binding the turn actually used. Both null means
      * a legacy, pre-catalog config. Set once via {@link #bindConnection} right after construction —

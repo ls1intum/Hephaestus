@@ -21,16 +21,10 @@ import org.springframework.stereotype.Component;
  * Keeps {@code fx_rate} current: one ECB fetch a day, plus a catch-up fetch at boot when nothing
  * usable is stored.
  *
- * <p><b>Server role only.</b> {@link ConditionalOnServerRole} keeps this bean — and with it the only
- * outbound dependency this feature has — off the worker and webhook tiers. Those pods deploy with
- * {@code hephaestus.runtime.server.enabled=false}; an ungated bean here would hand them an egress
- * dependency they have no business having (and previously crash-looped them). {@link SchedulerLock}
- * then stops two server replicas from both fetching.
- *
- * <p><b>Nothing here can fail a tick.</b> {@link EcbFxRateClient} never throws, an unchanged rate is
- * a no-op, and a lost race on the daily unique row is swallowed. The worst outcome of a broken fetch
- * is that rates go stale — at which point {@link FxRateLookup} stops converting altogether rather
- * than showing a drifting number.
+ * <p>{@link ConditionalOnServerRole} keeps this bean — and with it the only outbound dependency this
+ * feature has — off the worker and webhook tiers, which would otherwise crash-loop on an egress
+ * dependency they have no business having. {@link SchedulerLock} then stops two server replicas from
+ * both fetching.
  */
 @ConditionalOnServerRole
 @Component
@@ -57,10 +51,9 @@ public class FxRateFetchScheduler {
     }
 
     /**
-     * The ECB publishes its daily reference rates at around 16:00 CET on TARGET working days; 16:30
-     * leaves headroom for a late publication without waiting a whole day. Weekends are skipped
-     * because nothing is published then — TARGET holidays simply produce a no-op fetch (the document
-     * still carries the previous working day) well inside the staleness window.
+     * The ECB publishes at around 16:00 CET on TARGET working days; 16:30 leaves headroom for a late
+     * publication without waiting a whole day. A TARGET holiday produces a no-op fetch, well inside the
+     * staleness window.
      */
     @Scheduled(cron = "0 30 16 * * MON-FRI", zone = "Europe/Berlin")
     @SchedulerLock(name = "fx-rate-fetch", lockAtMostFor = "PT5M", lockAtLeastFor = "PT30S")
@@ -69,17 +62,25 @@ public class FxRateFetchScheduler {
     }
 
     /**
-     * Catch-up fetch at boot when no usable rate is stored — the first start after an operator sets
-     * {@code hephaestus.llm.display-currency}, and equally an instance coming back from an outage
-     * long enough to have gone stale. Skipped entirely when the display currency is unset, so the
-     * default configuration makes no outbound request at all.
+     * Covers the first start after an operator sets {@code hephaestus.llm.display-currency}, and an
+     * instance returning from an outage long enough to have gone stale. Makes no outbound request at
+     * all under the default configuration.
+     *
+     * <p><b>Cannot fail the boot.</b> An exception thrown from an {@link ApplicationReadyEvent}
+     * listener aborts {@code SpringApplication.run}, so without this guard an unreachable database or
+     * an ECB outage at the wrong moment would crash-loop the server — over a number that is only ever
+     * shown beside the USD one. The next scheduled fetch retries; until then the UI simply shows USD.
      */
     @EventListener(ApplicationReadyEvent.class)
     public void fetchOnStartupIfMissing() {
-        if (!fxRateLookup.isEnabled() || fxRateLookup.latest().isPresent()) {
-            return;
+        try {
+            if (!fxRateLookup.isEnabled() || fxRateLookup.latest().isPresent()) {
+                return;
+            }
+            fetchIfEnabled("bootstrap");
+        } catch (RuntimeException e) {
+            log.warn("fx: bootstrap rate fetch failed — display currency stays unavailable until the daily fetch", e);
         }
-        fetchIfEnabled("bootstrap");
     }
 
     private void fetchIfEnabled(String trigger) {
@@ -88,16 +89,16 @@ public class FxRateFetchScheduler {
         }
         Optional<EcbDailyRate> fetched = client.fetchLatestUsdRate();
         if (fetched.isEmpty()) {
-            // Already warned by the client; the previously stored rate stays untouched.
+            // Already warned by the client; the stored rate stays untouched.
             return;
         }
         store(fetched.get(), trigger);
     }
 
     /**
-     * Deliberately untransacted: the read and the write are two independent statements, each already
-     * atomic on its own, and the daily unique index is the real arbiter of a two-replica race. An
-     * enclosing transaction here would only widen the window while an HTTP fetch is in flight.
+     * Deliberately untransacted: each statement is atomic on its own and the daily unique index is the
+     * real arbiter of a two-replica race, so an enclosing transaction would only hold a connection open
+     * across an HTTP fetch.
      */
     void store(EcbDailyRate rate, String trigger) {
         LocalDate today = LocalDate.now(clock.withZone(ZoneOffset.UTC));
@@ -115,7 +116,7 @@ public class FxRateFetchScheduler {
         try {
             fxRateRepository.save(row);
         } catch (DataIntegrityViolationException e) {
-            // Another replica inserted the same day between our read and our write. Its row is
+            // Another replica inserted the same day between our read and our write; its row is
             // identical to ours, so there is nothing to reconcile.
             log.debug("fx: concurrent insert for {} — keeping the row that won", rate.date());
             return;

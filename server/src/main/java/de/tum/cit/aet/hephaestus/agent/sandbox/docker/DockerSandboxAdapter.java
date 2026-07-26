@@ -382,7 +382,7 @@ public class DockerSandboxAdapter implements SandboxManager {
                 }
                 env.put("LLM_PROXY_URL", proxyUrl);
             } else if (appServerIp != null) {
-                // Unified proxy route (#1368 slice 5): no per-provider path segment — the proxy
+                // Unified proxy route: no per-provider path segment — the proxy
                 // identifies the connection from the authenticated job token, not the URL.
                 env.put(
                     "LLM_PROXY_URL",

@@ -16,7 +16,7 @@ public interface LlmModelRepository extends JpaRepository<LlmModel, Long> {
     Optional<LlmModel> findByConnectionIdAndSlug(Long connectionId, String slug);
 
     /**
-     * Ledger price-resolution lookup (#1368 slice 6): the catalog entry a job's frozen
+     * Ledger price-resolution lookup: the catalog entry a job's frozen
      * {@code (connectionId, upstreamModelId)} pair resolves to. Returns a {@link List} rather than
      * {@link Optional} because {@code upstream_model_id} carries no uniqueness constraint — an admin
      * may register two catalog entries pointing at the same upstream id (different slugs/capabilities).
@@ -24,10 +24,10 @@ public interface LlmModelRepository extends JpaRepository<LlmModel, Long> {
      */
     List<LlmModel> findByConnectionIdAndUpstreamModelId(Long connectionId, String upstreamModelId);
 
-    /** Create-path conflict guard for {@code ux_llm_model_connection_upstream} (#1368). */
+    /** Create-path conflict guard for {@code ux_llm_model_connection_upstream}. */
     boolean existsByConnectionIdAndUpstreamModelId(Long connectionId, String upstreamModelId);
 
-    /** Update-path conflict guard: same uniqueness, excluding the row being updated (#1368). */
+    /** Update-path conflict guard: same uniqueness, excluding the row being updated. */
     boolean existsByConnectionIdAndUpstreamModelIdAndIdNot(Long connectionId, String upstreamModelId, Long id);
 
     boolean existsByConnectionId(Long connectionId);

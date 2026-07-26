@@ -94,7 +94,7 @@ class LlmModelResolverTest extends BaseUnitTest {
 
     @Test
     void shouldRejectCatalogSnapshotWithoutModelIdentity() {
-        var ref = new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 10L);
+        var ref = new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 10L, null, null);
         assertThat(resolver.resolveProxyCredential(ref)).isNull();
     }
 
@@ -143,6 +143,6 @@ class LlmModelResolverTest extends BaseUnitTest {
 
     @Test
     void shouldNotResolveLegacyProxyCredential() {
-        assertThat(resolver.resolveProxyCredential(new LlmModelResolver.ConnectionRef(null, null))).isNull();
+        assertThat(resolver.resolveProxyCredential(LlmModelResolver.ConnectionRef.NONE)).isNull();
     }
 }

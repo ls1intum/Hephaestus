@@ -200,7 +200,7 @@ public class PiRuntimeFactory {
 
     /**
      * Sandbox-layer fills in {@code llmProxyUrl} during PREPARE; this only emits the policy shape.
-     * Proxy is now the ONLY mode (#1368 slice 5) — no per-config branching.
+     * Proxy is now the ONLY mode — no per-config branching.
      */
     static NetworkPolicy buildNetworkPolicy(String jobToken, boolean allowInternet) {
         return new NetworkPolicy(allowInternet, null, jobToken);

@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.spi;
 
 /**
- * Cross-module port: record instance LLM governance settings changes on the auth-event trail (#1368).
+ * Cross-module port: record instance LLM governance settings changes on the auth-event trail.
  * Same reasoning as {@link LlmConnectionAudit} (GLOBAL, {@code config_audit_event.workspace_id} is NOT
  * NULL).
  *

@@ -5,7 +5,7 @@ import org.springframework.security.authentication.AbstractAuthenticationToken;
 
 /**
  * Authentication token representing a validated proxy-scoped bearer token — either an
- * {@code AgentJob}'s job token or a mentor session's registry-minted token (#1368 slice 5).
+ * {@code AgentJob}'s job token or a mentor session's registry-minted token.
  *
  * <p>Set on the {@link org.springframework.security.core.context.SecurityContext} by
  * {@link JobTokenAuthenticationFilter} after successful token validation. The resolved

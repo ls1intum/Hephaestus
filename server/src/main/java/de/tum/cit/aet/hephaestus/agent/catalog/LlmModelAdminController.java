@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
 import de.tum.cit.aet.hephaestus.core.Audited;
-import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -27,14 +26,19 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /**
- * Instance-admin management of the LLM catalog model list (#1368): CRUD plus pricing and sharing.
+ * Instance-admin management of the LLM catalog model list: CRUD plus pricing and sharing.
  * GLOBAL — gated by {@code app_admin}, not workspace context.
+ *
+ * <p>No {@code @WorkspaceAgnostic} here. A class-level tenancy bypass on a controller opens for every
+ * statement any handler reaches, including future ones; the bypass belongs on the repository query
+ * that is genuinely cross-tenant — here {@code WorkspaceAgentBindingRepository#existsByInstanceModelId}
+ * (the delete-time in-use check) and the grant-allowlist finders — where a reviewer can see exactly
+ * what it excuses.
  */
 @RestController
 @RequestMapping("/admin/llm")
 @Tag(name = "Admin LLM", description = "Instance-admin LLM connection and settings management")
 @PreAuthorize("hasAuthority('app_admin')")
-@WorkspaceAgnostic("Instance-admin LLM model catalog; authorized by app_admin, not workspace context")
 @ConditionalOnServerRole
 @RequiredArgsConstructor
 @Validated

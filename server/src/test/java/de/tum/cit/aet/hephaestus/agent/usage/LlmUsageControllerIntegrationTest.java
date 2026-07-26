@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.agent.usage;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageDTOs.WorkspaceLlmUsageReportDTO;
 import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRate;
 import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateRepository;
 import de.tum.cit.aet.hephaestus.core.audit.ConfigAuditEvent;
@@ -27,8 +26,11 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
@@ -37,6 +39,11 @@ import org.springframework.test.web.reactive.server.WebTestClient;
  * member is 403'd.
  */
 @Tag("integration")
+// Pins the unconfigured half of the display-currency feature, mirroring
+// LlmUsageFxDisplayIntegrationTest's EUR. Stated rather than inherited: application.yml imports an
+// optional local .env, so a developer who sets HEPHAESTUS_LLM_DISPLAY_CURRENCY would otherwise fail
+// a test that is supposed to be about the property being unset.
+@TestPropertySource(properties = "hephaestus.llm.display-currency=")
 class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
@@ -76,7 +83,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         event.setOutputTokens(20);
         event.setTotalCalls(2);
         event.setCostUsd(new BigDecimal(cost));
-        // Budgeted spend only counts PRICED + INSTANCE-funded rows (#1368 slice 6) — both are the
+        // Budgeted spend only counts PRICED + INSTANCE-funded rows — both are the
         // entity defaults, but set them explicitly so this fixture keeps meaning that if the
         // defaults ever change.
         event.setPricingState(PricingState.PRICED);
@@ -139,7 +146,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     @WithAdminUser
     void byJobTypeAndByDaySplitPricedByoAndUnpricedSeparately() {
         // One job type, one day, mixing all three so a blind SUM(cost_usd) would either merge BYO
-        // into the budgeted figure or silently drop the unpriced event's visibility (#1368 slice 6).
+        // into the budgeted figure or silently drop the unpriced event's visibility.
         Workspace workspace = setupWorkspaceWithAdmin("usage-breakdown");
         seedEvent(workspace, LlmUsageJobType.PULL_REQUEST_REVIEW, "2.00", CURRENT, 5);
         seedByoEvent(workspace, LlmUsageJobType.PULL_REQUEST_REVIEW, "50.00", CURRENT, 5);
@@ -249,7 +256,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     }
 
     /**
-     * #1368: {@code instancePaused} is the webapp's only reliable signal that new shared-model
+     * {@code instancePaused} is the webapp's only reliable signal that new shared-model
      * work is currently paused. An unverifiable month on a capped workspace pauses — a cap whose true
      * spend can't be confirmed is treated as reached.
      */
@@ -276,7 +283,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     }
 
     /**
-     * #1368: the report carries both caps, judged separately. An exhausted own-provider cap pauses
+     * the report carries both caps, judged separately. An exhausted own-provider cap pauses
      * own-provider work only — the shared-model purse is a different person's money and stays open.
      */
     @Test
@@ -441,7 +448,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     }
 
     /**
-     * {@code PUT /workspaces/{slug}/llm/budget} (#1368) — the workspace admin's own cap on
+     * {@code PUT /workspaces/{slug}/llm/budget} — the workspace admin's own cap on
      * the money the workspace itself pays. It is the exact mirror of the instance admin's cap, with
      * the ownership boundary the whole two-purse design rests on: setting it can only restrict the
      * workspace's own spending, and it grants no reach whatsoever over the shared-model budget.
@@ -525,63 +532,24 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         assertThat(row.getNewValue()).contains("12.5");
     }
 
-    @Test
+    @ParameterizedTest(name = "monthlyBudgetUsd={0} ({1})")
+    @CsvSource({ "1.234, more than two decimals", "-1.00, negative" })
     @WithAdminUser
-    void anOwnProviderCapWithMoreThanTwoDecimalsIsRejectedWith400() {
-        Workspace workspace = setupWorkspaceWithAdmin("own-provider-budget-precision");
+    void anUnusableOwnProviderCapIsRejectedWith400(String cap, String why) {
+        Workspace workspace = setupWorkspaceWithAdmin("own-provider-budget-" + why.replace(' ', '-'));
 
         webTestClient
             .put()
             .uri("/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("monthlyBudgetUsd", "1.234"))
+            .bodyValue(Map.of("monthlyBudgetUsd", cap))
             .exchange()
             .expectStatus()
             .isBadRequest();
-        assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getMonthlyByoLlmBudgetUsd()).isNull();
-    }
-
-    @Test
-    @WithAdminUser
-    void aNegativeOwnProviderCapIsRejectedWith400() {
-        Workspace workspace = setupWorkspaceWithAdmin("own-provider-budget-negative");
-
-        webTestClient
-            .put()
-            .uri("/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("monthlyBudgetUsd", "-1.00"))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
-        assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getMonthlyByoLlmBudgetUsd()).isNull();
-    }
-
-    @Test
-    @WithMentorUser
-    void aPlainMemberCannotSetTheOwnProviderCap() {
-        User owner = persistUser("own-provider-budget-member-owner");
-        Workspace workspace = createWorkspace(
-            "own-provider-budget-member",
-            "Byo budget member",
-            "own-provider-budget-member-org",
-            AccountType.ORG,
-            owner
-        );
-        ensureWorkspaceMembership(workspace, persistUser("mentor"), WorkspaceMembership.WorkspaceRole.MEMBER);
-
-        webTestClient
-            .put()
-            .uri("/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("monthlyBudgetUsd", "25.00"))
-            .exchange()
-            .expectStatus()
-            .isForbidden();
-        assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getMonthlyByoLlmBudgetUsd()).isNull();
+        assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getMonthlyByoLlmBudgetUsd())
+            .as(why)
+            .isNull();
     }
 
     @Test
@@ -646,7 +614,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     }
 
     /**
-     * Zero-regression guard for the display-currency feature (#1368). An instance that has not set
+     * Zero-regression guard for the display-currency feature. An instance that has not set
      * {@code hephaestus.llm.display-currency} — the default, and the overwhelming majority — must get
      * back exactly the response it got before the feature existed. The fixture stores a perfectly
      * fresh rate first, so the only thing that can be suppressing {@code fx} is the unset property.
@@ -679,6 +647,77 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         // Not even as an explicit null: the key is absent from the wire bytes.
         assertThat(new String(body, StandardCharsets.UTF_8)).doesNotContain("\"fx\"");
+    }
+
+    /**
+     * The money-mutating mirror of {@link #workspaceAdminCannotReadAnotherWorkspacesReport}. Being an
+     * admin somewhere is not being an admin here — and this is the write, so a gap would let one
+     * tenant lift or slam another tenant's spending cap. The cap is asserted untouched afterwards
+     * because a 403 with the row already written would be the worst of both.
+     */
+    @Test
+    @WithMentorUser
+    void workspaceAdminCannotSetAnotherWorkspacesCap() {
+        User admin = persistUser("mentor");
+        Workspace ownWorkspace = createWorkspace(
+            "budget-own-admin",
+            "Budget own admin",
+            "budget-own-admin-org",
+            AccountType.ORG,
+            admin
+        );
+        ensureWorkspaceMembership(ownWorkspace, admin, WorkspaceMembership.WorkspaceRole.ADMIN);
+        Workspace otherWorkspace = createWorkspace(
+            "budget-other-admin",
+            "Budget other admin",
+            "budget-other-admin-org",
+            AccountType.ORG,
+            persistUser("budget-other-admin-owner")
+        );
+        otherWorkspace.setMonthlyByoLlmBudgetUsd(new BigDecimal("5.00"));
+        workspaceRepository.save(otherWorkspace);
+
+        webTestClient
+            .put()
+            .uri("/workspaces/{slug}/llm/budget", otherWorkspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(Map.of("monthlyBudgetUsd", "999.00"))
+            .exchange()
+            .expectStatus()
+            .isForbidden();
+
+        assertThat(
+            workspaceRepository.findById(otherWorkspace.getId()).orElseThrow().getMonthlyByoLlmBudgetUsd()
+        ).isEqualByComparingTo("5.00");
+    }
+
+    /** A plain member of THIS workspace may not set its cap either — read access is not write access. */
+    @Test
+    @WithMentorUser
+    void plainMemberCannotSetTheOwnProviderCap() {
+        User owner = persistUser("budget-member-owner");
+        Workspace workspace = createWorkspace(
+            "budget-member",
+            "Budget member",
+            "budget-member-org",
+            AccountType.ORG,
+            owner
+        );
+        User member = persistUser("mentor");
+        ensureWorkspaceMembership(workspace, member, WorkspaceMembership.WorkspaceRole.MEMBER);
+
+        webTestClient
+            .put()
+            .uri("/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(Map.of("monthlyBudgetUsd", "1.00"))
+            .exchange()
+            .expectStatus()
+            .isForbidden();
+
+        assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getMonthlyByoLlmBudgetUsd()).isNull();
     }
 
     @Test

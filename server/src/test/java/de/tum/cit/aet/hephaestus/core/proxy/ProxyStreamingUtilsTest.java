@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -451,6 +452,80 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
             assertThat(idx2).isLessThan(idx3);
             assertThat(idx3).isLessThan(idx4);
             assertThat(idx4).isLessThan(idx5);
+        }
+    }
+
+    /**
+     * The tee an accounting caller hangs off the stream. Both properties below are the reason it is a
+     * tee and not a buffer: the client's bytes are unchanged and unheld, and the observer cannot break
+     * them.
+     */
+    @Nested
+    class StreamSseToResponseWithTap {
+
+        private final DefaultDataBufferFactory bufferFactory = new DefaultDataBufferFactory();
+
+        /**
+         * Kills "drop the {@code tap.accept(bytes)} call": the client still gets a perfect stream, so
+         * nothing else in the suite notices, and every streamed call silently goes unbilled — which is
+         * precisely the state this seam was added to end.
+         */
+        @Test
+        @DisplayName("the tap sees exactly the bytes the client received")
+        void tapObservesEveryChunkTheClientGets() throws IOException {
+            Flux<DataBuffer> dataFlux = Flux.just(
+                bufferFactory.wrap("data: one\n\n".getBytes(StandardCharsets.UTF_8)),
+                bufferFactory.wrap("data: two\n\n".getBytes(StandardCharsets.UTF_8))
+            );
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            StringBuilder tapped = new StringBuilder();
+
+            ProxyStreamingUtils.streamSseToResponse(dataFlux, new HttpHeaders(), response, 200, bytes ->
+                tapped.append(new String(bytes, StandardCharsets.UTF_8))
+            );
+
+            assertThat(tapped.toString()).isEqualTo(response.getContentAsString());
+            assertThat(tapped.toString()).isEqualTo("data: one\n\ndata: two\n\n");
+        }
+
+        /**
+         * Accounting is best-effort and never gets to fail a response. Kills "let the tap's exception
+         * propagate out of doOnNext": the second frame would never reach the client.
+         */
+        @Test
+        @DisplayName("a tap that throws does not interrupt the stream to the client")
+        void aThrowingTapCannotBreakTheStream() throws IOException {
+            Flux<DataBuffer> dataFlux = Flux.just(
+                bufferFactory.wrap("data: one\n\n".getBytes(StandardCharsets.UTF_8)),
+                bufferFactory.wrap("data: two\n\n".getBytes(StandardCharsets.UTF_8))
+            );
+            MockHttpServletResponse response = new MockHttpServletResponse();
+
+            ProxyStreamingUtils.streamSseToResponse(dataFlux, new HttpHeaders(), response, 200, bytes -> {
+                throw new IllegalStateException("bookkeeping blew up");
+            });
+
+            assertThat(response.getContentAsString()).isEqualTo("data: one\n\ndata: two\n\n");
+        }
+
+        /**
+         * A stream that dies part-way still hands over what it delivered, so the caller bills the calls
+         * it observed rather than nothing.
+         */
+        @Test
+        @DisplayName("the tap keeps what it saw when the stream errors mid-flight")
+        void tapKeepsWhatItSawBeforeAMidStreamError() {
+            Flux<DataBuffer> dataFlux = Flux.<DataBuffer>just(
+                bufferFactory.wrap("data: delivered\n\n".getBytes(StandardCharsets.UTF_8))
+            ).concatWith(Flux.error(new RuntimeException("upstream died")));
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            StringBuilder tapped = new StringBuilder();
+
+            ProxyStreamingUtils.streamSseToResponse(dataFlux, new HttpHeaders(), response, 200, bytes ->
+                tapped.append(new String(bytes, StandardCharsets.UTF_8))
+            );
+
+            assertThat(tapped.toString()).isEqualTo("data: delivered\n\n");
         }
     }
 }

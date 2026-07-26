@@ -20,7 +20,7 @@ import tools.jackson.databind.ObjectMapper;
  * Authenticates requests using proxy-scoped bearer tokens instead of JWTs.
  * The main chain for all other endpoints remains unchanged.
  *
- * <p><b>Gating (#1368 slice 5):</b> the LLM proxy is the only credential path for both queued jobs
+ * <p><b>Gating:</b> the LLM proxy is the only credential path for both queued jobs
  * and interactive mentor sandboxes. It therefore follows the worker/sandbox capability, not the
  * practice-job feature flag: disabling practice reviews must not break mentor turns.
  */

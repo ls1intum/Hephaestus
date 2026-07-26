@@ -417,11 +417,13 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             var delivery = new DeliveryContent("", List.of(note), List.of());
             service.deliverFeedback(job, delivery);
 
+            // The signal list is the payload the ledger bills provenance against; asserting it exactly
+            // is the point of the test, so it is named rather than matched with any().
             verify(feedbackLedgerRecorder).record(
                 eq(job),
                 eq(delivery),
                 eq(WorkArtifact.PULL_REQUEST),
-                any(),
+                eq(List.of(signal)),
                 eq(true)
             );
             verify(feedbackLedgerRecorder, never()).recordSuppressedUnit(any(), any(), any());
@@ -690,7 +692,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
         @Test
         @DisplayName(
-            "#1368 fix wave, finding #4: a body formatted via the real delivery path is found by the " +
+            "a body formatted via the real delivery path is found by the " +
                 "real dedup-lookup marker — regression test for the two-different-literals bug"
         )
         void formattedBodyIsFoundByTheDedupLookupMarker() {

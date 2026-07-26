@@ -95,17 +95,11 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(List.of(slackLink, gitLabLink));
         when(membershipQuery.membershipsForLogins(Set.of("ga84xah"))).thenReturn(
             List.of(
-                new AccountWorkspaceMembershipQuery.WorkspaceMembershipView(
-                    1L,
-                    "hephaestustest",
-                    "Hephaestus",
-                    "MEMBER",
-                    314L
-                )
+                new AccountWorkspaceMembershipQuery.WorkspaceMembershipView(1L, "acme", "Hephaestus", "MEMBER", 314L)
             )
         );
-        Connection visible = slackConnection(1L, "hephaestustest", "Hephaestus", "T1", "hephaestus-test");
-        Connection inaccessible = slackConnection(2L, "other", "Other", "T1", "hephaestus-test");
+        Connection visible = slackConnection(1L, "acme", "Hephaestus", "T1", "acme-slack");
+        Connection inaccessible = slackConnection(2L, "other", "Other", "T1", "acme-slack");
         when(
             connectionRepository.findAllByKindAndInstanceKeyInAndState(
                 IntegrationKind.SLACK,
@@ -123,10 +117,10 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
         assertThat(dto.workspaces())
             .singleElement()
             .satisfies(workspace -> {
-                assertThat(workspace.workspaceSlug()).isEqualTo("hephaestustest");
+                assertThat(workspace.workspaceSlug()).isEqualTo("acme");
                 assertThat(workspace.workspaceName()).isEqualTo("Hephaestus");
                 assertThat(workspace.slackTeamId()).isEqualTo("T1");
-                assertThat(workspace.slackTeamName()).isEqualTo("hephaestus-test");
+                assertThat(workspace.slackTeamName()).isEqualTo("acme-slack");
                 assertThat(workspace.slackDisplayName()).isEqualTo("Felix Slack");
                 assertThat(workspace.channelMessagesAllowed()).isFalse();
                 assertThat(workspace.activeMonitoredChannelCount()).isEqualTo(3L);
@@ -142,7 +136,7 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
                 IntegrationKind.SLACK,
                 IntegrationState.ACTIVE
             )
-        ).thenReturn(Optional.of(slackConnection(1L, "hephaestustest", "Hephaestus", "T1", "hephaestus-test")));
+        ).thenReturn(Optional.of(slackConnection(1L, "acme", "Hephaestus", "T1", "acme-slack")));
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(
             List.of(link(SLACK_PROVIDER_ID, "U1", "T1", "Felix Slack"))
         );
@@ -165,7 +159,7 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
                 IntegrationKind.SLACK,
                 IntegrationState.ACTIVE
             )
-        ).thenReturn(Optional.of(slackConnection(1L, "hephaestustest", "Hephaestus", "T1", "hephaestus-test")));
+        ).thenReturn(Optional.of(slackConnection(1L, "acme", "Hephaestus", "T1", "acme-slack")));
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(
             List.of(link(SLACK_PROVIDER_ID, "U1", "T1", "Felix Slack"))
         );
@@ -184,7 +178,7 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
                 IntegrationKind.SLACK,
                 IntegrationState.ACTIVE
             )
-        ).thenReturn(Optional.of(slackConnection(1L, "hephaestustest", "Hephaestus", "T1", "hephaestus-test")));
+        ).thenReturn(Optional.of(slackConnection(1L, "acme", "Hephaestus", "T1", "acme-slack")));
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(
             List.of(link(SLACK_PROVIDER_ID, "U2", "T2", "Other Slack"))
         );
@@ -215,7 +209,7 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
 
     private void givenWorkspaceSummary() {
         when(workspaceSummaryQuery.findById(1L)).thenReturn(
-            Optional.of(new WorkspaceSummaryQuery.WorkspaceSummary(1L, "hephaestustest", "Hephaestus"))
+            Optional.of(new WorkspaceSummaryQuery.WorkspaceSummary(1L, "acme", "Hephaestus"))
         );
     }
 

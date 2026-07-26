@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.agent.usage;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageDTOs.WorkspaceLlmUsageReportDTO;
 import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRate;
 import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -11,6 +10,7 @@ import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -47,6 +47,9 @@ class LlmUsageFxDisplayIntegrationTest extends AbstractWorkspaceIntegrationTest 
 
     @Autowired
     private FxRateRepository fxRateRepository;
+
+    @Autowired
+    private WorkspaceRepository workspaceRepository;
 
     private Workspace setupWorkspaceWithAdmin(String slug) {
         User owner = persistUser(slug + "-owner");
@@ -109,7 +112,7 @@ class LlmUsageFxDisplayIntegrationTest extends AbstractWorkspaceIntegrationTest 
     }
 
     /**
-     * The admin envelope's reason for existing (#1368). {@code month} and {@code fx} are facts about
+     * The admin envelope's reason for existing. {@code month} and {@code fx} are facts about
      * the REQUEST, not about any workspace in it: one month resolves to exactly one rate. With TWO
      * workspaces spending, they must therefore appear ONCE — on the envelope — and not be copied onto
      * every row, which is what forced a client to reach into {@code rows[0]} for a response-level fact.
@@ -138,6 +141,9 @@ class LlmUsageFxDisplayIntegrationTest extends AbstractWorkspaceIntegrationTest 
             .isEqualTo("EUR")
             .jsonPath("$.fx.rateDate")
             .isEqualTo(today.toString())
+            // The UI credits the ECB by name in its disclosure, so the claim has to be on the wire.
+            .jsonPath("$.fx.source")
+            .isEqualTo("ECB")
             .jsonPath("$.fx.ratePerUsd")
             .value(rate -> assertThat(new BigDecimal(rate.toString())).isEqualByComparingTo("0.878966"))
             .jsonPath("$.workspaces[0].fx")
@@ -149,6 +155,44 @@ class LlmUsageFxDisplayIntegrationTest extends AbstractWorkspaceIntegrationTest 
 
         // Once for the whole response, not once per row: the key occurs a single time on the wire.
         assertThat(new String(body, StandardCharsets.UTF_8).split("\"fx\"", -1)).hasSize(2);
+    }
+
+    /**
+     * The value-level half of {@code LlmBudgetFxIsolationArchTest}, which can only prove that the
+     * enforcement classes do not IMPORT fx — not that a rollup service never converts a number on its
+     * way into a verdict.
+     *
+     * <p>The fixture is built so the two currencies disagree about the answer. Spend is $9.00 against
+     * a $8.00 cap: exhausted in USD. At the seeded ECB rate the same spend is €7.91, comfortably under
+     * a cap of 8 — so any code that converted before comparing would report WITHIN and quietly unpause
+     * a workspace that is over its budget. Asserting EXHAUSTED here fails the moment that happens.
+     */
+    @Test
+    @WithAdminUser
+    void budgetVerdictIsJudgedInUsdEvenWhenADisplayRateWouldUndercutIt() {
+        Workspace workspace = setupWorkspaceWithAdmin("fx-verdict-usd");
+        workspace.setMonthlyLlmBudgetUsd(new BigDecimal("8.00"));
+        workspaceRepository.save(workspace);
+        seedEvent(workspace, "9.00");
+        seedTodaysRate();
+
+        webTestClient
+            .get()
+            .uri("/workspaces/{slug}/llm/usage", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            // The rate is present — this is a converting context, not a null-fx accident.
+            .jsonPath("$.fx.ratePerUsd")
+            .value(rate -> assertThat(new BigDecimal(rate.toString())).isEqualByComparingTo("0.878966"))
+            .jsonPath("$.instanceTotalCostUsd")
+            .isEqualTo(9.0)
+            .jsonPath("$.instanceBudgetVerdict")
+            .isEqualTo("EXHAUSTED")
+            .jsonPath("$.instancePaused")
+            .isEqualTo(true);
     }
 
     @Test

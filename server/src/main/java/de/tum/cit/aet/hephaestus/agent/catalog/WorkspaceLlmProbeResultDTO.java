@@ -5,7 +5,7 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Workspace-framed "Test connection" result (#1368): answers only "does my key work?" — {@code
+ * Workspace-framed "Test connection" result: answers only "does my key work?" — {@code
  * reachable} plus how many models the provider listed. Deliberately narrower than {@link
  * LlmProbeResultDTO}: the raw model id list is never surfaced to a workspace admin, only the count (see
  * the LLM-config glossary: "Connected — N models available", never a raw dump).

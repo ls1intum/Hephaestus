@@ -5,7 +5,7 @@ import java.math.BigDecimal;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Audit snapshot of a model on a workspace's "bring your own" LLM connection (#1368). Carries no
+ * Audit snapshot of a model on a workspace's "bring your own" LLM connection. Carries no
  * credential material — the key lives on {@link WorkspaceLlmConnection}, not here — so every field is
  * safe to record verbatim, including the inline price the workspace admin set.
  *

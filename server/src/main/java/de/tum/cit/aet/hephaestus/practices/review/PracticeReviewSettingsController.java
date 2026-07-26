@@ -54,7 +54,7 @@ public class PracticeReviewSettingsController {
         content = @Content(schema = @Schema(implementation = PracticeReviewSettingsDTO.class))
     )
     @RequireAtLeastWorkspaceAdmin
-    @Audited("PRACTICE_REVIEW_SETTINGS")
+    @Audited("config_audit PRACTICE_REVIEW_SETTINGS")
     public ResponseEntity<PracticeReviewSettingsDTO> updatePracticeReviewSettings(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody UpdatePracticeReviewSettingsRequestDTO request

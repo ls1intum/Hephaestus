@@ -253,7 +253,7 @@ public class Workspace {
     // AI configuration
 
     /**
-     * Monthly cap in USD on this workspace's INSTANCE-funded spend (#1368) — the shared models the
+     * Monthly cap in USD on this workspace's INSTANCE-funded spend — the shared models the
      * host pays for. {@code null} = uncapped. When the workspace's calendar-month (UTC)
      * instance-funded spend in the {@code llm_usage_event} ledger reaches this cap, work running on
      * shared models pauses until the month rolls over or an instance admin raises the cap.
@@ -266,7 +266,7 @@ public class Workspace {
     private BigDecimal monthlyLlmBudgetUsd;
 
     /**
-     * Monthly cap in USD on this workspace's OWN-provider (BYO) spend (#1368). {@code null} =
+     * Monthly cap in USD on this workspace's OWN-provider (BYO) spend. {@code null} =
      * uncapped. The mirror of {@link #monthlyLlmBudgetUsd} for the other purse: this is the
      * workspace's own money, so the workspace admin sets it and only work on the workspace's own
      * connected provider pauses when it is reached.

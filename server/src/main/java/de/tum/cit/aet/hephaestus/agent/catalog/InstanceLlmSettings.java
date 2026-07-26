@@ -14,7 +14,7 @@ import org.hibernate.annotations.ColumnDefault;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Instance LLM settings singleton (#1368): egress allowlist, the workspace-BYO enable flag, and the
+ * Instance LLM settings singleton: egress allowlist, the workspace-BYO enable flag, and the
  * workspace-provider-connection flag. GLOBAL. {@code id} is fixed to 1 (a DB CHECK enforces the singleton),
  * so it is never generated — the row is seeded by the changelog.
  */

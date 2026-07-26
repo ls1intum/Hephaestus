@@ -6,14 +6,8 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One entry in the workspace-facing "which model can I pick" projection (#1368): the union of instance
- * catalog models visible to this workspace and the workspace's own BYO models, collapsed behind one
- * shape a Task binding can point at.
- *
- * <p>Deliberately narrow — this is the role-collision boundary from the LLM-config glossary. A workspace
- * admin gets a display name, the owning connection's display name, and price framing; never an upstream
- * model id, base URL, or auth material. {@code scope} is the field the UI groups on ("Shared models" /
- * "Your provider"); {@code id} is only unique within a scope, so callers must key on the pair.
+ * Deliberately narrow: a workspace admin gets display names and price framing, never an upstream model
+ * id, base URL, or auth material.
  */
 @Schema(description = "A model available for this workspace to bind a Task to")
 public record AvailableLlmModelDTO(

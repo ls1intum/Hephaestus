@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.config;
 
 /**
- * The two things a workspace runs an LLM for (#1368). Each purpose has at most one
+ * The two things a workspace runs an LLM for. Each purpose has at most one
  * {@link WorkspaceAgentBinding} per workspace — "what model runs detection" and "what model runs the
  * mentor" are the whole configuration surface, so the binding is keyed by {@code (workspace, purpose)}
  * rather than by a free-form config name.

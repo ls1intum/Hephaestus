@@ -12,6 +12,8 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditAction;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -21,6 +23,7 @@ import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 
@@ -120,17 +123,42 @@ class AgentBindingServiceTest extends BaseUnitTest {
         );
     }
 
+    /**
+     * The audit row is the only durable trace a delete leaves — the binding itself is gone — so the
+     * assertion is on its payload, not on the fact that a call happened. Two things must hold: the
+     * action reads {@code DELETED} (not {@code UPDATED} with an emptied-out "after", which would file a
+     * removal alongside genuine edits), and the {@code before} snapshot carries the model the workspace
+     * actually lost, captured before {@code delete()} rather than after.
+     */
     @Test
-    void deleteRemovesTheBinding() {
+    void deleteRemovesTheBindingAndFilesADeletedAuditRowNamingTheLostModel() {
         Workspace w = workspace();
         when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(w));
         WorkspaceAgentBinding existing = new WorkspaceAgentBinding();
+        LlmModel bound = new LlmModel();
+        bound.setId(42L);
+        existing.setInstanceModel(bound);
+        existing.setEnabled(true);
         when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.MENTOR)).thenReturn(Optional.of(existing));
 
         service.deleteBinding(context(), AgentPurpose.MENTOR);
 
         verify(bindingRepository).delete(existing);
-        verify(configAudit).record(any(ConfigAuditEntry.class));
+
+        ArgumentCaptor<ConfigAuditEntry> entry = ArgumentCaptor.forClass(ConfigAuditEntry.class);
+        verify(configAudit).record(entry.capture());
+        assertThat(entry.getValue().entityType()).isEqualTo(ConfigAuditEntityType.AGENT_BINDING);
+        assertThat(entry.getValue().entityId()).isEqualTo(AgentPurpose.MENTOR.name());
+        assertThat(entry.getValue().workspaceId()).isEqualTo(1L);
+        assertThat(entry.getValue().action())
+            .as("removing a binding is a deletion, not an update to an all-null snapshot")
+            .isEqualTo(ConfigAuditAction.DELETED);
+        assertThat(entry.getValue().after()).isNull();
+        assertThat(entry.getValue().before())
+            .as("the pre-delete state must name the model the workspace lost")
+            .hasFieldOrPropertyWithValue("instanceModelId", 42L)
+            .hasFieldOrPropertyWithValue("workspaceModelId", null)
+            .hasFieldOrPropertyWithValue("enabled", true);
     }
 
     @Test

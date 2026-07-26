@@ -6,7 +6,7 @@ import java.time.Instant;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-/** A model's price row (#1368) — either the current open row or a superseded historical one. */
+/** A model's price row — either the current open row or a superseded historical one. */
 @Schema(description = "A model's price, per 1M tokens")
 public record LlmModelPriceDTO(
     @NonNull @Schema(description = "Price row id") Long id,

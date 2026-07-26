@@ -5,7 +5,7 @@ import java.time.Instant;
 import org.jspecify.annotations.NonNull;
 
 /**
- * Instance LLM connection projection (#1368). The stored API key is never serialized: {@code hasApiKey}
+ * Instance LLM connection projection. The stored API key is never serialized: {@code hasApiKey}
  * reports whether one is set and {@code apiKeyLast4} exposes only its final four characters for
  * recognition.
  */

@@ -23,12 +23,12 @@ spring:
         timeout-per-shutdown-phase: 6m
 
 server:
-    # A real port (#1368 fix wave — was -1). The LLM proxy is the ONLY LLM credential path (ADR 0006's
+    # A REAL port — never -1. The LLM proxy is the ONLY LLM credential path (ADR 0006's
     # 2026-07-22 amendment): LlmProxyController/LlmProxySecurityConfig wire wherever the worker /
-    # sandbox capability is present. With no HTTP connector (-1), that proxy
-    # controller existed as a bean but could never actually be reached — the sandbox's
-    # `http://<thisPod>:<serverPort>/internal/llm` target resolved to a negative port, so every
-    # sandboxed job this pod claimed would fail to reach its LLM. Internal-only: no `ports:` mapping
+    # sandbox capability is present. Disabling the HTTP connector (-1) leaves that proxy
+    # controller wired as a bean but unreachable — the sandbox's
+    # `http://<thisPod>:<serverPort>/internal/llm` target resolves to a negative port, so every
+    # sandboxed job this pod claims fails to reach its LLM. Internal-only: no `ports:` mapping
     # in docker/compose.app.yaml's application-worker service publishes this externally, and no
     # Traefik router targets it — only /internal/llm/** and /actuator/** answer here, since the entire
     # user-facing auth/web surface stays off (hephaestus.runtime.server.enabled=false below leaves
@@ -49,12 +49,13 @@ hephaestus:
         nats:
             enabled: false
 
-    # Same AGENT_ENABLED env var as every other role (application.yml's base default is `false`), but
-    # the DEFAULT flips to true on this profile (#1368 fix wave): job execution IS this pod's purpose,
-    # so a worker booted with only the documented "bare minimum" env vars (docs/admin/runtime-roles.mdx)
-    # — none of which mention AGENT_ENABLED — now actually polls and executes instead of idling. An
-    # operator who genuinely wants a job-execution-disabled worker (e.g. drain-only) can still set
-    # AGENT_ENABLED=false explicitly; that override is unchanged.
+    # Same AGENT_ENABLED env var as every other role, but the DEFAULT is `true` here where
+    # application.yml's base default is `false`: job execution IS this pod's purpose, so a worker
+    # booted with only the documented "bare minimum" env vars (docs/admin/runtime-roles.mdx) — none of
+    # which mention AGENT_ENABLED — polls and executes rather than idling. An operator who wants a
+    # job-execution-disabled worker (e.g. drain-only) sets AGENT_ENABLED=false explicitly. Note that
+    # docker/compose.app.yaml passes AGENT_ENABLED to this service unconditionally, so under compose
+    # the env var always wins and this default never applies.
     agent:
         enabled: ${AGENT_ENABLED:true}
 

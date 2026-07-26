@@ -5,7 +5,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.random.RandomGenerator;
 
 /**
- * Backoff schedule for a requeued {@code agent_job} row (#1368 hardening): a job requeued after an
+ * Backoff schedule for a requeued {@code agent_job} row: a job requeued after an
  * infra failure, orphan recovery, or worker drain becomes eligible again only after {@code available_at}
  * elapses, instead of instantly re-competing for a claim.
  *
@@ -15,7 +15,7 @@ import java.util.random.RandomGenerator;
  * all retry in the same instant again (the thundering-herd failure mode plain exponential backoff has).
  *
  * <p>Without this, a crash-looping job (e.g. a config pointing at a dead LLM endpoint) burns its entire
- * retry budget in seconds — the pressure-test verdict's Tier 1 #4 finding.
+ * retry budget in seconds.
  */
 final class AgentJobBackoff {
 
@@ -27,7 +27,7 @@ final class AgentJobBackoff {
     /**
      * Upper bound on {@code n} before computing {@code n^4}. {@code hephaestus.agent.max-retries} has no
      * configured ceiling ({@code @PositiveOrZero} only), so a large operator-set value could otherwise
-     * reach {@code n} large enough for {@code n^4} to overflow {@code long} (#1368 fix wave, finding #13).
+     * reach {@code n} large enough for {@code n^4} to overflow {@code long}.
      * 1000^4 (1e12) is comfortably inside {@code long} range and already far beyond {@link #CAP} once
      * capped below, so clamping {@code n} here changes nothing about the OUTPUT for any realistic
      * {@code max-retries} value — it only removes the overflow risk at the input.
@@ -49,10 +49,9 @@ final class AgentJobBackoff {
         int n = Math.min(Math.max(0, attemptNumber), MAX_ATTEMPT_FOR_POWER);
         long baseSeconds = ((long) n * n * n * n) + 15;
         double jitterMultiplier = 1.0 + ((random.nextDouble() * 2.0 - 1.0) * JITTER_FRACTION);
-        // Jitter is applied to the UNCAPPED base, then the cap is enforced AFTER jitter (#1368 fix wave,
-        // finding #13) — capping before jitter let the +10% jitter leg push the final value past CAP
-        // (e.g. a maxed-out 900s base could jitter up to 990s). Clamping post-jitter guarantees the
-        // result never exceeds CAP regardless of jitter direction.
+        // Jitter applies to the UNCAPPED base and the cap is enforced AFTER it. Capping first would let
+        // the +10% leg push the result past CAP (a maxed-out 900s base jitters up to 990s); clamping
+        // last means no wait exceeds CAP whichever way the jitter goes.
         long jitteredSeconds = Math.round(baseSeconds * jitterMultiplier);
         long cappedSeconds = Math.min(jitteredSeconds, CAP.toSeconds());
         return Duration.ofSeconds(Math.max(1, cappedSeconds));

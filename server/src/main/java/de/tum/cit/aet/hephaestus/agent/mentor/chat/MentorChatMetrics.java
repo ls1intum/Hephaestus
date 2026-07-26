@@ -108,7 +108,7 @@ public class MentorChatMetrics {
         }
     }
 
-    /** A mentor turn was rejected by the monthly workspace LLM budget cap (#1368). */
+    /** A mentor turn was rejected by the monthly workspace LLM budget cap. */
     public void recordBudgetBlocked() {
         registry.counter("llm.budget.blocked", "surface", "mentor").increment();
     }

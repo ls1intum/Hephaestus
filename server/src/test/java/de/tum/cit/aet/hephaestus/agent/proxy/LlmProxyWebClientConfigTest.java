@@ -15,7 +15,7 @@ import reactor.netty.resources.LoopResources;
 
 /**
  * Proves the LLM proxy's {@link WebClient} bean actually carries the connect-time SSRF guard
- * (#1368 fix wave) — i.e. {@code EgressPolicy.validate()} is not the only line of defense against a
+ * — i.e. {@code EgressPolicy.validate()} is not the only line of defense against a
  * DNS-rebind target. A hostname that resolves to loopback ({@code localhost}, offline via the hosts
  * file) must be rejected AT RESOLUTION when the proxy is built with {@code allowLoopback=false}
  * (production default), and must pass resolution (though not actually connect, since nothing listens

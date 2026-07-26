@@ -297,7 +297,7 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
             }
             env.put("LLM_PROXY_URL", url);
         } else if (spec.networkPolicy() != null && appServerIp != null) {
-            // Unified proxy route (#1368 slice 5): no per-provider path segment.
+            // Unified proxy route: no per-provider path segment.
             env.put(
                 "LLM_PROXY_URL",
                 "http://" + appServerIp + ":" + sandboxProperties.resolvedLlmProxyPort(serverPort) + "/internal/llm"

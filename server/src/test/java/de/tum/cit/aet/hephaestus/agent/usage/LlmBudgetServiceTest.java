@@ -15,11 +15,16 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.YearMonth;
+import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mock;
 
 class LlmBudgetServiceTest extends BaseUnitTest {
@@ -41,10 +46,6 @@ class LlmBudgetServiceTest extends BaseUnitTest {
         budgetService = new LlmBudgetService(usageRepository, workspaceRepository, meterRegistry);
     }
 
-    private Workspace workspaceWithBudget(@Nullable BigDecimal budget) {
-        return workspaceWithBudgets(budget, null);
-    }
-
     /** A workspace carrying both caps: the instance admin's purse and the workspace admin's own. */
     private Workspace workspaceWithBudgets(@Nullable BigDecimal instanceBudget, @Nullable BigDecimal byoBudget) {
         Workspace workspace = new Workspace();
@@ -54,28 +55,12 @@ class LlmBudgetServiceTest extends BaseUnitTest {
         return workspace;
     }
 
-    private void stubMonthSpend(String spend) {
-        when(usageRepository.sumCost(eq(WORKSPACE_ID), any(Instant.class), any(Instant.class))).thenReturn(
-            new BigDecimal(spend)
+    /** The verdict for a workspace carrying these two caps, resolved the way every gate resolves it. */
+    private LlmBudgetDecision decideWithBudgets(@Nullable BigDecimal instanceBudget, @Nullable BigDecimal byoBudget) {
+        when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(
+            java.util.Optional.of(workspaceWithBudgets(instanceBudget, byoBudget))
         );
-    }
-
-    private void stubHasUnpriced(boolean hasUnpriced) {
-        when(
-            usageRepository.existsUnpricedInstanceFunded(eq(WORKSPACE_ID), any(Instant.class), any(Instant.class))
-        ).thenReturn(hasUnpriced);
-    }
-
-    private void stubByoMonthSpend(String spend) {
-        when(usageRepository.sumByoCost(eq(WORKSPACE_ID), any(Instant.class), any(Instant.class))).thenReturn(
-            new BigDecimal(spend)
-        );
-    }
-
-    private void stubHasUnpricedByo(boolean hasUnpriced) {
-        when(
-            usageRepository.existsUnpricedWorkspaceFunded(eq(WORKSPACE_ID), any(Instant.class), any(Instant.class))
-        ).thenReturn(hasUnpriced);
+        return budgetService.decide(WORKSPACE_ID);
     }
 
     /** Every ledger read stubbed leniently, so a single test can vary one purse at a time. */
@@ -98,102 +83,64 @@ class LlmBudgetServiceTest extends BaseUnitTest {
             .thenReturn(byoUnpriced);
     }
 
-    @Nested
-    class BudgetEvaluation {
-
-        @Test
-        void uncappedWorkspaceIsNeverExhausted() {
-            assertThat(budgetService.isBudgetExhausted(workspaceWithBudget(null))).isFalse();
-        }
-
-        @Test
-        void spendBelowBudgetIsNotExhausted() {
-            stubMonthSpend("9.99");
-            assertThat(budgetService.isBudgetExhausted(workspaceWithBudget(new BigDecimal("10.00")))).isFalse();
-        }
-
-        @Test
-        void spendAtBudgetIsExhausted() {
-            stubMonthSpend("10.00");
-            assertThat(budgetService.isBudgetExhausted(workspaceWithBudget(new BigDecimal("10.00")))).isTrue();
-        }
-
-        @Test
-        void zeroBudgetActsAsImmediatePauseSwitch() {
-            stubMonthSpend("0");
-            assertThat(budgetService.isBudgetExhausted(workspaceWithBudget(BigDecimal.ZERO))).isTrue();
-        }
-
-        @Test
-        void unknownWorkspaceIdIsNotExhausted() {
-            when(workspaceRepository.findById(99L)).thenReturn(java.util.Optional.empty());
-            assertThat(budgetService.isBudgetExhausted(99L)).isFalse();
-        }
+    private static @Nullable BigDecimal cap(@Nullable String value) {
+        return value == null || value.isEmpty() ? null : new BigDecimal(value);
     }
 
     /**
-     * #1368: the instance admin's purse — a cap over the shared models the host pays for. It is
-     * blocked by EXHAUSTED and by an unverifiable month (a cap whose true spend can't be confirmed is
-     * not a cap), and never blocked when uncapped.
+     * Each purse is blocked by EXHAUSTED and by an unverifiable month (a cap whose true spend cannot be
+     * confirmed is not a cap), and never blocked when uncapped. The two tables are deliberate mirrors:
+     * they must stay identical in rule while reading different ledger columns.
      */
     @Nested
-    @DisplayName("decide() — the instance-funded purse")
-    class InstanceFundedPurse {
+    @DisplayName("decide() — one purse's verdict")
+    class PurseVerdict {
 
-        @Test
-        @DisplayName("an uncapped instance purse never blocks and never queries the ledger")
-        void uncappedWorkspaceIsNeverBlocked() {
-            assertThat(budgetService.decide(workspaceWithBudget(null)).instanceFunded()).isEqualTo(
-                LlmBudgetBlockReason.NONE
-            );
-            // Never even asked the ledger — uncapped short-circuits first.
-            verify(usageRepository, never()).sumCost(any(), any(), any());
+        @ParameterizedTest(name = "instance cap={0} spend={1} unpriced={2} -> {3}")
+        @CsvSource(
+            {
+                ", 999999.00, true, NONE",
+                "10.00, 10.00, false, EXHAUSTED",
+                "10.00, 1.00, false, NONE",
+                "10.00, 1.00, true, UNPRICED_USAGE_BLOCKED",
+                "0, 0, false, EXHAUSTED",
+            }
+        )
+        void instancePurse(String capUsd, String spend, boolean unpriced, LlmBudgetBlockReason expected) {
+            stubLedger(spend, unpriced, "0.00", false);
+
+            assertThat(decideWithBudgets(cap(capUsd), null).instanceFunded()).isEqualTo(expected);
+        }
+
+        @ParameterizedTest(name = "byo cap={0} spend={1} unpriced={2} -> {3}")
+        @CsvSource(
+            {
+                ", 999999.00, true, NONE",
+                "25.00, 25.00, false, EXHAUSTED",
+                "25.00, 24.99, false, NONE",
+                "25.00, 1.00, true, UNPRICED_USAGE_BLOCKED",
+                "0, 0, false, EXHAUSTED",
+            }
+        )
+        void workspaceFundedPurse(String capUsd, String spend, boolean unpriced, LlmBudgetBlockReason expected) {
+            stubLedger("0.00", false, spend, unpriced);
+
+            assertThat(decideWithBudgets(null, cap(capUsd)).workspaceFunded()).isEqualTo(expected);
         }
 
         @Test
-        @DisplayName("priced instance spend at the cap is EXHAUSTED without probing for unpriced usage")
-        void exhaustedBudgetBlocks() {
-            stubMonthSpend("10.00");
-
-            assertThat(budgetService.decide(workspaceWithBudget(new BigDecimal("10.00"))).instanceFunded()).isEqualTo(
-                LlmBudgetBlockReason.EXHAUSTED
-            );
-            // EXHAUSTED is provable from the priced sum alone — never needs the unpriced-event query.
-            verify(usageRepository, never()).existsUnpricedInstanceFunded(any(), any(), any());
-        }
-
-        @Test
-        @DisplayName("within the cap with a fully priced month does not block")
-        void withinBudgetAndNoUnpricedUsageIsNeverBlocked() {
-            stubMonthSpend("1.00");
-            stubHasUnpriced(false);
-
-            assertThat(budgetService.decide(workspaceWithBudget(new BigDecimal("10.00"))).instanceFunded()).isEqualTo(
-                LlmBudgetBlockReason.NONE
-            );
-        }
-
-        @Test
-        @DisplayName("an unpriced instance-funded event blocks a capped instance purse")
-        void unverifiableMonthBlocksACappedWorkspace() {
-            stubMonthSpend("1.00");
-            stubHasUnpriced(true);
-
-            assertThat(budgetService.decide(workspaceWithBudget(new BigDecimal("10.00"))).instanceFunded()).isEqualTo(
-                LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED
-            );
-        }
-
-        @Test
-        @DisplayName("a workspace with neither cap set is allowed however the ledger looks")
-        void anUncappedWorkspaceIsAllowedWhateverTheLedgerSays() {
-            // Spend far past any plausible cap, unpriced usage on both purses: without a cap there is
-            // nothing to enforce, so the payer who opted out of enforcement stays unblocked.
+        @DisplayName("an uncapped purse asks the ledger nothing, and EXHAUSTED never probes for unpriced usage")
+        void theLedgerReadsAreLazy() {
             stubLedger("999999.00", true, "999999.00", true);
 
-            assertThat(budgetService.decide(workspaceWithBudgets(null, null))).isEqualTo(LlmBudgetDecision.ALLOWED);
+            assertThat(decideWithBudgets(null, null)).isEqualTo(LlmBudgetDecision.ALLOWED);
             verify(usageRepository, never()).sumCost(any(), any(), any());
+            verify(usageRepository, never()).sumByoCost(any(), any(), any());
+
+            decideWithBudgets(new BigDecimal("10.00"), new BigDecimal("10.00"));
+            // Both purses are provably exhausted from the priced sums alone.
             verify(usageRepository, never()).existsUnpricedInstanceFunded(any(), any(), any());
+            verify(usageRepository, never()).existsUnpricedWorkspaceFunded(any(), any(), any());
         }
 
         @Test
@@ -206,241 +153,119 @@ class LlmBudgetServiceTest extends BaseUnitTest {
     }
 
     /**
-     * #1368: the workspace admin's own purse — a cap over spend on the workspace's own connected
-     * provider. Same rules as the instance purse, but measured against {@code sumByoCost} and the BYO
-     * unpriced probe, because that is the money the workspace itself pays.
-     */
-    @Nested
-    @DisplayName("decide() — the workspace-funded (own-provider) purse")
-    class WorkspaceFundedPurse {
-
-        @Test
-        @DisplayName("an uncapped BYO purse never blocks and never queries the BYO ledger")
-        void uncappedByoPurseIsNeverBlocked() {
-            assertThat(budgetService.decide(workspaceWithBudgets(null, null)).workspaceFunded()).isEqualTo(
-                LlmBudgetBlockReason.NONE
-            );
-            verify(usageRepository, never()).sumByoCost(any(), any(), any());
-            verify(usageRepository, never()).existsUnpricedWorkspaceFunded(any(), any(), any());
-        }
-
-        @Test
-        @DisplayName("priced BYO spend at the cap is EXHAUSTED without probing for unpriced BYO usage")
-        void byoSpendAtTheCapIsExhausted() {
-            stubByoMonthSpend("25.00");
-
-            assertThat(
-                budgetService.decide(workspaceWithBudgets(null, new BigDecimal("25.00"))).workspaceFunded()
-            ).isEqualTo(LlmBudgetBlockReason.EXHAUSTED);
-            verify(usageRepository, never()).existsUnpricedWorkspaceFunded(any(), any(), any());
-        }
-
-        @Test
-        @DisplayName("within the BYO cap with a fully priced month does not block")
-        void byoSpendBelowTheCapDoesNotBlock() {
-            stubByoMonthSpend("24.99");
-            stubHasUnpricedByo(false);
-
-            assertThat(
-                budgetService.decide(workspaceWithBudgets(null, new BigDecimal("25.00"))).workspaceFunded()
-            ).isEqualTo(LlmBudgetBlockReason.NONE);
-        }
-
-        @Test
-        @DisplayName("an unpriced own-provider event blocks a capped BYO purse")
-        void unpricedByoUsageBlocksACappedByoPurse() {
-            stubByoMonthSpend("1.00");
-            stubHasUnpricedByo(true);
-
-            assertThat(
-                budgetService.decide(workspaceWithBudgets(null, new BigDecimal("25.00"))).workspaceFunded()
-            ).isEqualTo(LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED);
-        }
-
-        @Test
-        @DisplayName("a zero BYO cap pauses own-provider work immediately")
-        void zeroByoBudgetPausesImmediately() {
-            stubByoMonthSpend("0");
-
-            assertThat(budgetService.decide(workspaceWithBudgets(null, BigDecimal.ZERO)).workspaceFunded()).isEqualTo(
-                LlmBudgetBlockReason.EXHAUSTED
-            );
-        }
-    }
-
-    /**
      * The rule the whole two-purse design exists for: instance-funded and own-provider spend are
-     * different people's money, so neither purse may ever be blocked by the other's state. In
-     * particular each cap is only blocked by a blind spot its OWN owner can clear — an unpriced
-     * shared model is the host's to price, an unpriced BYO model the workspace's.
+     * different people's money, so neither purse may ever be blocked by the other's state. Each cap is
+     * only blocked by a blind spot its OWN owner can clear — an unpriced shared model is the host's to
+     * price, an unpriced BYO model the workspace's.
      */
     @Nested
     @DisplayName("decide() — the two purses never contaminate each other")
     class PurseIsolation {
 
-        @Test
-        @DisplayName("an unpriced INSTANCE event never blocks the BYO purse")
-        void unpricedInstanceUsageDoesNotBlockTheByoPurse() {
-            stubLedger("0.00", true, "0.00", false);
-
-            LlmBudgetDecision decision = budgetService.decide(
-                workspaceWithBudgets(new BigDecimal("10.00"), new BigDecimal("10.00"))
-            );
-
-            assertThat(decision.instanceFunded()).isEqualTo(LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED);
-            assertThat(decision.workspaceFunded()).isEqualTo(LlmBudgetBlockReason.NONE);
-        }
-
-        @Test
-        @DisplayName("an unpriced WORKSPACE event never blocks the instance purse")
-        void unpricedByoUsageDoesNotBlockTheInstancePurse() {
-            stubLedger("0.00", false, "0.00", true);
-
-            LlmBudgetDecision decision = budgetService.decide(
-                workspaceWithBudgets(new BigDecimal("10.00"), new BigDecimal("10.00"))
-            );
-
-            assertThat(decision.instanceFunded()).isEqualTo(LlmBudgetBlockReason.NONE);
-            assertThat(decision.workspaceFunded()).isEqualTo(LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED);
-        }
-
-        @Test
-        @DisplayName("an exhausted instance purse leaves the BYO purse spendable")
-        void exhaustedInstancePurseLeavesTheByoPurseOpen() {
-            stubLedger("10.00", false, "0.00", false);
-
-            LlmBudgetDecision decision = budgetService.decide(
-                workspaceWithBudgets(new BigDecimal("10.00"), new BigDecimal("10.00"))
-            );
-
-            assertThat(decision.instanceFunded()).isEqualTo(LlmBudgetBlockReason.EXHAUSTED);
-            assertThat(decision.workspaceFunded()).isEqualTo(LlmBudgetBlockReason.NONE);
-        }
-
-        @Test
-        @DisplayName("an exhausted BYO purse leaves the instance purse spendable")
-        void exhaustedByoPurseLeavesTheInstancePurseOpen() {
-            stubLedger("0.00", false, "10.00", false);
-
-            LlmBudgetDecision decision = budgetService.decide(
-                workspaceWithBudgets(new BigDecimal("10.00"), new BigDecimal("10.00"))
-            );
-
-            assertThat(decision.instanceFunded()).isEqualTo(LlmBudgetBlockReason.NONE);
-            assertThat(decision.workspaceFunded()).isEqualTo(LlmBudgetBlockReason.EXHAUSTED);
-        }
+        /** One month as both purses see it: each cap, its confirmed spend, and its unpriced blind spot. */
+        record Month(
+            String instanceCap,
+            String instanceSpend,
+            boolean instanceUnpriced,
+            String byoCap,
+            String byoSpend,
+            boolean byoUnpriced
+        ) {}
 
         /**
-         * The ownership invariant, exhaustively: the instance-funded verdict is a pure function of
-         * (instance cap, instance-funded ledger rows). Every combination of the BYO cap and the BYO
-         * ledger is swept while the instance inputs are held fixed — none of them may move the
-         * instance verdict. This is what "a workspace admin can only ever make things stricter"
-         * means operationally: nothing they can write is an input to the host's protection.
+         * Every row states a verdict for BOTH purses, which is what makes it a test of isolation rather
+         * than of one purse: the purse-at-a-time tables above hold the other side fixed and never look
+         * at it. The last two rows are the invariant at its extremes — nothing a workspace admin can
+         * write (a zero cap, a million dollars of own-provider spend, an unpriceable own-provider model)
+         * is an input to the host's verdict, and vice versa.
+         *
+         * <p>The ledger here is mocked, so what these rows pin is the DECISION logic. The
+         * {@code funding_source} SQL predicate that feeds it is proved against a real database by
+         * {@code LlmUsageLedgerIntegrationTest#theWorkspacesOwnCapReadsOnlyOwnProviderLedgerRows}.
          */
-        @Test
-        @DisplayName("the instance verdict is unmoved by every combination of BYO cap and BYO ledger")
-        void instanceVerdictIsIndependentOfEveryByoInput() {
-            BigDecimal[] byoCaps = { null, BigDecimal.ZERO, new BigDecimal("0.01"), new BigDecimal("1000000.00") };
-            String[] byoSpends = { "0.00", "999999.00" };
-            boolean[] byoUnpriced = { false, true };
-            BigDecimal instanceCap = new BigDecimal("10.00");
-
-            // Held fixed across the sweep: instance spend under the cap, one unpriced instance event.
-            for (BigDecimal byoCap : byoCaps) {
-                for (String byoSpend : byoSpends) {
-                    for (boolean unpriced : byoUnpriced) {
-                        stubLedger("1.00", true, byoSpend, unpriced);
-
-                        LlmBudgetDecision decision = budgetService.decide(workspaceWithBudgets(instanceCap, byoCap));
-
-                        assertThat(decision.instanceFunded())
-                            .as("byoCap=%s byoSpend=%s byoUnpriced=%s", byoCap, byoSpend, unpriced)
-                            .isEqualTo(LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED);
-                    }
-                }
-            }
+        static Stream<Arguments> crossPurse() {
+            return Stream.of(
+                Arguments.of(
+                    new Month("10.00", "0.00", true, "10.00", "0.00", false),
+                    LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED,
+                    LlmBudgetBlockReason.NONE,
+                    "an unpriced INSTANCE event never blocks the BYO purse"
+                ),
+                Arguments.of(
+                    new Month("10.00", "0.00", false, "10.00", "0.00", true),
+                    LlmBudgetBlockReason.NONE,
+                    LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED,
+                    "an unpriced WORKSPACE event never blocks the instance purse"
+                ),
+                Arguments.of(
+                    new Month("10.00", "10.00", false, "10.00", "0.00", false),
+                    LlmBudgetBlockReason.EXHAUSTED,
+                    LlmBudgetBlockReason.NONE,
+                    "an exhausted instance purse leaves the BYO purse spendable"
+                ),
+                Arguments.of(
+                    new Month("10.00", "0.00", false, "10.00", "10.00", false),
+                    LlmBudgetBlockReason.NONE,
+                    LlmBudgetBlockReason.EXHAUSTED,
+                    "an exhausted BYO purse leaves the instance purse spendable"
+                ),
+                Arguments.of(
+                    new Month("10.00", "1.00", true, "0", "999999.00", true),
+                    LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED,
+                    LlmBudgetBlockReason.EXHAUSTED,
+                    "a maxed-out, unpriceable BYO purse still leaves the instance verdict on its own inputs"
+                ),
+                Arguments.of(
+                    new Month("10.00", "999999.00", true, "0", "0.00", false),
+                    LlmBudgetBlockReason.EXHAUSTED,
+                    LlmBudgetBlockReason.EXHAUSTED,
+                    "a maxed-out, unpriceable instance purse does not change why the BYO purse is blocked"
+                )
+            );
         }
 
-        /** The mirror sweep: the BYO verdict is likewise blind to everything on the instance side. */
-        @Test
-        @DisplayName("the BYO verdict is unmoved by every combination of instance cap and instance ledger")
-        void byoVerdictIsIndependentOfEveryInstanceInput() {
-            BigDecimal[] instanceCaps = { null, BigDecimal.ZERO, new BigDecimal("0.01"), new BigDecimal("1000000.00") };
-            String[] instanceSpends = { "0.00", "999999.00" };
-            boolean[] instanceUnpriced = { false, true };
-            BigDecimal byoCap = new BigDecimal("10.00");
+        @ParameterizedTest(name = "{3}")
+        @MethodSource("crossPurse")
+        void oneBlockedPurseLeavesTheOtherAlone(
+            Month month,
+            LlmBudgetBlockReason expectedInstance,
+            LlmBudgetBlockReason expectedByo,
+            String why
+        ) {
+            stubLedger(month.instanceSpend(), month.instanceUnpriced(), month.byoSpend(), month.byoUnpriced());
 
-            for (BigDecimal instanceCap : instanceCaps) {
-                for (String instanceSpend : instanceSpends) {
-                    for (boolean unpriced : instanceUnpriced) {
-                        stubLedger(instanceSpend, unpriced, "10.00", false);
+            LlmBudgetDecision decision = decideWithBudgets(cap(month.instanceCap()), cap(month.byoCap()));
 
-                        LlmBudgetDecision decision = budgetService.decide(workspaceWithBudgets(instanceCap, byoCap));
-
-                        assertThat(decision.workspaceFunded())
-                            .as(
-                                "instanceCap=%s instanceSpend=%s instanceUnpriced=%s",
-                                instanceCap,
-                                instanceSpend,
-                                unpriced
-                            )
-                            .isEqualTo(LlmBudgetBlockReason.EXHAUSTED);
-                    }
-                }
-            }
+            assertThat(decision.instanceFunded()).as(why).isEqualTo(expectedInstance);
+            assertThat(decision.workspaceFunded()).as(why).isEqualTo(expectedByo);
         }
     }
 
     /**
-     * {@link LlmBudgetDecision#forFunding} routes a call to its payer's verdict. An unattributable
-     * call (null funding source) is judged against BOTH — fail-safe, never a way around a cap.
+     * An unattributable call (null funding source) is judged against BOTH purses — fail-safe, never a
+     * way around a cap. The non-null routing is covered by {@link BlockSubmission} below, which drives
+     * {@code forFunding} through the real gate.
      */
     @Nested
-    @DisplayName("LlmBudgetDecision.forFunding")
-    class DecisionRouting {
-
-        private final LlmBudgetDecision instanceBlocked = new LlmBudgetDecision(
-            LlmBudgetBlockReason.EXHAUSTED,
-            LlmBudgetBlockReason.NONE
-        );
-        private final LlmBudgetDecision byoBlocked = new LlmBudgetDecision(
-            LlmBudgetBlockReason.NONE,
-            LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED
-        );
+    @DisplayName("LlmBudgetDecision.forFunding with no funding source")
+    class UnattributableCalls {
 
         @Test
-        @DisplayName("each funding source reads only its own purse")
-        void eachFundingSourceReadsItsOwnPurse() {
-            assertThat(instanceBlocked.forFunding(FundingSource.INSTANCE)).isEqualTo(LlmBudgetBlockReason.EXHAUSTED);
-            assertThat(instanceBlocked.forFunding(FundingSource.WORKSPACE)).isEqualTo(LlmBudgetBlockReason.NONE);
-            assertThat(byoBlocked.forFunding(FundingSource.WORKSPACE)).isEqualTo(
+        @DisplayName("blocked when EITHER purse is blocked, allowed only when neither is")
+        void unknownFundingSourceIsFailSafe() {
+            LlmBudgetDecision instanceBlocked = new LlmBudgetDecision(
+                LlmBudgetBlockReason.EXHAUSTED,
+                LlmBudgetBlockReason.NONE
+            );
+            LlmBudgetDecision byoBlocked = new LlmBudgetDecision(
+                LlmBudgetBlockReason.NONE,
                 LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED
             );
-            assertThat(byoBlocked.forFunding(FundingSource.INSTANCE)).isEqualTo(LlmBudgetBlockReason.NONE);
-        }
 
-        @Test
-        @DisplayName("an unattributable call is blocked when EITHER purse is blocked")
-        void unknownFundingSourceIsFailSafe() {
             assertThat(instanceBlocked.forFunding(null)).isEqualTo(LlmBudgetBlockReason.EXHAUSTED);
             assertThat(byoBlocked.forFunding(null)).isEqualTo(LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED);
-            assertThat(instanceBlocked.blocks(null)).isTrue();
-            assertThat(byoBlocked.blocks(null)).isTrue();
-        }
-
-        @Test
-        @DisplayName("an unattributable call proceeds only when NEITHER purse is blocked")
-        void unknownFundingSourceProceedsWhenBothPursesAreOpen() {
             assertThat(LlmBudgetDecision.ALLOWED.forFunding(null)).isEqualTo(LlmBudgetBlockReason.NONE);
             assertThat(LlmBudgetDecision.ALLOWED.blocks(null)).isFalse();
-            assertThat(LlmBudgetDecision.ALLOWED.blocksAnything()).isFalse();
-        }
-
-        @Test
-        @DisplayName("blocksAnything reports a pause on either purse")
-        void blocksAnythingCoversEitherPurse() {
-            assertThat(instanceBlocked.blocksAnything()).isTrue();
-            assertThat(byoBlocked.blocksAnything()).isTrue();
         }
     }
 
@@ -452,47 +277,32 @@ class LlmBudgetServiceTest extends BaseUnitTest {
     @DisplayName("blockSubmission is scoped to whoever pays")
     class BlockSubmission {
 
-        @Test
-        @DisplayName("an exhausted instance cap does not block workspace-funded work")
-        void exhaustedInstanceCapDoesNotBlockWorkspaceFundedWork() {
-            stubLedger("10.00", false, "0.00", false);
+        @ParameterizedTest(name = "{4}")
+        @MethodSource("de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetServiceTest#exhaustedCaps")
+        void anExhaustedCapBlocksOnlyItsOwnFundingSource(
+            String instanceSpend,
+            String byoSpend,
+            FundingSource blockedSource,
+            String expectedCapTag,
+            String why
+        ) {
+            stubLedger(instanceSpend, false, byoSpend, false);
             Workspace workspace = workspaceWithBudgets(new BigDecimal("10.00"), new BigDecimal("10.00"));
+            FundingSource openSource =
+                blockedSource == FundingSource.INSTANCE ? FundingSource.WORKSPACE : FundingSource.INSTANCE;
 
+            assertThat(budgetService.blockSubmission(workspace, "PULL_REQUEST_REVIEW", openSource)).as(why).isFalse();
+            assertThat(budgetService.blockSubmission(workspace, "PULL_REQUEST_REVIEW", blockedSource)).isTrue();
             assertThat(
-                budgetService.blockSubmission(workspace, "PULL_REQUEST_REVIEW", FundingSource.WORKSPACE)
-            ).isFalse();
-            assertThat(
-                budgetService.blockSubmission(workspace, "PULL_REQUEST_REVIEW", FundingSource.INSTANCE)
-            ).isTrue();
-            assertThat(
-                meterRegistry.counter("llm.budget.blocked", "surface", "agent_job", "cap", "instance").count()
+                meterRegistry.counter("llm.budget.blocked", "surface", "agent_job", "cap", expectedCapTag).count()
             ).isEqualTo(1d);
-        }
 
-        @Test
-        @DisplayName("an exhausted BYO cap does not block instance-funded work")
-        void exhaustedByoCapDoesNotBlockInstanceFundedWork() {
-            stubLedger("0.00", false, "10.00", false);
-            Workspace workspace = workspaceWithBudgets(new BigDecimal("10.00"), new BigDecimal("10.00"));
-
-            assertThat(
-                budgetService.blockSubmission(workspace, "PULL_REQUEST_REVIEW", FundingSource.INSTANCE)
-            ).isFalse();
-            assertThat(
-                budgetService.blockSubmission(workspace, "PULL_REQUEST_REVIEW", FundingSource.WORKSPACE)
-            ).isTrue();
-            assertThat(
-                meterRegistry.counter("llm.budget.blocked", "surface", "agent_job", "cap", "byo").count()
-            ).isEqualTo(1d);
-        }
-
-        @Test
-        @DisplayName("an unattributable submission is blocked when either cap is reached")
-        void unattributableSubmissionIsBlockedByEitherCap() {
-            stubLedger("0.00", false, "10.00", false);
-            Workspace workspace = workspaceWithBudgets(new BigDecimal("10.00"), new BigDecimal("10.00"));
-
+            // An unattributable submission is blocked by either cap — and is filed under the cap that
+            // actually refused it, not the one the caller happened to be asking about.
             assertThat(budgetService.blockSubmission(workspace, "PULL_REQUEST_REVIEW", null)).isTrue();
+            assertThat(
+                meterRegistry.counter("llm.budget.blocked", "surface", "agent_job", "cap", expectedCapTag).count()
+            ).isEqualTo(2d);
         }
 
         @Test
@@ -509,45 +319,44 @@ class LlmBudgetServiceTest extends BaseUnitTest {
         }
     }
 
+    static Stream<Arguments> exhaustedCaps() {
+        return Stream.of(
+            Arguments.of(
+                "10.00",
+                "0.00",
+                FundingSource.INSTANCE,
+                "instance",
+                "an exhausted instance cap does not block workspace-funded work"
+            ),
+            Arguments.of(
+                "0.00",
+                "10.00",
+                FundingSource.WORKSPACE,
+                "byo",
+                "an exhausted BYO cap does not block instance-funded work"
+            )
+        );
+    }
+
     @Nested
     class Verdict {
 
-        @Test
-        void withinBudgetWithNoUnpricedEventsIsWithin() {
-            assertThat(LlmBudgetService.verdictFor(new BigDecimal("5.00"), false, new BigDecimal("10.00"))).isEqualTo(
-                LlmBudgetVerdict.WITHIN
-            );
-        }
-
-        @Test
-        void pricedSumAtOrAboveTheCapIsExhausted() {
-            assertThat(LlmBudgetService.verdictFor(new BigDecimal("10.00"), false, new BigDecimal("10.00"))).isEqualTo(
-                LlmBudgetVerdict.EXHAUSTED
-            );
-        }
-
-        @Test
-        void withinBudgetButWithAnUnpricedEventIsUnverifiable() {
-            assertThat(LlmBudgetService.verdictFor(new BigDecimal("5.00"), true, new BigDecimal("10.00"))).isEqualTo(
-                LlmBudgetVerdict.UNVERIFIABLE
-            );
-        }
-
-        @Test
-        void exhaustedTakesPriorityOverUnverifiable() {
-            // Both conditions true at once: already-reached-the-cap is the more actionable signal.
-            assertThat(LlmBudgetService.verdictFor(new BigDecimal("10.00"), true, new BigDecimal("10.00"))).isEqualTo(
-                LlmBudgetVerdict.EXHAUSTED
-            );
-        }
-
-        @Test
-        void uncappedWorkspaceCanNeverBeExhaustedButCanBeUnverifiable() {
-            assertThat(LlmBudgetService.verdictFor(new BigDecimal("999999.00"), false, null)).isEqualTo(
-                LlmBudgetVerdict.WITHIN
-            );
-            assertThat(LlmBudgetService.verdictFor(new BigDecimal("999999.00"), true, null)).isEqualTo(
-                LlmBudgetVerdict.UNVERIFIABLE
+        @ParameterizedTest(name = "spend={0} unpriced={1} cap={2} -> {3}")
+        @CsvSource(
+            {
+                "5.00, false, 10.00, WITHIN",
+                "10.00, false, 10.00, EXHAUSTED",
+                "5.00, true, 10.00, UNVERIFIABLE",
+                // Both conditions at once: already-reached-the-cap is the more actionable signal.
+                "10.00, true, 10.00, EXHAUSTED",
+                // Uncapped can never be EXHAUSTED, but can still be UNVERIFIABLE.
+                "999999.00, false, , WITHIN",
+                "999999.00, true, , UNVERIFIABLE",
+            }
+        )
+        void verdictFor(String pricedCost, boolean hasUnpriced, String capUsd, LlmBudgetVerdict expected) {
+            assertThat(LlmBudgetService.verdictFor(new BigDecimal(pricedCost), hasUnpriced, cap(capUsd))).isEqualTo(
+                expected
             );
         }
     }
@@ -555,20 +364,18 @@ class LlmBudgetServiceTest extends BaseUnitTest {
     @Nested
     class MonthWindow {
 
-        @Test
-        void windowIsHalfOpenUtcCalendarMonth() {
-            LlmBudgetService.MonthWindow window = LlmBudgetService.MonthWindow.of(YearMonth.of(2026, 7));
+        @ParameterizedTest(name = "{0}-{1} = [{2}, {3})")
+        @CsvSource(
+            {
+                "2026, 7, 2026-07-01T00:00:00Z, 2026-08-01T00:00:00Z",
+                "2026, 12, 2026-12-01T00:00:00Z, 2027-01-01T00:00:00Z",
+            }
+        )
+        void windowIsAHalfOpenUtcCalendarMonth(int year, int month, String from, String to) {
+            LlmBudgetService.MonthWindow window = LlmBudgetService.MonthWindow.of(YearMonth.of(year, month));
 
-            assertThat(window.from()).isEqualTo(Instant.parse("2026-07-01T00:00:00Z"));
-            assertThat(window.to()).isEqualTo(Instant.parse("2026-08-01T00:00:00Z"));
-        }
-
-        @Test
-        void windowRollsAcrossYearBoundary() {
-            LlmBudgetService.MonthWindow window = LlmBudgetService.MonthWindow.of(YearMonth.of(2026, 12));
-
-            assertThat(window.from()).isEqualTo(Instant.parse("2026-12-01T00:00:00Z"));
-            assertThat(window.to()).isEqualTo(Instant.parse("2027-01-01T00:00:00Z"));
+            assertThat(window.from()).isEqualTo(Instant.parse(from));
+            assertThat(window.to()).isEqualTo(Instant.parse(to));
         }
     }
 }

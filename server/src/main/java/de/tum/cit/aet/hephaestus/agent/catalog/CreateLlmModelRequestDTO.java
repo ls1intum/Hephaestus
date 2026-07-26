@@ -7,7 +7,7 @@ import jakarta.validation.constraints.Size;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-/** Create a model on an instance LLM connection (#1368). Pricing and sharing are set separately. */
+/** Pricing and sharing are set separately. */
 @Schema(description = "Create a model on an instance LLM connection")
 public record CreateLlmModelRequestDTO(
     @Nullable

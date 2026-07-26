@@ -5,8 +5,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,8 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Fixtures for {@link AuditByDefaultArchTest}'s endpoint detection, which can fail silently — an
- * endpoint the rule cannot see looks exactly like a compliant one. The class-gated case is the one
- * that matters: seven controllers declare the gate once at class level rather than per method.
+ * endpoint the rule cannot see looks exactly like a compliant one.
  */
 @Tag("architecture")
 class AuditByDefaultGateDetectionTest {
@@ -66,33 +68,30 @@ class AuditByDefaultGateDetectionTest {
         ReadOnlyController.class
     );
 
-    @Test
-    void seesAGateDeclaredOnTheControllerRatherThanTheMethod() {
-        assertThat(isAdminMutation(ClassGatedController.class, "create")).isTrue();
+    static Stream<Arguments> endpoints() {
+        return Stream.of(
+            Arguments.of(ClassGatedController.class, "create", true, "gate declared on the controller, not the method"),
+            Arguments.of(MethodGatedController.class, "update", true, "gate declared on the method"),
+            Arguments.of(InstanceAdminGatedController.class, "create", true, "instance-admin authority gate"),
+            Arguments.of(
+                UngatedController.class,
+                "create",
+                false,
+                "a public endpoint is not an admin action and must not be forced to declare one"
+            ),
+            Arguments.of(
+                ReadOnlyController.class,
+                "list",
+                false,
+                "reading changes nothing, so there is nothing to record"
+            )
+        );
     }
 
-    @Test
-    void seesAGateDeclaredOnTheMethod() {
-        assertThat(isAdminMutation(MethodGatedController.class, "update")).isTrue();
-    }
-
-    @Test
-    void seesTheInstanceAdminAuthorityGate() {
-        assertThat(isAdminMutation(InstanceAdminGatedController.class, "create")).isTrue();
-    }
-
-    @Test
-    void ignoresAnUngatedEndpoint() {
-        assertThat(isAdminMutation(UngatedController.class, "create"))
-            .as("a public endpoint is not an admin action and must not be forced to declare one")
-            .isFalse();
-    }
-
-    @Test
-    void ignoresAReadUnderAnAdminGate() {
-        assertThat(isAdminMutation(ReadOnlyController.class, "list"))
-            .as("reading changes nothing, so there is nothing to record")
-            .isFalse();
+    @ParameterizedTest(name = "{3}")
+    @MethodSource("endpoints")
+    void detectsAdminMutations(Class<?> controller, String method, boolean expected, String why) {
+        assertThat(isAdminMutation(controller, method)).as(why).isEqualTo(expected);
     }
 
     private static boolean isAdminMutation(Class<?> controller, String method) {

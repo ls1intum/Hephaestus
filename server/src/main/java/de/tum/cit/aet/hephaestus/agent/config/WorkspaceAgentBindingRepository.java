@@ -1,12 +1,13 @@
 package de.tum.cit.aet.hephaestus.agent.config;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-/** Access to the per-purpose {@link WorkspaceAgentBinding}s of a workspace (#1368). */
+/** Access to the per-purpose {@link WorkspaceAgentBinding}s of a workspace. */
 public interface WorkspaceAgentBindingRepository extends JpaRepository<WorkspaceAgentBinding, Long> {
     List<WorkspaceAgentBinding> findByWorkspaceId(Long workspaceId);
 
@@ -56,6 +57,13 @@ public interface WorkspaceAgentBindingRepository extends JpaRepository<Workspace
         @Param("purpose") AgentPurpose purpose
     );
 
+    /**
+     * Is ANY workspace bound to this instance-catalog model? Asked by the instance admin before
+     * deleting the model, so it is deliberately cross-tenant: a binding in a workspace the operator
+     * has never heard of is exactly the one that must block the delete. Returns a boolean, never a
+     * row, so no tenant data crosses the boundary.
+     */
+    @WorkspaceAgnostic("Instance-admin delete guard: a catalog model is in use if ANY workspace binds it")
     boolean existsByInstanceModelId(Long instanceModelId);
 
     boolean existsByWorkspaceModelIdAndWorkspaceId(Long workspaceModelId, Long workspaceId);

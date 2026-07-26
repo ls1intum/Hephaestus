@@ -18,7 +18,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.mock.env.MockEnvironment;
 
 /**
- * #1368 fix wave: {@code HEPHAESTUS_WORKER_LLM_BASE_URL} / {@code HEPHAESTUS_WORKER_LLM_API_KEY} /
+ * {@code HEPHAESTUS_WORKER_LLM_BASE_URL} / {@code HEPHAESTUS_WORKER_LLM_API_KEY} /
  * {@code HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED} are now silently ignored (see MIGRATION.md). This
  * warner is the operator-visible signal that a deployment is still setting one of them.
  *
@@ -114,7 +114,7 @@ class DeprecatedEnvVarStartupWarnerTest extends BaseUnitTest {
     }
 
     /**
-     * #1368 fix wave: {@code application-worker.yml} used to set {@code hephaestus.agent.nats.enabled}
+     * {@code application-worker.yml} used to set {@code hephaestus.agent.nats.enabled}
      * and the (also-retired) {@code hephaestus.worker.llm.base-url}/{@code api-key} via {@code
      * ${VAR:}}-style placeholders with an EMPTY-STRING default. Spring's YAML property source binds
      * the key regardless — an unset env var resolves to {@code ""}, not "absent" — so {@link

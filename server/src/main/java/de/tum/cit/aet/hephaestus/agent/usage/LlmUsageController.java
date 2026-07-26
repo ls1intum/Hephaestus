@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.usage;
 
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageDTOs.WorkspaceLlmUsageReportDTO;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
@@ -17,12 +16,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
- * Workspace-admin LLM spend rollup (#1368): what this workspace spent this month (or a past month),
+ * Workspace-admin LLM spend rollup: what this workspace spent this month (or a past month),
  * by job type and day, plus the status of both purses.
  *
  * <p>Read-only. The workspace's own cap is written at {@code PUT /llm/budget}
- * ({@link WorkspaceLlmBudgetController}) — a cap is not a sub-resource of a report, which is what the
- * old {@code /llm-usage/byo-budget} path implied.
+ * ({@link WorkspaceLlmBudgetController}): a cap governs future spend, so it is not a sub-resource of a
+ * report about past spend.
  */
 @WorkspaceScopedController
 @RequestMapping("/llm/usage")

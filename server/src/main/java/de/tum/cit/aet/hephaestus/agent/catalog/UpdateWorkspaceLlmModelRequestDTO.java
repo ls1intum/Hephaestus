@@ -7,7 +7,7 @@ import java.math.BigDecimal;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Partial update of a model on a workspace's own AI provider connection (#1368). Every field is
+ * Partial update of a model on a workspace's own AI provider connection. Every field is
  * optional; an absent (null) field keeps its current value.
  *
  * <p>Pricing is all-or-nothing: the service only touches the price fields when {@code pricingMode} is

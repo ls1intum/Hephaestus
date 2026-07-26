@@ -31,6 +31,19 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
     Optional<Workspace> findByIdForUpdate(@Param("id") Long id);
 
     /**
+     * {@link #findByIdForUpdate} for a caller that only has the slug (the instance-admin budget
+     * write). Deliberately a single locking query rather than {@code findByWorkspaceSlug} followed by
+     * {@code findByIdForUpdate}: the second call would return the instance the first already put in
+     * the persistence context, WITHOUT refreshing its state, so the before-snapshot would still be the
+     * pre-lock read — exactly the staleness the lock exists to prevent.
+     */
+    @WorkspaceAgnostic("Locking read of the tenant root itself, by its own slug")
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "5000"))
+    @Query("SELECT w FROM Workspace w WHERE w.workspaceSlug = :slug")
+    Optional<Workspace> findByWorkspaceSlugForUpdate(@Param("slug") String slug);
+
+    /**
      * Reverse-lookup a workspace by its GitHub App installation id. Joins through the
      * {@code Connection} row whose {@code kind='GITHUB'} and {@code instance_key=installationId}.
      * Cross-workspace collision is structurally impossible at this layer because the

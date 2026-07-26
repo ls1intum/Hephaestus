@@ -43,17 +43,15 @@ class PullRequestCommentPoster {
     /**
      * Marker appended to summary posts so a re-review can locate and edit the prior summary in place.
      *
-     * <p>#1368 fix wave, finding #4: this MUST be the exact prefix every production delivery path
-     * actually embeds — {@link de.tum.cit.aet.hephaestus.agent.handler.FeedbackDeliveryService#formatPracticeNote}
-     * (the PR-review and issue-review delivery pipelines both post through it) calls {@link
-     * #summaryMarkerFor} for its embedded marker rather than hardcoding its own string, so the value
-     * used to FORMAT a comment and the value used to LOOK ONE UP ({@link #findExistingSummaryComment})
-     * can never drift apart again. Previously they were two different literals ({@code
-     * hephaestus-agent-feedback:} here vs a hardcoded {@code hephaestus:practice-review:} in {@code
-     * FeedbackDeliveryService}) — the dedup lookup could never match a real posted comment, so every
-     * delivery-recovery retry silently double-posted. See {@code PullRequestCommentPosterTest} /
-     * {@code FeedbackDeliveryServiceTest} for the round-trip test (format via the real handler path,
-     * then find via the lookup path).
+     * <p>This MUST be the exact prefix every production delivery path embeds. {@link
+     * de.tum.cit.aet.hephaestus.agent.handler.FeedbackDeliveryService#formatPracticeNote} (the
+     * PR-review and issue-review delivery pipelines both post through it) therefore calls {@link
+     * #summaryMarkerFor} for its embedded marker instead of hardcoding a string of its own, so the
+     * value used to FORMAT a comment and the value used to LOOK ONE UP ({@link
+     * #findExistingSummaryComment}) cannot drift apart. If they do, the dedup lookup matches no real
+     * posted comment and every delivery-recovery retry silently double-posts. {@code
+     * PullRequestCommentPosterTest} / {@code FeedbackDeliveryServiceTest} hold the round-trip test that
+     * enforces this (format via the real handler path, then find via the lookup path).
      */
     static final String SUMMARY_MARKER_PREFIX = "<!-- hephaestus:practice-review:";
 
@@ -456,7 +454,7 @@ class PullRequestCommentPoster {
     // content.body()); it is populated for parity so a future channel that wants out-of-band marker
     // dedup has it available.
     //
-    // Package-visible (#1368 fix wave, finding #4) so FeedbackDeliveryService.formatPracticeNote — the
+    // Package-visible so FeedbackDeliveryService.formatPracticeNote — the
     // actual production delivery template for PR review AND issue review — embeds THIS SAME marker
     // rather than a second, independently-hardcoded literal that could drift out of sync again.
     static String summaryMarkerFor(AgentJob job) {

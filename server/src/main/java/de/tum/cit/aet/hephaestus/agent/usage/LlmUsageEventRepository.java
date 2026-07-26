@@ -11,7 +11,13 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UUID> {
-    /** Idempotent append. A duplicate source attempt is the only write intentionally ignored. */
+    /**
+     * Idempotent append. A duplicate source attempt is the only write intentionally ignored.
+     *
+     * <p>The column list, the VALUES list and {@link LlmUsageInsert}'s components are one list written
+     * three times; {@code LlmUsageInsertContractTest} checks all three against {@link LlmUsageEvent}
+     * position by position, and explains there why this is hand-written SQL rather than a {@code save}.
+     */
     @Modifying
     @Query(
         value = """
@@ -28,18 +34,17 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
             :#{#event.cacheWriteTokens()}, :#{#event.reasoningTokens()}, :#{#event.totalCalls()},
             :#{#event.costUsd()}, :#{#event.occurredAt()}, :#{#event.pricingState()},
             :#{#event.fundingSource()}, :#{#event.appliedPriceId()},
-            :#{#event.appliedWorkspaceModelId()}, :#{#event.inputRate()}, :#{#event.outputRate()},
-            :#{#event.cacheReadRate()}, :#{#event.cacheWriteRate()}
+            :#{#event.appliedWorkspaceModelId()}, :#{#event.appliedPer1mInputUsd()},
+            :#{#event.appliedPer1mOutputUsd()}, :#{#event.appliedPer1mCacheReadUsd()},
+            :#{#event.appliedPer1mCacheWriteUsd()}
         ) ON CONFLICT (source_type, source_id, source_attempt) DO NOTHING
         """,
         nativeQuery = true
     )
     int insertIfAbsent(@Param("event") LlmUsageInsert event);
 
-    List<LlmUsageEvent> findByWorkspaceId(Long workspaceId);
-
     /**
-     * Month-to-date (or any window) BUDGETED spend for one workspace (#1368 slice 6): only
+     * Month-to-date (or any window) BUDGETED spend for one workspace: only
      * instance-funded, confirmed-priced events count — this is the sum the monthly budget cap
      * compares against. A workspace's own BYO (bring-your-own) spend NEVER counts toward its
      * instance-set budget (see {@link #sumByoCost}), and an UNPRICED event contributes nothing
@@ -86,7 +91,7 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
     long countUncosted(@Param("workspaceId") Long workspaceId, @Param("from") Instant from, @Param("to") Instant to);
 
     /**
-     * True when at least one INSTANCE-funded event this window has no resolved price (#1368 slice 6).
+     * True when at least one INSTANCE-funded event this window has no resolved price.
      * This is what turns a budget verdict from WITHIN into UNVERIFIABLE — spend that could push the
      * workspace over its cap but that {@link #sumCost} cannot see.
      */
@@ -125,7 +130,7 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
     );
 
     /**
-     * Per-job-type breakdown, split the same way the top-level totals are (#1368 slice 6): a
+     * Per-job-type breakdown, split the same way the top-level totals are: a
      * budgeted (priced, instance-funded) sum, a separate BYO sum, and an unpriced-event count — never
      * one blind {@code SUM(cost_usd)} mixing funding sources and pricing states.
      */
@@ -135,8 +140,6 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
             "AS pricedTotalCostUsd, " +
             "COALESCE(SUM(e.cost_usd) FILTER (WHERE e.pricing_state = 'PRICED' AND e.funding_source = 'WORKSPACE'), 0) " +
             "AS byoTotalCostUsd, " +
-            "COALESCE(BOOL_OR(e.pricing_state = 'UNPRICED' AND e.funding_source = 'WORKSPACE'), false) " +
-            "AS hasUnpricedByoUsage, " +
             "COUNT(*) FILTER (WHERE e.cost_usd IS NULL) AS unpricedEventCount, " +
             "SUM(e.input_tokens) AS inputTokens, SUM(e.output_tokens) AS outputTokens, " +
             "SUM(e.cache_read_tokens) AS cacheReadTokens, SUM(e.cache_write_tokens) AS cacheWriteTokens, " +
@@ -153,7 +156,7 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
     );
 
     /**
-     * Per-day breakdown, split the same way as {@link #aggregateByJobType} (#1368 slice 6).
+     * Per-day breakdown, split the same way as {@link #aggregateByJobType}.
      */
     @Query(
         value = "SELECT (e.occurred_at AT TIME ZONE 'UTC')::date AS day, " +
@@ -161,8 +164,6 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
             "AS pricedTotalCostUsd, " +
             "COALESCE(SUM(e.cost_usd) FILTER (WHERE e.pricing_state = 'PRICED' AND e.funding_source = 'WORKSPACE'), 0) " +
             "AS byoTotalCostUsd, " +
-            "COALESCE(BOOL_OR(e.pricing_state = 'UNPRICED' AND e.funding_source = 'WORKSPACE'), false) " +
-            "AS hasUnpricedByoUsage, " +
             "COUNT(*) FILTER (WHERE e.cost_usd IS NULL) AS unpricedEventCount, " +
             "COUNT(*) AS events " +
             "FROM llm_usage_event e " +
@@ -181,8 +182,15 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
      * included via LEFT JOIN so the admin sees budgets even at zero usage). Joins workspace
      * metadata SQL-side — this stays a metadata-only view (no tenant content). Splits budgeted
      * (instance-funded, priced) spend from BYO spend the same way {@link #sumCost} /
-     * {@link #sumByoCost} do (#1368 slice 6), so the admin list never sums shared + own-provider
+     * {@link #sumByoCost} do, so the admin list never sums shared + own-provider
      * spend into one figure.
+     *
+     * <p><b>Unpaged on purpose.</b> The row count is the instance's workspace count, not its event
+     * count — a self-hosted Hephaestus is a university or a company, so this is tens to low hundreds
+     * of rows of five scalars each, aggregated in one indexed pass over the month window. Paging it
+     * would also break the page: the admin's question is "who is spending", which needs the whole
+     * month ranked before it can be truncated. Revisit if an instance ever passes ~10k workspaces —
+     * at which point the fix is a materialised monthly rollup, not a page cursor.
      */
     @Query(
         value = "SELECT w.id AS workspaceId, w.slug AS workspaceSlug, w.display_name AS displayName, " +

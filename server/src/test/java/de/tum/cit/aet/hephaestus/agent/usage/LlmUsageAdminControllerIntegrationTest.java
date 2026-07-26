@@ -2,8 +2,6 @@ package de.tum.cit.aet.hephaestus.agent.usage;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageDTOs.AdminLlmUsageReportDTO;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageDTOs.AdminWorkspaceLlmUsageDTO;
 import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRate;
 import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -22,6 +20,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
@@ -30,6 +29,9 @@ import org.springframework.test.web.reactive.server.WebTestClient;
  * app_admin authority gate, the rollup values, budget set/clear, and request validation.
  */
 @Tag("integration")
+// See LlmUsageControllerIntegrationTest: the unset display currency is stated, not inherited from
+// whatever the developer's optional .env happens to hold.
+@TestPropertySource(properties = "hephaestus.llm.display-currency=")
 class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final String ADMIN_TOKEN = "mock-jwt-token-for-admin-user";
@@ -64,7 +66,7 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         event.setSourceType(LlmUsageSourceType.AGENT_JOB);
         event.setSourceId(UUID.randomUUID());
         event.setCostUsd(pricing == PricingState.UNPRICED ? null : new BigDecimal(cost));
-        // Budgeted spend only counts PRICED + INSTANCE-funded rows (#1368 slice 6) — both are the
+        // Budgeted spend only counts PRICED + INSTANCE-funded rows — both are the
         // entity defaults, but set them explicitly so this fixture keeps meaning that if the
         // defaults ever change.
         event.setPricingState(pricing);
@@ -117,7 +119,7 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     /**
-     * #1368: the admin rollup reports the workspace's OWN cap and its own-provider verdict as a
+     * the admin rollup reports the workspace's OWN cap and its own-provider verdict as a
      * separate column. Read-only here — it governs the workspace's money — and it must not bleed
      * into the instance verdict the admin acts on.
      */
@@ -261,6 +263,42 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
             .get()
             .uri("/admin/llm/usage")
             .headers(h -> h.setBearerAuth(MENTOR_TOKEN))
+            .exchange()
+            .expectStatus()
+            .isForbidden();
+    }
+
+    @Test
+    void anonymousIsUnauthorized() {
+        // 401, not 403: an unauthenticated caller must be told to authenticate. The two are answered
+        // by different layers (the entry point vs. @PreAuthorize), so passing the 403 case above says
+        // nothing about this one.
+        webTestClient.get().uri("/admin/llm/usage").exchange().expectStatus().isUnauthorized();
+    }
+
+    @Test
+    void settingAWorkspacesBudgetIsForbiddenForANonAdminAndUnauthorizedForAnonymous() {
+        // The mutation is the endpoint an operator's backstop is worth attacking; nonAdminIsForbidden
+        // only ever covered the read.
+        webTestClient
+            .put()
+            .uri("/admin/workspaces/{slug}/llm/budget", "any-workspace")
+            .headers(h -> h.setBearerAuth(MENTOR_TOKEN))
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(Map.of("monthlyBudgetUsd", 1))
+            .exchange()
+            .expectStatus()
+            .isForbidden();
+
+        // 403, not the 401 the anonymous *read* above returns: a state-changing request with no
+        // `Authorization: Bearer` header is cookie-shaped, so SecurityConfig#requiresCsrf refuses it
+        // at the CSRF filter before authentication ever runs. Asserting 401 here would invite someone
+        // to "fix" the app by exempting this mutation from CSRF. Either way the handler is unreachable.
+        webTestClient
+            .put()
+            .uri("/admin/workspaces/{slug}/llm/budget", "any-workspace")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(Map.of("monthlyBudgetUsd", 1))
             .exchange()
             .expectStatus()
             .isForbidden();

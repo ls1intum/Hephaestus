@@ -50,7 +50,7 @@ import tools.jackson.databind.JsonNode;
  * <h2>Security</h2>
  * <ul>
  *   <li>{@link #jobToken} is a 256-bit SecureRandom token encrypted at rest, used for LLM proxy
- *       authentication. It is never exposed in API responses, logs, or NATS messages.</li>
+ *       authentication. It is never exposed in API responses or logs.</li>
  *   <li>{@link #configSnapshot} freezes the agent config at submit time so in-flight jobs
  *       are not affected by config changes. Excluded from {@code toString()}; the API-facing
  *       {@code AgentJobDTO} additionally redacts an INSTANCE-scoped connection's base URL down to
@@ -81,7 +81,7 @@ public class AgentJob {
     private Workspace workspace;
 
     /**
-     * Which per-purpose {@link WorkspaceAgentBinding} this job runs on (#1368). The executor admits
+     * Which per-purpose {@link WorkspaceAgentBinding} this job runs on. The executor admits
      * the workspace's binding for this purpose at claim time; the frozen {@code configSnapshot} still
      * carries the model routing. Replaces the {@code config} reference for execution.
      */
@@ -150,20 +150,8 @@ public class AgentJob {
     @ToString.Exclude
     private String jobTokenHash;
 
-    @JsonIgnore
-    @Convert(converter = EncryptedStringConverter.class)
-    @Column(name = "llm_api_key", columnDefinition = "TEXT")
-    @ToString.Exclude
-    private String llmApiKey;
-
     @Column(name = "idempotency_key", length = 255)
     private String idempotencyKey;
-
-    @Column(name = "container_id", length = 64)
-    private String containerId;
-
-    @Column(name = "network_id", length = 64)
-    private String networkId;
 
     @Column(name = "exit_code")
     private Integer exitCode;
@@ -195,7 +183,7 @@ public class AgentJob {
     private int retryCount = 0;
 
     /**
-     * When this job becomes eligible for a poll-loop claim (#1368 hardening). Defaults to submit time
+     * When this job becomes eligible for a poll-loop claim. Defaults to submit time
      * (immediately eligible); a requeue after an infra failure, orphan recovery, or worker drain pushes
      * this into the future by {@link AgentJobBackoff#compute}, so a crash-looping job backs off instead
      * of instantly re-competing for a claim. {@link AgentJobRepository#findQueuedIdsOldestFirst} filters
@@ -209,7 +197,7 @@ public class AgentJob {
 
     /**
      * Why this QUEUED job's {@link #availableAt} was pushed into the future, when the reason is one an
-     * admin can undo (#1368). Only {@code BUDGET} is used today: the claim loop holds a job whose
+     * admin can undo. Only {@code BUDGET} is used today: the claim loop holds a job whose
      * payer is over their cap rather than cancelling it.
      *
      * <p>It exists so raising a cap can release exactly those jobs immediately
@@ -302,8 +290,9 @@ public class AgentJob {
     @Column(name = "llm_cache_write_tokens")
     private Integer llmCacheWriteTokens;
 
-    @Column(name = "llm_cost_usd")
-    private Double llmCostUsd;
+    // No cost field here. Cost is money, and money lives in llm_usage_event as NUMERIC(18,6) with the
+    // rates it was charged at — not as a binary float on the job row. The physical llm_cost_usd column
+    // is unmapped and awaiting its drop migration; its historical values were copied into the ledger.
 
     @PrePersist
     public void prePersist() {
@@ -328,7 +317,7 @@ public class AgentJob {
     }
 
     /**
-     * Generate a fresh 256-bit job token. Public (#1368 hardening) so a requeue path can mint a
+     * Generate a fresh 256-bit job token. Public so a requeue path can mint a
      * replacement without going through {@code prePersist} — see {@link AgentJobRepository#requeueOrphan},
      * which rotates the token on every orphan/drain requeue so a zombie sandbox that is still alive
      * (network-partitioned, not actually dead) cannot keep authenticating against the LLM proxy once a

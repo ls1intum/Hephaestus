@@ -3,7 +3,18 @@ info:
   contact:
     email: felixtj.dietrich@tum.de
     name: Felix T.J. Dietrich
-  description: API documentation for the Hephaestus application server.
+  description: |-
+    API documentation for the Hephaestus application server.
+
+    ### Money and exact decimals
+
+    Every monetary amount and per-unit rate is a JSON number carrying `format: decimal`. It is an exact decimal on the server (`BigDecimal`, backed by a `NUMERIC` column) and MUST NOT be parsed into a binary floating-point type in a language that has an exact decimal one: bind it to `BigDecimal` / `decimal` / `Decimal`, not to `double`.
+
+    JavaScript has no exact decimal type, so the generated TypeScript client necessarily binds these to `number` (IEEE-754 binary64). That is lossless for every value this API produces, and the margin is large: a binary64 round-trips any decimal of at most 15 significant digits exactly (`DBL_DIG`). Amounts are quantised to 6 decimal places, so they are exact below **$1,000,000,000**; per-1M-token rates are quantised to 8 places, so they are exact below **$10,000,000** per 1M tokens; budget caps are quantised to 2 places and their column tops out at $99,999,999.99. Every reachable value sits orders of magnitude inside those bounds.
+
+    What that margin does NOT license is arithmetic. Totals, remaining budget and cap verdicts are computed on the server in exact decimal and shipped as fields; a client that re-derives them by summing rows is accumulating binary rounding error the server does not have. Read the totals, do not add them up.
+
+    Amounts are USD throughout — the ledger, the caps and the gates all meter in USD, and the currency is therefore part of the field name (`...Usd`) rather than a per-amount field. Where a response also carries `FxRateInfo`, that is a display-only estimate in a second currency and is never an input to a budget decision.
   license:
     name: MIT License
     url: https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE
@@ -51,12 +62,13 @@ tags:
   name: Admin
 - description: Current user's Slack privacy preferences
   name: Slack User Preferences
-- description: Workspace-scoped "bring your own" AI provider models
-  name: Workspace LLM
 - description: Per-workspace Outline collection mirroring control plane
   name: Outline collections
 - description: Team management within workspace
   name: Teams
+- description: "Workspace-scoped \"bring your own\" AI provider connections, models\
+    \ and settings"
+  name: Workspace LLM
 - description: User profile and activity data
   name: Profile
 - description: Contributor rankings and league statistics
@@ -67,8 +79,6 @@ tags:
   name: Practice Review Settings
 - description: Active sessions
   name: Account
-- description: Workspace-scoped "bring your own" AI provider connections
-  name: Workspace LLM
 - description: Workspace integration connection management
   name: Connections
 - description: Instance-admin LLM connection and settings management
@@ -938,8 +948,8 @@ paths:
               $ref: "#/components/schemas/UpdateLlmBudgetRequest"
         required: true
       responses:
-        "200":
-          description: OK
+        "204":
+          description: Cap updated
       summary: Set or clear a workspace's monthly cap on host-funded LLM spend
       tags:
       - Admin
@@ -5359,14 +5369,16 @@ components:
           - UNVERIFIABLE
         instanceMonthlyBudgetUsd:
           type: number
-          description: Monthly cap in USD on spend this instance pays for; null =
-            uncapped. Yours to set.
+          format: decimal
+          description: Monthly cap in USD on this workspace's spend on shared (instance)
+            models — the money this instance pays for; null = uncapped. Yours to set.
         instancePaused:
           type: boolean
           description: "Whether work on SHARED models is paused for this workspace\
             \ right now (current month only) — authoritative, mirroring the live gate."
         instanceTotalCostUsd:
           type: number
+          format: decimal
           description: "This month's confirmed spend on shared (instance) models,\
             \ in USD — compared against instanceMonthlyBudgetUsd."
         ownProviderBudgetVerdict:
@@ -5379,6 +5391,7 @@ components:
           - UNVERIFIABLE
         ownProviderMonthlyBudgetUsd:
           type: number
+          format: decimal
           description: "The workspace's own cap in USD on its own-provider spend;\
             \ null = uncapped. Read-only here — it governs the workspace's money,\
             \ so only its own admins may change it."
@@ -5388,6 +5401,7 @@ components:
             now.
         ownProviderTotalCostUsd:
           type: number
+          format: decimal
           description: "This month's confirmed spend on the workspace's own connected\
             \ provider(s), in USD — compared against ownProviderMonthlyBudgetUsd."
         workspaceSlug:
@@ -5514,9 +5528,6 @@ components:
           description: Frozen agent config at submit time (an INSTANCE-scoped connection's
             baseUrl is redacted to scheme://host; only a WORKSPACE-scoped BYO connection's
             baseUrl is left intact)
-        containerId:
-          type: string
-          description: Docker container ID
         createdAt:
           type: string
           format: date-time
@@ -5558,12 +5569,6 @@ components:
           type: integer
           format: int32
           description: Tokens written to prompt cache
-        llmCostUsd:
-          type: number
-          format: double
-          description: "Deprecated, always null (#1368 slice 6): the runner no longer\
-            \ reports cost. See the workspace's LLM usage rollup for the authoritative,\
-            \ catalog-derived per-job cost."
         llmModel:
           type: string
           description: "LLM model used (e.g. gpt-5.4-mini, openai/gpt-oss-120b)"
@@ -5694,15 +5699,19 @@ components:
           description: "Model id, unique within its scope"
         per1mCacheReadUsd:
           type: number
+          format: decimal
           description: Cache-read rate per 1M tokens (USD)
         per1mCacheWriteUsd:
           type: number
+          format: decimal
           description: Cache-write rate per 1M tokens (USD)
         per1mInputUsd:
           type: number
+          format: decimal
           description: Input rate per 1M tokens (USD)
         per1mOutputUsd:
           type: number
+          format: decimal
           description: Output rate per 1M tokens (USD)
         pricingMode:
           type: string
@@ -6505,16 +6514,20 @@ components:
           description: Maximum output tokens
         per1mCacheReadUsd:
           type: number
+          format: decimal
           description: "Cache-read rate per 1M tokens (USD), if applicable"
         per1mCacheWriteUsd:
           type: number
+          format: decimal
           description: "Cache-write rate per 1M tokens (USD), if applicable"
         per1mInputUsd:
           type: number
+          format: decimal
           description: Input rate per 1M tokens (USD); required when the model has
             a price
         per1mOutputUsd:
           type: number
+          format: decimal
           description: Output rate per 1M tokens (USD); required when the model has
             a price
         priceNote:
@@ -6736,7 +6749,8 @@ components:
       description: "Display-only currency conversion for the USD amounts in this response.\
         \ Multiply a USD amount by ratePerUsd to get the display-currency estimate;\
         \ always label it as an estimate and show rateDate, which is the date the\
-        \ rate was actually published on (not necessarily today)."
+        \ rate was actually published on (not necessarily today), and attribute it\
+        \ to source."
       properties:
         currencyCode:
           type: string
@@ -6751,12 +6765,22 @@ components:
           example: 2026-07-24
         ratePerUsd:
           type: number
+          format: decimal
           description: "Units of the display currency per 1 USD, at 6 decimal places"
           example: 0.878966
+        source:
+          type: string
+          description: "Who published the rate, so a disclosure can name it instead\
+            \ of saying \"a reference rate\". ECB = the European Central Bank's daily\
+            \ euro foreign-exchange reference rates."
+          enum:
+          - ECB
+          example: ECB
       required:
       - currencyCode
       - rateDate
       - ratePerUsd
+      - source
     GitHubProvider:
       type: object
       description: GitHub provider configuration
@@ -7332,15 +7356,19 @@ components:
           description: Note
         per1mCacheReadUsd:
           type: number
+          format: decimal
           description: Cache-read rate per 1M tokens (USD)
         per1mCacheWriteUsd:
           type: number
+          format: decimal
           description: Cache-write rate per 1M tokens (USD)
         per1mInputUsd:
           type: number
+          format: decimal
           description: Input rate per 1M tokens (USD)
         per1mOutputUsd:
           type: number
+          format: decimal
           description: Output rate per 1M tokens (USD)
         pricingMode:
           type: string
@@ -7388,10 +7416,12 @@ components:
           format: int64
         instanceTotalCostUsd:
           type: number
+          format: decimal
           description: "Confirmed spend on shared (instance) models for this day,\
             \ in USD."
         ownProviderTotalCostUsd:
           type: number
+          format: decimal
           description: "Spend on this workspace's own connected provider(s) for this\
             \ day, in USD."
         unpricedEventCount:
@@ -7424,6 +7454,7 @@ components:
           format: int64
         instanceTotalCostUsd:
           type: number
+          format: decimal
           description: "Confirmed spend on shared (instance) models for this job type,\
             \ in USD."
         jobType:
@@ -7438,6 +7469,7 @@ components:
           format: int64
         ownProviderTotalCostUsd:
           type: number
+          format: decimal
           description: "Spend on this workspace's own connected provider(s) for this\
             \ job type, in USD."
         totalCalls:
@@ -9400,8 +9432,12 @@ components:
       properties:
         monthlyBudgetUsd:
           type: number
+          format: decimal
           description: "Cap in USD; 0 pauses the affected work immediately, null removes\
-            \ the cap"
+            \ the cap. The purse it governs is the one the path names, and only that\
+            \ one: /admin/workspaces/{workspaceSlug}/llm/budget caps spend on shared\
+            \ (instance) models, /workspaces/{workspaceSlug}/llm/budget caps the workspace's\
+            \ spend on its own connected provider. The two are never added together."
           minimum: 0.00
     UpdateLlmConnectionRequest:
       type: object
@@ -9433,16 +9469,20 @@ components:
           minLength: 0
         per1mCacheReadUsd:
           type: number
+          format: decimal
           description: "Cache-read rate per 1M tokens (USD), if applicable"
         per1mCacheWriteUsd:
           type: number
+          format: decimal
           description: "Cache-write rate per 1M tokens (USD), if applicable"
         per1mInputUsd:
           type: number
+          format: decimal
           description: Input rate per 1M tokens (USD); required when the model has
             a price
         per1mOutputUsd:
           type: number
+          format: decimal
           description: Output rate per 1M tokens (USD); required when the model has
             a price
         pricingMode:
@@ -9780,15 +9820,19 @@ components:
           description: Maximum output tokens
         per1mCacheReadUsd:
           type: number
+          format: decimal
           description: "Cache-read rate per 1M tokens (USD), if applicable"
         per1mCacheWriteUsd:
           type: number
+          format: decimal
           description: "Cache-write rate per 1M tokens (USD), if applicable"
         per1mInputUsd:
           type: number
+          format: decimal
           description: Input rate per 1M tokens (USD)
         per1mOutputUsd:
           type: number
+          format: decimal
           description: Output rate per 1M tokens (USD)
         priceNote:
           type: string
@@ -10243,15 +10287,19 @@ components:
           description: Maximum output tokens
         per1mCacheReadUsd:
           type: number
+          format: decimal
           description: Cache-read rate per 1M tokens (USD)
         per1mCacheWriteUsd:
           type: number
+          format: decimal
           description: Cache-write rate per 1M tokens (USD)
         per1mInputUsd:
           type: number
+          format: decimal
           description: Input rate per 1M tokens (USD)
         per1mOutputUsd:
           type: number
+          format: decimal
           description: Output rate per 1M tokens (USD)
         priceNote:
           type: string
@@ -10342,6 +10390,7 @@ components:
           - UNVERIFIABLE
         instanceMonthlyBudgetUsd:
           type: number
+          format: decimal
           description: Monthly cap in USD on spend the host pays for (shared models);
             null = uncapped. Set by instance admins only — a workspace admin can see
             it but not change it.
@@ -10353,6 +10402,7 @@ components:
             \ cannot pause anything."
         instanceTotalCostUsd:
           type: number
+          format: decimal
           description: "This month's confirmed spend on shared (instance) models,\
             \ in USD — the figure instanceMonthlyBudgetUsd compares against. A floor,\
             \ not the full total, while unpricedEventCount is non-zero."
@@ -10370,6 +10420,7 @@ components:
           - UNVERIFIABLE
         ownProviderMonthlyBudgetUsd:
           type: number
+          format: decimal
           description: Monthly cap in USD on spend this workspace pays for through
             its own connected provider; null = uncapped. Set by this workspace's own
             admins.
@@ -10379,6 +10430,7 @@ components:
             paused.
         ownProviderTotalCostUsd:
           type: number
+          format: decimal
           description: "This month's confirmed spend on this workspace's own connected\
             \ provider(s), in USD — the figure ownProviderMonthlyBudgetUsd compares\
             \ against. Different money from instanceTotalCostUsd: the two are never\

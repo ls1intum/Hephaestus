@@ -11,6 +11,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -28,6 +29,8 @@ import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult;
 import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.NetworkPolicy;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxCancelledException;
+import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
+import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxInfrastructureException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
@@ -47,17 +50,22 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.springframework.core.task.AsyncTaskExecutor;
+import org.springframework.dao.TransientDataAccessResourceException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
@@ -101,6 +109,14 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
     private AgentJobExecutor executor;
 
+    /**
+     * These tests drive the executor with a pre-frozen (or deliberately absent) price snapshot rather
+     * than through live catalog admission, so they pass no {@code LlmAdmissionService}. Named instead
+     * of a bare {@code null} so each construction says WHY it is opting out — the executor's
+     * production wiring always has one.
+     */
+    private static final de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService NO_LIVE_ADMISSION = null;
+
     private static final AgentProperties AGENT_PROPS = new AgentProperties(
         true,
         Duration.ofSeconds(1),
@@ -133,6 +149,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             meterRegistry,
             usageRecorder,
             llmBudgetService,
+            NO_LIVE_ADMISSION,
             Optional.empty(),
             Optional.empty()
         );
@@ -172,7 +189,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
         job.setStatus(AgentJobStatus.QUEUED);
         job.setWorkspace(workspaceStub());
 
-        // Claim-time budget recheck (#1368 fix wave): default to "both purses open" so every
+        // Claim-time budget recheck: default to "both purses open" so every
         // pre-existing claim test keeps its original meaning. An unstubbed mock would return null
         // here, and the executor would NPE dereferencing it — so this default is load-bearing.
         lenient().when(llmBudgetService.decide(anyLong())).thenReturn(LlmBudgetDecision.ALLOWED);
@@ -202,7 +219,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
         lenient().when(transactionManager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
 
         // Dispatch of a claimed job's execution runs on the sandbox executor; run it inline so
-        // processJob() is synchronously observable, mirroring how the old NATS-era executeJob() ran
+        // processJob() is synchronously observable, so the test observes the run
         // entirely on the calling (test) thread.
         lenient()
             .doAnswer(inv -> {
@@ -223,15 +240,20 @@ class AgentJobExecutorTest extends BaseUnitTest {
     /**
      * A terminal-write-stage job the way {@code persistTerminalState} re-reads it: real jobType +
      * workspace, matching the invariant a persisted {@link AgentJob} always has both (never null in
-     * production). Needed since #1368's fix wave reads both unconditionally when no agent-reported
+     * production). Needed because the terminal path reads both unconditionally when no agent-reported
      * usage is present, to write the UNPRICED ledger fallback.
+     */
+    /**
+     * The reload the terminal write performs. It carries {@code job}'s CURRENT config snapshot because
+     * in production it is the same row: a fixture that quietly handed back an unpriced snapshot would
+     * let a test claim it exercised the priced billing path while exercising the unpriced one.
      */
     private AgentJob freshJob() {
         AgentJob freshJob = new AgentJob();
         freshJob.prePersist();
         freshJob.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         freshJob.setWorkspace(workspaceStub());
-        freshJob.setConfigSnapshot(snapshot.toJson(objectMapper));
+        freshJob.setConfigSnapshot(job.getConfigSnapshot());
         return freshJob;
     }
 
@@ -276,6 +298,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 meterRegistry,
                 usageRecorder,
                 llmBudgetService,
+                NO_LIVE_ADMISSION,
                 Optional.empty(),
                 Optional.of(workerProps("test-worker"))
             );
@@ -368,7 +391,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
     }
 
     /**
-     * Claim-time budget recheck (#1368): a workspace can pre-queue jobs faster than the cap updates,
+     * Claim-time budget recheck: a workspace can pre-queue jobs faster than the cap updates,
      * so every claim rechecks {@code llmBudgetService.decide} before letting a job start. A blocked
      * job is HELD (available_at pushed into the future, still QUEUED, marked {@code hold_reason=BUDGET})
      * so the poll loop re-evaluates the cap and resumes it automatically once the workspace is back
@@ -378,7 +401,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
      * never holds work the workspace funds through its own provider (and vice versa).
      */
     @Nested
-    @DisplayName("Claim-time budget recheck (#1368)")
+    @DisplayName("Claim-time budget recheck")
     class ClaimTimeBudgetRecheck {
 
         /** A decision that blocks only the host's purse. */
@@ -905,57 +928,37 @@ class AgentJobExecutorTest extends BaseUnitTest {
         }
     }
 
-    /** #1368 hardening: error classification — see AgentJobExecutor#handleExecutionFailure's javadoc. */
+    /** See AgentJobExecutor#handleExecutionFailure's javadoc for why this errs conservative. */
     @Nested
-    @DisplayName("Error classification (#1368 hardening)")
+    @DisplayName("Error classification")
     class ErrorClassification {
 
-        @Test
-        @DisplayName(
-            "isRetryableInfraFailure: a SandboxInfrastructureException (provably-transient infra) is retryable (#1368 fix wave, finding #7)"
-        )
-        void sandboxInfrastructureExceptionIsRetryable() {
-            assertThat(
-                AgentJobExecutor.isRetryableInfraFailure(
-                    new de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxInfrastructureException(
-                        "docker daemon unreachable"
-                    )
-                )
-            ).isTrue();
+        static Stream<Arguments> failures() {
+            return Stream.of(
+                Arguments.of(
+                    new SandboxInfrastructureException("docker daemon unreachable"),
+                    true,
+                    "provably-transient infrastructure"
+                ),
+                Arguments.of(new java.io.IOException("connection reset"), true, "a bare IOException is network-ish"),
+                Arguments.of(
+                    new SandboxException("path traversal detected"),
+                    false,
+                    "a plain SandboxException is validation/config/unexpected, deterministic across retries"
+                ),
+                Arguments.of(
+                    new SandboxCancelledException("cancelled"),
+                    false,
+                    "cancellation is a SandboxException subtype, but handled separately"
+                ),
+                Arguments.of(new RuntimeException("parse error"), false, "unclassified defaults to not-retryable")
+            );
         }
 
-        @Test
-        @DisplayName(
-            "isRetryableInfraFailure: a plain SandboxException (validation/config/unexpected) is NOT retryable — narrowed #1368 fix wave, finding #7"
-        )
-        void plainSandboxExceptionIsNotRetryable() {
-            assertThat(
-                AgentJobExecutor.isRetryableInfraFailure(
-                    new de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException("path traversal detected")
-                )
-            ).isFalse();
-        }
-
-        @Test
-        @DisplayName(
-            "isRetryableInfraFailure: SandboxCancelledException (a SandboxException subtype) is NOT retryable — it is cancellation, handled separately"
-        )
-        void sandboxCancelledExceptionIsNotRetryable() {
-            assertThat(AgentJobExecutor.isRetryableInfraFailure(new SandboxCancelledException("cancelled"))).isFalse();
-        }
-
-        @Test
-        @DisplayName("isRetryableInfraFailure: a bare IOException is retryable (network-ish)")
-        void ioExceptionIsRetryable() {
-            assertThat(AgentJobExecutor.isRetryableInfraFailure(new java.io.IOException("connection reset"))).isTrue();
-        }
-
-        @Test
-        @DisplayName(
-            "isRetryableInfraFailure: an unclassified RuntimeException is NOT retryable — conservative default"
-        )
-        void unclassifiedExceptionIsNotRetryable() {
-            assertThat(AgentJobExecutor.isRetryableInfraFailure(new RuntimeException("parse error"))).isFalse();
+        @ParameterizedTest(name = "{2}")
+        @MethodSource("failures")
+        void classifiesRetryableInfraFailures(Exception failure, boolean expected, String why) {
+            assertThat(AgentJobExecutor.isRetryableInfraFailure(failure)).as(why).isEqualTo(expected);
         }
 
         @Test
@@ -976,6 +979,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 meterRegistry,
                 usageRecorder,
                 llmBudgetService,
+                NO_LIVE_ADMISSION,
                 Optional.empty(),
                 Optional.of(workerProps("infra-retry-worker"))
             );
@@ -1046,6 +1050,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 meterRegistry,
                 usageRecorder,
                 llmBudgetService,
+                NO_LIVE_ADMISSION,
                 Optional.empty(),
                 Optional.of(workerProps("infra-retry-worker-2"))
             );
@@ -1098,6 +1103,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 meterRegistry,
                 usageRecorder,
                 llmBudgetService,
+                NO_LIVE_ADMISSION,
                 Optional.empty(),
                 Optional.of(workerProps("infra-retry-worker-3"))
             );
@@ -1134,13 +1140,13 @@ class AgentJobExecutorTest extends BaseUnitTest {
     }
 
     /**
-     * #1368 fix wave: a job that started executing (past claim+RUNNING) but ends with no
+     * a job that started executing (past claim+RUNNING) but ends with no
      * parseable usage must still leave a ledger trace — an UNPRICED entry, so the month turns
      * UNVERIFIABLE instead of looking falsely fully accounted for. Never for jobs refused before
      * RUNNING — see {@code ClaimTimeBudgetRecheck#refusedPreStartJobNeverWritesAUsageLedgerEntry}.
      */
     @Nested
-    @DisplayName("Unpriced usage ledger fallback (#1368 fix wave)")
+    @DisplayName("Unpriced usage ledger fallback")
     class UnpricedUsageLedgerFallback {
 
         @Test
@@ -1396,8 +1402,184 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             executor.processJob(jobId);
 
-            verify(usageRecorder).recordUnverifiable(eq(99L), any());
+            // A reported call with all-zero tokens is evidence of nothing priceable, so the row must be
+            // UNPRICED — but it must still carry the call as telemetry rather than vanishing.
+            ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample = ArgumentCaptor.forClass(
+                LlmUsageRecorder.LlmUsageSample.class
+            );
+            verify(usageRecorder).recordUnverifiable(eq(99L), sample.capture());
+            assertThat(sample.getValue().sourceId()).isEqualTo(freshJob.getId());
+            assertThat(sample.getValue().model()).isEqualTo("claude-sonnet-4");
+            assertThat(sample.getValue().inputTokens()).isZero();
+            assertThat(sample.getValue().outputTokens()).isZero();
+            assertThat(sample.getValue().totalCalls()).isEqualTo(1);
             verify(usageRecorder, never()).record(any(), any());
+        }
+
+        @Test
+        @DisplayName("a clean finish with no runner usage still bills the calls the proxy watched go out")
+        void cleanCompletionWithoutRunnerUsage_billsTheProxyAccumulators() {
+            // The provider was really called and really charged for — the proxy recorded each call as it
+            // happened — but the runner never wrote a usable usage.json. Reading only the runner would
+            // book this month as free and let the workspace keep spending past its cap.
+            job.setConfigSnapshot(snapshot.withPriceSnapshot(pricedSnapshot()).toJson(objectMapper));
+            stubClaimableJob();
+            setupFullExecution(); // AgentResult with no usage at all
+
+            AgentJob freshJob = freshJob();
+            when(jobRepository.findById(any(UUID.class))).thenReturn(Optional.of(freshJob));
+            when(jobRepository.findLlmUsageById(jobId)).thenReturn(
+                Optional.of(new AgentJobLlmUsage(4, 900, 600, 30, 100, 0))
+            );
+            when(jobRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(jobRepository.transitionStatus(any(), eq(AgentJobStatus.COMPLETED), any(), any(), any())).thenReturn(
+                1
+            );
+
+            executor.processJob(jobId);
+
+            ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample = ArgumentCaptor.forClass(
+                LlmUsageRecorder.LlmUsageSample.class
+            );
+            verify(usageRecorder).record(eq(99L), sample.capture());
+            assertThat(sample.getValue().totalCalls()).isEqualTo(4);
+            assertThat(sample.getValue().inputTokens()).isEqualTo(900);
+            assertThat(sample.getValue().outputTokens()).isEqualTo(600);
+            assertThat(sample.getValue().cacheReadTokens()).isEqualTo(100);
+            // Billed at the price frozen at admission — this is the priced path, not a null-cost row
+            // that merely happens to carry token counts.
+            assertThat(sample.getValue().price().pricingState()).isEqualTo(
+                de.tum.cit.aet.hephaestus.agent.usage.PricingState.PRICED
+            );
+            verify(usageRecorder, never()).recordUnverifiable(any(), any());
+        }
+
+        @Test
+        @DisplayName("a runner that did report usage wins over the proxy accumulators — never both")
+        void cleanCompletionWithRunnerUsage_prefersTheRunnerReport() {
+            // The runner's report also covers streamed calls the proxy accumulator skips, so it is the
+            // better number when it exists. Falling back must never turn into adding the two together.
+            job.setConfigSnapshot(snapshot.withPriceSnapshot(pricedSnapshot()).toJson(objectMapper));
+            stubClaimableJob();
+            setupFullExecution();
+            when(practiceAgent.parseResult(any())).thenReturn(
+                new AgentResult(
+                    true,
+                    Map.of("review", "LGTM"),
+                    new AgentResult.LlmUsage("claude-sonnet-4", 1000, 700, 50, 10, 20, 0.0, 6)
+                )
+            );
+
+            AgentJob freshJob = freshJob();
+            when(jobRepository.findById(any(UUID.class))).thenReturn(Optional.of(freshJob));
+            lenient()
+                .when(jobRepository.findLlmUsageById(jobId))
+                .thenReturn(Optional.of(new AgentJobLlmUsage(4, 900, 600, 30, 100, 0)));
+            when(jobRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(jobRepository.transitionStatus(any(), eq(AgentJobStatus.COMPLETED), any(), any(), any())).thenReturn(
+                1
+            );
+
+            executor.processJob(jobId);
+
+            ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample = ArgumentCaptor.forClass(
+                LlmUsageRecorder.LlmUsageSample.class
+            );
+            verify(usageRecorder).record(eq(99L), sample.capture());
+            assertThat(sample.getValue().totalCalls()).isEqualTo(6);
+            assertThat(sample.getValue().inputTokens()).isEqualTo(1000);
+            assertThat(sample.getValue().outputTokens()).isEqualTo(700);
+        }
+    }
+
+    @Nested
+    @DisplayName("terminal-write retry — only failures a retry can resolve")
+    class TerminalWriteRetry {
+
+        @Test
+        @DisplayName("a deterministic failure is attempted once, not three times")
+        void deterministicFailureIsNotRetried() {
+            // Re-running the same transaction with the same inputs cannot produce a different answer;
+            // it only delays the give-up handling the sweeper depends on.
+            stubClaimableJob();
+            setupFullExecution();
+            when(jobRepository.transitionStatus(any(), eq(AgentJobStatus.COMPLETED), any(), any(), any())).thenReturn(
+                1
+            );
+            when(jobRepository.findById(any(UUID.class))).thenThrow(
+                new IllegalStateException("Started job has no admitted LLM price snapshot")
+            );
+
+            executor.processJob(jobId);
+
+            // Each attempt opens with the fenced terminal transition, so counting it counts attempts.
+            verify(jobRepository, times(1)).transitionStatus(any(), eq(AgentJobStatus.COMPLETED), any(), any(), any());
+            verify(usageRecorder, never()).record(any(), any());
+            verify(usageRecorder, never()).recordUnverifiable(any(), any());
+        }
+
+        @Test
+        @DisplayName("a transient data-access failure is retried and the terminal write still lands")
+        void transientFailureIsRetriedUntilItSucceeds() {
+            job.setConfigSnapshot(snapshot.withPriceSnapshot(pricedSnapshot()).toJson(objectMapper));
+            stubClaimableJob();
+            setupFullExecution();
+            when(jobRepository.transitionStatus(any(), eq(AgentJobStatus.COMPLETED), any(), any(), any())).thenReturn(
+                1
+            );
+            when(jobRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(jobRepository.findLlmUsageById(jobId)).thenReturn(
+                Optional.of(new AgentJobLlmUsage(2, 100, 50, 0, 0, 0))
+            );
+            AgentJob freshJob = freshJob();
+            AtomicInteger loads = new AtomicInteger();
+            when(jobRepository.findById(any(UUID.class))).thenAnswer(inv -> {
+                if (loads.incrementAndGet() == 1) {
+                    throw new TransientDataAccessResourceException("connection reset");
+                }
+                return Optional.of(freshJob);
+            });
+
+            executor.processJob(jobId);
+
+            verify(jobRepository, times(2)).transitionStatus(any(), eq(AgentJobStatus.COMPLETED), any(), any(), any());
+
+            // The retried attempt must not bill twice, and the one sample that lands must carry the
+            // job's real token counts — a retry that re-ran the usage read with a partial result would
+            // charge the workspace for tokens it did not spend.
+            ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample = ArgumentCaptor.forClass(
+                LlmUsageRecorder.LlmUsageSample.class
+            );
+            verify(usageRecorder, times(1)).record(eq(99L), sample.capture());
+            assertThat(sample.getValue().inputTokens()).isEqualTo(100L);
+            assertThat(sample.getValue().outputTokens()).isEqualTo(50L);
+            assertThat(sample.getValue().totalCalls()).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("classification covers pool exhaustion and wrapped causes, and stops at deterministic errors")
+        void classifierRecognisesOnlyResolvableInfrastructureFailures() {
+            assertThat(
+                AgentJobExecutor.isRetryableTerminalWriteFailure(new TransientDataAccessResourceException("blip"))
+            ).isTrue();
+            assertThat(
+                AgentJobExecutor.isRetryableTerminalWriteFailure(
+                    new org.springframework.transaction.CannotCreateTransactionException("pool exhausted")
+                )
+            ).isTrue();
+            assertThat(
+                AgentJobExecutor.isRetryableTerminalWriteFailure(
+                    new RuntimeException("wrapped", new org.springframework.dao.RecoverableDataAccessException("gone"))
+                )
+            ).isTrue();
+            assertThat(
+                AgentJobExecutor.isRetryableTerminalWriteFailure(new IllegalStateException("no price snapshot"))
+            ).isFalse();
+            assertThat(
+                AgentJobExecutor.isRetryableTerminalWriteFailure(
+                    new org.springframework.dao.DataIntegrityViolationException("constraint")
+                )
+            ).isFalse();
         }
     }
 
@@ -1409,7 +1591,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             "the practice request carries the snapshot's resolved behaviour + the job's own token — ONE credential path"
         )
         void requestCarriesSnapshotBehaviourAndJobToken() {
-            // #1368 slice 5: no worker-side BYO-LLM override exists anymore — every host (app-server AND
+            // There is no worker-side BYO-LLM override — every host (app-server AND
             // worker) reaches the LLM proxy the same way, via the job's own token.
             executor = new AgentJobExecutor(
                 AGENT_PROPS,
@@ -1424,6 +1606,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 meterRegistry,
                 usageRecorder,
                 llmBudgetService,
+                NO_LIVE_ADMISSION,
                 Optional.empty(),
                 Optional.of(workerProps("test-worker"))
             );
@@ -1462,7 +1645,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Poll loop capacity math (#1368 NATS→Postgres cutover)")
+    @DisplayName("Poll loop capacity math")
     class PollLoopCapacity {
 
         @Test
@@ -1492,6 +1675,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 meterRegistry,
                 usageRecorder,
                 llmBudgetService,
+                NO_LIVE_ADMISSION,
                 Optional.of(capacityState),
                 Optional.empty()
             );
@@ -1544,6 +1728,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 meterRegistry,
                 usageRecorder,
                 llmBudgetService,
+                NO_LIVE_ADMISSION,
                 Optional.of(capacityState),
                 Optional.empty()
             );
@@ -1564,7 +1749,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         @DisplayName(
-            "#1368 fix wave: capacity is further bounded by the sandbox executor's actual free pool " +
+            "capacity is further bounded by the sandbox executor's actual free pool " +
                 "slots — reviewMax alone is not enough, it can exceed the pool size"
         )
         void capacityIsBoundedBySandboxExecutorFreeSlots() throws Exception {
@@ -1599,6 +1784,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     meterRegistry,
                     usageRecorder,
                     llmBudgetService,
+                    NO_LIVE_ADMISSION,
                     Optional.of(capacityState),
                     Optional.empty()
                 );
@@ -1613,7 +1799,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Sandbox pool rejection (#1368 fix wave)")
+    @DisplayName("Sandbox pool rejection")
     class PoolRejection {
 
         @Test
@@ -1632,6 +1818,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 meterRegistry,
                 usageRecorder,
                 llmBudgetService,
+                NO_LIVE_ADMISSION,
                 Optional.empty(),
                 Optional.of(workerProps("rejecting-worker"))
             );
@@ -1677,6 +1864,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 meterRegistry,
                 usageRecorder,
                 llmBudgetService,
+                NO_LIVE_ADMISSION,
                 Optional.empty(),
                 Optional.of(workerProps("rejecting-worker"))
             );
@@ -1722,7 +1910,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Drain requeue-first (#1368 fix wave — matches the documented drain contract)")
+    @DisplayName("Drain requeue-first — matches the documented drain contract")
     class DrainRequeue {
 
         @Test
@@ -1741,6 +1929,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 meterRegistry,
                 usageRecorder,
                 llmBudgetService,
+                NO_LIVE_ADMISSION,
                 Optional.empty(),
                 Optional.of(workerProps("draining-worker"))
             );
@@ -1791,6 +1980,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 meterRegistry,
                 usageRecorder,
                 llmBudgetService,
+                NO_LIVE_ADMISSION,
                 Optional.empty(),
                 Optional.of(workerProps("draining-worker"))
             );
@@ -1830,7 +2020,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Drain admission race (#1368 fix wave)")
+    @DisplayName("Drain admission race")
     class DrainAdmissionRace {
 
         @Test
@@ -1863,7 +2053,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Execution-start fence (#1368)")
+    @DisplayName("Execution-start fence")
     class ExecutionStartFence {
 
         @Test
@@ -1896,6 +2086,32 @@ class AgentJobExecutorTest extends BaseUnitTest {
     }
 
     // Helpers
+
+    /** The claim-path stubs every "run one job end to end" test needs. */
+    private void stubClaimableJob() {
+        when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
+        when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            Optional.of(binding)
+        );
+        when(
+            jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_DETECTION), any())
+        ).thenReturn(0L);
+        when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    /** A frozen admission price, so a billed sample is PRICED rather than unverifiable-by-price. */
+    private static de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot pricedSnapshot() {
+        return new de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot(
+            de.tum.cit.aet.hephaestus.agent.usage.FundingSource.INSTANCE,
+            de.tum.cit.aet.hephaestus.agent.usage.PricingState.PRICED,
+            1L,
+            null,
+            new java.math.BigDecimal("1.00"),
+            new java.math.BigDecimal("2.00"),
+            new java.math.BigDecimal("0.10"),
+            new java.math.BigDecimal("0.20")
+        );
+    }
 
     private JobTypeHandler setupFullExecution() {
         SandboxResult successResult = new SandboxResult(0, Map.of(), "success", false, Duration.ofMinutes(2));

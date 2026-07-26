@@ -63,12 +63,12 @@ public enum ConfigAuditEntityType {
     WORKSPACE_BYO_LLM_BUDGET,
 
     /**
-     * A workspace's own "bring your own" LLM provider connection (#1368): the endpoint the workspace
+     * A workspace's own "bring your own" LLM provider connection: the endpoint the workspace
      * owns the key and the bill for. Workspace-admin-owned and tenant-scoped, unlike the instance
      * catalog (which is GLOBAL and therefore audited on {@code auth_event} instead — this port cannot
      * carry a null {@code workspace_id}).
      */
     WORKSPACE_LLM_CONNECTION,
-    /** A model on a workspace's own BYO connection (#1368), including its inline price and enablement. */
+    /** A model on a workspace's own BYO connection, including its inline price and enablement. */
     WORKSPACE_LLM_MODEL,
 }

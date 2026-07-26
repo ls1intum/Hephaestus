@@ -26,7 +26,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
 
     Optional<AgentJob> findByIdAndWorkspaceId(UUID id, Long workspaceId);
 
-    /** Concurrency count for a workspace's per-purpose binding (#1368). */
+    /** Concurrency count for a workspace's per-purpose binding. */
     long countByWorkspaceIdAndPurposeAndStatusIn(
         Long workspaceId,
         AgentPurpose purpose,
@@ -42,7 +42,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     // Execution pipeline queries (issue #746)
 
     /**
-     * Release this workspace's budget-held jobs so they can be claimed on the next poll (#1368).
+     * Release this workspace's budget-held jobs so they can be claimed on the next poll.
      * Called right after either monthly cap is raised or cleared: the hold pushed {@code available_at}
      * up to an hour out, and without this the flagship self-serve action ("I raised my cap") would
      * look broken for that whole hour.
@@ -89,7 +89,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     /**
      * Claim a QUEUED job for execution with {@code FOR UPDATE SKIP LOCKED}.
      * Returns empty if the row is already locked (a concurrent poller claimed it first), not QUEUED,
-     * or not yet eligible ({@code available_at > :now} — #1368 fix wave).
+     * or not yet eligible ({@code available_at > :now}).
      *
      * <p>{@code available_at <= :now} is re-checked here (not just in {@link #findQueuedIdsOldestFirst}'s
      * candidate poll): the candidate list is fetched once per poll iteration, but this claim can run
@@ -189,10 +189,32 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     );
 
     /**
-     * Add one proxied call's token usage to the job's running totals (#1368). Written by the LLM
+     * Add one proxied call's token usage to the running totals of ONE attempt. Written by the LLM
      * proxy per non-streaming call so a job that crashes mid-run still has the calls it made on
      * record — the terminal write overwrites these with the runner-reported authoritative totals on
      * a clean finish, so on the happy path this is superseded and never double-counts.
+     *
+     * <p><b>Fenced on {@code retry_count} and {@code RUNNING}</b>, because a provider call can outlive
+     * the attempt that issued it. The proxy authenticates a call against a RUNNING row, then waits on
+     * the provider — up to the proxy's block timeout — before writing here. In that window {@link
+     * #requeueOrphan} can hand the row to a new attempt (bumping {@code retry_count} and ZEROing these
+     * same columns so the next attempt bills only its own calls); this is precisely the window orphan
+     * recovery exists for, where a worker looks dead but is not. Keyed on the job id alone, that late
+     * write would land on the new attempt's freshly-zeroed counters and be billed at ITS frozen price
+     * and ITS funding source — one attempt's tokens charged to another, possibly to the other purse.
+     * The {@code retry_count} predicate makes such a write match no row at all, which the caller
+     * reports rather than swallows.
+     *
+     * <p>{@code status = 'RUNNING'} closes the same hole on the terminal side: once a clean finish has
+     * replaced these columns with the runner's authoritative totals, adding proxy tokens on top would
+     * corrupt the very record the recovery paths read.
+     *
+     * <p>{@code llm_cache_write_tokens} is deliberately not touched: neither OpenAI-compatible usage
+     * shape the proxy parses reports cache WRITES, so there is nothing per call to add. That column is
+     * only ever filled by the runner's own end-of-run report.
+     *
+     * @param attempt the {@code retry_count} the caller observed when it authenticated the call
+     * @return 1 if the attempt still owns the row, 0 if it has been superseded (a safe no-op)
      */
     @WorkspaceAgnostic("ID-based per-call usage accumulation from the worker-local proxy")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
@@ -202,17 +224,16 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
             "j.llmTotalInputTokens = COALESCE(j.llmTotalInputTokens, 0) + :input, " +
             "j.llmTotalOutputTokens = COALESCE(j.llmTotalOutputTokens, 0) + :output, " +
             "j.llmTotalReasoningTokens = COALESCE(j.llmTotalReasoningTokens, 0) + :reasoning, " +
-            "j.llmCacheReadTokens = COALESCE(j.llmCacheReadTokens, 0) + :cacheRead, " +
-            "j.llmCacheWriteTokens = COALESCE(j.llmCacheWriteTokens, 0) + :cacheWrite " +
-            "WHERE j.id = :id"
+            "j.llmCacheReadTokens = COALESCE(j.llmCacheReadTokens, 0) + :cacheRead " +
+            "WHERE j.id = :id AND j.retryCount = :attempt AND j.status = 'RUNNING'"
     )
     int accumulateLlmUsage(
         @Param("id") UUID id,
+        @Param("attempt") int attempt,
         @Param("input") int input,
         @Param("output") int output,
         @Param("reasoning") int reasoning,
-        @Param("cacheRead") int cacheRead,
-        @Param("cacheWrite") int cacheWrite
+        @Param("cacheRead") int cacheRead
     );
 
     /**
@@ -231,7 +252,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     java.util.Optional<AgentJobLlmUsage> findLlmUsageById(@Param("id") UUID id);
 
     /**
-     * Like {@link #transitionToCancelled}, fenced to the owning worker (#1368 fix wave, mirrors
+     * Like {@link #transitionToCancelled}, fenced to the owning worker (mirrors
      * {@link #transitionStatusOwnedBy}): a worker draining a job it believes it still owns must not
      * cancel a sibling's run if the job was orphan-requeued out from under it between the drain
      * snapshot and this write.
@@ -278,13 +299,13 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     );
 
     /**
-     * Poll-loop candidate lookup (#1368 NATS→Postgres cutover): the oldest {@code QUEUED} job ids, up
+     * Poll-loop candidate lookup: the oldest {@code QUEUED} job ids, up
      * to this worker's free local capacity. A light id-only projection — {@link
      * #findByIdQueuedForUpdateSkipLocked} re-checks and locks each candidate individually, so a stale
      * read here (a job already claimed by a sibling between this query and the claim attempt) just
      * costs a skipped candidate, never a double-claim.
      *
-     * <p>Fairness predicate (#1368): excludes candidates whose {@code (workspace, purpose)} binding is
+     * <p>Fairness predicate: excludes candidates whose {@code (workspace, purpose)} binding is
      * already at its {@code max_concurrent_jobs} cap. Without this, one workspace-purpose with a deep
      * QUEUED backlog that is fully saturated on RUNNING jobs monopolises every LIMIT window — {@code
      * processJob} would re-check and skip every one of them (correctly refusing to over-claim), but a
@@ -301,7 +322,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      * available_at} first) and {@code ix_agent_job_running_purpose} (running jobs per
      * {@code (workspace, purpose)}, for the correlated count).
      *
-     * <p>{@code available_at <= now()} (#1368 hardening) excludes jobs backed off after an infra
+     * <p>{@code available_at <= now()} excludes jobs backed off after an infra
      * failure / orphan requeue / drain requeue (see {@link #requeueOrphan}) until their backoff
      * elapses — see {@link AgentJobBackoff}.
      */
@@ -353,7 +374,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      * CAS requeue of an orphaned (or draining) job: RUNNING → QUEUED, clear ownership, bump
      * retry_count. Returns 1 if this caller won the race, 0 otherwise.
      *
-     * <p>Fenced on {@code worker_id = :workerId} (#1368 fix wave): checking status alone let a
+     * <p>Fenced on {@code worker_id = :workerId}: checking status alone let a
      * belated requeue attempt (e.g. a slow sweeper pass, or a second replica's concurrent sweep)
      * match a row that a DIFFERENT worker has since legitimately re-claimed — status is RUNNING
      * again, just under a new owner — silently stealing that worker's in-progress job back to
@@ -370,7 +391,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      * (also this worker's own id, requeuing a job that failed on a provably-infra error instead of
      * failing it terminally).
      *
-     * <p>#1368 hardening: also (a) sets {@code available_at} to a backoff-computed future instant
+     * <p>Also (a) sets {@code available_at} to a backoff-computed future instant
      * (see {@link AgentJobBackoff}) instead of leaving the job instantly re-claimable — a crash-looping
      * job would otherwise burn its whole retry budget in seconds; (b) ROTATES the job token
      * ({@code job_token}/{@code job_token_hash}) — the caller mints a fresh pair (see
@@ -386,7 +407,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     @WorkspaceAgnostic("ID-based orphan/drain requeue; caller is @WorkspaceAgnostic sweeper or worker-local drain")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
-        // #1368: also ZERO the per-attempt LLM token/call/cost accumulators. The proxy accumulates
+        // Also ZERO the per-attempt LLM token/call accumulators. The proxy accumulates
         // onto these columns as a job runs; the caller bills the dead attempt's usage (via
         // billTerminatedJob) BEFORE requeuing. If we left the totals in place, the next attempt's
         // proxy calls would add ON TOP of the already-billed ones, and the next terminal billing —
@@ -397,8 +418,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
             "j.retryCount = j.retryCount + 1, j.availableAt = :availableAt, " +
             "j.jobToken = :newJobToken, j.jobTokenHash = :newJobTokenHash, " +
             "j.llmTotalCalls = 0, j.llmTotalInputTokens = 0, j.llmTotalOutputTokens = 0, " +
-            "j.llmTotalReasoningTokens = 0, j.llmCacheReadTokens = 0, j.llmCacheWriteTokens = 0, " +
-            "j.llmCostUsd = 0 " +
+            "j.llmTotalReasoningTokens = 0, j.llmCacheReadTokens = 0, j.llmCacheWriteTokens = 0 " +
             "WHERE j.id = :id AND j.status = 'RUNNING' AND j.workerId = :workerId AND j.retryCount < :maxRetries"
     )
     int requeueOrphan(
@@ -412,7 +432,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
 
     /**
      * Self-fenced requeue for a claim this SAME worker just won but could not dispatch (sandbox
-     * executor pool rejection, #1368 fix wave): RUNNING → QUEUED, ownership cleared, {@code
+     * executor pool rejection): RUNNING → QUEUED, ownership cleared, {@code
      * retry_count} left untouched. The job never actually started executing — refusing it before
      * dispatch is a delivery-mechanism hiccup, not a failed attempt, so it must not burn part of the
      * job's retry budget (that would let a chronically undersized sandbox pool exhaust {@code
@@ -427,7 +447,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     @WorkspaceAgnostic("ID-based self-fenced requeue; caller is the claiming worker itself")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
-        // #1368 hardening: available_at is DELIBERATELY left untouched (not backed off) — the job
+        // available_at is DELIBERATELY left untouched (not backed off) — the job
         // never actually started executing, so this is a delivery-mechanism hiccup, not a failed
         // attempt, and it must stay immediately reclaimable. No explicit reset to "now" is needed
         // either: this row could only have been claimed in the first place because available_at was
@@ -471,7 +491,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         @Param("fromStatuses") Collection<DeliveryStatus> fromStatuses
     );
 
-    // Delivery recovery sweep (#1368 hardening): jobs stuck at delivery_status=PENDING because the
+    // Delivery recovery sweep: jobs stuck at delivery_status=PENDING because the
     // executor crashed between marking PENDING (in the terminal-write transaction) and finishing
     // delivery. See AgentJobZombieSweeper#recoverStuckDeliveries.
 
@@ -503,7 +523,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     int claimDeliveryRecoveryAttempt(@Param("id") UUID id, @Param("expectedAttempts") short expectedAttempts);
 
     /**
-     * Fenced terminal write for a delivery-recovery attempt (#1368 fix wave, finding #5):
+     * Fenced terminal write for a delivery-recovery attempt:
      * {@code delivery_status} carries the CAS from {@code fromStatuses}, but the write is ALSO fenced on
      * {@code delivery_attempts = :expectedAttempts} — the value THIS attempt's own {@link
      * #claimDeliveryRecoveryAttempt} call just claimed. {@code delivery_attempts} is a counter, not a
@@ -534,7 +554,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         @Param("expectedAttempts") short expectedAttempts
     );
 
-    // Retention (#1368 hardening): AgentJobRetentionService. Both batched via a bounded subquery so a
+    // Retention: AgentJobRetentionService. Both batched via a bounded subquery so a
     // large backlog is worked off in many short transactions instead of one long one (mirrors
     // integration.core.sync.SyncJobService's retention style — no single unbounded UPDATE/DELETE).
 
@@ -543,7 +563,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      * {@code batchSize} TERMINAL rows completed before {@code cutoff} that still carry a payload.
      * Idempotent — a row with both columns already NULL is not matched again.
      *
-     * <p>Excludes {@code delivery_status = 'PENDING'} (#1368 fix wave, BLOCKER finding #2): a job whose
+     * <p>Excludes {@code delivery_status = 'PENDING'}: a job whose
      * delivery has not landed yet may still need its {@code output} to compose the delivery-recovery
      * retry ({@code JobTypeHandler#deliver} reads {@code job.getOutput()}) — stripping it first would
      * make a stuck-PENDING job permanently undeliverable.
@@ -567,7 +587,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     /**
      * Delete up to {@code batchSize} TERMINAL rows completed before {@code cutoff} outright.
      *
-     * <p>Two exclusions (#1368 fix wave):
+     * <p>Two exclusions:
      * <ul>
      *   <li><b>{@code delivery_status = 'PENDING'}</b> (finding #2) — a job whose delivery has not
      *       landed yet must survive for the delivery-recovery sweep to retry; deleting it outright
@@ -579,8 +599,8 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      *       outlive the operational {@code agent_job} row. A row referenced by {@code feedback} already
      *       shed its heavy payload columns at {@code payload-retention} (14d, well before this 90d
      *       delete), so excluding it here only means the (now-lightweight) row itself lives on — bounded,
-     *       not unbounded, growth. See also 1784636803503-40, which hardens the FK itself to RESTRICT so
-     *       this can never regress silently.</li>
+     *       not unbounded, growth. The {@code feedback} FK is {@code ON DELETE RESTRICT}, so a future
+     *       delete that forgets this exclusion fails loudly instead of shedding the data.</li>
      * </ul>
      */
     @WorkspaceAgnostic("Cross-workspace retention batch; caller is @WorkspaceAgnostic retention service")
@@ -598,15 +618,14 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     )
     int deleteTerminalRowsOlderThan(@Param("cutoff") Instant cutoff, @Param("batchSize") int batchSize);
 
-    // Queue health gauges (#1368 hardening): AgentQueueHealthSampler.
+    // Queue health gauges: AgentQueueHealthSampler.
 
     /**
-     * Depth + oldest-eligible-age + running count in a SINGLE pass (#1368 fix wave, finding #12):
-     * previously three separate queries, each a COUNT/MIN scan — worst exactly when an incident has
-     * inflated the backlog, i.e. when the signal matters most and the query is most expensive. One
-     * query with {@code FILTER} clauses scans the (still index-backed, via the {@code status IN (...)}
-     * predicate matching the partial indexes {@code ix_agent_job_queued_available} /
-     * {@code ix_agent_job_running_config}) row set once instead of three times.
+     * Depth + oldest-eligible-age + running count in a SINGLE pass. Three separate COUNT/MIN scans
+     * would be slowest exactly when an incident has inflated the backlog — when the signal matters most.
+     * One query with {@code FILTER} clauses scans the row set once, still index-backed via the
+     * {@code status IN (...)} predicate matching the partial indexes
+     * {@code ix_agent_job_queued_available} / {@code ix_agent_job_running_config}.
      *
      * <p>{@code :now} is a bind parameter rather than JPQL/SQL {@code now()} for the same reason as
      * elsewhere in this repository — judged on the same app-clock instant {@code available_at} was

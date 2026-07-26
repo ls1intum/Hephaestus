@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import static de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent.TriggerEventNames;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -408,8 +409,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             ).thenReturn(new GateDecision.Detect(workspace, List.of()));
             when(agentJobService.submit(any(), any(), any())).thenThrow(new RuntimeException("DB error"));
 
-            // Should not throw
-            listener.onPullRequestCreated(event);
+            // Swallowing is the contract: this listener runs on the webhook consumer, and a thrown
+            // exception would NAK the delivery and redeliver the same doomed submission.
+            assertThatCode(() -> listener.onPullRequestCreated(event)).doesNotThrowAnyException();
         }
 
         @Test
@@ -618,10 +620,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             when(
                 practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.REVIEW_SUBMITTED, TriggerMode.AUTO)
             ).thenReturn(new GateDecision.Detect(workspace, List.of()));
-            when(agentJobService.submit(any(), any(), any())).thenThrow(new RuntimeException("NATS error"));
+            when(agentJobService.submit(any(), any(), any())).thenThrow(new RuntimeException("submission failed"));
 
-            // Should not throw — inner submitJob catch handles it
-            listener.onReviewSubmitted(event);
+            assertThatCode(() -> listener.onReviewSubmitted(event)).doesNotThrowAnyException();
         }
 
         @Test

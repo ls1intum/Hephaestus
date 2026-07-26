@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.handler.spi;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Tri-state result of {@link JobTypeHandler#findExistingDelivery} (#1368 fix wave, finding #6) —
+ * Tri-state result of {@link JobTypeHandler#findExistingDelivery} —
  * mirrors {@code FeedbackChannel.ExistingSummaryLookup} one layer up, at the handler/delivery-recovery
  * boundary. See {@link JobTypeHandler#findExistingDelivery}'s javadoc for why a boolean/{@code Optional}
  * is not enough here: collapsing "confirmed not delivered" and "could not determine" into the same value

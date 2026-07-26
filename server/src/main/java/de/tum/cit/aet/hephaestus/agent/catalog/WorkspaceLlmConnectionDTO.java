@@ -5,7 +5,7 @@ import java.time.Instant;
 import org.jspecify.annotations.NonNull;
 
 /**
- * A workspace's own "bring your own" LLM connection (#1368) — same shape as the instance connection
+ * A workspace's own "bring your own" LLM connection — same shape as the instance connection
  * projection, scoped to one workspace. The stored API key is never serialized: {@code hasApiKey}
  * reports whether one is set and {@code apiKeyLast4} exposes only its final four characters.
  */

@@ -505,7 +505,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     }
 
     /**
-     * Delivery-recovery dedup lookup (#1368 hardening) — see {@link JobTypeHandler#findExistingDelivery}.
+     * Delivery-recovery dedup lookup — see {@link JobTypeHandler#findExistingDelivery}.
      * PR-review delivery is the ADR 0021 re-review pipeline (summary + inline notes + ledger), which is
      * NOT reproduced here; this only guards the narrower "did a summary comment carrying this exact job's
      * marker already land" question, so a delivery-recovery retry after a crash does not blindly re-post

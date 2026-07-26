@@ -71,7 +71,7 @@ public class MentorPiAdapter {
         // minimum buildable budget so any valid binding always yields a mentor sandbox.
         int timeoutSeconds = Math.max(llmConfig.timeoutSeconds(), PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS + 1);
 
-        // ONE credential path (#1368 slice 5): the mentor's interactive sandbox is not an AgentJob row,
+        // ONE credential path: the mentor's interactive sandbox is not an AgentJob row,
         // so it gets an equivalent proxy-scoped token from the in-memory mentor registry rather than a
         // DB-backed job token. sessionId is generated here (rather than left to the InteractiveSandboxSpec
         // constructor) so it can also key the mint — DockerInteractiveSandboxAdapter revokes this token by

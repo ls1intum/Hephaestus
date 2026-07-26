@@ -26,6 +26,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 
 @Tag("unit")
@@ -71,14 +73,19 @@ class BotCommandProcessorTest extends BaseUnitTest {
             verify(agentJobService).submit(eq(1L), eq(AgentJobType.PULL_REQUEST_REVIEW), any());
         }
 
+        /**
+         * Trailing text after the command is accepted — the second matching leg. A reviewer typing
+         * "/hephaestus review please" means the same thing, and trailing whitespace alone is already
+         * covered by the exact case above (the body is stripped before matching).
+         */
         @Test
-        void reviewCommandWithTrailingSpace_triggersReview() {
+        void reviewCommandWithTrailingArguments_triggersReview() {
             PullRequest pr = createOpenPr();
             mockPrLookup(pr);
             mockGateDetect(pr);
             when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.of(new AgentJob()));
 
-            processor.onBotCommandReceived(event("/hephaestus review   "));
+            processor.onBotCommandReceived(event("/hephaestus review please"));
 
             verify(agentJobService).submit(eq(1L), eq(AgentJobType.PULL_REQUEST_REVIEW), any());
         }
@@ -95,23 +102,15 @@ class BotCommandProcessorTest extends BaseUnitTest {
             verify(agentJobService).submit(eq(1L), eq(AgentJobType.PULL_REQUEST_REVIEW), any());
         }
 
-        @Test
-        void reviewAllCommand_doesNotTrigger() {
-            processor.onBotCommandReceived(event("/hephaestus review-all"));
-
-            verify(pullRequestRepository, never()).findByRepositoryIdAndNumber(anyLong(), anyInt());
-        }
-
-        @Test
-        void reviewcodeCommand_doesNotTrigger() {
-            processor.onBotCommandReceived(event("/hephaestus reviewcode"));
-
-            verify(pullRequestRepository, never()).findByRepositoryIdAndNumber(anyLong(), anyInt());
-        }
-
-        @Test
-        void unknownCommand_silentlyIgnored() {
-            processor.onBotCommandReceived(event("/hephaestus deploy"));
+        /**
+         * "review" must be a whole word: a command that merely STARTS with it is a different command,
+         * and running an expensive review on it would be worse than ignoring it. Nothing is looked up
+         * and nothing is submitted — an unknown command touches no repository at all.
+         */
+        @ParameterizedTest(name = "{0} is ignored")
+        @ValueSource(strings = { "/hephaestus review-all", "/hephaestus reviewcode", "/hephaestus deploy" })
+        void aCommandThatIsNotReview_isSilentlyIgnored(String command) {
+            processor.onBotCommandReceived(event(command));
 
             verify(pullRequestRepository, never()).findByRepositoryIdAndNumber(anyLong(), anyInt());
             verify(agentJobService, never()).submit(any(), any(), any());

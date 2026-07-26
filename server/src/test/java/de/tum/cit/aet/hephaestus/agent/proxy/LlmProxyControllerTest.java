@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -13,11 +14,18 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.TimeUnit;
+import mockwebserver3.MockResponse;
+import mockwebserver3.MockWebServer;
+import mockwebserver3.RecordedRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -42,6 +50,9 @@ class LlmProxyControllerTest extends BaseUnitTest {
     @Mock
     private ProxyUsageAccumulator usageAccumulator;
 
+    @Mock
+    private MentorTurnUsageAccumulator mentorTurnUsageAccumulator;
+
     private LlmProxyController controller;
 
     @BeforeEach
@@ -52,7 +63,13 @@ class LlmProxyControllerTest extends BaseUnitTest {
             resolver,
             egressPolicy,
             OBJECT_MAPPER,
-            new ProxyAccounting(budgetGate, usageAccumulator, new SimpleMeterRegistry(), OBJECT_MAPPER)
+            new ProxyAccounting(
+                budgetGate,
+                usageAccumulator,
+                mentorTurnUsageAccumulator,
+                new SimpleMeterRegistry(),
+                OBJECT_MAPPER
+            )
         );
     }
 
@@ -68,7 +85,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
         void rejectsWithoutResolvingCredentialWhenWorkspaceIsOverBudget() {
             var routing = routing("openai-completions");
             authenticate(routing);
-            when(budgetGate.isBlocked(routing.workspaceId(), routing.connectionScope())).thenReturn(true);
+            when(budgetGate.isBlocked(routing)).thenReturn(true);
 
             var result = controller.proxy(
                 request("POST", "/internal/llm/chat/completions"),
@@ -82,14 +99,16 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         /**
-         * #1368: the gate asks only the purse funding THIS call, and the 429 body names WHICH purse
-         * stopped it — the two have different remedies and different people behind them.
+         * The 429 body names WHICH purse stopped the call — the two have different remedies and
+         * different people behind them. Which purse the gate consults is
+         * {@code ProxyBudgetGateTest}'s subject; here the routing's funding source is what the body
+         * must be worded from.
          */
         @Test
         void the429BodyNamesTheSharedPurseForASharedModelCall() {
             var routing = routing("openai-completions");
             authenticate(routing);
-            when(budgetGate.isBlocked(routing.workspaceId(), FundingSource.INSTANCE)).thenReturn(true);
+            when(budgetGate.isBlocked(routing)).thenReturn(true);
 
             var result = controller.proxy(
                 request("POST", "/internal/llm/chat/completions"),
@@ -108,7 +127,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
         void the429BodyNamesTheOwnProviderPurseForAnOwnProviderCall() {
             var routing = workspaceFundedRouting();
             authenticate(routing);
-            when(budgetGate.isBlocked(routing.workspaceId(), FundingSource.WORKSPACE)).thenReturn(true);
+            when(budgetGate.isBlocked(routing)).thenReturn(true);
 
             var result = controller.proxy(
                 request("POST", "/internal/llm/chat/completions"),
@@ -124,15 +143,17 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         /**
-         * The asymmetry: an exhausted host budget must not 429 a call the workspace pays for. The
-         * gate answers false for the WORKSPACE purse, so the call proceeds to credential resolution
-         * (which here returns nothing, hence 502 — anything but 429 proves the gate let it through).
+         * A call the gate allows is never turned into a 429 further down: it proceeds to credential
+         * resolution (which here returns nothing, hence 502 — anything but 429 proves it went
+         * through). The asymmetry that produces the allow — an exhausted host budget must not stop a
+         * call the workspace pays for — is decided inside the gate, and pinned by
+         * {@code ProxyBudgetGateTest}.
          */
         @Test
-        void doesNotRejectAnOwnProviderCallWhenOnlyTheInstancePurseIsBlocked() {
+        void doesNotRejectACallTheGateAllows() {
             var routing = workspaceFundedRouting();
             authenticate(routing);
-            when(budgetGate.isBlocked(routing.workspaceId(), FundingSource.WORKSPACE)).thenReturn(false);
+            when(budgetGate.isBlocked(routing)).thenReturn(false);
             when(resolver.resolveProxyCredential(any())).thenReturn(null);
 
             var result = controller.proxy(
@@ -255,9 +276,9 @@ class LlmProxyControllerTest extends BaseUnitTest {
                 StandardCharsets.UTF_8
             );
 
-            byte[] output = controller.prepareBody(input, "catalog-model", false);
+            var prepared = controller.prepareBody(input, "catalog-model", false);
 
-            var tree = OBJECT_MAPPER.readTree(output);
+            var tree = OBJECT_MAPPER.readTree(prepared.body());
             assertThat(tree.path("model").asString()).isEqualTo("catalog-model");
             assertThat(tree.has("service_tier")).isFalse();
         }
@@ -276,11 +297,14 @@ class LlmProxyControllerTest extends BaseUnitTest {
         void shouldAddStreamingUsageForChatCompletions() {
             byte[] input = "{\"stream\":true,\"messages\":[]}".getBytes(StandardCharsets.UTF_8);
 
-            byte[] output = controller.prepareBody(input, "catalog-model", true);
+            var prepared = controller.prepareBody(input, "catalog-model", true);
 
-            var tree = OBJECT_MAPPER.readTree(output);
+            var tree = OBJECT_MAPPER.readTree(prepared.body());
             assertThat(tree.path("model").asString()).isEqualTo("catalog-model");
             assertThat(tree.path("stream_options").path("include_usage").asBoolean()).isTrue();
+            // The un-augmented body is kept so a provider that rejects the flag can be retried on
+            // exactly what the caller sent.
+            assertThat(OBJECT_MAPPER.readTree(prepared.withoutUsageRequest()).has("stream_options")).isFalse();
         }
 
         @Test
@@ -318,6 +342,204 @@ class LlmProxyControllerTest extends BaseUnitTest {
             byte[] input = "{\"modalities\":[\"text\"]}".getBytes(StandardCharsets.UTF_8);
 
             assertThat(controller.prepareBody(input, "model", false)).isNotNull();
+        }
+    }
+
+    /**
+     * A streamed call, end to end against a real upstream: what the client receives, and what the
+     * ledger is told, from the same bytes.
+     *
+     * <p>Before this, the controller returned the instant it saw an SSE body, so a streamed call
+     * reached no accounting at all. These tests drive an actual HTTP stream because the failure they
+     * guard against is invisible to any mock — the response is perfect either way, and only the
+     * accounting is missing.
+     */
+    @Nested
+    class Streaming {
+
+        private MockWebServer upstream;
+        private LlmProxyController streamingController;
+
+        @BeforeEach
+        void startUpstream() throws IOException {
+            upstream = new MockWebServer();
+            upstream.start();
+            streamingController = new LlmProxyController(
+                WebClient.builder().build(),
+                resolver,
+                egressPolicy,
+                OBJECT_MAPPER,
+                new ProxyAccounting(
+                    budgetGate,
+                    usageAccumulator,
+                    mentorTurnUsageAccumulator,
+                    new SimpleMeterRegistry(),
+                    OBJECT_MAPPER
+                )
+            );
+        }
+
+        @AfterEach
+        void stopUpstream() throws IOException {
+            upstream.close();
+        }
+
+        private ProxyRouting streamingRouting() {
+            return new ProxyRouting(
+                "job:stream",
+                "openai-completions",
+                upstream.url("/v1").toString(),
+                FundingSource.INSTANCE,
+                7L,
+                8L,
+                9L,
+                ATTEMPT
+            );
+        }
+
+        private MockHttpServletResponse proxyStream(String... sseFrames) {
+            StringBuilder body = new StringBuilder();
+            for (String frame : sseFrames) {
+                body.append("data: ").append(frame).append("\n\n");
+            }
+            upstream.enqueue(
+                new MockResponse.Builder()
+                    .code(200)
+                    .addHeader("Content-Type", "text/event-stream")
+                    .body(body.toString())
+                    .build()
+            );
+            ProxyRouting routing = streamingRouting();
+            authenticate(routing);
+            when(
+                resolver.resolveProxyCredential(
+                    new LlmModelResolver.ConnectionRef(
+                        routing.connectionScope(),
+                        routing.connectionId(),
+                        routing.modelId(),
+                        routing.workspaceId()
+                    )
+                )
+            ).thenReturn(
+                new LlmModelResolver.ProxyCredential(
+                    upstream.url("/v1").toString(),
+                    "openai-completions",
+                    LlmAuthMode.BEARER,
+                    "catalog-model",
+                    "secret"
+                )
+            );
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            controllerProxy(response);
+            return response;
+        }
+
+        private void controllerProxy(MockHttpServletResponse response) {
+            streamingController.proxy(
+                request("POST", "/internal/llm/chat/completions"),
+                response,
+                new HttpHeaders(),
+                "{\"stream\":true,\"messages\":[]}".getBytes(StandardCharsets.UTF_8)
+            );
+        }
+
+        /**
+         * Kills "return before recording usage on the SSE branch" — i.e. the original bug. The client's
+         * bytes are asserted alongside the accounting so a fix that buffered the stream to read it would
+         * not pass either.
+         */
+        @Test
+        @DisplayName("a streamed call is billed for the usage its final frame reports")
+        void aStreamedCallIsBilled() throws Exception {
+            MockHttpServletResponse response = proxyStream(
+                "{\"choices\":[{\"delta\":{\"content\":\"hi\"}}],\"usage\":null}",
+                "{\"choices\":[],\"usage\":{\"prompt_tokens\":100,\"completion_tokens\":40," +
+                    "\"prompt_tokens_details\":{\"cached_tokens\":25}}}",
+                "[DONE]"
+            );
+
+            assertThat(response.getContentAsString()).contains("\"content\":\"hi\"").contains("[DONE]");
+            ArgumentCaptor<ProxyTokenUsage> usage = ArgumentCaptor.forClass(ProxyTokenUsage.class);
+            verify(usageAccumulator).accumulate(eq(ATTEMPT), usage.capture());
+            assertThat(usage.getValue().billableInputTokens()).isEqualTo(75);
+            assertThat(usage.getValue().outputTokens()).isEqualTo(40);
+            assertThat(usage.getValue().cacheReadTokens()).isEqualTo(25);
+        }
+
+        /**
+         * A stream that ends before its usage frame bills what it observed — which is nothing. Recording
+         * a zero-token call instead would put a fabricated event in the ledger.
+         */
+        @Test
+        @DisplayName("a stream that terminates before the usage frame records nothing")
+        void aTruncatedStreamRecordsNothing() throws Exception {
+            MockHttpServletResponse response = proxyStream(
+                "{\"choices\":[{\"delta\":{\"content\":\"cut off here\"}}],\"usage\":null}"
+            );
+
+            assertThat(response.getContentAsString()).contains("cut off here");
+            verifyNoInteractions(usageAccumulator);
+        }
+
+        /**
+         * The request-side half of the fix, proven on the wire: without the flag the provider sends no
+         * usage at all and there is nothing for the tap to read.
+         */
+        @Test
+        @DisplayName("the outgoing streaming request asks the provider to report usage")
+        void theOutgoingRequestAsksForUsage() throws Exception {
+            proxyStream("[DONE]");
+
+            RecordedRequest sent = upstream.takeRequest(5, TimeUnit.SECONDS);
+            assertThat(sent).isNotNull();
+            assertThat(
+                OBJECT_MAPPER.readTree(sent.getBody().utf8()).path("stream_options").path("include_usage").asBoolean()
+            ).isTrue();
+        }
+
+        /**
+         * Asking for usage is the proxy's own addition to the caller's payload, so a provider that
+         * refuses the field must cost the caller nothing more than our blindness to that call's tokens.
+         *
+         * <p>Kills "drop the retry-without-stream_options fallback": every streaming call against such a
+         * provider then fails with a 400 the runner never asked for.
+         */
+        @Test
+        @DisplayName("a provider that rejects stream_options degrades to an unmetered call, not a failure")
+        void aProviderThatRejectsTheUsageRequestDegrades() throws Exception {
+            upstream.enqueue(
+                new MockResponse.Builder()
+                    .code(400)
+                    .addHeader("Content-Type", "application/json")
+                    .body("{\"error\":{\"message\":\"Unrecognized request argument: stream_options\"}}")
+                    .build()
+            );
+            upstream.enqueue(
+                new MockResponse.Builder()
+                    .code(200)
+                    .addHeader("Content-Type", "text/event-stream")
+                    .body("data: {\"choices\":[{\"delta\":{\"content\":\"served anyway\"}}]}\n\n")
+                    .build()
+            );
+            ProxyRouting routing = streamingRouting();
+            authenticate(routing);
+            stubCredential(
+                routing,
+                new LlmModelResolver.ProxyCredential(
+                    upstream.url("/v1").toString(),
+                    "openai-completions",
+                    LlmAuthMode.BEARER,
+                    "catalog-model",
+                    "secret"
+                )
+            );
+            MockHttpServletResponse response = new MockHttpServletResponse();
+
+            controllerProxy(response);
+
+            assertThat(response.getContentAsString()).contains("served anyway");
+            assertThat(upstream.takeRequest(5, TimeUnit.SECONDS).getBody().utf8()).contains("stream_options");
+            assertThat(upstream.takeRequest(5, TimeUnit.SECONDS).getBody().utf8()).doesNotContain("stream_options");
         }
     }
 
@@ -399,6 +621,14 @@ class LlmProxyControllerTest extends BaseUnitTest {
         return headers;
     }
 
+    /** One running attempt of one job, with nothing spent yet — the gate is stubbed in these tests. */
+    private static final ProxyRouting.BilledAttempt ATTEMPT = new ProxyRouting.BilledAttempt(
+        de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType.AGENT_JOB,
+        java.util.UUID.fromString("00000000-0000-0000-0000-0000000000aa"),
+        0,
+        java.math.BigDecimal.ZERO
+    );
+
     private static ProxyRouting routing(String protocol) {
         return new ProxyRouting(
             "job:test",
@@ -408,7 +638,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
             7L,
             8L,
             9L,
-            java.util.UUID.fromString("00000000-0000-0000-0000-0000000000aa")
+            ATTEMPT
         );
     }
 
@@ -422,7 +652,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
             7L,
             8L,
             9L,
-            java.util.UUID.fromString("00000000-0000-0000-0000-0000000000aa")
+            ATTEMPT
         );
     }
 

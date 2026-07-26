@@ -1,10 +1,18 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.LlmProperties;
+import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
+import java.util.Optional;
 import java.util.stream.IntStream;
 import mockwebserver3.MockResponse;
 import mockwebserver3.MockWebServer;
@@ -16,17 +24,20 @@ import tools.jackson.databind.ObjectMapper;
 class LlmConnectionProbeServiceTest extends BaseUnitTest {
 
     private MockWebServer upstream;
+    private LlmConnectionRepository connectionRepository;
     private LlmConnectionProbeService service;
 
     @BeforeEach
     void setUp() throws IOException {
         upstream = new MockWebServer();
         upstream.start();
+        connectionRepository = mock(LlmConnectionRepository.class);
         service = new LlmConnectionProbeService(
-            mock(LlmConnectionRepository.class),
+            connectionRepository,
             mock(EgressPolicy.class),
             new ObjectMapper(),
-            true
+            // Loopback allowed: the probe target is a MockWebServer on localhost.
+            new LlmProperties("", new LlmProperties.Egress(true), new LlmProperties.Fx(LlmProperties.ECB_DAILY_URL))
         );
     }
 
@@ -69,6 +80,30 @@ class LlmConnectionProbeServiceTest extends BaseUnitTest {
 
         assertThat(result.reachable()).isTrue();
         assertThat(result.models()).containsExactly("valid-model");
+    }
+
+    @Test
+    void shouldProbeAStoredConnectionFromAProjectionRatherThanTheEntity() {
+        // The probe blocks for up to its full network timeout. Loading a projection instead of the
+        // entity is what lets probeStored() run with no transaction and no JDBC connection held — a
+        // handful of admins testing one stalled provider must not be able to starve the pool.
+        when(connectionRepository.findProbeTargetById(5L)).thenReturn(
+            Optional.of(new LlmProbeTarget(upstream.url("/v1").toString(), LlmAuthMode.BEARER, "sk-abc"))
+        );
+        upstream.enqueue(jsonResponse("{\"data\":[{\"id\":\"gpt-5\"}]}"));
+
+        LlmProbeResultDTO result = service.probeStored(5L);
+
+        assertThat(result.reachable()).isTrue();
+        assertThat(result.models()).containsExactly("gpt-5");
+        verify(connectionRepository, never()).findById(any());
+    }
+
+    @Test
+    void shouldReportNotFoundForAnUnknownStoredConnection() {
+        when(connectionRepository.findProbeTargetById(9L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.probeStored(9L)).isInstanceOf(EntityNotFoundException.class);
     }
 
     private ProbeLlmConnectionRequestDTO request() {

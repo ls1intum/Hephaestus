@@ -98,7 +98,7 @@ public class LlmModelResolver {
 
     /**
      * Identifies WHICH connection row funds a config's binding, without exposing any credential
-     * material (#1368 slice 5). Frozen into {@link de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot}
+     * material. Frozen into {@link de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot}
      * so the proxy can re-resolve the live credential for an in-flight job without re-reading the
      * config's (possibly since-changed) current binding. Both components {@code null} represent an
      * unusable legacy snapshot.
@@ -109,10 +109,8 @@ public class LlmModelResolver {
         @Nullable Long modelId,
         @Nullable Long workspaceId
     ) {
-        /** Backward-compatible shape for legacy snapshots and callers without a catalog model reference. */
-        public ConnectionRef(@Nullable FundingSource scope, @Nullable Long connectionId) {
-            this(scope, connectionId, null, null);
-        }
+        /** The unusable-snapshot shape: no scope, no connection, nothing to resolve. */
+        public static final ConnectionRef NONE = new ConnectionRef(null, null, null, null);
     }
 
     /**
@@ -153,7 +151,7 @@ public class LlmModelResolver {
                 config.getWorkspace().getId()
             );
         }
-        return new ConnectionRef(null, null);
+        return ConnectionRef.NONE;
     }
 
     /**

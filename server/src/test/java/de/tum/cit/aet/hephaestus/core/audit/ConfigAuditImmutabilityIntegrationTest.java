@@ -14,9 +14,13 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -174,27 +178,22 @@ class ConfigAuditImmutabilityIntegrationTest {
         assertThat(rowExists(fresh)).as("a recent row survives").isTrue();
     }
 
-    @Test
-    void theEntityTypeConstraintAcceptsEveryValueTheApplicationCanEmit() {
-        // From the applied schema, not the changelog text: a CHECK narrowed by a later changeset is
-        // invisible to anything that greps XML, and rejects an INSERT for a value Java still emits.
-        assertThat(checkConstraintValues("ck_config_audit_event_entity_type")).containsExactlyInAnyOrderElementsOf(
-            names(ConfigAuditEntityType.values())
+    static Stream<Arguments> enumConstraints() {
+        return Stream.of(
+            Arguments.of("ck_config_audit_event_entity_type", ConfigAuditEntityType.values()),
+            Arguments.of("ck_config_audit_event_action", ConfigAuditAction.values()),
+            Arguments.of("ck_config_audit_event_actor_kind", ConfigAuditActorKind.values())
         );
     }
 
-    @Test
-    void theActionConstraintAcceptsEveryValueTheApplicationCanEmit() {
-        assertThat(checkConstraintValues("ck_config_audit_event_action")).containsExactlyInAnyOrderElementsOf(
-            names(ConfigAuditAction.values())
-        );
-    }
-
-    @Test
-    void theActorKindConstraintAcceptsEveryValueTheApplicationCanEmit() {
-        assertThat(checkConstraintValues("ck_config_audit_event_actor_kind")).containsExactlyInAnyOrderElementsOf(
-            names(ConfigAuditActorKind.values())
-        );
+    /**
+     * Read from the applied schema, not the changelog text: a CHECK narrowed by a later changeset is
+     * invisible to anything that greps XML, and rejects an INSERT for a value Java still emits.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("enumConstraints")
+    void theCheckConstraintAcceptsEveryValueTheApplicationCanEmit(String constraintName, Enum<?>[] values) {
+        assertThat(checkConstraintValues(constraintName)).containsExactlyInAnyOrderElementsOf(names(values));
     }
 
     private static final String SLUG = "audit-immutability";

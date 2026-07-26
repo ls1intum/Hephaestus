@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
  *
  * <p>Without this guard, two catalog entries could point at the same upstream id (e.g. one NO_CHARGE, one
  * PRICED) and {@code LlmUsageRecorder} would nondeterministically match either one, letting a NO_CHARGE
- * sibling silently shadow a PRICED one for billing purposes (#1368).
+ * sibling silently shadow a PRICED one for billing purposes.
  */
 @ResponseStatus(HttpStatus.CONFLICT)
 public class LlmModelUpstreamIdConflictException extends RuntimeException {

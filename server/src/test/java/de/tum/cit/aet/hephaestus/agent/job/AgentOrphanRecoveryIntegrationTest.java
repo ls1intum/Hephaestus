@@ -9,7 +9,6 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelPrice;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelPriceRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
-import de.tum.cit.aet.hephaestus.agent.catalog.ModelVisibility;
 import de.tum.cit.aet.hephaestus.agent.catalog.PricingMode;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
@@ -19,6 +18,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -35,8 +35,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * End-to-end proof of multi-replica orphan recovery against REAL Postgres (#1138, rewritten for the
- * #1368 NATS→Postgres cutover) — the path mocks can't cover: a dead worker's RUNNING job is detected,
+ * End-to-end proof of multi-replica orphan recovery against REAL Postgres (#1138) — the path mocks
+ * can't cover: a dead worker's RUNNING job is detected,
  * CAS-requeued back to QUEUED, and becomes claimable by a live poller.
  *
  * <p>The queue IS the {@code agent_job} table now, so there is no separate transport to verify a
@@ -110,22 +110,10 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         databaseTestUtils.cleanDatabase();
         workspace = workspaceRepository.save(TestEntities.activeWorkspace("orphan-recovery-ws"));
 
-        LlmConnection connection = new LlmConnection();
-        connection.setSlug("orphan-recovery");
-        connection.setDisplayName("Orphan recovery provider");
-        connection.setBaseUrl("https://api.openai.com/v1");
-        connection.setApiProtocol("openai-completions");
-        connection.setEnabled(true);
-        connection = connectionRepository.save(connection);
-
-        LlmModel model = new LlmModel();
-        model.setConnection(connection);
-        model.setSlug("orphan-recovery-model");
-        model.setDisplayName("Orphan recovery model");
-        model.setUpstreamModelId("test-model");
-        model.setVisibility(ModelVisibility.PUBLIC);
-        model.setEnabled(true);
-        instanceModel = modelRepository.save(model);
+        LlmConnection connection = connectionRepository.save(LlmCatalogTestFixtures.connection("orphan-recovery"));
+        instanceModel = modelRepository.save(
+            LlmCatalogTestFixtures.model(connection, "orphan-recovery-model", "test-model")
+        );
 
         LlmModelPrice price = new LlmModelPrice();
         price.setModel(instanceModel);
@@ -134,7 +122,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         price.setEffectiveFrom(Instant.now().minusSeconds(60));
         priceRepository.save(price);
 
-        // The workspace's PRACTICE_DETECTION binding: what the executor admits at claim time (#1368).
+        // The workspace's PRACTICE_DETECTION binding: what the executor admits at claim time.
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
         binding.setWorkspace(workspace);
         binding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
@@ -157,9 +145,9 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         assertThat(requeued.getWorkerId()).isNull();
         assertThat(requeued.getRetryCount()).isEqualTo(1);
 
-        // #1368 hardening: the requeue backs the job off (available_at = now + AgentJobBackoff), so it
+        // the requeue backs the job off (available_at = now + AgentJobBackoff), so it
         // is deliberately NOT yet a poll candidate — see jobWithFutureAvailableAtIsNotClaimed below for
-        // that assertion. #1368 fix wave (finding #3): processJob's own SKIP LOCKED claim NOW also gates
+        // that assertion. processJob's own SKIP LOCKED claim also gates
         // on available_at <= now (closing the stale-poll-result race — see
         // AgentJobRepository#findByIdQueuedForUpdateSkipLocked's javadoc), so a direct claim attempt
         // made WHILE still backed off correctly does NOT succeed. Simulate the backoff having elapsed
@@ -175,9 +163,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName(
-        "#1368 hardening: orphan requeue rotates the job token — the old token no longer authenticates, the new one does"
-    )
+    @DisplayName("orphan requeue rotates the job token — the old token no longer authenticates, the new one does")
     void orphanRequeueRotatesTheJobToken() {
         UUID jobId = runningJobOwnedBy("dead-replica", Instant.now().minus(Duration.ofMinutes(5)), 0);
         registerStaleWorker("dead-replica", Instant.now().minus(Duration.ofMinutes(5)));
@@ -195,7 +181,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         // for the old token even before considering the hash change.
         assertThat(jobRepository.findByJobTokenHashAndStatus(oldTokenHash, AgentJobStatus.RUNNING)).isEmpty();
 
-        // The new token authenticates once the job is claimed (RUNNING) again. #1368 fix wave (finding
+        // The new token authenticates once the job is claimed (RUNNING) again. (Finding
         // #3): the claim now also gates on available_at, so fast-forward past the requeue's backoff
         // first — see orphanRecoveryRequeuesAndBecomesClaimable's comment for the full reasoning.
         fastForwardAvailableAt(jobId);
@@ -207,7 +193,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("#1368 fix wave, finding #3: a direct claim attempt made WHILE still backed off does not succeed")
+    @DisplayName("a direct claim attempt made WHILE still backed off does not succeed")
     void claimAttemptWhileStillBackedOffDoesNotSucceed() {
         UUID jobId = runningJobOwnedBy("dead-replica-5", Instant.now().minus(Duration.ofMinutes(5)), 0);
         registerStaleWorker("dead-replica-5", Instant.now().minus(Duration.ofMinutes(5)));
@@ -231,7 +217,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("#1368 hardening: a job whose available_at is in the future is not offered as a poll candidate")
+    @DisplayName("a job whose available_at is in the future is not offered as a poll candidate")
     void jobWithFutureAvailableAtIsNotClaimed() {
         UUID jobId = runningJobOwnedBy("dead-replica-4", Instant.now().minus(Duration.ofMinutes(5)), 0);
         registerStaleWorker("dead-replica-4", Instant.now().minus(Duration.ofMinutes(5)));
@@ -265,7 +251,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     }
 
     /**
-     * #1368 fix wave: {@code requeueOrphan} used to CAS on {@code status='RUNNING'} alone. A belated
+     * {@code requeueOrphan} CASes on worker ownership, not on {@code status='RUNNING'} alone. A belated
      * requeue attempt — e.g. a slow/duplicate sweeper pass working from a stale {@link OrphanedJobRef}
      * snapshot — could match a row that a LIVE sibling has since legitimately re-claimed: status is
      * RUNNING again, just under a different {@code worker_id}. Without the {@code worker_id} fence,
@@ -381,7 +367,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     }
 
     /**
-     * Simulates the requeue's backoff having elapsed (#1368 fix wave, finding #3): moves
+     * Simulates the requeue's backoff having elapsed: moves
      * {@code available_at} into the past directly, standing in for "time passed and a later poll
      * iteration is now attempting the claim" without actually sleeping out the backoff window in the
      * test.

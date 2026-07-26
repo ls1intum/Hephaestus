@@ -5,12 +5,8 @@ import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageJobType;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
-import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerJobCancelDispatcher;
 import java.time.Instant;
@@ -138,10 +134,10 @@ public class AgentJobLifecycleService {
      * <p>Uses conditional UPDATE to prevent cancel/executor races. If the job was already
      * cancelled, this is idempotent. If the job is in a terminal state, throws 409.
      *
-     * <p>The sandbox cancel call and the LLM usage ledger write both run AFTER the status-transition
-     * transaction commits (#1368 fix wave — {@link LlmUsageRecorder#recordUnverifiable} MUST be called
-     * post-commit, matching {@code AgentJobExecutor}'s own cancellation handling). Sandbox-cancel
-     * failures are caught and logged — they do not affect the already-committed CANCELLED status.
+     * <p>The ledger write runs INSIDE the status-transition transaction — {@link LlmUsageRecorder}'s
+     * append is {@code MANDATORY} precisely so accounting and the state change stand or fall together.
+     * Only the sandbox cancel runs after the commit, because it leaves the database; its failures are
+     * caught and logged and do not affect the already-committed CANCELLED status.
      *
      * @param workspaceId workspace ID
      * @param jobId       job UUID
@@ -242,39 +238,16 @@ public class AgentJobLifecycleService {
         }
         ConfigSnapshot snap = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
         LlmPriceSnapshot price =
-            snap.priceSnapshot() != null
-                ? snap.priceSnapshot()
-                : new LlmPriceSnapshot(
-                      FundingSource.INSTANCE,
-                      PricingState.UNPRICED,
-                      null,
-                      null,
-                      null,
-                      null,
-                      null,
-                      null
-                  );
-        LlmUsageRecorder.LlmUsageSample sample = new LlmUsageRecorder.LlmUsageSample(
-            LlmUsageJobType.from(job.getJobType()),
-            LlmUsageSourceType.AGENT_JOB,
-            job.getId(),
-            job.getRetryCount(),
-            snap.upstreamModelId(),
-            0L,
-            0L,
-            0L,
-            0L,
-            0L,
-            0,
-            price,
-            Instant.now()
-        );
-        usageRecorder.recordUnverifiable(workspaceId, sample);
+            snap.priceSnapshot() != null ? snap.priceSnapshot() : LlmPriceSnapshot.unpricedInstance();
+        // A user cancel is issued from the API, which has no access to what the attempt consumed —
+        // the tokens the proxy already attributed to the row are billed by whichever executor path
+        // observes the cancellation. This row exists to say the attempt's spend is unknown.
+        TerminalUsage.none().appendTo(usageRecorder, workspaceId, job, snap.upstreamModelId(), price);
         log.info("Recorded UNPRICED usage ledger entry (user-cancel): jobId={}", job.getId());
     }
 
     /**
-     * Delivery-recovery entry point (#1368 hardening), called ONLY by {@link
+     * Delivery-recovery entry point, called ONLY by {@link
      * AgentJobZombieSweeper#recoverStuckDeliveries} for a job stuck at {@code delivery_status=PENDING} —
      * the executor crashed between the terminal-write transaction (which sets PENDING) and finishing the
      * actual delivery. Unlike {@link #retryDelivery} (the operator-facing endpoint, which requires the
@@ -283,7 +256,7 @@ public class AgentJobLifecycleService {
      * value that CAS just wrote — so no further claim is needed here; this method performs the actual
      * re-delivery attempt and records its outcome.
      *
-     * <p><b>Tri-state dedup check (#1368 fix wave, finding #6).</b> Before re-attempting, asks the handler
+     * <p><b>Tri-state dedup check.</b> Before re-attempting, asks the handler
      * whether a delivery already landed for this exact job (the crash may have happened AFTER the comment
      * posted but BEFORE {@code deliveryCommentId} was persisted — see {@link
      * de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler#findExistingDelivery}):
@@ -297,7 +270,7 @@ public class AgentJobLifecycleService {
      *       the delivery stays PENDING for a later sweep pass (bounded by the attempt cap) instead.</li>
      * </ul>
      *
-     * <p><b>Fenced terminal writes (#1368 fix wave, finding #5).</b> {@code delivery_attempts} is a
+     * <p><b>Fenced terminal writes.</b> {@code delivery_attempts} is a
      * counter, not a lease: a slow attempt spanning multiple sweep passes could otherwise be superseded
      * by a later one that claims a NEW attempt while {@code delivery_status} is still PENDING, and
      * whichever finishes LAST would win an unconditional write — including a stale FAILED clobbering an
@@ -368,8 +341,8 @@ public class AgentJobLifecycleService {
             }
             return won;
         } catch (Exception e) {
-            // No terminal write here — deliberately mirrors the pre-#1368-fix-wave contract: a failed
-            // attempt leaves delivery_status PENDING (already attempt-counted by this call's CAS claim)
+            // No terminal write here: a failed attempt leaves delivery_status PENDING (already
+            // attempt-counted by this call's CAS claim)
             // for the next sweep pass to retry. Only once AgentJobZombieSweeper#recoverStuckDeliveries
             // observes the attempt cap exhausted does it write the terminal FAILED itself.
             log.warn("Delivery recovery attempt failed: jobId={}, error={}", job.getId(), e.getMessage());
@@ -378,7 +351,7 @@ public class AgentJobLifecycleService {
     }
 
     /**
-     * Fenced terminal delivery-status write (#1368 fix wave, finding #5) — see {@link
+     * Fenced terminal delivery-status write — see {@link
      * #recoverStuckDelivery}'s javadoc. Logs (does not throw) when the fence is lost: a superseded
      * attempt's write is expected to no-op, not fail loudly.
      */

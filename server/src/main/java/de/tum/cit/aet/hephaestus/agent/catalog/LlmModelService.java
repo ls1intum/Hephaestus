@@ -20,7 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * CRUD, pricing, and sharing for instance-owned LLM catalog models (#1368). GLOBAL, {@code
+ * CRUD, pricing, and sharing for instance-owned LLM catalog models. GLOBAL, {@code
  * app_admin}-owned, so this service is {@link WorkspaceAgnostic}; access is gated by
  * {@code hasAuthority('app_admin')} on {@link LlmModelAdminController}.
  *
@@ -144,7 +144,7 @@ public class LlmModelService {
             // DB inside save() — Hibernate can defer the INSERT to the transaction's implicit flush at
             // commit, which is OUTSIDE this try/catch. A concurrent-create race would then surface the
             // unique-constraint violation as an uncaught 500 instead of the 409 this catch exists to
-            // produce (#1368 fix wave). Flushing synchronously here brings the violation back inside.
+            // produce. Flushing synchronously here brings the violation back inside.
             saved = modelRepository.saveAndFlush(model);
         } catch (DataIntegrityViolationException e) {
             // The fast-path checks above are racy; the unique constraints backstop the loser of a
@@ -256,7 +256,13 @@ public class LlmModelService {
             .findByModelIdAndEffectiveToIsNull(modelId)
             .ifPresent(open -> {
                 open.setEffectiveTo(now);
-                priceRepository.save(open);
+                // saveAndFlush, not save: the new row below is IDENTITY-generated, so persisting it
+                // issues its INSERT immediately — and Hibernate orders queued INSERTs ahead of queued
+                // UPDATEs at flush regardless. Either way the new open row would hit the database while
+                // the old one is still open, and ux_llm_model_price_open (one open price per model)
+                // would reject a perfectly legitimate reprice. Closing the old row first removes it
+                // from the index's partial predicate before the insert lands.
+                priceRepository.saveAndFlush(open);
             });
 
         LlmModelPrice price = new LlmModelPrice();
@@ -372,7 +378,7 @@ public class LlmModelService {
     /**
      * Matches the {@code ux_llm_model_connection_upstream} unique index by name so a save() failure is
      * only reported as an upstream-id conflict when that specific constraint fired — any other integrity
-     * failure (e.g. a future NOT NULL column) should not be mislabelled (#1368).
+     * failure (e.g. a future NOT NULL column) should not be mislabelled.
      */
     private static boolean isUpstreamIdConflict(DataIntegrityViolationException e) {
         Throwable cur = e;

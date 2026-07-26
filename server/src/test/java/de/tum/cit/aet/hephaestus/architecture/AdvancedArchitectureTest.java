@@ -488,6 +488,14 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
     class TestArchitectureTests {
 
         /**
+         * Tests that drive Liquibase themselves and therefore must NOT have a Spring context: the
+         * context would build the schema (either via its own Liquibase run or {@code ddl-auto}) before
+         * the test could seed the pre-migration rows it exists to migrate. The rule below is about
+         * consistent setup and cleanup, which a test owning its whole database lifecycle already has.
+         */
+        private static final Set<String> SCHEMA_OWNING_TESTS = Set.of("LegacyAgentConfigMigrationIntegrationTest");
+
+        /**
          * Integration tests should extend base test classes or be annotated with @SpringBootTest.
          *
          * <p>Using shared base classes ensures consistent setup and
@@ -515,6 +523,9 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
             ) {
                 @Override
                 public void check(JavaClass javaClass, ConditionEvents events) {
+                    if (SCHEMA_OWNING_TESTS.contains(javaClass.getSimpleName())) {
+                        return;
+                    }
                     boolean hasSpringBootTest = javaClass.isAnnotatedWith(SpringBootTest.class);
 
                     boolean extendsValidBase = javaClass

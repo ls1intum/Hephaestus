@@ -5,19 +5,18 @@ import de.tum.cit.aet.hephaestus.agent.mentor.MentorLlmConfig;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.exception.TurnAlreadyInFlightException;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.TranslatorState;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageJobType;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder.LlmUsageSample;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
-import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
+import de.tum.cit.aet.hephaestus.mentor.MentorTurnLlmUsage;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Duration;
@@ -215,36 +214,6 @@ public class MentorTurnPersistence {
         else node.put(field, value.toString());
     }
 
-    /** Compatibility overload for tests and callers that do not execute an LLM turn. */
-    public TurnPersistenceCookie persistInFlight(
-        ChatThread thread,
-        String userText,
-        UUID assistantMessageId,
-        @Nullable UUID userMessageId
-    ) {
-        return persistInFlight(
-            thread,
-            userText,
-            assistantMessageId,
-            userMessageId,
-            new MentorLlmConfig(
-                "openai-responses",
-                "",
-                "unknown",
-                null,
-                null,
-                false,
-                FundingSource.INSTANCE,
-                null,
-                null,
-                null,
-                legacyUnpriced(),
-                false,
-                600
-            )
-        );
-    }
-
     /**
      * Match the partial-unique in-flight index by name so a concurrent-turn 409 distinguishes
      * the expected race from other integrity violations.
@@ -309,12 +278,16 @@ public class MentorTurnPersistence {
         ) {
             return null;
         }
-        var cost = price.calculateCost(
-            breakdown.inputTokens(),
-            breakdown.outputTokens(),
-            breakdown.cacheReadTokens(),
-            breakdown.cacheWriteTokens()
-        );
+        // Display copy of the same figure the ledger stores; any clamp is logged and counted once, by
+        // LlmUsageRecorder, on the write that actually bills it.
+        var cost = price
+            .calculateCost(
+                breakdown.inputTokens(),
+                breakdown.outputTokens(),
+                breakdown.cacheReadTokens(),
+                breakdown.cacheWriteTokens()
+            )
+            .usd();
         return cost != null ? cost.doubleValue() : null;
     }
 
@@ -398,7 +371,7 @@ public class MentorTurnPersistence {
     }
 
     /**
-     * Append this turn's spend to the unified {@code llm_usage_event} ledger (#1368) — the
+     * Append this turn's spend to the unified {@code llm_usage_event} ledger — the
      * accounting source for the per-workspace rollup and budget cap. {@code chat_message.metadata}
      * keeps carrying the same numbers for the wire contract; the ledger row survives thread
      * deletion. Runs for finalise AND interrupt: an interrupted turn still burned tokens.
@@ -406,16 +379,48 @@ public class MentorTurnPersistence {
      * <p>Written in the same transaction as the assistant message, so a completed turn and its
      * accounting row commit atomically. The ledger's source identity makes a repeated finalisation
      * idempotent.
+     *
+     * <p><b>Two possible sources, in a fixed order.</b> The runner's own report is authoritative when
+     * there is one — it is what the chat UI already showed. When there is none, the turn is billed from
+     * what the LLM proxy recorded on the turn's row as each call was served, instead of being booked as
+     * a zero-token UNVERIFIABLE event. That is the crashed-turn case, and it is the whole reason the
+     * proxy meters a turn's calls as they happen: a turn that dies before Pi reports anything still
+     * made real, already-paid-for calls. Never both — the proxy's totals and the runner's are two views
+     * of the same calls, so summing them would double-bill.
+     *
+     * <p><b>Read from the row, not from the loaded entity.</b> A proxy call can land between the
+     * caller's {@code findById} and this point, and the mapped columns are read-only to JPA precisely
+     * so a stale snapshot cannot roll it back. Callers reach here only after the terminal
+     * {@code saveAndFlush}, which locks the row and closes the accumulator's {@code in_flight} fence —
+     * so the projection read below is final, not merely current.
      */
     private void billTurn(ChatMessage assistant, TranslatorState state, TurnPersistenceCookie cookie) {
         ChatThread thread = assistant.getThread();
         if (thread == null || thread.getWorkspace() == null || !state.hasLlmCallStarted()) return;
         UsageBreakdown usage = extractUsageFromState(state);
-        boolean unverifiable =
-            usage.inputTokens() <= 0 &&
-            usage.outputTokens() <= 0 &&
-            usage.cacheReadTokens() <= 0 &&
-            usage.cacheWriteTokens() <= 0;
+        int calls = state.observedCallCount();
+        long reasoning = 0;
+        if (isEmpty(usage)) {
+            MentorTurnLlmUsage viaProxy = chatMessageRepository
+                .findLlmUsageById(assistant.getId())
+                .orElse(MentorTurnLlmUsage.NONE);
+            if (viaProxy.hasBillableUsage()) {
+                log.info(
+                    "Mentor turn {} reported no usage of its own; billing the {} call(s) the proxy recorded",
+                    assistant.getId(),
+                    viaProxy.totalCalls()
+                );
+                usage = new UsageBreakdown(
+                    usage.model(),
+                    viaProxy.inputTokens(),
+                    viaProxy.outputTokens(),
+                    viaProxy.cacheReadTokens(),
+                    /* cacheWrite — no OpenAI-compatible usage block reports one per call */ 0
+                );
+                calls = viaProxy.totalCalls();
+                reasoning = viaProxy.reasoningTokens();
+            }
+        }
         LlmUsageSample sample = new LlmUsageSample(
             LlmUsageJobType.MENTOR_TURN,
             LlmUsageSourceType.MENTOR_TURN,
@@ -426,13 +431,22 @@ public class MentorTurnPersistence {
             usage.outputTokens(),
             usage.cacheReadTokens(),
             usage.cacheWriteTokens(),
-            0,
-            Math.max(1, state.observedCallCount()),
+            reasoning,
+            Math.max(1, calls),
             cookie.priceSnapshot(),
             Instant.now()
         );
-        if (unverifiable) usageRecorder.recordUnverifiable(thread.getWorkspace().getId(), sample);
+        if (isEmpty(usage)) usageRecorder.recordUnverifiable(thread.getWorkspace().getId(), sample);
         else usageRecorder.record(thread.getWorkspace().getId(), sample);
+    }
+
+    private static boolean isEmpty(UsageBreakdown usage) {
+        return (
+            usage.inputTokens() <= 0 &&
+            usage.outputTokens() <= 0 &&
+            usage.cacheReadTokens() <= 0 &&
+            usage.cacheWriteTokens() <= 0
+        );
     }
 
     /**
@@ -559,15 +573,7 @@ public class MentorTurnPersistence {
         Instant startedAt,
         String upstreamModelId,
         LlmPriceSnapshot priceSnapshot
-    ) {
-        public TurnPersistenceCookie(UUID threadId, UUID userMessageId, UUID assistantMessageId, Instant startedAt) {
-            this(threadId, userMessageId, assistantMessageId, startedAt, "unknown", legacyUnpriced());
-        }
-    }
-
-    private static LlmPriceSnapshot legacyUnpriced() {
-        return new LlmPriceSnapshot(FundingSource.INSTANCE, PricingState.UNPRICED, null, null, null, null, null, null);
-    }
+    ) {}
 
     private record UsageBreakdown(
         @Nullable String model,

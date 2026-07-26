@@ -58,7 +58,7 @@ class ConfigSnapshotTest extends BaseUnitTest {
             )
         );
         when(resolver.connectionRef(binding)).thenReturn(
-            new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 7L)
+            new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 7L, null, null)
         );
     }
 
@@ -133,7 +133,7 @@ class ConfigSnapshotTest extends BaseUnitTest {
 
         @Test
         void shouldNotContainAuthHeaderMaterialInJson() {
-            // Locked decision (#1368 slice 5): NEVER freeze the credential OR any header material —
+            // Locked decision: NEVER freeze the credential OR any header material —
             // authHeaderName/authValuePrefix are re-resolved live from the connection, never from the
             // snapshot.
             WorkspaceAgentBinding binding = createBinding();

@@ -5,7 +5,7 @@ import jakarta.validation.constraints.Min;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Set a workspace's model + execution limits for one agent purpose (#1368). Exactly one of
+ * Set a workspace's model + execution limits for one agent purpose. Exactly one of
  * {@code instanceModelId} / {@code workspaceModelId} must be provided. Execution limits and the
  * enabled flag keep their current value when omitted.
  */

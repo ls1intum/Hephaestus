@@ -19,7 +19,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
  */
 @WorkspaceScopedController
 @RequestMapping("/llm/settings")
-@Tag(name = "Workspace LLM", description = "Workspace-scoped \"bring your own\" AI provider connections")
+@Tag(
+    name = "Workspace LLM",
+    description = "Workspace-scoped \"bring your own\" AI provider connections, models and settings"
+)
 @RequiredArgsConstructor
 @Validated
 public class WorkspaceLlmSettingsController {
@@ -35,7 +38,7 @@ public class WorkspaceLlmSettingsController {
     public ResponseEntity<WorkspaceLlmSettingsDTO> get(WorkspaceContext workspaceContext) {
         // The policy this answers with is instance-wide, so the context is not read. It is declared
         // anyway because every workspace-scoped handler declares it (enforced by
-        // WorkspaceScopedControllerComplianceTest): resolving it is what proves the caller belongs to
+        // WorkspaceScopedControllerComplianceIntegrationTest): resolving it is what proves the caller belongs to
         // the workspace in the path, and "this one happens not to need the id" is exactly the
         // assumption that rule exists to stop anyone making silently.
         return ResponseEntity.ok(

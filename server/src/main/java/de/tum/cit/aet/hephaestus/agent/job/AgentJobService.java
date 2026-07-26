@@ -48,7 +48,6 @@ public class AgentJobService {
     private final AgentJobRepository agentJobRepository;
     private final WorkspaceAgentBindingRepository agentBindingRepository;
     private final WorkspaceRepository workspaceRepository;
-    private final ReviewableArtifactLoader artifactLoader;
     private final ConnectionService connectionService;
     private final JobTypeHandlerRegistry handlerRegistry;
     private final ObjectMapper objectMapper;
@@ -61,7 +60,6 @@ public class AgentJobService {
         AgentJobRepository agentJobRepository,
         WorkspaceAgentBindingRepository agentBindingRepository,
         WorkspaceRepository workspaceRepository,
-        ReviewableArtifactLoader artifactLoader,
         ConnectionService connectionService,
         JobTypeHandlerRegistry handlerRegistry,
         ObjectMapper objectMapper,
@@ -73,7 +71,6 @@ public class AgentJobService {
         this.agentJobRepository = agentJobRepository;
         this.agentBindingRepository = agentBindingRepository;
         this.workspaceRepository = workspaceRepository;
-        this.artifactLoader = artifactLoader;
         this.connectionService = connectionService;
         this.handlerRegistry = handlerRegistry;
         this.objectMapper = objectMapper;
@@ -164,22 +161,19 @@ public class AgentJobService {
     }
 
     /**
-     * Submit agent jobs for the given workspace — one per enabled config.
+     * Submit the workspace's practice-detection job for one reviewable artifact, if it has an enabled
+     * binding and the purse funding that binding still has room.
      *
-     * <p>Creates a job for EACH enabled agent config, with config-scoped idempotency keys.
-     * This provides redundancy: if one agent times out, others may still complete.
-     * Each delivery independently posts a new summary comment + diff notes.
-     *
-     * <p><strong>Not {@code @Transactional}</strong>: each config gets its own transaction via
-     * {@link #submitForConfig}, so a constraint-violation race on one config
-     * does not abort the PostgreSQL transaction for subsequent configs.
-     * Callers MUST NOT wrap calls to this method in an outer {@code @Transactional},
-     * as that would cause the template to join the outer transaction, defeating isolation.
+     * <p><strong>Not {@code @Transactional}</strong>: {@link #submitForBinding} opens its own
+     * transaction, so the idempotency-key race it absorbs (a concurrent submit winning the partial
+     * unique index) rolls back only that insert. An outer transaction would be joined instead, and the
+     * race would then poison the caller's whole unit of work — so callers MUST NOT wrap this.
      *
      * @param workspaceId workspace ID
      * @param jobType     the job type
      * @param request     handler-specific submission request
-     * @return the first created (or existing deduplicated) job, or empty if no enabled config found
+     * @return the created (or existing, deduplicated) job; empty when the workspace has no enabled
+     *     practice-detection binding, or the cap funding it is reached
      */
     public Optional<AgentJob> submit(Long workspaceId, AgentJobType jobType, JobSubmissionRequest request) {
         Workspace workspace = workspaceRepository
@@ -195,7 +189,7 @@ public class AgentJobService {
             return Optional.empty();
         }
 
-        // Monthly budget cap (#1368): this is THE choke point for all sandboxed LLM work —
+        // Monthly budget cap: this is THE choke point for all sandboxed LLM work —
         // webhook detection, retrospective replays, dev/bot manual triggers, conversation
         // reviews — so one check pauses them all. Scoped to whoever pays for THIS binding, so an
         // exhausted host budget never pauses work the workspace funds itself (and vice versa);
@@ -305,10 +299,8 @@ public class AgentJobService {
                 );
             }
 
-            // The credential is NEVER frozen onto the job (#1368 slice 5 — ONE credential path,
-            // resolved live by the proxy from the config snapshot's catalog connection reference on
-            // every call). AgentJob.llmApiKey is retained on the entity only for backward-compatible
-            // column shape; nothing writes or reads it anymore.
+            // The credential is NEVER frozen onto the job: there is ONE credential path, resolved live
+            // by the proxy from the config snapshot's catalog connection reference on every call.
 
             try {
                 agentJobRepository.saveAndFlush(job);
@@ -327,8 +319,8 @@ public class AgentJobService {
                 workspace.getId()
             );
 
-            // #1368 NATS→Postgres cutover: the QUEUED insert above IS the enqueue — AgentJobExecutor's
-            // poll loop discovers it directly from the agent_job table, no publish event needed.
+            // The QUEUED insert above IS the enqueue — AgentJobExecutor's poll loop discovers it
+            // directly from the agent_job table, so there is nothing further to dispatch.
 
             return job;
         });

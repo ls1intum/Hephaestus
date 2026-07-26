@@ -215,7 +215,7 @@ public class PracticeCatalogController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @Audited("PRACTICE_ACTIVE")
+    @Audited("config_audit PRACTICE_ACTIVE")
     public ResponseEntity<PracticeDTO> setActive(
         WorkspaceContext workspaceContext,
         @PathVariable String practiceSlug,
@@ -260,7 +260,7 @@ public class PracticeCatalogController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @Audited("PRACTICE_ACTIVE")
+    @Audited("config_audit PRACTICE_ACTIVE")
     public ResponseEntity<Void> deletePractice(WorkspaceContext workspaceContext, @PathVariable String practiceSlug) {
         practiceService.deletePractice(workspaceContext, practiceSlug);
         return ResponseEntity.noContent().build();

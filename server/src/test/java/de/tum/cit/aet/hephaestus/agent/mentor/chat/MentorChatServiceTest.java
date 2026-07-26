@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -16,11 +17,15 @@ import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorAgentProperties;
+import de.tum.cit.aet.hephaestus.agent.mentor.MentorLlmConfig;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorPiAdapter;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.exception.MentorRunnerException;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.exception.TurnAlreadyInFlightException;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.PiEventToUiChunkTranslator;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
+import de.tum.cit.aet.hephaestus.agent.proxy.MentorProxyCredentialRegistry;
+import de.tum.cit.aet.hephaestus.agent.proxy.ProxyRouting;
+import de.tum.cit.aet.hephaestus.agent.proxy.ProxyTokenUsage;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.AttachedSandbox;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
@@ -34,6 +39,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetBlockReason;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetDecision;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
 import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
@@ -45,6 +51,7 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -65,6 +72,7 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -143,6 +151,8 @@ class MentorChatServiceTest extends BaseUnitTest {
     private ScheduledExecutorService scheduler;
     private ExecutorService turnExec;
     private FakeSandbox sandbox;
+    private MentorProxyCredentialRegistry proxyCredentialRegistry;
+    private String sessionToken;
     private MentorChatService service;
     private RecordingEmitter emitter;
     private io.micrometer.core.instrument.simple.SimpleMeterRegistry meterRegistry;
@@ -155,6 +165,21 @@ class MentorChatServiceTest extends BaseUnitTest {
         // Direct executor so the test runs on the caller thread — no race between dispatch and assertion.
         turnExec = directExecutor();
         sandbox = new FakeSandbox();
+        proxyCredentialRegistry = new MentorProxyCredentialRegistry();
+        // Every real mentor sandbox is built with a proxy credential minted for its session, so the
+        // fixture mints one too: without it each turn would run unmetered and the warning that says so
+        // would be the normal case here rather than the exception.
+        sessionToken = proxyCredentialRegistry.mint(
+            sandbox.identity().sessionId(),
+            new MentorProxyCredentialRegistry.Route(
+                "openai-responses",
+                "https://upstream.example.com/v1",
+                FundingSource.INSTANCE,
+                1L,
+                2L,
+                WORKSPACE_ID
+            )
+        );
         emitter = new RecordingEmitter();
 
         // Package-private constructors on the executor wrappers (see MentorChatExecutorConfig)
@@ -184,10 +209,11 @@ class MentorChatServiceTest extends BaseUnitTest {
             schedulerBean,
             new MentorChatMetrics(meterRegistry),
             llmBudgetService,
-            llmAdmissionService
+            llmAdmissionService,
+            proxyCredentialRegistry
         );
 
-        // Both purses open by default (#1368) — the turn-level gate dereferences this decision, so an
+        // Both purses open by default — the turn-level gate dereferences this decision, so an
         // unstubbed null would NPE every unrelated test rather than reading as "not blocked".
         when(llmBudgetService.decide(WORKSPACE_ID)).thenReturn(LlmBudgetDecision.ALLOWED);
 
@@ -205,7 +231,7 @@ class MentorChatServiceTest extends BaseUnitTest {
                 FundingSource.INSTANCE
             )
         );
-        when(llmModelResolver.connectionRef(any())).thenReturn(new LlmModelResolver.ConnectionRef(null, null));
+        when(llmModelResolver.connectionRef(any())).thenReturn(LlmModelResolver.ConnectionRef.NONE);
         when(llmAdmissionService.admit(any(WorkspaceAgentBinding.class))).thenReturn(
             new AdmittedLlmModel(
                 new ResolvedLlmModel(
@@ -246,11 +272,14 @@ class MentorChatServiceTest extends BaseUnitTest {
         when(persistence.ensureThread(eq(WORKSPACE_ID), eq(THREAD_ID), any(), any())).thenReturn(thread);
         when(persistence.persistInFlight(any(), any(), any(), any(), any())).thenAnswer(inv -> {
             UUID assistantId = inv.getArgument(2, UUID.class);
+            MentorLlmConfig admitted = inv.getArgument(4, MentorLlmConfig.class);
             return new MentorTurnPersistence.TurnPersistenceCookie(
                 THREAD_ID,
                 UUID.randomUUID(),
                 assistantId,
-                Instant.now()
+                Instant.now(),
+                admitted.upstreamModelId(),
+                admitted.priceSnapshot()
             );
         });
         when(workspaceContextBuilder.build(any())).thenReturn(new LinkedHashMap<>());
@@ -494,7 +523,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         assertOutcomeRecorded(MentorChatMetrics.Outcome.ERROR);
     }
 
-    // 1e. Monthly LLM budget gate (#1368): both blocking reasons must refuse the turn BEFORE
+    // 1e. Monthly LLM budget gate: both blocking reasons must refuse the turn BEFORE
     // anything persists, with their own user-facing message. The gate is scoped to whoever funds the
     // resolved mentor model — the default fixture admits an INSTANCE-funded (shared) model.
 
@@ -532,7 +561,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         assertThat(String.join("\n", emitter.rawData))
             .contains("This workspace's monthly AI budget is reached")
             .doesNotContain("has no price");
-        verify(persistence, never()).persistInFlight(any(), any(), any(), any());
+        verify(persistence, never()).persistInFlight(any(), any(), any(), any(), any());
         try {
             verify(interactiveSandboxService, never()).attach(any());
         } catch (InteractiveSandboxException e) {
@@ -554,7 +583,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         assertThat(String.join("\n", emitter.rawData))
             .contains("Some usage has no price, so it can't be checked against the budget")
             .doesNotContain("is reached");
-        verify(persistence, never()).persistInFlight(any(), any(), any(), any());
+        verify(persistence, never()).persistInFlight(any(), any(), any(), any(), any());
         try {
             verify(interactiveSandboxService, never()).attach(any());
         } catch (InteractiveSandboxException e) {
@@ -565,7 +594,7 @@ class MentorChatServiceTest extends BaseUnitTest {
     }
 
     /**
-     * #1368: the host's exhausted budget must not pause a mentor running on the workspace's OWN
+     * the host's exhausted budget must not pause a mentor running on the workspace's OWN
      * provider — that is the workspace's money, governed by the workspace's own cap.
      */
     @Test
@@ -594,7 +623,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         assertThat(String.join("\n", emitter.rawData))
             .contains("This workspace's monthly AI cap is reached")
             .contains("a workspace admin raises the cap");
-        verify(persistence, never()).persistInFlight(any(), any(), any(), any());
+        verify(persistence, never()).persistInFlight(any(), any(), any(), any(), any());
         assertOutcomeRecorded(MentorChatMetrics.Outcome.ERROR);
     }
 
@@ -784,14 +813,120 @@ class MentorChatServiceTest extends BaseUnitTest {
         assertOutcomeRecorded(MentorChatMetrics.Outcome.POISONED);
     }
 
+    // 3b. Per-turn proxy metering: the window in which a turn's calls are billable
+
+    /**
+     * Wrap the scripted runner so that, at the moment the prompt goes out, we do what a real sandbox
+     * call does at the proxy: authenticate the session token, see which turn it names, post one call's
+     * tokens against that turn, and look again at what the gate would now be told.
+     *
+     * <p>The direct {@code accumulate} stands in for {@code MentorTurnUsageAccumulator}, which in
+     * production advances the meter only after the call's durable row write has landed. There is no
+     * database in this tier; the orchestrator behaviour under test is the binding, not the write.
+     */
+    private void probeProxyDuringPrompt(String token, AtomicReference<ProxyRouting.BilledAttempt> seen) {
+        Consumer<JsonNode> scripted = sandbox.onSend;
+        sandbox.onSend = frame -> {
+            if ("prompt".equals(frame.path("method").asString(""))) {
+                ProxyRouting.BilledAttempt attempt = proxyCredentialRegistry.validate(token).orElseThrow().attempt();
+                if (attempt != null) {
+                    // 100k input tokens at the fixture's $10/M — a whole dollar of this turn's own spend.
+                    proxyCredentialRegistry.accumulate(attempt.sourceId(), new ProxyTokenUsage(100_000, 0, 0, 0));
+                }
+                seen.set(proxyCredentialRegistry.validate(token).orElseThrow().attempt());
+            }
+            scripted.accept(frame);
+        };
+    }
+
+    /**
+     * The turn-scoped binding, from the orchestrator's side, and the whole point of it: mid-turn, the
+     * credential the sandbox is holding reports THIS turn and what THIS turn has already spent — which
+     * is what lets the budget gate refuse a turn before it has finished.
+     *
+     * <p>Kills "never call bindTurn": the probe sees no billing target, which is the state that let a
+     * turn spend without limit against an exhausted cap. Kills "never call unbindTurn": the session
+     * stays billable to a finished turn after it ends, so the NEXT turn's first calls land on the dead
+     * one.
+     */
+    /** The default fixture admits a NO_CHARGE model; the spend assertion needs real rates. */
+    private void admitAtTenDollarsPerMillionInputTokens() {
+        when(llmAdmissionService.admit(any(WorkspaceAgentBinding.class))).thenReturn(
+            new AdmittedLlmModel(
+                new ResolvedLlmModel(
+                    "https://api.openai.com",
+                    "openai-completions",
+                    "test-model",
+                    null,
+                    null,
+                    false,
+                    FundingSource.INSTANCE
+                ),
+                new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 1L, 2L, WORKSPACE_ID),
+                new LlmPriceSnapshot(
+                    FundingSource.INSTANCE,
+                    PricingState.PRICED,
+                    3L,
+                    null,
+                    new BigDecimal("10"),
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO
+                )
+            )
+        );
+    }
+
+    @Test
+    @DisplayName("mid-turn, the sandbox credential reports this turn and what it has already spent")
+    void aTurnIsBoundToItsSandboxCredentialOnlyWhileItRuns() {
+        admitAtTenDollarsPerMillionInputTokens();
+        AtomicReference<ProxyRouting.BilledAttempt> duringPrompt = new AtomicReference<>();
+        scheduleHappyPathResponses(sandbox).run();
+        probeProxyDuringPrompt(sessionToken, duringPrompt);
+
+        runTurnSync();
+
+        assertThat(duringPrompt.get()).as("the turn was billable while it ran").isNotNull();
+        assertThat(duringPrompt.get().sourceType()).isEqualTo(LlmUsageSourceType.MENTOR_TURN);
+        assertThat(duringPrompt.get().spentUsd())
+            .as("and the gate could see what it had already spent")
+            .isEqualByComparingTo("1.00");
+        assertThat(proxyCredentialRegistry.validate(sessionToken).orElseThrow().attempt())
+            .as("it stops being billable when it ends")
+            .isNull();
+    }
+
+    /**
+     * A turn the runner kills mid-flight releases its binding on the way out, so the sandbox's next
+     * turn starts from a clean slate rather than inheriting a dead turn's billing target.
+     *
+     * <p>Kills "unbind only on the success path".
+     */
+    @Test
+    @DisplayName("a turn that dies mid-way still releases its binding")
+    void aTurnThatDiesStillReleasesItsBinding() {
+        AtomicReference<ProxyRouting.BilledAttempt> duringPrompt = new AtomicReference<>();
+        scheduleRunnerPoisoned(sandbox).run();
+        probeProxyDuringPrompt(sessionToken, duringPrompt);
+
+        runTurnSync();
+
+        verify(persistence).interrupt(any(), any(), any(Throwable.class));
+        assertThat(duringPrompt.get()).as("it was billable while it ran").isNotNull();
+        assertThat(proxyCredentialRegistry.validate(sessionToken).orElseThrow().attempt()).isNull();
+    }
+
     // 4. In-flight conflict from persistence → 409 chunk; no runner activity
 
     @Test
     @DisplayName("in-flight conflict: persistence throws; conflict chunk sent; sandbox never attached")
     void runTurn_inFlightConflict_returns409() {
-        when(persistence.persistInFlight(any(), any(), any(), any(), any())).thenThrow(
-            new TurnAlreadyInFlightException(THREAD_ID, new RuntimeException("dup"))
-        );
+        // doThrow, not when(...).thenThrow: the latter would call the stub registered in setUp with
+        // null arguments just to record the intent.
+        doThrow(new TurnAlreadyInFlightException(THREAD_ID, new RuntimeException("dup")))
+            .when(persistence)
+            .persistInFlight(any(), any(), any(), any(), any());
 
         runTurnSync();
 
@@ -864,7 +999,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         }
 
         // Persistence MUST NOT be called when the LOCAL lock rejects up front.
-        verify(persistence, never()).persistInFlight(any(), any(), any(), any());
+        verify(persistence, never()).persistInFlight(any(), any(), any(), any(), any());
         // Distinct outcome metric so SLO dashboards separate same-JVM double-submit from the
         // durable DB backstop (the latter signals JVM-lock leak across replicas).
         assertOutcomeRecorded(MentorChatMetrics.Outcome.IN_FLIGHT_CONFLICT_LOCAL);

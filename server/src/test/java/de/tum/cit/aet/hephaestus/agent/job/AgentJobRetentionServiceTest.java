@@ -22,7 +22,7 @@ import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * #1368 hardening: {@link AgentJobRetentionService}'s batch-loop logic — a single pass must keep
+ * {@link AgentJobRetentionService}'s batch-loop logic — a single pass must keep
  * calling the batched UPDATE/DELETE until a batch returns fewer rows than the batch size (the
  * "backlog drained" signal), and must count every batch into the retention metrics.
  */

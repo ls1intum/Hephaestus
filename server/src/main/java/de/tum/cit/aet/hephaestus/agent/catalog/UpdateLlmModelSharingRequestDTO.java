@@ -7,7 +7,7 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Share a model with workspaces (#1368). {@code PUBLIC} shares with all workspaces and clears any
+ * Share a model with workspaces. {@code PUBLIC} shares with all workspaces and clears any
  * existing grants; {@code GRANTED} shares only with {@code workspaceIds}, replacing the current set.
  */
 @Schema(description = "Share with: all workspaces, or a selected set")

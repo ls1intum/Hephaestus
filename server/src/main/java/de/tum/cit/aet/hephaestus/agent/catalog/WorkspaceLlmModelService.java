@@ -20,7 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 /**
- * CRUD for models on a workspace's own "bring your own" LLM connection (#1368), plus the
+ * CRUD for models on a workspace's own "bring your own" LLM connection, plus the
  * available-models projection every workspace admin uses to pick a Task's model: the union of instance
  * catalog models visible to this workspace and the workspace's own BYO models.
  *
@@ -125,7 +125,7 @@ public class WorkspaceLlmModelService {
             // saveAndFlush (not save): a generated-id entity's INSERT can otherwise be deferred by
             // Hibernate to the transaction's implicit flush at commit — OUTSIDE this try/catch — letting
             // a concurrent-create race's unique-constraint violation escape as an uncaught 500 instead of
-            // the 409 this catch exists to produce (#1368 fix wave).
+            // the 409 this catch exists to produce.
             saved = modelRepository.saveAndFlush(model);
         } catch (DataIntegrityViolationException e) {
             // The fast-path checks above are racy; the unique constraints backstop the loser of a
@@ -314,7 +314,7 @@ public class WorkspaceLlmModelService {
     /**
      * Matches the {@code ux_ws_llm_model_connection_upstream} unique index by name so a save() failure
      * is only reported as an upstream-id conflict when that specific constraint fired — any other
-     * integrity failure should not be mislabelled (#1368).
+     * integrity failure should not be mislabelled.
      */
     private static boolean isUpstreamIdConflict(DataIntegrityViolationException e) {
         Throwable cur = e;

@@ -4,8 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -41,27 +44,20 @@ class InstanceAdminGateExemptionTest {
     @RestController
     static class Ungated {}
 
-    @Test
-    void exemptsOnlyTheExactInstanceAdminGate() {
-        assertThat(isExempt(InstanceAdminOnly.class))
-            .as("the exact app_admin gate is cross-workspace by design")
-            .isTrue();
+    static Stream<Arguments> gates() {
+        return Stream.of(
+            Arguments.of(InstanceAdminOnly.class, true, "the exact app_admin gate is cross-workspace by design"),
+            Arguments.of(AppAdminOrMember.class, false, "reachable by a workspace member"),
+            Arguments.of(AppAdminOrOwner.class, false, "reachable by a workspace owner"),
+            Arguments.of(NotAppAdmin.class, false, "negated gate excludes instance admins entirely"),
+            Arguments.of(Ungated.class, false, "no gate at all")
+        );
     }
 
-    @Test
-    void doesNotExemptCompositeExpressionsThatMerelyMentionAppAdmin() {
-        assertThat(isExempt(AppAdminOrMember.class)).as("reachable by a workspace member").isFalse();
-        assertThat(isExempt(AppAdminOrOwner.class)).as("reachable by a workspace owner").isFalse();
-        assertThat(isExempt(NotAppAdmin.class)).as("negated gate excludes instance admins entirely").isFalse();
-    }
-
-    @Test
-    void doesNotExemptUngatedControllers() {
-        assertThat(isExempt(Ungated.class)).isFalse();
-    }
-
-    private static boolean isExempt(Class<?> type) {
+    @ParameterizedTest(name = "{2}")
+    @MethodSource("gates")
+    void exemptsOnlyTheExactInstanceAdminGate(Class<?> type, boolean expected, String why) {
         JavaClass javaClass = new ClassFileImporter().importClasses(type).get(type);
-        return MultiTenancyArchitectureTest.isInstanceAdminGated(javaClass);
+        assertThat(MultiTenancyArchitectureTest.isInstanceAdminGated(javaClass)).as(why).isEqualTo(expected);
     }
 }

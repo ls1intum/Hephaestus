@@ -14,12 +14,16 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Optional;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 
 /**
- * Unit coverage of {@link LlmConnectionService}, including the {@code auth_event} audit wiring (#1368
- * slice 7) through the {@link LlmConnectionAudit} SPI port.
+ * What creating, updating and deleting an instance LLM connection does — and what it records.
+ *
+ * <p>Every successful mutation lands on {@code auth_event} through the {@link LlmConnectionAudit} SPI
+ * port, and every rejected one lands nowhere: this catalog holds provider credentials, so an audit
+ * row for a change that did not happen is as misleading as a missing row for one that did.
  */
 class LlmConnectionServiceTest extends BaseUnitTest {
 
@@ -114,8 +118,15 @@ class LlmConnectionServiceTest extends BaseUnitTest {
 
             connectionService.delete(5L);
 
-            verify(connectionRepository).delete(connection);
-            verify(llmConnectionAudit).connectionDeleted(5L, "openai-prod");
+            // The row that was deleted must be the one that was looked up, and the audit must name
+            // that same row — an audit entry naming a different connection than the one removed is
+            // worse than none, because the trail then reads as complete while pointing at the wrong
+            // provider.
+            ArgumentCaptor<LlmConnection> deleted = ArgumentCaptor.forClass(LlmConnection.class);
+            verify(connectionRepository).delete(deleted.capture());
+            assertThat(deleted.getValue().getId()).isEqualTo(5L);
+            assertThat(deleted.getValue().getSlug()).isEqualTo("openai-prod");
+            verify(llmConnectionAudit).connectionDeleted(deleted.getValue().getId(), deleted.getValue().getSlug());
         }
 
         @Test
@@ -143,20 +154,76 @@ class LlmConnectionServiceTest extends BaseUnitTest {
     @Nested
     class Update {
 
-        @Test
-        void updatingAConnectionAuditsTheUpdate() {
+        private LlmConnection stored() {
             LlmConnection connection = new LlmConnection();
             connection.setId(5L);
             connection.setSlug("openai-prod");
             connection.setDisplayName("Old name");
+            connection.setApiKey("sk-stored");
+            connection.setEnabled(true);
             when(connectionRepository.findById(5L)).thenReturn(Optional.of(connection));
             when(connectionRepository.save(any(LlmConnection.class))).thenAnswer(inv -> inv.getArgument(0));
+            return connection;
+        }
 
-            UpdateLlmConnectionRequestDTO request = new UpdateLlmConnectionRequestDTO("New name", null, null, null);
+        @Test
+        void appliesTheSuppliedFieldsAndAuditsTheUpdate() {
+            LlmConnection connection = stored();
 
-            connectionService.update(5L, request);
+            LlmConnection saved = connectionService.update(
+                5L,
+                new UpdateLlmConnectionRequestDTO("New name", null, null, false)
+            );
 
+            assertThat(saved.getDisplayName()).isEqualTo("New name");
+            assertThat(saved.isEnabled()).isFalse();
+            assertThat(saved).isSameAs(connection);
             verify(llmConnectionAudit).connectionUpdated(5L, "openai-prod");
+        }
+
+        /** An absent field is "leave it alone", not "set it to null" — the whole point of a PATCH shape. */
+        @Test
+        void leavesOmittedFieldsUntouched() {
+            LlmConnection connection = stored();
+
+            connectionService.update(5L, new UpdateLlmConnectionRequestDTO(null, null, null, null));
+
+            assertThat(connection.getDisplayName()).isEqualTo("Old name");
+            assertThat(connection.getApiKey()).isEqualTo("sk-stored");
+            assertThat(connection.isEnabled()).isTrue();
+        }
+
+        /**
+         * Clearing wins over supplying. An admin who ticks "remove the stored key" while the form still
+         * carries a value must end up with no credential — the ambiguous request may never leave one
+         * behind, and this is the only place that rule is decided.
+         */
+        @Test
+        void clearingTheApiKeyBeatsASuppliedOne() {
+            LlmConnection connection = stored();
+
+            connectionService.update(5L, new UpdateLlmConnectionRequestDTO(null, "sk-new", true, null));
+
+            assertThat(connection.getApiKey()).isNull();
+        }
+
+        @Test
+        void aSuppliedApiKeyReplacesTheStoredOne() {
+            LlmConnection connection = stored();
+
+            connectionService.update(5L, new UpdateLlmConnectionRequestDTO(null, "sk-new", false, null));
+
+            assertThat(connection.getApiKey()).isEqualTo("sk-new");
+        }
+
+        @Test
+        void unknownConnectionRaisesNotFoundWithoutAuditing() {
+            when(connectionRepository.findById(404L)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() ->
+                connectionService.update(404L, new UpdateLlmConnectionRequestDTO("New name", null, null, null))
+            ).isInstanceOf(EntityNotFoundException.class);
+            verifyNoInteractions(llmConnectionAudit);
         }
     }
 }

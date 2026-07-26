@@ -25,13 +25,16 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /**
- * Workspace-admin management of models on "your AI provider" (#1368), plus the available-models
+ * Workspace-admin management of models on "your AI provider", plus the available-models
  * projection every workspace admin uses to bind a Task's model. Sibling to
  * {@link WorkspaceLlmConnectionController}; both share the {@code /llm} prefix.
  */
 @WorkspaceScopedController
 @RequestMapping("/llm")
-@Tag(name = "Workspace LLM", description = "Workspace-scoped \"bring your own\" AI provider models")
+@Tag(
+    name = "Workspace LLM",
+    description = "Workspace-scoped \"bring your own\" AI provider connections, models and settings"
+)
 @RequiredArgsConstructor
 @Validated
 public class WorkspaceLlmModelController {
@@ -52,7 +55,7 @@ public class WorkspaceLlmModelController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @Audited("WORKSPACE_LLM_MODEL")
+    @Audited("config_audit WORKSPACE_LLM_MODEL")
     public ResponseEntity<WorkspaceLlmModelDTO> create(
         WorkspaceContext workspaceContext,
         @PathVariable Long connectionId,
@@ -108,7 +111,7 @@ public class WorkspaceLlmModelController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @Audited("WORKSPACE_LLM_MODEL")
+    @Audited("config_audit WORKSPACE_LLM_MODEL")
     public ResponseEntity<WorkspaceLlmModelDTO> update(
         WorkspaceContext workspaceContext,
         @PathVariable Long id,
@@ -131,7 +134,7 @@ public class WorkspaceLlmModelController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @Audited("WORKSPACE_LLM_MODEL")
+    @Audited("config_audit WORKSPACE_LLM_MODEL")
     public ResponseEntity<Void> delete(WorkspaceContext workspaceContext, @PathVariable Long id) {
         modelService.delete(workspaceContext, id);
         return ResponseEntity.noContent().build();

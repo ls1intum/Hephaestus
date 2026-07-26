@@ -3,9 +3,12 @@ package de.tum.cit.aet.hephaestus.agent.catalog;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditAction;
@@ -23,6 +26,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -134,16 +138,27 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
             verify(connectionRepository, never()).save(any());
         }
 
+        /**
+         * The SSRF guard has to fail the create closed, and has to run before the row is written —
+         * a policy consulted after {@code save()} would leave a persisted connection pointing at an
+         * internal address. Both are asserted through the outcome: only the exact requested base URL is
+         * rejected, so a run that normalised the URL first, skipped the policy, or called it too late
+         * would end with a saved row and no exception.
+         */
         @Test
-        void validatesTheBaseUrlThroughEgressPolicy() {
+        void doesNotCreateAConnectionWhoseBaseUrlTheEgressPolicyRejects() {
             byoEnabled(true);
             when(connectionRepository.findByWorkspaceIdAndSlug(1L, "openai-prod")).thenReturn(Optional.empty());
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(connectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            doThrow(new IllegalArgumentException("Base URL must be a public https:// address"))
+                .when(egressPolicy)
+                .validate("https://api.openai.com");
 
-            connectionService.create(workspaceContext, createRequest());
+            assertThatThrownBy(() -> connectionService.create(workspaceContext, createRequest()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("public https");
 
-            verify(egressPolicy).validate("https://api.openai.com");
+            verify(connectionRepository, never()).save(any());
+            verifyNoInteractions(configAudit);
         }
 
         @Test
@@ -174,6 +189,48 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
             assertThat(entry.getValue().workspaceId()).isEqualTo(1L);
             assertThat(entry.getValue().action()).isEqualTo(ConfigAuditAction.CREATED);
             assertThat(entry.getValue().after()).asString().contains("openai-prod").doesNotContain("sk-abc");
+        }
+    }
+
+    @Nested
+    class Update {
+
+        @Test
+        @DisplayName("a PATCH serializes on the connection row, never a plain tenancy lookup")
+        void patchTakesTheLockingRead() {
+            // A PATCH writes back every column. Without the lock, a concurrent PATCH that only flips
+            // `enabled` reverts this one's key clearing — leaving a credential live that the admin was
+            // told was deleted.
+            WorkspaceLlmConnection connection = new WorkspaceLlmConnection();
+            connection.setId(5L);
+            connection.setSlug("openai-prod");
+            connection.setApiKey("sk-abc");
+            connection.setEnabled(true);
+            when(connectionRepository.findByIdAndWorkspaceIdForUpdate(5L, 1L)).thenReturn(Optional.of(connection));
+            when(connectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            WorkspaceLlmConnection result = connectionService.update(
+                workspaceContext,
+                5L,
+                new UpdateWorkspaceLlmConnectionRequestDTO(null, null, true, null)
+            );
+
+            assertThat(result.getApiKey()).isNull();
+            verify(connectionRepository).findByIdAndWorkspaceIdForUpdate(5L, 1L);
+            verify(connectionRepository, never()).findByIdAndWorkspaceId(anyLong(), anyLong());
+        }
+
+        @Test
+        void throwsNotFoundWhenTheConnectionBelongsToAnotherWorkspace() {
+            when(connectionRepository.findByIdAndWorkspaceIdForUpdate(5L, 1L)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() ->
+                connectionService.update(
+                    workspaceContext,
+                    5L,
+                    new UpdateWorkspaceLlmConnectionRequestDTO("Renamed", null, null, null)
+                )
+            ).isInstanceOf(EntityNotFoundException.class);
         }
     }
 
@@ -234,12 +291,11 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
         @Test
         void reachableProbeReportsOnlyTheModelCountNeverTheRawList() {
             byoEnabled(true);
-            WorkspaceLlmConnection connection = new WorkspaceLlmConnection();
-            connection.setId(5L);
-            connection.setBaseUrl("https://api.openai.com");
-            connection.setAuthMode(LlmAuthMode.BEARER);
-            connection.setApiKey("sk-abc");
-            when(connectionRepository.findByIdAndWorkspaceId(5L, 1L)).thenReturn(Optional.of(connection));
+            // A projection, not the entity: the probe runs outside any transaction, so it must not
+            // depend on a managed entity still being attached.
+            when(connectionRepository.findProbeTargetByIdAndWorkspaceId(5L, 1L)).thenReturn(
+                Optional.of(new LlmProbeTarget("https://api.openai.com", LlmAuthMode.BEARER, "sk-abc"))
+            );
             when(probeService.probeCredential("https://api.openai.com", LlmAuthMode.BEARER, "sk-abc")).thenReturn(
                 LlmProbeResultDTO.reachable(List.of("gpt-5", "gpt-5-mini"), 200)
             );
@@ -253,10 +309,9 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
         @Test
         void unreachableProbeCarriesTheAdvisoryMessage() {
             byoEnabled(true);
-            WorkspaceLlmConnection connection = new WorkspaceLlmConnection();
-            connection.setId(5L);
-            connection.setBaseUrl("https://api.openai.com");
-            when(connectionRepository.findByIdAndWorkspaceId(5L, 1L)).thenReturn(Optional.of(connection));
+            when(connectionRepository.findProbeTargetByIdAndWorkspaceId(5L, 1L)).thenReturn(
+                Optional.of(new LlmProbeTarget("https://api.openai.com", LlmAuthMode.BEARER, null))
+            );
             when(probeService.probeCredential(any(), any(), any())).thenReturn(
                 LlmProbeResultDTO.unreachable(503, "Provider returned HTTP 503")
             );

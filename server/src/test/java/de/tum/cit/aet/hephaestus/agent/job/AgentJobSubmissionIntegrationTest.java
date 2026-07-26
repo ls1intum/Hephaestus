@@ -7,7 +7,6 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
-import de.tum.cit.aet.hephaestus.agent.catalog.ModelVisibility;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
@@ -24,6 +23,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -37,9 +37,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Integration test for {@link AgentJobService#submit} exercising real PostgreSQL
- * idempotency (partial unique index) and config snapshot capture. #1368 NATS→Postgres cutover:
- * the QUEUED insert IS the enqueue — there is no separate publish event to assert on anymore.
+ * Integration test for {@link AgentJobService#submit} exercising real PostgreSQL idempotency (partial
+ * unique index) and config snapshot capture. The QUEUED insert IS the enqueue, so the row itself is
+ * the whole observable outcome — there is no separate publish event to assert on.
  */
 class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
 
@@ -86,24 +86,12 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
 
         workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("submit-test"));
 
-        LlmConnection connection = new LlmConnection();
-        connection.setSlug("submit-test");
-        connection.setDisplayName("Submit test");
-        connection.setBaseUrl("https://api.openai.example/v1");
-        connection.setApiProtocol("openai-completions");
-        connection.setEnabled(true);
-        connection = llmConnectionRepository.save(connection);
+        LlmConnection connection = llmConnectionRepository.save(LlmCatalogTestFixtures.connection("submit-test"));
+        LlmModel model = llmModelRepository.save(
+            LlmCatalogTestFixtures.model(connection, "submit-model", "gpt-submit-test")
+        );
 
-        LlmModel model = new LlmModel();
-        model.setConnection(connection);
-        model.setSlug("submit-model");
-        model.setDisplayName("Submit model");
-        model.setUpstreamModelId("gpt-submit-test");
-        model.setVisibility(ModelVisibility.PUBLIC);
-        model.setEnabled(true);
-        model = llmModelRepository.save(model);
-
-        // The workspace's PRACTICE_DETECTION binding — what submit() discovers and freezes (#1368).
+        // The workspace's PRACTICE_DETECTION binding — what submit() discovers and freezes.
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
         binding.setWorkspace(workspace);
         binding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
@@ -215,7 +203,7 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             assertThat(job.getIdempotencyKey()).isEqualTo(
                 // per-phase key: a manual/dev submission carries the "manual" phase segment, and the
                 // trailing segment is now the purpose — one PRACTICE_DETECTION job per workspace,
-                // no per-config fan-out (#1368)
+                // no per-config fan-out
                 "pr_review:org/submit-repo:10:manual:abc123:detection"
             );
             assertThat(job.getPurpose()).isEqualTo(AgentPurpose.PRACTICE_DETECTION);

@@ -10,17 +10,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Read/write access to the instance LLM settings singleton (#1368). GLOBAL: gated by
- * {@code app_admin} on {@link InstanceLlmSettingsController}, so this service is
- * {@link WorkspaceAgnostic}.
- *
- * <p>Unlike {@link LlmConnectionService}/{@link LlmModelService}, this service stays UNGATED: it is
- * also consumed by {@link WorkspaceLlmConnectionService} and {@link WorkspaceLlmModelService} (for the
- * {@code allow_workspace_connections} BYO gate), which load unconditionally on every runtime role. A
- * hard {@link LlmSettingsAudit} dependency here would break their context refresh on worker/webhook
- * (the port's sole implementation is {@code @ConditionalOnServerRole}, matching how
- * {@code AccountPreferencesService} consumes {@code ResearchConsentAudit} via {@link ObjectProvider}
- * for the same reason).
+ * Loads on every runtime role, because the workspace BYO gate consumes it. {@link LlmSettingsAudit} is
+ * therefore taken as an {@link ObjectProvider}: its sole implementation is
+ * {@code @ConditionalOnServerRole}, and a hard dependency would fail the context on worker/webhook.
  */
 @Service
 @RequiredArgsConstructor
@@ -39,8 +31,11 @@ public class InstanceLlmSettingsService {
 
     @Transactional
     public InstanceLlmSettings update(UpdateInstanceLlmSettingsRequestDTO request) {
+        // Locked read: one row, two independently patchable fields, two admins. See the repository
+        // method for why an unlocked read-modify-write can silently re-enable workspace-supplied
+        // providers after another admin disabled them.
         InstanceLlmSettings settings = settingsRepository
-            .findById(SINGLETON_ID)
+            .findByIdForUpdate(SINGLETON_ID)
             .orElseGet(() -> {
                 InstanceLlmSettings created = defaults();
                 created.setId(SINGLETON_ID);

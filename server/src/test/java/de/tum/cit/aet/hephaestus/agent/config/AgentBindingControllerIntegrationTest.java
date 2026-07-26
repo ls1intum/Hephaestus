@@ -4,13 +4,15 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
-import de.tum.cit.aet.hephaestus.agent.catalog.ModelVisibility;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
+import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,7 +21,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
- * The per-purpose binding endpoints over the real stack (#1368).
+ * The per-purpose binding endpoints over the real stack.
  *
  * <p>Exists mainly for the listing: it reports each binding's {@code ready}, which resolves the bound
  * model → connection AFTER the loading transaction closed (readiness is judged outside a transaction
@@ -47,22 +49,8 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
     }
 
     private LlmModel seedInstanceModel(String slug) {
-        LlmConnection connection = new LlmConnection();
-        connection.setSlug(slug);
-        connection.setDisplayName("Binding test");
-        connection.setBaseUrl("https://api.openai.example/v1");
-        connection.setApiProtocol("openai-completions");
-        connection.setEnabled(true);
-        connection = llmConnectionRepository.save(connection);
-
-        LlmModel model = new LlmModel();
-        model.setConnection(connection);
-        model.setSlug(slug + "-model");
-        model.setDisplayName("Binding test model");
-        model.setUpstreamModelId("gpt-binding-test");
-        model.setVisibility(ModelVisibility.PUBLIC);
-        model.setEnabled(true);
-        return llmModelRepository.save(model);
+        LlmConnection connection = llmConnectionRepository.save(LlmCatalogTestFixtures.connection(slug));
+        return llmModelRepository.save(LlmCatalogTestFixtures.model(connection, slug + "-model", "gpt-binding-test"));
     }
 
     @Test
@@ -192,5 +180,112 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
             .exchange()
             .expectStatus()
             .isUnauthorized();
+    }
+
+    @Test
+    @WithMentorUser
+    @DisplayName("a plain member cannot configure an agent")
+    void aWorkspaceMemberCannotPutABinding() {
+        Workspace workspace = setupWorkspace("binding-member");
+        // Login must match @WithMentorUser's default "mentor" principal so the membership resolver
+        // finds this exact row.
+        User member = persistUser("mentor");
+        ensureWorkspaceMembership(workspace, member, WorkspaceRole.MEMBER);
+
+        webTestClient
+            .put()
+            .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), AgentPurpose.PRACTICE_DETECTION)
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(Map.of("instanceModelId", seedInstanceModel("binding-member-model").getId(), "enabled", true))
+            .exchange()
+            .expectStatus()
+            .isForbidden();
+    }
+
+    @Test
+    @WithMentorUser
+    @DisplayName("a plain member cannot turn an agent off")
+    void aWorkspaceMemberCannotDeleteABinding() {
+        Workspace workspace = setupWorkspace("binding-member-del");
+        User member = persistUser("mentor");
+        ensureWorkspaceMembership(workspace, member, WorkspaceRole.MEMBER);
+
+        webTestClient
+            .delete()
+            .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), AgentPurpose.PRACTICE_DETECTION)
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isForbidden();
+    }
+
+    @Test
+    @WithMentorUser
+    @DisplayName("an admin of another workspace cannot configure this workspace's agents")
+    void aWorkspaceAdminWithNoMembershipHereIsForbidden() {
+        // A genuine (non-superadmin) workspace ADMIN. @WithAdminUser would carry the instance-wide
+        // app_admin elevation and pass this call for the wrong reason.
+        User admin = persistUser("mentor");
+        Workspace own = createWorkspace("binding-own-ws", "Own", "binding-own-org", AccountType.ORG, admin);
+        ensureWorkspaceMembership(own, admin, WorkspaceRole.ADMIN);
+
+        Workspace other = createWorkspace(
+            "binding-other-ws",
+            "Other",
+            "binding-other-org",
+            AccountType.ORG,
+            persistUser("binding-other-owner")
+        );
+
+        webTestClient
+            .delete()
+            .uri("/workspaces/{slug}/agents/{purpose}", other.getWorkspaceSlug(), AgentPurpose.PRACTICE_DETECTION)
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isForbidden();
+
+        // Sanity: the same principal IS admitted in the workspace it actually administers.
+        webTestClient
+            .get()
+            .uri("/workspaces/{slug}/agents", own.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk();
+    }
+
+    @Test
+    @DisplayName("the mutating endpoints require authentication too, not just the listing")
+    void anonymousCannotPutOrDeleteABinding() {
+        User owner = persistUser("binding-anon-mut-owner");
+        Workspace workspace = createWorkspace(
+            "binding-anon-mut",
+            "Binding Workspace",
+            "binding-anon-mut-org",
+            AccountType.ORG,
+            owner
+        );
+
+        // 403, not 401: with no `Authorization: Bearer` header these state-changing requests are
+        // cookie-shaped, so SecurityConfig#requiresCsrf refuses them at the CSRF filter before
+        // authentication runs. Asserting 401 would invite exempting the mutations from CSRF to
+        // "fix" it. Either way the handler is never reached.
+        webTestClient
+            .put()
+            .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), AgentPurpose.PRACTICE_DETECTION)
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(Map.of("instanceModelId", 1, "enabled", true))
+            .exchange()
+            .expectStatus()
+            .isForbidden();
+
+        webTestClient
+            .delete()
+            .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), AgentPurpose.PRACTICE_DETECTION)
+            .exchange()
+            .expectStatus()
+            .isForbidden();
     }
 }

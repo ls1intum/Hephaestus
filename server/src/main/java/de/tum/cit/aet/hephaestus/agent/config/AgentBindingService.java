@@ -21,7 +21,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Reads and writes each workspace's per-purpose {@link WorkspaceAgentBinding}s (#1368) — the single
+ * Reads and writes each workspace's per-purpose {@link WorkspaceAgentBinding}s — the single
  * source the runtime resolves a model from.
  *
  * older config edits still reach the runtime during the transition; a direct binding write clears the
@@ -116,7 +116,14 @@ public class AgentBindingService {
             .ifPresent(binding -> {
                 BindingSnapshot before = BindingSnapshot.of(binding);
                 bindingRepository.delete(binding);
-                audit(purpose, workspaceId, before, BindingSnapshot.empty());
+                // DELETED, not UPDATED-to-an-empty-snapshot: ConfigAuditEntry derives the action from
+                // which side is null, so an all-null "after" would file this alongside genuine edits and
+                // read in the audit trail as "someone cleared every field", not "the binding is gone".
+                // Every other delete path in the codebase (workspace role, practice, workspace LLM
+                // model/connection) files DELETED; this one is the same event.
+                configAudit.record(
+                    ConfigAuditEntry.deleted(ConfigAuditEntityType.AGENT_BINDING, purpose.name(), workspaceId, before)
+                );
             });
     }
 
@@ -178,10 +185,6 @@ public class AgentBindingService {
                 b.getWorkspaceModel() == null ? null : b.getWorkspaceModel().getId(),
                 b.isEnabled()
             );
-        }
-
-        static BindingSnapshot empty() {
-            return new BindingSnapshot(null, null, null);
         }
     }
 }

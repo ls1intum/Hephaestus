@@ -78,9 +78,46 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
             RuntimeRole.WORKER_PROPERTY
         ),
         Map.entry("de.tum.cit.aet.hephaestus.core.runtime.hub.HubConfiguration", RuntimeRole.SERVER_PROPERTY),
-        // Display-currency rate fetcher (#1368) — the only egress this feature has. Server-only so the
+        // ─── LLM catalog + cost governance ───────────────────────────────────────────────
+        // Admin surfaces and the services behind them are server-only: the worker and webhook pods do
+        // not load core.auth, so an admin controller mapped there is a route with no authentication
+        // layer under it. Two of these (the settings and usage-admin controllers) shipped ungated while
+        // their package siblings were gated, so /admin/llm/settings and /admin/llm/usage were
+        // request-mapped on both. Pinning the whole cluster here is what makes a dropped annotation a
+        // test failure rather than a production discovery.
+        Map.entry("de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionAdminController", RuntimeRole.SERVER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionService", RuntimeRole.SERVER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.agent.catalog.LlmModelAdminController", RuntimeRole.SERVER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.agent.catalog.LlmModelService", RuntimeRole.SERVER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.agent.catalog.InstanceLlmSettingsController", RuntimeRole.SERVER_PROPERTY),
+        // NOT listed: InstanceLlmSettingsService. It is deliberately ungated — the workspace-scoped
+        // read of the instance policy goes through it too, and the gate belongs on the admin surface.
+        Map.entry("de.tum.cit.aet.hephaestus.agent.usage.LlmUsageAdminController", RuntimeRole.SERVER_PROPERTY),
+        // Display-currency rate fetcher — the only egress this feature has. Server-only so the
         // worker and webhook pods never acquire an outbound dependency on ecb.europa.eu.
         Map.entry("de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateFetchScheduler", RuntimeRole.SERVER_PROPERTY),
+        // Agent-queue sweepers. ServerSchedulingConfig silences the @Scheduled tick off-server,
+        // but an ungated BEAN still registers its gauges — permanent zeros in agent.queue.* from pods
+        // that never sample. Gate the bean, not just the tick.
+        Map.entry("de.tum.cit.aet.hephaestus.agent.job.AgentQueueHealthSampler", RuntimeRole.SERVER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.agent.job.AgentJobRetentionService", RuntimeRole.SERVER_PROPERTY),
+        // Mentor in-flight reaper — same reasoning as the agent-queue sweepers above, and it also
+        // holds a @SchedulerLock, so an ungated bean would register mentor.in_flight.reaper.failure
+        // on pods that can never sweep.
+        Map.entry("de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorInFlightReaper", RuntimeRole.SERVER_PROPERTY),
+        // LLM proxy (ADR 0006): runs beside the sandbox on the WORKER, and only there.
+        Map.entry("de.tum.cit.aet.hephaestus.agent.proxy.LlmProxyController", RuntimeRole.WORKER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.agent.proxy.LlmProxySecurityConfig", RuntimeRole.WORKER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.agent.proxy.ProxyAccounting", RuntimeRole.WORKER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.agent.proxy.ProxyUsageAccumulator", RuntimeRole.WORKER_PROPERTY),
+        // Config-audit trail (#1359): the admin viewer and the retention sweep are server-only; the
+        // recorder deliberately is not (every role writes to the trail).
+        Map.entry("de.tum.cit.aet.hephaestus.core.audit.ConfigAuditRetentionJob", RuntimeRole.SERVER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.core.audit.web.AdminConfigAuditController", RuntimeRole.SERVER_PROPERTY),
+        Map.entry(
+            "de.tum.cit.aet.hephaestus.integration.slack.sync.status.SlackIntegrationSyncRunner",
+            RuntimeRole.SERVER_PROPERTY
+        ),
         Map.entry(
             "de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerTokenExchangeController",
             RuntimeRole.SERVER_PROPERTY
@@ -353,6 +390,37 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
             )
             .isEmpty();
     }
+
+    /*
+     * Deliberately absent: a blanket "every class with a @Scheduled method carries a runtime-role
+     * gate" rule. Read this before adding one.
+     *
+     * The premise is false. @EnableScheduling lives on the SERVER-gated
+     * ServerSchedulingConfig, so on a worker or webhook pod NO @Scheduled method fires, gated or not.
+     * The gate therefore never protects the tick — it protects bean-construction side effects
+     * (chiefly meter registration, which is why AgentQueueHealthSampler and MentorInFlightReaper are
+     * pinned in EXPECTED_GATES above). A rule aimed at @Scheduled is aimed at the wrong thing.
+     *
+     * All three formulations were measured against the tree and all three fail:
+     *
+     *   1. "Every @Scheduled class is gated" — ~15 violations, and most are not violations. Four
+     *      (SandboxReconciler, InteractiveSandboxRegistry, DockerAttachedSandboxAdapter,
+     *      StdinWriteWatchdog) carry NO stereotype: they are @Bean-built by the WORKER-gated
+     *      DockerSandboxConfiguration. Spring never evaluates @ConditionalOnProperty on a class it
+     *      does not component-scan, so the rule would demand an annotation that does nothing.
+     *   2. "…restricted to component-scanned classes" — still ~10, including three @Service classes
+     *      (ContributorService, SyncJobService, GitLabWebhookService) whose schedule is secondary to
+     *      their API. A class-level role gate there deletes the service from pods that legitimately
+     *      call its other methods, turning a cosmetic meter concern into an outage.
+     *   3. "…restricted to classes that also register meters" — still 4, all rate-limit trackers
+     *      (Scoped/GitLab/Slack/Outline). Those track limits observed by whichever role makes the
+     *      API call, so server-gating them blinds rate limiting on exactly the pods that call out.
+     *
+     * Every formulation needs an exemption list as long as EXPECTED_GATES itself, which reproduces
+     * the inclusion-list problem it was meant to solve while adding a rule that is wrong about what
+     * it is protecting. Gates go on beans whose CONSTRUCTION has an off-role cost; that judgement is
+     * recorded case-by-case in EXPECTED_GATES, which is the honest shape for it.
+     */
 
     @Test
     void noBeanIsGatedOnTheRetiredSandboxEnabledFlag() {

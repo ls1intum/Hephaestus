@@ -30,7 +30,7 @@ import org.hibernate.annotations.ColumnDefault;
 
 /**
  * What model, and with what execution limits, a workspace runs a given {@link AgentPurpose} on
- * (#1368). Exactly one binding per {@code (workspace, purpose)} — the object the admin configures IS
+ *. Exactly one binding per {@code (workspace, purpose)} — the object the admin configures IS
  * the purpose→model binding, not a separately-named profile that is wired up elsewhere.
  *
  * <p>Routing and credentials live in the selected catalog model; this entity only binds that model to

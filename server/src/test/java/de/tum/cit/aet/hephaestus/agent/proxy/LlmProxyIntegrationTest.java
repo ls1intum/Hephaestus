@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -213,24 +214,23 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     private AgentJob runningJob(String protocol, LlmAuthMode authMode, String upstreamModelId, boolean modelEnabled) {
-        LlmConnection connection = new LlmConnection();
-        connection.setSlug("connection-" + System.nanoTime());
-        connection.setDisplayName("Test connection");
+        // The three fields this test is actually about — the fixture supplies the rest.
+        LlmConnection connection = LlmCatalogTestFixtures.connection("connection-" + System.nanoTime());
         connection.setBaseUrl(upstream.url("/v1").toString().replaceAll("/$", ""));
         connection.setApiProtocol(protocol);
         connection.setAuthMode(authMode);
         connection.setApiKey("upstream-secret");
-        connection.setEnabled(true);
         connection = connectionRepository.save(connection);
 
-        LlmModel model = new LlmModel();
-        model.setConnection(connection);
-        model.setSlug("model-" + System.nanoTime());
-        model.setDisplayName("Test model");
-        model.setUpstreamModelId(upstreamModelId);
-        model.setVisibility(ModelVisibility.PUBLIC);
-        model.setEnabled(modelEnabled);
-        model = modelRepository.save(model);
+        LlmModel model = modelRepository.save(
+            LlmCatalogTestFixtures.model(
+                connection,
+                "model-" + System.nanoTime(),
+                upstreamModelId,
+                ModelVisibility.PUBLIC,
+                modelEnabled
+            )
+        );
 
         // The per-purpose binding IS the config pointer now: one row per (workspace, purpose).
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();

@@ -3,13 +3,17 @@ package de.tum.cit.aet.hephaestus.agent.catalog;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
+import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
@@ -104,22 +108,18 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
     }
 
     private LlmModel seedInstanceModel(String upstreamId, ModelVisibility visibility, boolean enabled) {
-        LlmConnection connection = new LlmConnection();
-        connection.setSlug("instance-conn-" + System.nanoTime());
-        connection.setDisplayName("Instance Connection");
-        connection.setBaseUrl("https://instance.example.com/v1");
-        connection.setApiProtocol("openai-completions");
-        connection.setEnabled(true);
-        connection = llmConnectionRepository.save(connection);
-
-        LlmModel model = new LlmModel();
-        model.setConnection(connection);
-        model.setSlug("instance-model-" + System.nanoTime());
-        model.setDisplayName("Shared Model");
-        model.setUpstreamModelId(upstreamId);
-        model.setVisibility(visibility);
-        model.setEnabled(enabled);
-        return llmModelRepository.save(model);
+        LlmConnection connection = llmConnectionRepository.save(
+            LlmCatalogTestFixtures.connection("instance-conn-" + System.nanoTime())
+        );
+        return llmModelRepository.save(
+            LlmCatalogTestFixtures.model(
+                connection,
+                "instance-model-" + System.nanoTime(),
+                upstreamId,
+                visibility,
+                enabled
+            )
+        );
     }
 
     @Test
@@ -378,5 +378,92 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
             .exchange()
             .expectStatus()
             .isUnauthorized();
+    }
+
+    // ─── Access control ────────────────────────────────────────────────────────────────────────
+    // Every endpoint on this controller is @RequireAtLeastWorkspaceAdmin. The matrix mirrors
+    // WorkspaceLlmConnectionControllerIntegrationTest, its sibling under the same /llm prefix.
+
+    @Test
+    @WithMentorUser
+    void aWorkspaceMemberCannotReachAnyModelEndpoint() {
+        Workspace workspace = setupWorkspace("wsmodel-member-ws");
+        // Login must match @WithMentorUser's default "mentor" principal so the membership resolver
+        // finds this exact row.
+        User member = persistUser("mentor");
+        ensureWorkspaceMembership(workspace, member, WorkspaceRole.MEMBER);
+        String slug = workspace.getWorkspaceSlug();
+
+        webTestClient
+            .get()
+            .uri("/workspaces/{slug}/llm/models", slug)
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isForbidden();
+
+        webTestClient
+            .get()
+            .uri("/workspaces/{slug}/llm/available-models", slug)
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isForbidden();
+
+        // The read gate is the interesting one, but a member must not be able to write either.
+        webTestClient
+            .post()
+            .uri("/workspaces/{slug}/llm/connections/{connectionId}/models", slug, 1)
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            // A raw map, not the request record: authorization runs before body binding, so the
+            // body only has to be well-formed JSON for the 403 to be the assertion that fails first.
+            .bodyValue(Map.of("displayName", "Member Model", "upstreamModelId", "gpt-5"))
+            .exchange()
+            .expectStatus()
+            .isForbidden();
+
+        webTestClient
+            .delete()
+            .uri("/workspaces/{slug}/llm/models/{id}", slug, 1)
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isForbidden();
+    }
+
+    @Test
+    @WithMentorUser
+    void aWorkspaceAdminWithNoMembershipInAnotherWorkspaceIsForbiddenThere() {
+        // A genuine (non-superadmin) workspace ADMIN — @WithAdminUser carries the instance-wide
+        // app_admin elevation, which would let this call through for the wrong reason.
+        User admin = persistUser("mentor");
+        Workspace own = createWorkspace("wsmodel-own-ws", "Own", "wsmodel-own-org", AccountType.ORG, admin);
+        ensureWorkspaceMembership(own, admin, WorkspaceRole.ADMIN);
+
+        Workspace other = createWorkspace(
+            "wsmodel-other-ws",
+            "Other",
+            "wsmodel-other-org",
+            AccountType.ORG,
+            persistUser("wsmodel-other-owner")
+        );
+
+        webTestClient
+            .get()
+            .uri("/workspaces/{slug}/llm/models", other.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isForbidden();
+
+        // Sanity: the same principal IS admitted in the workspace it actually administers.
+        webTestClient
+            .get()
+            .uri("/workspaces/{slug}/llm/models", own.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk();
     }
 }

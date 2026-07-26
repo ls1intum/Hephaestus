@@ -27,7 +27,7 @@ import org.hibernate.annotations.ColumnDefault;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Workspace-owned BYO model with inline current price (#1368). Tenant-scoped: {@code workspace_id}
+ * Workspace-owned BYO model with inline current price. Tenant-scoped: {@code workspace_id}
  * is denormalized so every query carries a workspace predicate for the tenancy inspector. Price is
  * the current rate only (no audit history); tri-state {@code pricing_mode} mirrors the instance side.
  */

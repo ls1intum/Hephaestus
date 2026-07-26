@@ -26,7 +26,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Instance-curated model behind a {@link LlmConnection}: an opaque upstream id plus capability
- * and visibility metadata (#1368). GLOBAL (not tenant-scoped).
+ * and visibility metadata. GLOBAL (not tenant-scoped).
  */
 @Entity
 @Table(

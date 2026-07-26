@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.usage;
 
 /**
- * Why one purse's cap refuses further LLM spend for a workspace (#1368) — the per-purse component
+ * Why one purse's cap refuses further LLM spend for a workspace — the per-purse component
  * of {@link LlmBudgetDecision}. Shared by all three enforcement gates —
  * {@code AgentJobService.submit}, the {@code AgentJobExecutor} claim-time recheck, and
  * {@code MentorChatService}'s turn gate — so each gate applies exactly the same verdict and can

@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.LlmProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -17,6 +18,8 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 
 /**
@@ -47,41 +50,28 @@ class FxRateLookupTest extends BaseUnitTest {
     }
 
     private FxRateLookup lookup(String configuredCurrency) {
-        return new FxRateLookup(repository, CLOCK, configuredCurrency);
+        LlmProperties properties = new LlmProperties(
+            configuredCurrency,
+            new LlmProperties.Egress(false),
+            new LlmProperties.Fx(LlmProperties.ECB_DAILY_URL)
+        );
+        return new FxRateLookup(repository, CLOCK, properties);
     }
 
     private FxRateLookup enabledLookup() {
         return lookup("EUR");
     }
 
-    // FEATURE FLAG
+    @ParameterizedTest(name = "display-currency={0}: {1}")
+    @CsvSource(
+        { "'', not configured", "EURO, not an ISO 4217 code", "CHF, valid ISO but not convertible from the feed" }
+    )
+    void shouldStayOffAndNeverTouchTheTable(String configured, String why) {
+        FxRateLookup fx = lookup(configured);
 
-    @Test
-    @DisplayName("should stay off and never touch the table when no display currency is configured")
-    void shouldReturnEmptyWhenDisplayCurrencyUnset() {
-        FxRateLookup fx = lookup("");
-
-        assertThat(fx.isEnabled()).isFalse();
+        assertThat(fx.isEnabled()).as(why).isFalse();
         assertThat(fx.latest()).isEmpty();
         assertThat(fx.forMonth(CURRENT_MONTH)).isEmpty();
-        verifyNoInteractions(repository);
-    }
-
-    @Test
-    @DisplayName("should stay off when the configured code is not ISO 4217")
-    void shouldReturnEmptyWhenCurrencyCodeIsNotIso4217() {
-        FxRateLookup fx = lookup("EURO");
-
-        assertThat(fx.isEnabled()).isFalse();
-        verifyNoInteractions(repository);
-    }
-
-    @Test
-    @DisplayName("should stay off for a valid ISO code the ECB feed cannot convert to")
-    void shouldReturnEmptyWhenCurrencyIsValidButUnsupported() {
-        FxRateLookup fx = lookup("CHF");
-
-        assertThat(fx.isEnabled()).isFalse();
         verifyNoInteractions(repository);
     }
 
@@ -96,8 +86,6 @@ class FxRateLookupTest extends BaseUnitTest {
         assertThat(fx.latest()).hasValueSatisfying(info -> assertThat(info.currencyCode()).isEqualTo("EUR"));
     }
 
-    // MONTH RESOLUTION
-
     @Test
     @DisplayName("should resolve the month in progress to the newest stored rate")
     void shouldUseNewestRateWhenMonthIsInProgress() {
@@ -105,56 +93,39 @@ class FxRateLookupTest extends BaseUnitTest {
 
         Optional<FxRateInfoDTO> info = enabledLookup().forMonth(CURRENT_MONTH);
 
+        // Today is a Saturday the ECB published nothing on: the label must report Friday, the rate
+        // actually used, rather than imply a Saturday rate exists.
         assertThat(info).hasValueSatisfying(fx -> {
             assertThat(fx.rateDate()).isEqualTo(FRIDAY);
             assertThat(fx.ratePerUsd()).isEqualByComparingTo("0.878966");
         });
-    }
-
-    @Test
-    @DisplayName("should report Friday's date when today is a Saturday the ECB published nothing on")
-    void shouldReportFridaysDateWhenTodayIsSaturday() {
-        when(repository.findTopByOrderByRateDateDesc()).thenReturn(Optional.of(rate(FRIDAY, "1.1377")));
-
-        Optional<FxRateInfoDTO> info = enabledLookup().forMonth(CURRENT_MONTH);
-
-        // The label must say which rate was actually used, not imply a Saturday rate exists.
-        assertThat(info).hasValueSatisfying(fx -> assertThat(fx.rateDate()).isEqualTo(FRIDAY));
         verify(repository, never()).findTopByOrderByRateDateAsc();
     }
 
+    /**
+     * A closed month resolves to the last rate dated inside it, AND stays there once newer rates
+     * arrive. Both halves in one test because the second is only meaningful given the first: asserting
+     * the freeze without asserting what it froze to would pass on a lookup that returned nothing.
+     */
     @Test
-    @DisplayName("should resolve a closed month to the last rate dated inside that month")
-    void shouldUseLastInMonthRateWhenMonthIsClosed() {
-        when(repository.findTopByOrderByRateDateDesc()).thenReturn(Optional.of(rate(FRIDAY, "1.1377")));
-        when(repository.findTopByRateDateLessThanEqualOrderByRateDateDesc(LocalDate.of(2026, 6, 30))).thenReturn(
-            Optional.of(rate(LocalDate.of(2026, 6, 30), "1.1200"))
-        );
-
-        Optional<FxRateInfoDTO> info = enabledLookup().forMonth(CLOSED_MONTH);
-
-        assertThat(info).hasValueSatisfying(fx -> {
-            assertThat(fx.rateDate()).isEqualTo(LocalDate.of(2026, 6, 30));
-            assertThat(fx.ratePerUsd()).isEqualByComparingTo("0.892857");
-        });
-    }
-
-    @Test
-    @DisplayName("should keep a closed month's rate unchanged after a newer rate arrives")
-    void shouldFreezeClosedMonthWhenNewerRateIsStored() {
+    @DisplayName("should resolve a closed month to its last in-month rate and keep it after newer rates arrive")
+    void shouldFreezeClosedMonthOnItsLastInMonthRate() {
         when(repository.findTopByRateDateLessThanEqualOrderByRateDateDesc(LocalDate.of(2026, 6, 30))).thenReturn(
             Optional.of(rate(LocalDate.of(2026, 6, 30), "1.1200"))
         );
         when(repository.findTopByOrderByRateDateDesc()).thenReturn(Optional.of(rate(FRIDAY, "1.1377")));
         FxRateLookup fx = enabledLookup();
+
         FxRateInfoDTO before = fx.forMonth(CLOSED_MONTH).orElseThrow();
+
+        assertThat(before.rateDate()).isEqualTo(LocalDate.of(2026, 6, 30));
+        assertThat(before.ratePerUsd()).isEqualByComparingTo("0.892857"); // 1 / 1.1200, inverted once
 
         // A new day is published: the newest rate moves, but nothing on or before 30 June changes.
         when(repository.findTopByOrderByRateDateDesc()).thenReturn(Optional.of(rate(SATURDAY, "1.4000")));
         FxRateInfoDTO after = fx.forMonth(CLOSED_MONTH).orElseThrow();
 
         assertThat(after).isEqualTo(before);
-        assertThat(after.rateDate()).isEqualTo(LocalDate.of(2026, 6, 30));
     }
 
     @Test
@@ -188,8 +159,6 @@ class FxRateLookupTest extends BaseUnitTest {
         assertThat(fx.forMonth(CLOSED_MONTH)).isEmpty();
         verify(repository, never()).findTopByRateDateLessThanEqualOrderByRateDateDesc(any());
     }
-
-    // STALENESS
 
     @Test
     @DisplayName("should omit the conversion when the newest stored rate is 8 days old")

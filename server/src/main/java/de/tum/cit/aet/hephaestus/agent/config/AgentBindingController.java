@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 /**
- * A workspace's agents (#1368): what model, with what limits, runs practice detection and the mentor.
+ * A workspace's agents: what model, with what limits, runs practice detection and the mentor.
  *
  * <p>The resource is the agent itself, identified by its {@link AgentPurpose} — there is exactly one
  * of each per workspace, so the purpose is its natural key and {@code PUT} is a plain idempotent
@@ -64,7 +64,7 @@ public class AgentBindingController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @Audited("AGENT_BINDING")
+    @Audited("config_audit AGENT_BINDING")
     public ResponseEntity<AgentBindingDTO> configureAgent(
         WorkspaceContext workspaceContext,
         @PathVariable AgentPurpose purpose,
@@ -78,7 +78,7 @@ public class AgentBindingController {
     @Operation(summary = "Remove the agent for one purpose (turn it off)")
     @ApiResponse(responseCode = "204", description = "Binding removed")
     @RequireAtLeastWorkspaceAdmin
-    @Audited("AGENT_BINDING")
+    @Audited("config_audit AGENT_BINDING")
     public ResponseEntity<Void> deleteAgent(WorkspaceContext workspaceContext, @PathVariable AgentPurpose purpose) {
         agentBindingService.deleteBinding(workspaceContext, purpose);
         return ResponseEntity.noContent().build();

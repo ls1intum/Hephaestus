@@ -4,16 +4,20 @@ import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.security.MessageDigest;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -92,7 +96,15 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
         }
     }
 
-    /** Look up an {@code AgentJob} by token and translate its frozen {@link ConfigSnapshot} into routing. */
+    /**
+     * Look up an {@code AgentJob} by token and translate its frozen {@link ConfigSnapshot} into routing.
+     *
+     * <p>This lookup is also where the attempt's identity and its spend-so-far are read, because this
+     * is the only place both are already in hand: the row it loads carries the {@code retry_count} that
+     * names the attempt and the token accumulators the proxy has been adding to, and the snapshot it
+     * parses carries the rates those tokens were admitted at. Everything the budget gate and the usage
+     * accumulator need about "who is calling and what have they spent" therefore costs no extra query.
+     */
     private Optional<ProxyRouting> resolveJobRouting(String token) {
         String hash = AgentJob.computeTokenHash(token);
         Optional<AgentJob> optionalJob = agentJobRepository.findByJobTokenHashAndStatus(hash, AgentJobStatus.RUNNING);
@@ -125,9 +137,43 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
                 snapshot.connectionId(),
                 snapshot.modelId(),
                 job.getWorkspace().getId(),
-                job.getId()
+                new ProxyRouting.BilledAttempt(
+                    LlmUsageSourceType.AGENT_JOB,
+                    job.getId(),
+                    job.getRetryCount(),
+                    spentSoFarUsd(job, snapshot)
+                )
             )
         );
+    }
+
+    /**
+     * Price the calls this attempt has already made, from the row's running token totals and the rates
+     * frozen onto it at admission.
+     *
+     * <p>Reasoning tokens are deliberately absent from the arguments: they are already counted inside
+     * the output bucket, exactly as {@code LlmUsageRecorder} prices a finished attempt. Same inputs,
+     * same rates, same method — so what the gate judges an attempt on cannot drift from what the ledger
+     * will eventually charge it.
+     */
+    private static BigDecimal spentSoFarUsd(AgentJob job, ConfigSnapshot snapshot) {
+        LlmPriceSnapshot price = snapshot.priceSnapshot();
+        if (price == null) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal cost = price
+            .calculateCost(
+                zeroIfNull(job.getLlmTotalInputTokens()),
+                zeroIfNull(job.getLlmTotalOutputTokens()),
+                zeroIfNull(job.getLlmCacheReadTokens()),
+                zeroIfNull(job.getLlmCacheWriteTokens())
+            )
+            .usd();
+        return cost != null ? cost : BigDecimal.ZERO;
+    }
+
+    private static long zeroIfNull(@Nullable Integer tokens) {
+        return tokens != null ? tokens : 0L;
     }
 
     /**

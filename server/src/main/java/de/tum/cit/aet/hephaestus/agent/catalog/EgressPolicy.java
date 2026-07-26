@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
+import de.tum.cit.aet.hephaestus.agent.LlmProperties;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.security.PrivateAddressGuard;
 import java.net.InetAddress;
@@ -10,28 +11,19 @@ import java.util.Arrays;
 import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * SSRF egress guard for instance-owned LLM provider connections (#1368). Shared: the LLM proxy will
- * reuse it to vet where credentialed traffic may egress. Kept a plain component (its only dependencies
- * are the {@link InstanceLlmSettingsRepository} singleton and the loopback dev toggle) so it is
- * straightforward to unit-test.
+ * SSRF egress guard for LLM provider connections.
  *
- * <p>A base URL passes only when it (1) parses with no userinfo, query string, or fragment — those
- * are how a gateway URL smuggles a credential (e.g. {@code https://gw/v1?api-key=SECRET}) past the
- * guard and into snapshots/DTOs/logs, (2) is HTTPS — or plain HTTP but strictly to a localhost/loopback
- * dev target AND {@link #allowLoopback} is enabled (production defaults it OFF: an unconditional
- * loopback allowance is an SSRF hole letting a workspace admin point their "provider" at host-local
- * services), (3) does not resolve to a non-public address per {@link PrivateAddressGuard} — private /
- * link-local / loopback / unique-local / multicast / CGNAT / NAT64 / IANA benchmarking ranges (which
- * blocks the cloud metadata endpoint {@code 169.254.169.254} as a link-local address) — this check is
- * unconditional and independent of {@link #allowLoopback}, and (4) — when the instance allowlist is
- * non-blank — has a host that appears verbatim in that allowlist. An empty allowlist permits any public
- * host. The same {@link PrivateAddressGuard} predicate is re-applied at connect time by the LLM proxy's
- * and probe's guarded resolver (see {@code core.WebClientConnectors#resolverGroup}), closing the
- * DNS-rebind/TOCTOU window a validate-then-reconnect design would otherwise leave open.
+ * <p>Userinfo, query strings and fragments are rejected because that is how a gateway URL smuggles a
+ * credential (e.g. {@code https://gw/v1?api-key=SECRET}) into snapshots, DTOs and logs. A blank
+ * allowlist permits any public host.
+ *
+ * <p>Validating here is not sufficient on its own: the same {@link PrivateAddressGuard} predicate is
+ * re-applied at connect time by the proxy's and probe's guarded resolver (see
+ * {@code core.WebClientConnectors#resolverGroup}), closing the DNS-rebind/TOCTOU window a
+ * validate-then-reconnect design would otherwise leave open.
  */
 @Component
 @WorkspaceAgnostic("Instance egress policy reads the global instance_llm_settings singleton, not tenant data")
@@ -45,18 +37,16 @@ public class EgressPolicy {
     private final InstanceLlmSettingsRepository settingsRepository;
 
     /**
-     * Gates the localhost/loopback HTTP allowance (default {@code false} — production SSRF hardening).
-     * Mirrors how other dev-only toggles, e.g. {@code hephaestus.auth.dev-login-enabled}, are
-     * property-gated: off unless a local/dev profile explicitly turns it on.
+     * Off in production: an unconditional loopback allowance would let a workspace admin point their
+     * "provider" at host-local services. Read from {@link LlmProperties} rather than a local
+     * {@code @Value} so this guard and the probe's connect-time resolver cannot drift apart on what
+     * "loopback allowed" means.
      */
     private final boolean allowLoopback;
 
-    public EgressPolicy(
-        InstanceLlmSettingsRepository settingsRepository,
-        @Value("${hephaestus.llm.egress.allow-loopback:false}") boolean allowLoopback
-    ) {
+    public EgressPolicy(InstanceLlmSettingsRepository settingsRepository, LlmProperties llmProperties) {
         this.settingsRepository = settingsRepository;
-        this.allowLoopback = allowLoopback;
+        this.allowLoopback = llmProperties.egress().allowLoopback();
     }
 
     /**
@@ -100,7 +90,7 @@ public class EgressPolicy {
         }
     }
 
-    /** Resolves the host and refuses if any resolved address is private/loopback/link-local/unique-local. */
+    /** Unconditional — a non-public address is refused even when {@link #allowLoopback} is on. */
     private static void assertPublicAddress(String host) {
         InetAddress[] addresses;
         try {
@@ -109,21 +99,10 @@ public class EgressPolicy {
             throw new IllegalArgumentException(NOT_PUBLIC_HTTPS);
         }
         for (InetAddress address : addresses) {
-            if (isBlocked(address)) {
+            if (PrivateAddressGuard.isNonPublic(address)) {
                 throw new IllegalArgumentException(NOT_PUBLIC_HTTPS);
             }
         }
-    }
-
-    /**
-     * Delegates to {@link PrivateAddressGuard} — the same predicate the connect-time resolver guard
-     * ({@code core.SsrfGuardedResolverGroup}) enforces (#1368 fix wave). Previously this method
-     * hand-rolled a narrower RFC-1918-plus-loopback-plus-link-local check that missed multicast, CGNAT
-     * (100.64.0.0/10), NAT64, and the IANA benchmarking/TEST-NET ranges — letting validation and the
-     * proxy's actual connection disagree on what counts as private.
-     */
-    private static boolean isBlocked(InetAddress address) {
-        return PrivateAddressGuard.isNonPublic(address);
     }
 
     private void assertAllowlisted(String host) {

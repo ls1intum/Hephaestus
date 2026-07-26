@@ -9,8 +9,11 @@ import org.springframework.stereotype.Component;
 
 /**
  * Loads the reviewable SCM artifact (pull request or issue) a job targets, each with the eager-fetch
- * graph its review path needs. Keeping "which artifact is this job about" here gives it one home and
- * keeps {@code AgentJobService}'s dependency surface within the god-class budget.
+ * graph its review path needs.
+ *
+ * <p>Thin on purpose: its caller is {@link DevTriggerController}, and a {@code @RestController} may not
+ * depend on a {@code @Repository} ({@code ArchitectureTest#controllersDoNotAccessRepositories}). Which
+ * fetch graph each review path needs is a real decision, and this is where it is written down once.
  */
 @Component
 class ReviewableArtifactLoader {
@@ -26,11 +29,6 @@ class ReviewableArtifactLoader {
     /** Loads a pull request with the full association graph the detection gate needs. */
     Optional<PullRequest> findPullRequestForGate(long pullRequestId) {
         return pullRequestRepository.findByIdWithAllForGate(pullRequestId);
-    }
-
-    /** Loads an issue with its repository eagerly fetched (gate-bypass path; no role check). */
-    Optional<Issue> findIssueWithRepository(long issueId) {
-        return issueRepository.findByIdWithRepository(issueId);
     }
 
     /**

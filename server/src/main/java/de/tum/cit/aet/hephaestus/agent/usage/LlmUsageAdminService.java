@@ -1,8 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.usage;
 
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageDTOs.AdminLlmUsageReportDTO;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageDTOs.AdminWorkspaceLlmUsageDTO;
 import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateInfoDTO;
 import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateLookup;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
@@ -23,14 +21,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Instance-admin side of LLM cost governance (#1368): the cross-tenant month rollup (spend
+ * Instance-admin side of LLM cost governance: the cross-tenant month rollup (spend
  * totals only — metadata, no tenant content) and the per-workspace budget cap write. Deliberately
- * separate from the workspace-scoped {@link LlmUsageService}: this service is
- * {@link WorkspaceAgnostic} because it reads across every tenant; access is gated upstream by
+ * separate from the workspace-scoped {@link LlmUsageService}. Access is gated upstream by
  * {@code hasAuthority('app_admin')} on {@link LlmUsageAdminController}.
+ *
+ * <p>The {@link WorkspaceAgnostic} bypass is declared on {@link #getReport} alone, not on the class:
+ * only the rollup genuinely reads across every tenant. {@link #updateBudget} writes exactly one
+ * workspace's row, so it stays inside the tenancy inspector where a stray cross-tenant write is
+ * still an error.
  */
 @Service
-@WorkspaceAgnostic("Instance-admin spend rollup aggregates across all tenants (spend metadata only)")
 public class LlmUsageAdminService {
 
     private final LlmUsageEventRepository usageRepository;
@@ -56,6 +57,7 @@ public class LlmUsageAdminService {
     }
 
     @Transactional(readOnly = true)
+    @WorkspaceAgnostic("Instance-admin spend rollup aggregates across all tenants (spend metadata only)")
     public AdminLlmUsageReportDTO getReport(YearMonth month) {
         LlmBudgetService.MonthWindow window = LlmBudgetService.MonthWindow.of(month);
         boolean isCurrentMonth = month.equals(YearMonth.now(ZoneOffset.UTC));
@@ -79,8 +81,13 @@ public class LlmUsageAdminService {
      */
     @Transactional
     public void updateBudget(String workspaceSlug, @Nullable BigDecimal monthlyLlmBudgetUsd) {
+        // Locked read: this cap and the workspace's own-provider cap are two columns of ONE workspace
+        // row, written by two different people. Hibernate's UPDATE covers every column, so an instance
+        // admin and a workspace admin patching concurrently would each revert the other's cap — and
+        // both audit trails would claim a transition that no longer holds. The lock makes
+        // read-snapshot-write one step, so the two purses stay independent.
         Workspace workspace = workspaceRepository
-            .findByWorkspaceSlug(workspaceSlug)
+            .findByWorkspaceSlugForUpdate(workspaceSlug)
             .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceSlug));
         BigDecimal before = workspace.getMonthlyLlmBudgetUsd();
         workspace.setMonthlyLlmBudgetUsd(monthlyLlmBudgetUsd);

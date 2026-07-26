@@ -32,6 +32,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.springframework.transaction.TransactionStatus;
@@ -183,38 +185,17 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
             verify(agentJobRepository, never()).transitionStatus(any(), any(), any(), any(), any());
         }
 
-        @Test
-        void shouldThrow409ForCompletedJob() {
-            AgentJob job = createJobWithStatus(AgentJobStatus.COMPLETED);
+        @ParameterizedTest
+        @EnumSource(value = AgentJobStatus.class, names = { "COMPLETED", "FAILED", "TIMED_OUT" })
+        void shouldThrow409ForAnAlreadyTerminalJob(AgentJobStatus terminalStatus) {
+            AgentJob job = createJobWithStatus(terminalStatus);
             UUID jobId = job.getId();
 
             when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
 
             assertThatThrownBy(() -> service.cancel(1L, jobId))
                 .isInstanceOf(AgentJobStateConflictException.class)
-                .hasMessageContaining("COMPLETED");
-        }
-
-        @Test
-        void shouldThrow409ForFailedJob() {
-            AgentJob job = createJobWithStatus(AgentJobStatus.FAILED);
-            UUID jobId = job.getId();
-
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
-
-            assertThatThrownBy(() -> service.cancel(1L, jobId))
-                .isInstanceOf(AgentJobStateConflictException.class)
-                .hasMessageContaining("FAILED");
-        }
-
-        @Test
-        void shouldThrow409ForTimedOutJob() {
-            AgentJob job = createJobWithStatus(AgentJobStatus.TIMED_OUT);
-            UUID jobId = job.getId();
-
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
-
-            assertThatThrownBy(() -> service.cancel(1L, jobId)).isInstanceOf(AgentJobStateConflictException.class);
+                .hasMessageContaining(terminalStatus.name());
         }
 
         @Test
@@ -249,7 +230,7 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
 
     /** The CAS winner records an attempt-scoped ledger row in the same transaction. */
     @Nested
-    @DisplayName("Unpriced usage ledger write on user-cancel (#1368 fix wave)")
+    @DisplayName("Unpriced usage ledger write on user-cancel")
     class UnverifiableUsageLedger {
 
         @Test
@@ -467,9 +448,9 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
         }
     }
 
-    /** #1368 hardening (tri-state + fenced writes: #1368 fix wave, findings #5/#6): {@code recoverStuckDelivery}. */
+    /** {@code recoverStuckDelivery}: the tri-state dedup lookup and the fenced terminal write. */
     @Nested
-    @DisplayName("recoverStuckDelivery (#1368 hardening)")
+    @DisplayName("recoverStuckDelivery")
     class RecoverStuckDelivery {
 
         private static final short CLAIMED_ATTEMPTS = 1;

@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -22,7 +23,7 @@ import org.hibernate.annotations.ColumnDefault;
 
 /**
  * Instance-owned LLM provider connection: an endpoint the instance can talk to, its credential,
- * and how its traffic egresses (#1368). {@code app_admin}-owned and GLOBAL (not tenant-scoped).
+ * and how its traffic egresses. {@code app_admin}-owned and GLOBAL (not tenant-scoped).
  */
 @Entity
 @Table(
@@ -55,7 +56,7 @@ public class LlmConnection {
     private String apiProtocol;
 
     @ColumnDefault("'BEARER'")
-    @Enumerated(jakarta.persistence.EnumType.STRING)
+    @Enumerated(EnumType.STRING)
     @Column(name = "auth_mode", nullable = false, length = 16, updatable = false)
     private LlmAuthMode authMode = LlmAuthMode.BEARER;
 

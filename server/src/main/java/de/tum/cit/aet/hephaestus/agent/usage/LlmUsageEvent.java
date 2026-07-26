@@ -25,7 +25,7 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One row per LLM-consuming unit of work — the unified, append-only spend ledger (#1368).
+ * One row per LLM-consuming unit of work — the unified, append-only spend ledger.
  *
  * <p>Every source of LLM cost writes here at the moment it persists its own result:
  * detection / replay jobs ({@code agent_job} terminal write) and mentor turns
@@ -117,9 +117,12 @@ public class LlmUsageEvent {
      * USD cost of this unit of work. Nullable: unknown model pricing yields token counts
      * without a cost — rollups treat null as zero (visibility over false precision).
      *
-     * <p>{@code NUMERIC(18,6)} — widened from {@code NUMERIC(12,6)} (#1368 migration-correctness fix,
-     * changelog 1784636803503-29) so a genuinely large event cost is never silently clamped down
-     * against a workspace's own (potentially very high) budget cap.
+     * <p>{@code NUMERIC(18,6)} is wider than any real event cost. The narrower bound is the wire's:
+     * an amount is only reproduced exactly in a browser below $1,000,000,000 (see
+     * {@code MoneyWirePrecisionTest}), so that is where {@link LlmPriceSnapshot#calculateCost} clamps —
+     * never silently: {@link LlmUsageRecorder} WARN-logs it and increments
+     * {@code llm.usage.cost.clamped}, because a capped amount under-bills and every budget check
+     * downstream would then read low.
      */
     @Nullable
     @Column(name = "cost_usd", precision = 18, scale = 6)
@@ -131,7 +134,7 @@ public class LlmUsageEvent {
     private Instant occurredAt;
 
     /**
-     * Resolved pricing outcome (#1368). {@code UNPRICED} stops "unknown price" from being a silent
+     * Resolved pricing outcome. {@code UNPRICED} stops "unknown price" from being a silent
      * $0 — it makes the month's budget verdict unverifiable rather than under-counted.
      */
     @NonNull
@@ -144,7 +147,7 @@ public class LlmUsageEvent {
     @Column(name = "reasoning_tokens", nullable = false)
     private long reasoningTokens;
 
-    /** Which cap this usage counts against — instance backstop vs. workspace BYO self-cap (#1368). */
+    /** Which cap this usage counts against — instance backstop vs. workspace BYO self-cap. */
     @NonNull
     @ColumnDefault("'INSTANCE'")
     @Enumerated(EnumType.STRING)
@@ -159,19 +162,24 @@ public class LlmUsageEvent {
     /**
      * Provenance: the {@code workspace_llm_model} row applied to this event, if any (BYO path only —
      * the instance path uses {@link #appliedPriceId} instead). Soft ref (no FK); {@code workspace_llm_model}
-     * carries no price-history table, so there is no analogous "price row id" to reference (#1368 slice 6).
+     * carries no price-history table, so there is no analogous "price row id" to reference.
      */
     @Nullable
     @Column(name = "applied_workspace_model_id")
     private Long appliedWorkspaceModelId;
 
     /**
-     * Frozen per-1M-token rates actually applied to this event (#1368 slice 6). {@code appliedPriceId} /
+     * Frozen per-1M-token rates actually applied to this event. {@code appliedPriceId} /
      * {@code appliedWorkspaceModelId} alone are live soft refs — if the referenced row is later
      * repriced or deleted, its CURRENT rates no longer describe what a HISTORICAL event was actually
-     * charged. These five columns make every dollar falsifiable independent of the catalog's present
-     * state. Set on every PRICED event (both instance and BYO paths); left null for NO_CHARGE (rate is
-     * moot — cost is definitionally $0) and UNPRICED (no rate was ever resolved).
+     * charged. These four columns make every dollar falsifiable independent of the catalog's present
+     * state.
+     *
+     * <p>Written whenever the admitted snapshot carried a rate — which includes an event downgraded to
+     * UNPRICED at completion ({@link LlmUsageRecorder#recordUnverifiable}): the price WAS resolved at
+     * admission, only the token counts are untrustworthy, and keeping the rates is what lets an
+     * operator reconstruct what the attempt would have cost. Null when no rate was ever resolved, and
+     * for NO_CHARGE, where the rate is moot because the cost is definitionally $0.
      */
     @Nullable
     @Column(name = "applied_per_1m_input_usd", precision = 18, scale = 8)

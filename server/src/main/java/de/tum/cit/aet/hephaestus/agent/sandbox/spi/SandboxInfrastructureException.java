@@ -4,7 +4,7 @@ package de.tum.cit.aet.hephaestus.agent.sandbox.spi;
  * Narrow subtype of {@link SandboxException} reserved for failures PROVABLY caused by transient
  * sandbox/container infrastructure — a Docker daemon call that failed, timed out, or was interrupted
  * (network create/connect, container create/start/wait/stop/remove, file injection/collection I/O) —
- * as opposed to validation, configuration, or unexpected-defect failures (#1368 fix wave, finding #7).
+ * as opposed to validation, configuration, or unexpected-defect failures.
  *
  * <p>{@code AgentJobExecutor#isRetryableInfraFailure} checks specifically for this subtype (not the
  * broader {@link SandboxException}) when deciding whether a failed job is safe to requeue for retry.

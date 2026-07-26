@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
@@ -15,8 +16,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Bounds {@code agent_job} growth (#1368 hardening — pressure-test verdict Tier 1 #1): with no
- * retention, a busy instance accumulates roughly 3.65M rows/year at 10k jobs/day, each carrying up to
+ * Bounds {@code agent_job} growth: with no retention, a busy instance accumulates roughly 3.65M
+ * rows/year at 10k jobs/day, each carrying up to
  * 64KB of {@code container_logs}. Two passes, mirroring {@code integration.core.sync.SyncJobService}'s
  * retention style:
  *
@@ -34,7 +35,14 @@ import org.springframework.transaction.support.TransactionTemplate;
  * UPDATE/DELETE would hold locks and generate WAL/dead-tuple pressure for an unacceptably long single
  * transaction (the brandur.org/postgres-queues dead-tuple death spiral this queue design otherwise
  * avoids by keeping every OTHER transaction span short).
+ *
+ * <p><b>Server role only</b>, on top of the feature flag — the house pattern for a sweeper
+ * ({@code ExportRetentionSweeper}, {@code ConfigAuditRetentionJob}, {@code FxRateFetchScheduler}).
+ * {@code ServerSchedulingConfig} silences the {@code @Scheduled} tick on the worker and webhook pods,
+ * but gating the tick and not the bean leaves those pods holding a retention component and its two
+ * counters for no reason; the sweep has exactly one owner and it is the server.
  */
+@ConditionalOnServerRole
 @Component
 @ConditionalOnProperty(prefix = "hephaestus.agent", name = "enabled", havingValue = "true")
 @WorkspaceAgnostic("Cross-workspace retention sweep; caller is @WorkspaceAgnostic maintenance job")
@@ -46,7 +54,7 @@ public class AgentJobRetentionService {
     private static final int BATCH_SIZE = 500;
 
     /**
-     * Wall-clock budget per pass (strip, then delete — #1368 fix wave, finding #11): on a fresh backlog
+     * Wall-clock budget per pass (strip, then delete, finding #11): on a fresh backlog
      * (e.g. retention just enabled against an already-large table) the batch loop could otherwise run for
      * a very long time in one {@link #runRetention()} invocation. Stopping early once the budget is spent
      * just means the remainder is worked off on the NEXT scheduled run (6h later) instead of blocking this
@@ -80,7 +88,7 @@ public class AgentJobRetentionService {
     /**
      * Daily-ish cadence (every 6h) is plenty for a slow-moving retention window measured in days.
      *
-     * <p>{@code @SchedulerLock} single-flights this across replicas (#1368 fix wave, finding #11):
+     * <p>{@code @SchedulerLock} single-flights this across replicas:
      * without it, every server-role replica fires this on its own 6h timer, all racing the same batched
      * UPDATE/DELETE — each replica's batch loop mostly finds nothing left to do (wasted round-trips) or,
      * worse, several replicas' batches interleave against the same backlog, multiplying lock/WAL pressure

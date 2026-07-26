@@ -15,9 +15,9 @@ import lombok.Setter;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Per-workspace grant of a {@code GRANTED}-visibility instance {@link LlmModel} (#1368). GLOBAL.
- * Allowlist by reference (composite PK modeled on {@code account_feature}); revocation is a delete
- * and needs no data migration.
+ * Per-workspace grant of a {@code GRANTED}-visibility instance {@link LlmModel}. Allowlist by
+ * reference (composite PK modeled on {@code account_feature}); revocation is a delete and needs no
+ * data migration. Workspace-scoped: the row names the tenant it grants access to.
  */
 @Entity
 @Table(name = "llm_model_workspace_grant")

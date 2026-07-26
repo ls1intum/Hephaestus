@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Size;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Partial update of a model's metadata (#1368). Every field is optional; an absent (null) field keeps
+ * Partial update of a model's metadata. Every field is optional; an absent (null) field keeps
  * its current value. Pricing and sharing are updated through their own endpoints, not here.
  */
 @Schema(description = "Update a model's metadata (all fields optional; pricing and sharing are separate)")

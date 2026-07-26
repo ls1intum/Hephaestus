@@ -5,7 +5,7 @@ import jakarta.validation.constraints.Size;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Partial update of your own AI provider connection (#1368). Every field is optional; an absent (null)
+ * Partial update of your own AI provider connection. Every field is optional; an absent (null)
  * field keeps its current value. The API key is write-only: an absent {@code apiKey} keeps the stored
  * key, and {@code clearApiKey=true} removes it (clearing wins over a supplied value).
  */

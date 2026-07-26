@@ -1,19 +1,17 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageJobType;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
-import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -31,9 +29,9 @@ import tools.jackson.databind.ObjectMapper;
  * Periodic recovery for orphaned agent jobs. Runs on the server role only (relies on
  * {@code @EnableScheduling}, which is server-scoped); reads {@code worker_registry} written by workers.
  *
- * <p>Two sweeps (a third — re-publishing stale QUEUED jobs the NATS consumer never picked up — is
- * obsolete now that the queue is the {@code agent_job} table itself: a QUEUED row is always visible
- * to the next poll, there is nothing to re-publish):
+ * <p>The queue is the {@code agent_job} table itself, so a QUEUED row is always visible to the next
+ * poll and nothing has to be re-dispatched. What can go wrong is a row stuck RUNNING, which is what
+ * these two sweeps recover:
  * <ol>
  *   <li><b>Orphan requeue</b> (every 20s): requeues RUNNING jobs whose owning worker's heartbeat went
  *       stale, so a sibling picks them up on its next poll rather than waiting out the full timeout.</li>
@@ -41,6 +39,7 @@ import tools.jackson.databind.ObjectMapper;
  *       {@code TIMED_OUT} once they exceed their timeout + buffer.</li>
  * </ol>
  */
+@ConditionalOnServerRole
 @Component
 @ConditionalOnProperty(prefix = "hephaestus.agent", name = "enabled", havingValue = "true")
 @WorkspaceAgnostic("Zombie sweeper operates across all workspaces")
@@ -69,7 +68,7 @@ public class AgentJobZombieSweeper {
 
     /**
      * A COMPLETED job's delivery is considered stuck once it has sat at {@code delivery_status=PENDING}
-     * longer than this (#1368 hardening) — long enough that a normal in-flight delivery attempt (a
+     * longer than this — long enough that a normal in-flight delivery attempt (a
      * couple of GraphQL calls, seconds) would have finished; anything still PENDING past this point is
      * presumed to be a crash between the terminal write (which sets PENDING) and delivery finishing.
      */
@@ -87,11 +86,12 @@ public class AgentJobZombieSweeper {
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transactionTemplate;
     private final AgentJobLifecycleService lifecycleService;
-    private final @Nullable LlmUsageRecorder usageRecorder;
+    private final LlmUsageRecorder usageRecorder;
     private final Counter zombieReaped;
     private final Counter orphanRequeued;
     private final Counter orphanFailed;
     private final Counter deliveryRecovered;
+    private final Counter snapshotUnreadable;
 
     @Autowired
     public AgentJobZombieSweeper(
@@ -123,28 +123,12 @@ public class AgentJobZombieSweeper {
         this.deliveryRecovered = Counter.builder("agent.job.delivery.recovered")
             .description("Stuck PENDING deliveries successfully re-attempted by the recovery sweep")
             .register(meterRegistry);
-    }
-
-    /** Compatibility constructor for recovery tests that predate attempt-ledger accounting. */
-    public AgentJobZombieSweeper(
-        AgentJobRepository jobRepository,
-        WorkerRegistryRepository workerRegistryRepository,
-        AgentProperties agentProperties,
-        ObjectMapper objectMapper,
-        TransactionTemplate transactionTemplate,
-        AgentJobLifecycleService lifecycleService,
-        MeterRegistry meterRegistry
-    ) {
-        this(
-            jobRepository,
-            workerRegistryRepository,
-            agentProperties,
-            objectMapper,
-            transactionTemplate,
-            lifecycleService,
-            null,
-            meterRegistry
-        );
+        // Mirrors mentor.in_flight.reaper.failure: the money path degraded rather than failing, so
+        // there is no exception for an operator to find. A sustained rate means jobs are terminalising
+        // with spend nobody can price — usually a snapshot written by a newer server than this one.
+        this.snapshotUnreadable = Counter.builder("agent.job.snapshot.unreadable")
+            .description("Terminal accounting events whose config snapshot could not be read; billed UNPRICED")
+            .register(meterRegistry);
     }
 
     /**
@@ -154,7 +138,6 @@ public class AgentJobZombieSweeper {
      * requeues a dead worker's jobs long before this 2-minute reaper's {@code timeout + 5min} cutoff
      * fires, so the two don't fight over dead-worker jobs — they're separated by timing.
      */
-    @Transactional
     @Scheduled(fixedDelay = 2, timeUnit = TimeUnit.MINUTES, initialDelay = 1)
     public void reapStaleRunningJobs() {
         // Use the buffer as cutoff: any job running longer than 5 minutes is worth checking.
@@ -166,39 +149,41 @@ public class AgentJobZombieSweeper {
             return;
         }
 
+        // Each job reaped in its OWN transaction, like the orphan sweep below. A method-level
+        // @Transactional here would not survive its own catch block: a constraint violation inside the
+        // loop marks the transaction rollback-only, so the catch resumes, the loop finishes, and the
+        // commit then throws UnexpectedRollbackException — discarding every job the batch had already
+        // reaped, ledger events included. Per-job boundaries make one poison job cost one job.
         for (AgentJob job : staleJobs) {
             try {
-                AgentJob lockedJob = jobRepository.findByIdWithWorkspaceForUpdate(job.getId()).orElse(null);
-                if (lockedJob == null || lockedJob.getStatus() != AgentJobStatus.RUNNING) continue;
-                int timeoutSeconds = getTimeoutFromSnapshot(lockedJob);
-                Duration maxLifetime = Duration.ofSeconds(timeoutSeconds).plus(RUNNING_BUFFER);
-                if (
-                    lockedJob.getStartedAt() != null &&
-                    lockedJob.getStartedAt().plus(maxLifetime).isAfter(Instant.now())
-                ) {
-                    continue; // Not stale yet for this specific job's timeout
-                }
-
-                int updated = jobRepository.transitionStatus(
-                    lockedJob.getId(),
-                    AgentJobStatus.TIMED_OUT,
-                    Instant.now(),
-                    "Reaped: exceeded timeout (executor may have crashed)",
-                    Set.of(AgentJobStatus.RUNNING)
-                );
-
-                if (updated > 0) {
-                    recordUnverifiableUsage(lockedJob);
-                    zombieReaped.increment();
-                    log.warn(
-                        "Reaped stale RUNNING job: jobId={}, startedAt={}",
-                        lockedJob.getId(),
-                        lockedJob.getStartedAt()
-                    );
-                }
+                transactionTemplate.executeWithoutResult(status -> reapIfStale(job.getId()));
             } catch (Exception e) {
                 log.warn("Failed to reap stale job: jobId={}, error={}", job.getId(), e.getMessage());
             }
+        }
+    }
+
+    private void reapIfStale(UUID jobId) {
+        AgentJob lockedJob = jobRepository.findByIdWithWorkspaceForUpdate(jobId).orElse(null);
+        if (lockedJob == null || lockedJob.getStatus() != AgentJobStatus.RUNNING) return;
+        int timeoutSeconds = getTimeoutFromSnapshot(lockedJob);
+        Duration maxLifetime = Duration.ofSeconds(timeoutSeconds).plus(RUNNING_BUFFER);
+        if (lockedJob.getStartedAt() != null && lockedJob.getStartedAt().plus(maxLifetime).isAfter(Instant.now())) {
+            return; // Not stale yet for this specific job's timeout
+        }
+
+        int updated = jobRepository.transitionStatus(
+            jobId,
+            AgentJobStatus.TIMED_OUT,
+            Instant.now(),
+            "Reaped: exceeded timeout (executor may have crashed)",
+            Set.of(AgentJobStatus.RUNNING)
+        );
+
+        if (updated > 0) {
+            recordUnverifiableUsage(lockedJob);
+            zombieReaped.increment();
+            log.warn("Reaped stale RUNNING job: jobId={}, startedAt={}", jobId, lockedJob.getStartedAt());
         }
     }
 
@@ -250,7 +235,7 @@ public class AgentJobZombieSweeper {
                     }
                     continue;
                 }
-                // #1368 hardening: backoff-computed available_at + a rotated job token — see
+                // backoff-computed available_at + a rotated job token — see
                 // AgentJobExecutor#requeueOrphanWithRotation's javadoc (mirrored here since the sweeper
                 // and executor are independent CAS callers of the same requeueOrphan query).
                 int attemptNumber = orphan.getRetryCount() + 1;
@@ -288,7 +273,7 @@ public class AgentJobZombieSweeper {
     }
 
     /**
-     * Delivery-recovery sweep (#1368 hardening): re-attempts delivery for jobs stuck at
+     * Delivery-recovery sweep: re-attempts delivery for jobs stuck at
      * {@code delivery_status=PENDING} — the executor crashed between the terminal-write transaction
      * (which sets PENDING) and finishing the actual delivery, so {@link AgentJobLifecycleService#retryDelivery}
      * (which requires the FAILED CAS source) cannot reach them. Bounded by {@link #MAX_DELIVERY_RECOVERY_ATTEMPTS}
@@ -335,7 +320,7 @@ public class AgentJobZombieSweeper {
                 }
                 // The CAS above incremented delivery_attempts from expectedAttempts to
                 // expectedAttempts + 1 — that post-increment value is THIS attempt's fence token for its
-                // terminal write (#1368 fix wave, finding #5; see AgentJobLifecycleService#recoverStuckDelivery).
+                // terminal write (see AgentJobLifecycleService#recoverStuckDelivery).
                 short claimedAttempts = (short) (expectedAttempts + 1);
                 boolean delivered = lifecycleService.recoverStuckDelivery(job, claimedAttempts);
                 if (delivered) {
@@ -363,16 +348,35 @@ public class AgentJobZombieSweeper {
         }
     }
 
-    private int getTimeoutFromSnapshot(AgentJob job) {
-        try {
-            if (job.getConfigSnapshot() != null) {
-                ConfigSnapshot snapshot = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
-                return snapshot.timeoutSeconds();
-            }
-        } catch (Exception e) {
-            log.debug("Could not parse config snapshot for job {}: {}", job.getId(), e.getMessage());
+    /**
+     * Read a job's frozen {@link ConfigSnapshot}, or {@code null} when it cannot be read.
+     *
+     * <p>The ONE place this sweeper parses a snapshot, because the two things it reads out of one —
+     * the timeout and the price — are needed on the same job in the same pass, and they used to
+     * disagree about whether an unreadable snapshot was fatal. It is never: a snapshot the sweeper
+     * cannot read is a fact about a job that is already being taken off the queue, and refusing to
+     * take it off would leave it RUNNING forever.
+     *
+     * <p>Unreadable is a real, expected state, not a corrupt row. {@link ConfigSnapshot#fromJson}
+     * deliberately rejects a snapshot written by a NEWER schema version, so a reverted rolling deploy
+     * leaves behind jobs this server cannot read but a canary pod could. Those jobs still have to
+     * terminalise here.
+     */
+    private @Nullable ConfigSnapshot parseSnapshot(AgentJob job) {
+        if (job.getConfigSnapshot() == null) {
+            return null;
         }
-        return 600; // Default 10 minutes
+        try {
+            return ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
+        } catch (RuntimeException e) {
+            log.warn("Could not read config snapshot for job {}: {}", job.getId(), e.getMessage());
+            return null;
+        }
+    }
+
+    private int getTimeoutFromSnapshot(AgentJob job) {
+        ConfigSnapshot snapshot = parseSnapshot(job);
+        return snapshot != null ? snapshot.timeoutSeconds() : 600; // Default 10 minutes
     }
 
     private void recordUnverifiableUsage(AgentJob job) {
@@ -386,49 +390,36 @@ public class AgentJobZombieSweeper {
      * Bill a reaped orphan from token counts the caller captured itself. The {@code counts} MUST be
      * read BEFORE any requeue of this job — {@link AgentJobRepository#requeueOrphan} atomically zeroes
      * the row's accumulators, so a post-requeue re-read would drop the reaped attempt's spend.
+     *
+     * <p><b>This method must not throw.</b> Every caller runs it inside the same transaction as the
+     * state transition it accompanies, so an exception here does not merely skip the ledger event — it
+     * rolls back the TIMED_OUT/FAILED/requeue write that the caller already made. The job returns to
+     * RUNNING, the next sweep reaches the same line, and it fails identically forever, burning a
+     * {@code (workspace, purpose)} concurrency slot for as long as the row exists.
      */
     private void recordUnverifiableUsage(AgentJob job, @Nullable AgentJobLlmUsage counts) {
-        if (usageRecorder == null || job.getExecutionStartedAt() == null) return;
-        ConfigSnapshot snapshot = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
-        // Jobs that started before admission snapshots were introduced still need to be recovered.
-        // Their spend cannot be reconstructed safely, so preserve the state transition and append an
-        // explicit instance-funded UNPRICED event rather than either inventing a cost or rolling back.
-        LlmPriceSnapshot price =
-            snapshot.priceSnapshot() != null
-                ? snapshot.priceSnapshot()
-                : new LlmPriceSnapshot(
-                      FundingSource.INSTANCE,
-                      PricingState.UNPRICED,
-                      null,
-                      null,
-                      null,
-                      null,
-                      null,
-                      null
-                  );
-        // #1368: a reaped zombie made real, priced calls through the proxy before it was abandoned —
-        // bill them from the tokens the proxy attributed to the row (captured pre-requeue) instead of
-        // recording zero cost.
-        boolean billable = counts != null && counts.hasBillableUsage() && price.pricingState() != PricingState.UNPRICED;
-        LlmUsageRecorder.LlmUsageSample sample = new LlmUsageRecorder.LlmUsageSample(
-            LlmUsageJobType.from(job.getJobType()),
-            LlmUsageSourceType.AGENT_JOB,
-            job.getId(),
-            job.getRetryCount(),
-            snapshot.upstreamModelId(),
-            billable ? counts.inputTokens() : 0,
-            billable ? counts.outputTokens() : 0,
-            billable ? counts.cacheReadTokens() : 0,
-            billable ? counts.cacheWriteTokens() : 0,
-            billable ? counts.reasoningTokens() : 0,
-            billable ? counts.totalCalls() : 0,
-            price,
-            Instant.now()
-        );
-        if (billable) {
-            usageRecorder.record(job.getWorkspace().getId(), sample);
-        } else {
-            usageRecorder.recordUnverifiable(job.getWorkspace().getId(), sample);
+        if (job.getExecutionStartedAt() == null) return;
+        ConfigSnapshot snapshot = parseSnapshot(job);
+        if (snapshot == null) {
+            snapshotUnreadable.increment();
         }
+        // Jobs that started before admission snapshots were introduced — and jobs whose snapshot this
+        // server cannot read at all — still need to be recovered. Their spend cannot be reconstructed
+        // safely, so preserve the state transition and append an explicit instance-funded UNPRICED
+        // event rather than either inventing a cost or rolling back.
+        LlmPriceSnapshot price =
+            snapshot != null && snapshot.priceSnapshot() != null
+                ? snapshot.priceSnapshot()
+                : LlmPriceSnapshot.unpricedInstance();
+        // A reaped zombie made real, priced calls through the proxy before it was abandoned — bill
+        // them from the tokens the proxy attributed to the row (captured pre-requeue) instead of
+        // recording zero cost.
+        TerminalUsage.resolve(null, counts).appendTo(
+            usageRecorder,
+            job.getWorkspace().getId(),
+            job,
+            snapshot != null ? snapshot.upstreamModelId() : null,
+            price
+        );
     }
 }

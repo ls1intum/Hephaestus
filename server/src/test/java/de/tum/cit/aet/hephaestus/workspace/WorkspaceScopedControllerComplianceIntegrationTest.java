@@ -17,7 +17,7 @@ import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.util.ReflectionUtils;
 import org.springframework.web.bind.annotation.RequestMapping;
 
-class WorkspaceScopedControllerComplianceTest extends AbstractWorkspaceIntegrationTest {
+class WorkspaceScopedControllerComplianceIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
     private ApplicationContext applicationContext;

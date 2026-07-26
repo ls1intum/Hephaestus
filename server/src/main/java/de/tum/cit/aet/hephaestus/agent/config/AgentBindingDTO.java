@@ -5,7 +5,7 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A workspace's model + execution limits for one agent purpose (#1368), plus whether it resolves to
+ * A workspace's model + execution limits for one agent purpose, plus whether it resolves to
  * an available model right now.
  */
 @Schema(description = "A workspace's agent binding for one purpose")

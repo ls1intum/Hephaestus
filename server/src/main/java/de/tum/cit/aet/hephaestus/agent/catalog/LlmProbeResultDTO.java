@@ -6,7 +6,7 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Advisory result of a connection probe (#1368). Always returned with HTTP 200 — a failed upstream is
+ * Advisory result of a connection probe. Always returned with HTTP 200 — a failed upstream is
  * reported as {@code reachable=false} with a message, never raised to the caller. The upstream body is
  * never echoed verbatim; only model ids are surfaced.
  */

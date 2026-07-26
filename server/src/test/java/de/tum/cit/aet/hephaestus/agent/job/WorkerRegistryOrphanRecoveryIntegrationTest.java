@@ -46,7 +46,7 @@ class WorkerRegistryOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     private TransactionTemplate transactionTemplate;
 
     // This context has worker.enabled=true and NO hephaestus.worker.control.endpoint — the exact
-    // topology where orphan recovery used to silently no-op (Gap D). required=false so a regression
+    // topology where orphan recovery would otherwise silently no-op. required=false so a regression
     // (identity bound only when WSS is configured) fails on the assertion, not on context load.
     @Autowired(required = false)
     private WorkerProperties workerProperties;
@@ -104,8 +104,8 @@ class WorkerRegistryOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     void requeueOrphanIsCasIdempotent() {
         UUID id = runningJob("w-stale", Instant.now().minus(Duration.ofMinutes(5)));
 
-        // requeueOrphan is @Modifying — wrap in a tx, as the sweeper does. Fenced on worker_id (#1368
-        // fix wave) — "w-stale" is the row's actual owner both times, so the fence itself doesn't
+        // requeueOrphan is @Modifying — wrap in a tx, as the sweeper does. Fenced on worker_id:
+        // "w-stale" is the row's actual owner both times, so the fence itself doesn't
         // block the second call; status alone (no longer RUNNING after the first win) does.
         String newToken = AgentJob.generateJobToken();
         int firstWin = transactionTemplate.execute(s ->

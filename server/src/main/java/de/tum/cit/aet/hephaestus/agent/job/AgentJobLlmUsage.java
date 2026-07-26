@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
 /**
- * A job's accumulated LLM token totals (#1368), read from the {@code agent_job} row as a projection.
+ * A job's accumulated LLM token totals, read from the {@code agent_job} row as a projection.
  * The proxy adds one call's tokens per non-streaming forward; the crash/cancel accounting paths read
  * this back to bill the calls a job actually made before it terminated abnormally.
  */

@@ -24,7 +24,7 @@ import org.hibernate.annotations.ColumnDefault;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Effective-dated price row for an instance {@link LlmModel} (#1368). GLOBAL. Repricing closes the
+ * Effective-dated price row for an instance {@link LlmModel}. GLOBAL. Repricing closes the
  * open row's {@code effective_to} and inserts a new one in one transaction; per-1M-token units.
  */
 @Entity

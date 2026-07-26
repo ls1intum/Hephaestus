@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
+import static de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures.admittedMentorConfig;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorTurnPersistence;
@@ -80,7 +81,7 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
 
     private ChatThread seedThreadWithUserMessage(String firstPrompt) {
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, firstPrompt);
-        persistence.persistInFlight(thread, firstPrompt, UUID.randomUUID(), null);
+        persistence.persistInFlight(thread, firstPrompt, UUID.randomUUID(), null, admittedMentorConfig());
         return thread;
     }
 
@@ -116,7 +117,7 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
         other.setAccountType(AccountType.ORG);
         other = workspaceRepository.save(other);
         ChatThread foreign = persistence.ensureThread(other.getId(), UUID.randomUUID(), user, "foreign prompt");
-        persistence.persistInFlight(foreign, "foreign prompt", UUID.randomUUID(), null);
+        persistence.persistInFlight(foreign, "foreign prompt", UUID.randomUUID(), null, admittedMentorConfig());
 
         // Query scoped to MY workspace but passing both ids: the foreign thread is filtered out by the
         // workspace_id join, even though its id was supplied.

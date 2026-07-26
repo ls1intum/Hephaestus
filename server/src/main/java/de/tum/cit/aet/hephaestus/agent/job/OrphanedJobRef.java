@@ -13,7 +13,7 @@ public interface OrphanedJobRef {
 
     /**
      * The (dead) worker id the job is currently RUNNING-owned by. Threaded back into the requeue CAS
-     * (#1368 fix wave) so the sweeper only reclaims the row while it is still owned by the worker it
+     * so the sweeper only reclaims the row while it is still owned by the worker it
      * identified as dead — never a sibling that has since legitimately re-claimed it.
      */
     String getWorkerId();

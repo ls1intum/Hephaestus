@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -25,6 +26,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -77,7 +79,7 @@ class LlmModelServiceTest extends BaseUnitTest {
     }
 
     private void stubModelSavePassthrough() {
-        // Stubs both: create()/update() now flush synchronously (saveAndFlush — #1368 fix wave, so a
+        // Stubs both: create()/update() now flush synchronously (saveAndFlush, so a
         // concurrent unique-constraint violation surfaces inside their try/catch instead of escaping as
         // an uncaught 500 at the transaction's implicit end-of-method flush), while updateSharing()
         // (untouched — it never changes upstream_model_id) still calls plain save().
@@ -130,22 +132,31 @@ class LlmModelServiceTest extends BaseUnitTest {
             open.setPer1mInputUsd(new BigDecimal("1.00"));
             open.setPer1mOutputUsd(new BigDecimal("2.00"));
             when(priceRepository.findByModelIdAndEffectiveToIsNull(7L)).thenReturn(Optional.of(open));
+            when(priceRepository.saveAndFlush(any(LlmModelPrice.class))).thenAnswer(invocation ->
+                invocation.getArgument(0)
+            );
             when(priceRepository.save(any(LlmModelPrice.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
             modelService.updatePrice(7L, pricedRequest("3.00", "9.00"));
 
-            ArgumentCaptor<LlmModelPrice> savedCaptor = ArgumentCaptor.forClass(LlmModelPrice.class);
-            verify(priceRepository, times(2)).save(savedCaptor.capture());
-            List<LlmModelPrice> saved = savedCaptor.getAllValues();
+            // The close must reach the database BEFORE the insert, not merely before commit.
+            // ux_llm_model_price_open allows one open row per model, and the new row is
+            // IDENTITY-generated (its INSERT fires at persist, ahead of any pending UPDATE), so a
+            // deferred close would make the reprice collide with the row it is superseding. Hence
+            // saveAndFlush on the closing row, asserted in order here.
+            ArgumentCaptor<LlmModelPrice> closed = ArgumentCaptor.forClass(LlmModelPrice.class);
+            ArgumentCaptor<LlmModelPrice> inserted = ArgumentCaptor.forClass(LlmModelPrice.class);
+            InOrder inOrder = inOrder(priceRepository);
+            inOrder.verify(priceRepository).saveAndFlush(closed.capture());
+            inOrder.verify(priceRepository).save(inserted.capture());
+            verify(priceRepository, never()).save(open);
 
-            // First save closes the previously-open row.
-            assertThat(saved.get(0)).isSameAs(open);
-            assertThat(saved.get(0).getEffectiveTo()).isNotNull();
+            assertThat(closed.getValue()).isSameAs(open);
+            assertThat(closed.getValue().getEffectiveTo()).isNotNull();
 
-            // Second save is the new open row.
-            assertThat(saved.get(1)).isNotSameAs(open);
-            assertThat(saved.get(1).getEffectiveTo()).isNull();
-            assertThat(saved.get(1).getPer1mInputUsd()).isEqualByComparingTo("3.00");
+            assertThat(inserted.getValue()).isNotSameAs(open);
+            assertThat(inserted.getValue().getEffectiveTo()).isNull();
+            assertThat(inserted.getValue().getPer1mInputUsd()).isEqualByComparingTo("3.00");
         }
 
         @Test
@@ -186,7 +197,7 @@ class LlmModelServiceTest extends BaseUnitTest {
 
         @Test
         void pricedModeRejectsAllZeroRates() {
-            // #1368 fix wave: an all-zero-rate PRICED model would otherwise pass validation and
+            // an all-zero-rate PRICED model would otherwise pass validation and
             // count as verified $0 spend forever — that's what Free is for.
             UpdateLlmModelPriceRequestDTO request = new UpdateLlmModelPriceRequestDTO(
                 PricingMode.PRICED,
@@ -313,15 +324,35 @@ class LlmModelServiceTest extends BaseUnitTest {
     @Nested
     class SharingReplace {
 
+        /**
+         * Replace-all grant updates must read the row through the write-locked finder, or two admins
+         * editing the same model's grant set at once silently overwrite each other. Asserted on the
+         * instance that actually gets mutated rather than on which finder was called: the two finders
+         * hand back different objects here, so a read that skipped the lock would write its visibility
+         * onto the unlocked copy and return that one instead.
+         */
         @Test
         void locksTheModelWhileReplacingItsGrantSet() {
             stubModelSavePassthrough();
+            // A decoy behind the NON-locking finder. lenient() because it must stay unused while the
+            // code is correct — that is the assertion. If updateSharing ever reads through
+            // findByIdWithConnection instead, it picks this object up and the assertions below fail.
+            LlmModel unlockedCopy = new LlmModel();
+            unlockedCopy.setId(7L);
+            unlockedCopy.setVisibility(ModelVisibility.PUBLIC);
+            lenient().when(modelRepository.findByIdWithConnection(7L)).thenReturn(Optional.of(unlockedCopy));
             when(grantRepository.findByIdModelId(7L)).thenReturn(List.of());
 
-            modelService.updateSharing(7L, new UpdateLlmModelSharingRequestDTO(ModelVisibility.GRANTED, List.of()));
+            LlmModel result = modelService.updateSharing(
+                7L,
+                new UpdateLlmModelSharingRequestDTO(ModelVisibility.GRANTED, List.of())
+            );
 
-            verify(modelRepository).findByIdForUpdate(7L);
-            verify(modelRepository, never()).findByIdWithConnection(7L);
+            assertThat(result).as("the row that was mutated and saved must be the write-locked one").isSameAs(model);
+            assertThat(model.getVisibility()).isEqualTo(ModelVisibility.GRANTED);
+            assertThat(unlockedCopy.getVisibility())
+                .as("the unlocked read must not be the one that gets written")
+                .isEqualTo(ModelVisibility.PUBLIC);
         }
 
         @Test
@@ -398,8 +429,14 @@ class LlmModelServiceTest extends BaseUnitTest {
             LlmModelWorkspaceGrant existing = new LlmModelWorkspaceGrant(7L, 1L);
             when(grantRepository.findByIdModelId(7L)).thenReturn(List.of(existing));
 
-            modelService.updateSharing(7L, new UpdateLlmModelSharingRequestDTO(ModelVisibility.GRANTED, List.of()));
+            LlmModel result = modelService.updateSharing(
+                7L,
+                new UpdateLlmModelSharingRequestDTO(ModelVisibility.GRANTED, List.of())
+            );
 
+            assertThat(result.getVisibility())
+                .as("an empty grant list still means GRANTED — shared with nobody, not made public")
+                .isEqualTo(ModelVisibility.GRANTED);
             verify(workspaceRepository, never()).findAllById(anyCollection());
             verify(grantRepository).deleteAll(List.of(existing));
             verify(grantRepository, never()).saveAll(anyCollection());
@@ -466,7 +503,7 @@ class LlmModelServiceTest extends BaseUnitTest {
         }
 
         /**
-         * #1368 fix wave: the fast-path {@code existsByConnectionIdAndUpstreamModelId} check above is
+         * the fast-path {@code existsByConnectionIdAndUpstreamModelId} check above is
          * racy — two concurrent creates/updates can both pass it. The unique constraint
          * {@code ux_llm_model_connection_upstream} is the real backstop, but it only fires when the
          * INSERT/UPDATE is actually flushed to the DB. {@code save()} alone doesn't guarantee that (a

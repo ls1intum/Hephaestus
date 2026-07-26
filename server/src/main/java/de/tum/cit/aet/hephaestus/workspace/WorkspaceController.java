@@ -66,7 +66,7 @@ public class WorkspaceController {
         content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
     )
     @RequireAtLeastWorkspaceAdmin
-    @Audited("WORKSPACE_STATUS")
+    @Audited("config_audit WORKSPACE_STATUS")
     public ResponseEntity<WorkspaceDTO> updateStatus(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody UpdateWorkspaceStatusRequestDTO request
@@ -79,7 +79,7 @@ public class WorkspaceController {
     @Operation(summary = "Purge (soft delete) a workspace")
     @ApiResponse(responseCode = "204", description = "Workspace purged")
     @RequireWorkspaceOwner
-    @Audited("WORKSPACE_STATUS")
+    @Audited("config_audit WORKSPACE_STATUS")
     public ResponseEntity<Void> purgeWorkspace(WorkspaceContext workspaceContext) {
         workspaceLifecycleService.purgeWorkspace(workspaceContext);
         return ResponseEntity.noContent().build();
@@ -156,7 +156,7 @@ public class WorkspaceController {
         content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
     )
     @RequireAtLeastWorkspaceAdmin
-    @Audited("WORKSPACE_TOKEN")
+    @Audited("config_audit WORKSPACE_TOKEN")
     public ResponseEntity<WorkspaceDTO> updateToken(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody UpdateWorkspaceTokenRequestDTO request
@@ -173,7 +173,7 @@ public class WorkspaceController {
         content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
     )
     @RequireAtLeastWorkspaceAdmin
-    @Audited("WORKSPACE_VISIBILITY")
+    @Audited("config_audit WORKSPACE_VISIBILITY")
     public ResponseEntity<WorkspaceDTO> updatePublicVisibility(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody UpdateWorkspacePublicVisibilityRequestDTO request
@@ -190,7 +190,7 @@ public class WorkspaceController {
         content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
     )
     @RequireAtLeastWorkspaceAdmin
-    @Audited("WORKSPACE_FEATURES")
+    @Audited("config_audit WORKSPACE_FEATURES")
     public ResponseEntity<WorkspaceDTO> updateFeatures(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody UpdateWorkspaceFeaturesRequestDTO request

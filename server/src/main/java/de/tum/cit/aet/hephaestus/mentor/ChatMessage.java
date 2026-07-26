@@ -126,9 +126,53 @@ public class ChatMessage {
     private JsonNode parts;
 
     /**
-     * Optimistic-lock version — Hibernate bumps on managed writes, {@code reapStaleInFlight}
-     * bumps explicitly. Stale-snapshot writers (reaper-vs-finalise, finalise-vs-interrupt) get
+     * Tokens the LLM proxy has served for this turn, added one call at a time by
+     * {@code ChatMessageRepository#accumulateLlmUsage} while the row is {@code in_flight}. They are the
+     * only record of a turn that dies before its runner reports anything: the in-flight reaper bills
+     * from them instead of booking a crashed turn as zero tokens.
+     *
+     * <p><b>Read-only to JPA on purpose.</b> {@code insertable = false} lets the column default supply
+     * the initial zero; {@code updatable = false} means no entity flush ever writes them, so
+     * {@code finalise}'s and the reaper's {@code saveAndFlush} of a snapshot loaded BEFORE a proxy call
+     * landed cannot silently roll that call's tokens back. The fenced native UPDATE is the single
+     * writer, and it deliberately does not bump {@link #version} — a per-call accounting add is not a
+     * change to the turn's observable state, and bumping it would make every proxied call a
+     * lost-update race for the orchestrator's own terminal write.
+     *
+     * <p>{@code @ColumnDefault} is load-bearing, not decoration: with no insert value supplied, the
+     * column's DEFAULT is what satisfies its NOT NULL. Liquibase declares one, and this makes the
+     * schema Hibernate generates for the test tier declare the same — without it every mentor-turn
+     * insert fails there while production is fine, which is the worst way for the two schema sources
+     * to disagree.
+     *
+     * <p>Mirrors {@code AgentJob}'s columns of the same names; {@code llm_cache_write_tokens} has no
+     * counterpart here because no OpenAI-compatible usage block reports cache WRITES per call.
+     */
+    @org.hibernate.annotations.ColumnDefault("0")
+    @Column(name = "llm_total_calls", nullable = false, insertable = false, updatable = false)
+    private int llmTotalCalls;
+
+    @org.hibernate.annotations.ColumnDefault("0")
+    @Column(name = "llm_total_input_tokens", nullable = false, insertable = false, updatable = false)
+    private long llmTotalInputTokens;
+
+    @org.hibernate.annotations.ColumnDefault("0")
+    @Column(name = "llm_total_output_tokens", nullable = false, insertable = false, updatable = false)
+    private long llmTotalOutputTokens;
+
+    @org.hibernate.annotations.ColumnDefault("0")
+    @Column(name = "llm_total_reasoning_tokens", nullable = false, insertable = false, updatable = false)
+    private long llmTotalReasoningTokens;
+
+    @org.hibernate.annotations.ColumnDefault("0")
+    @Column(name = "llm_cache_read_tokens", nullable = false, insertable = false, updatable = false)
+    private long llmCacheReadTokens;
+
+    /**
+     * Optimistic-lock version — Hibernate bumps it on every managed write, including the reaper's.
+     * Stale-snapshot writers (reaper-vs-finalise, finalise-vs-interrupt) get
      * {@code OptimisticLockingFailureException}; the orchestrator skips so the winner survives.
+     * {@code accumulateLlmUsage} deliberately leaves it alone — see that query.
      */
     @org.hibernate.annotations.ColumnDefault("0")
     @jakarta.persistence.Version

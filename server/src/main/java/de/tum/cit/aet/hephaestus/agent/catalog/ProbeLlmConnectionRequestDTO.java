@@ -7,7 +7,7 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Draft probe request (#1368): test an as-yet-unsaved connection against its {@code /models} endpoint
+ * Draft probe request: test an as-yet-unsaved connection against its {@code /models} endpoint
  * using the supplied credential. The credential is used only for the probe and never persisted.
  */
 @Schema(description = "Draft connection probe using a supplied (never-persisted) credential")

@@ -28,7 +28,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
  * reachable and still rejects a non-purpose, i.e. the win is precedence and not a route that shadows
  * its sibling entirely.
  */
-class AgentsPathDispatchTest extends AbstractWorkspaceIntegrationTest {
+class AgentsPathDispatchIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
     private WebTestClient webTestClient;

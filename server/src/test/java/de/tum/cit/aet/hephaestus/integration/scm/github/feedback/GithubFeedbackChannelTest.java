@@ -340,7 +340,7 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
         verify(prNodeIdResolver, never()).resolve(anyLong(), any(), any(), anyInt());
     }
 
-    // findExistingSummary — #1368 fix wave, finding #6 (tri-state dedup + pagination)
+    // findExistingSummary, finding #6 (tri-state dedup + pagination)
 
     private static final FeedbackTarget PR_TARGET = new FeedbackTarget(
         new IntegrationRef(IntegrationKind.GITHUB, 1L, null),

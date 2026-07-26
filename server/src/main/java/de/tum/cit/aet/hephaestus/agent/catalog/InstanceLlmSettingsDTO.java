@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.agent.catalog;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.NonNull;
 
-/** Instance-wide LLM governance settings (#1368). GLOBAL, {@code app_admin}-owned. */
 @Schema(description = "Instance-wide LLM governance settings")
 public record InstanceLlmSettingsDTO(
     @Schema(

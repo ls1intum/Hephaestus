@@ -9,7 +9,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * #1368 hardening: quartic-with-jitter backoff math. A seeded {@link RandomGenerator} makes the
+ * quartic-with-jitter backoff math. A seeded {@link RandomGenerator} makes the
  * jitter deterministic for assertions instead of asserting a range every time.
  */
 class AgentJobBackoffTest extends BaseUnitTest {

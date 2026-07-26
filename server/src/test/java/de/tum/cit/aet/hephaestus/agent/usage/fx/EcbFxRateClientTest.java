@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.usage.fx;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.agent.LlmProperties;
 import de.tum.cit.aet.hephaestus.agent.usage.fx.EcbFxRateClient.EcbDailyRate;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
@@ -38,7 +39,14 @@ class EcbFxRateClientTest extends BaseUnitTest {
     }
 
     private EcbFxRateClient clientFor(String path) {
-        return new EcbFxRateClient(ecb.url(path).toString());
+        return clientForUrl(ecb.url(path).toString());
+    }
+
+    /** The one knob {@code hephaestus.llm.fx.daily-url} exists for: aim the client at a fixture. */
+    private static EcbFxRateClient clientForUrl(String dailyUrl) {
+        return new EcbFxRateClient(
+            new LlmProperties("", new LlmProperties.Egress(false), new LlmProperties.Fx(dailyUrl))
+        );
     }
 
     private static String fixture() throws IOException {
@@ -63,18 +71,11 @@ class EcbFxRateClientTest extends BaseUnitTest {
 
         assertThat(parsed).hasValueSatisfying(rate -> {
             assertThat(rate.date()).isEqualTo(LocalDate.of(2026, 7, 24));
-            // Stored in the ECB's own direction: US dollars per ONE euro, so above 1.
+            // Stored in the ECB's own direction: US dollars per ONE euro, so above 1. The fixture
+            // lists 30 other currencies (GBP at 0.86545 among them) — pinning the exact value is
+            // already the proof that USD, and only USD, was picked out.
             assertThat(rate.usdPerEur()).isEqualByComparingTo("1.1377");
         });
-    }
-
-    @Test
-    @DisplayName("should ignore the other 30 currencies in the document")
-    void shouldPickUsdWhenDocumentListsManyCurrencies() throws IOException {
-        Optional<EcbDailyRate> parsed = EcbFxRateClient.parseUsdRate(fixture());
-
-        // GBP (0.86545) sits before several others and would be a plausible wrong pick.
-        assertThat(parsed.orElseThrow().usdPerEur()).isNotEqualByComparingTo("0.86545");
     }
 
     @Test
@@ -153,6 +154,6 @@ class EcbFxRateClientTest extends BaseUnitTest {
         String deadUrl = ecb.url("/daily.xml").toString();
         ecb.close();
 
-        assertThat(new EcbFxRateClient(deadUrl).fetchLatestUsdRate()).isEmpty();
+        assertThat(clientForUrl(deadUrl).fetchLatestUsdRate()).isEmpty();
     }
 }

@@ -7,7 +7,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
 /**
- * Shared PRICED/NO_CHARGE/UNPRICED validation (#1368) for both the instance catalog ({@link LlmModelService})
+ * Shared PRICED/NO_CHARGE/UNPRICED validation for both the instance catalog ({@link LlmModelService})
  * and workspace BYO models ({@code WorkspaceLlmModelService}) — same rule, two owners of the rates.
  *
  * <ul>
@@ -17,9 +17,22 @@ import org.springframework.util.StringUtils;
  *       forever, which is what {@code Free} is for.</li>
  *   <li>{@code NO_CHARGE}/{@code UNPRICED} must carry no rates at all; {@code NO_CHARGE} additionally requires a
  *       note explaining why (e.g. self-hosted, no cost).</li>
+ *   <li>Every rate must be below {@link #MAX_RATE_EXCLUSIVE}.</li>
  * </ul>
+ *
+ * <p>The magnitude bound lives HERE, and not only in the request DTOs' {@code @Digits}, because the
+ * rates have four entry points (instance create/reprice, workspace BYO create/update) and only one of
+ * them may not silently widen it. A rate that clears {@code NUMERIC(18,8)} but not binary64 is quoted
+ * back to the admin as a different number than the one stored, which is the failure this prevents —
+ * see {@code MoneyWirePrecisionTest} for where the bound comes from.
  */
 final class LlmPriceValidation {
+
+    /**
+     * Rates are {@code NUMERIC(18,8)}. At scale 8 a binary64 round-trips exactly only below
+     * {@code 10^7} (15 significant digits), so this — not the column — is the real ceiling.
+     */
+    static final BigDecimal MAX_RATE_EXCLUSIVE = new BigDecimal("10000000");
 
     private LlmPriceValidation() {}
 
@@ -48,6 +61,14 @@ final class LlmPriceValidation {
             if (!anyPositive) {
                 throw new IllegalArgumentException(
                     "A price requires at least one rate greater than zero. For a free model, choose Free instead."
+                );
+            }
+            boolean anyTooLarge = rates
+                .stream()
+                .anyMatch(rate -> rate != null && rate.compareTo(MAX_RATE_EXCLUSIVE) >= 0);
+            if (anyTooLarge) {
+                throw new IllegalArgumentException(
+                    "Rates must be below " + MAX_RATE_EXCLUSIVE.toPlainString() + " per 1M tokens."
                 );
             }
         } else {

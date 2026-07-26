@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
+import de.tum.cit.aet.hephaestus.agent.LlmProperties;
 import de.tum.cit.aet.hephaestus.core.WebClientConnectors;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
@@ -8,11 +9,9 @@ import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.ReactorClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import reactor.netty.http.client.HttpClient;
@@ -20,13 +19,10 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * "Test &amp; fetch models" probe for LLM connections (#1368). Issues a short-timeout {@code GET
- * {baseUrl}/models} and reports only whether the provider answered and which model ids it listed.
- *
- * <p>Contract: the probe never throws on an upstream failure — a 4xx, 5xx or timeout is reported as an
- * advisory {@link LlmProbeResultDTO} with {@code reachable=false}. Only the egress guard (a client-side
- * misconfiguration) may reject the request before any network call. The upstream body is never echoed
- * back; only {@code data[].id} is extracted.
+ * Contract: the probe never throws on an upstream failure — a 4xx, 5xx or timeout comes back as an
+ * advisory {@link LlmProbeResultDTO} with {@code reachable=false}. Only the egress guard may reject the
+ * request, before any network call. The upstream body is never echoed back; only {@code data[].id} is
+ * extracted.
  */
 @Service
 @WorkspaceAgnostic("Instance LLM connection probe reads the global connection catalog, not tenant data")
@@ -47,25 +43,22 @@ public class LlmConnectionProbeService {
         LlmConnectionRepository connectionRepository,
         EgressPolicy egressPolicy,
         ObjectMapper objectMapper,
-        @Value("${hephaestus.llm.egress.allow-loopback:false}") boolean allowLoopback
+        LlmProperties llmProperties
     ) {
+        // Shared with EgressPolicy's validate-time guard, so the two layers cannot drift apart on what
+        // "loopback allowed" means.
+        boolean allowLoopback = llmProperties.egress().allowLoopback();
         this.connectionRepository = connectionRepository;
         this.egressPolicy = egressPolicy;
         this.objectMapper = objectMapper;
-        // Dedicated short-timeout client — deliberately independent of any job/proxy timeout.
-        // Redirects are NEVER followed (Reactor Netty's default: no automatic redirect-following unless
-        // explicitly enabled, reasserted below for clarity): only the initial URL is egress-validated,
-        // and the custom auth header (x-api-key / api-key / Authorization) would otherwise survive a
-        // cross-origin redirect and exfiltrate the credential to whatever host the 3xx points at. A
-        // redirect response is reported as an ordinary unreachable/unsupported probe result (its status
-        // is not 2xx), never followed and never treated as an error.
+        // Dedicated short-timeout client, independent of any job/proxy timeout.
         //
-        // Connect-time SSRF guard (#1368 fix wave): EgressPolicy.validate() above only checks the DNS
-        // answer AT VALIDATION TIME — without a guarded resolver here too, a DNS-rebind target (public
-        // answer during validation, private answer at connect time) would sail straight through. The
-        // guarded resolver re-runs the same private-address check on the resolution actually used to
-        // connect, closing that TOCTOU window; the loopback exemption mirrors EgressPolicy's own
-        // literal-host dev/e2e allowance so the two layers agree.
+        // followRedirect(false): only the initial URL is egress-validated, and the auth header would
+        // otherwise survive a cross-origin redirect and exfiltrate the credential to whatever host the
+        // 3xx points at. A redirect surfaces as an ordinary non-2xx probe result.
+        //
+        // The guarded resolver re-runs EgressPolicy's private-address check on the resolution actually
+        // used to connect, closing the DNS-rebind TOCTOU window that validate-time checking leaves open.
         HttpClient httpClient = HttpClient.create()
             .resolver(WebClientConnectors.resolverGroup(allowLoopback))
             .followRedirect(false);
@@ -75,28 +68,28 @@ public class LlmConnectionProbeService {
         this.restClient = RestClient.builder().requestFactory(factory).build();
     }
 
-    /** Probe a stored connection using its persisted credential. */
-    @Transactional(readOnly = true)
+    /**
+     * Deliberately NOT {@code @Transactional}: the credential is loaded in the repository's own short
+     * transaction so the outbound request holds no JDBC connection. Wrapping the method would park a
+     * pooled connection for the full network timeout per probe, letting a few admins testing one
+     * stalled provider starve the pool for the whole instance.
+     */
     public LlmProbeResultDTO probeStored(Long connectionId) {
-        LlmConnection connection = connectionRepository
-            .findById(connectionId)
+        LlmProbeTarget target = connectionRepository
+            .findProbeTargetById(connectionId)
             .orElseThrow(() -> new EntityNotFoundException("LlmConnection", connectionId));
-        egressPolicy.validate(connection.getBaseUrl());
-        return probe(connection.getBaseUrl(), connection.getAuthMode(), connection.getApiKey());
+        egressPolicy.validate(target.baseUrl());
+        return probe(target.baseUrl(), target.authMode(), target.apiKey());
     }
 
-    /** Probe an unsaved draft using the supplied credential (never persisted). */
+    /** The supplied credential is never persisted. */
     public LlmProbeResultDTO probeDraft(ProbeLlmConnectionRequestDTO request) {
         egressPolicy.validate(request.baseUrl());
         LlmAuthMode authMode = request.authMode() != null ? request.authMode() : LlmAuthMode.BEARER;
         return probe(request.baseUrl(), authMode, request.apiKey());
     }
 
-    /**
-     * Low-level probe entry point for a caller that owns a different scope's connection (workspace BYO)
-     * and has already egress-validated {@code baseUrl} itself — reused rather than duplicated so both
-     * scopes share the exact same "test & fetch models" mechanics.
-     */
+    /** The caller (workspace BYO) must have egress-validated {@code baseUrl} itself. */
     public LlmProbeResultDTO probeCredential(String baseUrl, LlmAuthMode authMode, String apiKey) {
         return probe(baseUrl, authMode, apiKey);
     }
@@ -130,8 +123,7 @@ public class LlmConnectionProbeService {
                     return LlmProbeResultDTO.reachable(extractModelIds(body), status);
                 });
         } catch (Exception e) {
-            // Any transport-level failure (timeout, DNS, connection refused, malformed body) is advisory,
-            // never fatal. The exception message may carry host detail, so keep it out of the response.
+            // The exception message may carry host detail, so keep it out of the response.
             log.info("LLM connection probe failed: reason={}", e.getClass().getSimpleName());
             return LlmProbeResultDTO.unreachable(null, "Could not reach the provider: " + e.getClass().getSimpleName());
         }

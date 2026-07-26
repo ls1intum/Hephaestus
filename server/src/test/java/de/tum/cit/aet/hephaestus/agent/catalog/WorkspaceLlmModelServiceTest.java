@@ -223,7 +223,7 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
 
         @Test
         void pricedModeReusesTheSharedPriceValidationAndRejectsAllZeroRates() {
-            // #1368 fix wave: an all-zero-rate PRICED model would otherwise pass validation and
+            // an all-zero-rate PRICED model would otherwise pass validation and
             // count as verified $0 spend forever — that's what Free is for.
             byoEnabled(true);
             when(connectionRepository.findByIdAndWorkspaceId(50L, 1L)).thenReturn(Optional.of(connection()));
@@ -356,7 +356,7 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
         }
 
         /**
-         * #1368 fix wave: the fast-path {@code existsByConnectionIdAndUpstreamModelId} check is racy;
+         * the fast-path {@code existsByConnectionIdAndUpstreamModelId} check is racy;
          * the unique constraint {@code ux_ws_llm_model_connection_upstream} is the real backstop but only
          * fires on an actual flush — {@code saveAndFlush()} (not {@code save()}) forces that inside the
          * try/catch so the violation becomes a 409 instead of an uncaught 500.
