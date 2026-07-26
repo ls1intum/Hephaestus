@@ -74,4 +74,4 @@ silent refresh is wired; until then the de-facto impersonation time-box is `acce
   when instance settings permit it. Usage is metered into `llm_usage_event` and capped by two
   independent monthly budgets — the instance's cap on shared-model spend and the workspace's cap on
   its own provider — which are never summed. See
-  [ADR 0026](../decisions/0026-per-purpose-agent-bindings-and-llm-governance.md).
+  [ADR 0026](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0026-per-purpose-agent-bindings-and-llm-governance.md).

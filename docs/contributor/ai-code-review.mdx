@@ -47,7 +47,7 @@ sequenceDiagram
 | Diff validator    | `DiffHunkValidator`             | Validates diff note line positions against actual diff hunks. Snaps invalid positions to nearest valid line (`TreeSet.floor`/`ceiling`)                                    |
 | Feedback service  | `FeedbackDeliveryService`       | Posts MR summary comment and diff notes to the git provider. Suppresses delivery for closed, merged, draft, or opted-out PRs                                               |
 | Bot command       | `BotCommandProcessor`           | Listens for `/hephaestus review` comments (via Spring `@TransactionalEventListener`) to retrigger reviews                                                                  |
-| Job executor      | `AgentJobExecutor`              | Polls the `agent_job` table for `QUEUED` work — the table is the queue — claiming with `FOR UPDATE SKIP LOCKED`, dispatching to the sandbox executor pool, and persisting results in micro-transactions. See [ADR 0025](../decisions/0025-agent-job-queue-on-postgresql.md) for why this is not NATS |
+| Job executor      | `AgentJobExecutor`              | Polls the `agent_job` table for `QUEUED` work — the table is the queue — claiming with `FOR UPDATE SKIP LOCKED`, dispatching to the sandbox executor pool, and persisting results in micro-transactions. See [ADR 0025](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0025-agent-job-queue-on-postgresql.md) for why this is not NATS |
 
 ## Agent architecture
 

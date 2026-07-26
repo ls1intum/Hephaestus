@@ -6,289 +6,107 @@
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
     <!--
-        Per-workspace LLM configuration, usage accounting and cost control (#1368), plus the
-        evaluation-provenance (#1363) and config-audit (#1359) deltas that ride the same branch.
+        Per-workspace LLM configuration, usage accounting and cost control (#1368).
 
         Every object this branch introduces is created ONCE, in its final shape. Where the branch's
         development history created something and then widened, narrowed or dropped it, only the end
         state is here: an operator replays this file forever, and an intermediate state that existed
         for one afternoon is nothing but risk and noise. Concretely folded away:
-          • ck_config_audit_event_entity_type — created once with its full value set instead of
-            created plus six DROP/ADD widenings.
           • llm_usage_event — created with its final columns, precision and constraints instead of
             created plus four ALTER passes (pricing_state, provenance, cost widening, attempt keying).
           • instance_llm_settings.default_unpriced_policy — never created; enforcement is structural.
           • agent_config's catalog-binding columns — never created; the legacy table is migrated into
             the workspace catalog (changeSet -33) and dropped (-39) inside this same file, so columns
             that could only ever hold NULL are pure churn.
+        Folding stops at the release boundary: 1784237313759 (evaluation provenance, #1363) and
+        1784242879917 (the config-audit trail, #1359) shipped while this branch was in review, so
+        their change sets are on deployed databases and stay in their own, immutable files. What is
+        left here is only the delta on top of them — for the audit trail, one widening of
+        ck_config_audit_event_entity_type (changeSet -5) to admit the names #1368 introduces.
 
         The one place the branch's history is preserved deliberately is ADD CONSTRAINT ... NOT VALID
-        followed by a separate VALIDATE CONSTRAINT (changeSets -3/-4 and -22/-29). That is not churn:
-        it is what keeps the ACCESS EXCLUSIVE lock momentary on tables that already hold production
-        rows, with the row scan running afterwards under SHARE UPDATE EXCLUSIVE.
+        followed by a separate VALIDATE CONSTRAINT (changeSets -22/-29). That is not churn: it is what
+        keeps the ACCESS EXCLUSIVE lock momentary on tables that already hold production rows, with
+        the row scan running afterwards under SHARE UPDATE EXCLUSIVE.
 
         VARCHAR + CHECK, never a native PG enum: released changelogs are immutable and PostgreSQL
         cannot drop an enum label, so a closed set that may gain values must be a CHECK.
     -->
 
     <!-- ══════════════════════════════════════════════════════════════════════════════════════
-         Evaluation provenance (#1363): per-run digests, and a suppression-reason set that matches
-         the reasons the pipeline can actually write.
-         ══════════════════════════════════════════════════════════════════════════════════════ -->
-
-    <changeSet id="1785015307013-1" author="hephaestus">
-        <preConditions onFail="MARK_RAN" onFailMessage="agent_job.prompt_digest already present">
-            <not><columnExists tableName="agent_job" columnName="prompt_digest"/></not>
-        </preConditions>
-        <comment>The run's prompt-template version: a digest of the prompt scaffolding the sandbox received.</comment>
-        <addColumn tableName="agent_job">
-            <column name="prompt_digest" type="VARCHAR(64)"/>
-        </addColumn>
-        <rollback>
-            <dropColumn tableName="agent_job" columnName="prompt_digest"/>
-        </rollback>
-    </changeSet>
-
-    <changeSet id="1785015307013-2" author="hephaestus">
-        <preConditions onFail="MARK_RAN" onFailMessage="agent_job.inputs_digest already present">
-            <not><columnExists tableName="agent_job" columnName="inputs_digest"/></not>
-        </preConditions>
-        <comment>The run's input snapshot: a digest over all materialised sandbox input files, job id elided.</comment>
-        <addColumn tableName="agent_job">
-            <column name="inputs_digest" type="VARCHAR(64)"/>
-        </addColumn>
-        <rollback>
-            <dropColumn tableName="agent_job" columnName="inputs_digest"/>
-        </rollback>
-    </changeSet>
-
-    <changeSet id="1785015307013-3" author="hephaestus">
-        <preConditions onFail="MARK_RAN" onFailMessage="chk_feedback_suppression_reason already realigned">
-            <sqlCheck expectedResult="1">
-                SELECT count(*) FROM pg_constraint
-                WHERE conname = 'chk_feedback_suppression_reason'
-                  AND pg_get_constraintdef(oid) LIKE '%POLICY_FLOOR_DROP%'
-            </sqlCheck>
-        </preConditions>
-        <comment>
-            Realign suppression reasons to the ones that have writers, MIGRATING EVERY RETIRED VALUE
-            FIRST. PostgreSQL validates a new CHECK against existing rows, so replacing the constraint
-            without moving the rows aborts the whole deployment on the first row holding a retired
-            value — and leaves the database half-migrated. POLICY_FLOOR_DROP becomes VOLUME_CAPPED (the
-            policy floor is gone; a volume cap remains). REVIEWER_SIDE, BELOW_THRESHOLD and
-            LOW_CONFIDENCE have no successor — the gates that wrote them no longer exist and
-            FeedbackSuppressionReason no longer has the constants, so a surviving row would also throw
-            on read. They go to NULL, which is honest: the unit was withheld, for a reason this schema
-            no longer has a word for. The new constraint is added NOT VALID so the momentary ACCESS
-            EXCLUSIVE lock does not span a full scan of feedback; changeSet -4 validates it.
-        </comment>
-        <sql>
-            ALTER TABLE feedback DROP CONSTRAINT chk_feedback_suppression_reason;
-            UPDATE feedback SET suppression_reason = 'VOLUME_CAPPED' WHERE suppression_reason = 'POLICY_FLOOR_DROP';
-            UPDATE feedback SET suppression_reason = NULL
-                WHERE suppression_reason IN ('REVIEWER_SIDE', 'BELOW_THRESHOLD', 'LOW_CONFIDENCE');
-            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_suppression_reason CHECK (suppression_reason IS NULL OR suppression_reason IN ('VOLUME_CAPPED', 'COMPOSER_DEDUPED', 'REACTED_DISPUTED', 'REACTED_NOT_APPLICABLE', 'CONVERSATION_EXPIRED', 'ARTIFACT_GONE', 'ARTIFACT_CLOSED', 'ARTIFACT_MERGED', 'ARTIFACT_DRAFT', 'RECIPIENT_OPTED_OUT', 'EMPTY_AFTER_SANITIZE')) NOT VALID;
-        </sql>
-        <rollback>
-            <sql>
-                ALTER TABLE feedback DROP CONSTRAINT chk_feedback_suppression_reason;
-                UPDATE feedback SET suppression_reason = 'POLICY_FLOOR_DROP' WHERE suppression_reason = 'VOLUME_CAPPED';
-                -- Reasons the restored code cannot express. NULL (permitted by the restored CHECK) keeps the
-                -- rollback executable and stays honest: the row was withheld, for a reason this schema lost.
-                UPDATE feedback SET suppression_reason = NULL WHERE suppression_reason IN ('COMPOSER_DEDUPED', 'ARTIFACT_GONE', 'ARTIFACT_CLOSED', 'ARTIFACT_MERGED', 'ARTIFACT_DRAFT', 'RECIPIENT_OPTED_OUT', 'EMPTY_AFTER_SANITIZE');
-                ALTER TABLE feedback ADD CONSTRAINT chk_feedback_suppression_reason CHECK (suppression_reason IS NULL OR suppression_reason IN ('REVIEWER_SIDE', 'BELOW_THRESHOLD', 'LOW_CONFIDENCE', 'POLICY_FLOOR_DROP', 'REACTED_DISPUTED', 'REACTED_NOT_APPLICABLE', 'CONVERSATION_EXPIRED'));
-            </sql>
-        </rollback>
-    </changeSet>
-
-    <changeSet id="1785015307013-4" author="hephaestus">
-        <preConditions onFail="MARK_RAN" onFailMessage="chk_feedback_suppression_reason already validated">
-            <sqlCheck expectedResult="1">
-                SELECT count(*) FROM pg_constraint
-                WHERE conname = 'chk_feedback_suppression_reason' AND NOT convalidated
-            </sqlCheck>
-        </preConditions>
-        <comment>Validate chk_feedback_suppression_reason under SHARE UPDATE EXCLUSIVE (reads and writes unblocked).</comment>
-        <sql>ALTER TABLE feedback VALIDATE CONSTRAINT chk_feedback_suppression_reason;</sql>
-        <!-- Intentionally empty: VALIDATE only flips pg_constraint.convalidated on a constraint that
-             already exists and already applies to new rows. There is no inverse worth running — a
-             hand-crafted UPDATE pg_constraint SET convalidated = false is catalog surgery, and dropping
-             the constraint is changeSet -3's rollback, not this one's. -->
-        <rollback/>
-    </changeSet>
-
-    <!-- ══════════════════════════════════════════════════════════════════════════════════════
-         Admin configuration audit trail (#1359): append-only, workspace-scoped, unpartitioned
-         (~10^4 rows/year, and no read pattern leads with occurred_at, so partitions would prune
-         nothing). Retention is a trigger-permitted DELETE past the window (changeSet -6) rather than
-         auth_event's DROP PARTITION. Scalar FKs (sfk_*) — no JPA @ManyToOne, so they are excluded
-         from the JPA-vs-DB drift gate. workspace_id is NOT NULL: every producer today is
-         workspace-scoped.
+         Admin configuration audit trail (#1359): the delta this branch adds to the released
+         1784242879917_changelog.xml, which creates config_audit_event, its append-only triggers and
+         its read-path indexes.
          ══════════════════════════════════════════════════════════════════════════════════════ -->
 
     <changeSet id="1785015307013-5" author="hephaestus">
-        <preConditions onFail="MARK_RAN" onFailMessage="config_audit_event already present">
-            <not><tableExists tableName="config_audit_event"/></not>
-        </preConditions>
-        <comment>
-            Create the append-only admin config audit trail with its full entity-type value set. The
-            set is a superset by design: AGENT_CONFIG, AI_CONFIG_BINDING, WORKSPACE_LLM_BUDGET and
-            WORKSPACE_BYO_LLM_BUDGET are the names earlier rows were written under and stay admitted
-            forever, because trg_config_audit_event_block_mutation (changeSet -6) refuses any UPDATE
-            except erasure — rewriting history to tidy the vocabulary is precisely the mutation this
-            table exists to prevent. Nothing writes those four after this release.
-        </comment>
-        <sql splitStatements="false"><![CDATA[
-            CREATE TABLE config_audit_event (
-                id BIGSERIAL PRIMARY KEY,
-                occurred_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-                workspace_id BIGINT NOT NULL
-                    CONSTRAINT sfk_config_audit_event_workspace_id REFERENCES workspace(id),
-                actor_kind VARCHAR(16) NOT NULL,
-                actor_account_id BIGINT
-                    CONSTRAINT sfk_config_audit_event_actor_account_id REFERENCES account(id) ON DELETE SET NULL,
-                acting_account_id BIGINT
-                    CONSTRAINT sfk_config_audit_event_acting_account_id REFERENCES account(id) ON DELETE SET NULL,
-                entity_type VARCHAR(48) NOT NULL,
-                entity_id VARCHAR(64) NOT NULL,
-                action VARCHAR(16) NOT NULL,
-                changed_keys TEXT[] NOT NULL,
-                old_value JSONB,
-                new_value JSONB,
-                CONSTRAINT ck_config_audit_event_actor_kind
-                    CHECK (actor_kind IN ('USER', 'SYSTEM', 'IMPERSONATED')),
-                CONSTRAINT ck_config_audit_event_action
-                    CHECK (action IN ('CREATED', 'UPDATED', 'DELETED')),
-                CONSTRAINT ck_config_audit_event_entity_type
-                    CHECK (entity_type IN (
-                        'PRACTICE_REVIEW_SETTINGS', 'AGENT_BINDING', 'AGENT_CONFIG', 'AI_CONFIG_BINDING',
-                        'WORKSPACE_ROLE', 'WORKSPACE_FEATURES', 'WORKSPACE_STATUS',
-                        'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY', 'PRACTICE_ACTIVE',
-                        'WORKSPACE_INSTANCE_LLM_BUDGET', 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET',
-                        'WORKSPACE_LLM_BUDGET', 'WORKSPACE_BYO_LLM_BUDGET',
-                        'WORKSPACE_LLM_CONNECTION', 'WORKSPACE_LLM_MODEL'
-                    ))
-                -- No "old_value OR new_value IS NOT NULL" check: it would forbid the erasure UPDATE that
-                -- changeSet -6 exists to permit (erasure NULLs both). Enforced at the write path instead,
-                -- in ConfigAuditEntry's constructor.
-            );
-
-            -- workspace_id: NO ACTION, not CASCADE — CASCADE would be a one-click audit eraser, and the
-            -- cascaded DELETE would trip the changeSet -6 trigger (FK referential actions fire triggers,
-            -- PG 37.1). The account FKs are ON DELETE SET NULL, which is exactly what that trigger's
-            -- per-column erasure carve-out permits, so the two agree rather than deadlock.
-
-            -- Per-resource and per-control history (#1357): the settings pages filter by entity, then
-            -- by changed key.
-            CREATE INDEX ix_config_audit_event_entity
-                ON config_audit_event (workspace_id, entity_type, entity_id, occurred_at DESC, id DESC);
-
-            -- Workspace timeline.
-            CREATE INDEX ix_config_audit_event_workspace_occurred
-                ON config_audit_event (workspace_id, occurred_at DESC, id DESC);
-        ]]></sql>
-        <rollback>
-            <sql splitStatements="false"><![CDATA[
-                DROP TABLE IF EXISTS config_audit_event;
-            ]]></sql>
-        </rollback>
-    </changeSet>
-
-    <changeSet id="1785015307013-6" author="hephaestus" context="prod">
-        <preConditions onFail="MARK_RAN" onFailMessage="config_audit_event immutability trigger already present">
+        <preConditions onFail="MARK_RAN" onFailMessage="config_audit_event entity_type CHECK already admits the #1368 names">
             <sqlCheck expectedResult="0">
-                SELECT count(*) FROM pg_trigger WHERE tgname = 'trg_config_audit_event_block_mutation'
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'ck_config_audit_event_entity_type'
+                  AND pg_get_constraintdef(oid) LIKE '%WORKSPACE_LLM_MODEL%'
             </sqlCheck>
         </preConditions>
         <comment>
-            Immutability at the storage layer. context="prod" because the test tier's fixtures do UPDATE
-            and DELETE. The REVOKE is inert until a non-superuser app role exists (the app connects as
-            the image's bootstrap superuser, which skips privilege checks); the triggers are the binding
-            control. TRUNCATE needs a statement-level trigger — row triggers never fire on it.
+            Admit the entity types #1368 introduces: the per-purpose binding that replaces the named
+            agent config, the two budget caps, and a workspace's own LLM connections and models. DROP +
+            ADD, the same shape 1784242879917-3/-4 use — the ADD validates every existing row in one
+            pass (no rewrite) under a momentary ACCESS EXCLUSIVE lock, trivial at this table's size.
+
+            The value set is a superset of what anything writes, by design: AGENT_CONFIG,
+            AI_CONFIG_BINDING, WORKSPACE_LLM_BUDGET and WORKSPACE_BYO_LLM_BUDGET are names earlier rows
+            were written under and stay admitted forever, because
+            trg_config_audit_event_block_mutation refuses any UPDATE except erasure — rewriting history
+            to tidy the vocabulary is precisely the mutation this table exists to prevent. The set must
+            match ConfigAuditEntityType exactly; ConfigAuditImmutabilityIntegrationTest reads
+            pg_constraint on the migrated schema and fails if the two drift.
         </comment>
         <sql splitStatements="false"><![CDATA[
-            REVOKE UPDATE, TRUNCATE ON config_audit_event FROM CURRENT_USER;
+            ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
+            ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
+                CHECK (entity_type IN (
+                    'PRACTICE_REVIEW_SETTINGS', 'AGENT_BINDING', 'AGENT_CONFIG', 'AI_CONFIG_BINDING',
+                    'WORKSPACE_ROLE', 'WORKSPACE_FEATURES', 'WORKSPACE_STATUS',
+                    'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY', 'PRACTICE_ACTIVE',
+                    'WORKSPACE_INSTANCE_LLM_BUDGET', 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET',
+                    'WORKSPACE_LLM_BUDGET', 'WORKSPACE_BYO_LLM_BUDGET',
+                    'WORKSPACE_LLM_CONNECTION', 'WORKSPACE_LLM_MODEL'
+                ));
+        ]]></sql>
+        <rollback>
+            <!-- Narrows the CHECK back to the released set, but ONLY while no row uses one of the
+                 names #1368 added. Unconditionally re-adding it would abort the rollback the moment a
+                 single admin action had been recorded, and there is no data-preserving alternative:
+                 this table is append-only at the storage layer, so remapping those rows to an older
+                 spelling is the exact mutation trg_config_audit_event_block_mutation refuses. When
+                 rows are present the wider CHECK stays — it only ever admits more — and the operator
+                 is told, rather than the rollback failing or the history being quietly rewritten. -->
+            <sql splitStatements="false"><![CDATA[
+                DO $cfg_entity_rollback$
+                DECLARE
+                    added CONSTANT text[] := ARRAY[
+                        'AGENT_BINDING', 'WORKSPACE_INSTANCE_LLM_BUDGET',
+                        'WORKSPACE_OWN_PROVIDER_LLM_BUDGET', 'WORKSPACE_LLM_BUDGET',
+                        'WORKSPACE_BYO_LLM_BUDGET', 'WORKSPACE_LLM_CONNECTION', 'WORKSPACE_LLM_MODEL'];
+                    in_use text;
+                BEGIN
+                    SELECT string_agg(DISTINCT entity_type, ', ' ORDER BY entity_type) INTO in_use
+                    FROM config_audit_event WHERE entity_type = ANY (added);
 
-            CREATE OR REPLACE FUNCTION config_audit_event_block_mutation() RETURNS trigger AS $cfg_immut$
-            BEGIN
-                IF TG_OP = 'DELETE' THEN
-                    -- Retention is the ONLY sanctioned delete (ConfigAuditRetentionJob, 365 days).
-                    -- Keeping the window here rather than blocking DELETE outright is what lets this
-                    -- table stay unpartitioned while still honouring storage limitation (GDPR Art.
-                    -- 5(1)(e)). Inside the window the row is untouchable.
-                    IF OLD.occurred_at >= now() - interval '365 days' THEN
-                        RAISE EXCEPTION 'config_audit_event is append-only: DELETE is only permitted past the 365-day retention window';
+                    IF in_use IS NOT NULL THEN
+                        RAISE WARNING 'Hephaestus #1368: ck_config_audit_event_entity_type is left widened — config_audit_event already holds rows of type %, and this trail is append-only, so they cannot be remapped to an older spelling. The wider CHECK only admits more and is harmless; nothing else in this rollback depends on it.', in_use;
+                        RETURN;
                     END IF;
-                    RETURN OLD;
-                END IF;
-                -- Permit ONLY erasure, per column: each redactable column may stay or go to NULL. Per-column
-            -- (not all-at-once) so an FK's ON DELETE SET NULL, which touches one column, does not trip
-            -- this. Comparing to_jsonb(NEW) minus the redactable keys covers future columns with no edit here.
 
-                IF (NEW.actor_account_id IS NULL OR NEW.actor_account_id = OLD.actor_account_id)
-                   AND (NEW.acting_account_id IS NULL OR NEW.acting_account_id = OLD.acting_account_id)
-                   AND (NEW.old_value IS NULL OR NEW.old_value = OLD.old_value)
-                   AND (NEW.new_value IS NULL OR NEW.new_value = OLD.new_value)
-                   AND (to_jsonb(NEW) - 'actor_account_id' - 'acting_account_id' - 'old_value' - 'new_value')
-                        IS NOT DISTINCT FROM (to_jsonb(OLD) - 'actor_account_id' - 'acting_account_id' - 'old_value' - 'new_value')
-                THEN
-                    RETURN NEW;
-                END IF;
-                RAISE EXCEPTION 'config_audit_event is append-only: only erasure (setting actor refs / snapshots to NULL) is permitted';
-            END;
-            $cfg_immut$ LANGUAGE plpgsql;
-
-            CREATE TRIGGER trg_config_audit_event_block_mutation
-                BEFORE UPDATE OR DELETE ON config_audit_event
-                FOR EACH ROW EXECUTE FUNCTION config_audit_event_block_mutation();
-
-            CREATE OR REPLACE FUNCTION config_audit_event_block_truncate() RETURNS trigger AS $cfg_trunc$
-            BEGIN
-                RAISE EXCEPTION 'config_audit_event is append-only: TRUNCATE is not permitted';
-            END;
-            $cfg_trunc$ LANGUAGE plpgsql;
-
-            CREATE TRIGGER trg_config_audit_event_block_truncate
-                BEFORE TRUNCATE ON config_audit_event
-                FOR EACH STATEMENT EXECUTE FUNCTION config_audit_event_block_truncate();
-        ]]></sql>
-        <rollback>
-            <sql splitStatements="false"><![CDATA[
-                DROP TRIGGER IF EXISTS trg_config_audit_event_block_truncate ON config_audit_event;
-                DROP TRIGGER IF EXISTS trg_config_audit_event_block_mutation ON config_audit_event;
-                DROP FUNCTION IF EXISTS config_audit_event_block_truncate();
-                DROP FUNCTION IF EXISTS config_audit_event_block_mutation();
-                GRANT UPDATE, TRUNCATE ON config_audit_event TO CURRENT_USER;
-            ]]></sql>
-        </rollback>
-    </changeSet>
-
-    <changeSet id="1785015307013-7" author="hephaestus">
-        <preConditions onFail="MARK_RAN" onFailMessage="config_audit_event read-path indexes already present">
-            <sqlCheck expectedResult="0">
-                SELECT count(*) FROM pg_indexes WHERE indexname = 'ix_config_audit_event_occurred'
-            </sqlCheck>
-        </preConditions>
-        <comment>Index the three audit-trail read paths that the workspace-leading indexes cannot serve.</comment>
-        <sql splitStatements="false"><![CDATA[
-            -- The instance-admin view spans workspaces, so neither workspace-leading index serves it.
-            CREATE INDEX ix_config_audit_event_occurred
-                ON config_audit_event (occurred_at DESC, id DESC);
-
-            -- "What did this administrator change" is the first question of an access review.
-            CREATE INDEX ix_config_audit_event_actor
-                ON config_audit_event (actor_account_id, occurred_at DESC)
-                WHERE actor_account_id IS NOT NULL;
-
-            -- changed_keys is persisted rather than derived precisely so it can be filtered on.
-            CREATE INDEX ix_config_audit_event_changed_keys
-                ON config_audit_event USING GIN (changed_keys);
-        ]]></sql>
-        <rollback>
-            <sql splitStatements="false"><![CDATA[
-                DROP INDEX IF EXISTS ix_config_audit_event_occurred;
-                DROP INDEX IF EXISTS ix_config_audit_event_actor;
-                DROP INDEX IF EXISTS ix_config_audit_event_changed_keys;
+                    ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
+                    ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
+                        CHECK (entity_type IN (
+                            'PRACTICE_REVIEW_SETTINGS', 'AI_CONFIG_BINDING', 'AGENT_CONFIG',
+                            'WORKSPACE_ROLE', 'WORKSPACE_FEATURES', 'WORKSPACE_STATUS',
+                            'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY', 'PRACTICE_ACTIVE'
+                        ));
+                END
+                $cfg_entity_rollback$;
             ]]></sql>
         </rollback>
     </changeSet>
@@ -409,8 +227,18 @@
     </changeSet>
 
     <changeSet id="1785015307013-10" author="hephaestus">
-        <preConditions onFail="MARK_RAN" onFailMessage="llm_usage_event missing — nothing to backfill into">
-            <tableExists tableName="llm_usage_event"/>
+        <preConditions onFail="MARK_RAN" onFailMessage="nothing to backfill from: agent_job.llm_cost_usd has already been dropped by changeSet -43, so this backfill has already run">
+            <and>
+                <tableExists tableName="llm_usage_event"/>
+                <!-- The source column this reads is dropped by changeSet -43 later in this same file.
+                     A first pass runs 10 before 43 and sees it; a SECOND pass over an already-upgraded
+                     database (an operator re-running migrations, or Liquibase tracking that had to be
+                     rebuilt) reaches this changeSet with the column gone, and the statement below would
+                     abort on a column that does not exist. Its absence is also exactly the proof that
+                     the backfill has already happened, so MARK_RAN is the honest outcome rather than a
+                     suppression. -->
+                <columnExists tableName="agent_job" columnName="llm_cost_usd"/>
+            </and>
         </preConditions>
         <comment>
             Backfill the ledger from detection/replay job history. NOT EXISTS keeps a re-run
@@ -1123,9 +951,10 @@
         </preConditions>
         <comment>Validate ck_agent_job_status under SHARE UPDATE EXCLUSIVE (reads and writes unblocked).</comment>
         <sql>ALTER TABLE agent_job VALIDATE CONSTRAINT ck_agent_job_status;</sql>
-        <!-- Intentionally empty, as in changeSet -4: VALIDATE only flips pg_constraint.convalidated on a
-             constraint that already exists and already applies to new rows. Dropping it is changeSet
-             -22's rollback, not this one's. -->
+        <!-- Intentionally empty: VALIDATE only flips pg_constraint.convalidated on a constraint that
+             already exists and already applies to new rows. There is no inverse worth running — a
+             hand-crafted UPDATE pg_constraint SET convalidated = false is catalog surgery, and dropping
+             the constraint is changeSet -22's rollback, not this one's. -->
         <rollback/>
     </changeSet>
 
@@ -1427,26 +1256,30 @@
             <!-- Undo only what this changeSet inserted, identified by the legacy- slug prefix. Bindings
                  first, then models, then connections — the FKs are RESTRICT.
 
-                 HALTS when agent_config is gone, and the guard is the whole point rather than a
-                 formality. Liquibase rolls a file back in REVERSE order, so changeSet -39's rollback
-                 runs before this one — and -39's is deliberately empty, meaning agent_config stays
-                 dropped. By the time this DELETE runs, the rows it removes hold the ONLY surviving copy
-                 of every workspace's encrypted provider key: -33 copied the ciphertext out of
-                 agent_config, and -39 then destroyed the source. Deleting them unguarded is not an undo,
-                 it is the irreversible data loss -33 exists to prevent.
+                 The DELETE is conditional on agent_config still being there, and the condition is the
+                 whole point rather than a formality. Liquibase rolls a file back in REVERSE order, so
+                 changeSet -39's rollback runs before this one — and -39's is deliberately empty,
+                 meaning agent_config stays dropped. Once it is gone the legacy- rows are the ONLY
+                 surviving copy of every workspace's encrypted provider key: -33 copied the ciphertext
+                 out of agent_config, and -39 then destroyed the source. Deleting them then is not an
+                 undo, it is the irreversible loss -33 exists to prevent.
 
-                 So: roll back to just after -33 (agent_config still present, the migration repeatable)
-                 and this undoes cleanly. Attempt to roll back past -39 and it stops the run with the
-                 reason, instead of quietly taking the keys with it. Roll forward instead. -->
+                 So when the source table is gone this SKIPS the delete and says so, rather than either
+                 destroying the keys or halting the run:
+                   • Rolling the whole release back: changeSets -32, -17 and -16 drop
+                     workspace_agent_binding, workspace_llm_model and workspace_llm_connection a few
+                     steps later anyway, so skipping and deleting reach the identical end state — and
+                     halting here would leave the release half-rolled-back, which is strictly worse.
+                   • Rolling back only part of the release, to a point where those tables survive:
+                     keeping the rows is the safe outcome, and re-applying -33 forward is a no-op (its
+                     precondition requires an empty catalog), so the carry-over simply stands.
+                 Rolling back to just after -33, with agent_config still present, undoes cleanly. -->
             <sql splitStatements="false"><![CDATA[
-                DO $$
+                DO $legacy_carryover_rollback$
                 BEGIN
                     IF to_regclass('agent_config') IS NULL THEN
-                        RAISE EXCEPTION
-                            'Refusing to roll back changeSet 1785015307013-33: agent_config has already '
-                            'been dropped by changeSet -39, so the legacy-%% rows this would delete hold '
-                            'the only copy of every workspace''s encrypted LLM key. Roll forward instead, '
-                            'or restore agent_config from a backup first.';
+                        RAISE WARNING 'Hephaestus #1368: leaving the carried-over legacy-%% LLM connections, models and bindings in place while rolling back changeSet 1785015307013-33 — agent_config was already dropped by changeSet -39, so these rows hold the only copy of every workspace''s encrypted provider key. If you are rolling the whole release back they are dropped with their tables a few steps later; if you are stopping short of that, they stay and re-applying the migration leaves them untouched.';
+                        RETURN;
                     END IF;
 
                     DELETE FROM workspace_agent_binding b
@@ -1454,7 +1287,8 @@
                      WHERE b.workspace_model_id = m.id AND m.slug LIKE 'legacy-%';
                     DELETE FROM workspace_llm_model WHERE slug LIKE 'legacy-%';
                     DELETE FROM workspace_llm_connection WHERE slug LIKE 'legacy-%';
-                END $$;
+                END
+                $legacy_carryover_rollback$;
             ]]></sql>
         </rollback>
     </changeSet>
@@ -1779,10 +1613,13 @@
         <dropColumn tableName="agent_job" columnName="network_id"/>
         <dropColumn tableName="agent_job" columnName="container_id"/>
         <rollback>
+            <!-- The widths are the originals (1773354889621 / 1773500736939), not a round number: a
+                 rollback that silently widens a column is a rollback that did not restore the schema
+                 it claims to. -->
             <addColumn tableName="agent_job">
                 <column name="llm_api_key" type="TEXT"/>
-                <column name="network_id" type="VARCHAR(128)"/>
-                <column name="container_id" type="VARCHAR(128)"/>
+                <column name="network_id" type="VARCHAR(64)"/>
+                <column name="container_id" type="VARCHAR(64)"/>
             </addColumn>
         </rollback>
     </changeSet>

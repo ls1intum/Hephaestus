@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.catalog;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -40,10 +41,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * indistinguishable from a no-op.
  *
  * <p>So this test stops the migration where the release branch begins, writes the rows a real
- * upgrading instance would have (including a suppression reason the branch retires, which a naive
- * CHECK replacement aborts the whole deployment on), and then finishes the migration and asserts what
- * survived. The split point is derived from the changelog itself rather than hard-coded, so adding a
- * changeset upstream cannot silently turn this into a no-op.
+ * upgrading instance would have, and then finishes the migration and asserts what survived. The split
+ * point is derived from the changelog itself rather than hard-coded: everything outside {@code
+ * RELEASE_CHANGELOG} is "the old schema", so a changelog that lands on {@code main} while this branch
+ * is in review moves the boundary by itself instead of silently turning this into a no-op.
  *
  * <p>The fixture is built around what the OLD code actually did, not around what the pointer columns
  * suggest. {@code practice_config_id} / {@code mentor_config_id} were written by one explicit UI
@@ -308,17 +309,20 @@ class LegacyAgentConfigMigrationIntegrationTest {
         ).isEqualTo("0");
     }
 
+    /**
+     * The FK hardening that rides along with the retirement: {@code feedback.agent_job_id} used to
+     * CASCADE, which took feedback, its observations, its placements and its reactions — append-only
+     * research data — with any agent_job delete. The seeded job has feedback hanging off it, so the
+     * refusal is exercised rather than asserted from the catalog alone.
+     */
     @Test
     @Order(13)
-    void aRetiredSuppressionReasonDoesNotAbortTheDeployment() throws SQLException {
-        // The whole migration having reached this point is the assertion: replacing the CHECK without
-        // moving these rows first makes PostgreSQL reject the constraint and fail the deploy.
-        assertThat(scalar("SELECT count(*)::text FROM feedback WHERE suppression_reason = 'VOLUME_CAPPED'"))
-            .as("POLICY_FLOOR_DROP has a successor and keeps its meaning")
-            .isEqualTo("1");
-        assertThat(scalar("SELECT count(*)::text FROM feedback WHERE suppression_reason IS NULL"))
-            .as("reasons with no successor go to NULL rather than blocking the upgrade or crashing on read")
-            .isEqualTo("1");
+    void deletingAnAgentJobNoLongerTakesItsFeedbackWithIt() throws SQLException {
+        assertThatThrownBy(() -> execute("DELETE FROM agent_job WHERE id = '9a000000-0000-0000-0000-000000000001'"))
+            .as("the FK is RESTRICT now, so the delete is refused instead of cascading")
+            .hasMessageContaining("sfk_feedback_agent_job");
+
+        assertThat(scalar("SELECT count(*)::text FROM feedback")).isEqualTo("1");
     }
 
     /**
@@ -486,8 +490,8 @@ class LegacyAgentConfigMigrationIntegrationTest {
             // through to the oldest enabled config).
             "UPDATE workspace SET practice_config_id = 9502, mentor_config_id = 9502 WHERE id = 9402",
             "UPDATE workspace SET practice_config_id = 9508 WHERE id = 9407",
-            // A completed job with recorded spend and two suppressed findings, one holding a reason this
-            // release retires.
+            // A completed job with recorded spend, and a suppressed finding hanging off it so the FK
+            // this release hardens to RESTRICT has a row to refuse a cascade on.
             "INSERT INTO \"user\" (id, native_id, provider_id) VALUES (9601, 9601, 1)",
             """
             INSERT INTO agent_job (id, workspace_id, config_id, job_type, status, config_snapshot, job_token,
@@ -500,9 +504,7 @@ class LegacyAgentConfigMigrationIntegrationTest {
             INSERT INTO feedback (id, agent_job_id, workspace_id, recipient_user_id, about_user_id, channel,
                                   position, delivery_state, suppression_reason, source, created_at)
             VALUES ('9b000000-0000-0000-0000-000000000001', '9a000000-0000-0000-0000-000000000001', 9401,
-                    9601, 9601, 'IN_CONTEXT', 1, 'SUPPRESSED', 'POLICY_FLOOR_DROP', 'AGENT', now()),
-                   ('9b000000-0000-0000-0000-000000000002', '9a000000-0000-0000-0000-000000000001', 9401,
-                    9601, 9601, 'IN_CONTEXT', 2, 'SUPPRESSED', 'LOW_CONFIDENCE', 'AGENT', now())
+                    9601, 9601, 'IN_CONTEXT', 1, 'SUPPRESSED', 'VOLUME_CAPPED', 'AGENT', now())
             """,
             // One mentor turn with recorded spend, so the chat_message backfill has something to classify.
             """
