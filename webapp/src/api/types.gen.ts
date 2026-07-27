@@ -2542,7 +2542,7 @@ export type AgentJob = {
      */
     llmModel?: string;
     /**
-     * Model version/snapshot date (e.g. 2026-03-17)
+     * Model version/snapshot date (e.g. 2026-03-17). Only jobs from before the model catalog carry one; absent on everything newer.
      */
     llmModelVersion?: string;
     /**
