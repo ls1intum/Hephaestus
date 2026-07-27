@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.integration.core.graphql.FragmentMergingDocumentSource;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.GitHubGraphQlFragments;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import graphql.ExecutionInput;
 import graphql.GraphQLError;
@@ -40,20 +41,30 @@ import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
  */
 class GraphQlOperationDocumentValidationTest extends BaseUnitTest {
 
-    private record Vendor(String name, String schema, String operations, String fragments) {}
+    private record Vendor(String name, String schema, String operations, List<String> fragments) {
+        List<Resource> fragmentResources() {
+            return fragments
+                .stream()
+                .map(location -> (Resource) new ClassPathResource(location))
+                .toList();
+        }
+    }
 
     private static final List<Vendor> VENDORS = List.of(
         new Vendor(
             "github",
             "graphql/github/schema.github.graphql",
             "graphql/github/operations/",
-            "graphql/github/fragments/ProjectFragments.graphql"
+            List.of(
+                GitHubGraphQlFragments.PROJECT_FRAGMENTS_RESOURCE,
+                GitHubGraphQlFragments.COMMIT_ENRICHMENT_FIELDS_RESOURCE
+            )
         ),
         new Vendor(
             "gitlab",
             "graphql/gitlab/schema.gitlab.graphql",
             "graphql/gitlab/operations/",
-            "graphql/gitlab/fragments/GitLabUserFields.graphql"
+            List.of("graphql/gitlab/fragments/GitLabUserFields.graphql")
         )
     );
 
@@ -62,9 +73,12 @@ class GraphQlOperationDocumentValidationTest extends BaseUnitTest {
         for (Vendor vendor : VENDORS) {
             GraphQLSchema schema = loadSchema(vendor.schema());
             FragmentMergingDocumentSource documentSource = new FragmentMergingDocumentSource(
-                List.of(new ClassPathResource(vendor.operations()), new ClassPathResource(vendor.fragments())),
+                Stream.concat(
+                    Stream.of((Resource) new ClassPathResource(vendor.operations())),
+                    vendor.fragmentResources().stream()
+                ).toList(),
                 List.of(".graphql", ".gql"),
-                List.of(new ClassPathResource(vendor.fragments()))
+                vendor.fragmentResources()
             );
             for (String name : operationNames(vendor.operations())) {
                 arguments.add(Arguments.of(vendor.name() + "/" + name, schema, documentSource, name));

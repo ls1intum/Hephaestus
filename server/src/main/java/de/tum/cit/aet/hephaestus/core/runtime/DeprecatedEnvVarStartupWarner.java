@@ -15,52 +15,63 @@ import org.springframework.stereotype.Component;
  * Warns once at boot when a deployment still sets an env var that Hephaestus has retired and now
  * silently ignores — see {@code MIGRATION.md}.
  *
- * <p>A WARN must mean the operator's own config sets one of these, so no shipped profile may name a
- * retired key: Spring binds a {@code ${VAR:}} placeholder to an empty string rather than leaving it
- * absent, and one leftover line in an {@code application-*.yml} would warn on every boot.
+ * <p><b>These are environment-variable names, verbatim, not dotted property names.</b> That is the
+ * whole point of the class and it is easy to get wrong: {@code hephaestus.agent.nats.enabled} looks
+ * like the right key, but Spring resolves it only from {@code HEPHAESTUS_AGENT_NATS_ENABLED} — and the
+ * var operators actually set was {@code AGENT_NATS_ENABLED}, with no prefix. A dotted entry for an
+ * unprefixed var can never fire. {@code DeprecatedEnvVarStartupWarnerTest} pins the shape.
+ *
+ * <p>A WARN must mean the operator's own config sets one of these, so:
+ *
+ * <ul>
+ *   <li>no shipped {@code application-*.yml} may still read one through a {@code ${VAR:…}}
+ *       placeholder — that would be live config, not a leftover;
+ *   <li>a blank value counts as absent. {@code docker/compose.app.yaml} forwards each retired var as
+ *       {@code ${VAR:-}} for one release so a stale line in the operator's {@code docker/.env} reaches
+ *       the JVM at all (Compose {@code .env} entries are interpolation inputs, not container
+ *       environment — without the forward this warner is blind on every Compose deployment). Unset,
+ *       that forward delivers an empty string, which must not warn on every boot.
+ * </ul>
+ *
+ * <p>Deliberately absent: {@code NATS_SERVER}. It fed the retired {@code hephaestus.agent.nats.server},
+ * but it is still the live setting for webhook and sync ingest, so warning on it would fire on every
+ * correctly configured deployment.
  */
 @Component
 public class DeprecatedEnvVarStartupWarner {
 
     private static final Logger log = LoggerFactory.getLogger(DeprecatedEnvVarStartupWarner.class);
 
-    /** Retired property (dotted form — {@link Environment} resolves the env-var form too) -> replacement guidance. */
-    private static final Map<String, String> RETIRED_PROPERTIES = new LinkedHashMap<>();
+    /** Retired environment variable (exact name) -&gt; replacement guidance. */
+    private static final Map<String, String> RETIRED_ENV_VARS = new LinkedHashMap<>();
 
     static {
-        RETIRED_PROPERTIES.put(
-            "hephaestus.worker.llm.base-url",
+        RETIRED_ENV_VARS.put(
+            "HEPHAESTUS_WORKER_LLM_BASE_URL",
             "providers are configured in the admin console under Instance admin → AI models"
         );
-        RETIRED_PROPERTIES.put(
-            "hephaestus.worker.llm.api-key",
+        RETIRED_ENV_VARS.put(
+            "HEPHAESTUS_WORKER_LLM_API_KEY",
             "providers are configured in the admin console under Instance admin → AI models"
         );
-        RETIRED_PROPERTIES.put(
-            "hephaestus.sandbox.llm-proxy.enabled",
+        RETIRED_ENV_VARS.put(
+            "HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED",
             "the LLM proxy now runs automatically wherever agent jobs execute; there is no standalone enable flag"
         );
-        RETIRED_PROPERTIES.put(
-            "hephaestus.agent.nats.enabled",
-            "the agent queue now runs on PostgreSQL; set AGENT_ENABLED instead"
-        );
-        RETIRED_PROPERTIES.put(
-            "hephaestus.agent.nats.server",
-            "the agent queue now runs on PostgreSQL; set AGENT_ENABLED instead"
-        );
-        RETIRED_PROPERTIES.put(
-            "hephaestus.agent.nats.max-ack-pending",
+        RETIRED_ENV_VARS.put("AGENT_NATS_ENABLED", "the agent queue now runs on PostgreSQL; set AGENT_ENABLED instead");
+        RETIRED_ENV_VARS.put(
+            "AGENT_NATS_MAX_ACK_PENDING",
             "the agent queue now runs on PostgreSQL; there is no ack-pending equivalent for poll-based delivery"
         );
-        RETIRED_PROPERTIES.put(
-            "hephaestus.agent.nats.fetch-batch-size",
+        RETIRED_ENV_VARS.put(
+            "AGENT_NATS_FETCH_BATCH_SIZE",
             "the agent queue now runs on PostgreSQL; set AGENT_CLAIM_BATCH_SIZE instead"
         );
     }
 
-    /** The keys this warner fires on, so a regression guard can assert no shipped profile defines one. */
-    static Set<String> retiredPropertyNames() {
-        return Collections.unmodifiableSet(RETIRED_PROPERTIES.keySet());
+    /** The vars this warner fires on, so the regression guards can assert the shipped config agrees. */
+    static Set<String> retiredEnvVarNames() {
+        return Collections.unmodifiableSet(RETIRED_ENV_VARS.keySet());
     }
 
     private final Environment environment;
@@ -71,9 +82,10 @@ public class DeprecatedEnvVarStartupWarner {
 
     @EventListener(ApplicationReadyEvent.class)
     public void warnOnRetiredProperties() {
-        RETIRED_PROPERTIES.forEach((property, replacement) -> {
-            if (environment.getProperty(property) != null) {
-                log.warn("{} is set but no longer read — {}. Remove it from your deployment.", property, replacement);
+        RETIRED_ENV_VARS.forEach((envVar, replacement) -> {
+            String value = environment.getProperty(envVar);
+            if (value != null && !value.isBlank()) {
+                log.warn("{} is set but no longer read — {}. Remove it from your deployment.", envVar, replacement);
             }
         });
     }

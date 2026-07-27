@@ -16,6 +16,7 @@ const EXPECTED_SLUGS = [
 	"decisions-and-documentation",
 	"delivery-and-version-control-discipline",
 	"issue-traceability-and-lifecycle",
+	"communication",
 ];
 
 describe("areaVisuals", () => {

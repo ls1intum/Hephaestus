@@ -15,7 +15,7 @@ deployment — distinct from a **workspace admin**, whose powers are scoped to a
   (`app_admin`/`admin`) that might arrive via a grantable `account_feature` row, so an
   `/admin/users`-granted flag can never escalate to instance admin.
 - First-admin bootstrap (no DB seed required) is covered separately in the
-  `docs/runbooks/auth-cutover.md` runbook.
+  [auth-cutover runbook](https://github.com/ls1intum/Hephaestus/blob/main/docs/runbooks/auth-cutover.md#first-instance-admin-bootstrap).
 
 ## The shell
 

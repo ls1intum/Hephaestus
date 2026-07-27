@@ -1,6 +1,64 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { MoneyCell } from "./job-utils";
+import { holdReasonCopy, jobWait, MoneyCell } from "./job-utils";
+
+const NOW = new Date("2026-05-20T12:00:00Z").getTime();
+const SOON = new Date("2026-05-20T12:05:00Z");
+const EARLIER = new Date("2026-05-20T11:55:00Z");
+
+describe("jobWait", () => {
+	it("reports a hold whenever the server names a reason", () => {
+		expect(jobWait({ status: "QUEUED", holdReason: "BUDGET", availableAt: SOON }, NOW)).toEqual({
+			kind: "hold",
+			reason: "BUDGET",
+		});
+	});
+
+	it("still reports a hold once the parked instant has lapsed", () => {
+		// The server re-parks a still-capped run each poll, so a lapsed hold is a hold. Keying this
+		// off the clock instead of the reason would blank the row every few minutes.
+		expect(jobWait({ status: "QUEUED", holdReason: "BUDGET", availableAt: EARLIER }, NOW)).toEqual({
+			kind: "hold",
+			reason: "BUDGET",
+		});
+	});
+
+	it("reports a backoff for a queued run whose next attempt is still ahead", () => {
+		expect(jobWait({ status: "QUEUED", availableAt: SOON }, NOW)).toEqual({ kind: "backoff" });
+	});
+
+	it("reports nothing for a queued run that is already claimable", () => {
+		// `availableAt` is required and in the past for almost every run: reporting a wait here would
+		// put a "due …" line on every queued row in the table.
+		expect(jobWait({ status: "QUEUED", availableAt: EARLIER }, NOW)).toBeNull();
+	});
+
+	it("reports nothing once the run has left the queue, whatever its timestamps say", () => {
+		expect(jobWait({ status: "RUNNING", availableAt: SOON }, NOW)).toBeNull();
+		expect(
+			jobWait({ status: "COMPLETED", holdReason: "BUDGET", availableAt: SOON }, NOW),
+		).toBeNull();
+	});
+});
+
+describe("holdReasonCopy", () => {
+	it("names the reason it knows in words an operator can act on", () => {
+		expect(holdReasonCopy("BUDGET").label).toBe("Over the AI budget");
+		expect(holdReasonCopy("BUDGET").detail).toMatch(/resumes on its own/);
+	});
+
+	it("reads a reason it has never seen as English rather than as a constant", () => {
+		// `holdReason` is a plain string on the wire; a reason added server-side must not surface raw.
+		expect(holdReasonCopy("MODEL_UNAVAILABLE").label).toBe("Model unavailable");
+		expect(holdReasonCopy("MODEL_UNAVAILABLE").detail).toMatch(/resumes on its own/);
+	});
+
+	it("never suggests a held run failed", () => {
+		for (const reason of ["BUDGET", "MODEL_UNAVAILABLE"]) {
+			expect(holdReasonCopy(reason).detail).toMatch(/rather than failed/);
+		}
+	});
+});
 
 describe("MoneyCell", () => {
 	it("announces the figure without the cents it pads the column with", () => {

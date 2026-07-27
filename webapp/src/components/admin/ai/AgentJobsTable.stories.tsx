@@ -2,7 +2,13 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, userEvent, within } from "storybook/test";
 import { expectPageReflows, expectTablesScrollInPlace, expectTargetSize } from "@/test/reflow";
 import { AgentJobsTable } from "./AgentJobsTable";
-import { mockJobs } from "./story-mock-data";
+import {
+	mockJobBackingOff,
+	mockJobHeldForUnknownReason,
+	mockJobHeldOnBudget,
+	mockJobQueued,
+	mockJobs,
+} from "./story-mock-data";
 
 /** Paginated table of AI runs with a status filter. Read-only: no cancel or retry lives here. */
 const meta = {
@@ -46,6 +52,38 @@ export const FilterIsLabelledByItsVisibleText: Story = {
 		await expect(canvas.getByLabelText("Status")).toBe(
 			canvas.getByRole("combobox", { name: "Status" }),
 		);
+	},
+};
+
+/**
+ * Three runs that all read "Queued". Only the status cell's second line says why two of them are not
+ * moving, and only the two that are waiting on the clock print a time at all.
+ */
+export const QueuedHeldAndBackingOff: Story = {
+	args: { jobs: [mockJobQueued, mockJobHeldOnBudget, mockJobBackingOff] },
+	play: async ({ canvas }) => {
+		const [, queued, held, backingOff] = canvas.getAllByRole("row");
+
+		// Claimable now: `availableAt` is required on every run, so an unconditional render would put
+		// a stale "due …" on this row too.
+		await expect(queued).toHaveAccessibleName(/Queued/);
+		await expect(queued).not.toHaveAccessibleName(/held|due/i);
+
+		// The cap that parked it, and when it is next due — without a second badge claiming a status
+		// the server's enum (and so the filter above) does not have.
+		await expect(held).toHaveAccessibleName(/Held · Over the AI budget · due in \d+ minutes/);
+		await expect(backingOff).toHaveAccessibleName(/Backing off · due in \d+ minutes/);
+		await expect(backingOff).not.toHaveAccessibleName(/Held/);
+	},
+};
+
+/** A reason the client has never seen still has to reach the operator in words. */
+export const HeldForAnUnknownReason: Story = {
+	args: { jobs: [mockJobHeldForUnknownReason] },
+	play: async ({ canvas }) => {
+		const [, held] = canvas.getAllByRole("row");
+		await expect(held).toHaveAccessibleName(/Held · Model unavailable · due in \d+ minutes/);
+		await expect(held).not.toHaveAccessibleName(/MODEL_UNAVAILABLE/);
 	},
 };
 

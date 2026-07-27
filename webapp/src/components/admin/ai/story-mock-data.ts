@@ -41,6 +41,13 @@ export const mockPracticeReviewSettings: PracticeReviewSettings = {
 	runForAllUsersOverride: undefined,
 };
 
+/**
+ * A run that is waiting on the clock has to be minutes from now or its "due …" phrase reads as
+ * history, so the two waiting fixtures are anchored to load time. Every other fixture keeps the
+ * fixed 2026-05-20 scene, where `availableAt` is a claim time already past.
+ */
+const MINUTE_MS = 60_000;
+
 export const mockJobCompleted: AgentJob = {
 	id: "job-completed-1",
 	jobType: "PULL_REQUEST_REVIEW",
@@ -48,6 +55,8 @@ export const mockJobCompleted: AgentJob = {
 	model: "gpt-5.4-mini",
 	configSnapshot: { name: "Default reviewer", llmProvider: "OPENAI" },
 	createdAt: new Date("2026-05-20T10:00:00Z"),
+	// Claimable the instant it was submitted, and claimed five minutes before it finished.
+	availableAt: new Date("2026-05-20T10:00:00Z"),
 	completedAt: new Date("2026-05-20T10:05:00Z"),
 	deliveryStatus: "DELIVERED",
 	llmModel: "openai/gpt-oss-120b",
@@ -66,6 +75,8 @@ export const mockJobRunning: AgentJob = {
 	model: "openai/gpt-oss-120b",
 	configSnapshot: { name: "GPU gateway (OpenAI)", llmProvider: "OPENAI" },
 	createdAt: new Date("2026-05-20T11:58:00Z"),
+	// A worker has already claimed it, so its eligibility instant is behind it.
+	availableAt: new Date("2026-05-20T11:58:00Z"),
 	retryCount: 0,
 };
 
@@ -76,6 +87,8 @@ export const mockJobFailedDelivery: AgentJob = {
 	model: "gpt-5.4-mini",
 	configSnapshot: { name: "Default reviewer" },
 	createdAt: new Date("2026-05-20T09:00:00Z"),
+	// One execution retry, so a backoff pushed it out two minutes before it ran and completed.
+	availableAt: new Date("2026-05-20T09:02:00Z"),
 	completedAt: new Date("2026-05-20T09:05:00Z"),
 	deliveryStatus: "FAILED",
 	errorMessage: "GitLab API returned 403 when posting the MR note.",
@@ -93,7 +106,48 @@ export const mockJobQueued: AgentJob = {
 	model: "gpt-5.4-mini",
 	configSnapshot: { name: "Default reviewer" },
 	createdAt: new Date("2026-05-20T12:00:00Z"),
+	// Eligible since it was submitted: this one is waiting for a free worker, not for the clock.
+	availableAt: new Date("2026-05-20T12:00:00Z"),
 	retryCount: 0,
+};
+
+/** Queued and parked on the monthly AI cap — the case the runs table has to tell apart from above. */
+export const mockJobHeldOnBudget: AgentJob = {
+	id: "job-held-budget-1",
+	jobType: "PULL_REQUEST_REVIEW",
+	status: "QUEUED",
+	model: "gpt-5.4-nano",
+	configSnapshot: { name: "Default reviewer" },
+	createdAt: new Date("2026-05-20T12:01:00Z"),
+	availableAt: new Date(Date.now() + 5 * MINUTE_MS),
+	holdReason: "BUDGET",
+	retryCount: 0,
+};
+
+/** A reason this client has never heard of, which still has to read as English. */
+export const mockJobHeldForUnknownReason: AgentJob = {
+	id: "job-held-unknown-1",
+	jobType: "ISSUE_REVIEW",
+	status: "QUEUED",
+	model: "gpt-5.4-nano",
+	configSnapshot: { name: "Default reviewer" },
+	createdAt: new Date("2026-05-20T12:02:00Z"),
+	availableAt: new Date(Date.now() + 9 * MINUTE_MS),
+	holdReason: "MODEL_UNAVAILABLE",
+	retryCount: 0,
+};
+
+/** Queued with no hold: it crashed, and the ordinary retry backoff has pushed it into the future. */
+export const mockJobBackingOff: AgentJob = {
+	id: "job-backoff-1",
+	jobType: "PULL_REQUEST_REVIEW",
+	status: "QUEUED",
+	model: "openai/gpt-oss-20b",
+	configSnapshot: { name: "GPU gateway (OpenAI)", llmProvider: "OPENAI" },
+	createdAt: new Date("2026-05-20T11:00:00Z"),
+	availableAt: new Date(Date.now() + 3 * MINUTE_MS),
+	errorMessage: "Runner exited with code 137 (out of memory).",
+	retryCount: 2,
 };
 
 export const mockJobTimedOut: AgentJob = {
@@ -103,6 +157,8 @@ export const mockJobTimedOut: AgentJob = {
 	model: "openai/gpt-oss-120b",
 	configSnapshot: { name: "GPU gateway (OpenAI)", llmProvider: "OPENAI" },
 	createdAt: new Date("2026-05-20T08:00:00Z"),
+	// One execution retry backed it off three minutes; it then ran for twenty and was killed.
+	availableAt: new Date("2026-05-20T08:03:00Z"),
 	completedAt: new Date("2026-05-20T08:20:00Z"),
 	errorMessage: "Agent exceeded the 1200s timeout and was terminated.",
 	llmModel: "gpt-oss-120b",
@@ -114,6 +170,7 @@ export const mockJobs: AgentJob[] = [
 	mockJobCompleted,
 	mockJobRunning,
 	mockJobQueued,
+	mockJobHeldOnBudget,
 	mockJobFailedDelivery,
 	mockJobTimedOut,
 ];

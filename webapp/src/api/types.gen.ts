@@ -2494,11 +2494,15 @@ export type PageAgentJob = {
  */
 export type AgentJob = {
     /**
+     * When this job becomes eligible to be claimed. In the future while the job is waiting — on a retry backoff, or on a hold. Read together with holdReason: a QUEUED job with availableAt in the future is waiting, not starved for workers.
+     */
+    availableAt: Date;
+    /**
      * Timestamp when the job completed
      */
     completedAt?: Date;
     /**
-     * Frozen agent config at submit time (an INSTANCE-scoped connection's baseUrl is redacted to scheme://host; only a WORKSPACE-scoped BYO connection's baseUrl is left intact)
+     * Frozen agent config at submit time (an INSTANCE-scoped connection's baseUrl is redacted to scheme://host; only a WORKSPACE-scoped connection's baseUrl is left intact)
      */
     configSnapshot: unknown;
     /**
@@ -2521,6 +2525,10 @@ export type AgentJob = {
      * Container exit code
      */
     exitCode?: number;
+    /**
+     * Why a QUEUED job is waiting rather than eligible, when the reason is one an admin can undo. BUDGET = the payer is over its monthly LLM cap and the job resumes by itself once the cap is raised or the month rolls over. Absent means no such hold — a future availableAt is then an ordinary retry backoff.
+     */
+    holdReason?: string;
     /**
      * Job ID
      */
@@ -4035,7 +4043,7 @@ export type AgentBindingRequest = {
      */
     timeoutSeconds?: number;
     /**
-     * Workspace-owned (BYO) model id to run this purpose on
+     * Workspace-owned model id to run this purpose on
      */
     workspaceModelId?: number;
 };
@@ -4132,7 +4140,7 @@ export type AdminLlmUsageReport = {
      */
     month: string;
     /**
-     * One row per workspace with ledger activity this month
+     * One row per workspace, including workspaces with no ledger activity this month
      */
     workspaces: Array<AdminWorkspaceLlmUsage>;
 };

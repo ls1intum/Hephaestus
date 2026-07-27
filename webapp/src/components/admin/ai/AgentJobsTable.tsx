@@ -24,11 +24,14 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import {
 	DELIVERY_STATUS_LABELS,
 	deliveryBadgeVariant,
 	formatTokens,
+	holdReasonCopy,
 	type JobStatus,
+	jobWait,
 	modelLabel,
 	STATUS_LABELS,
 	statusBadgeVariant,
@@ -153,12 +156,34 @@ export function AgentJobsTable({
 					</TableHeader>
 					<TableBody>
 						{jobs.map((job) => {
+							const wait = jobWait(job);
 							return (
 								<TableRow key={job.id}>
 									<TableCell>
+										{/* A hold is a sub-state of QUEUED, not a peer of it, so it qualifies the status
+										    badge from underneath instead of standing beside it as a second badge. The
+										    server's `JobStatus` is what the filter above sends, and a "Held" badge would
+										    advertise a value that filter cannot ask for. */}
 										<Badge variant={statusBadgeVariant(job.status)}>
 											{STATUS_LABELS[job.status]}
 										</Badge>
+										{wait && (
+											<div
+												className={cn(
+													"mt-1 max-w-56 text-xs",
+													// A hold needs someone to lift it; a backoff clears itself, so it stays
+													// muted. Neither is destructive — the run is waiting, not broken.
+													wait.kind === "hold" ? "text-warning" : "text-muted-foreground",
+												)}
+											>
+												{wait.kind === "hold"
+													? `Held · ${holdReasonCopy(wait.reason).label} · due `
+													: "Backing off · due "}
+												{/* Same reason as the Created cell: a tooltip trigger is a button, and one
+												    per row would sit between every row and its Details action. */}
+												<RelativeTime value={job.availableAt} tooltip={false} />
+											</div>
+										)}
 									</TableCell>
 									<TableCell className="max-w-40 truncate">{modelLabel(job)}</TableCell>
 									<TableCell className="text-muted-foreground">

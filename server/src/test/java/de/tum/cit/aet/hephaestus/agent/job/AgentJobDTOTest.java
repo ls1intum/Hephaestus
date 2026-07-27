@@ -6,8 +6,11 @@ import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -39,6 +42,37 @@ class AgentJobDTOTest extends BaseUnitTest {
 
         ObjectNode snapshot = (ObjectNode) dto.configSnapshot();
         assertThat(snapshot.path("baseUrl").asString()).as(why).isEqualTo(expectedBaseUrl);
+    }
+
+    /**
+     * A budget-held job is QUEUED like any other, so without these two fields the console shows it as
+     * "waiting for a worker" and an admin has no way to tell that raising the cap is what releases it.
+     * The pair is the signal: {@code availableAt} in the future says waiting, {@code holdReason} says
+     * why — and says it is an admin's to undo, unlike an ordinary retry backoff.
+     */
+    @Test
+    void carriesTheHoldReasonAndReleaseTimeOfABudgetHeldJob() {
+        AgentJob job = jobWithSnapshot(snapshotWithScope(FundingSource.INSTANCE));
+        Instant releaseAt = job.getCreatedAt().plus(Duration.ofHours(6));
+        job.setStatus(AgentJobStatus.QUEUED);
+        job.setAvailableAt(releaseAt);
+        job.setHoldReason(AgentJob.HOLD_REASON_BUDGET);
+
+        AgentJobDTO dto = AgentJobDTO.from(job);
+
+        assertThat(dto.holdReason()).isEqualTo(AgentJob.HOLD_REASON_BUDGET);
+        assertThat(dto.availableAt()).isEqualTo(releaseAt);
+    }
+
+    @Test
+    void reportsNoHoldForAnOrdinaryQueuedJob() {
+        AgentJob job = jobWithSnapshot(snapshotWithScope(FundingSource.INSTANCE));
+        job.setStatus(AgentJobStatus.QUEUED);
+
+        AgentJobDTO dto = AgentJobDTO.from(job);
+
+        assertThat(dto.holdReason()).isNull();
+        assertThat(dto.availableAt()).as("defaulted to submit time by prePersist, never null").isNotNull();
     }
 
     private static AgentJob jobWithSnapshot(ConfigSnapshot snapshot) {

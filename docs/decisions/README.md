@@ -6,6 +6,29 @@ Decisions that shape the Hephaestus server foundations. Each ADR follows the
 
 New ADRs use the next available number and link from this index.
 
+## These are repo-only — deliberately not on the docs site
+
+`docs/decisions/`, `docs/runbooks/`, `docs/auth-architecture.md` and `docs/auth-glossary.md` are
+**not** registered with any Docusaurus plugin and never appear on
+[the site](https://ls1intum.github.io/Hephaestus/). That is a decision, not an oversight. They are
+written against internal class names, they are amended by the same PR that changes the code, and
+their reader already has the repository checked out. This index is their table of contents.
+
+Two rules follow, and CI enforces the second one:
+
+1. **An ADR is a record of a decision, not a changelog.** Context, drivers, options, decision,
+   consequences, revisit trigger. A bug fixed after the fact belongs in a changeset
+   (`.changeset/*.md`), not in an amendment — amend an ADR only when the decision or one of its
+   consequences actually changed.
+2. **A published page links here by absolute GitHub URL, never a relative path.** A relative
+   `../decisions/…` link from `docs/user/`, `docs/contributor/` or `docs/admin/` resolves to
+   nothing on the site, and `onBrokenMarkdownLinks: 'throw'` fails the docs build. Use
+   `https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/<file>.md`. Relative links
+   *between* files in this tree are fine — they are only ever read on GitHub.
+
+An operator-facing fact must not live only here. If a runbook step is something a self-hoster has to
+do, its home is the Admin Guide (`docs/admin/`) and the runbook links to it.
+
 | # | Title | Status |
 |---|---|---|
 | [0001](0001-flat-top-level-layout.md) | Flat top-level layout | Accepted |
@@ -32,7 +55,7 @@ New ADRs use the next available number and link from this index.
 | [0022](0022-observation-presence-assessment-and-schema-cleanup.md) | Observation = presence × assessment (drop `Practice.kind`); reaction anchors on feedback; ruthless column cleanup | Accepted |
 | [0023](0023-outline-documentation-integration.md) | Outline documentation integration — a content source, not a detection surface | Accepted |
 | [0024](0024-integration-sync-lifecycle-and-two-deletion-semantics.md) | Integration sync lifecycle — drift tombstones and mirror erasure are two different operations | Accepted |
-| [0025](0025-agent-job-queue-on-postgresql.md) | Agent job queue moves off NATS onto PostgreSQL | Accepted (amended 2026-07-21 — fairness + fencing fix wave) |
+| [0025](0025-agent-job-queue-on-postgresql.md) | Agent job queue moves off NATS onto PostgreSQL | Accepted |
 | [0026](0026-per-purpose-agent-bindings-and-llm-governance.md) | Per-purpose agent bindings and governed OpenAI-compatible LLM catalog | Accepted (amended 2026-07-26 — named-agent-config model deleted) |
 | [0027](0027-dialog-lifetime-and-where-a-write-outcome-lands.md) | Dialog lifetime, and where a write's outcome lands when the dialog is gone | Accepted |
 

@@ -18,7 +18,7 @@ public record AgentJobDTO(
     @Schema(description = "Job output (agent results)") Object output,
     @NonNull
     @Schema(
-        description = "Frozen agent config at submit time (an INSTANCE-scoped connection's baseUrl is redacted to scheme://host; only a WORKSPACE-scoped BYO connection's baseUrl is left intact)"
+        description = "Frozen agent config at submit time (an INSTANCE-scoped connection's baseUrl is redacted to scheme://host; only a WORKSPACE-scoped connection's baseUrl is left intact)"
     )
     Object configSnapshot,
     @Schema(
@@ -33,6 +33,20 @@ public record AgentJobDTO(
     DeliveryStatus deliveryStatus,
     @Schema(description = "Git provider comment/note ID for posted feedback") String deliveryCommentId,
     @NonNull @Schema(description = "Number of retry attempts") Integer retryCount,
+    @NonNull
+    @Schema(
+        description = "When this job becomes eligible to be claimed. In the future while the job is " +
+            "waiting — on a retry backoff, or on a hold. Read together with holdReason: a QUEUED job " +
+            "with availableAt in the future is waiting, not starved for workers."
+    )
+    Instant availableAt,
+    @Schema(
+        description = "Why a QUEUED job is waiting rather than eligible, when the reason is one an admin " +
+            "can undo. BUDGET = the payer is over its monthly LLM cap and the job resumes by itself once " +
+            "the cap is raised or the month rolls over. Absent means no such hold — a future availableAt " +
+            "is then an ordinary retry backoff."
+    )
+    String holdReason,
     @NonNull @Schema(description = "Timestamp when the job was created") Instant createdAt,
     @Schema(description = "Timestamp when the job started running") Instant startedAt,
     @Schema(description = "Timestamp when the job completed") Instant completedAt,
@@ -64,6 +78,8 @@ public record AgentJobDTO(
             job.getDeliveryStatus(),
             job.getDeliveryCommentId(),
             job.getRetryCount(),
+            job.getAvailableAt(),
+            job.getHoldReason(),
             job.getCreatedAt(),
             job.getStartedAt(),
             job.getCompletedAt(),
@@ -80,7 +96,7 @@ public record AgentJobDTO(
 
     /**
      * The audience here is a workspace admin, who may see the full {@code baseUrl} only of a
-     * {@code WORKSPACE}-scoped (BYO) connection they configured themselves. Anything else — an INSTANCE
+     * {@code WORKSPACE}-scoped connection they configured themselves. Anything else — an INSTANCE
      * connection, or a scope-less snapshot from a rolling upgrade — is cut back to {@code scheme://host}
      * so an operator's gateway or deployment path cannot leak.
      */

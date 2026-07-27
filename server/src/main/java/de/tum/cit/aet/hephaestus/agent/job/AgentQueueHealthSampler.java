@@ -35,6 +35,7 @@ public class AgentQueueHealthSampler {
     private final AgentJobRepository jobRepository;
     private final AtomicLong depth = new AtomicLong();
     private final AtomicLong oldestAgeSeconds = new AtomicLong();
+    private final AtomicLong held = new AtomicLong();
     private final AtomicLong running = new AtomicLong();
     private final Counter samplerFailures;
 
@@ -46,6 +47,14 @@ public class AgentQueueHealthSampler {
         Gauge.builder("agent.queue.oldest_age_seconds", oldestAgeSeconds, AtomicLong::get)
             .description(
                 "Age in seconds of the oldest eligible QUEUED job; 0 when the queue is empty; last-good on sampler failure"
+            )
+            .register(meterRegistry);
+        // Without this, a workspace over its monthly LLM cap is indistinguishable from an idle instance:
+        // its whole backlog sits at available_at in the future, so agent.queue.depth reads 0 and the
+        // "queue is backed up" alert stays silent while nothing runs. Alert on held > 0 sustained.
+        Gauge.builder("agent.queue.held", held, AtomicLong::get)
+            .description(
+                "QUEUED jobs parked on an admin-undoable hold (monthly LLM cap); excluded from agent.queue.depth; last-good on sampler failure"
             )
             .register(meterRegistry);
         Gauge.builder("agent.queue.running", running, AtomicLong::get)
@@ -62,6 +71,7 @@ public class AgentQueueHealthSampler {
         try {
             AgentJobRepository.QueueHealthSnapshot snapshot = jobRepository.queueHealthSnapshot(now);
             depth.set(snapshot.getDepth());
+            held.set(snapshot.getHeld());
             running.set(snapshot.getRunning());
             Instant oldest = snapshot.getOldestAvailableAt();
             oldestAgeSeconds.set(oldest != null ? Math.max(0, Duration.between(oldest, now).getSeconds()) : 0L);

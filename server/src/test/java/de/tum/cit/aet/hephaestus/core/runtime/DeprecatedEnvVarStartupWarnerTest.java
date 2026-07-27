@@ -8,26 +8,34 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.env.YamlPropertySourceLoader;
-import org.springframework.core.env.EnumerablePropertySource;
+import org.springframework.core.env.Environment;
 import org.springframework.core.env.PropertySource;
+import org.springframework.core.env.StandardEnvironment;
+import org.springframework.core.env.SystemEnvironmentPropertySource;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.FileSystemResource;
-import org.springframework.mock.env.MockEnvironment;
 
 class DeprecatedEnvVarStartupWarnerTest extends BaseUnitTest {
+
+    private static final Path COMPOSE_APP = Path.of("..", "docker", "compose.app.yaml");
+
+    /** The service that carries the one-release pass-through block; see the warner's javadoc. */
+    private static final String FORWARDING_SERVICE = "services.application-server.environment.";
 
     private ListAppender<ILoggingEvent> appender;
     private Logger logger;
@@ -53,81 +61,134 @@ class DeprecatedEnvVarStartupWarnerTest extends BaseUnitTest {
             .toList();
     }
 
+    /**
+     * Resolution through the real {@link SystemEnvironmentPropertySource}, not a hand-set property on a
+     * {@code MockEnvironment}. That distinction is the whole bug this class exists to prevent: a
+     * {@code MockEnvironment} answers to whatever string you put in it, so it will happily confirm a
+     * watch-list of dotted names that no environment variable on earth can satisfy.
+     */
+    private static Environment environmentWith(Map<String, Object> vars) {
+        StandardEnvironment environment = new StandardEnvironment();
+        environment
+            .getPropertySources()
+            .replace(
+                StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
+                new SystemEnvironmentPropertySource(StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME, vars)
+            );
+        return environment;
+    }
+
     @Test
-    void warnsOnEachRetiredPropertyThatIsStillSet() {
-        MockEnvironment environment = new MockEnvironment();
-        environment.setProperty("hephaestus.worker.llm.base-url", "https://api.anthropic.com");
-        environment.setProperty("hephaestus.worker.llm.api-key", "sk-test");
-        environment.setProperty("hephaestus.sandbox.llm-proxy.enabled", "true");
-        environment.setProperty("hephaestus.agent.nats.enabled", "true");
-        environment.setProperty("hephaestus.agent.nats.server", "nats://localhost:4222");
-        environment.setProperty("hephaestus.agent.nats.max-ack-pending", "16");
-        environment.setProperty("hephaestus.agent.nats.fetch-batch-size", "5");
+    void warnsOnEachRetiredEnvVarThatIsStillSet() {
+        Map<String, Object> vars = new LinkedHashMap<>();
+        DeprecatedEnvVarStartupWarner.retiredEnvVarNames().forEach(name -> vars.put(name, "leftover"));
 
-        new DeprecatedEnvVarStartupWarner(environment).warnOnRetiredProperties();
+        new DeprecatedEnvVarStartupWarner(environmentWith(vars)).warnOnRetiredProperties();
 
-        List<String> messages = warnMessages();
-        assertThat(messages).hasSize(7);
-        assertThat(messages)
-            .anySatisfy(m -> assertThat(m).contains("hephaestus.worker.llm.base-url").contains("AI models"))
-            .anySatisfy(m -> assertThat(m).contains("hephaestus.worker.llm.api-key").contains("AI models"))
-            .anySatisfy(m ->
-                assertThat(m).contains("hephaestus.sandbox.llm-proxy.enabled").contains("no standalone enable flag")
+        assertThat(warnMessages()).hasSize(DeprecatedEnvVarStartupWarner.retiredEnvVarNames().size());
+        assertThat(warnMessages())
+            .allSatisfy(message -> assertThat(message).contains("is set but no longer read"))
+            .anySatisfy(message -> assertThat(message).contains("AGENT_NATS_ENABLED").contains("AGENT_ENABLED"))
+            .anySatisfy(message ->
+                assertThat(message).contains("AGENT_NATS_FETCH_BATCH_SIZE").contains("AGENT_CLAIM_BATCH_SIZE")
             )
-            .anySatisfy(m -> assertThat(m).contains("hephaestus.agent.nats.enabled").contains("AGENT_ENABLED"))
-            .anySatisfy(m -> assertThat(m).contains("hephaestus.agent.nats.server").contains("AGENT_ENABLED"))
-            .anySatisfy(m -> assertThat(m).contains("hephaestus.agent.nats.max-ack-pending").contains("PostgreSQL"))
-            .anySatisfy(m ->
-                assertThat(m).contains("hephaestus.agent.nats.fetch-batch-size").contains("AGENT_CLAIM_BATCH_SIZE")
+            .anySatisfy(message ->
+                assertThat(message).contains("HEPHAESTUS_WORKER_LLM_BASE_URL").contains("AI models")
             );
     }
 
     @ParameterizedTest(name = "{0}")
-    @CsvSource(
-        {
-            "hephaestus.worker.llm.base-url, https://api.anthropic.com, AI models",
-            "hephaestus.agent.nats.enabled, false, PostgreSQL",
-        }
-    )
-    void warnsExactlyOnceNamingOnlyThePropertyThatIsSet(String property, String value, String guidance) {
-        MockEnvironment environment = new MockEnvironment();
-        environment.setProperty(property, value);
+    @MethodSource("retiredEnvVars")
+    void warnsExactlyOnceNamingOnlyTheVarThatIsSet(String envVar) {
+        new DeprecatedEnvVarStartupWarner(environmentWith(Map.of(envVar, "leftover"))).warnOnRetiredProperties();
 
-        new DeprecatedEnvVarStartupWarner(environment).warnOnRetiredProperties();
+        assertThat(warnMessages()).hasSize(1);
+        assertThat(warnMessages().get(0)).startsWith(envVar + " is set but no longer read");
+    }
 
-        List<String> messages = warnMessages();
-        assertThat(messages).hasSize(1);
-        assertThat(messages.get(0)).contains(property).contains(guidance);
+    /**
+     * The one-release Compose pass-through hands every retired var to the container as {@code ${VAR:-}},
+     * so on the overwhelmingly common deployment — nothing stale set — each arrives as an empty string.
+     * Treating that as "set" would put six WARNs in every clean boot log and train operators to ignore
+     * the line.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("retiredEnvVars")
+    void treatsTheEmptyValueOfAnUnsetComposeForwardAsAbsent(String envVar) {
+        new DeprecatedEnvVarStartupWarner(environmentWith(Map.of(envVar, ""))).warnOnRetiredProperties();
+
+        assertThat(warnMessages()).isEmpty();
     }
 
     @Test
-    void neverWarnsWhenNoneOfTheRetiredPropertiesAreSet() {
-        MockEnvironment environment = new MockEnvironment();
-
-        new DeprecatedEnvVarStartupWarner(environment).warnOnRetiredProperties();
+    void neverWarnsWhenNoneOfTheRetiredVarsAreSet() {
+        new DeprecatedEnvVarStartupWarner(environmentWith(Map.of())).warnOnRetiredProperties();
 
         assertThat(warnMessages()).isEmpty();
     }
 
     /**
-     * Spring's YAML source binds the key whatever the value is — a {@code ${VAR:}} placeholder with an
-     * empty default resolves to {@code ""}, not "absent" — so the value cannot rescue a retired key;
-     * the line has to be gone.
+     * The watch list holds environment-variable names, verbatim. A dotted property name here is
+     * unfireable for any var that does not carry the {@code HEPHAESTUS_} prefix — which was true of
+     * {@code AGENT_NATS_ENABLED}, {@code AGENT_NATS_MAX_ACK_PENDING} and
+     * {@code AGENT_NATS_FETCH_BATCH_SIZE}, i.e. of most of the list.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("retiredEnvVars")
+    void everyWatchedNameIsSpeltAsAnEnvironmentVariable(String name) {
+        assertThat(name)
+            .as("watch environment-variable names (FOO_BAR), never dotted property names (foo.bar)")
+            .matches("[A-Z][A-Z0-9_]*");
+    }
+
+    /**
+     * A Compose {@code .env} entry is an interpolation input, not container environment. Unless the
+     * compose file names the var under {@code environment:}, the JVM never sees the operator's stale
+     * line and the warner is decoration on every Compose deployment — which is what it was.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("retiredEnvVars")
+    void everyWatchedVarIsForwardedToTheContainerByTheShippedComposeFile(String name) throws Exception {
+        String forwarded = propertyIn(COMPOSE_APP, FORWARDING_SERVICE + name);
+
+        assertThat(forwarded)
+            .as(
+                "docker/compose.app.yaml must forward %s to the container (as ${%s:-}) for the release " +
+                    "in which it is warned about, or a stale docker/.env value never reaches the JVM",
+                name,
+                name
+            )
+            .isNotNull()
+            .contains(name);
+    }
+
+    /**
+     * A WARN has to mean "your leftover", so nothing shipped may still read the var. Checks the raw
+     * text rather than parsed keys: the failure mode is a surviving {@code ${VAR:default}} placeholder,
+     * which parses to an ordinary string and is invisible in the key set.
      *
      * <p>Static content, deliberately: booting each profile to check would need every one of them to
      * have a satisfiable environment, and would not fail until it did.
      */
     @ParameterizedTest(name = "{0}")
     @MethodSource("shippedProfileYamlFiles")
-    void noShippedProfileDefinesARetiredProperty(Path profile) throws Exception {
-        List<String> retiredKeysStillDefined = propertyNamesIn(profile)
-            .stream()
-            .filter(DeprecatedEnvVarStartupWarner.retiredPropertyNames()::contains)
-            .toList();
+    void noShippedProfileStillReadsARetiredEnvVar(Path profile) throws Exception {
+        String yaml = Files.readString(profile, StandardCharsets.UTF_8);
 
-        assertThat(retiredKeysStillDefined)
-            .as("%s must not define retired properties — every boot of that profile would warn", profile.getFileName())
+        List<String> stillRead = new ArrayList<>();
+        for (String name : DeprecatedEnvVarStartupWarner.retiredEnvVarNames()) {
+            if (yaml.contains("${" + name + ":") || yaml.contains("${" + name + "}")) {
+                stillRead.add(name);
+            }
+        }
+
+        assertThat(stillRead)
+            .as("%s still reads a retired var — it is live config, not a leftover, so warning is wrong", profile)
             .isEmpty();
+    }
+
+    static List<String> retiredEnvVars() {
+        return List.copyOf(DeprecatedEnvVarStartupWarner.retiredEnvVarNames());
     }
 
     static List<Path> shippedProfileYamlFiles() throws IOException {
@@ -139,13 +200,15 @@ class DeprecatedEnvVarStartupWarnerTest extends BaseUnitTest {
         }
     }
 
-    private static List<String> propertyNamesIn(Path profile) throws IOException {
+    private static String propertyIn(Path yaml, String key) throws IOException {
         return new YamlPropertySourceLoader()
-            .load(profile.toString(), new FileSystemResource(profile))
+            .load(yaml.toString(), new FileSystemResource(yaml))
             .stream()
-            .map(EnumerablePropertySource.class::cast)
-            .flatMap(source -> Arrays.stream(source.getPropertyNames()))
-            .toList();
+            .map(PropertySource.class::cast)
+            .filter(source -> source.containsProperty(key))
+            .findFirst()
+            .map(source -> String.valueOf(source.getProperty(key)))
+            .orElse(null);
     }
 
     /**

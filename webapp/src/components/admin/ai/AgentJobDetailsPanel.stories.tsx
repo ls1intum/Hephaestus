@@ -3,8 +3,11 @@ import { expect, fn, screen, userEvent, within } from "storybook/test";
 import { expectControlOnScreen, expectDialogFitsViewport, expectPageReflows } from "@/test/reflow";
 import { AgentJobDetailsPanel } from "./AgentJobDetailsPanel";
 import {
+	mockJobBackingOff,
 	mockJobCompleted,
 	mockJobFailedDelivery,
+	mockJobHeldForUnknownReason,
+	mockJobHeldOnBudget,
 	mockJobRunning,
 	mockJobTimedOut,
 } from "./story-mock-data";
@@ -31,7 +34,57 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Completed: Story = {};
+export const Completed: Story = {
+	play: async () => {
+		const panel = await screen.findByRole("dialog");
+		// A finished run's `availableAt` is the claim time it was given on submit. Printing it here
+		// would offer a "Next attempt" for a run that has no next attempt.
+		await expect(within(panel).queryByText("Next attempt")).toBeNull();
+		await expect(within(panel).queryByRole("heading", { name: /on hold/i })).toBeNull();
+	},
+};
+
+/** The whole point of the two new fields: which cap parked this run, and when it is next due. */
+export const HeldOnBudget: Story = {
+	args: { job: mockJobHeldOnBudget },
+	play: async () => {
+		const panel = await screen.findByRole("dialog");
+
+		await expect(within(panel).getByRole("heading", { name: "On hold" })).toBeInTheDocument();
+		await expect(within(panel).getByText(/Over the AI budget/)).toBeInTheDocument();
+		await expect(within(panel).getByText(/The monthly AI cap is spent/)).toBeInTheDocument();
+		// It is waiting, not broken — and it lifts itself.
+		await expect(within(panel).getByText(/rather than failed/)).toBeInTheDocument();
+		await expect(within(panel).getByText(/resumes on its own/)).toBeInTheDocument();
+
+		// When it is due to be retried, with the absolute instant a hover away for the server log.
+		await expect(within(panel).getByText("Next attempt")).toBeInTheDocument();
+		await expect(
+			within(panel).getByRole("button", { name: /^in \d+ minutes$/ }),
+		).toBeInTheDocument();
+	},
+};
+
+/** An unknown reason gets the same treatment, humanised, and never leaks the raw constant. */
+export const HeldForAnUnknownReason: Story = {
+	args: { job: mockJobHeldForUnknownReason },
+	play: async () => {
+		const panel = await screen.findByRole("dialog");
+		await expect(within(panel).getByText(/Model unavailable/)).toBeInTheDocument();
+		await expect(within(panel).queryByText(/MODEL_UNAVAILABLE/)).toBeNull();
+		await expect(within(panel).getByText(/resumes on its own/)).toBeInTheDocument();
+	},
+};
+
+/** A crash backoff is a wait with no cap behind it: a next attempt, and no "On hold" block. */
+export const BackingOffAfterACrash: Story = {
+	args: { job: mockJobBackingOff },
+	play: async () => {
+		const panel = await screen.findByRole("dialog");
+		await expect(within(panel).getByText("Next attempt")).toBeInTheDocument();
+		await expect(within(panel).queryByRole("heading", { name: /on hold/i })).toBeNull();
+	},
+};
 
 export const Running: Story = {
 	args: { job: mockJobRunning },

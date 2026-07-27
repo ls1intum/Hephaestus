@@ -179,19 +179,22 @@ public class GitHubGraphQlConfig {
     @Bean
     public HttpGraphQlClient gitHubGraphQlClient(WebClient gitHubGraphQlWebClient) {
         // Operations are loaded from graphql/github/operations/ by name.
-        // Shared fragments from graphql/github/fragments/ProjectFragments.graphql are
+        // Shared fragments (GitHubGraphQlFragments) are
         // selectively appended by FragmentMergingDocumentSource: only fragments that are
         // actually referenced (transitively via ...FragmentName spreads) are included.
         // This satisfies GraphQL spec §5.5.1.4 (fragments must be used) while keeping
-        // fragment definitions DRY in a single file.
-        Resource fragmentFile = new ClassPathResource("graphql/github/fragments/ProjectFragments.graphql");
+        // fragment definitions in documents the two GraphQL validators can see.
+        List<Resource> fragmentFiles = List.of(
+            new ClassPathResource(GitHubGraphQlFragments.PROJECT_FRAGMENTS_RESOURCE),
+            new ClassPathResource(GitHubGraphQlFragments.COMMIT_ENRICHMENT_FIELDS_RESOURCE)
+        );
         FragmentMergingDocumentSource documentSource = new FragmentMergingDocumentSource(
             List.of(
                 new ClassPathResource("graphql/github/operations/"),
                 new ClassPathResource("graphql/github/fragments/")
             ),
             List.of(".graphql", ".gql"),
-            List.of(fragmentFile)
+            fragmentFiles
         );
         return HttpGraphQlClient.builder(gitHubGraphQlWebClient).documentSource(documentSource).build();
     }

@@ -475,27 +475,37 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     int deleteTerminalRowsOlderThan(@Param("cutoff") Instant cutoff, @Param("batchSize") int batchSize);
 
     /**
-     * Depth, oldest-eligible-age and running count in a single pass, so the scan cost does not triple
-     * exactly when an incident has inflated the backlog. {@code :now} is bound rather than read from
-     * the DB clock, matching {@link #findByIdQueuedForUpdateSkipLocked}.
+     * Depth, oldest-eligible-age, held count and running count in a single pass, so the scan cost does
+     * not multiply exactly when an incident has inflated the backlog. {@code :now} is bound rather than
+     * read from the DB clock, matching {@link #findByIdQueuedForUpdateSkipLocked}.
+     *
+     * <p>{@code depth} counts only jobs a worker could claim right now, which is what "are we keeping
+     * up?" means — a job on a retry backoff is not work the fleet is behind on. {@code held} is counted
+     * separately for the case that distinction hides: a workspace over its LLM cap has its whole backlog
+     * pushed out of {@code depth}, so depth alone reads identically to an idle instance. Held is the
+     * number that separates paused from idle.
      */
     @WorkspaceAgnostic("Fleet-wide queue-health snapshot; caller is @WorkspaceAgnostic health sampler")
     @Query(
         value = "SELECT " +
             "  COUNT(*) FILTER (WHERE status = 'QUEUED' AND available_at <= :now) AS depth, " +
             "  MIN(available_at) FILTER (WHERE status = 'QUEUED' AND available_at <= :now) AS oldestAvailableAt, " +
+            "  COUNT(*) FILTER (WHERE status = 'QUEUED' AND hold_reason IS NOT NULL) AS held, " +
             "  COUNT(*) FILTER (WHERE status = 'RUNNING') AS running " +
             "FROM agent_job WHERE status IN ('QUEUED', 'RUNNING')",
         nativeQuery = true
     )
     QueueHealthSnapshot queueHealthSnapshot(@Param("now") Instant now);
 
-    /** {@code oldestAvailableAt} is null when the queue is empty. */
+    /** {@code oldestAvailableAt} is null when nothing is eligible. */
     interface QueueHealthSnapshot {
         long getDepth();
 
         @Nullable
         Instant getOldestAvailableAt();
+
+        /** QUEUED jobs parked on an admin-undoable hold (currently only a monthly LLM cap). */
+        long getHeld();
 
         long getRunning();
     }

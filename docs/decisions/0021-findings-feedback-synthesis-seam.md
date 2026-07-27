@@ -69,6 +69,20 @@ A finding is the evidence record (database + the reflective dashboard). What rea
 ## Final schema (5 tables + 2 `Practice` columns)
 
 > Hardened by a standards-grounded ego-death pressure-test (SARIF, GitHub/GitLab/Gerrit, SonarQube, xAPI/Caliper/AS2/PROV-O, W3C Web Annotation). Every field is justified to a precedent or a breaking scenario in **§ Grounding** below; theatre is cut in **§ Deliberately not adopted**. The single fatal pre-test gap — the schema could not answer its own RQ ("do practices change over time") — is closed by `PracticeFinding.correlation_key` (F-18).
+>
+> **This block is the schema as decided, not the schema as shipped.** It is left verbatim because
+> that is what an ADR is for. Names and value sets have moved since — ADR 0022 renamed
+> `PracticeFinding` to `Observation` and replaced the signed verdict with `presence` × `assessment`,
+> and the `suppression_reason` set sketched below (`AUDIENCE_REVIEWER`, `BELOW_THRESHOLD`,
+> `LOW_CONFIDENCE`, `POLICY_FLOOR_DROP`) no longer exists in any of the three places that matter.
+> For what the code holds today, read one of these instead, never this block:
+>
+> - **Shipped tables, columns and enums:** [`docs/contributor/practice-feedback-schema.md`](../contributor/practice-feedback-schema.md).
+> - **`FeedbackSuppressionReason` — the values and the live writer of each:**
+>   [`docs/contributor/evaluation-provenance.md` § 2](../contributor/evaluation-provenance.md), which
+>   owns that list. It is enumerated exactly once, there; the Java enum
+>   (`practices/feedback/FeedbackSuppressionReason`) and the `chk_feedback_suppression_reason` CHECK
+>   constraint are what it tracks.
 
 ```
 PracticeFinding  (@Immutable — KEEP; +correlation_key, +subject_user_id; verdict renamed)

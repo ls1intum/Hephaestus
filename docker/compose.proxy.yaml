@@ -88,8 +88,9 @@ services:
       timeout: 10s
       retries: 5
       start_period: 3s
-    # nginx writes an access-log line per request, and the page auto-refreshes every 5s while it is
-    # being served — a long outage with browsers left open is exactly when this grows unattended.
+    # Access logging is off (see the nginx-default-config below), so this is nginx startup and error
+    # output only — but the page auto-refreshes every 5s, so a long outage with browsers left open is
+    # exactly when a repeating error would grow unattended.
     logging:
       driver: "json-file"
       options:
@@ -109,6 +110,13 @@ configs:
         server_name _;
 
         root /usr/share/nginx/html;
+
+        # No per-request access line. This server answers on a catch-all Host rule
+        # whenever the webapp router is down, so the URL it would log is the deep
+        # link the contributor was trying to reach — and those name people
+        # (/w/<slug>/user/<username>). Keeps the "no layer writes a per-request
+        # IP/URL record" posture whole; error_log is untouched.
+        access_log off;
 
         location / {
             rewrite ^ /index.html break;

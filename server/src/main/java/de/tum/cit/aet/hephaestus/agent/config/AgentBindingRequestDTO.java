@@ -13,7 +13,7 @@ import org.jspecify.annotations.Nullable;
 @Schema(description = "Bind a model and execution limits to an agent purpose")
 public record AgentBindingRequestDTO(
     @Nullable @Schema(description = "Shared (instance-catalog) model id to run this purpose on") Long instanceModelId,
-    @Nullable @Schema(description = "Workspace-owned (BYO) model id to run this purpose on") Long workspaceModelId,
+    @Nullable @Schema(description = "Workspace-owned model id to run this purpose on") Long workspaceModelId,
     @Nullable
     @Min(AgentBindingLimits.MIN_TIMEOUT_SECONDS)
     @Max(AgentBindingLimits.MAX_TIMEOUT_SECONDS)

@@ -238,6 +238,7 @@ export const getWorkspaceResponseTransformer = async (data: any): Promise<GetWor
 };
 
 const agentJobSchemaResponseTransformer = (data: any) => {
+    data.availableAt = new Date(data.availableAt);
     if (data.completedAt) {
         data.completedAt = new Date(data.completedAt);
     }

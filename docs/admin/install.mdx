@@ -98,7 +98,7 @@ access — see [GitHub integration](./github-integration)):
    `GH_OAUTH_CLIENT_ID` / `GH_OAUTH_CLIENT_SECRET`.
 
 GitLab login works the same way and can be used instead of (or next to) GitHub — see the
-[GitLab section in Production Setup](./production-setup#gitlab-rollout-bundle).
+[GitLab rollout bundle](./production-setup#gitlab-rollout-bundle).
 
 ## 4. First admin — before first boot
 
@@ -146,8 +146,8 @@ Login alone syncs nothing. Two things make data flow, both covered step-by-step 
 ## 7. Optional integrations
 
 All off by default. The compose file already passes their variables through — enable them
-in `.env` and `docker compose up -d`. Each is documented in
-[Production Setup](./production-setup), which doubles as the variable reference:
+in `.env` and `docker compose up -d`. Each has its variable reference in
+[Integrations & Reference Deployment](./production-setup):
 
 | Add-on | What it gives you | Where |
 | --- | --- | --- |
@@ -155,20 +155,17 @@ in `.env` and `docker compose up -d`. Each is documented in
 | Slack | Mentor in Slack, channel ingestion, digests | [Slack app setup](./production-setup#slack-app-configuration) |
 | Outline | Wiki as a content source for reviews | [Outline integration](./production-setup#outline-integration) |
 | AI practice review | Automated PR feedback from the coding agent | [Practice review bundle](./production-setup#practice-review-rollout-bundle) |
+| An AI provider | The model everything AI runs on — required by the row above | [Connect an AI Provider](./ai-providers) |
 
 **AI practice review needs two things, not one:** the environment bundle above
-(`AGENT_ENABLED`, `GIT_CHECKOUT_ENABLED`, `PRACTICE_REVIEW_FOR_ALL` — set together; the last is a
-compose-file alias that fans out to `PRACTICE_REVIEW_RUN_FOR_ALL` and
-`HEPHAESTUS_FEATURES_FLAGS_PRACTICE_REVIEW_FOR_ALL`, which is what the server reads; the job
+(`AGENT_ENABLED`, `GIT_CHECKOUT_ENABLED`, `PRACTICE_REVIEW_FOR_ALL` — set together; the job
 queue itself runs on PostgreSQL, no NATS setup needed for this bundle), **and** a model that the
-workspace can actually run on. There are two ways to supply one, and either is enough: an instance
-admin registers a connection and model under **Instance admin → AI models** and grants it to the
-workspace, or — if instance settings permit bring-your-own connections — a workspace admin adds their
-own connection and model under the workspace's **Administration → AI models**. Either way, a workspace
-admin must then bind a model to the **practice detection** purpose on that same page. With the flags
-on but nothing bound, nothing is reviewed: webhook-driven reviews are skipped with only a DEBUG log
-line, since an unbound workspace is a normal state and one line per event would be noise. The manual
-dev trigger answers with the reason, so use it to tell "unbound" apart from "broken".
+workspace can actually run on. Setting that model up — registering a provider connection, testing it,
+pricing the model, sharing it, and binding it to the **practice detection** purpose — is
+[Connect an AI Provider](./ai-providers), and nothing reviews anything until it is done. With the
+flags on but nothing bound, webhook-driven reviews are skipped with only a DEBUG log line, since an
+unbound workspace is a normal state and one line per event would be noise. The manual dev trigger
+answers with the reason, so use it to tell "unbound" apart from "broken".
 
 ## 8. Legal pages (public instances)
 
@@ -213,5 +210,4 @@ a backup instead. Set up [Backup & Restore](./backup-restore) **before** you hav
 | GitHub webhook deliveries show `401` | `WEBHOOK_SECRET` on GitHub differs from `.env` — must be byte-identical. |
 | Data appears only ~hourly | No GitHub webhook configured (see step 6). |
 | `release-pin-fetcher` fails | `IMAGE_TAG` is not a published release (no signed pin asset), or the host can't reach `github.com` **or Sigstore**. Signature verification is keyless, so it needs `fulcio.sigstore.dev`, `rekor.sigstore.dev` and `tuf-repo-cdn.sigstore.dev` as well — an egress filter that allows only GitHub fails here with the release tag perfectly valid. Use a real release tag and check outbound HTTPS to all four. |
-| Encryption-key error mentions **bytes**, not characters | The key must be 32 *bytes*. A 32-character key containing non-ASCII is longer than 32 bytes; regenerate with the ASCII command above. |
 | `docker compose down`/`logs` aborts with "variable is missing" | Required `.env` values are validated for every subcommand. Fill them (dummy values are fine) before teardown. |

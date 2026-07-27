@@ -5343,7 +5343,8 @@ components:
           example: 2026-07
         workspaces:
           type: array
-          description: One row per workspace with ledger activity this month
+          description: "One row per workspace, including workspaces with no ledger\
+            \ activity this month"
           items:
             $ref: "#/components/schemas/AdminWorkspaceLlmUsage"
       required:
@@ -5518,18 +5519,25 @@ components:
         workspaceModelId:
           type: integer
           format: int64
-          description: Workspace-owned (BYO) model id to run this purpose on
+          description: Workspace-owned model id to run this purpose on
     AgentJob:
       type: object
       description: Agent job execution record (job_token intentionally omitted)
       properties:
+        availableAt:
+          type: string
+          format: date-time
+          description: "When this job becomes eligible to be claimed. In the future\
+            \ while the job is waiting — on a retry backoff, or on a hold. Read together\
+            \ with holdReason: a QUEUED job with availableAt in the future is waiting,\
+            \ not starved for workers."
         completedAt:
           type: string
           format: date-time
           description: Timestamp when the job completed
         configSnapshot:
           description: Frozen agent config at submit time (an INSTANCE-scoped connection's
-            baseUrl is redacted to scheme://host; only a WORKSPACE-scoped BYO connection's
+            baseUrl is redacted to scheme://host; only a WORKSPACE-scoped connection's
             baseUrl is left intact)
         createdAt:
           type: string
@@ -5553,6 +5561,13 @@ components:
           type: integer
           format: int32
           description: Container exit code
+        holdReason:
+          type: string
+          description: "Why a QUEUED job is waiting rather than eligible, when the\
+            \ reason is one an admin can undo. BUDGET = the payer is over its monthly\
+            \ LLM cap and the job resumes by itself once the cap is raised or the\
+            \ month rolls over. Absent means no such hold — a future availableAt is\
+            \ then an ordinary retry backoff."
         id:
           type: string
           format: uuid
@@ -5623,6 +5638,7 @@ components:
           - TIMED_OUT
           - CANCELLED
       required:
+      - availableAt
       - configSnapshot
       - createdAt
       - id

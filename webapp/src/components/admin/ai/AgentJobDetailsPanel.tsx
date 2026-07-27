@@ -27,8 +27,10 @@ import {
 	DELIVERY_STATUS_LABELS,
 	deliveryBadgeVariant,
 	formatTokens,
+	holdReasonCopy,
 	isCancellable,
 	isDeliveryRetryable,
+	jobWait,
 	modelLabel,
 	STATUS_LABELS,
 	statusBadgeVariant,
@@ -62,6 +64,8 @@ export function AgentJobDetailsPanel({
 	onCancel,
 	onRetryDelivery,
 }: AgentJobDetailsPanelProps) {
+	const wait = job ? jobWait(job) : null;
+	const hold = wait?.kind === "hold" ? holdReasonCopy(wait.reason) : null;
 	return (
 		<Sheet open={open} onOpenChange={onOpenChange}>
 			{/* The width overrides have to repeat `data-[side=right]:` to land at all. `SheetContent`'s own
@@ -107,6 +111,13 @@ export function AgentJobDetailsPanel({
 												<RelativeTime value={job.completedAt} />
 											</DetailRow>
 										)}
+										{/* Only for a run that is waiting on the clock. Every other run's `availableAt`
+										    is a claim time already in the past and tells the reader nothing. */}
+										{wait && (
+											<DetailRow label="Next attempt">
+												<RelativeTime value={job.availableAt} />
+											</DetailRow>
+										)}
 										<DetailRow label="Delivery">
 											{job.deliveryStatus ? (
 												<Badge variant={deliveryBadgeVariant(job.deliveryStatus)}>
@@ -122,6 +133,20 @@ export function AgentJobDetailsPanel({
 										{job.retryCount > 0 && <DetailRow label="Retries">{job.retryCount}</DetailRow>}
 									</dl>
 								</section>
+
+								{/* Deliberately not the destructive treatment the Error block below uses: a hold has
+								    nothing to fix and nothing was lost. It is the amber of a cap that someone can
+								    raise, next to the "Next attempt" row that says when it lapses on its own. */}
+								{hold && (
+									<section>
+										<h3 className="mb-1 text-xs font-semibold uppercase text-muted-foreground">
+											On hold
+										</h3>
+										<p className="rounded-md bg-warning/10 p-3 text-sm">
+											<span className="font-medium">{hold.label}.</span> {hold.detail}
+										</p>
+									</section>
+								)}
 
 								{job.errorMessage && (
 									<section>

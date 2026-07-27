@@ -1,37 +1,9 @@
 # ADR 0025: Agent job queue moves off NATS onto PostgreSQL
 
-**Status:** Accepted (amended 2026-07-21 — fairness + fencing fix wave)
+**Status:** Accepted
 **Date:** 2026-07-21
 **Authors:** Felix T.J. Dietrich
 **Builds on:** [ADR 0005](0005-two-role-runtime-via-conditional-on-property.md) (two-role runtime, original agent NATS consumer), [ADR 0006](0006-llm-proxy-on-coordinator-trust-model.md) (in-app LLM proxy as the sole credential path), [ADR 0013](0013-no-jetstream-dlq-stream.md) (no JetStream DLQ stream)
-
-> **Amendment (2026-07-21, adversarial review fix wave):** Two gaps in the initial cutover, both
-> fixed without changing the decision above:
->
-> - **Head-of-line starvation.** The poll candidate query (`findQueuedIdsOldestFirst`) was a plain
->   `WHERE status='QUEUED' ORDER BY created_at LIMIT n`. If the oldest `n` QUEUED rows all belonged to
->   one `(workspace, purpose)` already at its `max_concurrent_jobs` cap, every claim attempt in that
->   batch correctly skipped them — but a younger, immediately-runnable job for a *different* purpose
->   or workspace never even entered the candidate batch, and could starve indefinitely behind an
->   unclaimable backlog. The query now excludes candidates whose `(workspace, purpose)` is already at
->   the RUNNING cap on its `workspace_agent_binding` row (a correlated subquery, supported by a new
->   partial index `ix_agent_job_running_purpose`); the per-row `FOR UPDATE`
->   concurrency recheck inside the claim transaction remains the authoritative gate, so a stale read
->   in this predicate costs nothing beyond an ordinary skipped candidate.
-> - **Unfenced orphan requeue.** `requeueOrphan` CAS'd on `status='RUNNING'` alone. If a job was
->   requeued by the sweeper and immediately re-claimed by a live sibling before a second, belated
->   sweep pass (or a second replica's concurrent pass) processed the same stale orphan snapshot, the
->   belated requeue matched the row again — status was RUNNING once more, just under the new owner —
->   and silently stole the sibling's legitimately in-progress job back to QUEUED. `requeueOrphan` now
->   additionally fences on `worker_id = :deadWorkerId` (the id the caller identified as dead) and
->   enforces the retry cap in the SQL `WHERE` itself, not just in the caller. The same CAS is reused by
->   the worker drain path (see ADR 0009's amendment) so a draining worker's own jobs return to the
->   queue through the identical fenced mechanism.
->
-> Also new: `AgentJobExecutor`'s poll capacity is now bounded by the sandbox executor's actual free
-> thread-pool slots (previously only `WorkerCapacityState.reviewMax`, an independently-configured
-> knob that can exceed the pool size), and a sandbox-pool rejection backs off the poll loop instead of
-> immediately re-claiming — closing a retry-budget-burning churn loop a saturated pool could trigger.
 
 ## Context
 
@@ -95,13 +67,24 @@ Option 2. The agent job queue is delivered by polling `agent_job` directly:
   `FOR UPDATE SKIP LOCKED`, so replicas divide the backlog instead of contending for it.
 - `AGENT_MAX_RETRIES` (default `5`) replaces JetStream's `max-deliver` as the bound on how many
   times a job is retried before it is left failed.
+- **Eligibility is a column, not a timer.** `agent_job.available_at` gates the candidate query, so a
+  requeue (orphan recovery, worker drain, classified infra failure) schedules its own next attempt
+  with backoff instead of becoming instantly reclaimable. This is what replaces JetStream's
+  `ack-wait`.
+- **The candidate query admits only runnable work.** A `(workspace, purpose)` already at the
+  `max_concurrent_jobs` cap on its `workspace_agent_binding` row contributes zero candidates, so an
+  unclaimable backlog can never fill the `LIMIT` window ahead of a job that could run. The per-row
+  `FOR UPDATE` recheck inside the claim transaction stays the authoritative gate; a stale read here
+  costs one skipped candidate.
 - `AGENT_NATS_ENABLED`, `HEPHAESTUS_AGENT_NATS_SERVER`, `AGENT_NATS_MAX_ACK_PENDING`, and
   `AGENT_NATS_FETCH_BATCH_SIZE` are removed; the `AGENT` JetStream stream is abandoned (operators
   may delete it, `nats stream rm AGENT`, as optional cleanup — nothing depends on it existing or
   not).
-- Worker fencing and orphan recovery are unchanged: `worker_registry` heartbeats and Postgres-side
-  claim expiry, already the actual mechanism that survived a worker dying mid-job, now govern
-  claim loss uniformly instead of racing a JetStream ack-wait timer that pointed at the same row.
+- Worker fencing and orphan recovery are unchanged in intent: `worker_registry` heartbeats and
+  Postgres-side claim expiry, already the actual mechanism that survived a worker dying mid-job, now
+  govern claim loss uniformly instead of racing a JetStream ack-wait timer that pointed at the same
+  row. A requeue is fenced on the worker id the caller identified as dead, so a belated second sweep
+  cannot steal a job a live sibling has legitimately re-claimed.
 - NATS is untouched everywhere else. Webhook ingest (ADR 0008) and SCM/Slack sync consumption keep
   their own JetStream streams and consumers; `NATS_ENABLED` / `HEPHAESTUS_SYNC_NATS_SERVER`
   continue to gate exactly what they gated before this change.
@@ -127,202 +110,35 @@ Option 2. The agent job queue is delivered by polling `agent_job` directly:
 - **No push-based wakeup.** A job submitted the instant after a poll waits out the rest of the
   interval rather than being dispatched immediately, unlike JetStream's push consumer. Acceptable
   given the default 1s interval against jobs that run for minutes.
+- **The queue is now our table to keep small.** A broker expired its own messages; a table does not.
+  `agent_job` therefore carries a retention obligation the stream used to absorb — `AgentJobRetentionService`
+  strips heavy payload columns past `AGENT_PAYLOAD_RETENTION` (default `P14D`) and deletes terminal
+  rows past `AGENT_ROW_RETENTION` (default `P90D`), and the table is autovacuum-tuned for its churn.
+  Retention on a queue table is a correctness surface, not housekeeping: it must never delete a row
+  another table still references, nor one whose delivery has not landed.
+- **The admission filter is not scheduling fairness.** It bounds the one starvation mode that was
+  unbounded in time; among the candidates that survive it, ordering is still strictly global
+  `available_at ASC, id ASC`. There are no per-workspace lanes, no round-robin, and no proportional
+  share, so a workspace enqueuing a hundred jobs it is *entitled* to run — under its cap, or with no
+  `workspace_agent_binding` row at all, which `COALESCE`s to unbounded — takes the whole candidate
+  window ahead of a younger job from a quiet workspace. That wait is bounded by the busy workspace's
+  cap, not by any fairness rule, and because the cap is per `(workspace, purpose)` a workspace
+  running *k* purposes can hold *k* × its cap RUNNING at once. `max_concurrent_jobs` is the only
+  lever; an instance with a noisy tenant should set it rather than expect the queue to arbitrate.
+- **A requeue cannot cancel an LLM call already in flight.** Requeue rotates the job's proxy token,
+  so no *new* request authenticates on the old one — but `JobTokenAuthenticationFilter` authenticates
+  once at request entry and `LlmProxyController` then streams the upstream response without
+  re-validating at chunk boundaries. A request already past authentication when the rotation happens
+  streams to completion. Closing this would mean a mid-stream liveness check, which conflicts with
+  running the proxy with no read-idle timeout (LLM SSE streams go silent while the model thinks).
+  Accepted cost: a drain or infra-retry requeue during an active call can incur one extra concurrent
+  call's spend until that call completes or hits `responseTimeout=300s`.
 
 ## Revisit trigger
 
 Worker replica count grows to where polling load on `agent_job` becomes measurable against the
 database's own budget; or a push-based wakeup (e.g. `LISTEN`/`NOTIFY`) becomes worth the added
-complexity to shave the poll-interval latency off job start.
-
-## Hardening (2026-07-21)
-
-A pressure test against the OSS queue field (Oban, River, pg-boss, Graphile Worker, Solid Queue,
-good_job, Que) confirmed the design above — SKIP LOCKED claim, partial indexes, worker fencing,
-retry cap in SQL, pure polling at this scale — matches or beats free-tier equivalents. It also
-surfaced concrete gaps, closed here:
-
-- **Retention.** `agent_job` had no pruning — 10k jobs/day is ~3.65M rows/year, each carrying up to
-  64KB of `container_logs`. `AgentJobRetentionService` now runs two batched passes (`AGENT_PAYLOAD_RETENTION`,
-  default `P14D`: strip `container_logs`/`output` to `NULL`; `AGENT_ROW_RETENTION`, default `P90D`:
-  delete the row outright), plus autovacuum tuning on `agent_job` and `worker_registry`
-  (`autovacuum_vacuum_scale_factor = 0`, an absolute threshold instead) — Oban's own documented
-  recommendation for a high-churn queue table.
-- **Backoff + `available_at`.** A requeued job (orphan recovery, worker drain, or a classified
-  infra failure — see below) used to become instantly reclaimable, so a crash-looping job burned
-  its whole retry budget in seconds. `agent_job.available_at` (backed by
-  `ix_agent_job_queued_available`) now gates the poll candidate query; `requeueOrphan` sets it to
-  `now() + backoff`, a quartic-with-jitter schedule (`AgentJobBackoff`) capped at 15 minutes. A
-  `CHECK` constraint on `status` closes the gap between the six documented `AgentJobStatus` values
-  and what the column actually enforced.
-- **Error classification.** Every execution failure used to become `FAILED` unconditionally,
-  including sandbox-infrastructure blips (Docker daemon unreachable, image pull failure) that have
-  nothing to do with the job itself. `AgentJobExecutor#handleExecutionFailure` classifies
-  provably-infra failures as retryable — requeued with backoff, bounded by the same `retry_count <
-  max-retries` cap every other requeue path uses — while everything else (a non-zero agent exit, a
-  parse/envelope-mismatch failure, an unclassified exception) still fails immediately, exactly as
-  before. This pass classified on `SandboxException` and `IOException`; the fix wave below narrowed
-  the first of those to `SandboxInfrastructureException`, which is what the code tests today. Throwing
-  a plain `SandboxException` for a transient Docker blip therefore yields a terminal `FAILED`, by
-  design.
-- **Token rotation on requeue.** `requeueOrphan` used to leave the job's `job_token` unchanged, so a
-  zombie sandbox that was merely network-partitioned (not actually dead) could keep authenticating
-  against the LLM proxy once a sibling worker re-claimed the same row — both could spend against
-  the same job. The requeue now mints and stores a fresh token/hash pair; the old one is dead the
-  moment the CAS commits, whether or not the zombie ever notices.
-- **Delivery recovery + dedup.** A job stuck at `delivery_status = PENDING` (the executor crashed
-  between the terminal write and finishing delivery) was previously unrecoverable through the
-  operator-facing retry endpoint, which only accepts a `FAILED` source. `AgentJobZombieSweeper`
-  now sweeps PENDING deliveries older than ~10 minutes and re-attempts them through
-  `AgentJobLifecycleService#recoverStuckDelivery`, bounded by a `delivery_attempts` column (3
-  attempts, then FAILED). Before re-posting, the handler checks whether a comment carrying the
-  job's marker already landed (`JobTypeHandler#findExistingDelivery` /
-  `FeedbackChannel#findExistingSummary`) — closing the crash window where the comment posted but
-  the id was never persisted. Implemented for GitHub (reuses the existing `GetPullRequestComments`/
-  `GetIssueComments` queries) and for GitLab merge requests (reuses the existing
-  `GetMergeRequestDiscussions` query, flattening discussions to notes). Both scans are page-bounded and
-  fail closed: whatever they cannot prove empty — the page budget, a note thread truncated inside its
-  discussion, a transport or GraphQL error — answers unknown, which never auto-reposts and leaves the
-  delivery for a later attempt or an explicit administrator retry.
-- **Queue health metrics.** `agent.queue.depth`, `agent.queue.oldest_age_seconds` (the canonical
-  health signal — depth alone can't distinguish "briefly busy" from "stuck"), and
-  `agent.queue.running` are sampled every 30s by `AgentQueueHealthSampler`. A failed sample keeps the
-  last-good values and increments `agent.queue.health.sampler.failures`. `agent.job.claim.latency`
-  times claim minus `available_at`; `agent.job.execution.duration` is now tagged by `jobType` and
-  outcome `status` (previously untagged and only recorded on the success path). The poll loop
-  sleeps `pollInterval × (0.9–1.1)` instead of a fixed interval, so replicas configured identically
-  don't all poll in lockstep.
-
-**What the fairness predicate does and does not do.** The amendment above added a
-starvation guard to the candidate query, and it is worth being exact about its reach, because it is
-not scheduling fairness. It is an *admission filter*: a `(workspace, purpose)` already at its
-`max_concurrent_jobs` cap contributes **zero** candidates, so its unclaimable backlog can never fill
-the `LIMIT` window and hide a runnable job behind it. That closes the one starvation mode that was
-unbounded in time — a job could previously wait out arbitrarily many poll cycles while a saturated
-bucket stayed saturated.
-
-Among the candidates that survive the filter, ordering is still strictly global
-`available_at ASC, id ASC`. There are no per-workspace lanes, no round-robin, and no proportional
-share. So a workspace that enqueues a hundred jobs it is *entitled* to run — under its cap, or with
-no `workspace_agent_binding` row at all, which `COALESCE`s to unbounded — still takes the whole
-candidate window and every free worker slot ahead of a younger job from a quiet workspace. That
-younger job waits for as long as the busy workspace's jobs take to drain below its cap, which is
-bounded by the cap but not by any fairness rule. The per-`(workspace, purpose)` shape of the cap
-also means a workspace running *k* purposes can hold *k* × its cap RUNNING jobs at once.
-
-Deliberately not built in this pass (documented, not forgotten): per-workspace fairness *lanes* —
-i.e. round-robin or weighted-share dequeue across workspaces, which is what would bound the wait
-above — plus immutable per-attempt records and a full multi-class decomposition of
-`AgentJobExecutor`. These ride with the replay/backfill epic (#1354), which is what actually needs
-them. Until then, `max_concurrent_jobs` on `workspace_agent_binding` is the only lever that bounds
-one workspace's share of the queue; an instance with a noisy tenant should set it rather than
-expect the queue to arbitrate.
-
-## Fix wave (2026-07-21, adversarial review of the hardening commit)
-
-A second adversarial pass over the hardening above found 14 issues, all closed here except where
-noted as a documented residual:
-
-- **BLOCKER — retention cascaded into feedback history.** `feedback.agent_job_id` carries
-  `ON DELETE CASCADE` (1781092589259-32), which transitively cascades to `feedback_observation`,
-  `feedback_placement`, and `reaction` — append-only research/product data. The 90-day row-delete
-  pass would have silently destroyed it. `deleteTerminalRowsOlderThan` now excludes any job still
-  referenced by `feedback` (`NOT EXISTS`); those rows already shed their heavy payload at 14 days,
-  so they stay lightweight, not unbounded. The FK is also `ON DELETE RESTRICT` rather than CASCADE,
-  so this class of bug cannot regress silently — verified no application code deletes `agent_job`
-  rows outside the retention service.
-- **Retention vs. in-flight delivery.** Both the strip and delete passes now exclude
-  `delivery_status = 'PENDING'` — a job whose delivery has not landed yet needs its `output` for a
-  delivery-recovery retry to compose from, and must not be deleted out from under that retry.
-- **Stale poll result bypassing backoff.** `findByIdQueuedForUpdateSkipLocked` now re-checks
-  `available_at <= :now` at claim time (bound parameter, not DB `now()`, for the same app-clock
-  consistency reason as the queue-health queries) — closing the narrow window where a concurrent
-  backoff-requeue between the candidate poll and this claim could still be claimed instantly.
-- **Delivery marker mismatch.** The actual PR/issue review delivery path
-  (`FeedbackDeliveryService#formatPracticeNote`) embedded `<!-- hephaestus:practice-review:<job> -->`,
-  but the delivery-recovery dedup lookup (`PullRequestCommentPoster#findExistingSummaryComment`)
-  searched for a different literal (`<!-- hephaestus-agent-feedback:<job> -->`) — the two had drifted
-  apart, so the dedup lookup could never match a real posted comment and every recovery retry
-  double-posted. Now ONE canonical marker (`PullRequestCommentPoster#summaryMarkerFor`), used by
-  every formatter and the lookup alike; a round-trip regression test formats via the real handler
-  path and asserts the lookup marker is contained in it.
-- **Tri-state dedup (not `Optional`).** `FeedbackChannel#findExistingSummary` and
-  `JobTypeHandler#findExistingDelivery` returned an `Optional` that collapsed "confirmed absent" and
-  "could not determine" (rate limit, transport error, unsupported channel) into the same empty value
-  — every lookup FAILURE silently fell through to "post again". Both are now a tri-state
-  `FOUND`/`ABSENT`/`UNKNOWN`: only `ABSENT` proceeds to post; `UNKNOWN` leaves the delivery PENDING
-  for a later attempt (failing terminally once the attempt cap is exhausted) instead of guessing.
-  GitHub's lookup now paginates (bounded, 3 pages) and reports `ABSENT` only once `hasNextPage=false`
-  confirms every comment was scanned — exhausting the page budget with more comments left is
-  `UNKNOWN`, never `ABSENT`. GitLab has no listing query (unchanged from the prior amendment) and now
-  explicitly returns `UNKNOWN`, so it never auto-reposts on recovery — only records a confirmed match
-  or exhausts the attempt cap.
-- **`delivery_attempts` was a counter, not a lease.** The attempt-counter CAS
-  (`claimDeliveryRecoveryAttempt`) only guarded against two callers claiming the identical attempt
-  number concurrently — it did not stop a SLOW attempt spanning multiple 5-minute sweep passes from
-  being superseded by a later one while `delivery_status` stayed PENDING throughout, and the final
-  DELIVERED/FAILED write was unconditional (`updateDeliveryStatus`), so whichever attempt finished
-  LAST always won — including a stale FAILED clobbering an in-flight or already-succeeded DELIVERED.
-  Every terminal write in `recoverStuckDelivery` is now fenced via
-  `transitionDeliveryStatusFenced(..., expectedAttempts)` on the exact attempt token this call
-  claimed; a superseded attempt's write matches no row and is logged, not silently lost.
-- **Infra-failure classification too broad.** `isRetryableInfraFailure` treated every
-  `SandboxException` as retryable, including validation/config failures (path traversal, input-size
-  limits, a misconfigured network policy) that are deterministic across retries, and
-  `DockerSandboxAdapter`'s catch-all wrap of an unexpected exception — an unknown defect. A new
-  narrower `SandboxInfrastructureException` subtype is now reserved for failures PROVABLY caused by
-  transient infra (an actual `DockerException`/disk-I/O wrap from `DockerClientOperations`,
-  `SandboxContainerManager`, or the file-injection paths in `SandboxWorkspaceManager`); validation and
-  the catch-all wrap stay the broader `SandboxException` and fail fast, unchanged.
-- **Retried failures could double-spend invisibly.** A job requeued after a classified infra failure
-  had already started executing (past claim, `RUNNING`) and could carry real LLM spend, but no
-  ledger row was written before the retry bought another run — N retries of one job could
-  under-count spend by up to N-1 runs. `handleExecutionFailure`'s successful-requeue branch now
-  records an UNPRICED ledger row unconditionally before returning, mirroring the pattern already used
-  for cancellation and drain. The ledger's `UNIQUE (source_type, source_id, source_attempt)` makes a
-  spurious duplicate safe; `source_id` alone is deliberately not unique, because a second attempt at
-  the same job is separately billable.
-- **Token rotation vs. in-flight proxy streams — residual window, documented rather than closed.**
-  `requeueOrphan`'s token rotation already prevents a NEW proxy request from authenticating with the
-  old token (the row's `job_token_hash` no longer matches once rotated, and the CAS also moves the
-  row out of `RUNNING` for the moment of rotation). What it does NOT do: `JobTokenAuthenticationFilter`
-  authenticates once per request at entry, and `LlmProxyController#doProxy` then streams the upstream
-  response (SSE calls can run minutes) with no re-validation at chunk boundaries — a request already
-  past authentication when rotation happens keeps streaming to completion on its original,
-  now-superseded token. Closing this fully would mean re-validating mid-stream, which conflicts with
-  a deliberate existing choice (`LlmProxyWebClientConfig` runs with no read-idle timeout, because LLM
-  SSE streams go silent during model "thinking" — a mid-stream liveness check would need its own
-  design, not a quick fence). Chosen: document the window rather than build a partial fence; a
-  worker-drain or infra-retry requeue during an active LLM call can still incur one extra concurrent
-  call's cost until that call naturally completes or times out (`responseTimeout=300s`).
-- **Migration locks on the hot queue table.** The four hardening indexes
-  (`ix_agent_job_running_purpose`, `ix_agent_job_queued_available`, `ix_agent_job_delivery_pending`,
-  `ix_agent_job_retention`) are created with `CREATE INDEX CONCURRENTLY` (each in its own
-  `runInTransaction="false"` changeset — required, since `CONCURRENTLY` cannot run inside a
-  transaction block). Each of those four changesets guards on `pg_index.indisvalid` rather than on the
-  index merely existing, and drops before it creates: a `CONCURRENTLY` build that fails partway leaves
-  an index the planner will never use, and an existence-only guard would record the changeset as
-  applied and leave the queue permanently unindexed. The status CHECK is added `NOT VALID` and
-  validated separately (`VALIDATE CONSTRAINT` takes `SHARE UPDATE EXCLUSIVE`, which blocks other
-  schema changes but not ordinary reads/writes).
-- **Retention runs on every replica, unbounded.** `AgentJobRetentionService#runRetention` now carries
-  `@SchedulerLock` (ShedLock, already used elsewhere in this codebase for retention/cleanup jobs —
-  see `ConfigAuditRetentionJob`), single-flighting the sweep across server-role replicas, and each
-  batch-loop pass is capped at a 5-minute wall-clock budget — a fresh, large backlog resumes on the
-  next 6-hour run instead of running unbounded in one pass.
-- **Queue-depth gauge was backlog-linear.** `AgentQueueHealthSampler` ran three separate COUNT/MIN
-  queries every 15s — each an index scan, most expensive exactly when an incident has inflated the
-  backlog. Now one query (`AgentJobRepository#queueHealthSnapshot`, `FILTER` clauses) returns all
-  three signals in one pass; a sample failure keeps the last-good gauge values (rather than a
-  misleading momentary "queue is empty") and increments a new
-  `agent.queue.health.sampler.failures` counter; the interval is widened to 30s.
-- **Backoff cap/overflow.** `AgentJobBackoff` capped the base BEFORE applying jitter, so the +10%
-  jitter leg could push the final wait past the documented 15-minute cap; the attempt number was also
-  unbounded (`max-retries` has no configured ceiling), risking `long` overflow in `n^4` at an
-  extreme operator-set value. The cap is now enforced AFTER jitter, and `n` is clamped to a safe
-  ceiling before the power is computed (a value far past where the cap would apply anyway, so
-  behaviour is unchanged for every realistic `max-retries`).
-- **Autovacuum settings are applied unconditionally.** Preconditioning on "does an
-  `autovacuum_vacuum_scale_factor` option exist" would let a stale or partially-applied value
-  silently skip the change, since the check cannot see *which* value is set. `ALTER TABLE ... SET
-  (...)` is inherently idempotent, so the changesets reapply the intended value outright rather than
-  trying to precondition-match an exact prior state.
+complexity to shave the poll-interval latency off job start; or a tenant's wait behind a busy
+workspace becomes a real complaint, at which point per-workspace fairness lanes (round-robin or
+weighted-share dequeue) are the answer — deliberately deferred to the replay/backfill epic (#1354),
+which needs them anyway.

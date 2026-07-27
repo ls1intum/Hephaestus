@@ -228,8 +228,11 @@ services:
       GH_APP_INSTALLATION_URL: ${GH_APP_INSTALLATION_URL:-}
       GH_AUTH_TOKEN: ${GH_AUTH_TOKEN}
       GITLAB_ENABLED: ${GITLAB_ENABLED:-false}
-      GITLAB_DEFAULT_SERVER_URL: ${GITLAB_DEFAULT_SERVER_URL:-https://gitlab.lrz.de}
-      HEPHAESTUS_FEATURES_FLAGS_GITLAB_WORKSPACE_CREATION: ${GITLAB_WORKSPACE_CREATION:-false}
+      # Follows GITLAB_OAUTH_BASE_URL when unset, matching docker/compose.app.yaml and
+      # application.yml. A concrete default here would win over that chain and pin every deployment
+      # of this file to one instance.
+      GITLAB_DEFAULT_SERVER_URL: ${GITLAB_DEFAULT_SERVER_URL:-${GITLAB_OAUTH_BASE_URL:-https://gitlab.com}}
+      GITLAB_WORKSPACE_CREATION: ${GITLAB_WORKSPACE_CREATION:-false}
       # Slack OAuth/admin and mentor replies run here; inbound Events API and interactivity are
       # verified on webhook-server, which needs the same signing secret.
       HEPHAESTUS_INTEGRATION_SLACK_ENABLED: ${HEPHAESTUS_INTEGRATION_SLACK_ENABLED:-false}
@@ -254,8 +257,8 @@ services:
       OUTLINE_OAUTH_DISPLAY_NAME: ${OUTLINE_OAUTH_DISPLAY_NAME:-Outline}
       OUTLINE_OAUTH_CLIENT_ID: ${OUTLINE_OAUTH_CLIENT_ID:-}
       OUTLINE_OAUTH_CLIENT_SECRET: ${OUTLINE_OAUTH_CLIENT_SECRET:-}
+      # Feature flag; application.yml reads this exact name (see docker/compose.app.yaml).
       PRACTICE_REVIEW_FOR_ALL: ${PRACTICE_REVIEW_FOR_ALL:-false}
-      HEPHAESTUS_FEATURES_FLAGS_PRACTICE_REVIEW_FOR_ALL: ${PRACTICE_REVIEW_FOR_ALL:-false}
       AGENT_ENABLED: ${AGENT_ENABLED:-false}
       GIT_CHECKOUT_ENABLED: ${GIT_CHECKOUT_ENABLED:-false}
       GIT_STORAGE_PATH: /data/git-repos

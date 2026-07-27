@@ -10,28 +10,43 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Development Workflow',
-      items: ['local-development', 'testing', 'coding-guidelines', 'workspace-context', 'dockerless-postgres'],
+      items: [
+        'local-development',
+        'testing',
+        'e2e-testing',
+        'coding-guidelines',
+        'api-error-handling',
+        'workspace-context',
+        'dockerless-postgres',
+      ],
     },
     {
       type: 'category',
       label: 'Architecture & Data',
-      items: ['system-design', 'sync-lifecycle', 'database-schema', 'database-migration', 'achievements'],
+      items: [
+        'system-design',
+        'instance-admin',
+        'sync-lifecycle',
+        'migration-unified-integration',
+        'database-schema',
+        'database-migration',
+        'achievements',
+      ],
     },
     {
       type: 'category',
       label: 'Operations',
-      items: ['release-management'],
+      items: ['release-management', 'ci-cd'],
     },
     {
       type: 'category',
       label: 'AI Development',
-      items: [
-        'ai-agent-workflow',
-        'ai-code-review',
-        'unified-pi-runtime',
-        'llm-cost-vocabulary',
-        'evaluation-provenance',
-      ],
+      items: ['ai-agent-workflow', 'ai-code-review', 'unified-pi-runtime', 'agent/agent-workspace-abi', 'llm-cost-vocabulary'],
+    },
+    {
+      type: 'category',
+      label: 'Practices & Feedback',
+      items: ['practice-catalogue', 'practice-feedback-schema', 'evaluation-provenance'],
     },
   ],
 };

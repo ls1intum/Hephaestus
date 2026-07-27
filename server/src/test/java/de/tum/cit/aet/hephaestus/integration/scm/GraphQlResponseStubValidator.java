@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.integration.core.graphql.FragmentMergingDocumentSource;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.GitHubGraphQlFragments;
 import graphql.language.Document;
 import graphql.language.Field;
 import graphql.language.FragmentDefinition;
@@ -35,6 +36,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 
@@ -79,22 +81,32 @@ public final class GraphQlResponseStubValidator {
         GITHUB(
             "graphql/github/schema.github.graphql",
             "graphql/github/operations/",
-            "graphql/github/fragments/ProjectFragments.graphql"
+            List.of(
+                GitHubGraphQlFragments.PROJECT_FRAGMENTS_RESOURCE,
+                GitHubGraphQlFragments.COMMIT_ENRICHMENT_FIELDS_RESOURCE
+            )
         ),
         GITLAB(
             "graphql/gitlab/schema.gitlab.graphql",
             "graphql/gitlab/operations/",
-            "graphql/gitlab/fragments/GitLabUserFields.graphql"
+            List.of("graphql/gitlab/fragments/GitLabUserFields.graphql")
         );
 
         private final String schemaLocation;
         private final String operationsLocation;
-        private final String fragmentsLocation;
+        private final List<String> fragmentLocations;
 
-        Vendor(String schemaLocation, String operationsLocation, String fragmentsLocation) {
+        Vendor(String schemaLocation, String operationsLocation, List<String> fragmentLocations) {
             this.schemaLocation = schemaLocation;
             this.operationsLocation = operationsLocation;
-            this.fragmentsLocation = fragmentsLocation;
+            this.fragmentLocations = fragmentLocations;
+        }
+
+        private List<Resource> fragmentResources() {
+            return fragmentLocations
+                .stream()
+                .map(location -> (Resource) new ClassPathResource(location))
+                .toList();
         }
     }
 
@@ -335,9 +347,12 @@ public final class GraphQlResponseStubValidator {
     private static FragmentMergingDocumentSource documentSource(Vendor vendor) {
         return DOCUMENT_SOURCES.computeIfAbsent(vendor, key ->
             new FragmentMergingDocumentSource(
-                List.of(new ClassPathResource(key.operationsLocation), new ClassPathResource(key.fragmentsLocation)),
+                Stream.concat(
+                    Stream.of((Resource) new ClassPathResource(key.operationsLocation)),
+                    key.fragmentResources().stream()
+                ).toList(),
                 List.of(".graphql", ".gql"),
-                List.of(new ClassPathResource(key.fragmentsLocation))
+                key.fragmentResources()
             )
         );
     }

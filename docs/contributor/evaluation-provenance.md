@@ -49,7 +49,14 @@ User reactions are only usable as labels if "the developer saw it" is a fact, no
 **prepared unit** — a composed review that reached the delivery layer — lands exactly one `feedback`
 row, in the state that says what became of it (`FeedbackDeliveryState`, defined in
 [practice-feedback-schema.md](./practice-feedback-schema.md)). Only `DELIVERED` counts as exposure;
-`SUPPRESSED` means policy withheld it and always carries a reason:
+`SUPPRESSED` means policy withheld it and always carries a reason.
+
+> **This table is the one home of the suppression-reason list.** It tracks the Java enum
+> `practices/feedback/FeedbackSuppressionReason` and the `chk_feedback_suppression_reason` CHECK
+> constraint, which must agree with it value-for-value. `practice-feedback-schema.md` § 3.9 and
+> ADR 0021 point here rather than repeating it — a second copy of an enum is a second thing to be
+> wrong. Adding a value means: enum constant, CHECK-constraint changeset, and a row below naming its
+> writer.
 
 | Reason | Written by | Granularity |
 | --- | --- | --- |
