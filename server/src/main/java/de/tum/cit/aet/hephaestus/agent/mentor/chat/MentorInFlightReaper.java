@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
+import de.tum.cit.aet.hephaestus.agent.config.AgentBindingLimits;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageJobType;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
@@ -73,14 +74,24 @@ public class MentorInFlightReaper {
 
     private static final Logger log = LoggerFactory.getLogger(MentorInFlightReaper.class);
     /**
+     * What a turn may take beyond its own budget before it is certainly not running: sandbox startup,
+     * streaming finalisation, and this sweep's own cron/lock delay.
+     */
+    private static final Duration OVERHEAD_ALLOWANCE = Duration.ofMinutes(10);
+
+    /**
      * The floor under the configured window. A turn reaped while it is still running is billed as
      * abandoned and loses its thread to the in-flight index, so the window has to clear the longest
-     * turn a binding can produce plus startup, streaming finalisation, and scheduler/database delay.
+     * turn a binding can produce.
      *
-     * <p>{@code AgentBindingRequestDTO.timeoutSeconds} has a minimum and no maximum, so this floor is
-     * not derived from an enforced ceiling: a binding configured past it can still be reaped mid-run.
+     * <p>Derived, not chosen: {@link AgentBindingLimits#MAX_TIMEOUT_SECONDS} is the ceiling the binding
+     * API enforces and {@code MentorPiAdapter} clamps every turn's budget to, so the longest possible
+     * turn is bounded and this floor clears it by {@link #OVERHEAD_ALLOWANCE}. Raise the ceiling and
+     * this window rises with it.
      */
-    private static final Duration MINIMUM_SAFE_WINDOW = Duration.ofMinutes(70);
+    private static final Duration MINIMUM_SAFE_WINDOW = Duration.ofSeconds(AgentBindingLimits.MAX_TIMEOUT_SECONDS).plus(
+        OVERHEAD_ALLOWANCE
+    );
     private final ChatMessageRepository chatMessageRepository;
     private final LlmUsageRecorder usageRecorder;
     private final MeterRegistry meterRegistry;

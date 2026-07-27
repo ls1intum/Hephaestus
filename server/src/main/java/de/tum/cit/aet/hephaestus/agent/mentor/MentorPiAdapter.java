@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.mentor;
 
+import de.tum.cit.aet.hephaestus.agent.config.AgentBindingLimits;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MentorContextKeys;
 import de.tum.cit.aet.hephaestus.agent.proxy.MentorProxyCredentialRegistry;
 import de.tum.cit.aet.hephaestus.agent.proxy.MentorProxyCredentialRegistry.Route;
@@ -65,11 +66,22 @@ public class MentorPiAdapter {
 
         String baseUrl = llmConfig.baseUrl();
 
-        // The binding API floor (@Min(30) on AgentBindingRequestDTO timeoutSeconds) sits below PiPlanSpec's
-        // runtime floor (must exceed TIMEOUT_BUFFER_SECONDS=60), so a legitimately persisted 30-60s binding
-        // would otherwise throw from PiPlanSpec and surface as an ERROR on the chat stream. Clamp up to the
-        // minimum buildable budget so any valid binding always yields a mentor sandbox.
-        int timeoutSeconds = Math.max(llmConfig.timeoutSeconds(), PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS + 1);
+        // Clamped at BOTH ends, and the two ends answer to different owners.
+        //
+        // Up: the binding API floor (AgentBindingLimits.MIN_TIMEOUT_SECONDS=30) sits below PiPlanSpec's
+        // runtime floor (must exceed TIMEOUT_BUFFER_SECONDS=60), so a legitimately persisted 30-60s
+        // binding would otherwise throw from PiPlanSpec and surface as an ERROR on the chat stream.
+        //
+        // Down: this is where a turn's budget is fixed, so it is the one place that can make
+        // "no mentor turn outlives AgentBindingLimits.MAX_TIMEOUT_SECONDS" true of every turn rather
+        // than only of turns configured through the validated API. MentorInFlightReaper sizes its window
+        // from that ceiling and bills anything older as abandoned, so a row that got past validation —
+        // migrated from an older table, or written by hand — must not be able to outlive it.
+        int timeoutSeconds = Math.clamp(
+            llmConfig.timeoutSeconds(),
+            PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS + 1,
+            AgentBindingLimits.MAX_TIMEOUT_SECONDS
+        );
 
         // ONE credential path: the mentor's interactive sandbox is not an AgentJob row,
         // so it gets an equivalent proxy-scoped token from the in-memory mentor registry rather than a

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.usage;
 
+import de.tum.cit.aet.hephaestus.core.AuditLedger;
 import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Operation;
@@ -80,7 +81,7 @@ public class LlmUsageAdminController {
         operationId = "adminUpdateWorkspaceLlmBudget"
     )
     @ApiResponse(responseCode = "204", description = "Cap updated")
-    @Audited("config_audit WORKSPACE_INSTANCE_LLM_BUDGET")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "WORKSPACE_INSTANCE_LLM_BUDGET")
     public ResponseEntity<Void> updateBudget(
         @PathVariable String workspaceSlug,
         @Valid @RequestBody UpdateLlmBudgetRequestDTO request

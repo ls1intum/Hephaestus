@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
-import static de.tum.cit.aet.hephaestus.agent.usage.TransactionCallbacks.afterCommit;
+import static de.tum.cit.aet.hephaestus.core.TransactionCallbacks.afterCommit;
 
 import de.tum.cit.aet.hephaestus.agent.proxy.ProxyRouting.BilledAttempt;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;

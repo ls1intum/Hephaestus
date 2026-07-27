@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.config.AgentBindingLimits;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
@@ -116,6 +117,39 @@ class MentorInFlightReaperTest extends BaseUnitTest {
                     "holds the lock across far more of this two-minute sweep's ticks than its own runtime warrants"
             )
             .isNotBlank();
+    }
+
+    /**
+     * The sweep's one assumption about the outside world: a turn older than the window cannot still be
+     * running. That is only true because a binding's per-run timeout has an enforced ceiling
+     * ({@link AgentBindingLimits#MAX_TIMEOUT_SECONDS}, refused above by the binding API and clamped to
+     * by {@code MentorPiAdapter}) and this window is sized from it. Reaping a live turn bills it as
+     * abandoned and closes a conversation someone is talking to, so the two must be checked against
+     * each other rather than each against a literal.
+     *
+     * <p>Fails if the derivation is replaced by a constant and the ceiling is later raised, or if the
+     * floor stops being applied to a configured window that is too small.
+     */
+    @Test
+    @DisplayName("the window always outlasts the longest turn a binding can be configured to produce")
+    void shouldNeverReapWithinTheConfigurableTimeoutCeiling() {
+        Duration longestPossibleTurn = Duration.ofSeconds(AgentBindingLimits.MAX_TIMEOUT_SECONDS);
+
+        MentorInFlightReaper defaultWindow = reaperWith(mock(MentorInFlightReaper.class));
+        // An operator lowering the property below the safe floor gets the floor, not their value:
+        // hephaestus.mentor.in-flight-reaper.window is a knob for sweeping LATER, never sooner.
+        MentorInFlightReaper misconfigured = new MentorInFlightReaper(
+            chatMessageRepository,
+            usageRecorder,
+            meterRegistry,
+            mock(MentorInFlightReaper.class),
+            Duration.ofMinutes(1)
+        );
+
+        assertThat(defaultWindow.window()).isGreaterThan(longestPossibleTurn);
+        assertThat(misconfigured.window())
+            .as("a window under the timeout ceiling reaps turns that are still streaming")
+            .isGreaterThan(longestPossibleTurn);
     }
 
     private MentorInFlightReaper reaperWith(MentorInFlightReaper self) {

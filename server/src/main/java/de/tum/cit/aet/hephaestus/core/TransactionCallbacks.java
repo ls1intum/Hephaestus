@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.agent.usage;
+package de.tum.cit.aet.hephaestus.core;
 
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -17,8 +17,14 @@ public final class TransactionCallbacks {
      * protects. Not a lambda either — {@link TransactionSynchronization} has no abstract method, so it
      * is not a functional interface.
      *
-     * <p>Callers that require a transaction say so themselves before calling; running immediately is
-     * the right default only where there is genuinely nothing to wait for.
+     * <p><b>Only the registration is shared; the precondition is not.</b> Whether "no transaction" is
+     * an error is the caller's question, and the four callers answer it differently on purpose:
+     * {@code LlmUsageRecorder} throws first, because a budget alert raised outside the source result's
+     * transaction would be reacting to spend that may never land, while
+     * {@code MentorTurnUsageAccumulator}, {@code AccountExportService} and
+     * {@code GitHubWorkspaceProvisioningAdapter} are each correct running inline. So callers that
+     * require a transaction say so themselves before calling; running immediately is the right default
+     * only where there is genuinely nothing to wait for.
      */
     public static void afterCommit(Runnable action) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {

@@ -90,6 +90,14 @@ services:
     restart: "no"
     networks:
       - shared-network
+    # Same cap as the long-running services in this file. This one writes a few lines per deploy, but
+    # `restart: "no"` means its container — and its log — outlives the run and is only replaced on the
+    # next deploy; a failing cosign verify retries and is the case worth bounding.
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
 
   application-server:
     image: "ghcr.io/ls1intum/hephaestus/application-server:${IMAGE_TAG}"
@@ -209,7 +217,9 @@ services:
       # Instance-wide LLM knobs. Providers, models, prices and credentials are NOT here — they are
       # runtime catalog data an instance admin registers in the UI. These three are the deploy-time
       # facts that cannot be.
-      # Second display currency for spend figures (empty = USD only; only EUR is honoured today).
+      # Second display currency for spend figures. Empty (the default) is USD only. EUR is the one
+      # supported value: anything else — including a well-formed code like GBP — FAILS THE BOOT with a
+      # message naming what is accepted, rather than starting up and quietly showing USD.
       # The reports and the FX fetcher are server-role, so this belongs on this pod.
       HEPHAESTUS_LLM_DISPLAY_CURRENCY: ${HEPHAESTUS_LLM_DISPLAY_CURRENCY:-}
       HEPHAESTUS_LLM_FX_DAILY_URL: ${HEPHAESTUS_LLM_FX_DAILY_URL:-https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml}
@@ -410,6 +420,14 @@ services:
       interval: 5s
       timeout: 10s
       retries: 10
+    # Same cap as the other long-running services in this file. Postgres logs checkpoints, autovacuum
+    # and every failed connection attempt; on the single-host install it shares a disk with the data
+    # directory it is logging about, so an unbounded log can take the database down with it.
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
 
 networks:
   shared-network:

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
 import de.tum.cit.aet.hephaestus.core.AuditExempt;
+import de.tum.cit.aet.hephaestus.core.AuditLedger;
 import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -77,7 +78,7 @@ public class WorkspaceLlmConnectionController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @Audited("config_audit WORKSPACE_LLM_CONNECTION")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "WORKSPACE_LLM_CONNECTION")
     public ResponseEntity<WorkspaceLlmConnectionDTO> create(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody CreateWorkspaceLlmConnectionRequestDTO request
@@ -103,7 +104,7 @@ public class WorkspaceLlmConnectionController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @Audited("config_audit WORKSPACE_LLM_CONNECTION")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "WORKSPACE_LLM_CONNECTION")
     public ResponseEntity<WorkspaceLlmConnectionDTO> update(
         WorkspaceContext workspaceContext,
         @PathVariable Long id,
@@ -128,7 +129,7 @@ public class WorkspaceLlmConnectionController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @Audited("config_audit WORKSPACE_LLM_CONNECTION")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "WORKSPACE_LLM_CONNECTION")
     public ResponseEntity<Void> delete(WorkspaceContext workspaceContext, @PathVariable Long id) {
         connectionService.delete(workspaceContext, id);
         return ResponseEntity.noContent().build();

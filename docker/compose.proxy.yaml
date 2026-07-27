@@ -50,6 +50,14 @@ services:
       interval: 4s
       timeout: 2s
       retries: 5
+    # Same cap as the other shared-infra containers (compose.core.yaml). Access logging is off, so
+    # this is startup, ACME and router errors only — but an unreachable ACME endpoint or a bad label
+    # retries forever, and an uncapped json-file log fills the host disk with it.
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   maintenance:
     image: nginx:alpine
@@ -80,6 +88,13 @@ services:
       timeout: 10s
       retries: 5
       start_period: 3s
+    # nginx writes an access-log line per request, and the page auto-refreshes every 5s while it is
+    # being served — a long outage with browsers left open is exactly when this grows unattended.
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 networks:
   shared-network:

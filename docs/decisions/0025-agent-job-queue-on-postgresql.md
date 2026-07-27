@@ -192,9 +192,30 @@ surfaced concrete gaps, closed here:
   sleeps `pollInterval × (0.9–1.1)` instead of a fixed interval, so replicas configured identically
   don't all poll in lockstep.
 
-Deliberately not built in this pass (documented, not forgotten): per-workspace fairness lanes,
-immutable per-attempt records, and a full multi-class decomposition of `AgentJobExecutor` — these
-ride with the replay/backfill epic (#1354), which is what actually needs them.
+**What the fairness predicate does and does not do.** The amendment above added a
+starvation guard to the candidate query, and it is worth being exact about its reach, because it is
+not scheduling fairness. It is an *admission filter*: a `(workspace, purpose)` already at its
+`max_concurrent_jobs` cap contributes **zero** candidates, so its unclaimable backlog can never fill
+the `LIMIT` window and hide a runnable job behind it. That closes the one starvation mode that was
+unbounded in time — a job could previously wait out arbitrarily many poll cycles while a saturated
+bucket stayed saturated.
+
+Among the candidates that survive the filter, ordering is still strictly global
+`available_at ASC, id ASC`. There are no per-workspace lanes, no round-robin, and no proportional
+share. So a workspace that enqueues a hundred jobs it is *entitled* to run — under its cap, or with
+no `workspace_agent_binding` row at all, which `COALESCE`s to unbounded — still takes the whole
+candidate window and every free worker slot ahead of a younger job from a quiet workspace. That
+younger job waits for as long as the busy workspace's jobs take to drain below its cap, which is
+bounded by the cap but not by any fairness rule. The per-`(workspace, purpose)` shape of the cap
+also means a workspace running *k* purposes can hold *k* × its cap RUNNING jobs at once.
+
+Deliberately not built in this pass (documented, not forgotten): per-workspace fairness *lanes* —
+i.e. round-robin or weighted-share dequeue across workspaces, which is what would bound the wait
+above — plus immutable per-attempt records and a full multi-class decomposition of
+`AgentJobExecutor`. These ride with the replay/backfill epic (#1354), which is what actually needs
+them. Until then, `max_concurrent_jobs` on `workspace_agent_binding` is the only lever that bounds
+one workspace's share of the queue; an instance with a noisy tenant should set it rather than
+expect the queue to arbitrate.
 
 ## Fix wave (2026-07-21, adversarial review of the hardening commit)
 

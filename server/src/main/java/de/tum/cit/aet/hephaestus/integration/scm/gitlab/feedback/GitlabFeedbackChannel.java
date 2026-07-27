@@ -6,7 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabBackwardPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolver.MrCoordinates;
 import java.util.List;
 import java.util.Locale;
@@ -89,7 +89,7 @@ public class GitlabFeedbackChannel implements FeedbackChannel {
         // generic createNote mutation — only the noteable gid resolution differs.
         String subject = target.subjectExternalId();
         String noteableGid;
-        if (subject != null && subject.lastIndexOf('#') > subject.lastIndexOf('!')) {
+        if (isIssueSubject(subject)) {
             MrCoordinates issue = GitlabMrResolver.parseIssueSubjectExternalId(subject);
             noteableGid = mrResolver.resolveIssueGid(scopeId, issue.projectPath(), issue.iid());
         } else {
@@ -215,27 +215,32 @@ public class GitlabFeedbackChannel implements FeedbackChannel {
         return UpdateOutcome.edited(new SummaryHandle(noteId));
     }
 
-    /** Page size per request for {@link #findExistingSummary}'s marker scan — GitLab caps {@code first} at 100. */
+    /** Page size per request for {@link #findExistingSummary}'s marker scan — GitLab caps page size at 100. */
     private static final int EXISTING_SUMMARY_SEARCH_PAGE_SIZE = 100;
 
     /**
-     * Bounded page budget for {@link #findExistingSummary}: 3 pages of
-     * {@link #EXISTING_SUMMARY_SEARCH_PAGE_SIZE} discussions covers the MRs this bot comments on without an
-     * unbounded scan; past it, {@code UNKNOWN} is the correct answer rather than a guess at absence.
+     * Our cap, not GitLab's: the backwards walk already puts a just-posted marker on the first page, so the
+     * budget only bounds the rarer case of a marker buried under 300 newer notes — worth {@code UNKNOWN}
+     * (recovery retries) rather than an unbounded scan of a thousand-note thread on every lookup.
      */
     private static final int EXISTING_SUMMARY_SEARCH_PAGE_BUDGET = 3;
 
     /**
-     * Dedup lookup for the delivery-recovery crash window: pages this MR's discussions through the same
-     * {@code GetMergeRequestDiscussions} document {@link GitlabInlineFindingChannel} and discussion sync use,
-     * and returns the marker-bearing note's own id — the handle {@link #updateSummary} edits in place.
+     * Dedup lookup for the delivery-recovery crash window: scans this MR/issue's notes for one whose body
+     * contains {@code marker}, walking the connection backwards from its newest end ({@code last}/{@code
+     * before}) — the summary a crashed delivery already posted is the newest note, so the scan finds it on the
+     * first request even on a thread far longer than the page budget. Returns the marker-bearing note's own id,
+     * the handle {@link #updateSummary} edits in place.
+     *
+     * <p>Reads the noteable's <em>flat</em> {@code notes} connection (both {@code Issue} and {@code MergeRequest}
+     * implement {@code NoteableInterface}, so one shape serves both) rather than {@code discussions { notes }}:
+     * the nested form pages notes at a fixed {@code first: 100} inside each discussion with no cursor of its own,
+     * so an over-long thread hides notes no cursor can reach. The flat connection has its own cursor, so every
+     * note is reachable and no thread is silently unscanned.
      *
      * <p>Only {@code ABSENT} is a green light to post; {@code UNKNOWN} leaves the delivery {@code PENDING} for a
-     * later attempt. Every branch that cannot prove the marker is missing therefore answers {@code UNKNOWN}.
-     *
-     * <p>The document nests {@code notes(first: 100)} inside each discussion with no cursor of its own, so a
-     * thread whose {@code notes.pageInfo.hasNextPage} is true holds notes no cursor can reach — after seeing one,
-     * exhausting the outer connection still answers {@code UNKNOWN}.
+     * later attempt. Budget exhausted, a transport/GraphQL error, a missing cursor or the rate-limit guard
+     * therefore all yield {@code UNKNOWN} rather than {@code ABSENT}.
      */
     @Override
     public ExistingSummaryLookup findExistingSummary(FeedbackTarget target, String marker) {
@@ -247,57 +252,57 @@ public class GitlabFeedbackChannel implements FeedbackChannel {
             return ExistingSummaryLookup.unknown();
         }
         String subject = target.subjectExternalId();
-        if (subject != null && subject.lastIndexOf('#') > subject.lastIndexOf('!')) {
-            // Issue subject: this document is merge-request-only and issue notes have no listing counterpart.
-            return ExistingSummaryLookup.unknown();
+        String documentName;
+        String notesPath;
+        MrCoordinates coordinates;
+        if (isIssueSubject(subject)) {
+            documentName = "GetIssueNotesNewest";
+            notesPath = "project.issue.notes";
+            coordinates = GitlabMrResolver.parseIssueSubjectExternalId(subject);
+        } else {
+            documentName = "GetMergeRequestNotesNewest";
+            notesPath = "project.mergeRequest.notes";
+            coordinates = GitlabMrResolver.parseSubjectExternalId(subject);
         }
-        MrCoordinates mr = GitlabMrResolver.parseSubjectExternalId(subject);
 
-        boolean sawTruncatedThread = false;
         String cursor = null;
         for (int page = 0; page < EXISTING_SUMMARY_SEARCH_PAGE_BUDGET; page++) {
             try {
                 ClientGraphQlResponse response = gitLabProvider
                     .forScope(scopeId)
-                    .documentName("GetMergeRequestDiscussions")
-                    .variable("fullPath", mr.projectPath())
-                    .variable("iid", String.valueOf(mr.iid()))
-                    .variable("first", EXISTING_SUMMARY_SEARCH_PAGE_SIZE)
-                    .variable("after", cursor)
+                    .documentName(documentName)
+                    .variable("fullPath", coordinates.projectPath())
+                    .variable("iid", String.valueOf(coordinates.iid()))
+                    .variable("last", EXISTING_SUMMARY_SEARCH_PAGE_SIZE)
+                    .variable("before", cursor)
                     .execute()
                     .block(GRAPHQL_TIMEOUT);
                 if (response == null || !response.getErrors().isEmpty()) {
                     return ExistingSummaryLookup.unknown();
                 }
 
-                List<Map<String, Object>> discussions = response
-                    .field("project.mergeRequest.discussions.nodes")
-                    .getValue();
-                if (discussions == null) {
+                List<Map<String, Object>> notes = response.field(notesPath + ".nodes").getValue();
+                if (notes == null) {
                     return ExistingSummaryLookup.unknown();
                 }
-                for (Map<String, Object> discussion : discussions) {
-                    Map<String, Object> notes = notesConnection(discussion);
-                    for (Map<String, Object> note : nodesOf(notes)) {
-                        String noteId = (String) note.get("id");
-                        String body = (String) note.get("body");
-                        if (noteId != null && body != null && body.contains(marker)) {
-                            return ExistingSummaryLookup.found(new SummaryHandle(noteId));
-                        }
+                for (Map<String, Object> note : notes) {
+                    String noteId = (String) note.get("id");
+                    String body = (String) note.get("body");
+                    if (noteId != null && body != null && body.contains(marker)) {
+                        return ExistingSummaryLookup.found(new SummaryHandle(noteId));
                     }
-                    sawTruncatedThread = sawTruncatedThread || hasUnreadNotes(notes);
                 }
 
-                GitLabPageInfo pageInfo = response
-                    .field("project.mergeRequest.discussions.pageInfo")
-                    .toEntity(GitLabPageInfo.class);
+                GitLabBackwardPageInfo pageInfo = response
+                    .field(notesPath + ".pageInfo")
+                    .toEntity(GitLabBackwardPageInfo.class);
                 if (pageInfo == null) {
                     return ExistingSummaryLookup.unknown();
                 }
-                if (!pageInfo.hasNextPage()) {
-                    return sawTruncatedThread ? ExistingSummaryLookup.unknown() : ExistingSummaryLookup.absent();
+                if (!pageInfo.hasPreviousPage()) {
+                    return ExistingSummaryLookup.absent();
                 }
-                cursor = pageInfo.endCursor();
+                cursor = pageInfo.startCursor();
                 if (cursor == null || cursor.isBlank()) {
                     return ExistingSummaryLookup.unknown();
                 }
@@ -313,21 +318,12 @@ public class GitlabFeedbackChannel implements FeedbackChannel {
         return ExistingSummaryLookup.unknown();
     }
 
-    @SuppressWarnings("unchecked")
-    private static Map<String, Object> notesConnection(Map<String, Object> discussion) {
-        Object notes = discussion.get("notes");
-        return notes instanceof Map<?, ?> map ? (Map<String, Object>) map : Map.of();
-    }
-
-    @SuppressWarnings("unchecked")
-    private static List<Map<String, Object>> nodesOf(Map<String, Object> connection) {
-        Object nodes = connection.get("nodes");
-        return nodes instanceof List<?> list ? (List<Map<String, Object>>) list : List.of();
-    }
-
-    private static boolean hasUnreadNotes(Map<String, Object> notesConnection) {
-        Object pageInfo = notesConnection.get("pageInfo");
-        return pageInfo instanceof Map<?, ?> map && Boolean.TRUE.equals(map.get("hasNextPage"));
+    /**
+     * A GitLab issue subject is {@code "project/path#iid"}, a merge request {@code "project/path!iid"} — the
+     * last separator wins, so a project path containing either character still classifies by its own suffix.
+     */
+    private static boolean isIssueSubject(String subjectExternalId) {
+        return subjectExternalId != null && subjectExternalId.lastIndexOf('#') > subjectExternalId.lastIndexOf('!');
     }
 
     /** Conservative NOT_FOUND heuristic: GitLab signals a deleted note only via a free-text mutation error. */

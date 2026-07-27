@@ -4031,7 +4031,7 @@ export type AgentBindingRequest = {
      */
     maxConcurrentJobs?: number;
     /**
-     * Per-run timeout in seconds
+     * Per-run timeout in seconds (30–3600; one hour is the longest a single run may take)
      */
     timeoutSeconds?: number;
     /**

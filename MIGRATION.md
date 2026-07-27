@@ -16,13 +16,21 @@ This document helps you upgrade between versions of Hephaestus. For what a versi
 
 ## Check Your Version
 
+Run these from the directory you deploy from — for a self-hosted install that is
+`/opt/hephaestus/docker/self-host`, the same directory as your `.env`. Running them from the
+repository root points at a different Compose project and reports nothing.
+
 ```bash
 # Deployed version (the image tag your containers run; APP_VERSION is derived from it)
-docker compose -f docker/compose.app.yaml images application-server
+docker compose images application-server
 
 # Latest release
-git describe --tags --abbrev=0
+curl -fsSL https://api.github.com/repos/ls1intum/Hephaestus/releases/latest \
+  | grep -m1 '"tag_name"'
 ```
+
+Signed in, you can also read the running version straight off the app: production shows it in the
+header, linked to its release notes.
 
 ---
 
@@ -65,12 +73,18 @@ Entries exist only for releases that need operator action. Everything else is in
 
 **After**: OpenAI and other OpenAI-compatible endpoints are registered at runtime under **Instance admin → AI models**, with an explicit Chat Completions or Responses API contract, per-model pricing, and optional sharing with workspaces. Workspaces can also connect their own compatible endpoint. The LLM proxy — the only path a sandbox has to a provider key — now runs automatically wherever the worker/sandbox capability is on (`hephaestus.runtime.worker.enabled`, default true), which is both the worker pod and the application-server replica that serves interactive mentor sandboxes. It has no standalone enable flag. The three env vars above are no longer read.
 
-**Migration**:
+**Migration** — step 1 is a configuration edit, so make it in the same pass that sets the new
+`IMAGE_TAG`. Steps 2–6 run against the upgraded instance, once it has booted and applied its schema
+migration: that migration is what writes the deploy-log lines steps 4–6 quote, so start the new
+version first and keep its startup log to hand.
 
 1. Remove `HEPHAESTUS_WORKER_LLM_BASE_URL`, `HEPHAESTUS_WORKER_LLM_API_KEY`,
    `HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED`, and every `AGENT_DEFAULT_CONFIG_*` variable from your
-   deployment. They are silently ignored, not an error, but keeping them is misleading.
-2. Register your OpenAI-compatible endpoint(s) under Instance admin → AI models (or have a workspace admin connect their own under the workspace's AI settings).
+   deployment. None of them is read any more and none of them is an error. The first three are not
+   ignored quietly, though: every boot names each one it still finds (`… is set but no longer read`),
+   so a clean startup log is how you confirm they are gone. The `AGENT_DEFAULT_CONFIG_*` variables
+   pass unmentioned — delete them while you are in the file, or nothing will remind you.
+2. Register your OpenAI-compatible endpoint(s) under Instance admin → AI models (or have a workspace admin connect their own under the workspace's Administration → AI models). Each page tests the connection before you save it, so you learn the endpoint answers without waiting for a review to fail.
 3. **Review and re-enable each workspace's carried-over AI configuration.** The upgrade copies every
    agent configuration that was in use — endpoint, model name, encrypted API key, timeout,
    concurrent-run limit and internet setting — into that workspace's AI models page, named after the
@@ -83,6 +97,9 @@ Entries exist only for releases that need operator action. Everything else is in
    deliberate: in the default PROXY credential mode the endpoint a configuration actually called came
    from an instance-wide environment variable rather than from the configuration row, so re-enabling
    automatically could silently re-point a workspace's traffic — and its key — at a different host.
+   Until someone does, that workspace's practice detection and mentor are simply idle: nothing errors,
+   so there is nothing to notice. A workspace is done when its AI models page shows an enabled
+   connection and a model bound to each purpose it uses.
 4. **Fix what the upgrade could not determine.** These cases need a value typed in before they will
    work, and the deploy log names the affected workspaces (`AI configuration carried over with a
    placeholder endpoint, model id or non-OpenAI protocol in these workspaces: …`):
@@ -117,10 +134,11 @@ Entries exist only for releases that need operator action. Everything else is in
 
 **Migration**:
 
-1. Set `AGENT_ENABLED=true` (replacing `AGENT_NATS_ENABLED=true`) on **every** role that needs to submit, execute, or recover jobs — not just the role that claims and runs them. In a split-pod deployment that means **both** `application-server` (submits jobs from PR/issue events and runs the orphan-recovery sweep — both gate on this same flag, independent of the worker role) **and** `application-worker` (claims and executes them, additionally gated on the worker role); `docker/compose.app.yaml` already sets the same `AGENT_ENABLED` value on both services. In the monolith, set it once. No profile turns it on for you: a pod you do not set it on claims nothing.
-2. Remove `HEPHAESTUS_AGENT_NATS_SERVER`, `AGENT_NATS_MAX_ACK_PENDING`, and `AGENT_NATS_FETCH_BATCH_SIZE` from your deployment — they are silently ignored, not an error, but keeping them is misleading.
-3. Optional cleanup: the `AGENT` JetStream stream is no longer read from or written to. Delete it with `nats stream rm AGENT` if you want to reclaim its storage; leaving it in place is harmless.
-4. Do not remove NATS itself or `NATS_ENABLED` — webhook ingest and SCM/Slack sync still require it.
+1. Set `AGENT_ENABLED=true` (replacing `AGENT_NATS_ENABLED=true`) on **every** role that needs to submit, execute, or recover jobs — not just the role that claims and runs them. In a split-pod deployment that means **both** `application-server` (submits jobs from PR/issue events and runs the orphan-recovery sweep — both gate on this same flag, independent of the worker role) **and** `application-worker` (claims and executes them, additionally gated on the worker role); `docker/compose.app.yaml` already sets the same `AGENT_ENABLED` value on both services. In the monolith, set it once. No profile turns it on for you: a pod you do not set it on claims nothing — including a `worker`-profile pod you start outside the shipped Compose files, which in earlier releases turned itself on.
+2. Confirm the flag actually took, on each side. Once the upgraded server is up, the `agent.queue.depth`, `agent.queue.oldest_age_seconds` and `agent.queue.running` metrics exist; if `AGENT_ENABLED` never reached that pod they are absent altogether rather than reading zero — which is the difference between "the queue is idle" and "the queue was never switched on". For the worker side, open a pull request and watch `agent.queue.oldest_age_seconds`: it should rise and fall. An age that only ever climbs means the server is submitting and no worker is claiming.
+3. Remove `AGENT_NATS_ENABLED`, `HEPHAESTUS_AGENT_NATS_SERVER`, `AGENT_NATS_MAX_ACK_PENDING`, and `AGENT_NATS_FETCH_BATCH_SIZE` from your deployment. None is read any more and none is an error, but each one still set is named in every boot log (`… is set but no longer read`) until you delete it.
+4. Optional cleanup, after the upgraded instance has run long enough that you are not rolling back: the `AGENT` JetStream stream is no longer read from or written to. Delete it with `nats stream rm AGENT` if you want to reclaim its storage; leaving it in place is harmless.
+5. Do not remove NATS itself or `NATS_ENABLED` — webhook ingest and SCM/Slack sync still require it.
 
 #### 🔴 AI endpoints renamed to one vocabulary
 

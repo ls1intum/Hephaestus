@@ -7,6 +7,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.config.AgentBindingLimits;
 import de.tum.cit.aet.hephaestus.agent.proxy.MentorProxyCredentialRegistry;
 import de.tum.cit.aet.hephaestus.agent.proxy.ProxyRouting;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentImageProperties;
@@ -67,6 +68,10 @@ class MentorPiAdapterTest extends BaseUnitTest {
     }
 
     private static MentorLlmConfig llmConfig(String rawBaseUrl, boolean allowInternet) {
+        return llmConfig(rawBaseUrl, allowInternet, 120);
+    }
+
+    private static MentorLlmConfig llmConfig(String rawBaseUrl, boolean allowInternet, int timeoutSeconds) {
         String resolvedBaseUrl =
             rawBaseUrl != null && !rawBaseUrl.isBlank() ? rawBaseUrl.trim() : "https://api.openai.com";
         return new MentorLlmConfig(
@@ -82,7 +87,7 @@ class MentorPiAdapterTest extends BaseUnitTest {
             null,
             null,
             allowInternet,
-            120
+            timeoutSeconds
         );
     }
 
@@ -120,6 +125,43 @@ class MentorPiAdapterTest extends BaseUnitTest {
         assertThatThrownBy(() -> adapter.buildSandboxSpec(REQUEST, llmConfig(null), unsupported, null))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("unsupported mentor context input key");
+    }
+
+    /**
+     * This is where a turn's budget is fixed, so it is the only place that can make the sentence
+     * "no mentor turn outlives {@link AgentBindingLimits#MAX_TIMEOUT_SECONDS}" true of EVERY turn and
+     * not just of the ones configured through the validated API. {@code MentorInFlightReaper} sizes its
+     * window from that ceiling and bills anything older as abandoned, so a row that got past validation
+     * — copied from the pre-binding table, or written by hand — must not be able to outlive it.
+     *
+     */
+    @Test
+    @DisplayName("a binding stored above the ceiling still produces a turn bounded by the ceiling")
+    void turnBudgetIsClampedDownToTheConfigurableCeiling() {
+        PiPlanSpec spec = capturePlanSpec(
+            llmConfig(null, false, AgentBindingLimits.MAX_TIMEOUT_SECONDS * 2),
+            Map.of(),
+            null
+        );
+
+        assertThat(spec.timeoutSeconds()).isEqualTo(AgentBindingLimits.MAX_TIMEOUT_SECONDS);
+    }
+
+    /**
+     * The other end of the same clamp: the binding API floor sits below {@link PiPlanSpec}'s runtime
+     * floor, so a legitimately persisted 30-60s binding would otherwise throw out of the spec and reach
+     * the mentee as an ERROR on the chat stream instead of an answer.
+     */
+    @Test
+    @DisplayName("a binding at the configurable floor still yields a buildable sandbox")
+    void turnBudgetIsClampedUpToTheSmallestBuildableBudget() {
+        PiPlanSpec spec = capturePlanSpec(
+            llmConfig(null, false, AgentBindingLimits.MIN_TIMEOUT_SECONDS),
+            Map.of(),
+            null
+        );
+
+        assertThat(spec.timeoutSeconds()).isEqualTo(PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS + 1);
     }
 
     @Test

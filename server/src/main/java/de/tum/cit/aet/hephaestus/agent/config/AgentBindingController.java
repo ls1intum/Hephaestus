@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.config;
 
+import de.tum.cit.aet.hephaestus.core.AuditLedger;
 import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -64,7 +65,7 @@ public class AgentBindingController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @Audited("config_audit AGENT_BINDING")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "AGENT_BINDING")
     public ResponseEntity<AgentBindingDTO> configureAgent(
         WorkspaceContext workspaceContext,
         @PathVariable AgentPurpose purpose,
@@ -78,7 +79,7 @@ public class AgentBindingController {
     @Operation(summary = "Remove the agent for one purpose (turn it off)")
     @ApiResponse(responseCode = "204", description = "Binding removed")
     @RequireAtLeastWorkspaceAdmin
-    @Audited("config_audit AGENT_BINDING")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "AGENT_BINDING")
     public ResponseEntity<Void> deleteAgent(WorkspaceContext workspaceContext, @PathVariable AgentPurpose purpose) {
         agentBindingService.deleteBinding(workspaceContext, purpose);
         return ResponseEntity.noContent().build();

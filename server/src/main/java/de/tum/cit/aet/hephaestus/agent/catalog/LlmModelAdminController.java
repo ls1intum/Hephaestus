@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
+import de.tum.cit.aet.hephaestus.core.AuditLedger;
 import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Operation;
@@ -59,7 +60,7 @@ public class LlmModelAdminController {
         description = "A model with this slug or upstream model id already exists on the connection",
         content = @Content(schema = @Schema(hidden = true))
     )
-    @Audited("auth_event LLM_MODEL_CREATED")
+    @Audited(ledger = AuditLedger.AUTH_EVENT, type = "LLM_MODEL_CREATED")
     public ResponseEntity<LlmModelDTO> create(
         @PathVariable Long connectionId,
         @Valid @RequestBody CreateLlmModelRequestDTO request
@@ -126,7 +127,7 @@ public class LlmModelAdminController {
         description = "Another model on the connection already uses this upstream model id",
         content = @Content(schema = @Schema(hidden = true))
     )
-    @Audited("auth_event LLM_MODEL_UPDATED")
+    @Audited(ledger = AuditLedger.AUTH_EVENT, type = "LLM_MODEL_UPDATED")
     public ResponseEntity<LlmModelDTO> update(
         @PathVariable Long id,
         @Valid @RequestBody UpdateLlmModelRequestDTO request
@@ -147,7 +148,7 @@ public class LlmModelAdminController {
         description = "Cannot delete a model still bound to an agent configuration",
         content = @Content(schema = @Schema(hidden = true))
     )
-    @Audited("auth_event LLM_MODEL_DELETED")
+    @Audited(ledger = AuditLedger.AUTH_EVENT, type = "LLM_MODEL_DELETED")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         modelService.delete(id);
         return ResponseEntity.noContent().build();
@@ -165,7 +166,7 @@ public class LlmModelAdminController {
         description = "LLM model not found",
         content = @Content(schema = @Schema(hidden = true))
     )
-    @Audited("auth_event LLM_MODEL_PRICE_CHANGED")
+    @Audited(ledger = AuditLedger.AUTH_EVENT, type = "LLM_MODEL_PRICE_CHANGED")
     public ResponseEntity<LlmModelDTO> updatePrice(
         @PathVariable Long id,
         @Valid @RequestBody UpdateLlmModelPriceRequestDTO request
@@ -186,7 +187,7 @@ public class LlmModelAdminController {
         description = "LLM model not found",
         content = @Content(schema = @Schema(hidden = true))
     )
-    @Audited("auth_event LLM_MODEL_SHARING_CHANGED")
+    @Audited(ledger = AuditLedger.AUTH_EVENT, type = "LLM_MODEL_SHARING_CHANGED")
     public ResponseEntity<LlmModelDTO> updateSharing(
         @PathVariable Long id,
         @Valid @RequestBody UpdateLlmModelSharingRequestDTO request

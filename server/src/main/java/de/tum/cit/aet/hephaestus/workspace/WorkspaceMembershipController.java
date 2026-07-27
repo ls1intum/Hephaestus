@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import de.tum.cit.aet.hephaestus.core.AuditExempt;
+import de.tum.cit.aet.hephaestus.core.AuditLedger;
 import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
@@ -114,7 +115,7 @@ public class WorkspaceMembershipController {
      */
     @PostMapping("/assign")
     @RequireAtLeastWorkspaceAdmin
-    @Audited("config_audit WORKSPACE_ROLE")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "WORKSPACE_ROLE")
     public ResponseEntity<WorkspaceMembershipDTO> assignRole(
         WorkspaceContext context,
         @Valid @RequestBody AssignRoleRequestDTO request
@@ -139,7 +140,7 @@ public class WorkspaceMembershipController {
      */
     @PatchMapping("/{userId}/hidden")
     @RequireAtLeastWorkspaceAdmin
-    @Audited("config_audit WORKSPACE_ROLE")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "WORKSPACE_ROLE")
     public ResponseEntity<WorkspaceMembershipDTO> updateMemberVisibility(
         WorkspaceContext context,
         @PathVariable Long userId,
@@ -164,7 +165,7 @@ public class WorkspaceMembershipController {
      */
     @DeleteMapping("/{userId}")
     @RequireAtLeastWorkspaceAdmin
-    @Audited("config_audit WORKSPACE_ROLE")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "WORKSPACE_ROLE")
     public ResponseEntity<Void> removeMember(WorkspaceContext context, @PathVariable Long userId) {
         WorkspaceMembership membership = requireMembership(context.id(), userId);
         requireCanManageRole(context, membership.getRole());

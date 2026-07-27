@@ -2,9 +2,14 @@ package de.tum.cit.aet.hephaestus.core.auth.provider;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.core.security.ServerUrlValidator;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -20,6 +25,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Owns the instance-scoped {@link LoginProvider} table: seeds the env-configured defaults on first
@@ -36,6 +42,16 @@ import org.springframework.web.server.ResponseStatusException;
  *
  * <p>Every mutation evicts the {@link LoginProviderClientRegistrationRepository} cache so an admin's
  * edit/enable/disable takes effect immediately rather than after the 60s TTL.
+ *
+ * <p>The three admin mutations write to the {@code auth_event} trail an instance admin reads at
+ * {@code /admin/audit}. That is the ledger's own subject matter, not a fallback for
+ * {@code config_audit_event} being workspace-scoped: adding, editing or removing a login provider
+ * changes how every person signs in to this instance, which is the same class of fact as
+ * {@code APP_ROLE_CHANGED} and the impersonation pair. Only the field <em>names</em> that changed are
+ * recorded, never their values — {@code clientSecret} in the {@code changed} list says the secret was
+ * rotated without putting it, or any part of it, in the trail. Env seeding is deliberately not audited:
+ * it is a deploy-time fact of the compose file with no authenticated principal behind it, and it is
+ * already reported on the boot log.
  */
 @ConditionalOnServerRole
 @Service
@@ -61,15 +77,21 @@ public class LoginProviderService {
     private final LoginProviderRepository repository;
     private final LoginProviderClientRegistrationRepository registrationCache;
     private final AuthProperties authProperties;
+    private final AuthEventLogger authEventLogger;
+    private final ObjectMapper objectMapper;
 
     public LoginProviderService(
         LoginProviderRepository repository,
         LoginProviderClientRegistrationRepository registrationCache,
-        AuthProperties authProperties
+        AuthProperties authProperties,
+        AuthEventLogger authEventLogger,
+        ObjectMapper objectMapper
     ) {
         this.repository = repository;
         this.registrationCache = registrationCache;
         this.authProperties = authProperties;
+        this.authEventLogger = authEventLogger;
+        this.objectMapper = objectMapper;
     }
 
     /** Enabled providers for the login page / discovery, stable order. */
@@ -130,6 +152,7 @@ public class LoginProviderService {
         provider.setEnabled(true);
         provider.setSeededFromEnv(false);
         LoginProvider saved = persist(provider);
+        audit(AuthEvent.EventType.LOGIN_PROVIDER_CREATED, saved, null);
         log.info("auth.login-provider: admin created '{}' ({})", registrationId, saved.getType());
         return saved;
     }
@@ -138,29 +161,39 @@ public class LoginProviderService {
     @Transactional
     public LoginProvider update(String registrationId, Patch patch) {
         LoginProvider provider = require(registrationId);
+        // Field NAMES only — this list goes into the audit trail, so it must stay free of values.
+        List<String> changed = new ArrayList<>();
         if (patch.displayName() != null && !patch.displayName().isBlank()) {
             provider.setDisplayName(patch.displayName().trim());
+            changed.add("displayName");
         }
         if (patch.baseUrl() != null && !patch.baseUrl().isBlank()) {
             provider.setBaseUrl(resolveBaseUrl(provider.getType(), patch.baseUrl()));
+            changed.add("baseUrl");
         }
         if (patch.clientId() != null && !patch.clientId().isBlank()) {
             provider.setClientId(patch.clientId().trim());
+            changed.add("clientId");
         }
         // Write-only secret: a null/blank value leaves the sealed secret unchanged.
         if (patch.clientSecret() != null && !patch.clientSecret().isBlank()) {
             provider.setClientSecret(patch.clientSecret());
+            changed.add("clientSecret");
         }
         if (patch.scopes() != null && !patch.scopes().isBlank()) {
             provider.setScopes(sanitizeScopesOrThrow(provider.getType(), patch.scopes()));
+            changed.add("scopes");
         }
         if (patch.enabled() != null && !patch.enabled() && provider.isEnabled()) {
             requireNotLastEnabled(registrationId, "disable");
             provider.setEnabled(false);
+            changed.add("enabled");
         } else if (patch.enabled() != null && patch.enabled()) {
             provider.setEnabled(true);
+            changed.add("enabled");
         }
         LoginProvider saved = persist(provider);
+        audit(AuthEvent.EventType.LOGIN_PROVIDER_UPDATED, saved, changed);
         log.info("auth.login-provider: admin updated '{}' (enabled={})", registrationId, saved.isEnabled());
         return saved;
     }
@@ -174,7 +207,32 @@ public class LoginProviderService {
         }
         repository.delete(provider);
         registrationCache.evict(registrationId);
+        audit(AuthEvent.EventType.LOGIN_PROVIDER_DELETED, provider, null);
         log.info("auth.login-provider: admin deleted '{}'", registrationId);
+    }
+
+    /**
+     * Record an admin login-provider mutation on the {@code auth_event} trail. Best-effort by
+     * contract — {@link AuthEventLogger.Draft#record()} swallows its own failures, so the audit write
+     * can never break the mutation it describes.
+     *
+     * <p>{@code changed} is the list of field names a PATCH touched, and is omitted for create/delete
+     * where every field is implied. Values are never recorded: the registration id, the provider type
+     * and the enabled flag are the whole payload, so nothing here can carry a client secret.
+     */
+    private void audit(AuthEvent.EventType type, LoginProvider provider, @Nullable List<String> changed) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("registrationId", provider.getRegistrationId());
+        details.put("type", provider.getType().name());
+        details.put("enabled", provider.isEnabled());
+        if (changed != null) {
+            details.put("changed", changed);
+        }
+        authEventLogger
+            .event(type, AuthEvent.Result.SUCCESS)
+            .actingAccount(SecurityUtils.getCurrentAccountId().orElse(null))
+            .details(objectMapper.writeValueAsString(details))
+            .record();
     }
 
     /**

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.auth.web;
 
+import de.tum.cit.aet.hephaestus.core.AuditLedger;
 import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.core.auth.AuthSessionService;
 import de.tum.cit.aet.hephaestus.core.auth.impersonation.ImpersonationService;
@@ -70,7 +71,7 @@ public class AuthLifecycleController {
     @PostMapping("/impersonate")
     @PreAuthorize("hasAuthority('app_admin')")
     @Operation(summary = "Begin impersonating another account", operationId = "impersonate")
-    @Audited("auth_event IMPERSONATION_BEGIN")
+    @Audited(ledger = AuditLedger.AUTH_EVENT, type = "IMPERSONATION_BEGIN")
     public ResponseEntity<Void> impersonate(
         @Valid @RequestBody ImpersonateRequestDTO body,
         HttpServletRequest request,

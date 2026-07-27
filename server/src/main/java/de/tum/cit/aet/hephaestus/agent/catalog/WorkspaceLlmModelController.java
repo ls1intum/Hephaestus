@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
+import de.tum.cit.aet.hephaestus.core.AuditLedger;
 import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -55,7 +56,7 @@ public class WorkspaceLlmModelController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @Audited("config_audit WORKSPACE_LLM_MODEL")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "WORKSPACE_LLM_MODEL")
     public ResponseEntity<WorkspaceLlmModelDTO> create(
         WorkspaceContext workspaceContext,
         @PathVariable Long connectionId,
@@ -111,7 +112,7 @@ public class WorkspaceLlmModelController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @Audited("config_audit WORKSPACE_LLM_MODEL")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "WORKSPACE_LLM_MODEL")
     public ResponseEntity<WorkspaceLlmModelDTO> update(
         WorkspaceContext workspaceContext,
         @PathVariable Long id,
@@ -134,7 +135,7 @@ public class WorkspaceLlmModelController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @Audited("config_audit WORKSPACE_LLM_MODEL")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "WORKSPACE_LLM_MODEL")
     public ResponseEntity<Void> delete(WorkspaceContext workspaceContext, @PathVariable Long id) {
         modelService.delete(workspaceContext, id);
         return ResponseEntity.noContent().build();

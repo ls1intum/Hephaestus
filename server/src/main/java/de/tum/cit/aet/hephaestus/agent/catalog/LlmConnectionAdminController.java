@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
 import de.tum.cit.aet.hephaestus.core.AuditExempt;
+import de.tum.cit.aet.hephaestus.core.AuditLedger;
 import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Operation;
@@ -76,7 +77,7 @@ public class LlmConnectionAdminController {
         description = "An LLM connection with this slug already exists",
         content = @Content(schema = @Schema(hidden = true))
     )
-    @Audited("auth_event LLM_CONNECTION_CREATED")
+    @Audited(ledger = AuditLedger.AUTH_EVENT, type = "LLM_CONNECTION_CREATED")
     public ResponseEntity<LlmConnectionDTO> create(@Valid @RequestBody CreateLlmConnectionRequestDTO request) {
         LlmConnection created = connectionService.create(request);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
@@ -98,7 +99,7 @@ public class LlmConnectionAdminController {
         description = "LLM connection not found",
         content = @Content(schema = @Schema(hidden = true))
     )
-    @Audited("auth_event LLM_CONNECTION_UPDATED")
+    @Audited(ledger = AuditLedger.AUTH_EVENT, type = "LLM_CONNECTION_UPDATED")
     public ResponseEntity<LlmConnectionDTO> update(
         @PathVariable Long id,
         @Valid @RequestBody UpdateLlmConnectionRequestDTO request
@@ -119,7 +120,7 @@ public class LlmConnectionAdminController {
         description = "Cannot delete a connection still referenced by one or more models",
         content = @Content(schema = @Schema(hidden = true))
     )
-    @Audited("auth_event LLM_CONNECTION_DELETED")
+    @Audited(ledger = AuditLedger.AUTH_EVENT, type = "LLM_CONNECTION_DELETED")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         connectionService.delete(id);
         return ResponseEntity.noContent().build();

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
+import de.tum.cit.aet.hephaestus.core.AuditLedger;
 import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -53,7 +54,7 @@ public class PracticeReviewSettingsController {
         content = @Content(schema = @Schema(implementation = PracticeReviewSettingsDTO.class))
     )
     @RequireAtLeastWorkspaceAdmin
-    @Audited("config_audit PRACTICE_REVIEW_SETTINGS")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_REVIEW_SETTINGS")
     public ResponseEntity<PracticeReviewSettingsDTO> updatePracticeReviewSettings(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody UpdatePracticeReviewSettingsRequestDTO request

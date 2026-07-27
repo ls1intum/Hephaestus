@@ -5505,7 +5505,9 @@ components:
         timeoutSeconds:
           type: integer
           format: int32
-          description: Per-run timeout in seconds
+          description: Per-run timeout in seconds (30–3600; one hour is the longest
+            a single run may take)
+          maximum: 3600
           minimum: 30
         workspaceModelId:
           type: integer

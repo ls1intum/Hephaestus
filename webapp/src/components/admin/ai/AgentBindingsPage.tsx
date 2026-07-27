@@ -53,8 +53,25 @@ export const PURPOSE_TITLES: Record<Purpose, string> = Object.fromEntries(
 	PURPOSES.map((meta) => [meta.purpose, meta.title]),
 ) as Record<Purpose, string>;
 
+/**
+ * The range the server accepts for a per-run timeout. Both ends are stated here as well as on the
+ * server, because the generated client carries the bound only as prose in a doc comment on
+ * `AgentBindingRequest.timeoutSeconds` — there is no value to read. Keep in step with
+ * `AgentBindingLimits` on the server if either end moves.
+ */
 const MIN_TIMEOUT_SECONDS = 30;
+const MAX_TIMEOUT_SECONDS = 3600;
 const MIN_CONCURRENT_JOBS = 1;
+
+/**
+ * The ceiling, with the reason it exists rather than only the number: an hour is how long a run may
+ * live before the sweep that reclaims abandoned runs closes it, so a longer timeout would never be
+ * honoured.
+ */
+const TIMEOUT_CEILING = {
+	max: MAX_TIMEOUT_SECONDS,
+	error: `Runs stop after an hour, so enter ${MAX_TIMEOUT_SECONDS} seconds or less.`,
+};
 
 function bindingToSelection(binding?: AgentBinding): ModelSelection | null {
 	if (binding?.instanceModelId != null) return { scope: "SHARED", id: binding.instanceModelId };
@@ -74,7 +91,16 @@ interface ParsedNumber {
 	error: string | null;
 }
 
-function parseWholeNumber(raw: string, min: number, unit: string): ParsedNumber {
+/**
+ * @param ceiling The upper bound, for a field that has one, carrying its own message: a range on its
+ * own ("at most 3600") tells an admin nothing about why they cannot have more.
+ */
+function parseWholeNumber(
+	raw: string,
+	min: number,
+	unit: string,
+	ceiling?: { max: number; error: string },
+): ParsedNumber {
 	const trimmed = raw.trim();
 	if (trimmed === "") {
 		return { value: null, error: `Enter a number of ${unit}.` };
@@ -82,6 +108,9 @@ function parseWholeNumber(raw: string, min: number, unit: string): ParsedNumber 
 	const parsed = Number(trimmed);
 	if (!Number.isInteger(parsed) || parsed < min) {
 		return { value: null, error: `Enter a whole number of ${unit}, ${min} or more.` };
+	}
+	if (ceiling && parsed > ceiling.max) {
+		return { value: null, error: ceiling.error };
 	}
 	return { value: parsed, error: null };
 }
@@ -254,7 +283,7 @@ function AgentPurposeCard({
 
 	const noModels = availableModels.length === 0;
 
-	const timeout = parseWholeNumber(timeoutSeconds, MIN_TIMEOUT_SECONDS, "seconds");
+	const timeout = parseWholeNumber(timeoutSeconds, MIN_TIMEOUT_SECONDS, "seconds", TIMEOUT_CEILING);
 	const concurrency = parseWholeNumber(maxConcurrentJobs, MIN_CONCURRENT_JOBS, "runs");
 	const modelError = showErrors && !selection ? "Choose the model this runs on." : null;
 	const timeoutError = showErrors ? timeout.error : null;
@@ -382,6 +411,7 @@ function AgentPurposeCard({
 											type="number"
 											inputMode="numeric"
 											min={MIN_TIMEOUT_SECONDS}
+											max={MAX_TIMEOUT_SECONDS}
 											value={timeoutSeconds}
 											aria-invalid={Boolean(timeoutError)}
 											aria-describedby={timeoutError ? timeoutErrorId : undefined}

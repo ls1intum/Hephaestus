@@ -10,6 +10,10 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
 import de.tum.cit.aet.hephaestus.core.auth.AuthPropertiesFixture;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventData;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventWriter;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +24,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Pins the env → seed contract: a configured login provider is seeded once when absent, never
@@ -34,11 +39,22 @@ class LoginProviderServiceTest extends BaseUnitTest {
         LoginProviderClientRegistrationRepository.class
     );
 
+    /**
+     * The real {@link AuthEventLogger} over a mocked writer, not a mocked logger: the fluent
+     * {@code event(...).actingAccount(...).details(...).record()} chain is the thing under test in
+     * {@link #adminMutationsLandOnTheAuthEventTrail()}, and a mocked logger would assert nothing
+     * about what actually reaches the ledger.
+     */
+    private final AuthEventWriter authEventWriter = mock(AuthEventWriter.class);
+    private final AuthEventLogger authEventLogger = new AuthEventLogger(authEventWriter);
+
     private LoginProviderService service(Map<String, AuthProperties.LoginProviderSeed> providers) {
         return new LoginProviderService(
             repository,
             registrationCache,
-            AuthPropertiesFixture.withLoginProviders(providers)
+            AuthPropertiesFixture.withLoginProviders(providers),
+            authEventLogger,
+            new ObjectMapper()
         );
     }
 
@@ -500,6 +516,65 @@ class LoginProviderServiceTest extends BaseUnitTest {
         provider.setScopes("read");
         provider.setEnabled(true);
         return provider;
+    }
+
+    /**
+     * Changing how people sign in to the instance is the event an audit trail exists for. All three
+     * admin mutations must land on {@code auth_event} — the ledger an instance admin reads at
+     * {@code /admin/audit}, alongside {@code APP_ROLE_CHANGED} and the impersonation pair.
+     */
+    @Test
+    void adminMutationsLandOnTheAuthEventTrail() {
+        when(repository.existsByRegistrationId("gitlab-acme")).thenReturn(false);
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        LoginProvider existing = gitlabProvider("gitlab-acme", "sealed");
+        when(repository.findByRegistrationId("gitlab-acme")).thenReturn(Optional.of(existing));
+        // Two enabled providers, so neither disable nor delete trips the last-provider lockout guard.
+        when(repository.findByEnabledTrueOrderByDisplayNameAsc()).thenReturn(
+            List.of(existing, gitlabProvider("gitlab-other", "sealed"))
+        );
+        LoginProviderService service = adminService();
+
+        service.create(gitlabDraft("gitlab-acme", "https://gitlab.acme.test", null));
+        service.update("gitlab-acme", new LoginProviderService.Patch(null, null, null, "rotated", null, false));
+        service.delete("gitlab-acme");
+
+        ArgumentCaptor<AuthEventData> captor = ArgumentCaptor.forClass(AuthEventData.class);
+        verify(authEventWriter, Mockito.times(3)).write(captor.capture());
+        assertThat(captor.getAllValues())
+            .extracting(AuthEventData::type)
+            .containsExactly(
+                AuthEvent.EventType.LOGIN_PROVIDER_CREATED,
+                AuthEvent.EventType.LOGIN_PROVIDER_UPDATED,
+                AuthEvent.EventType.LOGIN_PROVIDER_DELETED
+            );
+        assertThat(captor.getAllValues())
+            .extracting(AuthEventData::details)
+            .allSatisfy(details -> assertThat(details).contains("\"registrationId\":\"gitlab-acme\""));
+    }
+
+    /**
+     * The PATCH audit names the fields that changed so an admin reading the trail can tell a display-name
+     * tweak from a credential rotation — but it must never carry the credential itself. {@code clientSecret}
+     * appearing as a CHANGED KEY is the whole point; the secret's value appearing anywhere is the bug.
+     */
+    @Test
+    void updateAuditNamesTheRotatedSecretWithoutRecordingIt() {
+        LoginProvider existing = gitlabProvider("gitlab-acme", "old-secret");
+        when(repository.findByRegistrationId("gitlab-acme")).thenReturn(Optional.of(existing));
+        when(repository.findByEnabledTrueOrderByDisplayNameAsc()).thenReturn(List.of(existing));
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        adminService().update(
+            "gitlab-acme",
+            new LoginProviderService.Patch("Renamed", null, null, "super-secret-value", null, null)
+        );
+
+        ArgumentCaptor<AuthEventData> captor = ArgumentCaptor.forClass(AuthEventData.class);
+        verify(authEventWriter).write(captor.capture());
+        String details = captor.getValue().details();
+        assertThat(details).contains("\"changed\":[\"displayName\",\"clientSecret\"]");
+        assertThat(details).doesNotContain("super-secret-value").doesNotContain("old-secret");
     }
 
     private static LoginProvider gitlabProvider(String registrationId, String clientSecret) {

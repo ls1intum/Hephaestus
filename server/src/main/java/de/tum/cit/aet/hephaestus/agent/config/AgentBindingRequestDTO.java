@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.config;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import org.jspecify.annotations.Nullable;
 
@@ -13,7 +14,11 @@ import org.jspecify.annotations.Nullable;
 public record AgentBindingRequestDTO(
     @Nullable @Schema(description = "Shared (instance-catalog) model id to run this purpose on") Long instanceModelId,
     @Nullable @Schema(description = "Workspace-owned (BYO) model id to run this purpose on") Long workspaceModelId,
-    @Nullable @Min(30) @Schema(description = "Per-run timeout in seconds") Integer timeoutSeconds,
+    @Nullable
+    @Min(AgentBindingLimits.MIN_TIMEOUT_SECONDS)
+    @Max(AgentBindingLimits.MAX_TIMEOUT_SECONDS)
+    @Schema(description = "Per-run timeout in seconds (30–3600; one hour is the longest a single run may take)")
+    Integer timeoutSeconds,
     @Nullable @Min(1) @Schema(description = "Maximum concurrent runs for this purpose") Integer maxConcurrentJobs,
     @Nullable @Schema(description = "Whether the sandbox may reach the public internet") Boolean allowInternet,
     @Nullable @Schema(description = "Whether this purpose is active (paused when false)") Boolean enabled

@@ -18,7 +18,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabBackwardPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolver.MrInfo;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
@@ -367,7 +367,7 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
         assertThat(outcome.kind()).isEqualTo(FeedbackChannel.UpdateOutcome.Kind.GONE);
     }
 
-    // findExistingSummary — tri-state delivery-recovery dedup over discussions→notes
+    // findExistingSummary — tri-state delivery-recovery dedup, walking the flat notes connection backwards
 
     private static final String MARKER = "<!-- hephaestus-summary:job-1 -->";
 
@@ -381,42 +381,40 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
         return spec;
     }
 
-    private ClientGraphQlResponse mockDiscussionsPage(
-        List<Map<String, Object>> discussions,
-        boolean hasNextPage,
-        String endCursor,
+    /**
+     * One page of the flat {@code notes} connection, keyed by the response path the channel reads for the
+     * given noteable — so a test that stubs the MR path fails outright if the channel queries the issue path.
+     */
+    private ClientGraphQlResponse mockNotesPage(
+        String notesPath,
+        List<Map<String, Object>> notes,
+        boolean hasPreviousPage,
+        String startCursor,
         List<ResponseError> errors
     ) {
         ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
         lenient().when(response.getErrors()).thenReturn(errors);
         ClientResponseField nodesField = mock(ClientResponseField.class);
-        lenient().when(response.field("project.mergeRequest.discussions.nodes")).thenReturn(nodesField);
-        lenient().when(nodesField.getValue()).thenReturn(discussions);
+        lenient().when(response.field(notesPath + ".nodes")).thenReturn(nodesField);
+        lenient().when(nodesField.getValue()).thenReturn(notes);
         ClientResponseField pageInfoField = mock(ClientResponseField.class);
-        lenient().when(response.field("project.mergeRequest.discussions.pageInfo")).thenReturn(pageInfoField);
+        lenient().when(response.field(notesPath + ".pageInfo")).thenReturn(pageInfoField);
         lenient()
-            .when(pageInfoField.toEntity(GitLabPageInfo.class))
-            .thenReturn(new GitLabPageInfo(hasNextPage, endCursor));
+            .when(pageInfoField.toEntity(GitLabBackwardPageInfo.class))
+            .thenReturn(new GitLabBackwardPageInfo(hasPreviousPage, startCursor));
         return response;
     }
 
-    private ClientGraphQlResponse mockDiscussionsPage(
-        List<Map<String, Object>> discussions,
-        boolean hasNextPage,
-        String endCursor
+    private ClientGraphQlResponse mockMrNotesPage(
+        List<Map<String, Object>> notes,
+        boolean hasPreviousPage,
+        String startCursor
     ) {
-        return mockDiscussionsPage(discussions, hasNextPage, endCursor, List.of());
+        return mockNotesPage(MR_NOTES_PATH, notes, hasPreviousPage, startCursor, List.of());
     }
 
-    /** One discussion node in the exact {@code notes { pageInfo, nodes }} shape the document returns. */
-    private static Map<String, Object> discussion(List<Map<String, Object>> notes, boolean notesHaveNextPage) {
-        return Map.of(
-            "id",
-            "gid://gitlab/Discussion/abc",
-            "notes",
-            Map.of("pageInfo", Map.of("hasNextPage", notesHaveNextPage), "nodes", notes)
-        );
-    }
+    private static final String MR_NOTES_PATH = "project.mergeRequest.notes";
+    private static final String ISSUE_NOTES_PATH = "project.issue.notes";
 
     private static Map<String, Object> note(String id, String body) {
         return Map.of("id", id, "body", body);
@@ -426,11 +424,8 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
     void findExistingSummary_matchOnFirstPage_isFound() {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
-        ClientGraphQlResponse page = mockDiscussionsPage(
-            List.of(
-                discussion(List.of(note("gid://gitlab/Note/1", "a human said hi")), false),
-                discussion(List.of(note("gid://gitlab/Note/2", MARKER + "\nsummary")), false)
-            ),
+        ClientGraphQlResponse page = mockMrNotesPage(
+            List.of(note("gid://gitlab/Note/1", "a human said hi"), note("gid://gitlab/Note/2", MARKER + "\nsummary")),
             false,
             null
         );
@@ -444,13 +439,33 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
         assertThat(result.handle().externalId()).isEqualTo("gid://gitlab/Note/2");
     }
 
+    /**
+     * The just-posted summary is the newest note, so the newest-end page must be requested FIRST — with no
+     * {@code before} cursor and a {@code last} page size. A forward walk would ask for {@code first}/{@code
+     * after} and only reach the marker after paging through the whole thread.
+     */
     @Test
-    void findExistingSummary_everyDiscussionScanned_noMatch_isAbsent() {
+    void findExistingSummary_walksTheNewestEndFirst() {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
-        ClientGraphQlResponse page = mockDiscussionsPage(
-            List.of(discussion(List.of(note("gid://gitlab/Note/1", "unrelated")), false)),
-            false, // outer hasNextPage=false and no thread truncated — every note was seen
+        ClientGraphQlResponse page = mockMrNotesPage(List.of(note("gid://gitlab/Note/9", MARKER)), true, "c");
+        when(spec.execute()).thenReturn(Mono.just(page));
+
+        channel.findExistingSummary(gitlabTarget(), MARKER);
+
+        verify(spec).variable(eq("last"), eq(100));
+        verify(spec).variable(eq("before"), eq(null));
+        verify(spec).variable(eq("fullPath"), eq("group/project"));
+        verify(spec).variable(eq("iid"), eq("42"));
+    }
+
+    @Test
+    void findExistingSummary_everyNoteScanned_noMatch_isAbsent() {
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+        HttpGraphQlClient.RequestSpec spec = mockRequestChain();
+        ClientGraphQlResponse page = mockMrNotesPage(
+            List.of(note("gid://gitlab/Note/1", "unrelated")),
+            false, // hasPreviousPage=false — the walk reached the oldest note, every note was seen
             null
         );
         when(spec.execute()).thenReturn(Mono.just(page));
@@ -461,31 +476,12 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
     }
 
     @Test
-    void findExistingSummary_truncatedNoteThread_isUnknown_notAbsent() {
-        // The document pages notes INSIDE each discussion at a fixed first:100 with no cursor of its own. A
-        // thread reporting notes.pageInfo.hasNextPage hides notes this scan can never reach, so exhausting the
-        // outer connection does NOT prove the marker is missing.
+    void findExistingSummary_pageBudgetExhaustedWithOlderNotesLeft_isUnknown_notAbsent() {
+        // hasPreviousPage=true on every page, all the way to the budget — absence is never confirmed.
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
-        ClientGraphQlResponse page = mockDiscussionsPage(
-            List.of(discussion(List.of(note("gid://gitlab/Note/1", "unrelated")), true)),
-            false, // outer connection exhausted — only the truncated thread stands between this and ABSENT
-            null
-        );
-        when(spec.execute()).thenReturn(Mono.just(page));
-
-        ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), MARKER);
-
-        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.UNKNOWN);
-    }
-
-    @Test
-    void findExistingSummary_pageBudgetExhaustedWithMoreDiscussionsLeft_isUnknown_notAbsent() {
-        // hasNextPage=true on every page, all the way to the budget — absence is never confirmed.
-        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
-        HttpGraphQlClient.RequestSpec spec = mockRequestChain();
-        ClientGraphQlResponse page = mockDiscussionsPage(
-            List.of(discussion(List.of(note("gid://gitlab/Note/1", "unrelated")), false)),
+        ClientGraphQlResponse page = mockMrNotesPage(
+            List.of(note("gid://gitlab/Note/1", "unrelated")),
             true,
             "cursor-1"
         );
@@ -498,26 +494,39 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
     }
 
     @Test
-    void findExistingSummary_secondPageHasTheMatch_isFound() {
-        // The scan must follow the cursor into a second page, not stop at the first.
+    void findExistingSummary_blankStartCursorWithOlderNotesLeft_isUnknown_notAbsent() {
+        // Older notes remain but the cursor to reach them is missing — the walk cannot continue and cannot
+        // claim the marker is gone.
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
-        ClientGraphQlResponse page1 = mockDiscussionsPage(
-            List.of(discussion(List.of(note("gid://gitlab/Note/1", "unrelated")), false)),
+        ClientGraphQlResponse page = mockMrNotesPage(List.of(note("gid://gitlab/Note/1", "unrelated")), true, "  ");
+        when(spec.execute()).thenReturn(Mono.just(page));
+
+        ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), MARKER);
+
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.UNKNOWN);
+        verify(spec, org.mockito.Mockito.times(1)).execute();
+    }
+
+    @Test
+    void findExistingSummary_secondPageHasTheMatch_isFound() {
+        // The scan must follow the startCursor backwards into an older page, not stop at the newest one.
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+        HttpGraphQlClient.RequestSpec spec = mockRequestChain();
+        ClientGraphQlResponse page1 = mockMrNotesPage(
+            List.of(note("gid://gitlab/Note/1", "unrelated")),
             true,
             "cursor-1"
         );
-        ClientGraphQlResponse page2 = mockDiscussionsPage(
-            List.of(discussion(List.of(note("gid://gitlab/Note/2", MARKER)), false)),
-            false,
-            null
-        );
+        ClientGraphQlResponse page2 = mockMrNotesPage(List.of(note("gid://gitlab/Note/2", MARKER)), false, null);
         when(spec.execute()).thenReturn(Mono.just(page1), Mono.just(page2));
 
         ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), MARKER);
 
         assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.FOUND);
         assertThat(result.handle().externalId()).isEqualTo("gid://gitlab/Note/2");
+        // The older page must be requested with the previous page's startCursor as `before`.
+        verify(spec).variable(eq("before"), eq("cursor-1"));
     }
 
     @Test
@@ -527,8 +536,9 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
         ResponseError error = mock(ResponseError.class);
-        ClientGraphQlResponse page = mockDiscussionsPage(
-            List.of(discussion(List.of(note("gid://gitlab/Note/1", "unrelated")), false)),
+        ClientGraphQlResponse page = mockNotesPage(
+            MR_NOTES_PATH,
+            List.of(note("gid://gitlab/Note/1", "unrelated")),
             false,
             null,
             List.of(error)
@@ -538,6 +548,76 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
         ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), MARKER);
 
         assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.UNKNOWN);
+    }
+
+    /**
+     * An ISSUE subject ({@code path#iid}) must reach the issue's own notes. This used to be a permanent
+     * {@code UNKNOWN} — the lookup only knew a merge-request document — so the channel could never find the
+     * summary it had itself posted on an issue.
+     */
+    @Test
+    void findExistingSummary_issueSubject_scansIssueNotes_isFound() {
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+        HttpGraphQlClient client = mock(HttpGraphQlClient.class);
+        HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(gitLabProvider.forScope(1L)).thenReturn(client);
+        when(client.documentName(any())).thenReturn(spec);
+        when(spec.variable(any(), any())).thenReturn(spec);
+        // Stubbed ONLY on the issue path: reading the merge-request path would yield null nodes → UNKNOWN.
+        ClientGraphQlResponse page = mockNotesPage(
+            ISSUE_NOTES_PATH,
+            List.of(note("gid://gitlab/Note/7", MARKER + "\nsummary")),
+            false,
+            null,
+            List.of()
+        );
+        when(spec.execute()).thenReturn(Mono.just(page));
+
+        ExistingSummaryLookup result = channel.findExistingSummary(gitlabIssueTarget(), MARKER);
+
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.FOUND);
+        assertThat(result.handle().externalId()).isEqualTo("gid://gitlab/Note/7");
+        verify(client).documentName("GetIssueNotesNewest");
+        verify(spec).variable(eq("fullPath"), eq("group/project"));
+        verify(spec).variable(eq("iid"), eq("7"));
+    }
+
+    @Test
+    void findExistingSummary_issueSubject_noMatch_isAbsent() {
+        // Fail-closed is only correct when absence is UNPROVEN. A fully scanned issue thread with no marker
+        // is a proven absence and must license the caller to post — otherwise the issue summary never lands.
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+        HttpGraphQlClient.RequestSpec spec = mockRequestChain();
+        ClientGraphQlResponse page = mockNotesPage(
+            ISSUE_NOTES_PATH,
+            List.of(note("gid://gitlab/Note/1", "hi")),
+            false,
+            null,
+            List.of()
+        );
+        when(spec.execute()).thenReturn(Mono.just(page));
+
+        ExistingSummaryLookup result = channel.findExistingSummary(gitlabIssueTarget(), MARKER);
+
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.ABSENT);
+    }
+
+    @Test
+    void findExistingSummary_mergeRequestSubject_usesTheMergeRequestDocument() {
+        // The mirror of the issue case: a "!iid" subject must NOT be routed to the issue document.
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+        HttpGraphQlClient client = mock(HttpGraphQlClient.class);
+        HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(gitLabProvider.forScope(1L)).thenReturn(client);
+        when(client.documentName(any())).thenReturn(spec);
+        when(spec.variable(any(), any())).thenReturn(spec);
+        ClientGraphQlResponse page = mockMrNotesPage(List.of(note("gid://gitlab/Note/3", MARKER)), false, null);
+        when(spec.execute()).thenReturn(Mono.just(page));
+
+        ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), MARKER);
+
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.FOUND);
+        verify(client).documentName("GetMergeRequestNotesNewest");
     }
 
     @Test
@@ -570,6 +650,10 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
 
     private static FeedbackTarget gitlabTarget() {
         return new FeedbackTarget(new IntegrationRef(IntegrationKind.GITLAB, 1L, null), "group/project!42", null);
+    }
+
+    private static FeedbackTarget gitlabIssueTarget() {
+        return new FeedbackTarget(new IntegrationRef(IntegrationKind.GITLAB, 1L, null), "group/project#7", null);
     }
 
     @SuppressWarnings("unchecked")

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
+import de.tum.cit.aet.hephaestus.core.AuditLedger;
 import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Operation;
@@ -42,7 +43,7 @@ public class InstanceLlmSettingsController {
 
     @PutMapping
     @Operation(summary = "Update instance-wide LLM governance settings", operationId = "adminUpdateLlmSettings")
-    @Audited("auth_event LLM_SETTINGS_CHANGED")
+    @Audited(ledger = AuditLedger.AUTH_EVENT, type = "LLM_SETTINGS_CHANGED")
     public ResponseEntity<InstanceLlmSettingsDTO> update(
         @Valid @RequestBody UpdateInstanceLlmSettingsRequestDTO request
     ) {

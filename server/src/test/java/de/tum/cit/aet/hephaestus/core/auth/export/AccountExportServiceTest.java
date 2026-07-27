@@ -211,7 +211,7 @@ class AccountExportServiceTest extends BaseUnitTest {
             return e;
         });
 
-        // No active transaction in a unit test → registerAfterCommit runs inline.
+        // No active transaction in a unit test → TransactionCallbacks.afterCommit runs the handoff inline.
         AccountExportService service = new AccountExportService(repo, worker, logger, clock);
 
         AccountExport created = service.requestExport(ACCOUNT_ID);

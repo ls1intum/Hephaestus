@@ -124,6 +124,13 @@ public class AuthEvent {
         LLM_MODEL_PRICE_CHANGED,
         LLM_MODEL_SHARING_CHANGED,
         LLM_SETTINGS_CHANGED,
+        // Instance login providers: app_admin-owned, GLOBAL, and belonging to no workspace, so
+        // config_audit_event cannot carry them either. They belong here on the merits regardless —
+        // this is the AUTHENTICATION trail, and adding, editing or removing a login provider changes
+        // how every person signs in to this instance.
+        LOGIN_PROVIDER_CREATED,
+        LOGIN_PROVIDER_UPDATED,
+        LOGIN_PROVIDER_DELETED,
     }
 
     public enum Result {

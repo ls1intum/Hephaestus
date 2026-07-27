@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.usage;
 
+import de.tum.cit.aet.hephaestus.core.AuditLedger;
 import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -41,7 +42,7 @@ public class WorkspaceLlmBudgetController {
     )
     @ApiResponse(responseCode = "204", description = "Cap updated")
     @RequireAtLeastWorkspaceAdmin
-    @Audited("config_audit WORKSPACE_OWN_PROVIDER_LLM_BUDGET")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "WORKSPACE_OWN_PROVIDER_LLM_BUDGET")
     public ResponseEntity<Void> updateBudget(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody UpdateLlmBudgetRequestDTO request

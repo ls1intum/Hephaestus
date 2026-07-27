@@ -147,6 +147,33 @@ describe("AgentBindingsPage", () => {
 		);
 	});
 
+	it("rejects a timeout above the ceiling and says why an hour is the limit", () => {
+		const { onSave } = renderPage();
+
+		fireEvent.click(screen.getAllByRole("button", { name: /Advanced/ })[0]);
+		const timeout = screen.getByLabelText("Timeout (seconds)");
+		fireEvent.change(timeout, { target: { value: "7200" } });
+		fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
+
+		// The reason, not just the range: a run that outlives an hour is stopped, so the number cannot
+		// be honoured however it is typed.
+		expect(
+			screen.getByText("Runs stop after an hour, so enter 3600 seconds or less."),
+		).toBeTruthy();
+		expect(timeout.getAttribute("aria-invalid")).toBe("true");
+		// Nothing is sent, so the admin never meets the server's bare 400 for this.
+		expect(onSave).not.toHaveBeenCalled();
+
+		// The ceiling itself is allowed — it is a maximum, not a value just short of one.
+		fireEvent.change(timeout, { target: { value: "3600" } });
+		fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
+
+		expect(onSave).toHaveBeenCalledWith(
+			"PRACTICE_DETECTION",
+			expect.objectContaining({ timeoutSeconds: 3600 }),
+		);
+	});
+
 	it("reopens the advanced disclosure when the field that blocked the save is inside it", () => {
 		renderPage();
 
