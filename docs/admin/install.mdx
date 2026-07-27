@@ -156,7 +156,9 @@ admin registers a connection and model under **Instance admin → AI models** an
 workspace, or — if instance settings permit bring-your-own connections — a workspace admin adds their
 own connection and model under the workspace's **Administration → AI models**. Either way, a workspace
 admin must then bind a model to the **practice detection** purpose on that same page. With the flags
-on but nothing bound, nothing is reviewed and no error explains why.
+on but nothing bound, nothing is reviewed: webhook-driven reviews are skipped with only a DEBUG log
+line, since an unbound workspace is a normal state and one line per event would be noise. The manual
+dev trigger answers with the reason, so use it to tell "unbound" apart from "broken".
 
 ## 8. Legal pages (public instances)
 

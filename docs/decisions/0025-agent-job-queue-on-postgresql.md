@@ -178,9 +178,11 @@ surfaced concrete gaps, closed here:
   job's marker already landed (`JobTypeHandler#findExistingDelivery` /
   `FeedbackChannel#findExistingSummary`) — closing the crash window where the comment posted but
   the id was never persisted. Implemented for GitHub (reuses the existing `GetPullRequestComments`/
-  `GetIssueComments` queries); GitLab has no equivalent reusable listing query today, so recovery
-  stays fail-closed there: an unknown lookup never auto-reposts and an administrator can retry
-  explicitly after checking the remote discussion.
+  `GetIssueComments` queries) and for GitLab merge requests (reuses the existing
+  `GetMergeRequestDiscussions` query, flattening discussions to notes). Both scans are page-bounded and
+  fail closed: whatever they cannot prove empty — the page budget, a note thread truncated inside its
+  discussion, a transport or GraphQL error — answers unknown, which never auto-reposts and leaves the
+  delivery for a later attempt or an explicit administrator retry.
 - **Queue health metrics.** `agent.queue.depth`, `agent.queue.oldest_age_seconds` (the canonical
   health signal — depth alone can't distinguish "briefly busy" from "stuck"), and
   `agent.queue.running` are sampled every 30s by `AgentQueueHealthSampler`. A failed sample keeps the

@@ -237,7 +237,7 @@ Three instance-wide LLM knobs *are* env vars, because they are deploy-time facts
 
 | Variable | Default | What it does |
 | --- | --- | --- |
-| `HEPHAESTUS_LLM_DISPLAY_CURRENCY` | *(empty)* | ISO 4217 code to show spend in **alongside** USD. Empty turns the second currency off entirely. Only `EUR` is honoured today; any other well-formed code logs a warning and falls back to USD-only. A value that is not shaped like a currency code fails startup, so a typo cannot hide as a missing feature. |
+| `HEPHAESTUS_LLM_DISPLAY_CURRENCY` | *(empty)* | Currency to show spend in **alongside** USD. Empty turns the second currency off entirely. `EUR` is the only supported value, and anything else — including a perfectly well-formed code such as `GBP` — fails startup naming what is accepted, so a currency this instance cannot convert to can never hide as a missing feature. |
 | `HEPHAESTUS_LLM_EGRESS_ALLOW_LOOPBACK` | `false` | Whether `http://localhost` provider base URLs may be saved and dialled. **Never set this in production** — it is an SSRF hole that lets a workspace admin aim a "provider" at host-local services. The private/link-local/CGNAT check is unconditional and this flag does not relax it. |
 | `HEPHAESTUS_LLM_FX_DAILY_URL` | ECB daily reference feed | Override only on an air-gapped instance mirroring the ECB file internally. |
 

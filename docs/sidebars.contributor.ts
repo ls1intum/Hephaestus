@@ -25,7 +25,7 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'AI Development',
-      items: ['ai-agent-workflow', 'ai-code-review', 'unified-pi-runtime'],
+      items: ['ai-agent-workflow', 'ai-code-review', 'unified-pi-runtime', 'llm-cost-vocabulary'],
     },
   ],
 };

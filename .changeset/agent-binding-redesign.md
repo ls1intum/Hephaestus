@@ -18,8 +18,9 @@ Budget enforcement is more accurate and more honest:
 - When a workspace crosses its monthly cap, detection work that was already queued is now **held and
   resumes automatically** once the cap is raised or the month rolls over, instead of being dropped
   the moment the cap is crossed. A held job is kept for up to seven days from when it was queued; a
-  job still over cap after that is cancelled rather than held indefinitely, so raise the cap or wait
-  out the month within that window if the queued reviews matter.
+  job still over cap after that is cancelled rather than held indefinitely. Raising the cap is the only
+  way to release a held job inside that window — the month rolls over too late for anything queued
+  before the 24th.
 - Once a workspace is over its cap, the in-app AI proxy refuses new calls, so a run already in
   progress can no longer keep spending unbounded.
 - A run that crashes or times out mid-way now records the calls it actually made, instead of

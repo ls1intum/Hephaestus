@@ -48,7 +48,7 @@ Split the webhook receiver out when:
 
 Each role ships with a Spring profile YAML that flips the other two flags off and prunes the bean graph:
 
-- `application-worker.yml` — `runtime.server=false`, `runtime.webhook=false`, `agent.enabled` defaults to `true` on this profile specifically (job execution IS this pod's purpose — see the `AGENT_ENABLED` note below), OAuth2 autoconfigure excluded, JPA still enabled. The servlet container stays on (`web-application-type=servlet`) with a real `server.port`: the internal LLM proxy (`/internal/llm/**`, the only credential path a sandbox has) is served with the worker/sandbox capability, and no `ports:`/Traefik mapping exposes it externally.
+- `application-worker.yml` — `runtime.server=false`, `runtime.webhook=false`, OAuth2 autoconfigure excluded, JPA still enabled. The servlet container stays on (`web-application-type=servlet`) with a real `server.port`: the internal LLM proxy (`/internal/llm/**`, the only credential path a sandbox has) is served with the worker/sandbox capability, and no `ports:`/Traefik mapping exposes it externally.
 - `application-webhook.yml` — `runtime.server=false`, `runtime.worker=false`, sync NATS enabled, agent job queue disabled (webhook pods never claim jobs).
 - No `application-server.yml` — the monolith default _is_ the server profile.
 
@@ -67,7 +67,7 @@ overlay's value where the overlay pins one, otherwise the base default.
 | `hephaestus.workspace.init-default` | false | false | false | `prod` profile |
 | `hephaestus.git.enabled` | false | false | false | env default |
 | `hephaestus.sync.nats.enabled` | false | **false** | **true** | env default / profile overlay |
-| `hephaestus.agent.enabled` | false | **true** | false | env default / profile overlay |
+| `hephaestus.agent.enabled` | false | false | false | env default |
 | Needs user-auth wiring | yes | no | no | role gating |
 
 Bolded cells are pinned by that role's profile overlay and are not the base default. Reading the
@@ -75,53 +75,40 @@ three `runtime.*` rows down a column gives that pod's role set: the `worker` ove
 and webhook roles off, the `webhook` overlay turns server and worker off, and the monolith (no
 overlay) runs all three.
 
-Three rows are **not** role-differentiated — they are instance-wide defaults, shown per role only
+Four rows are **not** role-differentiated — they are instance-wide defaults, shown per role only
 because operators ask per role: `init-default` is `false` in the `prod` profile for every role, and
-`git.enabled` (`GIT_CHECKOUT_ENABLED`) and `Needs user-auth wiring` are unaffected by which overlay is
-active. `git.enabled` in particular defaults `false` on **every** role until the operator sets the env
-var. There is no `hephaestus.sandbox.enabled`: that flag was
+`git.enabled` (`GIT_CHECKOUT_ENABLED`), `agent.enabled` (`AGENT_ENABLED`) and `Needs user-auth wiring`
+are unaffected by which overlay is active. The two env-var flags in particular default `false` on
+**every** role until the operator sets the variable — no profile turns work on for you. There is no
+`hephaestus.sandbox.enabled`: that flag was
 retired (an arch test now forbids reintroducing it) because the Docker sandbox IS the worker
 capability — it follows `hephaestus.runtime.worker.enabled`.
 
-Two rows read differently from what a bare `docker compose up` produces, because the shipped compose
-files set the env var the base default leaves off:
+One row reads differently from what a bare `docker compose up` produces, because the shipped compose
+file sets the env var the base default leaves off:
 
 - `sync.nats.enabled` is `${NATS_ENABLED:false}` in `application-prod.yml`, but `docker/compose.app.yaml`
   passes `NATS_ENABLED: ${NATS_ENABLED:-true}` to `application-server` — so the compose server pod runs
   with NATS **on**. The `webhook` overlay pins it `true` regardless (it needs the shared `Connection`
   bean); the `worker` overlay pins it `false` (the job queue is PostgreSQL, ADR 0025).
-- `agent.enabled` is `${AGENT_ENABLED:false}` in `application.yml` but `${AGENT_ENABLED:true}` in
-  `application-worker.yml`, while `docker/compose.app.yaml` passes `AGENT_ENABLED: ${AGENT_ENABLED:-false}`
-  to **both** services — so under the shipped compose a worker stays off until the operator sets the var,
-  and outside compose (Kubernetes, systemd) it comes up **on**. See the next section.
 
 `hephaestus.agent.enabled` (`AGENT_ENABLED`) gates three things that must agree, or a split
 deployment silently does half its job. They do **not** share a gate:
 
 - **Submission** (`AgentJobEventListener` / `IssueAgentJobEventListener` / `BotCommandProcessor`,
   which turn PR/issue/bot events into `agent_job` rows) needs only this flag. It wires on *any* pod
-  where the flag is `true`, including a `prod,worker` pod — `application-worker.yml` defaults
-  `AGENT_ENABLED` to `true`, so a worker pod does submit as well as execute.
+  where the flag is `true`, including a `prod,worker` pod — a worker with the flag on submits as well
+  as executes.
 - **Orphan recovery** (`AgentJobZombieSweeper`, which reclaims a dead worker's stuck jobs) needs this
   flag **and** the server role (`@ConditionalOnServerRole`), so it does not double-run on a
   dedicated worker pod.
 - **Execution** (`AgentJobExecutor`, the poll loop that claims and runs jobs) needs this flag **and**
   the worker role.
 
-Set `AGENT_ENABLED=true` on **every** pod that needs any of these — in the split-pod topology that
-is both `application-server` (submission + recovery) and `application-worker` (execution). The
-`application-worker` profile defaults it to `true` on its own, but `application-server` does not, so
-`application-server` needs the env var explicitly.
-
-Two consequences of that per-profile default, in opposite directions:
-
-- **Outside compose** (Kubernetes, systemd, a bare `java -jar`), a pod started with
-  `SPRING_PROFILES_ACTIVE=prod,worker` and none of the env vars below **claims and executes jobs**, and
-  therefore spends LLM budget, without the operator naming `AGENT_ENABLED` anywhere. To run a worker that
-  does not execute — a drain-only or standby pod — set `AGENT_ENABLED=false` explicitly.
-- **Under `docker/compose.app.yaml`**, `AGENT_ENABLED: ${AGENT_ENABLED:-false}` is passed to both
-  services, and an explicit env var always beats a profile default — so the compose worker is **off**
-  until the operator sets `AGENT_ENABLED=true` in `.env`. The profile default never applies there.
+`AGENT_ENABLED` is `false` on every role until you set it, however the pod is started. Set it to
+`true` on **every** pod that needs any of the three — in the split-pod topology that is both
+`application-server` (submission + recovery) and `application-worker` (execution). A pod you never set
+it on claims nothing and spends nothing.
 
 Interactive mentor turns are different from queued practice-review jobs: the HTTP/SSE request and
 its reusable sandbox live on the **application-server replica that accepted the request**. Keep the
@@ -143,10 +130,11 @@ SPRING_PROFILES_ACTIVE=prod,worker
 HEPHAESTUS_HUB_URL=wss://app.example.com/api/workers/connect
 HEPHAESTUS_WORKER_REGISTRATION_TOKEN=<shared bootstrap secret>
 HEPHAESTUS_WORKER_DRAIN_TIMEOUT=5m
+AGENT_ENABLED=true
 ```
 
-`AGENT_ENABLED` is deliberately absent: on the `worker` profile it already defaults to `true`, so this
-list boots a pod that claims and executes jobs. Add `AGENT_ENABLED=false` if you want the opposite.
+Drop the last line for a drain-only or standby pod: without it the worker boots, registers, and claims
+nothing.
 
 No LLM env vars are needed: the LLM proxy runs in-process on this pod (it follows the worker/sandbox
 capability, not `AGENT_ENABLED`) and reads providers

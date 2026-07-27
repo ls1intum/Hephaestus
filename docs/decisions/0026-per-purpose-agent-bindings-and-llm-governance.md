@@ -69,6 +69,59 @@ a crashed job bills the calls it made from proxy-accumulated counters, and enfor
 a capped workspace with an unverifiable month is paused (a cap you cannot verify is not a cap) while
 an uncapped workspace is never paused — the `WARN`/`BLOCK` knob is removed.
 
+### How tight the cap is: the in-flight bound
+
+The submit and claim gates (`AgentJobService.submit`, `AgentJobExecutor`) only decide whether a run may
+*start*. Once it is running it can make many upstream calls, and the ledger those gates read gains
+nothing until the run ends. So the gate that bounds a run in progress is `ProxyBudgetGate`, on the
+proxy's forward path — and what makes it a *bound* rather than a delay is that it judges recorded
+spend **plus the calling execution's own consumed-but-unrecorded spend**
+(`ProxyRouting.BilledAttempt#spentUsd`, priced with the rates frozen onto the attempt at admission).
+An execution's spend-so-far reaches the gate from wherever it accrues — an agent job's own row, a
+mentor turn's `MentorTurnMeter` — and both buffered and streamed calls feed it (`ProxyStreamUsageTap`
+reads the usage frame off an SSE stream as it passes).
+
+For every agent-job attempt and every mentor turn:
+
+> An execution is refused as soon as its OWN completed calls have consumed the headroom the ledger
+> last showed. So it can overshoot the cap by at most the calls it had already dispatched when that
+> last forward was admitted — one call for a sequential runner or Pi's agent loop — never by the whole
+> run.
+
+The in-flight term is what makes that hold. Keyed on the ledger alone, every check during a run would
+see zero of that run's spend, and one admitted job or turn could make unlimited calls against an
+exhausted cap. `ProxyBudgetGateTest` pins the claim.
+
+**The two purses are judged apart.** The instance backstop and a workspace's BYO self-cap
+(`FundingSource.INSTANCE` / `WORKSPACE`) are never summed, so an exhausted host budget cannot 429 calls
+the workspace pays for through its own provider — the two pause independently. An attempt whose funding
+source is unknown has its in-flight spend charged to both, matching how an unattributable call is
+judged against both caps.
+
+**The verdict is cached; the attempt's own spend is not.** The month-window `SUM` is cached per
+workspace for 30s so the proxy does not run it on every forward; the execution's own spend is read
+fresh on every request at no cost, because authenticating the token has already loaded the row (a job)
+or the meter (a mentor turn). Staleness therefore only affects spend by *other* executions and cap
+changes: a workspace that crosses the cap starts being blocked within one TTL, and one whose budget is
+raised unblocks within one TTL. Shrinking the TTL would not tighten the bound above — it is the fresh
+term that produces it — and would put a month-window `SUM` back on the hot path, so it stays fixed. The
+gate never kills a call already streaming; it acts only pre-forward.
+
+**What the bound does not cover.** Every call site that states the bound inherits this list:
+
+- **Concurrency.** Each execution is bounded on its own, so N running concurrently for one workspace
+  can together reach N times the cap before any of them stops. For jobs N is the workspace's
+  `maxConcurrentJobs` — an operator-set number, not an open end; for mentor turns it is the number of
+  developers chatting at once.
+- **Calls the provider reports no usage for.** A streamed call whose provider rejects
+  `stream_options.include_usage` (retried without it, counted as
+  `llm.proxy.stream.usage.unsupported`), or any response with no usage block, contributes nothing to
+  the in-flight term. That execution is bounded only by the ledger term.
+- **A crashed worker's mentor turn, until the reaper runs.** Its spend is on the `chat_message` row but
+  not yet in the ledger, so the gate lets the workspace keep spending against headroom that is already
+  gone. `MentorInFlightReaper` bills the calls the proxy recorded once its window elapses (default
+  `PT70M`, floored at 70 minutes). That is reaper latency, not a lost charge.
+
 ## Consequences
 
 - The runtime resolves a model only from a binding. `agent_config` and the scalar pointers were
