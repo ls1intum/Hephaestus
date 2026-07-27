@@ -18,6 +18,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.servlet.FilterChain;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -550,5 +551,68 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         workspace.setId(7L);
         job.setWorkspace(workspace);
         return job;
+    }
+
+    /**
+     * Why the proxy chain may disable CSRF. CSRF is exploitable only where the browser attaches a
+     * credential by itself; this filter reads one only from {@code Authorization}, so a forged
+     * cross-site request has nothing ambient to ride on. Static analysis flags the
+     * {@code csrf.disable()} in {@link LlmProxySecurityConfig} and cannot see that, so these tests
+     * are what keep the justification honest.
+     *
+     * <p>The negative cases send a token the last case proves is good, so "authenticates nobody"
+     * cannot pass for the trivial reason that the token was bad. They assert the repository is
+     * never even consulted: the filter does not find a credential to look up.
+     */
+    @Nested
+    class NoAmbientCredentialIsAccepted {
+
+        @Test
+        void theSameTokenInACookieAuthenticatesNobody() throws Exception {
+            var request = new MockHttpServletRequest();
+            request.setRemoteAddr("10.0.0.2");
+            request.setCookies(new Cookie("hephaestus_session", VALID_TOKEN), new Cookie("JSESSIONID", VALID_TOKEN));
+
+            filter.doFilterInternal(request, new MockHttpServletResponse(), filterChain);
+
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+            verify(agentJobRepository, never()).findByJobTokenHashAndStatus(any(), any());
+            verify(filterChain, never()).doFilter(any(), any());
+        }
+
+        @Test
+        void theSameTokenInAQueryParameterAuthenticatesNobody() throws Exception {
+            var request = new MockHttpServletRequest();
+            request.setRemoteAddr("10.0.0.2");
+            request.setParameter("access_token", VALID_TOKEN);
+            request.setParameter("token", VALID_TOKEN);
+
+            filter.doFilterInternal(request, new MockHttpServletResponse(), filterChain);
+
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+            verify(agentJobRepository, never()).findByJobTokenHashAndStatus(any(), any());
+            verify(filterChain, never()).doFilter(any(), any());
+        }
+
+        @Test
+        void theSameTokenInTheHeaderDoesAuthenticate() throws Exception {
+            when(
+                agentJobRepository.findByJobTokenHashAndStatus(eq(VALID_TOKEN_HASH), eq(AgentJobStatus.RUNNING))
+            ).thenReturn(Optional.of(createRunningJob()));
+            var authInsideChain = new AtomicReference<Authentication>();
+            doAnswer(invocation -> {
+                authInsideChain.set(SecurityContextHolder.getContext().getAuthentication());
+                return null;
+            })
+                .when(filterChain)
+                .doFilter(any(), any());
+            var request = new MockHttpServletRequest();
+            request.setRemoteAddr("10.0.0.2");
+            request.addHeader("Authorization", "Bearer " + VALID_TOKEN);
+
+            filter.doFilterInternal(request, new MockHttpServletResponse(), filterChain);
+
+            assertThat(authInsideChain.get()).isNotNull();
+        }
     }
 }
