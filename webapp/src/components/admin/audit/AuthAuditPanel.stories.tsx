@@ -87,7 +87,6 @@ export const Default: Story = {
 	},
 };
 
-/** Nothing recorded yet. */
 export const Empty: Story = {
 	parameters: { msw: { handlers: handlers([]) } },
 };
@@ -104,7 +103,6 @@ export const FiltersFromUrl: Story = {
 	parameters: { msw: { handlers: handlers([events[1]]) } },
 };
 
-/** The list failed to load. */
 export const LoadFailed: Story = {
 	parameters: {
 		msw: {

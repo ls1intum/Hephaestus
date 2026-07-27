@@ -182,10 +182,9 @@ export function AgentJobDetailsPanel({
 												</AlertDialogDescription>
 											</AlertDialogHeader>
 											<AlertDialogFooter>
-												{/* Never disabled: with both footer buttons out, this popup has no operable
-											    control at all, which is the shape `ConfirmDialog` exists to prevent. The
-											    request is not cancelled by dismissing; the trigger behind it stays
-											    disabled until it settles. */}
+												{/* Never disabled: a popup with both footer buttons out has no operable
+											    control at all. The trigger behind it stays disabled until the request
+											    settles. ADR 0027. */}
 												<AlertDialogCancel>Keep running</AlertDialogCancel>
 												<AlertDialogAction
 													variant="destructive"

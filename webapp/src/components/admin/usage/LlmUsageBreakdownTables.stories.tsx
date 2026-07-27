@@ -127,7 +127,6 @@ export const Loading: Story = {
 	args: { report: undefined },
 };
 
-/** A month with no AI work at all. */
 export const Empty: Story = {
 	args: { report: report({ byJobType: [] }) },
 };
@@ -143,13 +142,11 @@ export const ByDay: StoryObj<typeof LlmUsageByDayTable> = {
 	args: { report: report(), fx: eur },
 };
 
-/** Per-day, still loading. */
 export const ByDayLoading: StoryObj<typeof LlmUsageByDayTable> = {
 	render: (args) => <LlmUsageByDayTable {...args} />,
 	args: { report: undefined, fx: eur },
 };
 
-/** Per-day, empty month. */
 export const ByDayEmpty: StoryObj<typeof LlmUsageByDayTable> = {
 	render: (args) => <LlmUsageByDayTable {...args} />,
 	args: { report: report({ byDay: [] }), fx: eur },

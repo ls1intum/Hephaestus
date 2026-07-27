@@ -1,6 +1,6 @@
 import { TrendingUp } from "lucide-react";
-import { formatCapUsd, formatCostUsd } from "@/components/admin/ai/job-utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { formatCapUsd, formatCostUsd } from "@/lib/money";
 import { type Fx, FxAmount, spendConversion, spendOfCapConversion } from "./fx";
 import { type BudgetProjection, formatDayLabel } from "./usage-utils";
 

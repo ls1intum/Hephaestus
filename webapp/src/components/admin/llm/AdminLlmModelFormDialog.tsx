@@ -1,5 +1,4 @@
-import { AlertTriangle } from "lucide-react";
-import { useId, useState } from "react";
+import { useState } from "react";
 import type {
 	CreateLlmModelRequest,
 	LlmModel,
@@ -8,37 +7,28 @@ import type {
 	UpdateLlmModelSharingRequest,
 } from "@/api/types.gen";
 import { FacetMultiSelect } from "@/components/common/FacetMultiSelect";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
 	Dialog,
 	DialogBody,
 	DialogContent,
 	DialogDescription,
 	DialogFooter,
+	DialogForm,
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import {
-	Field,
-	FieldContent,
-	FieldDescription,
-	FieldError,
-	FieldLabel,
-	FieldLegend,
-	FieldSet,
-} from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
+import { Field, FieldDescription, FieldLegend, FieldSet } from "@/components/ui/field";
 import type { AdminLlmModelSaveBody } from "@/lib/admin-llm-model-save";
+import type { FieldErrors, LlmModelFormField } from "@/lib/llm-form-validation";
 import {
-	type FieldErrors,
-	type LlmModelFormField,
-	validateLlmModelForm,
-} from "@/lib/llm-form-validation";
+	LlmModelFields,
+	type LlmModelFieldsValue,
+	modelFieldsValueOf,
+	validateModelFields,
+} from "./LlmModelFields";
 import { type ModelAccessScope, ModelAccessScopeChoice } from "./ModelAccessScopeChoice";
-import { PriceModeEditor, type PriceModeValue } from "./PriceModeEditor";
+import type { PriceModeValue } from "./PriceModeEditor";
 import { type WorkspaceOption, workspaceFacetOptions } from "./workspace-options";
 
 export interface AdminLlmModelFormDialogProps {
@@ -64,14 +54,8 @@ function priceValueOf(model: LlmModel | null): PriceModeValue {
 }
 
 /**
- * Create/edit an instance catalog model (#1368). Creation includes initial access; later access
+ * Create/edit an instance catalog model. Creation includes initial access; later access
  * changes use the dedicated access dialog so their immediate impact cannot be bypassed.
- *
- * The body is a separate component keyed on the edited model, so switching which model is edited
- * remounts it with fresh initial state instead of copying props into state from an effect — the same
- * seeding rule as the workspace-scoped form. An effect would leave a window, between the prop change
- * and the effect running, in which the dialog shows the *previous* model's price and sharing under
- * the new model's title.
  */
 export function AdminLlmModelFormDialog({
 	open,
@@ -104,17 +88,9 @@ function AdminLlmModelFormDialogContent({
 	onSave,
 }: AdminLlmModelFormDialogContentProps) {
 	const isEdit = editing !== null;
-	const [displayName, setDisplayName] = useState(editing?.displayName ?? "");
-	const [upstreamModelId, setUpstreamModelId] = useState(editing?.upstreamModelId ?? "");
-	const [contextWindow, setContextWindow] = useState(
-		editing?.contextWindow != null ? String(editing.contextWindow) : "",
+	const [fields, setFields] = useState<LlmModelFieldsValue>(() =>
+		modelFieldsValueOf(editing, priceValueOf(editing)),
 	);
-	const [maxOutputTokens, setMaxOutputTokens] = useState(
-		editing?.maxOutputTokens != null ? String(editing.maxOutputTokens) : "",
-	);
-	const [supportsReasoning, setSupportsReasoning] = useState(editing?.supportsReasoning ?? false);
-	const [enabled, setEnabled] = useState(editing?.enabled ?? false);
-	const [price, setPrice] = useState<PriceModeValue>(() => priceValueOf(editing));
 	// The same shape and the same control as the dedicated access editor: "who may use this model" is
 	// one question, and two screens of one feature answering it two ways reads as two settings.
 	const [accessScope, setAccessScope] = useState<ModelAccessScope>(
@@ -124,38 +100,24 @@ function AdminLlmModelFormDialogContent({
 		editing?.grantedWorkspaceIds ?? [],
 	);
 	const [errors, setErrors] = useState<FieldErrors<LlmModelFormField>>({});
-	const displayNameErrorId = useId();
-	const upstreamModelIdErrorId = useId();
-
-	// The shared rules, not this form's own: a rule the workspace console enforces and the instance
-	// console does not is a rule an admin discovers from a 400.
-	const validate = (): boolean => {
-		const next = validateLlmModelForm({
-			displayName,
-			// The upstream id is immutable, so an edit neither sends nor validates one.
-			...(isEdit ? {} : { upstreamModelId }),
-			contextWindow,
-			maxOutputTokens,
-			...price,
-		});
-		setErrors(next);
-		return Object.keys(next).length === 0;
-	};
 
 	const handleSubmit = (event: React.FormEvent) => {
 		event.preventDefault();
-		if (!validate()) return;
+		const found = validateModelFields(fields, isEdit);
+		setErrors(found);
+		if (Object.keys(found).length > 0) return;
 
+		const { price } = fields;
 		const metadataShared = {
-			displayName: displayName.trim(),
-			contextWindow: contextWindow.trim() ? Number(contextWindow) : undefined,
-			maxOutputTokens: maxOutputTokens.trim() ? Number(maxOutputTokens) : undefined,
-			supportsReasoning,
-			enabled,
+			displayName: fields.displayName.trim(),
+			contextWindow: fields.contextWindow.trim() ? Number(fields.contextWindow) : undefined,
+			maxOutputTokens: fields.maxOutputTokens.trim() ? Number(fields.maxOutputTokens) : undefined,
+			supportsReasoning: fields.supportsReasoning,
+			enabled: fields.enabled,
 		};
 		const metadata: CreateLlmModelRequest | UpdateLlmModelRequest = isEdit
 			? metadataShared
-			: { ...metadataShared, upstreamModelId: upstreamModelId.trim() };
+			: { ...metadataShared, upstreamModelId: fields.upstreamModelId.trim() };
 
 		const priceBody: UpdateLlmModelPriceRequest = {
 			pricingMode: price.pricingMode,
@@ -177,9 +139,7 @@ function AdminLlmModelFormDialogContent({
 
 	return (
 		<DialogContent className="sm:max-w-lg">
-			{/* `contents`, so the header/body/footer are the popup's own flex children: a `<form>` with a
-			    layout box of its own would defeat the pinned-header/scrolling-body column. */}
-			<form onSubmit={handleSubmit} className="contents" noValidate>
+			<DialogForm onSubmit={handleSubmit}>
 				<DialogHeader>
 					<DialogTitle>{isEdit ? "Edit model" : "Add model"}</DialogTitle>
 					<DialogDescription>
@@ -191,136 +151,15 @@ function AdminLlmModelFormDialogContent({
 				    workspace picker, past 1000 px. Only the body scrolls, so the title and "Add model"
 				    stay reachable. */}
 				<DialogBody className="space-y-4 py-1">
-					<Field data-invalid={Boolean(errors.displayName)}>
-						<FieldLabel htmlFor="llm-model-display-name">Display name</FieldLabel>
-						<Input
-							id="llm-model-display-name"
-							value={displayName}
-							onChange={(e) => setDisplayName(e.target.value)}
-							placeholder="e.g. GPT-5"
-							// `required` is semantics only — the form is `noValidate`, so the browser never acts
-							// on it — but it is what tells a screen reader the field is required before submit
-							// (WCAG SC 3.3.2), and the workspace twin already marks the same two fields.
-							required
-							aria-invalid={Boolean(errors.displayName)}
-							// Announces *why* the field is invalid on the way back to it, which `aria-invalid`
-							// alone never does (WCAG SC 3.3.1).
-							aria-describedby={errors.displayName ? displayNameErrorId : undefined}
-						/>
-						{errors.displayName && (
-							<FieldError id={displayNameErrorId}>{errors.displayName}</FieldError>
-						)}
-					</Field>
-
-					<Field data-invalid={Boolean(errors.upstreamModelId)}>
-						<FieldLabel htmlFor="llm-model-upstream-id">Upstream model id</FieldLabel>
-						<Input
-							id="llm-model-upstream-id"
-							value={upstreamModelId}
-							onChange={(e) => setUpstreamModelId(e.target.value)}
-							disabled={isEdit}
-							placeholder="e.g. openai/gpt-5"
-							required={!isEdit}
-							autoComplete="off"
-							list="llm-model-upstream-id-options"
-							aria-invalid={Boolean(errors.upstreamModelId)}
-							aria-describedby={errors.upstreamModelId ? upstreamModelIdErrorId : undefined}
-						/>
-						{probedModelIds.length > 0 && (
-							<datalist id="llm-model-upstream-id-options">
-								{probedModelIds.map((id) => (
-									<option key={id} value={id} />
-								))}
-							</datalist>
-						)}
-						<FieldDescription>
-							{isEdit
-								? "Create a new model to use a different upstream id."
-								: "The exact id the provider expects. Slashes are part of the id."}
-						</FieldDescription>
-						{errors.upstreamModelId && (
-							<FieldError id={upstreamModelIdErrorId}>{errors.upstreamModelId}</FieldError>
-						)}
-					</Field>
-
-					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-						<Field>
-							<FieldLabel htmlFor="llm-model-context-window">
-								Context window <span className="font-normal text-muted-foreground">(optional)</span>
-							</FieldLabel>
-							<Input
-								id="llm-model-context-window"
-								type="number"
-								min={0}
-								value={contextWindow}
-								onChange={(e) => setContextWindow(e.target.value)}
-							/>
-						</Field>
-						<Field>
-							<FieldLabel htmlFor="llm-model-max-output">
-								Max output tokens{" "}
-								<span className="font-normal text-muted-foreground">(optional)</span>
-							</FieldLabel>
-							<Input
-								id="llm-model-max-output"
-								type="number"
-								min={0}
-								value={maxOutputTokens}
-								onChange={(e) => setMaxOutputTokens(e.target.value)}
-							/>
-						</Field>
-					</div>
-
-					<Field orientation="horizontal">
-						<Checkbox
-							id="llm-model-supports-reasoning"
-							checked={supportsReasoning}
-							onCheckedChange={(checked) => setSupportsReasoning(checked === true)}
-						/>
-						<FieldContent>
-							<FieldLabel htmlFor="llm-model-supports-reasoning" className="font-normal">
-								Supports a reasoning mode
-							</FieldLabel>
-						</FieldContent>
-					</Field>
-
-					<Field orientation="horizontal">
-						<FieldContent>
-							<FieldLabel htmlFor="llm-model-enabled">Active</FieldLabel>
-							<FieldDescription>
-								{isEdit
-									? "Only active models can be selected for new workspace requests."
-									: "New models are saved inactive. Review the saved price and sharing before activating."}
-							</FieldDescription>
-						</FieldContent>
-						<Switch
-							id="llm-model-enabled"
-							checked={enabled}
-							disabled={!isEdit || price.pricingMode === "UNPRICED"}
-							onCheckedChange={setEnabled}
-						/>
-					</Field>
-
-					{editing?.enabled && !enabled && (
-						<Alert variant="warning">
-							<AlertTriangle aria-hidden />
-							<AlertTitle>Work on this model stops immediately, in every workspace</AlertTitle>
-							<AlertDescription>
-								Practice detection and Mentor can't run on it until you reactivate it, or until each
-								workspace picks another model.
-							</AlertDescription>
-						</Alert>
-					)}
-
-					<PriceModeEditor
+					<LlmModelFields
 						audience="instance"
-						idPrefix="llm-model-price"
-						value={price}
-						onChange={(next) => {
-							setPrice(next);
-							if (next.pricingMode === "UNPRICED") setEnabled(false);
-						}}
+						idPrefix="llm-model"
+						isEdit={isEdit}
+						wasEnabled={editing?.enabled ?? false}
+						value={fields}
+						onChange={setFields}
 						errors={errors}
+						upstreamIdSuggestions={probedModelIds}
 					/>
 
 					{!isEdit && (
@@ -365,7 +204,7 @@ function AdminLlmModelFormDialogContent({
 						{isEdit ? "Save changes" : "Add model"}
 					</Button>
 				</DialogFooter>
-			</form>
+			</DialogForm>
 		</DialogContent>
 	);
 }

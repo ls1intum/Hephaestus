@@ -46,7 +46,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Detection is bound to a runnable model; triggers and policy populated. */
 export const RuntimeBound: Story = {};
 
 /** Practice detection has no model — nothing runs until one is chosen on the AI models page. */

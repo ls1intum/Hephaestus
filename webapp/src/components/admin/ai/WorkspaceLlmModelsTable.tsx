@@ -18,17 +18,13 @@ import { priceLabel } from "@/lib/llm-pricing";
 
 export interface WorkspaceLlmModelsTableProps {
 	models: WorkspaceLlmModel[];
-	/**
-	 * Every model with a write in flight, not just the most recent one. Deleting two rows without
-	 * waiting is normal here, and a single "which row is busy" id re-enables the first row's Delete
-	 * the moment the second settles.
-	 */
+	/** Ids of the models with a write in flight — see {@link usePendingMutationIds}. */
 	mutatingIds: ReadonlySet<number>;
 	onEdit: (model: WorkspaceLlmModel) => void;
 	onDelete: (model: WorkspaceLlmModel) => void;
 }
 
-/** Models on the workspace's own connected provider (#1368) — price framing uses workspace wording. */
+/** Models on the workspace's own connected provider — price framing uses workspace wording. */
 export function WorkspaceLlmModelsTable({
 	models,
 	mutatingIds,

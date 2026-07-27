@@ -72,7 +72,6 @@ export const NoProjection: Story = {
 	args: { projection: null },
 };
 
-/** The pace stays under the cap: a month-end estimate, but no date it is reached. */
 export const PaceStaysUnderCap: Story = {
 	args: { projection: { projectedMonthEndUsd: 47.5, reachedOn: null } },
 };
@@ -82,7 +81,6 @@ export const UsdOnly: Story = {
 	args: { fx: null },
 };
 
-/** Right at the wall. */
 export const AtTheCap: Story = {
 	args: {
 		percent: 100,

@@ -5,8 +5,7 @@ export interface DetailRowProps {
 
 /**
  * One label/value pair of a detail sheet's `<dl>` — the row renderer the "inspect this record"
- * sheets use, so a job sheet and an audit sheet read the same way. (`SyncJobsTable` still hand-rolls
- * the same construct in its expanded row; it is the one holdout.)
+ * sheets use, so a job sheet and an audit sheet read the same way.
  *
  * `dt`/`dd` is what associates the two programmatically; a pair of neighbouring spans reads as two
  * unrelated strings to a screen reader. The fixed label column aligns every row's value on one edge,

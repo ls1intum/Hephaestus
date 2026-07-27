@@ -36,10 +36,7 @@ function renderDialog(overrides: Partial<BudgetAmountDialogProps> = {}) {
  */
 describe("the cap editor's currency hint", () => {
 	it("withdraws the estimate when the month behind the open dialog closes", () => {
-		// The dialog outlives the check that opened it: `open` is plain React state, so stepping the
-		// month behind it — browser Back after Previous/Next, or a UTC month rolling over while it
-		// sits there — leaves it on screen against a closed month's frozen rate. "at today's rate"
-		// would then quote a rate the page behind it says no longer changes.
+		// See `fxCapHint`: the dialog outlives the check that opened it.
 		const { rerender } = renderDialog();
 		expect(screen.getByText(/at today's rate/i)).toBeTruthy();
 

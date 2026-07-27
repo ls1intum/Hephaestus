@@ -41,11 +41,7 @@ export interface AdminLlmConnectionsTableProps {
 	isError: boolean;
 	error?: unknown;
 	onRetry?: () => void;
-	/**
-	 * Ids of the rows with a write in flight, read from the mutation cache by the container. A set,
-	 * not one id: two rows can be mid-write at once, and a single id re-enables the still-running row
-	 * as soon as the other settles.
-	 */
+	/** Ids of the connections with a write in flight — see {@link usePendingMutationIds}. */
 	mutatingIds: ReadonlySet<number>;
 	selectedId: number | null;
 	onSelect: (connection: LlmConnection) => void;
@@ -91,7 +87,7 @@ function ConnectionsTableHeader() {
 	);
 }
 
-/** Instance-admin provider connections list (#1368). Credentials are never shown here at all. */
+/** Instance-admin provider connections list. Credentials are never shown here at all. */
 export function AdminLlmConnectionsTable({
 	connections,
 	modelCounts,

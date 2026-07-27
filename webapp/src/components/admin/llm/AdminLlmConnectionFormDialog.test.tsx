@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { LlmConnection } from "@/api/types.gen";
 import { validateLlmConnectionForm } from "@/lib/llm-form-validation";
@@ -104,6 +104,23 @@ describe("AdminLlmConnectionFormDialog", () => {
 		expect(rejection).toBeTruthy();
 		expect(screen.getByText(rejection as string)).toBeTruthy();
 		expect(onCreate).not.toHaveBeenCalled();
+	});
+
+	it("keeps a probe result while the connection is being named", () => {
+		// The probe answers a question about an endpoint and a credential; the display name is not one
+		// of its inputs, so naming the connection afterwards must not throw the discovery away — the
+		// model form's datalist is seeded from it.
+		const onProbe = vi.fn();
+		const onProbed = vi.fn();
+		renderDialog({ onProbe, onProbed });
+		fireEvent.click(screen.getByRole("button", { name: "Test & fetch models" }));
+		act(() => onProbe.mock.calls[0]?.[1].onSuccess({ reachable: true, models: ["gpt-5"] }));
+		expect(screen.getByText("gpt-5")).toBeTruthy();
+
+		fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "Production" } });
+
+		expect(screen.getByText("gpt-5")).toBeTruthy();
+		expect(onProbed).toHaveBeenLastCalledWith(["gpt-5"]);
 	});
 
 	it("ignores an in-flight probe after its connection inputs change", () => {

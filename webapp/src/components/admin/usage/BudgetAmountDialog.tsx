@@ -7,6 +7,7 @@ import {
 	DialogContent,
 	DialogDescription,
 	DialogFooter,
+	DialogForm,
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
@@ -53,9 +54,8 @@ export function BudgetAmountDialog({
 }: BudgetAmountDialogProps) {
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			{/* Keyed on the value the form seeds from, the way the five sibling LLM dialogs key on
-			    `editing` — so the input can never carry the previous subject's amount, and a caller
-			    cannot forget to say so. */}
+			{/* Keyed on the value the form seeds from, so the input can never carry the previous
+			    subject's amount and a caller cannot forget to say so. */}
 			{open && (
 				<BudgetAmountDialogContent
 					key={contentProps.currentValueUsd ?? "none"}
@@ -126,9 +126,7 @@ function BudgetAmountDialogContent({
 
 	return (
 		<DialogContent>
-			{/* noValidate: left to the browser, `min`/`step` block submit with a native bubble and the
-			    field's own `FieldError` explanation never renders. */}
-			<form onSubmit={handleSubmit} className="contents" noValidate>
+			<DialogForm onSubmit={handleSubmit}>
 				<DialogHeader>
 					<DialogTitle>{title}</DialogTitle>
 					<DialogDescription>{description}</DialogDescription>
@@ -148,9 +146,7 @@ function BudgetAmountDialogContent({
 								placeholder="e.g. 25.00"
 								value={value}
 								aria-invalid={isInvalid}
-								// Described-by, not a live region: the latter would interrupt typing once per digit.
-								// Both the estimate and the rejection reason, so tabbing back to a field marked
-								// invalid announces *why* rather than just "invalid" (WCAG SC 3.3.1).
+								// Both the estimate and the rejection reason.
 								aria-describedby={
 									[fxHint != null ? fxHintId : null, isInvalid ? errorId : null]
 										.filter(Boolean)
@@ -194,7 +190,7 @@ function BudgetAmountDialogContent({
 						{submitLabel}
 					</Button>
 				</DialogFooter>
-			</form>
+			</DialogForm>
 		</DialogContent>
 	);
 }

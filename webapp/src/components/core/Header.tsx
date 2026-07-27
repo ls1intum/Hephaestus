@@ -96,7 +96,6 @@ export default function Header({
 							<span className="text-xl font-semibold">Hephaestus</span>
 						</Link>
 					)}
-					{/* Release version in production; environment pill elsewhere. */}
 					{badge.kind === "release" ? (
 						<Tooltip>
 							<TooltipTrigger

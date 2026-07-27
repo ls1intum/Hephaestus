@@ -34,7 +34,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Connect your own AI provider — the glossary's verbatim copy moment appears in the description. */
+/** Connect your own AI provider. The description is the copy the cost vocabulary pins verbatim. */
 export const Connect: Story = {};
 
 /** Editing an already-connected provider; the key field shows the masked placeholder. */
@@ -67,8 +67,6 @@ export const MobileReflow: Story = {
 /** Submitting without a display name surfaces validation. */
 export const ValidationError: Story = {
 	play: async () => {
-		// Dialog renders in a portal → query the document. `toBeInTheDocument` (not `toBeVisible`):
-		// the popup's enter transition can still be animating opacity when this assertion runs.
 		await userEvent.click(await screen.findByRole("button", { name: /^connect provider$/i }));
 		await expect(await screen.findByText(/display name is required/i)).toBeInTheDocument();
 	},

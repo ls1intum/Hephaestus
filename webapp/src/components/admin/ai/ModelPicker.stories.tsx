@@ -87,8 +87,6 @@ export const OpensAndListsGroups: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await userEvent.click(canvas.getByRole("combobox"));
-		// The popup renders in a portal → query the document. `toBeInTheDocument` (not `toBeVisible`):
-		// the popup's enter transition can still be animating opacity when this assertion runs.
 		await expect(await screen.findByRole("option", { name: /GPT-5/ })).toBeInTheDocument();
 		await expect(await screen.findByRole("option", { name: /My OpenAI key/ })).toBeInTheDocument();
 	},

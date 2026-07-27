@@ -82,8 +82,7 @@ export const AccentInsensitiveSearch: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await userEvent.click(canvas.getByRole("combobox", { name: "Workspaces" }));
-		// The popup renders in a portal → query the document, not the canvas. By placeholder: Base UI's
-		// combobox input is itself `role="combobox"`, not a textbox.
+		// By placeholder: Base UI's combobox input is itself `role="combobox"`, not a textbox.
 		await userEvent.type(await screen.findByPlaceholderText("Search…"), "arztliche");
 		await expect(await screen.findByRole("option", { name: /Ärztliche/ })).toBeInTheDocument();
 		await expect(screen.queryByRole("option", { name: /Teaching/ })).toBeNull();

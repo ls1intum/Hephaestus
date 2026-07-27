@@ -102,6 +102,51 @@ describe("AdminLlmModelFormDialog", () => {
 		expect(onSave).not.toHaveBeenCalled();
 	});
 
+	it("says why an out-of-range token count was rejected, instead of a Save that does nothing", () => {
+		const onSave = renderDialog();
+		fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "GPT-5" } });
+		fireEvent.change(screen.getByLabelText("Upstream model id"), { target: { value: "gpt-5" } });
+		const contextWindow = screen.getByLabelText(/^Context window/);
+		const maxOutput = screen.getByLabelText(/^Max output tokens/);
+		fireEvent.change(contextWindow, { target: { value: "3000000000" } });
+		fireEvent.change(maxOutput, { target: { value: "3000000000" } });
+
+		fireEvent.click(screen.getByRole("button", { name: "Add model" }));
+
+		// The wording is `llm-form-validation`'s; what this dialog is answerable for is that a rule it
+		// enforces reaches the reader at all. Without this the submit was a dead end: validation
+		// failed, nothing was saved, and the screen said nothing.
+		const rejected = validateLlmModelForm({
+			displayName: "GPT-5",
+			upstreamModelId: "gpt-5",
+			contextWindow: "3000000000",
+			maxOutputTokens: "3000000000",
+			pricingMode: "UNPRICED",
+		});
+		expect(rejected.contextWindow).toBeTruthy();
+		expect(onSave).not.toHaveBeenCalled();
+
+		const alerts = screen.getAllByRole("alert");
+		expect(alerts.map((alert) => alert.textContent)).toEqual([
+			rejected.contextWindow,
+			rejected.maxOutputTokens,
+		]);
+		// Announced *on the way back to the field*, which `aria-invalid` alone never does (SC 3.3.1).
+		for (const [field, alert] of [
+			[contextWindow, alerts[0]],
+			[maxOutput, alerts[1]],
+		] as const) {
+			expect(field.getAttribute("aria-invalid")).toBe("true");
+			expect(field.getAttribute("aria-describedby")).toBe(alert?.id);
+		}
+
+		// And the form is not wedged: correcting the value gets the admin through.
+		fireEvent.change(contextWindow, { target: { value: "200000" } });
+		fireEvent.change(maxOutput, { target: { value: "8000" } });
+		fireEvent.click(screen.getByRole("button", { name: "Add model" }));
+		expect(onSave).toHaveBeenCalledTimes(1);
+	});
+
 	it("turns an active model off when its price becomes unknown", () => {
 		const onSave = vi.fn();
 		const editing: LlmModel = {

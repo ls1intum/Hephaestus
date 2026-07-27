@@ -100,7 +100,6 @@ export const WorkspaceScope: StoryObj<typeof WorkspaceConfigAuditPanel> = {
 	args: { search: {}, onSearchChange: fn(), workspaceSlug: "acme" },
 };
 
-/** Nothing has been changed yet. */
 export const Empty: Story = {
 	parameters: { msw: { handlers: handlers([]) } },
 };
@@ -117,7 +116,6 @@ export const FiltersFromUrl: Story = {
 	parameters: { msw: { handlers: handlers([entries[1]]) } },
 };
 
-/** The list failed to load. */
 export const LoadFailed: Story = {
 	parameters: {
 		msw: {

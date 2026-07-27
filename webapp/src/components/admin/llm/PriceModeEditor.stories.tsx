@@ -24,7 +24,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Instance admin: priced model, shows the per-1M rate inputs. */
 export const InstancePriced: Story = {};
 
 /** Instance admin: an intentional no-charge declaration, with the required note field. */
@@ -32,7 +31,6 @@ export const InstanceNoCharge: Story = {
 	args: { value: { pricingMode: "NO_CHARGE", note: "self-hosted, no cost" } },
 };
 
-/** Instance admin: no price set yet. */
 export const InstanceUnpriced: Story = {
 	args: { value: { pricingMode: "UNPRICED" } },
 };

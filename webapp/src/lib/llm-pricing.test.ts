@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { formatRateUsd } from "@/components/admin/ai/job-utils";
 import { priceLabel } from "./llm-pricing";
+import { formatRateUsd } from "./money";
 
 describe("priceLabel", () => {
 	/**
@@ -8,7 +8,7 @@ describe("priceLabel", () => {
 	 * list has to carry the digits that provider printed. The spend formatter clamps to cents, which
 	 * is right for money spent and wrong for a rate: it would turn $0.075 into "$0.08" and $0.003 into
 	 * the literal "<$0.01", which is not a number at all. What the digits look like is
-	 * `formatRateUsd`'s to decide and `job-utils.test.tsx`'s to state; the claim here is that the
+	 * `formatRateUsd`'s to decide and `money.test.ts`'s to state; the claim here is that the
 	 * label is composed from *that* formatter rather than the other one.
 	 */
 	it("renders a sub-cent rate as the number the provider publishes", () => {

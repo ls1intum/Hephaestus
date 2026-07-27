@@ -41,11 +41,9 @@ function ConfirmHarness(props: ConfirmDialogProps<Row>) {
  *
  * It names the row in its title, because a modal that says only "Are you sure?" is a modal nobody
  * can answer. It closes the moment it is confirmed — the request it starts is the row's business,
- * not the popup's — which is what keeps a second click from re-sending a delete, and what keeps a
- * pending request from ever holding a popup open with both of its buttons disabled.
+ * not the popup's.
  *
- * Dismissal (Escape, Cancel) is covered by `ConfirmDialog.test.tsx`, which asserts the same three
- * things this file could only restate: both footer buttons enabled, the popup gone, nothing acted on.
+ * Dismissal (Escape, Cancel) is covered by `ConfirmDialog.test.tsx`.
  */
 const meta = {
 	// The component is generic; the stories pin it to one row type so the render props are typed.

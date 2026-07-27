@@ -1,10 +1,5 @@
 import type { LlmUsageByJobType, WorkspaceLlmUsageReport } from "@/api/types.gen";
-import {
-	formatCostUsd,
-	formatRateUsd,
-	formatTokens,
-	MoneyCell,
-} from "@/components/admin/ai/job-utils";
+import { formatTokens, MoneyCell } from "@/components/admin/ai/job-utils";
 import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
 import {
 	Table,
@@ -16,6 +11,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { formatCostUsd, formatRateUsd } from "@/lib/money";
 import { type Fx, FxSpendLine } from "./fx";
 import { formatUsageDay, JOB_TYPE_LABELS } from "./usage-utils";
 
@@ -217,12 +213,7 @@ function AvgPerRun({ row }: { row: LlmUsageByJobType }) {
 }
 
 export interface LlmUsageByDayTableProps {
-	/**
-	 * The whole report, not a bare `rows` array — that is what makes the money rule impossible to
-	 * forget. Re-adding the row costs in float would drift from the exact figure the server already
-	 * put on the same payload, and become a second source of truth for a number the budget gate
-	 * enforces against. Omit while it loads, to keep the table shell stable.
-	 */
+	/** The whole report, for the same reason as {@link LlmUsageByJobTypeTableProps.report}. */
 	report?: WorkspaceLlmUsageReport;
 	/** Display-only conversion for the totals row; per-day cells stay USD-only. */
 	fx?: Fx;

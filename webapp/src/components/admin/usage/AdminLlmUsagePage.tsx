@@ -3,13 +3,13 @@ import { CircleAlert, CircleDollarSign } from "lucide-react";
 import { useId } from "react";
 import type { WorkspaceLlmUsageReport } from "@/api/types.gen";
 import { BudgetExhaustedAlert } from "@/components/admin/ai/BudgetExhaustedAlert";
-import { formatCapUsd, formatCostUsd } from "@/components/admin/ai/job-utils";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatCapUsd, formatCostUsd } from "@/lib/money";
 import { BudgetPaceAlert } from "./BudgetPaceAlert";
 import { CapIsNotMonthScoped } from "./CapIsNotMonthScoped";
 import { CAP_STATE_LABELS, CapMeter, capState } from "./CapMeter";
@@ -59,7 +59,7 @@ export interface AdminLlmUsagePageProps {
  * Workspace-admin cost control for one month.
  *
  * The workspace lives under two independent caps that are different people's money and are never
- * summed (#1368 glossary rule #2): the *shared-model budget* its host sets and funds, and the
+ * summed (`docs/contributor/llm-cost-vocabulary.md`, rule 2): the *shared-model budget* its host sets and funds, and the
  * *provider cap* the workspace sets on its own provider. They pause independently, so every banner
  * here names whose cap tripped and routes to whoever can lift it — the workspace admin can act on
  * their own cap, and on the host's they can only move a purpose across.

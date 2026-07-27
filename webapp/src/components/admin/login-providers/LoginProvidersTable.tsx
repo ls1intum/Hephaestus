@@ -46,11 +46,7 @@ interface LoginProvidersTableProps {
 	error?: unknown;
 	/** Refetch the provider list after a failure. */
 	onRetry?: () => void;
-	/**
-	 * Registration ids of the rows with a write in flight (toggle / edit / delete), read from the
-	 * mutation cache by the container. A set, not one id: two rows can be mid-write at once, and a
-	 * single id re-enables the still-running row as soon as the other settles.
-	 */
+	/** Registration ids of the rows with a write in flight — see {@link usePendingMutationIds}. */
 	mutatingIds: ReadonlySet<string>;
 	onEdit: (provider: LoginProviderView) => void;
 	onToggleEnabled: (provider: LoginProviderView, enabled: boolean) => void;
@@ -234,11 +230,8 @@ export function LoginProvidersTable({
 
 			<AlertDialog
 				open={deleting != null}
-				// Dismissal is always allowed, including while the DELETE is in flight. Refusing it would
-				// leave Escape and a disabled Cancel with no way out of a popup whose only other control is
-				// also disabled — a keyboard trap (WCAG 2.2 SC 2.1.2), unbounded against a connection that
-				// never answers. The request is not cancelled; the row it belongs to stays disabled until
-				// it settles, and a failure still toasts.
+				// Dismissal is always allowed, including while the DELETE is in flight — ADR 0027:
+				// https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0027-dialog-lifetime-and-where-a-write-outcome-lands.md
 				onOpenChange={(open) => {
 					if (!open) setDeleting(null);
 				}}

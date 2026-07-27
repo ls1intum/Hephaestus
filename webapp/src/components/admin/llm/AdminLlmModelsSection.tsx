@@ -29,11 +29,7 @@ export interface AdminLlmModelsSectionProps {
 	connectionEnabled: boolean;
 	workspaceOptions: WorkspaceOption[];
 	models: LlmModel[];
-	/**
-	 * Ids of the rows with a write in flight, read from the mutation cache by the container. A set,
-	 * not one id: deleting one model and saving another's access overlap, and a single id re-enables
-	 * the still-running row as soon as the other settles.
-	 */
+	/** Ids of the models with a write in flight — see {@link usePendingMutationIds}. */
 	mutatingIds: ReadonlySet<number>;
 	onAdd: () => void;
 	onEdit: (model: LlmModel) => void;
@@ -63,7 +59,7 @@ function shareLabel(model: LlmModel, workspaces: WorkspaceOption[]): string {
 		: `${firstName} + ${model.grantedWorkspaceIds.length - 1} more`;
 }
 
-/** Models under one instance connection (#1368), including an explicit workspace-access action. */
+/** Models under one instance connection, including an explicit workspace-access action. */
 export function AdminLlmModelsSection({
 	connectionDisplayName,
 	connectionEnabled,

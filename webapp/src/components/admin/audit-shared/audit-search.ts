@@ -3,15 +3,6 @@ import type { DateRange } from "react-day-picker";
 import { z } from "zod";
 
 /**
- * URL state for the audit surfaces: the whole filter selection lives in the query string, because an
- * audit view exists to be cited.
- *
- * Every field is `.catch()`-ed rather than merely optional. A stale link from a months-old ticket, or
- * a hand-typed `?accountId=abc`, must still open the log — just less narrowly filtered — instead of
- * hitting `validateSearch` and rendering an error page. Values stay loose strings for the same reason
- * and are narrowed to the API's enums at the call site.
- */
-/**
  * A repeated filter value. Accepts the single-value form too, because that is what the API takes
  * (`?action=CREATED&action=DELETED`) and therefore what someone hand-writing a URL will try —
  * discarding it would filter nothing while showing no active filter.
@@ -21,6 +12,15 @@ const multiValue = z
 	.optional()
 	.catch(undefined);
 
+/**
+ * URL state for the audit surfaces: the whole filter selection lives in the query string, because an
+ * audit view exists to be cited.
+ *
+ * Every field is `.catch()`-ed rather than merely optional. A stale link from a months-old ticket, or
+ * a hand-typed `?accountId=abc`, must still open the log — just less narrowly filtered — instead of
+ * hitting `validateSearch` and rendering an error page. Values stay loose strings for the same reason
+ * and are narrowed to the API's enums at the call site.
+ */
 export const auditSearchSchema = z.object({
 	tab: z.enum(["signins", "settings"]).catch("signins"),
 	// Sign-ins tab

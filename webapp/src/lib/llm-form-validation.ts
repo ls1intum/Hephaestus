@@ -4,11 +4,11 @@ import type { PricingMode } from "@/lib/llm-pricing";
 /**
  * Client-side validation for the LLM connection and model forms.
  *
- * Zod + `safeParse`, the same shape the workspace-creation wizard uses (`create-workspace/schemas.ts`),
- * because the forms set `noValidate` — a deliberate choice, so the messages render in `FieldError`
- * rather than in an unstylable browser bubble — which also makes `required`, `min`, `step` and
- * `type="url"` inert. Something has to enforce them, and it may as well be the same something for
- * every field.
+ * Zod + `safeParse`, the same shape the workspace-creation wizard uses
+ * (`components/workspace/create-workspace/schemas.ts`), because the forms set `noValidate` — a
+ * deliberate choice, so the messages render in `FieldError` rather than in an unstylable browser
+ * bubble — which also makes `required`, `min`, `step` and `type="url"` inert. Something has to
+ * enforce them, and it may as well be the same something for every field.
  *
  * The rules mirror the server's (`CreateWorkspaceLlmModelRequestDTO`, `LlmPriceValidation`,
  * `EgressPolicy`) so a form the browser accepts is one the server accepts. Deliberately *not*

@@ -124,6 +124,13 @@ export function UserCard(props: UserCardProps) {
 - **Routes** (`src/routes/**`): Data fetching, loaders, auth guards, side effects
 - **Components** (`src/components/**`): Pure, rely solely on props
 
+### Seeding a form from props
+
+Put the form body in its own component and `key` it on the subject being edited, so switching
+subjects remounts it with fresh initial state. Never copy props into state from an effect: between
+the prop change and the effect running the form shows the *previous* subject's values under the new
+subject's title.
+
 ## Data Fetching (TanStack Query)
 
 Always spread generated options from the @hey-api client:
@@ -374,12 +381,23 @@ Cover for each component:
 
 Use play functions for interaction testing.
 
+### Play functions: portals and transitions
+
+Dialogs, popovers, selects and toasts render into a portal, so they are on `document` and not in the
+story canvas — query them with `screen`, not `within(canvasElement)`. Assert `toBeInTheDocument()`
+rather than `toBeVisible()`: the popup's enter transition can still be animating opacity when the
+assertion runs.
+
 ## Accessibility
 
 - Follow shadcn/ui accessibility patterns
 - Keep ARIA roles aligned with design
 - Manage focus on dialog open/close
 - Provide keyboard shortcuts via hooks
+- A field marked `aria-invalid` also points `aria-describedby` at the element carrying its message.
+  `aria-invalid` announces *that* a field is wrong and never *why*, so a reader tabbing back to it
+  hears "invalid" alone (WCAG 2.2 SC 3.3.1). Use `aria-describedby`, not a live region — a live
+  region re-announces on every keystroke.
 
 ## Generated Files (Do Not Edit)
 

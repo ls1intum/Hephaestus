@@ -45,7 +45,6 @@ export const Uncapped: Story = {
 	args: { currentValueUsd: null },
 };
 
-/** Save in flight — inputs and actions disabled. */
 export const Pending: Story = {
 	args: { isPending: true },
 };
@@ -111,17 +110,7 @@ export const WithLiveCurrencyHint: Story = {
 	},
 };
 
-/**
- * The same dialog over a closed month. A cap applies from the moment it is saved, but a closed
- * month's rate is frozen inside it, so "at today's rate" would be quoting a rate the page behind
- * this dialog says no longer changes. The editors are withheld on a closed month — this covers the
- * dialog outliving that check: `open` is plain React state, so browser Back steps the month behind
- * an already-open dialog, and a UTC month can roll over while it sits there.
- *
- * The withdrawal itself is asserted twice already — on `fxCapHint` in `fx.test.tsx`, and across a
- * rerender in `BudgetAmountDialog.test.tsx`, which is the only form that reaches the flip. This is
- * the picture of the result.
- */
+/** The same dialog over a closed month, with the estimate withdrawn — see `fxCapHint` for why. */
 export const OnAClosedMonthTheHintIsWithdrawn: Story = {
 	args: { currentValueUsd: 50, fx: EUR, isCurrentMonth: false },
 };

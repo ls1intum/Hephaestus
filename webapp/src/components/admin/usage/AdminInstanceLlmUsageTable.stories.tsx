@@ -179,7 +179,6 @@ export const Default: Story = {
 	},
 };
 
-/** One workspace expanded to show the existing by-run-type and daily usage rollups. */
 export const Expanded: Story = {
 	args: {
 		expandedWorkspaceSlug: pausedOnSharedBudget.workspaceSlug,
@@ -442,7 +441,6 @@ export const EmptyOnDisplayCurrencyInstance: Story = {
 	},
 };
 
-/** Rollup still loading. */
 export const Loading: Story = {
 	args: { rows: [], isLoading: true },
 };

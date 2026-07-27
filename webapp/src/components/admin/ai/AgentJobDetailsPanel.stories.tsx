@@ -31,10 +31,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Completed + delivered run with full usage. */
 export const Completed: Story = {};
 
-/** Running run — exposes the Cancel action. */
 export const Running: Story = {
 	args: { job: mockJobRunning },
 	play: async () => {
@@ -45,12 +43,10 @@ export const Running: Story = {
 	},
 };
 
-/** Timed-out run — error message + exit code surfaced. */
 export const TimedOut: Story = {
 	args: { job: mockJobTimedOut },
 };
 
-/** Completed but delivery failed — exposes Retry delivery + error message. */
 export const FailedDelivery: Story = {
 	args: { job: mockJobFailedDelivery },
 };

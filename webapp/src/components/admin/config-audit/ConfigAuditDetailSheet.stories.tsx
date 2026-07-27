@@ -41,10 +41,7 @@ type Story = StoryObj<typeof meta>;
 /** A settings edit by a named admin: two fields changed, both listed with old and new values. */
 export const Default: Story = {
 	play: async () => {
-		// The sheet is portalled, so the queries run against the document rather than the canvas.
 		const body = within(document.body);
-		// Presence, not visibility: the sheet animates in, so a visibility assertion here races the
-		// enter transition rather than testing anything about the content.
 		// The workspace is named *and* numbered, so a row stays identifiable after a rename.
 		await expect(await body.findByText("Acme (#3)")).toBeInTheDocument();
 		await expect(await body.findByText(/timeoutSeconds/)).toBeInTheDocument();
@@ -109,7 +106,6 @@ export const RawSnapshotsRevealed: Story = {
 	},
 };
 
-/** Closed — the sheet renders nothing. */
 export const Closed: Story = {
 	args: { open: false },
 };

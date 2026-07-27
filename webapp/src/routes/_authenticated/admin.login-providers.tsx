@@ -28,10 +28,8 @@ export const Route = createFileRoute("/_authenticated/admin/login-providers")({
 });
 
 /**
- * Toggling and deleting a provider share one prefix, so one lookup answers "is this row busy" for
- * both. A single `useState("which row is busy")` id cannot: toggle one provider and delete another,
- * and whichever settles first clears the flag for both — the still-running row goes back to looking
- * idle and accepts a second click. Creation is not filed here; it has no row to disable.
+ * Toggling and deleting a provider share one prefix, so one {@link usePendingMutationIds} lookup
+ * covers both. Creation is not filed here; it has no row to disable.
  */
 const PROVIDER_WRITE_MUTATION_KEY = ["adminWriteLoginProvider"];
 

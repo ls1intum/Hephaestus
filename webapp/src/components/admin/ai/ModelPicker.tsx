@@ -65,7 +65,7 @@ function ModelOptions({ models }: { models: AvailableLlmModel[] }) {
 }
 
 /**
- * Model picker for an agent config binding (#1368). Groups by funding source: instance-shared models
+ * Model picker for an agent config binding. Groups by funding source: instance-shared models
  * and models billed through the workspace's own provider accounts. Never shows the upstream model id
  * or the owning connection's endpoint, only the display name and price framing.
  */

@@ -252,10 +252,6 @@ describe("the live hint under a cap field", () => {
 	});
 
 	it("withdraws the estimate on a closed month rather than dating it wrong", () => {
-		// A closed month's `fx` is frozen inside that month, and a cap applies from the moment it is
-		// saved — so "≈ €44 at today's rate" over that rate contradicts the page behind the dialog,
-		// which says those figures no longer change. Today's rate is not in the payload, so there is
-		// no honest figure to substitute.
 		expect(fxCapHint(50, eur, false)).toBeNull();
 	});
 });

@@ -26,15 +26,7 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/mod
 
 type Purpose = AgentBinding["purpose"];
 
-/**
- * Save and turn-off share one prefix, so one lookup answers "is this card busy" for both.
- *
- * One `useMutation` observer per operation tracks only its most recent call, so a single
- * `variables?.path.purpose` cannot describe two cards: save practice detection, then save the mentor
- * without waiting, and the observer's variables flip to `MENTOR` — practice detection re-enables
- * with its own PUT still in flight, and a second click sends it twice. The cache holds one entry per
- * call, so ask it instead.
- */
+/** Save and turn-off share one prefix, so one {@link usePendingMutationIds} lookup covers both. */
 const AGENT_WRITE_MUTATION_KEY = ["workspaceWriteAgent"];
 
 function ModelsContainer() {

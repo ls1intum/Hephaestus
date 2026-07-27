@@ -54,10 +54,8 @@ export const Route = createFileRoute("/_authenticated/admin/models")({
 });
 
 /**
- * Enabling and deleting a connection share one prefix, so one lookup answers "is this row busy" for
- * both. A single `useState("which row is busy")` id cannot: toggle one connection off, delete
- * another, and whichever settles first clears the flag for both — the still-running row goes back to
- * looking idle and accepts a second click. Creation is not filed here; it has no row to disable.
+ * Enabling and deleting a connection share one prefix, so one {@link usePendingMutationIds} lookup
+ * covers both. Creation is not filed here; it has no row to disable.
  */
 const CONNECTION_WRITE_MUTATION_KEY = ["adminWriteLlmConnection"];
 /** Same reason for models: deleting one must not un-disable the row whose access is still saving. */
@@ -386,8 +384,8 @@ function AdminLlmPage() {
 			<AdminLlmModelAccessDialog
 				open={accessModel != null}
 				// Dismissal is always allowed, including while the PUT is in flight. Refusing it leaves
-				// Escape, the close button and Cancel inert with focus held inside the popup, and `fetch`
-				// has no timeout of its own — against a black-holed connection there is then no way out.
+				// Escape, the close button and Cancel inert with focus held inside the popup, and we set no
+				// request timeout — against a black-holed connection there is then no way out.
 				// The request is not cancelled: its toast reports the outcome, and the row it belongs to
 				// stays disabled until it settles, so the dialog cannot be reopened onto a second save.
 				onOpenChange={(open) => {

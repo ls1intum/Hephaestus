@@ -1,12 +1,9 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createMemoryHistory, createRouter, RouterProvider } from "@tanstack/react-router";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import type { LoginProviderView } from "@/api/types.gen";
-import { AuthProvider } from "@/integrations/auth/AuthContext";
 import { server } from "@/mocks/server";
-import { routeTree } from "@/routeTree.gen";
+import { renderRouteAt, TRANSFORM_WAIT } from "@/test/router-harness";
 
 // Mounting the real route pulls in the whole admin layout and its lazy modules.
 vi.setConfig({ testTimeout: 20_000 });
@@ -25,32 +22,8 @@ function provider(registrationId: string, displayName: string): LoginProviderVie
 	};
 }
 
-/** The first mount in a file pays the lazy transform of the whole admin layout — seconds, not 1s. */
-const TRANSFORM_WAIT = { timeout: 10_000 };
-
-/**
- * The real router, not `Route.options.component`: the gate in `admin.tsx`'s `beforeLoad`, the route's
- * `head` and anything it reads off the URL only exist when the route is matched, and a test that
- * calls the component directly cannot tell a working route from an unreachable one.
- */
-async function renderLoginProvidersRoute() {
-	// One client for the guards and the provider, exactly as `main.tsx` wires it.
-	const queryClient = new QueryClient({
-		defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-	});
-	const router = createRouter({
-		routeTree,
-		history: createMemoryHistory({ initialEntries: ["/admin/login-providers"] }),
-		context: { queryClient, auth: undefined },
-	});
-	render(
-		<QueryClientProvider client={queryClient}>
-			<AuthProvider>
-				{/* biome-ignore lint/suspicious/noExplicitAny: the app's router context is wider than this test needs. */}
-				<RouterProvider router={router as any} />
-			</AuthProvider>
-		</QueryClientProvider>,
-	);
+function renderLoginProvidersRoute() {
+	renderRouteAt("/admin/login-providers");
 }
 
 describe("instance login providers route", () => {

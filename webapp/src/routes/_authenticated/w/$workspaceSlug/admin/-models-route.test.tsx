@@ -1,6 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createMemoryHistory, createRouter, RouterProvider } from "@tanstack/react-router";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { delay, HttpResponse, http } from "msw";
 // `@testing-library/user-event` re-exported. Not installed under its own name (see `package.json`),
 // and this is the only import path in the repo that reaches it. `fireEvent` is the house idiom and
@@ -9,19 +7,11 @@ import { userEvent } from "storybook/test";
 import { describe, expect, it, vi } from "vitest";
 import { listAgentsQueryKey } from "@/api/@tanstack/react-query.gen";
 import type { AgentBinding } from "@/api/types.gen";
-import { AuthProvider } from "@/integrations/auth/AuthContext";
 import { server } from "@/mocks/server";
-import { routeTree } from "@/routeTree.gen";
+import { renderRouteAt, TRANSFORM_WAIT } from "@/test/router-harness";
 
 // Mounting the real route pulls in the whole admin layout and its lazy modules.
 vi.setConfig({ testTimeout: 20_000 });
-
-/**
- * The first mount in a file pays the lazy transform of the whole admin layout and its route
- * modules — seconds under a loaded box, well past `findBy`'s own 1s default, which is separate
- * from the `testTimeout` above and is what actually decides these.
- */
-const TRANSFORM_WAIT = { timeout: 10_000 };
 
 const MODELS = [
 	{
@@ -105,23 +95,7 @@ function mockModelsRoute(bindings: () => AgentBinding[]) {
 
 async function renderModelsRoute(bindings: () => AgentBinding[]) {
 	mockModelsRoute(bindings);
-	// One client for the guards and the provider, exactly as `main.tsx` wires it.
-	const queryClient = new QueryClient({
-		defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-	});
-	const router = createRouter({
-		routeTree,
-		history: createMemoryHistory({ initialEntries: ["/w/acme/admin/models"] }),
-		context: { queryClient, auth: undefined },
-	});
-	render(
-		<QueryClientProvider client={queryClient}>
-			<AuthProvider>
-				{/* biome-ignore lint/suspicious/noExplicitAny: the app's router context is wider than this test needs. */}
-				<RouterProvider router={router as any} />
-			</AuthProvider>
-		</QueryClientProvider>,
-	);
+	const queryClient = renderRouteAt("/w/acme/admin/models");
 	await screen.findByRole("heading", { name: "AI models" }, TRANSFORM_WAIT);
 	// The four page queries land after the first paint; until they do the page renders a spinner.
 	await screen.findByLabelText("Practice detection runs on", undefined, TRANSFORM_WAIT);
@@ -250,7 +224,6 @@ describe("workspace AI models route", () => {
 		});
 		// `userEvent`, not `fireEvent`: the listbox commits on the pointer sequence, not on a bare click.
 		await userEvent.click(within(detection).getByRole("combobox"));
-		// The listbox is portalled, so it is not inside the card.
 		await userEvent.click(await screen.findByRole("option", { name: /GPT Other/ }));
 
 		fireEvent.click(saveButton("Practice detection runs on"));

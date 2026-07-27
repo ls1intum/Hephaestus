@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
- * ⚠️ Diverges from the shadcn registry in two places.
+ * ⚠️ Diverges from the shadcn registry.
  *
  * 1. `AlertDialogContent`: a `w-[calc(100%-2rem)]` gutter (upstream's `w-full` runs edge to edge at
  *    exactly 320 px, where `max-w-xs` stops clamping) and the same height bound `DialogContent`

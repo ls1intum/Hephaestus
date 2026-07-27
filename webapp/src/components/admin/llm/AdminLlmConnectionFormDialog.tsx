@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
 	CreateLlmConnectionRequest,
 	LlmConnection,
@@ -8,48 +8,24 @@ import type {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
 	Dialog,
 	DialogBody,
 	DialogContent,
 	DialogDescription,
 	DialogFooter,
+	DialogForm,
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import type { FieldErrors, LlmConnectionFormField } from "@/lib/llm-form-validation";
+import { defaultProtocolFor, type LlmAuthMode } from "@/lib/llm-provider-type";
 import {
-	Field,
-	FieldContent,
-	FieldDescription,
-	FieldError,
-	FieldLabel,
-} from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
-import {
-	type FieldErrors,
-	type LlmConnectionFormField,
-	validateLlmConnectionForm,
-} from "@/lib/llm-form-validation";
-import {
-	authModeDefaultFor,
-	baseUrlDefaultFor,
-	defaultProtocolFor,
-	type LlmAuthMode,
-	PROVIDER_PRESET_LABELS,
-	PROVIDER_PRESET_ORDER,
-	PROVIDER_PRESET_SELECT_ITEMS,
-	type ProviderPreset,
-	presetForConnection,
-	usesResponsesApi,
-} from "@/lib/llm-provider-type";
+	connectionFieldsValueOf,
+	LlmConnectionFields,
+	type LlmConnectionFieldsValue,
+	validateConnectionFields,
+} from "./LlmConnectionFields";
 
 export interface AdminLlmConnectionFormDialogProps {
 	open: boolean;
@@ -75,15 +51,7 @@ export interface AdminLlmConnectionFormDialogProps {
 	onProbed?: (models: string[]) => void;
 }
 
-/**
- * Create or update an instance OpenAI-compatible connection.
- *
- * The body is a separate component keyed on the edited connection, so switching which connection is
- * edited remounts it with fresh initial state instead of copying props into state from an effect —
- * the same seeding rule as the workspace-scoped form. An effect would leave a window, between the
- * prop change and the effect running, in which the dialog shows the *previous* connection's secrets
- * and endpoint under the new connection's title.
- */
+/** Create or update an instance OpenAI-compatible connection. */
 export function AdminLlmConnectionFormDialog({
 	open,
 	onOpenChange,
@@ -104,6 +72,20 @@ export function AdminLlmConnectionFormDialog({
 	);
 }
 
+/**
+ * Everything a probe's answer depends on. The display name is not among them, so naming a connection
+ * after testing it does not throw the result away.
+ */
+function probeInputsDiffer(a: LlmConnectionFieldsValue, b: LlmConnectionFieldsValue): boolean {
+	return (
+		a.baseUrl !== b.baseUrl ||
+		a.useResponsesApi !== b.useResponsesApi ||
+		a.authMode !== b.authMode ||
+		a.apiKey !== b.apiKey ||
+		a.clearApiKey !== b.clearApiKey
+	);
+}
+
 type AdminLlmConnectionFormDialogContentProps = Omit<AdminLlmConnectionFormDialogProps, "open">;
 
 function AdminLlmConnectionFormDialogContent({
@@ -118,17 +100,9 @@ function AdminLlmConnectionFormDialogContent({
 	onProbed,
 }: AdminLlmConnectionFormDialogContentProps) {
 	const isEdit = editing !== null;
-	const [displayName, setDisplayName] = useState(editing?.displayName ?? "");
-	const [baseUrl, setBaseUrl] = useState(editing?.baseUrl ?? baseUrlDefaultFor("OPENAI"));
-	const [preset, setPreset] = useState<ProviderPreset>(
-		editing ? presetForConnection(editing) : "OPENAI",
+	const [fields, setFields] = useState<LlmConnectionFieldsValue>(() =>
+		connectionFieldsValueOf(editing),
 	);
-	const [useResponsesApi, setUseResponsesApi] = useState(
-		editing ? usesResponsesApi(editing.apiProtocol) : false,
-	);
-	const [authMode, setAuthMode] = useState<LlmAuthMode>(editing?.authMode ?? "BEARER");
-	const [apiKey, setApiKey] = useState("");
-	const [clearApiKey, setClearApiKey] = useState(false);
 	const [probeResult, setProbeResult] = useState<LlmProbeResult | null>(null);
 	const [probeError, setProbeError] = useState<string | null>(null);
 	const [errors, setErrors] = useState<FieldErrors<LlmConnectionFormField>>({});
@@ -146,7 +120,7 @@ function AdminLlmConnectionFormDialogContent({
 		};
 	}, []);
 
-	const apiProtocol = defaultProtocolFor(useResponsesApi);
+	const apiProtocol = defaultProtocolFor(fields.useResponsesApi);
 	const clearProbe = () => {
 		probeGeneration.current += 1;
 		setProbeResult(null);
@@ -154,17 +128,9 @@ function AdminLlmConnectionFormDialogContent({
 		onProbed?.([]);
 	};
 
-	// The shared rules, not a presence check of this form's own: `noValidate` makes `type="url"`
-	// inert, and an endpoint carrying a credential or a query string is rejected by the server
-	// whichever console pasted it.
-	const validate = (): boolean => {
-		const next = validateLlmConnectionForm({
-			displayName,
-			// The endpoint is immutable, so an edit neither sends nor validates one.
-			...(isEdit ? {} : { baseUrl }),
-		});
-		setErrors(next);
-		return Object.keys(next).length === 0;
+	const handleFieldsChange = (next: LlmConnectionFieldsValue) => {
+		if (probeInputsDiffer(fields, next)) clearProbe();
+		setFields(next);
 	};
 
 	const handleTest = () => {
@@ -183,60 +149,48 @@ function AdminLlmConnectionFormDialogContent({
 				if (probeGeneration.current === generation && isMounted.current) setProbeError(message);
 			},
 		};
-		if (editing && !apiKey.trim() && !clearApiKey) {
+		if (editing && !fields.apiKey.trim() && !fields.clearApiKey) {
 			onProbeSaved?.(editing.id, callbacks);
 			return;
 		}
 		onProbe(
 			{
 				apiProtocol,
-				baseUrl: baseUrl.trim(),
-				apiKey: apiKey.trim() || undefined,
-				authMode,
+				baseUrl: fields.baseUrl.trim(),
+				apiKey: fields.apiKey.trim() || undefined,
+				authMode: fields.authMode,
 			},
 			callbacks,
 		);
 	};
 
-	// `useId()` rather than hand-spelled ids, the house rule `BudgetAmountDialog` set: the workspace
-	// twin of this dialog spells out the same field names, and two forms cannot own one id.
-	const displayNameId = useId();
-	const presetId = useId();
-	const responsesApiId = useId();
-	const baseUrlId = useId();
-	const authModeId = useId();
-	const apiKeyId = useId();
-	const clearApiKeyId = useId();
-	const displayNameErrorId = useId();
-	const baseUrlErrorId = useId();
-
 	const handleSubmit = (event: React.FormEvent) => {
 		event.preventDefault();
-		if (!validate()) return;
+		const found = validateConnectionFields(fields, isEdit);
+		setErrors(found);
+		if (Object.keys(found).length > 0) return;
 
 		if (editing) {
-			const body: UpdateLlmConnectionRequest = { displayName: displayName.trim() };
-			if (apiKey.trim()) body.apiKey = apiKey.trim();
-			if (clearApiKey) body.clearApiKey = true;
+			const body: UpdateLlmConnectionRequest = { displayName: fields.displayName.trim() };
+			if (fields.apiKey.trim()) body.apiKey = fields.apiKey.trim();
+			if (fields.clearApiKey) body.clearApiKey = true;
 			onUpdate(editing.id, body);
 			return;
 		}
 
 		onCreate({
-			displayName: displayName.trim(),
-			baseUrl: baseUrl.trim(),
+			displayName: fields.displayName.trim(),
+			baseUrl: fields.baseUrl.trim(),
 			apiProtocol,
-			authMode,
-			apiKey: apiKey.trim() || undefined,
+			authMode: fields.authMode,
+			apiKey: fields.apiKey.trim() || undefined,
 			enabled: false,
 		});
 	};
 
 	return (
 		<DialogContent className="sm:max-w-lg">
-			{/* `contents`, so the header/body/footer are the popup's own flex children: a `<form>` with a
-			    layout box of its own would defeat the pinned-header/scrolling-body column. */}
-			<form onSubmit={handleSubmit} className="contents" noValidate>
+			<DialogForm onSubmit={handleSubmit}>
 				<DialogHeader>
 					<DialogTitle>{isEdit ? "Edit connection" : "Add connection"}</DialogTitle>
 					<DialogDescription>
@@ -248,170 +202,14 @@ function AdminLlmConnectionFormDialogContent({
 				{/* Preset, endpoint, auth mode, credential and the probe result run to ~900 px, which
 				    overflows every phone in both directions; only the body scrolls. */}
 				<DialogBody className="space-y-4 py-1">
-					<Field data-invalid={Boolean(errors.displayName)}>
-						<FieldLabel htmlFor={displayNameId}>Display name</FieldLabel>
-						<Input
-							id={displayNameId}
-							value={displayName}
-							onChange={(event) => setDisplayName(event.target.value)}
-							placeholder="e.g. Production OpenAI"
-							// `required` is semantics only — the form is `noValidate`, so the browser never acts
-							// on it — but it is what tells a screen reader the field is required before submit
-							// (WCAG SC 3.3.2), and the workspace twin already marks the same field.
-							required
-							aria-invalid={Boolean(errors.displayName)}
-							// Announces *why* the field is invalid on the way back to it, which `aria-invalid`
-							// alone never does (WCAG SC 3.3.1).
-							aria-describedby={errors.displayName ? displayNameErrorId : undefined}
-						/>
-						{errors.displayName && (
-							<FieldError id={displayNameErrorId}>{errors.displayName}</FieldError>
-						)}
-					</Field>
-
-					{!isEdit && (
-						<Field>
-							<FieldLabel htmlFor={presetId}>Endpoint preset</FieldLabel>
-							<Select
-								items={PROVIDER_PRESET_SELECT_ITEMS}
-								value={preset}
-								onValueChange={(value) => {
-									if (!value) return;
-									const next = value as ProviderPreset;
-									if (!baseUrl || baseUrl === baseUrlDefaultFor(preset)) {
-										setBaseUrl(baseUrlDefaultFor(next));
-									}
-									setAuthMode(authModeDefaultFor(next));
-									setPreset(next);
-									clearProbe();
-								}}
-							>
-								<SelectTrigger id={presetId} className="w-full">
-									<SelectValue />
-								</SelectTrigger>
-								<SelectContent>
-									{PROVIDER_PRESET_ORDER.map((item) => (
-										<SelectItem key={item} value={item}>
-											{PROVIDER_PRESET_LABELS[item]}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
-							<Field orientation="horizontal" className="mt-2">
-								<Checkbox
-									id={responsesApiId}
-									checked={useResponsesApi}
-									onCheckedChange={(checked) => {
-										setUseResponsesApi(checked === true);
-										clearProbe();
-									}}
-								/>
-								<FieldContent>
-									<FieldLabel htmlFor={responsesApiId} className="font-normal">
-										Use the Responses API instead of Chat Completions
-									</FieldLabel>
-								</FieldContent>
-							</Field>
-							{preset === "AZURE_OPENAI_V1" && (
-								<FieldDescription>
-									Replace RESOURCE below with your Azure resource name. The v1 API does not need an
-									api-version parameter.
-								</FieldDescription>
-							)}
-						</Field>
-					)}
-
-					<Field data-invalid={Boolean(errors.baseUrl)}>
-						<FieldLabel htmlFor={baseUrlId}>Base URL</FieldLabel>
-						<Input
-							id={baseUrlId}
-							type="url"
-							value={baseUrl}
-							onChange={(event) => {
-								setBaseUrl(event.target.value);
-								clearProbe();
-							}}
-							disabled={isEdit}
-							placeholder="https://api.openai.com/v1"
-							required
-							aria-invalid={Boolean(errors.baseUrl)}
-							aria-describedby={errors.baseUrl ? baseUrlErrorId : undefined}
-						/>
-						{isEdit && (
-							<FieldDescription>
-								Endpoint, API shape, and authentication are immutable. Add a connection to change
-								them.
-							</FieldDescription>
-						)}
-						{errors.baseUrl && <FieldError id={baseUrlErrorId}>{errors.baseUrl}</FieldError>}
-					</Field>
-
-					{!isEdit && preset === "OTHER" && (
-						<Field>
-							<FieldLabel htmlFor={authModeId}>Authentication</FieldLabel>
-							<Select
-								items={[
-									{ value: "BEARER", label: "Bearer token" },
-									{ value: "API_KEY", label: "api-key header" },
-								]}
-								value={authMode}
-								onValueChange={(value) => {
-									if (!value) return;
-									setAuthMode(value as LlmAuthMode);
-									clearProbe();
-								}}
-							>
-								<SelectTrigger id={authModeId} className="w-full">
-									<SelectValue />
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="BEARER">Bearer token</SelectItem>
-									<SelectItem value="API_KEY">api-key header</SelectItem>
-								</SelectContent>
-							</Select>
-						</Field>
-					)}
-
-					<Field>
-						<FieldLabel htmlFor={apiKeyId}>API key</FieldLabel>
-						<Input
-							id={apiKeyId}
-							type="password"
-							value={apiKey}
-							onChange={(event) => {
-								setApiKey(event.target.value);
-								clearProbe();
-							}}
-							disabled={clearApiKey}
-							placeholder={
-								editing?.hasApiKey
-									? `Configured · ends in ····${editing.apiKeyLast4 ?? "····"}`
-									: "Enter API key"
-							}
-							autoComplete="off"
-						/>
-						<FieldDescription>
-							{editing?.hasApiKey ? "Leave blank to keep the current key." : "Stored encrypted."}
-						</FieldDescription>
-						{editing?.hasApiKey && (
-							<Field orientation="horizontal">
-								<Checkbox
-									id={clearApiKeyId}
-									checked={clearApiKey}
-									onCheckedChange={(checked) => {
-										setClearApiKey(checked === true);
-										if (checked === true) setApiKey("");
-										clearProbe();
-									}}
-								/>
-								<FieldContent>
-									<FieldLabel htmlFor={clearApiKeyId} className="font-normal">
-										Remove stored API key
-									</FieldLabel>
-								</FieldContent>
-							</Field>
-						)}
-					</Field>
+					<LlmConnectionFields
+						value={fields}
+						onChange={handleFieldsChange}
+						errors={errors}
+						isEdit={isEdit}
+						hasApiKey={Boolean(editing?.hasApiKey)}
+						apiKeyLast4={editing?.apiKeyLast4}
+					/>
 
 					{!isEdit && (
 						<p className="text-sm text-muted-foreground">
@@ -425,12 +223,12 @@ function AdminLlmConnectionFormDialogContent({
 							type="button"
 							variant="outline"
 							size="sm"
-							disabled={isProbing || !baseUrl.trim()}
+							disabled={isProbing || !fields.baseUrl.trim()}
 							onClick={handleTest}
 						>
 							{isProbing
 								? "Testing…"
-								: isEdit && !apiKey.trim() && !clearApiKey
+								: isEdit && !fields.apiKey.trim() && !fields.clearApiKey
 									? "Test saved connection"
 									: isEdit
 										? "Test changes"
@@ -482,7 +280,7 @@ function AdminLlmConnectionFormDialogContent({
 						{isEdit ? "Save changes" : "Save inactive connection"}
 					</Button>
 				</DialogFooter>
-			</form>
+			</DialogForm>
 		</DialogContent>
 	);
 }

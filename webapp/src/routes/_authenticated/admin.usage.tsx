@@ -98,23 +98,16 @@ function AdminInstanceUsagePage() {
 			editBudgetFor(null);
 		},
 		onError: (error, variables) => {
-			// The server's reason belongs against the amount that earned it, so while that dialog is
-			// open the field's own error is the whole report and a toast would only say it twice.
-			//
-			// The dialog stays dismissible during the write — `fetch` has no timeout, so refusing to
-			// close would be a trap — and dismissing it resets the mutation. A rejection arriving after
-			// that has no field left to land in: the table would keep showing the old budget and the
-			// admin would walk away believing the new one is in force. So it is said out loud instead.
+			// Inline while the dialog that would show it is open, out loud once it is gone. ADR 0027:
+			// https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0027-dialog-lifetime-and-where-a-write-outcome-lands.md
 			if (editingRef.current?.workspaceSlug !== variables.path.workspaceSlug) {
 				toast.error("Couldn't save the budget", { description: problemDetailOf(error) });
 			}
 		},
 	});
 
-	// Two questions the page asks separately: whether the stepper may move forward, and whether this
-	// *is* the current month — which is what the budget editors and the "at today's rate" hint turn
-	// on. `usageSearchSchema` clamps `month` to this month, so today each is the other's negation;
-	// they are asked apart because only that clamp makes it so, and the clamp is not this file's.
+	// Asked apart, not derived from each other: they agree today only because `usageSearchSchema`
+	// clamps `month` to this month, and that clamp is not this file's to keep.
 	const canGoNext = canStepForwardFrom(month);
 	const isCurrentMonth = isCurrentMonthUtc(month);
 

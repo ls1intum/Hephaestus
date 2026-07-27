@@ -66,7 +66,6 @@ export const MobileReflow: Story = {
 		chromatic: { viewports: [320, 375, 768] },
 	},
 	play: async () => {
-		// The dialog is a portal, so it is on `document`, not in the story canvas.
 		await screen.findByRole("button", { name: /save changes/i });
 		await expectDialogFitsViewport();
 	},
@@ -75,8 +74,6 @@ export const MobileReflow: Story = {
 /** Submitting without a display name or upstream id surfaces validation. */
 export const ValidationError: Story = {
 	play: async () => {
-		// Dialog renders in a portal → query the document. `toBeInTheDocument` (not `toBeVisible`):
-		// the popup's enter transition can still be animating opacity when this assertion runs.
 		await userEvent.click(await screen.findByRole("button", { name: /add inactive model/i }));
 		await expect(await screen.findByText(/display name is required/i)).toBeInTheDocument();
 		await expect(await screen.findByText(/upstream model id is required/i)).toBeInTheDocument();

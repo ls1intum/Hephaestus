@@ -49,9 +49,8 @@ function paginationItems(current: number, total: number): (number | "ellipsis")[
 }
 
 /**
- * Pager for a table that changes pages by calling back, not by navigating. The one pager for all of
- * them: the client-paged admin tables (users, achievements) and the server-paged ones (agent
- * activity, sync jobs) all mount this rather than each assembling its own out of the kit's parts.
+ * The one pager for a table that changes pages by calling back rather than by navigating, whether
+ * the paging happens on the client or on the server.
  *
  * Every control is a `<button disabled>`, not a styled `<a>`: the kit's `PaginationLink` is an anchor
  * for href-driven pagination, and an anchor with no `href` is neither focusable nor announced as a

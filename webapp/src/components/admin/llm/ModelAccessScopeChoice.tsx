@@ -1,3 +1,10 @@
+import {
+	Field,
+	FieldContent,
+	FieldDescription,
+	FieldLabel,
+	FieldTitle,
+} from "@/components/ui/field";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 /**
@@ -43,30 +50,28 @@ export function ModelAccessScopeChoice({
 			className="gap-3"
 			aria-label={label}
 		>
-			<label
-				htmlFor={`${idPrefix}-all`}
-				className="flex cursor-pointer items-start gap-3 rounded-lg border p-3"
-			>
-				<RadioGroupItem id={`${idPrefix}-all`} value="ALL" />
-				<span>
-					<span className="block text-sm font-medium">All workspaces</span>
-					<span className="text-muted-foreground block text-xs">
-						Every current and future workspace can select the model.
-					</span>
-				</span>
-			</label>
-			<label
-				htmlFor={`${idPrefix}-selected`}
-				className="flex cursor-pointer items-start gap-3 rounded-lg border p-3"
-			>
-				<RadioGroupItem id={`${idPrefix}-selected`} value="SELECTED" />
-				<span className="min-w-0 flex-1">
-					<span className="block text-sm font-medium">Selected workspaces</span>
-					<span className="text-muted-foreground block text-xs">
-						Only explicitly selected workspaces can select the model.
-					</span>
-				</span>
-			</label>
+			<FieldLabel htmlFor={`${idPrefix}-all`}>
+				<Field orientation="horizontal">
+					<FieldContent>
+						<FieldTitle>All workspaces</FieldTitle>
+						<FieldDescription>
+							Every current and future workspace can select the model.
+						</FieldDescription>
+					</FieldContent>
+					<RadioGroupItem id={`${idPrefix}-all`} value="ALL" />
+				</Field>
+			</FieldLabel>
+			<FieldLabel htmlFor={`${idPrefix}-selected`}>
+				<Field orientation="horizontal">
+					<FieldContent>
+						<FieldTitle>Selected workspaces</FieldTitle>
+						<FieldDescription>
+							Only explicitly selected workspaces can select the model.
+						</FieldDescription>
+					</FieldContent>
+					<RadioGroupItem id={`${idPrefix}-selected`} value="SELECTED" />
+				</Field>
+			</FieldLabel>
 		</RadioGroup>
 	);
 }

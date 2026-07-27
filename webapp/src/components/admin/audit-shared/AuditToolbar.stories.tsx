@@ -109,7 +109,6 @@ export const SelectsMultiple: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await userEvent.click(canvas.getByRole("combobox", { name: /^Setting/i }));
-		// The popup is portalled, so it is queried from the document rather than the canvas.
 		await userEvent.click(await screen.findByRole("option", { name: "Feature flags" }));
 		await userEvent.click(
 			await screen.findByRole("option", { name: ENTITY_TYPE_LABELS.AGENT_CONFIG }),

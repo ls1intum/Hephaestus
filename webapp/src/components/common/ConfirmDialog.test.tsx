@@ -60,11 +60,8 @@ describe("ConfirmDialog", () => {
 	});
 
 	it("lets Escape out while the confirmed request is still in flight", async () => {
-		// WCAG 2.2 SC 2.1.2. A confirm that refuses dismissal while its mutation is pending *and*
-		// disables both footer buttons is a popup with no operable control and no exit — bounded by
-		// the request against a normal failure, unbounded against a connection that never answers,
-		// since `fetch` has no timeout of its own. Nothing here is disabled and nothing here reads the
-		// caller's pending state, so the trap has no state to live in.
+		// WCAG 2.2 SC 2.1.2, per ADR 0027: nothing here is disabled and nothing here reads the
+		// caller's pending state, so the keyboard trap has no state to live in.
 		const onConfirm = vi.fn();
 		render(<Harness onConfirm={onConfirm} />);
 		fireEvent.click(screen.getByRole("button", { name: "Delete GPT-5" }));

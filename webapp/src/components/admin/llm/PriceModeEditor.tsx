@@ -31,7 +31,7 @@ export interface PriceModeEditorProps {
 
 /**
  * The price radio + fields shared by the instance model form and the workspace's own-provider model
- * form (#1368 glossary). The two "no rate" options are worded by {@link priceLabel}, the one owner of
+ * form. The two "no rate" options are worded by {@link priceLabel}, the one owner of
  * that vocabulary, so the radio a model's price was chosen on and the label the tables print for it
  * cannot drift: an instance model with no price reads "No price set" and a workspace model reads
  * "Price not set", in both places.
@@ -86,8 +86,6 @@ export function PriceModeEditor({
 					}}
 					aria-required={required}
 					aria-invalid={Boolean(error)}
-					// Tabbing back to a field marked invalid has to announce *why* (WCAG SC 3.3.1), which
-					// `aria-invalid` alone never does.
 					aria-describedby={error ? errorId : undefined}
 				/>
 				{error && <FieldError id={errorId}>{error}</FieldError>}

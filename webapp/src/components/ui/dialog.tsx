@@ -19,6 +19,8 @@ import { cn } from "@/lib/utils";
  *    tall dialog (`examples/base/dialog-sticky-footer.tsx`); naming it means the next tall dialog
  *    cannot get it subtly wrong. The `has-data-[slot=…]` switch is this registry's own idiom for
  *    descendant-driven layout — see `AlertDialogHeader`, `CardHeader`, `Attachment`, `ComboboxChips`.
+ * 3. `DialogForm` — the form wrapper a dialog whose footer submits must use, so the wrapping does
+ *    not cost the pinned-header/scrolling-body column.
  */
 function Dialog({ ...props }: DialogPrimitive.Root.Props) {
 	return <DialogPrimitive.Root data-slot="dialog" {...props} />;
@@ -118,6 +120,19 @@ function DialogBody({ className, ...props }: React.ComponentProps<"div">) {
 	);
 }
 
+/**
+ * A `<form>` that wraps a dialog's header, body and footer — so a footer button submits it — without
+ * becoming a layout box between {@link DialogContent} and them. `display: contents` is what keeps
+ * the three as the popup's own flex children; a form with a box of its own defeats the
+ * pinned-header/scrolling-body column.
+ *
+ * `noValidate` because these forms report their own errors: the browser's bubble is unstyled,
+ * announces nothing to a screen reader, and stops at the first offending field.
+ */
+function DialogForm({ className, ...props }: React.ComponentProps<"form">) {
+	return <form className={cn("contents", className)} noValidate {...props} />;
+}
+
 function DialogFooter({
 	className,
 	showCloseButton = false,
@@ -174,6 +189,7 @@ export {
 	DialogContent,
 	DialogDescription,
 	DialogFooter,
+	DialogForm,
 	DialogHeader,
 	DialogOverlay,
 	DialogPortal,

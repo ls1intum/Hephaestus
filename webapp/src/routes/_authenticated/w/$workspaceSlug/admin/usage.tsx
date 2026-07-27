@@ -77,23 +77,16 @@ function AdminUsageContainer() {
 			editOwnProviderCap(false);
 		},
 		onError: (error) => {
-			// The server's reason belongs next to the amount that earned it, so while the dialog is open
-			// the field's own error is the whole report and a toast would only say it twice.
-			//
-			// The dialog stays dismissible during the write — `fetch` has no timeout, so refusing to
-			// close would be a trap — and dismissing it resets the mutation. A rejection arriving after
-			// that has no field left to land in: the page would keep showing the old cap and the admin
-			// would walk away believing the new one is in force. So it is said out loud instead.
+			// Inline while the dialog that would show it is open, out loud once it is gone. ADR 0027:
+			// https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0027-dialog-lifetime-and-where-a-write-outcome-lands.md
 			if (!isEditingRef.current) {
 				toast.error("Couldn't save the cap", { description: problemDetailOf(error) });
 			}
 		},
 	});
 
-	// Two questions the page asks separately: whether this is *the* current month (what the cap editor
-	// and the "at today's rate" hint turn on) and whether the stepper may move forward.
-	// `usageSearchSchema` clamps `month` to this month, so today each is the other's negation; they
-	// are asked apart because only that clamp makes it so, and the clamp is not this file's.
+	// Asked apart, not derived from each other: they agree today only because `usageSearchSchema`
+	// clamps `month` to this month, and that clamp is not this file's to keep.
 	const isCurrentMonth = isCurrentMonthUtc(month);
 	const canGoNext = canStepForwardFrom(month);
 

@@ -26,6 +26,15 @@ import { ThemeProvider } from "@/integrations/theme";
 import { useImpersonationStore } from "@/stores/impersonation-store";
 import reportWebVitals from "./reportWebVitals";
 
+// No default request timeout, deliberately — several comments elsewhere depend on this being a
+// decision rather than a limitation. It would have to clear the slowest honest response: the GitLab
+// preflight chains two 10s upstream calls, any DB-bound call can wait out the server's 45s connection
+// pool timeout, and a workspace purge or an admin recompute is unbounded by design. Above that
+// threshold it buys nothing — and aborting a mutation does not abort the server, so it would turn a
+// slow write the server went on to apply into a failure the admin was told about. Requests that can
+// hang are handled where they are shown: those dialogs stay dismissible. It could not be set here in
+// any case — a `signal` on this config is one AbortSignal shared by every call — so it would go on a
+// `fetch` wrapper. The two streams (mentor chat, sync events) do not use this client at all.
 client.setConfig({
 	baseUrl: environment.serverUrl,
 	// Cookie-session auth (ADR 0017): the __Host-HEPHAESTUS_AT cookie is sent automatically

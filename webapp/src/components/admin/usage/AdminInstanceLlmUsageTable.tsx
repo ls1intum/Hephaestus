@@ -1,6 +1,6 @@
 import { ChevronDown, ChevronRight, CircleDollarSign, Info } from "lucide-react";
 import type { AdminWorkspaceLlmUsage, WorkspaceLlmUsageReport } from "@/api/types.gen";
-import { formatCapUsd, formatCostUsd, MoneyCell } from "@/components/admin/ai/job-utils";
+import { MoneyCell } from "@/components/admin/ai/job-utils";
 import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { formatCapUsd, formatCostUsd } from "@/lib/money";
 import { BudgetPaceAlert } from "./BudgetPaceAlert";
 import { CapIsNotMonthScoped } from "./CapIsNotMonthScoped";
 import { CAP_STATE_LABELS, CapMeter, type CapState, capState } from "./CapMeter";
@@ -353,9 +354,9 @@ interface WorkspaceUsageDetailsProps {
 /**
  * The expanded workspace's breakdowns, rendered under the table rather than inside it.
  *
- * It names the workspace in its own heading because it is no longer visually attached to the row
- * that opened it — the `aria-expanded`/`aria-controls` pair on that row's toggle is what still ties
- * the two together for assistive tech.
+ * It names the workspace in its own heading, since it sits outside the row that opened it — the
+ * `aria-expanded`/`aria-controls` pair on that row's toggle is what ties the two together for
+ * assistive tech.
  *
  * The two breakdown tables stack until `xl`: side by side they would each be too narrow to avoid a
  * horizontal scroller of their own, and two scrollers to read one number on one screen is

@@ -14,7 +14,7 @@ export interface InstanceLlmSettingsCardProps {
 }
 
 /**
- * Instance-wide LLM governance (#1368): the provider-host allowlist and whether workspaces may
+ * Instance-wide LLM governance: the provider-host allowlist and whether workspaces may
  * connect their own AI provider at all. Never surfaces egress/routing — the key always stays
  * server-side and traffic always goes through the in-app proxy, with no toggle for that.
  *

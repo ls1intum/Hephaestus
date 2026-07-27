@@ -33,7 +33,6 @@ export const Uncapped: Story = {
 	args: { currentCapUsd: null },
 };
 
-/** Save in flight — inputs and actions disabled. */
 export const Pending: Story = {
 	args: { isPending: true },
 };

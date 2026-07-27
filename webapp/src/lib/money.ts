@@ -69,7 +69,7 @@ export function formatCapUsd(value: number | undefined): string {
  * price list has to render as the number they will read there.
  *
  * Only for prices and per-unit rates. Anything that was actually spent uses {@link formatCostUsd},
- * whose `$0` / `<$0.01` bounds are the #1368 glossary's wording for spend.
+ * whose `$0` / `<$0.01` bounds are the wording for spend (`docs/contributor/llm-cost-vocabulary.md`, rule 5).
  */
 export function formatRateUsd(value: number | undefined): string {
 	return value == null ? "—" : USD_RATE.format(value);

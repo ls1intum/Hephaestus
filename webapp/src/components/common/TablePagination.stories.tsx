@@ -20,7 +20,7 @@ type Story = StoryObj<typeof meta>;
 /**
  * Reads the pager back as a reader meets it: the numbered tokens in order, with `▸` marking the one
  * carrying `aria-current="page"` and `…` standing for a gap. The window, the gaps and which page is
- * current are the whole of this component's logic, and this is the only place it is stated.
+ * current are the whole of this component's logic.
  *
  * Assembled from the accessible tree — page buttons by name, gaps by their own text — and put back
  * in reading order by document position, so it says nothing about how the pager is marked up. A

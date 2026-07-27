@@ -84,7 +84,6 @@ export const MobileReflow: Story = {
 		chromatic: { viewports: [320, 375, 768] },
 	},
 	play: async () => {
-		// The dialog is a portal, so it is on `document`, not in the story canvas.
 		await screen.findByRole("button", { name: /save inactive connection/i });
 		await expectDialogFitsViewport();
 	},

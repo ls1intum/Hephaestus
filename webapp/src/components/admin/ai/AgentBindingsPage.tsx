@@ -384,8 +384,6 @@ function AgentPurposeCard({
 											min={MIN_TIMEOUT_SECONDS}
 											value={timeoutSeconds}
 											aria-invalid={Boolean(timeoutError)}
-											// The reason, not just the fact: `aria-invalid` alone announces "invalid"
-											// and nothing else on the way back to the field (WCAG SC 3.3.1).
 											aria-describedby={timeoutError ? timeoutErrorId : undefined}
 											onChange={(e) => {
 												setTimeoutSeconds(e.target.value);

@@ -1,13 +1,10 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createMemoryHistory, createRouter, RouterProvider } from "@tanstack/react-router";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import type { AdminWorkspaceLlmUsage, WorkspaceLlmUsageReport } from "@/api/types.gen";
 import { currentMonthUtc, formatMonthLabel } from "@/components/admin/usage/usage-utils";
-import { AuthProvider } from "@/integrations/auth/AuthContext";
 import { server } from "@/mocks/server";
-import { routeTree } from "@/routeTree.gen";
+import { renderRouteAt, TRANSFORM_WAIT } from "@/test/router-harness";
 
 // Mounting the real route pulls in the whole admin layout and its lazy modules.
 vi.setConfig({ testTimeout: 20_000 });
@@ -85,28 +82,10 @@ function mockUsageRoutes(options: {
 }
 
 async function renderUsageRoute(url = "/admin/usage") {
-	// One client for the guards and the provider, exactly as `main.tsx` wires it.
-	const queryClient = new QueryClient({
-		defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-	});
-	const router = createRouter({
-		routeTree,
-		history: createMemoryHistory({ initialEntries: [url] }),
-		context: { queryClient, auth: undefined },
-	});
-	render(
-		<QueryClientProvider client={queryClient}>
-			<AuthProvider>
-				{/* biome-ignore lint/suspicious/noExplicitAny: the app's router context is wider than this test needs. */}
-				<RouterProvider router={router as any} />
-			</AuthProvider>
-		</QueryClientProvider>,
-	);
-	// The first mount in this file pays the lazy transform of the whole admin layout — seconds, not
-	// the 1s `findBy` default.
-	await screen.findByRole("heading", { name: "AI usage" }, { timeout: 10_000 });
+	renderRouteAt(url);
+	await screen.findByRole("heading", { name: "AI usage" }, TRANSFORM_WAIT);
 	// The report arrives after the first paint; until it does the table renders skeleton rows.
-	return screen.findByRole("button", { name: /Set budget for Acme/ }, { timeout: 10_000 });
+	return screen.findByRole("button", { name: /Set budget for Acme/ }, TRANSFORM_WAIT);
 }
 
 async function saveBudget(amount: string) {
@@ -158,15 +137,7 @@ describe("instance AI usage route", () => {
 		);
 	});
 
-	/**
-	 * A money setting that fails must never fail quietly.
-	 *
-	 * The rejection is normally rendered inline, against the amount that earned it. But the dialog is
-	 * dismissible while the PUT is in flight — deliberately, since `fetch` has no timeout of its own —
-	 * and dismissing it resets the mutation. The failure then has no field left to land in: without a
-	 * toast the table keeps showing the old budget and the admin walks away believing the new one is
-	 * in force.
-	 */
+	/** The `onError` guard in `admin.usage.tsx` carries the reasoning. */
 	it("says so out loud when a budget write fails after the dialog was dismissed", async () => {
 		let releaseBudgetPut: (() => void) | undefined;
 		const slowPut = new Promise<void>((resolve) => {

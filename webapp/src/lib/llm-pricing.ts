@@ -3,6 +3,9 @@ import { formatRateUsd } from "./money";
 
 export type PricingMode = "PRICED" | "NO_CHARGE" | "UNPRICED";
 
+/** Who is being addressed. The instance catalog and a workspace's own provider word things differently. */
+export type LlmAudience = "instance" | "workspace";
+
 export interface PriceFields {
 	pricingMode: PricingMode;
 	per1mInputUsd?: number;
@@ -19,9 +22,9 @@ export function priceFieldsOf(model: Pick<LlmModel, "currentPrice">): PriceField
 }
 
 /**
- * The #1368 glossary's price framing — the *only* place this word choice may live. Never render the
- * words "Priced" / "Unpriced" / "Unverifiable"; PRICED always shows the number itself, and
- * NO_CHARGE/UNPRICED read differently depending on who's looking.
+ * The only place the price wording lives (`docs/contributor/llm-cost-vocabulary.md`, rule 4). Never render the words
+ * "Priced" / "Unpriced" / "Unverifiable": PRICED always shows the number itself, and
+ * NO_CHARGE/UNPRICED read differently depending on who is looking.
  */
 export function priceLabel(model: PriceFields, audience: "instance" | "workspace"): string {
 	if (model.pricingMode === "NO_CHARGE") {

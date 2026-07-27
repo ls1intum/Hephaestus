@@ -376,7 +376,6 @@ export const PastMonth: Story = {
 	},
 };
 
-/** No usage recorded in the selected month. */
 export const Empty: Story = {
 	args: {
 		report: {
