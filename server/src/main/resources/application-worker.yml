@@ -49,16 +49,6 @@ hephaestus:
         nats:
             enabled: false
 
-    # Same AGENT_ENABLED env var as every other role, but the DEFAULT is `true` here where
-    # application.yml's base default is `false`: job execution IS this pod's purpose, so a worker
-    # booted with only the documented "bare minimum" env vars (docs/admin/runtime-roles.mdx) — none of
-    # which mention AGENT_ENABLED — polls and executes rather than idling. An operator who wants a
-    # job-execution-disabled worker (e.g. drain-only) sets AGENT_ENABLED=false explicitly. Note that
-    # docker/compose.app.yaml passes AGENT_ENABLED to this service unconditionally, so under compose
-    # the env var always wins and this default never applies.
-    agent:
-        enabled: ${AGENT_ENABLED:true}
-
     worker:
         control:
             endpoint: ${HEPHAESTUS_HUB_URL:}

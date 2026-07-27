@@ -793,7 +793,7 @@ class MentorSandboxStressTest {
         ProcessBuilder pb = new ProcessBuilder();
         Map<String, String> env = pb.environment();
         env.putAll(creds.asProcessEnv());
-        // #1368 slice 5: the runner reads LLM_PROXY_URL / LLM_PROXY_TOKEN (see MentorLiveLlmTest for
+        // The runner reads LLM_PROXY_URL / LLM_PROXY_TOKEN (see MentorLiveLlmTest for
         // the full rationale — no real proxy sits in front of this stress test either).
         env.put("LLM_PROXY_URL", creds.baseUrl());
         env.put("LLM_PROXY_TOKEN", creds.apiKey());

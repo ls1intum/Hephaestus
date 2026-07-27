@@ -1,24 +1,20 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageJobType;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
-import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
 import de.tum.cit.aet.hephaestus.mentor.MentorTurnLlmUsage;
 import io.micrometer.core.instrument.MeterRegistry;
-import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
-import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -76,8 +72,14 @@ import tools.jackson.databind.node.ObjectNode;
 public class MentorInFlightReaper {
 
     private static final Logger log = LoggerFactory.getLogger(MentorInFlightReaper.class);
-    // Agent configs allow up to 60 minutes. Keep another 10 minutes for startup,
-    // streaming finalisation, and scheduler/database delays before declaring a turn abandoned.
+    /**
+     * The floor under the configured window. A turn reaped while it is still running is billed as
+     * abandoned and loses its thread to the in-flight index, so the window has to clear the longest
+     * turn a binding can produce plus startup, streaming finalisation, and scheduler/database delay.
+     *
+     * <p>{@code AgentBindingRequestDTO.timeoutSeconds} has a minimum and no maximum, so this floor is
+     * not derived from an enforced ceiling: a binding configured past it can still be reaped mid-run.
+     */
     private static final Duration MINIMUM_SAFE_WINDOW = Duration.ofMinutes(70);
     private final ChatMessageRepository chatMessageRepository;
     private final LlmUsageRecorder usageRecorder;
@@ -160,11 +162,7 @@ public class MentorInFlightReaper {
             return false;
         }
         JsonNode existingMetadata = message.getMetadata();
-        JsonNode admission =
-            existingMetadata != null
-                ? existingMetadata.path("llmAdmission")
-                : tools.jackson.databind.node.MissingNode.getInstance();
-        LlmPriceSnapshot price = readPrice(admission.path("price"));
+        LlmPriceSnapshot price = MentorAdmissionMetadata.readPrice(existingMetadata);
         message.setStatus(ChatMessage.Status.interrupted);
         ObjectNode metadata =
             existingMetadata != null && existingMetadata.isObject()
@@ -186,7 +184,7 @@ public class MentorInFlightReaper {
             LlmUsageSourceType.MENTOR_TURN,
             message.getId(),
             0,
-            admission.path("model").asString(),
+            MentorAdmissionMetadata.readModel(existingMetadata),
             observed.inputTokens(),
             observed.outputTokens(),
             observed.cacheReadTokens(),
@@ -205,39 +203,6 @@ public class MentorInFlightReaper {
         // budget decision from silently counting the turn as free.
         usageRecorder.recordUnverifiable(workspaceId, sample);
         return false;
-    }
-
-    private static LlmPriceSnapshot readPrice(JsonNode node) {
-        if (node.isMissingNode()) {
-            return new LlmPriceSnapshot(
-                FundingSource.INSTANCE,
-                PricingState.UNPRICED,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
-        }
-        return new LlmPriceSnapshot(
-            FundingSource.valueOf(node.path("fundingSource").asString()),
-            PricingState.valueOf(node.path("pricingState").asString()),
-            longOrNull(node, "appliedPriceId"),
-            longOrNull(node, "appliedWorkspaceModelId"),
-            decimalOrNull(node, "per1mInputUsd"),
-            decimalOrNull(node, "per1mOutputUsd"),
-            decimalOrNull(node, "per1mCacheReadUsd"),
-            decimalOrNull(node, "per1mCacheWriteUsd")
-        );
-    }
-
-    private static @Nullable Long longOrNull(JsonNode node, String field) {
-        return node.path(field).isNull() ? null : Long.valueOf(node.path(field).asString());
-    }
-
-    private static @Nullable BigDecimal decimalOrNull(JsonNode node, String field) {
-        return node.path(field).isNull() ? null : new BigDecimal(node.path(field).asString());
     }
 
     private static Duration safeWindow(Duration configuredWindow) {

@@ -53,9 +53,8 @@ public interface FeedbackChannel {
      *
      * <p>Default {@code UNKNOWN} — a channel implements {@code FOUND}/{@code ABSENT} only when a
      * cheap-enough existing-listing query is available AND can distinguish "searched everything, nothing
-     * matched" from "could not search". A channel with no such query (e.g. {@code GitlabFeedbackChannel},
-     * documented on the class) stays {@code UNKNOWN} forever — its delivery-recovery sweep therefore never
-     * auto-reposts, only ever records a found match or exhausts its attempt cap. Deliberately NOT called
+     * matched" from "could not search". A channel that keeps the default never auto-reposts: it can only
+     * record a found match or exhaust its attempt cap. Deliberately NOT called
      * on the normal (non-recovery) delivery path — it costs an extra provider call, which is only worth
      * paying when a crash has already put a job's delivery status in doubt.
      */

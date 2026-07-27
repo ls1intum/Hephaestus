@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Dev-only REST endpoint for manually triggering PR/issue reviews without NATS.
+ * Dev-only REST endpoint for manually triggering PR/issue reviews.
  * Enabled by setting hephaestus.dev.trigger-enabled=true.
  *
  * <p>Two modes:

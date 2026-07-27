@@ -242,8 +242,8 @@ public class DockerSandboxConfiguration {
      * Bounded platform thread pool for sandbox Docker operations.
      *
      * <p>Uses direct handoff ({@code queueCapacity=0}) so that when all threads are occupied,
-     * submissions are rejected immediately — clean backpressure to the NATS consumer, which will
-     * redeliver the message later.
+     * submissions are rejected immediately. That rejection is the backpressure: the claim is undone
+     * and the row goes back to QUEUED for a later poll.
      */
     @Bean(name = "sandboxExecutor")
     public AsyncTaskExecutor sandboxExecutor(SandboxProperties properties) {

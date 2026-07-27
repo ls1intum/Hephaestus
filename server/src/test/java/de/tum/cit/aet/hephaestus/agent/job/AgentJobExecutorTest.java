@@ -1577,26 +1577,55 @@ class AgentJobExecutorTest extends BaseUnitTest {
         @DisplayName("classification covers pool exhaustion and wrapped causes, and stops at deterministic errors")
         void classifierRecognisesOnlyResolvableInfrastructureFailures() {
             assertThat(
-                AgentJobExecutor.isRetryableTerminalWriteFailure(new TransientDataAccessResourceException("blip"))
+                AgentJobExecutor.TERMINAL_PERSIST_POLICY.shouldRetry(new TransientDataAccessResourceException("blip"))
             ).isTrue();
             assertThat(
-                AgentJobExecutor.isRetryableTerminalWriteFailure(
+                AgentJobExecutor.TERMINAL_PERSIST_POLICY.shouldRetry(
                     new org.springframework.transaction.CannotCreateTransactionException("pool exhausted")
                 )
             ).isTrue();
+            // A TransactionTemplate and JPA both surface the underlying failure wrapped, so the match has
+            // to reach the cause and not just the top of the chain.
             assertThat(
-                AgentJobExecutor.isRetryableTerminalWriteFailure(
+                AgentJobExecutor.TERMINAL_PERSIST_POLICY.shouldRetry(
                     new RuntimeException("wrapped", new org.springframework.dao.RecoverableDataAccessException("gone"))
                 )
             ).isTrue();
             assertThat(
-                AgentJobExecutor.isRetryableTerminalWriteFailure(new IllegalStateException("no price snapshot"))
+                AgentJobExecutor.TERMINAL_PERSIST_POLICY.shouldRetry(new IllegalStateException("no price snapshot"))
             ).isFalse();
             assertThat(
-                AgentJobExecutor.isRetryableTerminalWriteFailure(
+                AgentJobExecutor.TERMINAL_PERSIST_POLICY.shouldRetry(
                     new org.springframework.dao.DataIntegrityViolationException("constraint")
                 )
             ).isFalse();
+        }
+
+        @Test
+        @DisplayName("a transient failure on every attempt gives up as PERSISTENCE_FAILED, not as a job failure")
+        void exhaustedRetriesReachTheCallerAsATerminalPersistenceFailure() {
+            // The give-up has to stay distinguishable from an ordinary job failure: the provider work is
+            // already done and paid for, so the row must be left RUNNING for the zombie sweeper rather
+            // than transitioned to FAILED (which would also hand the job back for a fresh, second-charging
+            // run). That distinction is what the exception translation around the retries carries.
+            stubClaimableJob();
+            setupFullExecution();
+            when(jobRepository.transitionStatus(any(), eq(AgentJobStatus.COMPLETED), any(), any(), any())).thenReturn(
+                1
+            );
+            when(jobRepository.findById(any(UUID.class))).thenThrow(
+                new TransientDataAccessResourceException("connection reset")
+            );
+
+            executor.processJob(jobId);
+
+            // Three attempts (the policy allows two retries), then give up.
+            verify(jobRepository, times(3)).transitionStatus(any(), eq(AgentJobStatus.COMPLETED), any(), any(), any());
+            verify(jobRepository, never()).transitionStatus(any(), eq(AgentJobStatus.FAILED), any(), any(), any());
+            verify(usageRecorder, never()).record(any(), any());
+            assertThat(
+                meterRegistry.find("agent.job.execution.duration").tag("status", "PERSISTENCE_FAILED").timer().count()
+            ).isEqualTo(1L);
         }
     }
 

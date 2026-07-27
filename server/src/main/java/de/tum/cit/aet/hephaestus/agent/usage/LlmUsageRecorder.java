@@ -10,7 +10,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
@@ -188,19 +187,14 @@ public class LlmUsageRecorder {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             throw new IllegalStateException("LLM usage must be recorded in the source result transaction");
         }
-        TransactionSynchronizationManager.registerSynchronization(
-            new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    try {
-                        alertIfBudgetCrossed(workspaceId, cost);
-                    } catch (RuntimeException e) {
-                        log.warn("Post-commit LLM budget alert failed for workspaceId={}", workspaceId, e);
-                        meterRegistry.counter("llm.budget.alert.failure").increment();
-                    }
-                }
+        TransactionCallbacks.afterCommit(() -> {
+            try {
+                alertIfBudgetCrossed(workspaceId, cost);
+            } catch (RuntimeException e) {
+                log.warn("Post-commit LLM budget alert failed for workspaceId={}", workspaceId, e);
+                meterRegistry.counter("llm.budget.alert.failure").increment();
             }
-        );
+        });
     }
 
     /**

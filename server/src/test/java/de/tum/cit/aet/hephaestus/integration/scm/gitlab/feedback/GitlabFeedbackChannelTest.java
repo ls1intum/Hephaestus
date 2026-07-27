@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.ExistingSummaryLookup;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackContent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackTarget;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.SummaryHandle;
@@ -17,9 +18,11 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolver.MrInfo;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -362,6 +365,207 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
         );
 
         assertThat(outcome.kind()).isEqualTo(FeedbackChannel.UpdateOutcome.Kind.GONE);
+    }
+
+    // findExistingSummary — tri-state delivery-recovery dedup over discussions→notes
+
+    private static final String MARKER = "<!-- hephaestus-summary:job-1 -->";
+
+    /** Sets up the {@code forScope(...).documentName(...).variable(...)} chain used by every page fetch. */
+    private HttpGraphQlClient.RequestSpec mockRequestChain() {
+        HttpGraphQlClient client = mock(HttpGraphQlClient.class);
+        HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(gitLabProvider.forScope(1L)).thenReturn(client);
+        when(client.documentName(any())).thenReturn(spec);
+        when(spec.variable(any(), any())).thenReturn(spec);
+        return spec;
+    }
+
+    private ClientGraphQlResponse mockDiscussionsPage(
+        List<Map<String, Object>> discussions,
+        boolean hasNextPage,
+        String endCursor,
+        List<ResponseError> errors
+    ) {
+        ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
+        lenient().when(response.getErrors()).thenReturn(errors);
+        ClientResponseField nodesField = mock(ClientResponseField.class);
+        lenient().when(response.field("project.mergeRequest.discussions.nodes")).thenReturn(nodesField);
+        lenient().when(nodesField.getValue()).thenReturn(discussions);
+        ClientResponseField pageInfoField = mock(ClientResponseField.class);
+        lenient().when(response.field("project.mergeRequest.discussions.pageInfo")).thenReturn(pageInfoField);
+        lenient()
+            .when(pageInfoField.toEntity(GitLabPageInfo.class))
+            .thenReturn(new GitLabPageInfo(hasNextPage, endCursor));
+        return response;
+    }
+
+    private ClientGraphQlResponse mockDiscussionsPage(
+        List<Map<String, Object>> discussions,
+        boolean hasNextPage,
+        String endCursor
+    ) {
+        return mockDiscussionsPage(discussions, hasNextPage, endCursor, List.of());
+    }
+
+    /** One discussion node in the exact {@code notes { pageInfo, nodes }} shape the document returns. */
+    private static Map<String, Object> discussion(List<Map<String, Object>> notes, boolean notesHaveNextPage) {
+        return Map.of(
+            "id",
+            "gid://gitlab/Discussion/abc",
+            "notes",
+            Map.of("pageInfo", Map.of("hasNextPage", notesHaveNextPage), "nodes", notes)
+        );
+    }
+
+    private static Map<String, Object> note(String id, String body) {
+        return Map.of("id", id, "body", body);
+    }
+
+    @Test
+    void findExistingSummary_matchOnFirstPage_isFound() {
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+        HttpGraphQlClient.RequestSpec spec = mockRequestChain();
+        ClientGraphQlResponse page = mockDiscussionsPage(
+            List.of(
+                discussion(List.of(note("gid://gitlab/Note/1", "a human said hi")), false),
+                discussion(List.of(note("gid://gitlab/Note/2", MARKER + "\nsummary")), false)
+            ),
+            false,
+            null
+        );
+        when(spec.execute()).thenReturn(Mono.just(page));
+
+        ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), MARKER);
+
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.FOUND);
+        // The handle must be the NOTE's own global id — that is exactly what updateSummary passes to
+        // UpdateNote as `id`, so a FOUND handle is directly usable for an in-place edit.
+        assertThat(result.handle().externalId()).isEqualTo("gid://gitlab/Note/2");
+    }
+
+    @Test
+    void findExistingSummary_everyDiscussionScanned_noMatch_isAbsent() {
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+        HttpGraphQlClient.RequestSpec spec = mockRequestChain();
+        ClientGraphQlResponse page = mockDiscussionsPage(
+            List.of(discussion(List.of(note("gid://gitlab/Note/1", "unrelated")), false)),
+            false, // outer hasNextPage=false and no thread truncated — every note was seen
+            null
+        );
+        when(spec.execute()).thenReturn(Mono.just(page));
+
+        ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), MARKER);
+
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.ABSENT);
+    }
+
+    @Test
+    void findExistingSummary_truncatedNoteThread_isUnknown_notAbsent() {
+        // The document pages notes INSIDE each discussion at a fixed first:100 with no cursor of its own. A
+        // thread reporting notes.pageInfo.hasNextPage hides notes this scan can never reach, so exhausting the
+        // outer connection does NOT prove the marker is missing.
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+        HttpGraphQlClient.RequestSpec spec = mockRequestChain();
+        ClientGraphQlResponse page = mockDiscussionsPage(
+            List.of(discussion(List.of(note("gid://gitlab/Note/1", "unrelated")), true)),
+            false, // outer connection exhausted — only the truncated thread stands between this and ABSENT
+            null
+        );
+        when(spec.execute()).thenReturn(Mono.just(page));
+
+        ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), MARKER);
+
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.UNKNOWN);
+    }
+
+    @Test
+    void findExistingSummary_pageBudgetExhaustedWithMoreDiscussionsLeft_isUnknown_notAbsent() {
+        // hasNextPage=true on every page, all the way to the budget — absence is never confirmed.
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+        HttpGraphQlClient.RequestSpec spec = mockRequestChain();
+        ClientGraphQlResponse page = mockDiscussionsPage(
+            List.of(discussion(List.of(note("gid://gitlab/Note/1", "unrelated")), false)),
+            true,
+            "cursor-1"
+        );
+        when(spec.execute()).thenReturn(Mono.just(page));
+
+        ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), MARKER);
+
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.UNKNOWN);
+        verify(spec, org.mockito.Mockito.times(3)).execute();
+    }
+
+    @Test
+    void findExistingSummary_secondPageHasTheMatch_isFound() {
+        // The scan must follow the cursor into a second page, not stop at the first.
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+        HttpGraphQlClient.RequestSpec spec = mockRequestChain();
+        ClientGraphQlResponse page1 = mockDiscussionsPage(
+            List.of(discussion(List.of(note("gid://gitlab/Note/1", "unrelated")), false)),
+            true,
+            "cursor-1"
+        );
+        ClientGraphQlResponse page2 = mockDiscussionsPage(
+            List.of(discussion(List.of(note("gid://gitlab/Note/2", MARKER)), false)),
+            false,
+            null
+        );
+        when(spec.execute()).thenReturn(Mono.just(page1), Mono.just(page2));
+
+        ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), MARKER);
+
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.FOUND);
+        assertThat(result.handle().externalId()).isEqualTo("gid://gitlab/Note/2");
+    }
+
+    @Test
+    void findExistingSummary_topLevelGraphQlError_isUnknown_notAbsent() {
+        // The page carries a complete, match-free, fully-scanned body AND an error: the error alone is what
+        // must stop this from reading as a confirmed absence.
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+        HttpGraphQlClient.RequestSpec spec = mockRequestChain();
+        ResponseError error = mock(ResponseError.class);
+        ClientGraphQlResponse page = mockDiscussionsPage(
+            List.of(discussion(List.of(note("gid://gitlab/Note/1", "unrelated")), false)),
+            false,
+            null,
+            List.of(error)
+        );
+        when(spec.execute()).thenReturn(Mono.just(page));
+
+        ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), MARKER);
+
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.UNKNOWN);
+    }
+
+    @Test
+    void findExistingSummary_transportError_isUnknown_notAbsent() {
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+        HttpGraphQlClient.RequestSpec spec = mockRequestChain();
+        when(spec.execute()).thenReturn(Mono.error(new RuntimeException("connection reset")));
+
+        ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), MARKER);
+
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.UNKNOWN);
+    }
+
+    @Test
+    void findExistingSummary_rateLimitCritical_isUnknown_notAbsent() {
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(true);
+
+        ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), MARKER);
+
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.UNKNOWN);
+    }
+
+    @Test
+    void findExistingSummary_blankMarker_isUnknown() {
+        // No marker to match means nothing can be confirmed either way — never a licence to post.
+        ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), "  ");
+
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.UNKNOWN);
     }
 
     private static FeedbackTarget gitlabTarget() {

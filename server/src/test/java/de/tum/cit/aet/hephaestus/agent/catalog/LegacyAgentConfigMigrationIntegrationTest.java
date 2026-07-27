@@ -222,9 +222,10 @@ class LegacyAgentConfigMigrationIntegrationTest {
     }
 
     /**
-     * A config with no model name used to yield a connection and nothing else, which quietly dropped
-     * that workspace's timeout, concurrency and internet limits — values that exist nowhere but
-     * {@code agent_config}, which the very next changeSet drops.
+     * Carrying a config with no model name over as a connection alone would drop that workspace's
+     * timeout, concurrency and internet limits — values that exist nowhere but {@code agent_config},
+     * which the very next changeSet drops. So the binding is created regardless, with a placeholder
+     * model name.
      */
     @Test
     @Order(8)
@@ -396,7 +397,7 @@ class LegacyAgentConfigMigrationIntegrationTest {
             .isEqualTo(ledgerBefore);
     }
 
-    /** Destructive, so it runs last: the whole release rolls back cleanly and takes the catalog with it. */
+    /** Destructive, so it runs last — the rollback takes the catalog with it. */
     @Test
     @Order(99)
     void theWholeReleaseRollsBack() throws Exception {

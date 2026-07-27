@@ -111,7 +111,7 @@ class PiResultParserTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("#1368 slice 5: reasoningTokens is populated from the responses-path shape when the runner reports it")
+    @DisplayName("reasoningTokens is populated from the responses-path shape when the runner reports it")
     void populatesReasoningTokensWhenPresent() {
         String usage =
             "{\"model\":\"gpt-5.4\",\"inputTokens\":100,\"outputTokens\":50,\"reasoningTokens\":30," +

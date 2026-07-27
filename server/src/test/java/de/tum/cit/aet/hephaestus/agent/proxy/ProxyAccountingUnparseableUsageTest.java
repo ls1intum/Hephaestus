@@ -23,8 +23,7 @@ import tools.jackson.databind.ObjectMapper;
  * <p>The tokens are gone either way — there is nothing to parse, so nothing can be billed. What this
  * pins is that the loss is OBSERVABLE: a gateway that starts wrapping responses stops the ledger from
  * seeing an entire connection's usage, and without a counter the first symptom is a suspiciously cheap
- * month. Its three siblings ({@code ProxyUsageAccumulator}, and both failure paths in
- * {@code MentorTurnUsageAccumulator}) WARN and count for the same reason.
+ * month.
  */
 class ProxyAccountingUnparseableUsageTest extends BaseUnitTest {
 

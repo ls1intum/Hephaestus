@@ -81,10 +81,9 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
         // ─── LLM catalog + cost governance ───────────────────────────────────────────────
         // Admin surfaces and the services behind them are server-only: the worker and webhook pods do
         // not load core.auth, so an admin controller mapped there is a route with no authentication
-        // layer under it. Two of these (the settings and usage-admin controllers) shipped ungated while
-        // their package siblings were gated, so /admin/llm/settings and /admin/llm/usage were
-        // request-mapped on both. Pinning the whole cluster here is what makes a dropped annotation a
-        // test failure rather than a production discovery.
+        // layer under it. An annotation is easy to drop on one class of a cluster whose siblings all
+        // carry it; pinning the whole cluster here makes that a test failure, not a production
+        // discovery.
         Map.entry("de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionAdminController", RuntimeRole.SERVER_PROPERTY),
         Map.entry("de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionService", RuntimeRole.SERVER_PROPERTY),
         Map.entry("de.tum.cit.aet.hephaestus.agent.catalog.LlmModelAdminController", RuntimeRole.SERVER_PROPERTY),
@@ -289,7 +288,7 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
      * {@code hephaestus.runtime.server.enabled=false}. {@link java.time.Clock} is the case that
      * actually bit: its only provider used to be the server-gated {@code AuthJwtConfig}, so the first
      * ungated consumer (the config-audit recorder, which must load on every role) broke both pods
-     * while all 4900 tests stayed green. Pin the provider ungated so it cannot regress.
+     * while the whole suite stayed green. Pin the provider ungated so it cannot regress.
      */
     @Test
     void clockBeanIsAvailableToEveryRuntimeRole() {

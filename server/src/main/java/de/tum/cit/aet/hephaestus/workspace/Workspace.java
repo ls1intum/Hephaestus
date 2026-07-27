@@ -271,16 +271,14 @@ public class Workspace {
      * workspace's own money, so the workspace admin sets it and only work on the workspace's own
      * connected provider pauses when it is reached.
      *
-     * <p>Two caps rather than one because instance-funded and own-provider spend are different
-     * people's money — they are never summed, and each cap may only be blocked by a blind spot its
-     * own owner can clear (an unpriced shared model is the host's to fix; an unpriced own-provider
-     * model is the workspace's).
+     * <p>The two caps are different people's money and are <b>never summed</b>; each may only be
+     * blocked by a blind spot its own owner can clear (an unpriced shared model is the host's to fix;
+     * an unpriced own-provider model is the workspace's). See {@code docs/contributor/llm-cost-vocabulary.md},
+     * rule 2.
      *
-     * <p><b>Why this still says "byo" when the API says "ownProvider".</b> The jargon is kept out of the
-     * HTTP surface and the UI. The column keeps its name because renaming a released column is a
-     * destructive migration that has to run deprecate-then-remove across two releases
-     * (docs/contributor/database-migration.mdx) — a cost with no operator-visible benefit. The field
-     * follows the column so that the mapping stays greppable in both directions.
+     * <p>The API and the UI say "ownProvider"; this keeps the column's "byo" because renaming a
+     * released column costs a two-release deprecate-then-remove migration for no operator-visible
+     * benefit. The field follows the column so the mapping stays greppable both ways.
      */
     @Column(name = "monthly_byo_llm_budget_usd", precision = 10, scale = 2)
     private BigDecimal monthlyByoLlmBudgetUsd;

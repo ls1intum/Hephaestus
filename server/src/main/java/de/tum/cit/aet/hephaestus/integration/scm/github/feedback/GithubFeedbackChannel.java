@@ -173,19 +173,14 @@ public class GithubFeedbackChannel implements FeedbackChannel {
     }
 
     /**
-     * Dedup lookup for the delivery-recovery crash window: scans this PR/issue's comments, page by page up to {@link
-     * #EXISTING_SUMMARY_SEARCH_PAGE_BUDGET} pages, for one whose body contains {@code marker}. Reuses the
-     * same {@code GetPullRequestComments} / {@code GetIssueComments} queries {@code
-     * GitHubIssueCommentSyncService} uses for sync — no new GraphQL surface.
+     * Dedup lookup for the delivery-recovery crash window: scans this PR/issue's comments for one whose body
+     * contains {@code marker}, walking the connection backwards from its newest end ({@code last}/{@code
+     * before}) — the summary a crashed delivery already posted is the newest comment, so the scan finds it on
+     * the first request even on a thread far longer than the page budget.
      *
-     * <p>{@code newest-created-first} is NOT how GitHub orders this connection — it is creation-order
-     * ascending — so there is no way to bias the scan toward where a JUST-posted marker is most likely to
-     * be. Instead: a match found on ANY scanned page is {@code FOUND}; running out of pages with {@code
-     * hasNextPage=false} (every comment was seen) is a confirmed {@code ABSENT}; hitting the page budget
-     * while {@code hasNextPage} is still {@code true} (more comments exist beyond what was scanned) is
-     * {@code UNKNOWN} — NOT {@code ABSENT}, because a marker could still be sitting unscanned past the
-     * budget. Any transport/GraphQL error or rate-limit-critical guard is {@code UNKNOWN} for the same
-     * reason: neither confirms absence, so the caller must not treat either as a green light to post.
+     * <p>Budget exhausted, a transport/GraphQL error, a missing cursor or the rate-limit guard all yield
+     * {@code UNKNOWN} rather than {@code ABSENT}: an unscanned comment may still carry the marker, and only
+     * {@code ABSENT} licenses the caller to post a second summary.
      */
     @Override
     public ExistingSummaryLookup findExistingSummary(FeedbackTarget target, String marker) {
@@ -204,14 +199,14 @@ public class GithubFeedbackChannel implements FeedbackChannel {
         String commentsPath;
         if (isIssueSubject(subject)) {
             IssueCoordinates issue = parseIssueSubjectExternalId(subject);
-            documentName = "GetIssueComments";
+            documentName = "GetIssueCommentsNewest";
             owner = issue.owner();
             name = issue.name();
             number = issue.number();
             commentsPath = "repository.issue.comments";
         } else {
             PrCoordinates pr = parseSubjectExternalId(subject);
-            documentName = "GetPullRequestComments";
+            documentName = "GetPullRequestCommentsNewest";
             owner = pr.owner();
             name = pr.name();
             number = pr.number();
@@ -227,8 +222,8 @@ public class GithubFeedbackChannel implements FeedbackChannel {
                     .variable("owner", owner)
                     .variable("name", name)
                     .variable("number", number)
-                    .variable("first", EXISTING_SUMMARY_SEARCH_PAGE_SIZE)
-                    .variable("after", cursor)
+                    .variable("last", EXISTING_SUMMARY_SEARCH_PAGE_SIZE)
+                    .variable("before", cursor)
                     .execute()
                     .block(GRAPHQL_TIMEOUT);
                 if (response == null || (response.getErrors() != null && !response.getErrors().isEmpty())) {
@@ -251,13 +246,12 @@ public class GithubFeedbackChannel implements FeedbackChannel {
                 }
 
                 GHPageInfo pageInfo = connection.getPageInfo();
-                boolean hasNextPage = pageInfo != null && pageInfo.getHasNextPage();
-                if (!hasNextPage) {
-                    return ExistingSummaryLookup.absent(); // every comment was scanned — confirmed absent
+                boolean hasPreviousPage = pageInfo != null && pageInfo.getHasPreviousPage();
+                if (!hasPreviousPage) {
+                    return ExistingSummaryLookup.absent();
                 }
-                cursor = pageInfo.getEndCursor();
+                cursor = pageInfo.getStartCursor();
                 if (cursor == null || cursor.isBlank()) {
-                    // hasNextPage=true but no cursor to continue with — cannot confirm absence past here.
                     return ExistingSummaryLookup.unknown();
                 }
             } catch (RuntimeException e) {
@@ -269,18 +263,15 @@ public class GithubFeedbackChannel implements FeedbackChannel {
                 return ExistingSummaryLookup.unknown();
             }
         }
-        // Page budget exhausted with more comments still unscanned — cannot confirm absence.
         return ExistingSummaryLookup.unknown();
     }
 
-    /** Page size per request for {@link #findExistingSummary}'s marker scan. */
     private static final int EXISTING_SUMMARY_SEARCH_PAGE_SIZE = 100;
 
     /**
-     * Bounded page budget for {@link #findExistingSummary}: 3 pages of
-     * {@link #EXISTING_SUMMARY_SEARCH_PAGE_SIZE} (300 comments) covers the overwhelming majority of
-     * PRs/issues this bot comments on without an unbounded scan; beyond that, {@code UNKNOWN} is the
-     * correct (conservative) answer rather than guessing absence.
+     * Our cap, not GitHub's: the backwards walk already puts a just-posted marker on the first page, so the
+     * budget only bounds the rarer case of a marker buried under 300 newer comments — worth {@code UNKNOWN}
+     * (recovery retries) rather than an unbounded scan of a thousand-comment thread on every lookup.
      */
     private static final int EXISTING_SUMMARY_SEARCH_PAGE_BUDGET = 3;
 

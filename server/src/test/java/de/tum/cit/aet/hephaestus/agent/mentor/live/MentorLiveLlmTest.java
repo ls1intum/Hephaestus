@@ -641,7 +641,7 @@ class MentorLiveLlmTest {
         ProcessBuilder pb = new ProcessBuilder();
         Map<String, String> env = pb.environment();
         env.putAll(creds.asProcessEnv()); // OPENAI_API_KEY + OPENAI_BASE_URL (legacy back-compat)
-        // #1368 slice 5: the runner reads LLM_PROXY_URL / LLM_PROXY_TOKEN — the same env vars the
+        // The runner reads LLM_PROXY_URL / LLM_PROXY_TOKEN — the same env vars the
         // sandbox adapter sets in production (via NetworkPolicy). There is no real proxy in front of
         // this live test, so we point LLM_PROXY_URL directly at the upstream gateway and LLM_PROXY_TOKEN
         // at the real credential; the runner cannot tell the difference. Without these the hephaestus

@@ -420,7 +420,6 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(blockedCount("byo")).isEqualTo(blockedBefore + 1);
     }
 
-    /** And it must never reach across: a zero BYO cap does not pause shared-model detection. */
     @Test
     void theWorkspacesOwnCapNeverPausesSharedModelDetection() {
         Workspace workspace = setupWorkspace("ledger-byo-cap-instance-work");

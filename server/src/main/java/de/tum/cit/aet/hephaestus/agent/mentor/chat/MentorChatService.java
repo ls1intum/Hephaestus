@@ -369,16 +369,14 @@ public class MentorChatService implements MentorTurnRunner {
                 // Meter this turn for exactly the window in which it owns the sandbox. Binding and
                 // unbinding INSIDE the sandbox lock is what makes the window exclusive: the next turn
                 // on this sandbox cannot bind until this one has released, so no call can ever be
-                // attributed to the wrong turn. The cost is that calls made after the lock is released
-                // (the client-disconnect drain) are not metered here — the runner's own usage report
-                // covers those, and it is what billTurn prefers anyway.
+                // attributed to the wrong turn. The cost is that a runner still calling after the lock
+                // is released (the client-disconnect drain) is refused by the proxy: outside the window
+                // there is no row to bill, and serving it would spend money nothing records.
                 UUID sandboxSessionId = sandbox.identity().sessionId();
                 if (!proxyCredentialRegistry.bindTurn(sandboxSessionId, proxyMeter)) {
-                    // The turn still gets BILLED — the proxy writes its calls to the turn's row, fenced on
-                    // the row's status, not on this binding. Only the in-flight gate goes blind.
                     log.warn(
-                        "Mentor sandbox session {} has no live proxy credential; this turn's spend will be " +
-                            "invisible to the in-flight budget gate",
+                        "Mentor sandbox session {} has no live proxy credential; this turn has no billing " +
+                            "target, so the proxy will refuse its LLM calls",
                         sandboxSessionId
                     );
                 }

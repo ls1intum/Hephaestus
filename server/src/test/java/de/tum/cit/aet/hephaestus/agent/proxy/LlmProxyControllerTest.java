@@ -158,6 +158,49 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
     }
 
+    /**
+     * A mentor sandbox outlives the turns that use it, so its credential stays valid between them.
+     * A call that arrives in that gap names no execution — and an unnamed call is one no accumulator
+     * can write down, since both of them key on the attempt.
+     */
+    @Nested
+    class CallsWithNoBillingTarget {
+
+        @Test
+        void refusesAMentorCallMadeBetweenTurnsRatherThanServingItUnbilled() {
+            authenticate(unboundMentorSessionRouting());
+
+            var result = controller.proxy(
+                request("POST", "/internal/llm/chat/completions"),
+                new MockHttpServletResponse(),
+                new HttpHeaders(),
+                jsonBody()
+            );
+
+            assertThat(result.getStatusCode().value()).isEqualTo(403);
+            // Never resolved a credential, so it never reached a provider: refused before the money,
+            // not after it.
+            verifyNoInteractions(resolver);
+            verifyNoInteractions(mentorTurnUsageAccumulator);
+            verifyNoInteractions(usageAccumulator);
+        }
+
+        /** The budget gate has nothing to judge without an attempt, and must not be reached first. */
+        @Test
+        void refusesBeforeConsultingTheBudgetGate() {
+            authenticate(unboundMentorSessionRouting());
+
+            controller.proxy(
+                request("POST", "/internal/llm/chat/completions"),
+                new MockHttpServletResponse(),
+                new HttpHeaders(),
+                jsonBody()
+            );
+
+            verifyNoInteractions(budgetGate);
+        }
+    }
+
     @Nested
     class SafeSurface {
 
@@ -633,6 +676,20 @@ class LlmProxyControllerTest extends BaseUnitTest {
             8L,
             9L,
             ATTEMPT
+        );
+    }
+
+    /** A live mentor sandbox credential with no turn bound to it — the one routing with no attempt. */
+    private static ProxyRouting unboundMentorSessionRouting() {
+        return new ProxyRouting(
+            "mentor-session",
+            "openai-completions",
+            "https://frozen.example.com/v1",
+            FundingSource.INSTANCE,
+            7L,
+            8L,
+            9L,
+            null
         );
     }
 

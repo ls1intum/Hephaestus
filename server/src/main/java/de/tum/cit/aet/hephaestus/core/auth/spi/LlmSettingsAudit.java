@@ -5,11 +5,10 @@ package de.tum.cit.aet.hephaestus.core.auth.spi;
  * Same reasoning as {@link LlmConnectionAudit} (GLOBAL, {@code config_audit_event.workspace_id} is NOT
  * NULL).
  *
- * <p>{@code core.auth} implements this (over its {@code AuthEventLogger}, in
- * {@code LlmCatalogAuditAdapter}); {@code agent.catalog.InstanceLlmSettingsService} consumes it via an
- * {@code ObjectProvider} — that service is also called by the ungated workspace BYO services, which
- * load on every runtime role, so it cannot carry a hard dependency on a
- * {@code @ConditionalOnServerRole} implementation.
+ * <p>Implemented by {@code core.auth.audit.LlmCatalogAuditAdapter}.
+ * {@code agent.catalog.InstanceLlmSettingsService} consumes it via an {@code ObjectProvider}: that
+ * service is also called by the ungated workspace BYO services, which load on every runtime role, so
+ * it cannot carry a hard dependency on a {@code @ConditionalOnServerRole} implementation.
  */
 public interface LlmSettingsAudit {
     void settingsChanged(boolean allowWorkspaceConnections);

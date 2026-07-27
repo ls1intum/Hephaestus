@@ -6,9 +6,11 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolver.MrCoordinates;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
@@ -32,23 +34,6 @@ import org.springframework.stereotype.Component;
  *
  * <p>Gated on {@code hephaestus.integration.gitlab.enabled=true} to track
  * {@link GitLabGraphQlClientProvider}.
- *
- * <p><b>{@link #findExistingSummary} is intentionally NOT overridden</b> (delivery-recovery dedup):
- * unlike GitHub, this codebase has no existing "list MR notes with body" query wired to a
- * reusable Java call site ({@code GetMergeRequestDiscussions.graphql} exists for sync but returns a
- * nested discussions→notes shape with its own resolver/response mapping, not a drop-in reuse the way
- * GitHub's {@code GetPullRequestComments}/{@code GetIssueComments} were for {@link
- * de.tum.cit.aet.hephaestus.integration.scm.github.feedback.GithubFeedbackChannel}). Building and wiring
- * that mapping is a bigger lift than this slice's scope.
- *
- * <p>The SPI default is {@code UNKNOWN}, not "proceed and post" — an "unsupported ≈ absent" default
- * would risk a duplicate note on every unsupported channel; see {@link
- * de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel#findExistingSummary}'s javadoc.
- * Concretely: a GitLab delivery-recovery retry NEVER auto-reposts —
- * every stuck-PENDING GitLab delivery is retried (attempt-counted) without confirmation, and once the
- * attempt cap is exhausted it is marked FAILED for a human to resolve via the operator-facing retry
- * endpoint, rather than risking a silent duplicate note. This is the safe direction to be wrong in for a
- * provider with no confirm-absence query available.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
@@ -228,6 +213,121 @@ public class GitlabFeedbackChannel implements FeedbackChannel {
         }
         log.info("Edited GitLab note in place: workspaceId={}, noteId={}", scopeId, noteId);
         return UpdateOutcome.edited(new SummaryHandle(noteId));
+    }
+
+    /** Page size per request for {@link #findExistingSummary}'s marker scan — GitLab caps {@code first} at 100. */
+    private static final int EXISTING_SUMMARY_SEARCH_PAGE_SIZE = 100;
+
+    /**
+     * Bounded page budget for {@link #findExistingSummary}: 3 pages of
+     * {@link #EXISTING_SUMMARY_SEARCH_PAGE_SIZE} discussions covers the MRs this bot comments on without an
+     * unbounded scan; past it, {@code UNKNOWN} is the correct answer rather than a guess at absence.
+     */
+    private static final int EXISTING_SUMMARY_SEARCH_PAGE_BUDGET = 3;
+
+    /**
+     * Dedup lookup for the delivery-recovery crash window: pages this MR's discussions through the same
+     * {@code GetMergeRequestDiscussions} document {@link GitlabInlineFindingChannel} and discussion sync use,
+     * and returns the marker-bearing note's own id — the handle {@link #updateSummary} edits in place.
+     *
+     * <p>Only {@code ABSENT} is a green light to post; {@code UNKNOWN} leaves the delivery {@code PENDING} for a
+     * later attempt. Every branch that cannot prove the marker is missing therefore answers {@code UNKNOWN}.
+     *
+     * <p>The document nests {@code notes(first: 100)} inside each discussion with no cursor of its own, so a
+     * thread whose {@code notes.pageInfo.hasNextPage} is true holds notes no cursor can reach — after seeing one,
+     * exhausting the outer connection still answers {@code UNKNOWN}.
+     */
+    @Override
+    public ExistingSummaryLookup findExistingSummary(FeedbackTarget target, String marker) {
+        if (marker == null || marker.isBlank()) {
+            return ExistingSummaryLookup.unknown();
+        }
+        long scopeId = target.ref().workspaceId();
+        if (gitLabProvider.isRateLimitCritical(scopeId)) {
+            return ExistingSummaryLookup.unknown();
+        }
+        String subject = target.subjectExternalId();
+        if (subject != null && subject.lastIndexOf('#') > subject.lastIndexOf('!')) {
+            // Issue subject: this document is merge-request-only and issue notes have no listing counterpart.
+            return ExistingSummaryLookup.unknown();
+        }
+        MrCoordinates mr = GitlabMrResolver.parseSubjectExternalId(subject);
+
+        boolean sawTruncatedThread = false;
+        String cursor = null;
+        for (int page = 0; page < EXISTING_SUMMARY_SEARCH_PAGE_BUDGET; page++) {
+            try {
+                ClientGraphQlResponse response = gitLabProvider
+                    .forScope(scopeId)
+                    .documentName("GetMergeRequestDiscussions")
+                    .variable("fullPath", mr.projectPath())
+                    .variable("iid", String.valueOf(mr.iid()))
+                    .variable("first", EXISTING_SUMMARY_SEARCH_PAGE_SIZE)
+                    .variable("after", cursor)
+                    .execute()
+                    .block(GRAPHQL_TIMEOUT);
+                if (response == null || !response.getErrors().isEmpty()) {
+                    return ExistingSummaryLookup.unknown();
+                }
+
+                List<Map<String, Object>> discussions = response
+                    .field("project.mergeRequest.discussions.nodes")
+                    .getValue();
+                if (discussions == null) {
+                    return ExistingSummaryLookup.unknown();
+                }
+                for (Map<String, Object> discussion : discussions) {
+                    Map<String, Object> notes = notesConnection(discussion);
+                    for (Map<String, Object> note : nodesOf(notes)) {
+                        String noteId = (String) note.get("id");
+                        String body = (String) note.get("body");
+                        if (noteId != null && body != null && body.contains(marker)) {
+                            return ExistingSummaryLookup.found(new SummaryHandle(noteId));
+                        }
+                    }
+                    sawTruncatedThread = sawTruncatedThread || hasUnreadNotes(notes);
+                }
+
+                GitLabPageInfo pageInfo = response
+                    .field("project.mergeRequest.discussions.pageInfo")
+                    .toEntity(GitLabPageInfo.class);
+                if (pageInfo == null) {
+                    return ExistingSummaryLookup.unknown();
+                }
+                if (!pageInfo.hasNextPage()) {
+                    return sawTruncatedThread ? ExistingSummaryLookup.unknown() : ExistingSummaryLookup.absent();
+                }
+                cursor = pageInfo.endCursor();
+                if (cursor == null || cursor.isBlank()) {
+                    return ExistingSummaryLookup.unknown();
+                }
+            } catch (RuntimeException e) {
+                log.debug(
+                    "Existing-summary dedup lookup failed (treated as unknown, not absent): scopeId={}, error={}",
+                    scopeId,
+                    e.getMessage()
+                );
+                return ExistingSummaryLookup.unknown();
+            }
+        }
+        return ExistingSummaryLookup.unknown();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> notesConnection(Map<String, Object> discussion) {
+        Object notes = discussion.get("notes");
+        return notes instanceof Map<?, ?> map ? (Map<String, Object>) map : Map.of();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> nodesOf(Map<String, Object> connection) {
+        Object nodes = connection.get("nodes");
+        return nodes instanceof List<?> list ? (List<Map<String, Object>>) list : List.of();
+    }
+
+    private static boolean hasUnreadNotes(Map<String, Object> notesConnection) {
+        Object pageInfo = notesConnection.get("pageInfo");
+        return pageInfo instanceof Map<?, ?> map && Boolean.TRUE.equals(map.get("hasNextPage"));
     }
 
     /** Conservative NOT_FOUND heuristic: GitLab signals a deleted note only via a free-text mutation error. */

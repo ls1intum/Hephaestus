@@ -1,7 +1,9 @@
 package de.tum.cit.aet.hephaestus.core.runtime;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -28,10 +30,11 @@ import org.springframework.stereotype.Component;
  *       (ack-pending, fetch batch size) has no poll-based equivalent and is simply dropped.</li>
  * </ul>
  *
- * <p>Deliberately checks the retired {@code hephaestus.agent.nats.*} keys, not any surviving property
- * with a similar name, and no shipped profile assigns one — a YAML-set placeholder default resolves
- * to a present-but-empty value rather than absent, which would make this warner fire on every boot.
- * A WARN here therefore means the operator's own deployment config still sets one of these.
+ * <p>A WARN here means the operator's own deployment config still sets one of these. That only holds
+ * while no shipped profile defines a retired key itself — Spring binds a {@code ${VAR:}} placeholder
+ * to an empty string rather than leaving it absent, so a single leftover line in an
+ * {@code application-*.yml} would make every boot of that profile warn. {@code
+ * DeprecatedEnvVarStartupWarnerTest#noShippedProfileDefinesARetiredProperty} pins that.
  */
 @Component
 public class DeprecatedEnvVarStartupWarner {
@@ -70,6 +73,11 @@ public class DeprecatedEnvVarStartupWarner {
             "hephaestus.agent.nats.fetch-batch-size",
             "the agent queue now runs on PostgreSQL; set AGENT_CLAIM_BATCH_SIZE instead"
         );
+    }
+
+    /** The keys this warner fires on, so a regression guard can assert no shipped profile defines one. */
+    static Set<String> retiredPropertyNames() {
+        return Collections.unmodifiableSet(RETIRED_PROPERTIES.keySet());
     }
 
     private final Environment environment;

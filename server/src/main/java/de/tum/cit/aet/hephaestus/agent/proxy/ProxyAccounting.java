@@ -63,6 +63,16 @@ public class ProxyAccounting {
     }
 
     /**
+     * A credential authenticated but named no execution to bill, so the call was refused unserved.
+     * Counted because the rate is a defect signal, not a usage statistic: a sandbox calling outside
+     * the window its turn owns means either a binding that failed (see
+     * {@code MentorProxyCredentialRegistry#bindTurn}) or a runner still working after its turn ended.
+     */
+    public void recordUnbillableRefusal(String apiProtocol) {
+        meterRegistry.counter("llm.proxy.unbillable.refused", "apiProtocol", apiProtocol).increment();
+    }
+
+    /**
      * Attribute a served NON-STREAMING call's tokens to the execution that made it. Never throws: a
      * body this cannot read must not turn a call the provider already served — and already charged us
      * for — into an error for the runner.

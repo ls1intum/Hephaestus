@@ -108,6 +108,17 @@ class LlmProxyController {
         HttpHeaders incomingHeaders,
         byte[] body
     ) {
+        // Nothing can record what nothing owns: with no attempt there is no row to accumulate onto, so
+        // a served call's tokens would reach neither the ledger nor the cap that reads it. Refuse it
+        // instead — a failed call the caller sees beats spend nobody can account for. Only a mentor
+        // session between turns gets here; a job token always names its attempt.
+        ProxyRouting.BilledAttempt attempt = routing.attempt();
+        if (attempt == null) {
+            accounting.recordUnbillableRefusal(routing.apiProtocol());
+            log.warn("Refusing an LLM call with no billing target: principal {}", routing.principalDescription());
+            return ResponseEntity.status(403).body("This credential is not running a billable execution");
+        }
+
         // In-flight budget backstop: once a workspace has crossed its monthly cap — counting what THIS
         // attempt has already consumed but not yet had recorded — refuse NEW upstream calls before
         // resolving any credential or hitting the network. Never interrupts a call already streaming.
@@ -196,8 +207,7 @@ class LlmProxyController {
             // response: the client sees the same frames, at the same time, flushed the same way. The
             // usage frame is the last one, so a stream that dies before it bills nothing — what it
             // observed — rather than a guess from the deltas.
-            ProxyStreamUsageTap tap =
-                served && routing.attempt() != null ? new ProxyStreamUsageTap(objectMapper, responsesProtocol) : null;
+            ProxyStreamUsageTap tap = served ? new ProxyStreamUsageTap(objectMapper, responsesProtocol) : null;
             ProxyStreamingUtils.streamSseToResponse(
                 upstream.sseBody(),
                 upstream.headers(),
@@ -208,15 +218,15 @@ class LlmProxyController {
             if (tap != null) {
                 // After the stream ends for ANY reason — natural end, client disconnect, upstream
                 // timeout — so whatever the tap managed to observe is still recorded.
-                accounting.recordUsage(routing.attempt(), tap.observed());
+                accounting.recordUsage(attempt, tap.observed());
             }
             return null;
         }
         // Crash-safe accounting: attribute this non-streaming call's tokens to the execution now, so a
         // job or turn that dies before its terminal write still bills the calls it actually made.
         // Best-effort — never affects the returned response.
-        if (routing.attempt() != null && upstream.body() != null && served) {
-            accounting.recordUsage(routing.attempt(), upstream.body(), responsesProtocol);
+        if (upstream.body() != null && served) {
+            accounting.recordUsage(attempt, upstream.body(), responsesProtocol);
         }
         return ResponseEntity.status(upstream.status()).headers(upstream.headers()).body(upstream.body());
     }

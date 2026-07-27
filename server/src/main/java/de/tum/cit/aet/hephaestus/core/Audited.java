@@ -30,8 +30,8 @@ import java.lang.annotation.Target;
  * </ul>
  *
  * <p>{@code AuditByDefaultArchTest} parses the value: an unknown ledger, or a token that is not a real
- * constant of its ledger's enum, fails the build. Before that check existed a typo'd entity type
- * silently opted the endpoint out of the "does it actually reach a recorder?" rule.
+ * constant of its ledger's enum, fails the build — otherwise a typo'd entity type silently opts the
+ * endpoint out of the "does it actually reach a recorder?" rule.
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)

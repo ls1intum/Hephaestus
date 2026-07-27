@@ -6,9 +6,7 @@ import com.github.benmanes.caffeine.cache.Ticker;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
-import java.security.SecureRandom;
 import java.time.Duration;
-import java.util.Base64;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -20,10 +18,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * Mints and validates proxy-scoped bearer tokens for the mentor's long-lived interactive sandbox
- *. {@code AgentJob} rows carry their own DB-backed job token; the mentor sandbox is
- * NOT an {@code AgentJob} (it is a reused, developer-attached session, not a one-shot NATS-dispatched
- * job), so it needs an equivalent credential minted outside that table.
+ * Mints and validates proxy-scoped bearer tokens for the mentor's long-lived interactive sandbox.
+ * {@code AgentJob} rows carry their own DB-backed job token; the mentor sandbox is NOT an
+ * {@code AgentJob} (it is a reused, developer-attached session, not a one-shot {@code agent_job} row),
+ * so it needs an equivalent credential minted outside that table.
  *
  * <p>In-memory, process-local — mirrors the fact that the interactive sandbox registry itself
  * (mentor sessions are keyed by {@code (developerId, workspaceId)} and attached per worker process)
@@ -58,12 +56,13 @@ import org.springframework.stereotype.Component;
  * session for the window in which it owns that sandbox, and {@link #unbindTurn unbinds} at the end of
  * that window; {@link #validate} reports the bound turn as the call's billing target.
  *
- * <h2>The bound this guarantees</h2>
- *
  * <blockquote>A mentor turn is refused as soon as its OWN completed calls have consumed the headroom
  * the ledger last showed, so it can overshoot the cap by at most the calls it had already dispatched
  * when the last admitted forward happened — one call for Pi's sequential agent loop — never by the
  * whole turn.</blockquote>
+ *
+ * <p>Why that holds and what it does NOT cover:
+ * {@code docs/decisions/0026-per-purpose-agent-bindings-and-llm-governance.md}.
  *
  * <p>Two turns cannot contaminate each other. The binding window is the window in which the turn holds
  * the per-sandbox lock, so at most one turn is bound to a session at any instant, and a call that
@@ -79,20 +78,6 @@ import org.springframework.stereotype.Component;
  * {@code MentorTurnUsageAccumulator}. So a worker that dies mid-turn no longer loses the turn's
  * spend — {@code MentorInFlightReaper} bills the calls the proxy recorded instead of booking a
  * zero-token UNVERIFIABLE event.
- *
- * <p><b>What it does not bound.</b>
- *
- * <ul>
- *   <li>A call made outside a binding window — before the turn's prompt, or during the
- *       client-disconnect drain after it — carries no meter, so it is invisible to the gate. It is
- *       still billed: the row write is fenced on the turn's status, not on the binding.</li>
- *   <li>Turns running concurrently for one workspace are each bounded on their own, so N of them can
- *       together reach N times the cap.</li>
- *   <li>A crashed worker's turn is billed only when the reaper's window elapses (default 70 minutes).
- *       Until then its spend is on the row but not in the ledger, so the gate lets the workspace keep
- *       spending against headroom that is already gone. That is the reaper's latency, not a lost
- *       charge.</li>
- * </ul>
  */
 @Component
 public class MentorProxyCredentialRegistry {
@@ -106,8 +91,6 @@ public class MentorProxyCredentialRegistry {
      * pathological mint loop, it is not a working-set limit.
      */
     private static final int MAX_ENTRIES = 10_000;
-
-    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final Cache<String, Entry> byTokenHash;
     private final Map<UUID, String> tokenHashBySession = new ConcurrentHashMap<>();
@@ -183,9 +166,7 @@ public class MentorProxyCredentialRegistry {
      *     {@link #revoke(UUID)} uses to find this token again at sandbox teardown
      */
     public String mint(UUID sessionId, Route route) {
-        byte[] bytes = new byte[32]; // 256 bits — same shape as AgentJob's job token
-        SECURE_RANDOM.nextBytes(bytes);
-        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        String token = AgentJob.generateJobToken();
         String hash = AgentJob.computeTokenHash(token);
         byTokenHash.put(
             hash,
@@ -214,8 +195,8 @@ public class MentorProxyCredentialRegistry {
      *
      * <p>The routing names the turn bound to this session at the instant the call authenticates, and
      * carries what that turn has already spent — which is what makes the turn's own in-flight spend
-     * visible to {@code ProxyBudgetGate}. A call that arrives between turns carries no billing target;
-     * it is still judged against the workspace's recorded spend, just without an in-flight term.
+     * visible to {@code ProxyBudgetGate}. A call that arrives between turns names no turn, and
+     * {@code LlmProxyController} refuses it: nothing would record its tokens.
      */
     public Optional<ProxyRouting> validate(String token) {
         Entry entry = byTokenHash.getIfPresent(AgentJob.computeTokenHash(token));
@@ -253,8 +234,9 @@ public class MentorProxyCredentialRegistry {
      * live turn is the correct target. The displaced meter is removed from the turn index in the same
      * step so it stops accepting usage — it never silently keeps collecting under a turn that ended.
      *
-     * @return false when the session has no live credential (revoked, or expired past {@link #TTL}),
-     *     in which case the turn runs unmetered; the caller is expected to make that observable.
+     * @return false when the session has no live credential (revoked, or expired past {@link #TTL}).
+     *     The turn then has no billing target, so every call it makes is refused by the proxy rather
+     *     than served unbilled — it spends nothing, and it also achieves nothing.
      */
     public boolean bindTurn(UUID sessionId, MentorTurnMeter meter) {
         String hash = tokenHashBySession.get(sessionId);

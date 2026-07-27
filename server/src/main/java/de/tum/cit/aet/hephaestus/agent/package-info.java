@@ -3,7 +3,7 @@
  *
  * <p>Subpackages:
  * <ul>
- *   <li>{@code agent.job} — agent job lifecycle (submit / NATS dispatch / execute / cancel)</li>
+ *   <li>{@code agent.job} — agent job lifecycle (submit / claim / execute / cancel)</li>
  *   <li>{@code agent.handler} — job-type dispatch + the practice detection → feedback delivery pipeline</li>
  *   <li>{@code agent.practice} — Pi runtime adapter for the practice-review agent (symmetric with {@code agent.mentor})</li>
  *   <li>{@code agent.mentor} — Pi runtime + interactive SSE chat backing the mentor flow</li>
@@ -19,9 +19,10 @@
  *   <li>{@code agent.task} — sealed Task envelope shared with sandbox containers</li>
  * </ul>
  *
- * <p>App ↔ worker boundary: see ADR 0005. The {@code agent.job} submission chain runs on
- * server (publishes to NATS); {@code agent.sandbox} + {@code AgentJobExecutor} run on worker
- * (consumes NATS, spawns containers).
+ * <p>App ↔ worker boundary: see ADR 0005. The queue is the {@code agent_job} table itself
+ * (ADR 0025): the submission chain runs on server and its QUEUED insert IS the enqueue, while
+ * {@code agent.sandbox} + {@code AgentJobExecutor} run on worker, claiming rows and spawning
+ * containers.
  */
 @org.springframework.modulith.ApplicationModule(displayName = "Agent")
 package de.tum.cit.aet.hephaestus.agent;

@@ -6,7 +6,6 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
-import java.util.Currency;
 import java.util.Locale;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -32,9 +31,6 @@ public class FxRateLookup {
      * weekends and TARGET holidays) while still catching a fetcher that has died.
      */
     public static final int MAX_RATE_AGE_DAYS = 7;
-
-    /** The only currency the ECB feed lets us convert to, since its rates are quoted per 1 EUR. */
-    private static final String SUPPORTED_CURRENCY = "EUR";
 
     private static final Logger log = LoggerFactory.getLogger(FxRateLookup.class);
 
@@ -101,33 +97,9 @@ public class FxRateLookup {
         return FxRateInfoDTO.fromEcbRate(displayCurrency.orElseThrow(), rate.getUsdPerEur(), rate.getRateDate());
     }
 
-    /**
-     * The semantic half of a two-stage check: {@link LlmProperties#displayCurrency()} already fails
-     * startup on a malformed code, so a deploy-time typo surfaces as a failed rollout. A well-formed
-     * code we cannot honestly convert to only warns and leaves the feature off — a display nicety must
-     * not be able to take an instance down, and USD is always a correct fallback.
-     */
+    /** Unset is the only way to reach this feature's off state; anything else has failed startup. */
     private static Optional<String> resolveCurrency(String configured) {
-        String code = configured == null ? "" : configured.trim();
-        if (code.isEmpty()) {
-            return Optional.empty();
-        }
-        String normalized = code.toUpperCase(Locale.ROOT);
-        try {
-            Currency.getInstance(normalized);
-        } catch (IllegalArgumentException e) {
-            log.warn("fx: hephaestus.llm.display-currency='{}' is not an ISO 4217 code — showing USD only", configured);
-            return Optional.empty();
-        }
-        if (!SUPPORTED_CURRENCY.equals(normalized)) {
-            log.warn(
-                "fx: hephaestus.llm.display-currency='{}' is not supported — the ECB reference feed only " +
-                    "quotes rates per 1 {}; showing USD only",
-                configured,
-                SUPPORTED_CURRENCY
-            );
-            return Optional.empty();
-        }
-        return Optional.of(normalized);
+        String code = configured == null ? "" : configured.trim().toUpperCase(Locale.ROOT);
+        return code.isEmpty() ? Optional.empty() : Optional.of(code);
     }
 }

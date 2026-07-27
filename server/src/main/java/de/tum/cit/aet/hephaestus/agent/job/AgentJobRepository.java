@@ -592,15 +592,14 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      *   <li><b>{@code delivery_status = 'PENDING'}</b> — a job whose delivery has not
      *       landed yet must survive for the delivery-recovery sweep to retry; deleting it outright
      *       would silently drop the delivery forever.</li>
-     *   <li><b>Referenced by {@code feedback}</b> — {@code feedback.agent_job_id}
-     *       carries {@code ON DELETE CASCADE} (1781092589259-32: "purging a job removes its synthesized
-     *       feedback"), which transitively cascades to {@code feedback_observation}, {@code
-     *       feedback_placement}, and {@code reaction} — append-only research/product data that must
+     *   <li><b>Referenced by {@code feedback}</b> — {@code feedback.agent_job_id} is
+     *       {@code ON DELETE RESTRICT} (1785015307013-28), so a delete that forgets this exclusion
+     *       fails loudly rather than shedding the append-only research data hanging off it
+     *       ({@code feedback_observation}, {@code feedback_placement}, {@code reaction}), which must
      *       outlive the operational {@code agent_job} row. A row referenced by {@code feedback} already
      *       shed its heavy payload columns at {@code payload-retention} (14d, well before this 90d
-     *       delete), so excluding it here only means the (now-lightweight) row itself lives on — bounded,
-     *       not unbounded, growth. The {@code feedback} FK is {@code ON DELETE RESTRICT}, so a future
-     *       delete that forgets this exclusion fails loudly instead of shedding the data.</li>
+     *       delete), so excluding it here only means the (now-lightweight) row itself lives on —
+     *       bounded, not unbounded, growth.</li>
      * </ul>
      */
     @WorkspaceAgnostic("Cross-workspace retention batch; caller is @WorkspaceAgnostic retention service")

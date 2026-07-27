@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
+import static de.tum.cit.aet.hephaestus.agent.usage.TransactionCallbacks.afterCommit;
+
 import de.tum.cit.aet.hephaestus.agent.proxy.ProxyRouting.BilledAttempt;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
@@ -12,8 +14,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Adds one proxied call's token usage to the mentor turn that made it — the mentor's counterpart to
@@ -108,28 +108,6 @@ public class MentorTurnUsageAccumulator {
             log.warn("Lost proxy usage accounting for mentor turn {} — this call may go unbilled", turnId, e);
             meterRegistry.counter("llm.proxy.usage.mentor.failure").increment();
         }
-    }
-
-    /**
-     * Run {@code action} once this accumulator's transaction has actually committed, or immediately
-     * when there is no transaction to wait for (a test calling the method unproxied).
-     *
-     * <p>The same {@code afterCommit} shape {@code LlmUsageRecorder} uses for its budget alert: work
-     * that must not become visible unless the row it describes is durable.
-     */
-    private static void afterCommit(Runnable action) {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            action.run();
-            return;
-        }
-        TransactionSynchronizationManager.registerSynchronization(
-            new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    action.run();
-                }
-            }
-        );
     }
 
     /**

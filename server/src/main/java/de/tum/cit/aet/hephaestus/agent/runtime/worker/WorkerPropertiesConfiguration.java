@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Configuration;
  * control channel is configured. Worker identity ({@code resolvedWorkerId()}) is a job-execution
  * concern (job ownership + orphan recovery, #1138), not a WSS concern; gating it on the WSS endpoint
  * (as {@link WorkerConfiguration} does for the control-channel beans) would silently disable orphan
- * recovery on a NATS-only worker. This keeps the two concerns separate so identity is always present
+ * recovery on a worker with no control endpoint. This keeps the two concerns separate so identity is always present
  * wherever {@code AgentJobExecutor} / {@code WorkerLivenessReporter} run.
  */
 @Configuration(proxyBeanMethods = false)

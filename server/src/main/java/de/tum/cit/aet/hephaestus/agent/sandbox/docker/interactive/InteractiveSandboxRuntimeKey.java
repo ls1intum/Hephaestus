@@ -1,14 +1,12 @@
 package de.tum.cit.aet.hephaestus.agent.sandbox.docker.interactive;
 
 import de.tum.cit.aet.hephaestus.agent.proxy.ProxyRouting;
+import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
@@ -39,7 +37,9 @@ record InteractiveSandboxRuntimeKey(
                     !entry.getKey().startsWith(SandboxLayout.SESSIONS_DIR_PREFIX) &&
                     !entry.getKey().startsWith(SandboxLayout.CONTEXT_PREFIX)
             )
-            .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, entry -> sha256(entry.getValue())));
+            .collect(
+                Collectors.toUnmodifiableMap(Map.Entry::getKey, entry -> ProvenanceDigest.sha256Hex(entry.getValue()))
+            );
         boolean internetAccess = spec.networkPolicy() != null && spec.networkPolicy().internetAccess();
         String proxyUrl = spec.networkPolicy() != null ? spec.networkPolicy().llmProxyUrl() : null;
         return new InteractiveSandboxRuntimeKey(
@@ -54,14 +54,6 @@ record InteractiveSandboxRuntimeKey(
             spec.volumeMounts(),
             routing != null ? RoutingKey.from(routing) : null
         );
-    }
-
-    private static String sha256(byte[] value) {
-        try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value));
-        } catch (NoSuchAlgorithmException impossible) {
-            throw new IllegalStateException("JVM does not provide SHA-256", impossible);
-        }
     }
 
     private record RoutingKey(

@@ -17,8 +17,7 @@ import org.mockito.Mock;
 import org.springframework.beans.factory.ObjectProvider;
 
 /**
- * Unit coverage of {@link InstanceLlmSettingsService}'s {@code auth_event} audit wiring (#1368
- * slice 7). {@link LlmSettingsAudit} is reached through an {@link ObjectProvider} (this service must
+ * Unit coverage of {@link InstanceLlmSettingsService}'s {@code auth_event} audit wiring. {@link LlmSettingsAudit} is reached through an {@link ObjectProvider} (this service must
  * stay loadable on the worker/webhook roles, where the port's sole implementation is absent) — both
  * branches are exercised: available (the normal server-role case) and absent (defensive; the DI-shape
  * reason this service uses a provider at all).

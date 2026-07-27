@@ -102,15 +102,9 @@ public class WorkspaceLlmConnectionService {
     }
 
     private String connectionSlug(Long workspaceId, String requested, String displayName) {
-        String base = StringUtils.hasText(requested) ? requested : CatalogSlug.from(displayName);
-        if (StringUtils.hasText(requested)) return base;
-        String candidate = base;
-        for (
-            int i = 2;
-            connectionRepository.findByWorkspaceIdAndSlug(workspaceId, candidate).isPresent();
-            i++
-        ) candidate = CatalogSlug.suffix(base, i);
-        return candidate;
+        return CatalogSlug.unique(requested, displayName, slug ->
+            connectionRepository.findByWorkspaceIdAndSlug(workspaceId, slug).isPresent()
+        );
     }
 
     @Transactional

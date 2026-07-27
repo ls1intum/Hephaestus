@@ -10,8 +10,9 @@
  *       auth: e.g. {@code GitProviderRegistry}, {@code IdentityProviderCatalog}.</li>
  * </ul>
  *
- * <p>This is the only {@code core.auth} package other modules may depend on; implementations and
- * domain entities stay encapsulated inside {@code core.auth}.
+ * <p>This is the only {@code core.auth} package other modules may depend on ({@code
+ * ModulithVerificationTest} enforces it); implementations and domain entities stay encapsulated
+ * inside {@code core.auth}.
  */
 @org.springframework.modulith.NamedInterface("auth-spi")
 package de.tum.cit.aet.hephaestus.core.auth.spi;

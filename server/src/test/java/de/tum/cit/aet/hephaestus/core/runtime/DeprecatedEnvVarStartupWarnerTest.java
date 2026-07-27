@@ -7,25 +7,29 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.env.YamlPropertySourceLoader;
+import org.springframework.core.env.EnumerablePropertySource;
 import org.springframework.core.env.PropertySource;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.mock.env.MockEnvironment;
 
 /**
- * {@code HEPHAESTUS_WORKER_LLM_BASE_URL} / {@code HEPHAESTUS_WORKER_LLM_API_KEY} /
- * {@code HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED} are now silently ignored (see MIGRATION.md). This
- * warner is the operator-visible signal that a deployment is still setting one of them.
- *
- * <p>#1368 NATS→Postgres cutover: {@code AGENT_NATS_ENABLED} / {@code hephaestus.agent.nats.server}
- * joined the retired list — the agent job queue is now the {@code agent_job} table.
+ * Retired env vars are silently ignored (see MIGRATION.md). This warner is the operator-visible
+ * signal that a deployment is still setting one of them.
  */
 class DeprecatedEnvVarStartupWarnerTest extends BaseUnitTest {
 
@@ -114,59 +118,53 @@ class DeprecatedEnvVarStartupWarnerTest extends BaseUnitTest {
     }
 
     /**
-     * {@code application-worker.yml} used to set {@code hephaestus.agent.nats.enabled}
-     * and the (also-retired) {@code hephaestus.worker.llm.base-url}/{@code api-key} via {@code
-     * ${VAR:}}-style placeholders with an EMPTY-STRING default. Spring's YAML property source binds
-     * the key regardless — an unset env var resolves to {@code ""}, not "absent" — so {@link
-     * DeprecatedEnvVarStartupWarner#warnOnRetiredProperties()} (which checks {@code getProperty(...) !=
-     * null}) fired a false-positive WARN on every single worker boot, even when the operator never
-     * touched any of those env vars. This is a static-content regression guard, not an env/property
-     * simulation: it loads the actual shipped profile and asserts none of the currently-retired keys
-     * are defined in it any more.
+     * A shipped profile that still defines a retired key makes this warner fire on every boot of that
+     * profile, blaming the operator for a line they never wrote. Spring's YAML source binds the key
+     * whatever the value is — a {@code ${VAR:}} placeholder with an empty default resolves to
+     * {@code ""}, not "absent" — so the value cannot rescue it; the line has to be gone.
+     *
+     * <p>Static content, deliberately: booting each profile to check would need every one of them to
+     * have a satisfiable environment, and would not fail until it did.
      */
-    @Test
-    void workerProfileNoLongerDefinesAnyRetiredKey() throws Exception {
-        YamlPropertySourceLoader loader = new YamlPropertySourceLoader();
-        List<PropertySource<?>> sources = loader.load(
-            "application-worker.yml",
-            new ClassPathResource("application-worker.yml")
-        );
-
-        List<String> retiredKeysStillDefined = sources
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("shippedProfileYamlFiles")
+    void noShippedProfileDefinesARetiredProperty(Path profile) throws Exception {
+        List<String> retiredKeysStillDefined = propertyNamesIn(profile)
             .stream()
-            .flatMap(source ->
-                java.util.Arrays.stream(
-                    ((org.springframework.core.env.EnumerablePropertySource<?>) source).getPropertyNames()
-                )
-            )
-            .filter(
-                name ->
-                    name.equals("hephaestus.agent.nats.enabled") ||
-                    name.equals("hephaestus.agent.nats.server") ||
-                    name.equals("hephaestus.agent.nats.max-ack-pending") ||
-                    name.equals("hephaestus.agent.nats.fetch-batch-size") ||
-                    name.equals("hephaestus.worker.llm.base-url") ||
-                    name.equals("hephaestus.worker.llm.api-key")
-            )
+            .filter(DeprecatedEnvVarStartupWarner.retiredPropertyNames()::contains)
             .toList();
 
         assertThat(retiredKeysStillDefined)
-            .as(
-                "application-worker.yml must not (re-)define retired properties — even an empty-string " +
-                    "placeholder default makes DeprecatedEnvVarStartupWarner false-positive on every worker boot"
-            )
+            .as("%s must not define retired properties — every boot of that profile would warn", profile.getFileName())
             .isEmpty();
     }
 
+    static List<Path> shippedProfileYamlFiles() throws IOException {
+        try (Stream<Path> files = Files.list(Path.of("src/main/resources"))) {
+            return files
+                .filter(path -> path.getFileName().toString().matches("application.*\\.yml"))
+                .sorted()
+                .toList();
+        }
+    }
+
+    private static List<String> propertyNamesIn(Path profile) throws IOException {
+        return new YamlPropertySourceLoader()
+            .load(profile.toString(), new FileSystemResource(profile))
+            .stream()
+            .map(EnumerablePropertySource.class::cast)
+            .flatMap(source -> Arrays.stream(source.getPropertyNames()))
+            .toList();
+    }
+
     /**
-     * #1368 fix wave (finding 1 — worker can't serve the LLM proxy): {@code application-worker.yml}
-     * used to set {@code server.port: -1}, which disables the HTTP connector entirely. Since
-     * {@code LlmProxyController}/{@code LlmProxySecurityConfig} wire on this exact profile whenever
-     * {@code hephaestus.agent.enabled=true} (the job-execution capability gate, ADR 0006), that made
-     * the proxy unreachable on every worker pod that actually executes jobs. This regression guard
-     * loads the shipped YAML directly (no Spring context — {@code webEnvironment=RANDOM_PORT} test
-     * infra would force a real port regardless of the YAML default, masking a regression here) and
-     * asserts the unresolved placeholder default is no longer the disabled-connector sentinel.
+     * {@code server.port: -1} disables the HTTP connector entirely. {@code LlmProxyController} /
+     * {@code LlmProxySecurityConfig} wire on the worker profile whenever
+     * {@code hephaestus.agent.enabled=true} (the job-execution capability gate, ADR 0006), so that
+     * sentinel makes the proxy unreachable on every worker pod that actually executes jobs.
+     *
+     * <p>Reads the shipped YAML rather than booting a context: {@code webEnvironment=RANDOM_PORT} test
+     * infra forces a real port regardless of the YAML default, which would mask the regression.
      */
     @Test
     void workerProfileServerPortIsNotTheDisabledConnectorSentinel() throws Exception {

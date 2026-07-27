@@ -18,8 +18,6 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 
 /**
@@ -62,14 +60,15 @@ class FxRateLookupTest extends BaseUnitTest {
         return lookup("EUR");
     }
 
-    @ParameterizedTest(name = "display-currency={0}: {1}")
-    @CsvSource(
-        { "'', not configured", "EURO, not an ISO 4217 code", "CHF, valid ISO but not convertible from the feed" }
-    )
-    void shouldStayOffAndNeverTouchTheTable(String configured, String why) {
-        FxRateLookup fx = lookup(configured);
+    /**
+     * Unset is the only off state left: every other value {@code LlmPropertiesTest} shows the
+     * instance refuses to boot with, so there is nothing here to degrade from.
+     */
+    @Test
+    void shouldStayOffAndNeverTouchTheTableWhenUnset() {
+        FxRateLookup fx = lookup("");
 
-        assertThat(fx.isEnabled()).as(why).isFalse();
+        assertThat(fx.isEnabled()).isFalse();
         assertThat(fx.latest()).isEmpty();
         assertThat(fx.forMonth(CURRENT_MONTH)).isEmpty();
         verifyNoInteractions(repository);

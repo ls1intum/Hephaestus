@@ -163,7 +163,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         sandbox = new FakeSandbox();
         proxyCredentialRegistry = new MentorProxyCredentialRegistry();
         // Every real mentor sandbox is built with a proxy credential minted for its session, so the
-        // fixture mints one too: without it each turn would run unmetered and the warning that says so
+        // fixture mints one too: without it every turn would fail to bind, and the warning that says so
         // would be the normal case here rather than the exception.
         sessionToken = proxyCredentialRegistry.mint(
             sandbox.identity().sessionId(),

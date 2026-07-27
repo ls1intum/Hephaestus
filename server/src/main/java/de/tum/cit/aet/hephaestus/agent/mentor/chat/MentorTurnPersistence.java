@@ -194,24 +194,7 @@ public class MentorTurnPersistence {
     private static ObjectNode admissionMetadata(MentorLlmConfig config) {
         LlmPriceSnapshot price = config.priceSnapshot();
         if (price == null) throw new IllegalStateException("Mentor turn has no admitted LLM price snapshot");
-        ObjectNode admission = NODES.objectNode();
-        admission.put("model", config.upstreamModelId());
-        ObjectNode p = admission.putObject("price");
-        p.put("fundingSource", price.fundingSource().name());
-        p.put("pricingState", price.pricingState().name());
-        putNullable(p, "appliedPriceId", price.appliedPriceId());
-        putNullable(p, "appliedWorkspaceModelId", price.appliedWorkspaceModelId());
-        putNullable(p, "per1mInputUsd", price.per1mInputUsd());
-        putNullable(p, "per1mOutputUsd", price.per1mOutputUsd());
-        putNullable(p, "per1mCacheReadUsd", price.per1mCacheReadUsd());
-        putNullable(p, "per1mCacheWriteUsd", price.per1mCacheWriteUsd());
-        return NODES.objectNode().set("llmAdmission", admission);
-    }
-
-    private static void putNullable(ObjectNode node, String field, @Nullable Object value) {
-        if (value == null) node.putNull(field);
-        else if (value instanceof Number number) node.put(field, number.toString());
-        else node.put(field, value.toString());
+        return MentorAdmissionMetadata.write(config.upstreamModelId(), price);
     }
 
     /**

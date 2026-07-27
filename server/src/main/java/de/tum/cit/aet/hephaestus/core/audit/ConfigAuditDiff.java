@@ -19,8 +19,8 @@ import org.jspecify.annotations.Nullable;
  * (arrays compare whole — element-wise paths would make the {@code changedKey} filter's value space
  * depend on list indices, which are not stable across reorders). A <em>key</em> is the dot-joined
  * field path from the snapshot root to a leaf, e.g. {@code volumeCaps.perPullRequest}. Nested
- * snapshots therefore yield the leaf path, not the containing object, so #1357's per-control filter
- * can address an individual control inside a composite entity.
+ * snapshots therefore yield the leaf path, not the containing object, so the per-control filter can
+ * address an individual control inside a composite entity.
  *
  * <h2>Create and delete</h2>
  * A CREATED row's keys are every leaf of the new state, and a DELETED row's every leaf of the old —

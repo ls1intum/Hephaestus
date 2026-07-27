@@ -5,10 +5,9 @@ import java.util.UUID;
 /**
  * Service Provider Interface for sandboxed container execution.
  *
- * <p>The job execution pipeline ({@code AgentJobExecutor}) codes against this interface. The
- * default implementation ({@code DockerSandboxAdapter}) manages containers on the local Docker
- * daemon. A future {@code RemoteRunnerAdapter} can delegate to runner agents on separate nodes via
- * NATS — same interface, different implementation, zero pipeline changes.
+ * <p>The job execution pipeline ({@code AgentJobExecutor}) codes against this interface, so where a
+ * container actually runs is an implementation choice the pipeline never sees. The default
+ * implementation ({@code DockerSandboxAdapter}) manages containers on the local Docker daemon.
  *
  * <p>The {@link #execute} method blocks until the container completes, times out, or is cancelled.
  * Callers are expected to invoke it on a dedicated executor (e.g. {@code sandboxExecutor}) — never

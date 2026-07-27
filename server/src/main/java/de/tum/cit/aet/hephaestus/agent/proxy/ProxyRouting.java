@@ -16,8 +16,8 @@ import org.jspecify.annotations.Nullable;
  * @param principalDescription log/metrics-safe identifier of the caller (job id or mentor session
  *     description) — never the token.
  * @param attempt which execution this call is billed to and what it has spent so far; {@code null}
- *     only when the credential names no live execution at all — a mentor session between turns, or a
- *     legacy route with no billing target.
+ *     only for a mentor session between turns (a job token always names its attempt), and
+ *     {@code LlmProxyController} refuses those calls rather than serving spend nothing can record.
  */
 public record ProxyRouting(
     String principalDescription,

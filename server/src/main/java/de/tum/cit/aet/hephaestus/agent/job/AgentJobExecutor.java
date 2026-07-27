@@ -53,6 +53,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,6 +64,12 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
+import org.springframework.core.retry.RetryException;
+import org.springframework.core.retry.RetryListener;
+import org.springframework.core.retry.RetryPolicy;
+import org.springframework.core.retry.RetryState;
+import org.springframework.core.retry.RetryTemplate;
+import org.springframework.core.retry.Retryable;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -109,6 +116,40 @@ public class AgentJobExecutor {
     // as long as each individual hold was short.
     private static final Duration BUDGET_HOLD_MAX_JOB_AGE = Duration.ofDays(7);
 
+    /**
+     * Which failures make the terminal accounting write worth re-attempting. NOT the same question as
+     * {@link #isRetryableInfraFailure}, which decides whether the whole JOB is requeued for a fresh
+     * run — conflating the two would charge twice for a job that already spent money.
+     *
+     * <p>{@code includes} matches nested causes, which is what makes it usable directly: a
+     * {@code TransactionTemplate} and JPA both surface the underlying failure wrapped.
+     */
+    static final RetryPolicy TERMINAL_PERSIST_POLICY = RetryPolicy.builder()
+        .includes(
+            TransientDataAccessException.class,
+            RecoverableDataAccessException.class,
+            DataAccessResourceFailureException.class,
+            CannotCreateTransactionException.class
+        )
+        .maxRetries(2)
+        // Growing, since a lock timeout or a failover needs more than the microseconds an immediate
+        // retry gives it.
+        .delay(Duration.ofMillis(200))
+        .multiplier(2)
+        .build();
+
+    /**
+     * Any failure of the pool-rejection requeue is worth another try: the write is one statement with
+     * no side effect to undo, and not landing it strands a job until the zombie sweeper notices.
+     *
+     * <p>Runs on the {@code agent-job-poll} thread, so a full exhaustion parks polling for 400 ms.
+     */
+    private static final RetryPolicy REQUEUE_REJECTED_CLAIM_POLICY = RetryPolicy.builder()
+        .includes(Exception.class)
+        .maxRetries(2)
+        .delay(Duration.ofMillis(200))
+        .build();
+
     private final AgentProperties agentProperties;
     private final AgentJobRepository jobRepository;
     private final WorkspaceAgentBindingRepository bindingRepository;
@@ -122,6 +163,14 @@ public class AgentJobExecutor {
     private final LlmUsageRecorder usageRecorder;
     private final LlmBudgetService llmBudgetService;
     private final @Nullable LlmAdmissionService llmAdmissionService;
+
+    /**
+     * The two writes this class re-attempts. Both go through {@link RetryTemplate} rather than
+     * {@code @Retryable}: each wraps a private method called from inside this class, and a
+     * self-invocation never reaches the proxy the annotation needs.
+     */
+    private final RetryTemplate terminalPersistRetries = retryTemplate(TERMINAL_PERSIST_POLICY);
+    private final RetryTemplate requeueRetries = retryTemplate(REQUEUE_REJECTED_CLAIM_POLICY);
 
     private final Counter concurrencyRejected;
     private final Timer claimLatency;
@@ -473,10 +522,6 @@ public class AgentJobExecutor {
         }
     }
 
-    /** Bounded retry budget for the pool-rejection requeue write (transient DB blips only). */
-    private static final int REQUEUE_REJECTED_CLAIM_ATTEMPTS = 3;
-    private static final Duration REQUEUE_REJECTED_CLAIM_RETRY_DELAY = Duration.ofMillis(200);
-
     /**
      * Undo a claim the sandbox executor couldn't accept: RUNNING → QUEUED, ownership cleared,
      * {@code retry_count} left untouched — the job never started executing, so this must not burn its
@@ -489,49 +534,68 @@ public class AgentJobExecutor {
      */
     private void requeueRejectedClaim(UUID jobId) {
         try {
-            boolean requeued = false;
-            Exception lastFailure = null;
-            for (int attempt = 1; attempt <= REQUEUE_REJECTED_CLAIM_ATTEMPTS && !requeued; attempt++) {
-                try {
+            requeueRetries.execute(
+                named("Requeue of rejected claim " + jobId, () -> {
                     transactionTemplate.executeWithoutResult(status ->
                         jobRepository.requeueRejectedClaim(jobId, workerId)
                     );
-                    requeued = true;
-                } catch (Exception e) {
-                    lastFailure = e;
-                    if (attempt < REQUEUE_REJECTED_CLAIM_ATTEMPTS) {
-                        log.debug(
-                            "Requeue of rejected claim {} failed (attempt {}/{}), retrying: {}",
-                            jobId,
-                            attempt,
-                            REQUEUE_REJECTED_CLAIM_ATTEMPTS,
-                            e.getMessage()
-                        );
-                        sleepQuietly(REQUEUE_REJECTED_CLAIM_RETRY_DELAY);
-                    }
-                }
-            }
-            if (!requeued) {
-                log.error(
-                    "Failed to requeue rejected claim {} after {} attempts — row stays RUNNING under this worker " +
-                        "until liveness/timeout recovery reclaims it: {}",
-                    jobId,
-                    REQUEUE_REJECTED_CLAIM_ATTEMPTS,
-                    lastFailure != null ? lastFailure.getMessage() : "unknown"
-                );
-            }
+                    return null;
+                })
+            );
+        } catch (RetryException e) {
+            log.error(
+                "Failed to requeue rejected claim {} — row stays RUNNING under this worker until " +
+                    "liveness/timeout recovery reclaims it",
+                jobId,
+                e.getLastException()
+            );
         } finally {
             releaseCapacity();
             localRunningJobs.remove(jobId);
         }
     }
 
-    private static void sleepQuietly(Duration duration) {
-        try {
-            Thread.sleep(duration.toMillis());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+    /**
+     * A template that WARNs once per failed attempt. Without the listener a retried write is silent
+     * until it gives up, so an operator cannot tell a database that wobbled from one that never
+     * wobbled.
+     */
+    private static RetryTemplate retryTemplate(RetryPolicy policy) {
+        RetryTemplate template = new RetryTemplate(policy);
+        template.setRetryListener(
+            new RetryListener() {
+                @Override
+                public void onRetryableExecution(RetryPolicy inUse, Retryable<?> operation, RetryState state) {
+                    // Fires after every execution, successful ones included; isSuccessful() is false
+                    // exactly when the attempt just recorded threw.
+                    if (state.isSuccessful()) {
+                        return;
+                    }
+                    log.warn(
+                        "{} failed (attempt {}): {}",
+                        operation.getName(),
+                        state.getExceptions().size(),
+                        String.valueOf(state.getLastException())
+                    );
+                }
+            }
+        );
+        return template;
+    }
+
+    /** Names a unit of work so the retry log says which write is failing. */
+    private static <R> Retryable<R> named(String name, Supplier<@Nullable R> work) {
+        return new Retryable<>() {
+            @Override
+            public String getName() {
+                return name;
+            }
+
+            @Override
+            public R execute() {
+                return work.get();
+            }
+        };
     }
 
     private Optional<ClaimResult> dispatchClaimResult(UUID jobId, Object claimResult) {
@@ -1014,9 +1078,9 @@ public class AgentJobExecutor {
             }
 
             Instant claimedAt = Instant.now();
-            // availableAt is null only for rows written before this column existed; skip those rather
-            // than record garbage latency.
-            if (job.getAvailableAt() != null && !job.getAvailableAt().isAfter(claimedAt)) {
+            // A job held for a future availableAt has no queue latency to record — it was waiting on
+            // the clock, not on a worker.
+            if (!job.getAvailableAt().isAfter(claimedAt)) {
                 claimLatency.record(Duration.between(job.getAvailableAt(), claimedAt));
             }
             job.setStatus(AgentJobStatus.RUNNING);
@@ -1128,13 +1192,9 @@ public class AgentJobExecutor {
         return AgentJobStatus.FAILED;
     }
 
-    /** Attempts at the terminal accounting write, and the base delay doubled between them. */
-    private static final int TERMINAL_PERSIST_ATTEMPTS = 3;
-    private static final Duration TERMINAL_PERSIST_RETRY_DELAY = Duration.ofMillis(200);
-
     /**
-     * The pause between attempts grows, since a lock timeout or a failover needs more than the
-     * microseconds an immediate retry gives it. A deterministic failure gives up on the first attempt.
+     * The accounting write for provider work that has ALREADY happened, re-attempted while the failure
+     * is one the database may recover from.
      *
      * <p>Giving up deliberately leaves the row RUNNING: the provider work is already done and paid for,
      * so re-running would charge for it twice. {@link AgentJobZombieSweeper} terminalises the row
@@ -1154,56 +1214,15 @@ public class AgentJobExecutor {
             case FAILED -> "Container exited with code " + sandboxResult.exitCode();
             default -> null;
         };
-
-        RuntimeException lastFailure = null;
-        for (int attempt = 1; attempt <= TERMINAL_PERSIST_ATTEMPTS; attempt++) {
-            try {
-                return persistTerminalStateOnce(jobId, agentResult, sandboxResult, terminalStatus, errorMessage);
-            } catch (RuntimeException e) {
-                if (!isRetryableTerminalWriteFailure(e)) {
-                    log.error("Terminal persistence failed unrecoverably for jobId={}: {}", jobId, e.getMessage());
-                    throw new TerminalPersistenceException(e);
-                }
-                lastFailure = e;
-                log.warn(
-                    "Terminal persistence attempt {}/{} failed for jobId={}: {}",
-                    attempt,
-                    TERMINAL_PERSIST_ATTEMPTS,
-                    jobId,
-                    e.getMessage()
-                );
-                if (attempt < TERMINAL_PERSIST_ATTEMPTS) {
-                    sleepQuietly(TERMINAL_PERSIST_RETRY_DELAY.multipliedBy(1L << (attempt - 1)));
-                }
-            }
+        try {
+            return terminalPersistRetries.execute(
+                named("Terminal persistence for jobId=" + jobId, () ->
+                    persistTerminalStateOnce(jobId, agentResult, sandboxResult, terminalStatus, errorMessage)
+                )
+            );
+        } catch (RetryException e) {
+            throw new TerminalPersistenceException(e.getLastException());
         }
-        throw new TerminalPersistenceException(lastFailure);
-    }
-
-    /**
-     * NOT the same question as {@link #isRetryableInfraFailure}, which decides whether the whole JOB is
-     * requeued for a fresh run. This one only decides whether to re-attempt the accounting write for
-     * provider work that has ALREADY happened — conflating the two would charge twice for a job that
-     * already spent money.
-     *
-     * <p>Walks the cause chain (bounded, cycle-safe): {@code TransactionTemplate} and JPA both surface
-     * the underlying failure wrapped.
-     */
-    static boolean isRetryableTerminalWriteFailure(Throwable failure) {
-        Throwable cause = failure;
-        for (int depth = 0; cause != null && depth < 10; depth++) {
-            if (
-                cause instanceof TransientDataAccessException ||
-                cause instanceof RecoverableDataAccessException ||
-                cause instanceof DataAccessResourceFailureException ||
-                cause instanceof CannotCreateTransactionException
-            ) {
-                return true;
-            }
-            Throwable next = cause.getCause();
-            cause = next == cause ? null : next;
-        }
-        return false;
     }
 
     private boolean persistTerminalStateOnce(

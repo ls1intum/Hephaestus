@@ -16,7 +16,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
- * Workspace-admin CRUD for "your AI provider" ({@code /workspaces/{slug}/llm/connections}, #1368):
+ * Workspace-admin CRUD for "your AI provider" ({@code /workspaces/{slug}/llm/connections}):
  * membership gate, cross-workspace tenancy isolation, the instance-wide BYO kill switch, and API-key
  * redaction.
  */

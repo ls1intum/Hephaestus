@@ -22,28 +22,35 @@ import org.springframework.validation.annotation.Validated;
  * whether a URL may be saved, the proxy's connect-time resolver whether it may be dialled — so it
  * has to have a single owner rather than a default repeated at each reader.
  *
- * @param displayCurrency ISO 4217 code the USD spend figures are additionally shown in. Empty (the
- *                        default) turns the whole display-currency feature off and every response is
- *                        byte-for-byte what it was before the feature existed. Only {@code EUR} is
- *                        honoured today — the ECB reference feed quotes per 1 EUR — and any other
- *                        well-formed code degrades to USD-only with a warning rather than failing
- *                        boot; see {@code FxRateLookup}. The pattern here catches the different
- *                        mistake: a value that is not a currency code at all
- *                        ({@code "euro"}, {@code "€"}, a stray quote), which is a deploy-time typo
- *                        and should surface as a failed startup, not as a feature that silently
- *                        never appears
+ * @param displayCurrency the code the USD spend figures are additionally shown in, or empty (the
+ *                        default) to leave every response byte-for-byte what it was before the
+ *                        feature existed. Anything outside {@link #SUPPORTED_DISPLAY_CURRENCIES}
+ *                        fails startup: the set is fixed and known here, so a value that could only
+ *                        ever have produced USD-only output is a deploy-time typo, not a
+ *                        configuration this instance can honour
  * @param egress          what the SSRF guard will let an admin point a provider connection at
  * @param fx              where the daily reference rates come from
  */
 @ConfigurationProperties(prefix = "hephaestus.llm")
 @Validated
 public record LlmProperties(
-    @Pattern(regexp = "|[A-Za-z]{3}", message = "must be an ISO 4217 currency code, e.g. EUR")
+    @Pattern(
+        regexp = "|" + SUPPORTED_DISPLAY_CURRENCIES,
+        flags = Pattern.Flag.CASE_INSENSITIVE,
+        message = "must be empty or one of: " + SUPPORTED_DISPLAY_CURRENCIES
+    )
     @DefaultValue("")
     String displayCurrency,
     @Valid @DefaultValue Egress egress,
     @Valid @DefaultValue Fx fx
 ) {
+    /**
+     * Every display currency the stored rates can express, as a regex alternation. One entry, because
+     * {@code fx_rate} holds a single {@code usd_per_eur} scalar — widening this means widening that
+     * table first.
+     */
+    public static final String SUPPORTED_DISPLAY_CURRENCIES = "EUR";
+
     /** The canonical ECB daily file — free, key-less, ~10 KB, published on TARGET working days. */
     public static final String ECB_DAILY_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml";
 

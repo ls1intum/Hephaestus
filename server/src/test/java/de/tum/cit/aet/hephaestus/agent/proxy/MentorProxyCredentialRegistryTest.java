@@ -205,7 +205,7 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
             assertThat(registry.boundTurns()).isZero();
         }
 
-        /** Idempotent, and value-matching: a stale unbind cannot detach the turn running now. */
+        /** Idempotent, and value-matching. */
         @Test
         void aStaleUnbindDoesNotDetachTheTurnRunningNow() {
             UUID sessionId = UUID.randomUUID();
@@ -239,7 +239,7 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
             assertThat(registry.boundTurns()).isEqualTo(1);
         }
 
-        /** A sandbox with no live credential cannot serve calls, so the caller must be told it is unmetered. */
+        /** No credential means no billing target, and the proxy refuses those — so the caller is told. */
         @Test
         void bindingToASessionWithNoLiveCredentialFails() {
             UUID sessionId = UUID.randomUUID();

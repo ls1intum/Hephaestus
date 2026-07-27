@@ -5,9 +5,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -348,28 +350,42 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
         null
     );
 
+    private HttpGraphQlClient graphQlClient;
+
     /** Sets up the {@code forScope(...).documentName(...).variable(...)} chain used by every page fetch. */
     private HttpGraphQlClient.RequestSpec mockRequestChain() {
-        HttpGraphQlClient client = mock(HttpGraphQlClient.class);
+        graphQlClient = mock(HttpGraphQlClient.class);
         HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
-        when(gitHubProvider.forScope(1L)).thenReturn(client);
-        when(client.documentName(any())).thenReturn(spec);
+        when(gitHubProvider.forScope(1L)).thenReturn(graphQlClient);
+        when(graphQlClient.documentName(any())).thenReturn(spec);
         when(spec.variable(any(), any())).thenReturn(spec);
         return spec;
     }
 
+    /**
+     * One page of a backwards (newest-end) walk. The forward pair is filled with the opposite values —
+     * {@code hasNextPage = !hasPreviousPage} and a cursor that is never a valid continuation — so a scan that
+     * reads {@code hasNextPage}/{@code endCursor} fails these tests instead of passing by coincidence.
+     */
     private ClientGraphQlResponse mockCommentsPageResponse(
         String commentsPath,
         List<GHIssueComment> nodes,
-        boolean hasNextPage,
-        String endCursor
+        boolean hasPreviousPage,
+        String startCursor
     ) {
         ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
         ClientResponseField field = mock(ClientResponseField.class);
         when(response.field(commentsPath)).thenReturn(field);
         GHIssueCommentConnection connection = GHIssueCommentConnection.builder()
             .setNodes(nodes)
-            .setPageInfo(GHPageInfo.builder().setHasNextPage(hasNextPage).setEndCursor(endCursor).build())
+            .setPageInfo(
+                GHPageInfo.builder()
+                    .setHasPreviousPage(hasPreviousPage)
+                    .setStartCursor(startCursor)
+                    .setHasNextPage(!hasPreviousPage)
+                    .setEndCursor("forward-cursor-decoy")
+                    .build()
+            )
             .setTotalCount(nodes.size())
             .build();
         when(field.toEntity(GHIssueCommentConnection.class)).thenReturn(connection);
@@ -382,83 +398,174 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
     }
 
     @Test
-    void findExistingSummary_matchOnFirstPage_isFound() {
+    void findExistingSummary_pagesFromTheNewestEnd_neverForwards() {
+        // The just-posted marker is the NEWEST comment, so the scan must ask for the tail of the connection
+        // (last/before). Asking for first/after starts at the oldest comment and can run out of budget before
+        // reaching the marker on a busy PR.
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
         ClientGraphQlResponse response = mockCommentsPageResponse(
             "repository.pullRequest.comments",
-            List.of(comment("IC_1", "unrelated"), comment("IC_2", "<!-- marker:job-1 -->body")),
+            List.of(comment("IC_1", "unrelated")),
             false,
             null
         );
         when(spec.execute()).thenReturn(Mono.just(response));
 
-        ExistingSummaryLookup result = channel.findExistingSummary(PR_TARGET, "<!-- marker:job-1 -->");
+        channel.findExistingSummary(PR_TARGET, "<!-- marker:job-1 -->");
 
-        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.FOUND);
-        assertThat(result.handle().externalId()).isEqualTo("IC_2");
+        verify(graphQlClient).documentName("GetPullRequestCommentsNewest");
+        verify(spec).variable("last", 100);
+        verify(spec).variable("before", null);
+        verify(spec, never()).variable(eq("first"), any());
+        verify(spec, never()).variable(eq("after"), any());
     }
 
     @Test
-    void findExistingSummary_everyCommentScanned_noMatch_isAbsent() {
+    void findExistingSummary_issueSubject_pagesTheIssueConnectionFromTheNewestEnd() {
+        FeedbackTarget issueTarget = new FeedbackTarget(
+            new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
+            "owner/repo/issues/42",
+            null
+        );
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
         ClientGraphQlResponse response = mockCommentsPageResponse(
-            "repository.pullRequest.comments",
-            List.of(comment("IC_1", "unrelated")),
-            false, // hasNextPage=false — every comment was scanned
+            "repository.issue.comments",
+            List.of(comment("IC_1", "<!-- marker:job-1 -->body")),
+            false,
             null
         );
         when(spec.execute()).thenReturn(Mono.just(response));
 
-        ExistingSummaryLookup result = channel.findExistingSummary(PR_TARGET, "<!-- marker:job-1 -->");
+        ExistingSummaryLookup result = channel.findExistingSummary(issueTarget, "<!-- marker:job-1 -->");
 
-        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.ABSENT);
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.FOUND);
+        verify(graphQlClient).documentName("GetIssueCommentsNewest");
+        verify(spec).variable("last", 100);
     }
 
     @Test
-    void findExistingSummary_pageBudgetExhaustedWithMoreCommentsLeft_isUnknown_notAbsent() {
-        // Regression for the original bug: a marker beyond the scanned pages must NOT be reported ABSENT.
+    void findExistingSummary_markerOnTheNewestPage_isFoundInOneRequest() {
+        // The point of scanning backwards: even with thousands of older comments still unscanned
+        // (hasPreviousPage=true), the marker is on the newest page and costs exactly one request.
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
-        // hasNextPage=true on every page, all the way to the budget — never confirms absence.
+        ClientGraphQlResponse newestPage = mockCommentsPageResponse(
+            "repository.pullRequest.comments",
+            List.of(comment("IC_1", "unrelated"), comment("IC_2", "<!-- marker:job-1 -->body")),
+            true,
+            "start-cursor-1"
+        );
+        when(spec.execute()).thenReturn(Mono.just(newestPage));
+
+        ExistingSummaryLookup result = channel.findExistingSummary(PR_TARGET, "<!-- marker:job-1 -->");
+
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.FOUND);
+        assertThat(result.handle().externalId()).isEqualTo("IC_2");
+        verify(spec, times(1)).execute();
+    }
+
+    @Test
+    void findExistingSummary_walkedBackToTheOldestComment_noMatch_isAbsent() {
+        when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
+        HttpGraphQlClient.RequestSpec spec = mockRequestChain();
+        ClientGraphQlResponse newestPage = mockCommentsPageResponse(
+            "repository.pullRequest.comments",
+            List.of(comment("IC_2", "unrelated")),
+            true,
+            "start-cursor-1"
+        );
+        ClientGraphQlResponse oldestPage = mockCommentsPageResponse(
+            "repository.pullRequest.comments",
+            List.of(comment("IC_1", "also unrelated")),
+            false, // hasPreviousPage=false — the oldest comment was reached, every comment was scanned
+            null
+        );
+        when(spec.execute()).thenReturn(Mono.just(newestPage), Mono.just(oldestPage));
+
+        ExistingSummaryLookup result = channel.findExistingSummary(PR_TARGET, "<!-- marker:job-1 -->");
+
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.ABSENT);
+        verify(spec, times(2)).execute();
+        verify(spec).variable("before", "start-cursor-1");
+    }
+
+    @Test
+    void findExistingSummary_pageBudgetExhaustedWithOlderCommentsLeft_isUnknown_notAbsent() {
+        // A marker older than the scanned pages must NOT be reported ABSENT — the caller would post a duplicate.
+        when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
+        HttpGraphQlClient.RequestSpec spec = mockRequestChain();
+        ClientGraphQlResponse page1 = mockCommentsPageResponse(
+            "repository.pullRequest.comments",
+            List.of(comment("IC_3", "unrelated")),
+            true,
+            "start-cursor-1"
+        );
+        ClientGraphQlResponse page2 = mockCommentsPageResponse(
+            "repository.pullRequest.comments",
+            List.of(comment("IC_2", "unrelated")),
+            true,
+            "start-cursor-2"
+        );
+        ClientGraphQlResponse page3 = mockCommentsPageResponse(
+            "repository.pullRequest.comments",
+            List.of(comment("IC_1", "unrelated")),
+            true, // still older comments left when the budget runs out
+            "start-cursor-3"
+        );
+        when(spec.execute()).thenReturn(Mono.just(page1), Mono.just(page2), Mono.just(page3));
+
+        ExistingSummaryLookup result = channel.findExistingSummary(PR_TARGET, "<!-- marker:job-1 -->");
+
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.UNKNOWN);
+        verify(spec, times(3)).execute();
+        verify(spec).variable("before", "start-cursor-2");
+    }
+
+    @Test
+    void findExistingSummary_matchOnAnOlderPage_isFound() {
+        // The scan must actually follow the cursor into an older page, not just check the newest one.
+        when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
+        HttpGraphQlClient.RequestSpec spec = mockRequestChain();
+        ClientGraphQlResponse newestPage = mockCommentsPageResponse(
+            "repository.pullRequest.comments",
+            List.of(comment("IC_2", "unrelated")),
+            true,
+            "start-cursor-1"
+        );
+        ClientGraphQlResponse olderPage = mockCommentsPageResponse(
+            "repository.pullRequest.comments",
+            List.of(comment("IC_1", "<!-- marker:job-1 -->body")),
+            false,
+            null
+        );
+        when(spec.execute()).thenReturn(Mono.just(newestPage), Mono.just(olderPage));
+
+        ExistingSummaryLookup result = channel.findExistingSummary(PR_TARGET, "<!-- marker:job-1 -->");
+
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.FOUND);
+        assertThat(result.handle().externalId()).isEqualTo("IC_1");
+        verify(spec, times(2)).execute();
+    }
+
+    @Test
+    void findExistingSummary_missingCursorMidWalk_isUnknown_notAbsent() {
+        // hasPreviousPage=true but no cursor to continue with: older comments exist and cannot be scanned.
+        when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
+        HttpGraphQlClient.RequestSpec spec = mockRequestChain();
         ClientGraphQlResponse response = mockCommentsPageResponse(
             "repository.pullRequest.comments",
             List.of(comment("IC_1", "unrelated")),
             true,
-            "cursor-1"
+            null
         );
         when(spec.execute()).thenReturn(Mono.just(response));
 
         ExistingSummaryLookup result = channel.findExistingSummary(PR_TARGET, "<!-- marker:job-1 -->");
 
         assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.UNKNOWN);
-    }
-
-    @Test
-    void findExistingSummary_secondPageHasTheMatch_isFound() {
-        // The scan must actually follow the cursor into a second page, not just check the first.
-        when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
-        HttpGraphQlClient.RequestSpec spec = mockRequestChain();
-        ClientGraphQlResponse page1 = mockCommentsPageResponse(
-            "repository.pullRequest.comments",
-            List.of(comment("IC_1", "unrelated")),
-            true,
-            "cursor-1"
-        );
-        ClientGraphQlResponse page2 = mockCommentsPageResponse(
-            "repository.pullRequest.comments",
-            List.of(comment("IC_2", "<!-- marker:job-1 -->body")),
-            false,
-            null
-        );
-        when(spec.execute()).thenReturn(Mono.just(page1), Mono.just(page2));
-
-        ExistingSummaryLookup result = channel.findExistingSummary(PR_TARGET, "<!-- marker:job-1 -->");
-
-        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.FOUND);
-        assertThat(result.handle().externalId()).isEqualTo("IC_2");
-        verify(spec, org.mockito.Mockito.times(2)).execute();
+        verify(spec, times(1)).execute();
     }
 
     @Test

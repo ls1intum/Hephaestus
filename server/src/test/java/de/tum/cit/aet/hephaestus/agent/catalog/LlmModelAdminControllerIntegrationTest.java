@@ -18,8 +18,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
- * Instance-admin CRUD, pricing, and sharing for the LLM model catalog ({@code /admin/llm/models},
- * #1368): app_admin gate, price-supersede history, selected-workspace sharing roundtrip, and the
+ * Instance-admin CRUD, pricing, and sharing for the LLM model catalog ({@code /admin/llm/models}):
+ * app_admin gate, price-supersede history, selected-workspace sharing roundtrip, and the
  * delete-in-use guard.
  */
 class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {

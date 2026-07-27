@@ -22,7 +22,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
  * Workspace-admin CRUD for models on "your AI provider" plus the available-models union projection
- * ({@code /workspaces/{slug}/llm/**}, #1368): tenancy isolation, and — the sharpest edge of this
+ * ({@code /workspaces/{slug}/llm/**}): tenancy isolation, and — the sharpest edge of this
  * endpoint — that a shared-catalog entry in the available-models response never leaks the instance's
  * upstream model id, base URL, or credential shape.
  */

@@ -38,6 +38,12 @@ import tools.jackson.databind.ObjectMapper;
  *   <li><b>Stale RUNNING</b> (every 2 min): the absolute-timeout backstop — marks RUNNING jobs
  *       {@code TIMED_OUT} once they exceed their timeout + buffer.</li>
  * </ol>
+ *
+ * <p><b>No {@code @SchedulerLock} on anything in this class, deliberately</b> — unlike the other
+ * schedulers in the codebase. Every sweep here acts through a conditional UPDATE that names the state
+ * it expects, so two replicas sweeping the same row produce one winner and one no-op; delivery
+ * recovery additionally claims via an attempt-counter CAS BEFORE any external post. Any
+ * {@code @Scheduled} method added here must earn that the same way, or take the lock.
  */
 @ConditionalOnServerRole
 @Component

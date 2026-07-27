@@ -20,7 +20,7 @@ import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One admin configuration change: who changed which control, when, from what to what (#1359).
+ * One admin configuration change: who changed which control, when, from what to what.
  *
  * <p>Append-only. {@code ConfigAuditRecorder} only INSERTs, and a {@code prod}-context trigger blocks
  * UPDATE, DELETE and TRUNCATE at the storage layer, with two carve-outs: erasure may set the actor
@@ -29,8 +29,7 @@ import org.jspecify.annotations.Nullable;
  * accompanying REVOKE does not currently bind — the app connects as the bootstrap superuser — so the
  * trigger is the only live control; it holds against application bugs, not against the operator.
  *
- * <p>{@code workspace_id} is NOT NULL: every producer today is workspace-scoped. #1356 introduces
- * instance-scoped controls and will relax it and add a scope discriminator.
+ * <p>{@code workspace_id} is NOT NULL: every producer is workspace-scoped.
  */
 @Entity
 @Table(name = "config_audit_event")
@@ -76,7 +75,7 @@ public class ConfigAuditEvent {
     /**
      * Dot-paths whose value differs between the snapshots (see {@code ConfigAuditDiff}). Persisted
      * rather than derived because Postgres has no built-in jsonb diff, and because per-control history
-     * (#1357) must filter server-side: several controls live in one entity, so a page of 50 rows may
+     * must filter server-side: several controls live in one entity, so a page of 50 rows may
      * contain zero matching the requested control, and a client filtering after paging cannot know
      * whether to fetch more.
      */

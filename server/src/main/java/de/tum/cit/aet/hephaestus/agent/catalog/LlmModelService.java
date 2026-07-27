@@ -160,14 +160,9 @@ public class LlmModelService {
     }
 
     private String modelSlug(Long connectionId, String requested, String displayName) {
-        String base = org.springframework.util.StringUtils.hasText(requested)
-            ? requested
-            : CatalogSlug.from(displayName);
-        if (org.springframework.util.StringUtils.hasText(requested)) return base;
-        String candidate = base;
-        for (int i = 2; modelRepository.findByConnectionIdAndSlug(connectionId, candidate).isPresent(); i++) candidate =
-            CatalogSlug.suffix(base, i);
-        return candidate;
+        return CatalogSlug.unique(requested, displayName, slug ->
+            modelRepository.findByConnectionIdAndSlug(connectionId, slug).isPresent()
+        );
     }
 
     private void requireActivatable(LlmModel model) {

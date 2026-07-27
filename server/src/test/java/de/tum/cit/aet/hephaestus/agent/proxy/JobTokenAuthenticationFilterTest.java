@@ -389,7 +389,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Mentor session token fallback (#1368 slice 5 — the mentor sandbox is not an AgentJob row)")
+    @DisplayName("Mentor session token fallback — the mentor sandbox is not an AgentJob row")
     class MentorTokenFallback {
 
         @Test

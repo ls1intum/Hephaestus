@@ -17,12 +17,9 @@ import org.springframework.test.context.DynamicPropertySource;
  * =true, hephaestus.agent.enabled=true}, mirroring the {@code prod,worker} production profile
  * (application-worker.yml) plus {@code AGENT_ENABLED=true}.
  *
- * <p><b>The worker must be able to serve the LLM proxy.</b> {@code application-worker.yml} must not
- * set {@code server.port=-1}: that disables the HTTP connector entirely, leaving
- * {@code LlmProxyController} and its {@code llmProxyFilterChain} security chain wired as beans but
- * unreachable over the network, so every sandboxed job this pod claimed would fail to reach its LLM.
- * This test proves the proxy chain's BEANS wire under the property set the profile produces (a real
- * TCP bind is an infra/Docker-Compose concern, out of scope for a unit-tier Spring context test).
+ * <p>Beans only. The values in {@code application-worker.yml} — which this test sets by hand rather
+ * than loads — are read by
+ * {@code de.tum.cit.aet.hephaestus.core.runtime.WorkerProfileOverlayTest}.
  *
  * <p><b>Split-role gating.</b> The job-submission listeners gate on {@code hephaestus.agent.enabled}
  * alone — NOT on the worker role — so they wire here even with {@code runtime.server.enabled=false}.

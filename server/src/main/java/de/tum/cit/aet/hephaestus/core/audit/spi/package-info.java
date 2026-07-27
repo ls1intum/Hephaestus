@@ -1,5 +1,5 @@
 /**
- * Cross-module port for the admin configuration audit trail (#1359).
+ * Cross-module port for the admin configuration audit trail.
  *
  * <p>{@code core.audit} owns the append-only {@code config_audit_event} table, but the modules that
  * mutate admin configuration ({@code agent}, and later {@code workspace}, {@code practices}) must not
