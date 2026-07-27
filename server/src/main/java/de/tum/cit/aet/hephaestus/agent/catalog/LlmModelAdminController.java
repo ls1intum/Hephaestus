@@ -28,13 +28,9 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /**
  * Instance-admin management of the LLM catalog model list: CRUD plus pricing and sharing.
- * GLOBAL — gated by {@code app_admin}, not workspace context.
  *
- * <p>No {@code @WorkspaceAgnostic} here. A class-level tenancy bypass on a controller opens for every
- * statement any handler reaches, including future ones; the bypass belongs on the repository query
- * that is genuinely cross-tenant — here {@code WorkspaceAgentBindingRepository#existsByInstanceModelId}
- * (the delete-time in-use check) and the grant-allowlist finders — where a reviewer can see exactly
- * what it excuses.
+ * <p>Deliberately no class-level {@code @WorkspaceAgnostic} — a controller-wide tenancy bypass would
+ * excuse every statement any handler ever reaches; the cross-tenant repository queries carry it.
  */
 @RestController
 @RequestMapping("/admin/llm")

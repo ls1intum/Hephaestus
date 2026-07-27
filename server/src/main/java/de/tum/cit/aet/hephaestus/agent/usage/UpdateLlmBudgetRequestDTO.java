@@ -7,13 +7,8 @@ import java.math.BigDecimal;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The body for BOTH monthly caps: the instance's cap on a workspace
- * ({@code PUT /admin/workspaces/{workspaceSlug}/llm/budget}) and the workspace's cap on its own
- * provider ({@code PUT /workspaces/{workspaceSlug}/llm/budget}).
- *
- * <p>One record, because it is one instrument used by two authorities. Which purse a request governs
- * is already carried by the path it is sent to; encoding it a second time in the field name is what
- * produced two near-identical DTOs whose only real difference was who was allowed to PUT.
+ * The body for both monthly caps. Which purse a request governs is carried by the path it is sent to,
+ * so the field name does not encode it a second time.
  */
 @Schema(description = "Set or clear a monthly LLM budget cap")
 public record UpdateLlmBudgetRequestDTO(

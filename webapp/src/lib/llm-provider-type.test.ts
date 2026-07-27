@@ -19,7 +19,6 @@ describe("OpenAI-compatible endpoint presets", () => {
 	it.each([
 		[true, API_PROTOCOLS.OPENAI_RESPONSES],
 		[false, API_PROTOCOLS.OPENAI_COMPLETIONS],
-		// Omitted: a connection that never opted in speaks the older wire API.
 		[undefined, API_PROTOCOLS.OPENAI_COMPLETIONS],
 	])("defaults useResponsesApi=%s to the matching wire API", (useResponsesApi, protocol) => {
 		expect(defaultProtocolFor(useResponsesApi)).toBe(protocol);

@@ -19,9 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam;
  * Workspace-admin LLM spend rollup: what this workspace spent this month (or a past month),
  * by job type and day, plus the status of both purses.
  *
- * <p>Read-only. The workspace's own cap is written at {@code PUT /llm/budget}
- * ({@link WorkspaceLlmBudgetController}): a cap governs future spend, so it is not a sub-resource of a
- * report about past spend.
+ * <p>Read-only; the workspace's own cap is written through {@link WorkspaceLlmBudgetController}.
  */
 @WorkspaceScopedController
 @RequestMapping("/llm/usage")

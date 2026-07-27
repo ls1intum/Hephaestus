@@ -13,21 +13,16 @@ import org.springframework.data.repository.query.Param;
 public interface LlmModelRepository extends JpaRepository<LlmModel, Long> {
     Optional<LlmModel> findByConnectionIdAndSlug(Long connectionId, String slug);
 
-    /** Create-path conflict guard for {@code ux_llm_model_connection_upstream}. */
     boolean existsByConnectionIdAndUpstreamModelId(Long connectionId, String upstreamModelId);
 
     boolean existsByConnectionId(Long connectionId);
 
-    /** Eager-fetches {@code connection} so the admin list view avoids one lazy load per row. */
     @Query("SELECT m FROM LlmModel m JOIN FETCH m.connection ORDER BY m.id")
     List<LlmModel> findAllWithConnection();
 
     /**
-     * Eager-fetches {@code connection} for a single model — needed wherever the loaded entity outlives
-     * the read transaction before being converted to {@link LlmModelDTO} (which reads
-     * {@code connection.displayName}). Without this, {@code LlmModelAdminController}'s GET/update/price/
-     * sharing endpoints throw {@code LazyInitializationException} once OSIV is off, since the plain
-     * lazy {@code connection} proxy is never touched inside the owning {@code @Transactional} method.
+     * {@code connection} is fetched eagerly because callers map the entity to a DTO after the
+     * transaction closes and OSIV is off.
      */
     @Query("SELECT m FROM LlmModel m JOIN FETCH m.connection WHERE m.id = :id")
     Optional<LlmModel> findByIdWithConnection(@Param("id") Long id);
@@ -38,10 +33,8 @@ public interface LlmModelRepository extends JpaRepository<LlmModel, Long> {
     Optional<LlmModel> findByIdForUpdate(@Param("id") Long id);
 
     /**
-     * Available-models projection: instance models usable by a given workspace — active, on an active
-     * connection, and either shared with every workspace ({@code PUBLIC}) or explicitly granted to this
-     * one. Both {@code llm_model} and {@code llm_model_workspace_grant} are global tables, so the
-     * {@code :workspaceId} parameter is a plain filter, not a tenancy predicate.
+     * Both {@code llm_model} and {@code llm_model_workspace_grant} are global tables, so
+     * {@code :workspaceId} is a plain filter here, not a tenancy predicate.
      */
     @Query(
         "SELECT m FROM LlmModel m JOIN FETCH m.connection c " +

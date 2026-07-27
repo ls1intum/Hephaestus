@@ -24,11 +24,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /**
- * Boot-validation + behavior coverage for the file's only {@code nativeQuery=true}
- * ({@code findFirstUserMessagePartsByThreadIds}). Native SQL is NOT boot-validated like JPQL, so a
- * jsonb type-mapping regression can degrade the whole prior-conversation context to empty undetected.
- * This test pins the {@code DISTINCT ON} earliest-user-message-per-thread contract, the
- * workspace-scope guard, and the jsonb-to-text projection against a real Postgres container.
+ * {@code findFirstUserMessagePartsByThreadIds} is native SQL, so it isn't boot-validated like JPQL — a
+ * jsonb type-mapping regression could silently empty the prior-conversation context. Runs against a real
+ * Postgres container to pin the {@code DISTINCT ON} and jsonb-to-text projection contracts.
  */
 class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
 
@@ -119,8 +117,7 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
         ChatThread foreign = persistence.ensureThread(other.getId(), UUID.randomUUID(), user, "foreign prompt");
         persistence.persistInFlight(foreign, "foreign prompt", UUID.randomUUID(), null, admittedMentorConfig());
 
-        // Query scoped to MY workspace but passing both ids: the foreign thread is filtered out by the
-        // workspace_id join, even though its id was supplied.
+        // Both ids are passed; the foreign one must still be filtered out by the workspace_id join.
         List<Object[]> rows = queryRepository.findFirstUserMessagePartsByThreadIds(
             workspace.getId(),
             List.of(mine.getId(), foreign.getId())

@@ -102,7 +102,6 @@ class GitlabApprovalChannelTest extends BaseUnitTest {
         assertThatThrownBy(() -> channel.approve(gitlabTarget(), null)).isInstanceOf(FeedbackDeliveryException.class);
     }
 
-    /** A failed approval must not leave a note claiming the merge request was approved. */
     @Test
     void approveDoesNotPostTheMessageWhenTheApprovalFailed() {
         stubScope();

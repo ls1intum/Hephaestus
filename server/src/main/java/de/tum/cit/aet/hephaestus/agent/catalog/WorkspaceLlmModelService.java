@@ -20,15 +20,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 /**
- * CRUD for models on a workspace's own "bring your own" LLM connection, plus the
- * available-models projection every workspace admin uses to pick a Task's model: the union of instance
- * catalog models visible to this workspace and the workspace's own BYO models.
+ * CRUD for models on a workspace's own "bring your own" LLM connection, plus the available-models
+ * projection a workspace admin picks a Task's model from.
  *
- * <p>Every mutation is gated on {@code allow_workspace_connections}, same as
- * {@link WorkspaceLlmConnectionService}. Pricing reuses {@link LlmPriceValidation} — same PRICED/NO_CHARGE/
- * UNPRICED rule as the instance catalog, just applied inline instead of through a temporal history.
- * Audited on {@code config_audit_event} — see {@link WorkspaceLlmConnectionService} for why this
- * differs from the instance catalog's {@code auth_event} ledger.
+ * <p>Unlike the instance catalog, a workspace model carries its price inline rather than as a temporal
+ * history.
  */
 @Service
 @RequiredArgsConstructor
@@ -44,18 +40,11 @@ public class WorkspaceLlmModelService {
 
     @Transactional(readOnly = true)
     public List<WorkspaceLlmModel> list(WorkspaceContext workspaceContext) {
-        // Eager-fetches connection — the controller converts every row straight to
-        // WorkspaceLlmModelDTO, same reasoning as get()'s javadoc comment.
         return modelRepository.findByWorkspaceIdWithConnection(workspaceContext.id());
     }
 
     @Transactional(readOnly = true)
     public WorkspaceLlmModel get(WorkspaceContext workspaceContext, Long id) {
-        // Eager-fetches connection: every caller (the controller's GET, and update()/delete() below,
-        // which reuse this lookup) either converts straight to WorkspaceLlmModelDTO — which reads
-        // connection.displayName — after this transaction closes, or needs the connection materialized
-        // for its own checks. A plain findByIdAndWorkspaceId would return a lazy connection proxy that
-        // throws LazyInitializationException once OSIV is off.
         return modelRepository
             .findByIdAndWorkspaceIdWithConnection(id, workspaceContext.id())
             .orElseThrow(() -> new EntityNotFoundException("WorkspaceLlmModel", id));
@@ -84,14 +73,6 @@ public class WorkspaceLlmModelService {
         }
 
         PricingMode pricingMode = request.pricingMode() != null ? request.pricingMode() : PricingMode.UNPRICED;
-        LlmPriceValidation.validate(
-            pricingMode,
-            request.per1mInputUsd(),
-            request.per1mOutputUsd(),
-            request.per1mCacheReadUsd(),
-            request.per1mCacheWriteUsd(),
-            request.priceNote()
-        );
 
         WorkspaceLlmModel model = new WorkspaceLlmModel();
         model.setWorkspace(connection.getWorkspace());
@@ -107,7 +88,7 @@ public class WorkspaceLlmModelService {
         if (request.enabled() != null) {
             model.setEnabled(request.enabled());
         }
-        applyPrice(
+        validateAndApplyPrice(
             model,
             pricingMode,
             request.per1mInputUsd(),
@@ -122,15 +103,8 @@ public class WorkspaceLlmModelService {
 
         WorkspaceLlmModel saved;
         try {
-            // saveAndFlush (not save): a generated-id entity's INSERT can otherwise be deferred by
-            // Hibernate to the transaction's implicit flush at commit — OUTSIDE this try/catch — letting
-            // a concurrent-create race's unique-constraint violation escape as an uncaught 500 instead of
-            // the 409 this catch exists to produce.
             saved = modelRepository.saveAndFlush(model);
         } catch (DataIntegrityViolationException e) {
-            // The fast-path checks above are racy; the unique constraints backstop the loser of a
-            // concurrent create. Report the same 409 rather than leaking a 500 — pick the exception that
-            // matches whichever constraint actually fired so the message names the right conflict.
             if (isUpstreamIdConflict(e)) {
                 throw new LlmModelUpstreamIdConflictException(connectionId, request.upstreamModelId());
             }
@@ -179,17 +153,8 @@ public class WorkspaceLlmModelService {
         if (request.enabled() != null) {
             model.setEnabled(request.enabled());
         }
-        // Pricing is all-or-nothing: only touched when pricingMode is given (see class docs).
         if (request.pricingMode() != null) {
-            LlmPriceValidation.validate(
-                request.pricingMode(),
-                request.per1mInputUsd(),
-                request.per1mOutputUsd(),
-                request.per1mCacheReadUsd(),
-                request.per1mCacheWriteUsd(),
-                request.priceNote()
-            );
-            applyPrice(
+            validateAndApplyPrice(
                 model,
                 request.pricingMode(),
                 request.per1mInputUsd(),
@@ -203,11 +168,6 @@ public class WorkspaceLlmModelService {
             requireActivatable(model);
         }
 
-        // saveAndFlush (not save): flush inside this transaction so any constraint violation surfaces
-        // here rather than at the implicit end-of-transaction flush. No unique constraint can fire on
-        // this path — UpdateWorkspaceLlmModelRequestDTO carries neither connection nor upstream model
-        // id, the two columns of ux_ws_llm_model_connection_upstream — so there is nothing to translate
-        // into a 409.
         WorkspaceLlmModel saved = modelRepository.saveAndFlush(model);
         configAudit.record(
             ConfigAuditEntry.updated(
@@ -235,10 +195,8 @@ public class WorkspaceLlmModelService {
     }
 
     /**
-     * The union projection every workspace admin picks a Task's model from: instance models visible to
-     * this workspace, plus this workspace's own usable BYO models. Read-only, no BYO gate — viewing is
-     * always allowed even if {@code allow_workspace_connections} was later turned off (existing bindings
-     * must remain visible/explicable).
+     * Deliberately not gated on {@code allow_workspace_connections}: already-bound BYO models must stay
+     * explicable after an admin turns the setting off.
      */
     @Transactional(readOnly = true)
     public List<AvailableLlmModelDTO> availableModels(WorkspaceContext workspaceContext) {
@@ -269,7 +227,7 @@ public class WorkspaceLlmModelService {
         }
     }
 
-    private static void applyPrice(
+    private static void validateAndApplyPrice(
         WorkspaceLlmModel model,
         PricingMode pricingMode,
         BigDecimal per1mInputUsd,
@@ -278,6 +236,14 @@ public class WorkspaceLlmModelService {
         BigDecimal per1mCacheWriteUsd,
         String priceNote
     ) {
+        LlmPriceValidation.validate(
+            pricingMode,
+            per1mInputUsd,
+            per1mOutputUsd,
+            per1mCacheReadUsd,
+            per1mCacheWriteUsd,
+            priceNote
+        );
         model.setPricingMode(pricingMode);
         model.setPer1mInputUsd(per1mInputUsd);
         model.setPer1mOutputUsd(per1mOutputUsd);
@@ -298,11 +264,6 @@ public class WorkspaceLlmModelService {
         return value != null && value.isBlank() ? null : value;
     }
 
-    /**
-     * Matches the {@code ux_ws_llm_model_connection_upstream} unique index by name so a save() failure
-     * is only reported as an upstream-id conflict when that specific constraint fired — any other
-     * integrity failure should not be mislabelled.
-     */
     private static boolean isUpstreamIdConflict(DataIntegrityViolationException e) {
         Throwable cur = e;
         while (cur != null) {

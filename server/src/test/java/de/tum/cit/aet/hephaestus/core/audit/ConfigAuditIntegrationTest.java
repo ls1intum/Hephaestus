@@ -60,18 +60,15 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         // Present AND null, not absent: null is "inherit the fleet default", so a serializer that
         // dropped null keys would make clearing an override indistinguishable from never setting one.
         assertThat(row.getNewValue()).contains("\"skipDrafts\":null").contains("\"cooldownMinutes\":45");
-        // Attribution through the real filter chain — the JWT -> CurrentAccount -> actor seam the
-        // recorder's unit test can only simulate. USER, not SYSTEM: a signed-in admin did this. (The
-        // id stays null here because the test harness mints a non-numeric subject; production subjects
-        // are always the account id. ConfigAuditRecorderTest covers the resolved-id case.)
+        // Through the real filter chain (JWT -> CurrentAccount -> actor): USER, not SYSTEM, because a
+        // signed-in admin did this. The id stays null because the test harness mints a non-numeric
+        // subject; production subjects are always the account id.
         assertThat(row.getActorKind()).isEqualTo(ConfigAuditActorKind.USER);
     }
 
     @Test
     @WithAdminUser
     void togglingAFeatureFlagIsRecorded() {
-        // Workspace-administration coverage the trail gained: enabling/disabling a feature is an admin
-        // action with accountability value, now recorded alongside AI config.
         Workspace workspace = setupWorkspace("audit-features");
 
         webTestClient
@@ -151,8 +148,7 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Test
     @WithAdminUser
     void filteringByChangedKeyNarrowsToOneControl() {
-        // The per-control History contract (#1357). Without changed_keys this is unanswerable
-        // server-side, and a client cannot filter after paging.
+        // Without changed_keys this is unanswerable server-side, and a client cannot filter after paging.
         Workspace workspace = setupWorkspace("audit-filter");
         patchPracticeReview(workspace, Map.of("cooldownMinutes", 45));
         patchPracticeReview(workspace, Map.of("skipDrafts", true));
@@ -239,8 +235,7 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Test
     @WithMentorUser
     void aNonInstanceAdminIsRefusedTheCrossWorkspaceView() {
-        // The one endpoint in this feature that spans tenants; app_admin is the only thing between a
-        // signed-in user and every workspace's configuration history.
+        // app_admin is the only thing between a signed-in user and every workspace's configuration history.
         webTestClient
             .get()
             .uri("/admin/config-audit")
@@ -389,8 +384,8 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @WithAdminUser
     @Transactional
     void anUnscopedReadOfTheAuditTableIsCaughtByTenancyEnforcement() {
-        // Pins that the table is registered workspace-scoped; isolation itself is carried by the gate and
-        // by findForWorkspace, which the two tests above cover.
+        // Pins that the table is registered workspace-scoped; isolation itself is carried by the gate
+        // and by findForWorkspace.
         assertThatThrownBy(() ->
             entityManager.createNativeQuery("SELECT * FROM config_audit_event", ConfigAuditEvent.class).getResultList()
         )

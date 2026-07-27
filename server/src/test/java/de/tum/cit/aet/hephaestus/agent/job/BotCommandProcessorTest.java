@@ -188,7 +188,6 @@ class BotCommandProcessorTest extends BaseUnitTest {
                 new RuntimeException("DB connection failed")
             );
 
-            // Should not throw
             processor.onBotCommandReceived(event("/hephaestus review"));
 
             verify(agentJobService, never()).submit(any(), any(), any());

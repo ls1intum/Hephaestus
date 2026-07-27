@@ -338,7 +338,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
 
         @Test
         void computeAndStoreDiffSummary_parsesPerFileChunks() throws Exception {
-            // The diff_summary.md parser is driven directly from an annotated diff.patch (no git needed).
+            // Feeds an annotated diff.patch straight into the parser; no git stubbing needed.
             String annotated =
                 "[L1] diff --git a/src/A.java b/src/A.java\n" +
                 "[L1] +line a1\n" +
@@ -360,10 +360,10 @@ class PullRequestContentSourceTest extends BaseUnitTest {
         @Test
         void computeAndStoreDiffSummary_emptyDiffPatch_writesNothing() {
             Map<String, byte[]> files = new LinkedHashMap<>();
-            provider.computeAndStoreDiffSummary(files); // no diff.patch present at all
+            provider.computeAndStoreDiffSummary(files);
             assertThat(files).doesNotContainKey("inputs/context/diff_summary.md");
 
-            files.put("inputs/context/diff.patch", new byte[0]); // present but empty
+            files.put("inputs/context/diff.patch", new byte[0]);
             provider.computeAndStoreDiffSummary(files);
             assertThat(files).doesNotContainKey("inputs/context/diff_summary.md");
         }
@@ -375,7 +375,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             lenient()
                 .when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L))
                 .thenReturn(List.of());
-            // A resolvable range but a blank diff → "Empty diff: no changed files…".
             when(
                 gitDiffOperations.resolveDiffRange(Path.of(repoPath), "main", "feature/auth-fix", "abc123def456")
             ).thenReturn(new String[] { "main", "abc123def456" });
@@ -394,7 +393,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             lenient()
                 .when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L))
                 .thenReturn(List.of());
-            // headVerified = true (commit present) but every range-resolution strategy fails → hard abort.
             when(gitRepositoryManager.commitExists(123L, "abc123def456")).thenReturn(true);
             when(
                 gitDiffOperations.resolveDiffRange(Path.of(repoPath), "main", "feature/auth-fix", "abc123def456")

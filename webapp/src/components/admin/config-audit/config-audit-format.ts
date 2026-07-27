@@ -1,41 +1,33 @@
 import type { ConfigAuditEntryView } from "@/api/types.gen";
 import { refLabel } from "../audit-shared/ref-label";
 
-/**
- * Formatting for the config-audit surface: turning the server's `changedKeys` + `oldValue`/`newValue`
- * snapshots into human before/after pairs. See `ConfigAuditDiff` (server) for how the diff is computed;
- * this is the read side.
- */
-
 type EntityType = NonNullable<ConfigAuditEntryView["entityType"]>;
 type Action = NonNullable<ConfigAuditEntryView["action"]>;
 type ActorKind = NonNullable<ConfigAuditEntryView["actorKind"]>;
 
+/** Entity types renamed since: the trail is append-only, so old rows keep the spelling they were
+ * written under and must still read as the thing they describe. */
+const RENAMED_ENTITY_TYPE_LABELS = {
+	AGENT_CONFIG: "Agent config",
+	AI_CONFIG_BINDING: "AI binding",
+	WORKSPACE_LLM_BUDGET: "Shared-model AI budget",
+	WORKSPACE_BYO_LLM_BUDGET: "Own-provider AI cap",
+} satisfies Partial<Record<EntityType, string>>;
+
 export const ENTITY_TYPE_LABELS: Record<EntityType, string> = {
 	PRACTICE_REVIEW_SETTINGS: "Review settings",
 	AGENT_BINDING: "AI binding",
-	// Retained for rows written before agent config and agent bindings were merged.
-	AGENT_CONFIG: "Agent config",
-	// The pre-rename spelling of AGENT_BINDING. The trail is append-only at the database level, so old
-	// rows keep the name they were written under; they describe the same thing, so they read the same.
-	AI_CONFIG_BINDING: "AI binding",
 	WORKSPACE_ROLE: "Workspace role",
 	WORKSPACE_FEATURES: "Feature flags",
 	WORKSPACE_STATUS: "Workspace status",
 	WORKSPACE_TOKEN: "Access token",
 	WORKSPACE_VISIBILITY: "Visibility",
 	PRACTICE_ACTIVE: "Practice active",
-	// Two caps, different people's money, never summed — so each label says whose. "AI budget" alone
-	// named neither, on the one surface where both appear in the same column. The stored key is
-	// append-only; the label is not, and every row for a purse reads the same regardless of which
-	// spelling it was written under.
 	WORKSPACE_INSTANCE_LLM_BUDGET: "Shared-model AI budget",
 	WORKSPACE_OWN_PROVIDER_LLM_BUDGET: "Own-provider AI cap",
-	// Pre-rename spellings of the two above; same meaning, so the same label.
-	WORKSPACE_LLM_BUDGET: "Shared-model AI budget",
-	WORKSPACE_BYO_LLM_BUDGET: "Own-provider AI cap",
 	WORKSPACE_LLM_CONNECTION: "Workspace AI provider",
 	WORKSPACE_LLM_MODEL: "Workspace model",
+	...RENAMED_ENTITY_TYPE_LABELS,
 };
 
 export const ACTION_LABELS: Record<Action, string> = {
@@ -44,7 +36,6 @@ export const ACTION_LABELS: Record<Action, string> = {
 	DELETED: "Deleted",
 };
 
-/** Badge variant per action, so the table and the sheet stay in sync. */
 export const ACTION_BADGE: Record<Action, "default" | "secondary" | "outline"> = {
 	CREATED: "default",
 	UPDATED: "secondary",
@@ -63,18 +54,15 @@ export function actionLabel(action: string | undefined): string {
 
 export interface ActorDisplay {
 	kind: ActorKind;
-	/** The responsible party: the signed-in user, the impersonating operator, or "System". */
 	primary: string;
 	primaryEmail?: string;
-	/** For impersonation: the identity acted as. */
 	actingAs?: string;
-	/** The account id to filter by (the operator for an impersonated change), if any. */
 	filterId?: number;
 }
 
 /**
- * Who caused the change. `actingActor` is the impersonating operator; `actor` is the identity they
- * assumed — mixing them up would misattribute the change, so the mapping is asserted in the tests.
+ * Who caused the change. On an impersonated row `actingActor` is the operator and `actor` the identity
+ * they assumed: swapping them attributes the operator's changes to their victim.
  */
 export function actorDisplay(entry: ConfigAuditEntryView): ActorDisplay {
 	const kind = entry.actorKind ?? "SYSTEM";
@@ -99,18 +87,15 @@ export function actorDisplay(entry: ConfigAuditEntryView): ActorDisplay {
 }
 
 export interface FieldChange {
-	/** The dot-path of the changed field, e.g. `cooldownMinutes` or `volumeCaps.perPullRequest`. */
+	/** Dot-path, e.g. `volumeCaps.perPullRequest`. */
 	path: string;
-	/** Prior value; `null` for a CREATED row (no prior state). */
 	before: string | null;
-	/** New value; `null` for a DELETED row. */
 	after: string | null;
 }
 
 /**
- * A single leaf value as display text. Credentials arrive as a `…Set` boolean (the server redacts them,
- * enforced by `ConfigAuditSnapshotArchTest`), rendered masked so a reader never reads the boolean as the
- * secret. The suffix anchor keeps ordinary keys like `publicKey` from matching.
+ * A leaf value as display text. The server redacts credentials to a `…Set` boolean, which renders
+ * masked so the boolean is never read as the secret; the suffix anchor keeps `publicKey` out of it.
  */
 export function formatLeaf(value: unknown, path?: string): string {
 	if (value === undefined || value === null) return "not set";
@@ -122,7 +107,6 @@ export function formatLeaf(value: unknown, path?: string): string {
 	return JSON.stringify(value);
 }
 
-/** The field-level diff: one entry per changed path, resolved from the parsed snapshots. */
 export function fieldChanges(entry: ConfigAuditEntryView): FieldChange[] {
 	const before = parseSnapshot(entry.oldValue);
 	const after = parseSnapshot(entry.newValue);
@@ -133,7 +117,6 @@ export function fieldChanges(entry: ConfigAuditEntryView): FieldChange[] {
 	}));
 }
 
-/** The affected resource as a short subject, enriched with the snapshot's `name` when present. */
 export function subjectLabel(entry: ConfigAuditEntryView): { label: string; hint?: string } {
 	const type = entityTypeLabel(entry.entityType);
 	const snapshot = parseSnapshot(entry.newValue) ?? parseSnapshot(entry.oldValue);
@@ -146,10 +129,8 @@ export function subjectLabel(entry: ConfigAuditEntryView): { label: string; hint
 	return { label: id ? `${type} ${identifier(id)}` : type };
 }
 
-/** A one-line summary of the change for the table row. */
 export function changeSummary(entry: ConfigAuditEntryView): string {
-	// The row's Action badge already says Created/Deleted; repeating it here would fill the widest
-	// piece of the cell with nothing.
+	// The row's Action badge already says Created/Deleted.
 	if (entry.action === "CREATED" || entry.action === "DELETED") return "";
 	const changes = fieldChanges(entry);
 	if (changes.length === 0) return "";
@@ -159,7 +140,6 @@ export function changeSummary(entry: ConfigAuditEntryView): string {
 	return `${changes.length} fields changed`;
 }
 
-/** Slugs render as-is (already human), numeric ids as `#42`. */
 function identifier(entityId: string): string {
 	return /^\d+$/.test(entityId) ? `#${entityId}` : entityId;
 }
@@ -176,7 +156,7 @@ function parseSnapshot(value: string | undefined): Record<string, unknown> | nul
 	}
 }
 
-/** Resolve a dot-path leaf out of a parsed snapshot object; arrays compare whole (never index into them). */
+/** Resolves a dot-path leaf; arrays are compared whole, so a segment never indexes into one. */
 function leafAt(obj: Record<string, unknown>, path: string): unknown {
 	return path.split(".").reduce<unknown>((acc, segment) => {
 		if (acc && typeof acc === "object" && !Array.isArray(acc)) {

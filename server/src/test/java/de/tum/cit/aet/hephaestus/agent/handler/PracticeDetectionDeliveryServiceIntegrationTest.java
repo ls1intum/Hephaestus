@@ -245,8 +245,8 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
 
             var result = deliveryService.deliver(agentJob, findings);
 
-            // The map the service returns is the contract the delivery layer keys feedback supersession on;
-            // it MUST be the same value written to observation.recurrence_key, or supersession breaks.
+            // The returned map is what the delivery layer keys feedback supersession on; it must match
+            // observation.recurrence_key exactly, or supersession breaks.
             assertThat(result.observationKeys().values().stream().map(ObservationKeys::recurrenceKey).toList())
                 .as("one stable key returned per delivered finding")
                 .hasSize(2)
@@ -303,8 +303,8 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         @Test
         @DisplayName("persisted finding pins the practice's current criteria revision (SCD-2)")
         void findingPinsCurrentRevision() {
-            // The seeded practice was saved straight through the repository, so it has no revision yet.
-            // Append revision 1 (the ostensive-as-authored) exactly as PracticeService.createPractice would.
+            // The seeded practice was saved straight through the repository, so it has no revision yet;
+            // append one here the way PracticeService.createPractice would.
             Practice practice = practiceRepository
                 .findByWorkspaceIdAndSlug(workspace.getId(), "pr-description-quality")
                 .orElseThrow();
@@ -320,8 +320,6 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
 
             List<Observation> persisted = observationRepository.findAll();
             assertThat(persisted).hasSize(1);
-            // The delivery service looks up the current revision per practice and passes practiceRevisionId
-            // to insertIfAbsent — so the finding must pin to exactly that revision, not null.
             Observation only = persisted.get(0);
             assertThat(only.getPracticeRevision()).isNotNull();
             assertThat(only.getPracticeRevision().getId()).isEqualTo(revision.getId());
@@ -333,9 +331,8 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
 
         @Test
         void persistsEveryDistinctBadFinding() {
-            // Each finding gets a unique idempotency key (includes index), so all 7 are
-            // distinct. There is NO per-practice cap on BAD findings: every distinct one
-            // is persisted (none discarded as a duplicate).
+            // Each finding's idempotency key includes its index, so all 7 are distinct; there is no
+            // per-practice cap on BAD findings.
             var findings = new ArrayList<ValidatedFinding>();
             for (int i = 0; i < 7; i++) {
                 findings.add(

@@ -36,12 +36,9 @@ public final class SsrfGuardedResolverGroup extends AddressResolverGroup<InetSoc
     public static final SsrfGuardedResolverGroup INSTANCE = new SsrfGuardedResolverGroup(false);
 
     /**
-     * Loopback-exempt variant: still blocks every other private/reserved range (so DNS rebinding to a
-     * non-loopback private address is closed exactly like {@link #INSTANCE}), but lets a RESOLVED
-     * loopback address through. For outbound calls whose policy layer has already decided loopback is
-     * an acceptable dev/e2e target (see {@code EgressPolicy#allowLoopback} /
-     * {@code hephaestus.llm.egress.allow-loopback}) — without this, that policy's own literal-host
-     * loopback allowance would be silently re-blocked at connect time by the general-purpose guard.
+     * Lets a RESOLVED loopback address through while still blocking every other private/reserved range,
+     * so DNS rebinding to a non-loopback private address stays closed exactly as in {@link #INSTANCE}.
+     * Only for callers whose policy layer has already allowed loopback as a dev/e2e target.
      */
     public static final SsrfGuardedResolverGroup LOOPBACK_EXEMPT_INSTANCE = new SsrfGuardedResolverGroup(true);
 
@@ -64,7 +61,6 @@ public final class SsrfGuardedResolverGroup extends AddressResolverGroup<InetSoc
         return blockedReason(resolved, false);
     }
 
-    /** Overload threading through the loopback exemption — see {@link #LOOPBACK_EXEMPT_INSTANCE}. */
     static UnknownHostException blockedReason(InetSocketAddress resolved, boolean allowLoopback) {
         InetAddress addr = (resolved == null) ? null : resolved.getAddress();
         if (addr == null) {
@@ -177,8 +173,8 @@ public final class SsrfGuardedResolverGroup extends AddressResolverGroup<InetSoc
 
         @Override
         public void close() {
-            // The delegate resolver is owned/cached by the shared DefaultAddressResolverGroup singleton,
-            // which closes it on its own lifecycle — closing it here would yank a process-wide resolver.
+            // Deliberately empty: the delegate belongs to the shared DefaultAddressResolverGroup
+            // singleton, so closing it here would yank a process-wide resolver.
         }
     }
 }

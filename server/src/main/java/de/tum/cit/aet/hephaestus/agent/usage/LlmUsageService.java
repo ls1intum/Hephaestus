@@ -19,8 +19,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Workspace-scoped read-side of the LLM usage ledger: the month rollup a workspace
- * admin sees. The cross-tenant admin rollup + budget write live on {@link LlmUsageAdminService}.
+ * Workspace-scoped side of the LLM usage ledger: the month rollup a workspace admin sees, and its own
+ * cap. The cross-tenant rollup and the host's cap live on {@link LlmUsageAdminService}.
  */
 @Service
 public class LlmUsageService {
@@ -32,10 +32,7 @@ public class LlmUsageService {
     private final ConfigAuditPort configAudit;
     private final AgentJobRepository jobRepository;
 
-    /**
-     * Display-only: the rate attached to the response so a UI can show a euro estimate beside the
-     * USD figures. Read-side only — no number it produces is ever compared against a budget.
-     */
+    /** Display-only; no number it produces is ever compared against a budget. */
     private final FxRateLookup fxRateLookup;
 
     public LlmUsageService(
@@ -99,8 +96,6 @@ public class LlmUsageService {
         BigDecimal instanceBudget = workspace.getMonthlyLlmBudgetUsd();
         BigDecimal ownProviderBudget = workspace.getMonthlyByoLlmBudgetUsd();
         long uncosted = usageRepository.countUncosted(workspaceId, window.from(), window.to());
-        // Each purse is judged only against blind spots its own owner can clear: an unpriced shared
-        // model is the host's to price, an unpriced BYO model the workspace's.
         LlmBudgetVerdict instanceVerdict = LlmBudgetService.verdictFor(
             pricedTotal,
             usageRepository.existsUnpricedInstanceFunded(workspaceId, window.from(), window.to()),
@@ -111,13 +106,7 @@ public class LlmUsageService {
             usageRepository.existsUnpricedWorkspaceFunded(workspaceId, window.from(), window.to()),
             ownProviderBudget
         );
-        // The paused flags mirror LlmBudgetService's decision — the SAME live gate that
-        // AgentJobService.submit / the claim-time recheck / MentorChatService actually enforce, rather
-        // than something the webapp re-derives. Only meaningful for the CURRENT month: the decision
-        // always evaluates against "now", so reporting it for a past month would misleadingly imply a
-        // closed month is still pausing new work.
-        boolean isCurrentMonth = month.equals(YearMonth.now(ZoneOffset.UTC));
-        LlmBudgetDecision decision = isCurrentMonth ? llmBudgetService.decide(workspaceId) : LlmBudgetDecision.ALLOWED;
+        LlmBudgetDecision decision = livePauseDecision(workspaceId, month);
         return new WorkspaceLlmUsageReportDTO(
             month.toString(),
             instanceBudget,
@@ -136,15 +125,8 @@ public class LlmUsageService {
     }
 
     /**
-     * Set or clear this workspace's own monthly cap on its own-provider spend.
-     *
-     * <p>The workspace-side mirror of {@code LlmUsageAdminService#updateBudget}: same instrument,
-     * same audit trail, different purse. A workspace admin owns this one because it governs money the
-     * workspace pays; it cannot touch the host's cap, so nothing here can loosen the instance's
-     * protection — only the workspace's own spending is affected.
-     *
-     * <p>Audited, and it releases any jobs the claim loop is holding on this cap so raising it takes
-     * effect on the next poll rather than up to an hour later.
+     * The mirror of {@code LlmUsageAdminService#updateBudget} for the purse the workspace itself pays:
+     * same instrument, same audit trail, and it cannot reach the host's cap.
      */
     @Transactional
     public void updateOwnProviderBudget(Long workspaceId, @Nullable BigDecimal monthlyBudgetUsd) {
@@ -169,6 +151,13 @@ public class LlmUsageService {
         jobRepository.releaseBudgetHolds(workspaceId, Instant.now());
     }
 
-    /** The cap itself — a plain amount, no credential material. {@code null} = uncapped. */
+    /** The live gate's verdict, which always evaluates against now — so a closed month pauses nothing. */
+    private LlmBudgetDecision livePauseDecision(Long workspaceId, YearMonth month) {
+        return month.equals(YearMonth.now(ZoneOffset.UTC))
+            ? llmBudgetService.decide(workspaceId)
+            : LlmBudgetDecision.ALLOWED;
+    }
+
+    /** {@code null} = uncapped. */
     public record OwnProviderLlmBudgetSnapshot(@Nullable BigDecimal monthlyBudgetUsd) implements ConfigAuditSnapshot {}
 }

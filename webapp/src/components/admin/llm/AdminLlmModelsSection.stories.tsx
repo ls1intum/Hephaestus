@@ -83,7 +83,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Mixes priced / free / no-price-set — the instance-admin price framing never says "Unpriced". */
 export const Default: Story = {};
 
 export const Empty: Story = {

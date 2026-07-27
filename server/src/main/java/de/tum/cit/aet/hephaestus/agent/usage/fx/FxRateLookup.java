@@ -16,8 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Resolves the one exchange rate a given month's USD figures are displayed with: the month in progress
  * tracks the newest stored rate, while a closed month uses the last rate published on or before its
- * final day, so its euro figure is frozen once the month ends. A month older than every stored rate
- * falls back to the oldest one; the reported {@code rateDate} makes that approximation visible.
+ * final day, so its figure is frozen once the month ends.
  *
  * <p>When the newest stored rate is more than {@link #MAX_RATE_AGE_DAYS} old every lookup returns empty
  * and the UI falls back to USD-only: a conversion quietly drifting from reality is worse than none.
@@ -27,8 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class FxRateLookup {
 
     /**
-     * Clears the longest normal publication gap (four days, at Easter and Christmas, since the ECB skips
-     * weekends and TARGET holidays) while still catching a fetcher that has died.
+     * Clears the longest normal publication gap — the ECB skips weekends and TARGET holidays — while
+     * still catching a fetcher that has died.
      */
     public static final int MAX_RATE_AGE_DAYS = 7;
 
@@ -62,12 +61,11 @@ public class FxRateLookup {
         }
         YearMonth currentMonth = YearMonth.now(clock.withZone(ZoneOffset.UTC));
         if (!month.isBefore(currentMonth)) {
-            // The month in progress (and, defensively, a future month) tracks the newest rate.
             return newest.map(this::toInfo);
         }
         return fxRateRepository
             .findTopByRateDateLessThanEqualOrderByRateDateDesc(month.atEndOfMonth())
-            // Nothing on or before that month at all: the month predates every rate we hold.
+            // The month predates every rate we hold; the reported rateDate makes the approximation visible.
             .or(fxRateRepository::findTopByOrderByRateDateAsc)
             .map(this::toInfo);
     }

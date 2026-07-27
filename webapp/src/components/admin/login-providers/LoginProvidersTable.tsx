@@ -46,7 +46,6 @@ interface LoginProvidersTableProps {
 	error?: unknown;
 	/** Refetch the provider list after a failure. */
 	onRetry?: () => void;
-	/** Registration ids of the rows with a write in flight — see {@link usePendingMutationIds}. */
 	mutatingIds: ReadonlySet<string>;
 	onEdit: (provider: LoginProviderView) => void;
 	onToggleEnabled: (provider: LoginProviderView, enabled: boolean) => void;
@@ -230,8 +229,7 @@ export function LoginProvidersTable({
 
 			<AlertDialog
 				open={deleting != null}
-				// Dismissal is always allowed, including while the DELETE is in flight — ADR 0027:
-				// https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0027-dialog-lifetime-and-where-a-write-outcome-lands.md
+				// Dismissal is allowed even while the DELETE is in flight (ADR 0027).
 				onOpenChange={(open) => {
 					if (!open) setDeleting(null);
 				}}

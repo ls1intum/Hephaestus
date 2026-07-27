@@ -20,7 +20,6 @@ import org.springframework.test.web.reactive.server.WebTestClient;
  * fact and therefore never reads its {@link de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext},
  * which makes it the one endpoint on this surface where a broken membership gate would leave no other
  * symptom: the body is identical whoever asks, so only the status code can tell you the gate ran.
- * Matches {@link WorkspaceLlmConnectionControllerIntegrationTest}'s matrix.
  */
 class WorkspaceLlmSettingsControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 

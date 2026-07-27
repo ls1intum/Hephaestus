@@ -38,33 +38,27 @@ function AdminInstanceUsagePage() {
 	const queryClient = useQueryClient();
 	const month = monthOf(Route.useSearch());
 	const navigate = useNavigate({ from: Route.fullPath });
-	// Stepping a month is a navigation, so the month on screen is always the month in the address bar
-	// and always forwardable. `replace` is deliberately not used: Back stepping months is the point.
+	// No `replace`: stepping months and walking back through them with Back is the point.
 	const goToMonth = (next: string) => navigate({ search: (prev) => ({ ...prev, month: next }) });
 	const [editing, setEditing] = useState<AdminWorkspaceLlmUsage | null>(null);
-	// Which workspace's budget dialog is on screen *right now*. React Query snapshots a mutation's
-	// options when `mutate` is called, so the `editing` its callbacks close over is the one from that
-	// moment — the single value that cannot answer "is that field still on screen to report into".
-	const editingRef = useRef<AdminWorkspaceLlmUsage | null>(null);
+	// React Query snapshots a mutation's options at `mutate` time, so the `editing` its callbacks
+	// close over is the one from that moment and cannot say whether the field is still on screen.
+	const onScreenWorkspaceRef = useRef<AdminWorkspaceLlmUsage | null>(null);
 	const editBudgetFor = (workspace: AdminWorkspaceLlmUsage | null) => {
-		editingRef.current = workspace;
+		onScreenWorkspaceRef.current = workspace;
 		setEditing(workspace);
 	};
 	const [expanded, setExpanded] = useState<AdminWorkspaceLlmUsage | null>(null);
 
 	const listQuery = useQuery({
 		...adminGetLlmUsageReportOptions({ query: { month } }),
-		// Keep the previous month's rows on screen while stepping months — no spinner flash.
 		placeholderData: keepPreviousData,
 	});
-	// Most expensive workspaces first — that's what an instance admin scans for. Name is a stable
-	// tiebreak so the many $0.00 rows don't reshuffle on every refetch.
+	// Name is a stable tiebreak, so the many $0.00 rows do not reshuffle on every refetch.
 	const rows = [...(listQuery.data?.workspaces ?? [])].sort(
 		(a, b) =>
 			b.instanceTotalCostUsd - a.instanceTotalCostUsd || a.displayName.localeCompare(b.displayName),
 	);
-	// The rate belongs to the month, not to any row, so it is read off the envelope: a month with no
-	// workspaces in it has no first row to take it from, and still has a rate.
 	const fx = listQuery.data?.fx;
 	const detailQuery = useQuery({
 		...getLlmUsageReportOptions({
@@ -77,19 +71,17 @@ function AdminInstanceUsagePage() {
 	const updateBudget = useMutation({
 		...adminUpdateWorkspaceLlmBudgetMutation(),
 		onSuccess: (_data, variables) => {
-			// Prefix key (no options) invalidates every cached month.
+			// Both keys are prefixes, omitting `query`: a budget is not month-scoped, so every cached
+			// month has to go.
 			queryClient.invalidateQueries({ queryKey: adminGetLlmUsageReportQueryKey() });
-			// The expanded Details panel is fed by the *workspace-scoped* report, a different key family
-			// that the prefix above does not reach. It stays mounted across the write, so without this it
-			// keeps quoting the budget that was just replaced — right under a row already showing the new
-			// one. Omitting `query` covers every cached month: a budget is not month-scoped.
+			// The expanded Details panel reads the *workspace-scoped* report, a different key family
+			// that the prefix above does not reach, and it stays mounted across the write.
 			queryClient.invalidateQueries({
 				queryKey: getLlmUsageReportQueryKey({
 					path: { workspaceSlug: variables.path.workspaceSlug },
 				}),
 			});
-			// The proxy caches its answer for about 30s, so "resumes now" would be a small lie. A bound
-			// ("within a minute") rather than a hedge ("about a minute") — it is one the gate keeps.
+			// The proxy caches its answer for about 30s, so "resumes now" would be a small lie.
 			toast.success(
 				variables.body.monthlyBudgetUsd == null
 					? "Budget removed. New calls resume within a minute."
@@ -98,16 +90,15 @@ function AdminInstanceUsagePage() {
 			editBudgetFor(null);
 		},
 		onError: (error, variables) => {
-			// Inline while the dialog that would show it is open, out loud once it is gone. ADR 0027:
-			// https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0027-dialog-lifetime-and-where-a-write-outcome-lands.md
-			if (editingRef.current?.workspaceSlug !== variables.path.workspaceSlug) {
+			// Inline while the dialog that would show it is open, out loud once it is gone (ADR 0027).
+			if (onScreenWorkspaceRef.current?.workspaceSlug !== variables.path.workspaceSlug) {
 				toast.error("Couldn't save the budget", { description: problemDetailOf(error) });
 			}
 		},
 	});
 
-	// Asked apart, not derived from each other: they agree today only because `usageSearchSchema`
-	// clamps `month` to this month, and that clamp is not this file's to keep.
+	// Asked apart, not derived from each other: they agree only because `usageSearchSchema` clamps
+	// `month` to this month, and that clamp is not this file's to keep.
 	const canGoNext = canStepForwardFrom(month);
 	const isCurrentMonth = isCurrentMonthUtc(month);
 
@@ -117,7 +108,7 @@ function AdminInstanceUsagePage() {
 		}
 		updateBudget.mutate({
 			path: { workspaceSlug: editing.workspaceSlug },
-			// undefined (field omitted) clears the cap server-side.
+			// undefined (field omitted) clears the budget server-side.
 			body: { monthlyBudgetUsd: monthlyBudgetUsd ?? undefined },
 		});
 	};

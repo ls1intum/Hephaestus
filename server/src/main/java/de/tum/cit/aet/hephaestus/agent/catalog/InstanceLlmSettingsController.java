@@ -17,12 +17,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Instance-admin management of the instance-wide LLM governance settings: the egress
- * allowlist and the workspace-provider-connection flag. GLOBAL —
- * gated by {@code app_admin}, not workspace context.
+ * Instance-admin management of the instance-wide LLM governance settings: the egress allowlist and the
+ * workspace-provider-connection flag.
  *
- * <p>No {@code @WorkspaceAgnostic} here. A class-level tenancy bypass on a controller opens for every
- * statement any handler reaches, including future ones; the singleton's repository carries its own.
+ * <p>Deliberately no class-level {@code @WorkspaceAgnostic} — a controller-wide tenancy bypass would
+ * excuse every statement any handler ever reaches; the singleton's repository carries it.
  */
 @RestController
 @RequestMapping("/admin/llm/settings")

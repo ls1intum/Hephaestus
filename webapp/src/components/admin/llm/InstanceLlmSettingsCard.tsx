@@ -14,14 +14,11 @@ export interface InstanceLlmSettingsCardProps {
 }
 
 /**
- * Instance-wide LLM governance: the provider-host allowlist and whether workspaces may
- * connect their own AI provider at all. Never surfaces egress/routing — the key always stays
- * server-side and traffic always goes through the in-app proxy, with no toggle for that.
+ * Instance-wide LLM governance: the provider-host allowlist and whether workspaces may connect their
+ * own AI provider.
  *
- * The form is mounted only once its settings exist, so its fields seed from them directly instead of
- * being copied in by an effect. An effect would fire again on every background refetch — a second
- * admin's change, or just this tab regaining focus past the query's `staleTime` — and silently
- * overwrite whatever the admin had typed but not yet saved.
+ * The form is mounted only once its settings exist, so its fields seed from them directly. An effect
+ * copying settings into state would re-run on a background refetch and overwrite an unsaved edit.
  */
 export function InstanceLlmSettingsCard({
 	settings,
@@ -56,11 +53,7 @@ function InstanceLlmSettingsForm({ settings, isSubmitting, onSave }: InstanceLlm
 		settings.allowWorkspaceConnections,
 	);
 
-	// Derived, never stored: "is there anything to save" is a comparison against what the server holds
-	// right now, and the server's answer moves — a stored flag would have to be invalidated by whatever
-	// notices that, which is the same edge the seeding rule above exists to avoid.
-	// Trimmed on the host list because that is the form the payload below is sent in, so a lone
-	// trailing newline is not offered as a change.
+	// Compared trimmed, because that is the form the payload is sent in.
 	const savedHosts = (settings.allowedEgressHosts ?? "").trim();
 	const dirty =
 		allowedHosts.trim() !== savedHosts ||

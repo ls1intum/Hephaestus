@@ -20,12 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Post-submission lifecycle operations on an agent job: user-initiated cancel and delivery
- * retry. Split from {@link AgentJobService} (which owns submission) so each side stays within a
- * single responsibility — cancel needs the sandbox/worker plumbing, submission the config/gate
- * plumbing, and neither needs the other's.
- */
+/** Post-submission lifecycle operations on an agent job: user cancel and delivery retry. */
 @Service
 public class AgentJobLifecycleService {
 
@@ -60,27 +55,14 @@ public class AgentJobLifecycleService {
     }
 
     /**
-     * Retry delivery for a completed agent job whose delivery previously FAILED.
-     *
-     * <p>Atomically CASes delivery {@code FAILED → PENDING} then re-runs the handler's {@code deliver()}
-     * method — the same delivery path used by {@link AgentJobExecutor} after sandbox execution. Only
-     * {@code FAILED} is accepted as the CAS source: admitting {@code PENDING} would let two concurrent
-     * retries both succeed (a {@code PENDING → PENDING} no-op returns {@code updated=1}).
-     *
-     * <p><strong>PENDING is therefore not recoverable through this API.</strong> A job stuck in
-     * {@code PENDING} (executor crashed between marking PENDING and finishing delivery, or this method
-     * crashed after the {@code FAILED → PENDING} CAS committed) requires operator intervention to demote
-     * it back to {@code FAILED} before it can be retried here.
-     *
-     * @param workspaceId workspace ID
-     * @param jobId       job UUID
-     * @return the job after delivery attempt
+     * Retries delivery for a completed job whose delivery previously FAILED. Only {@code FAILED} is
+     * accepted as the CAS source: admitting {@code PENDING} would let two concurrent retries both
+     * succeed, since a {@code PENDING → PENDING} no-op still reports one row updated. A job stuck at
+     * PENDING is therefore not recoverable here — {@link #recoverStuckDelivery} is its path.
      */
     public AgentJob retryDelivery(Long workspaceId, UUID jobId) {
         int updated = transactionTemplate.execute(status -> {
-            agentJobRepository
-                .findByIdAndWorkspaceId(jobId, workspaceId)
-                .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()));
+            requireJob(workspaceId, jobId);
 
             return agentJobRepository.transitionDeliveryStatus(
                 jobId,
@@ -95,14 +77,14 @@ public class AgentJobLifecycleService {
             );
         }
 
-        // Reload the entity fresh for delivery (avoids stale detached entity issues)
+        // Reload after the CAS commit so the entity is not stale.
         AgentJob job = transactionTemplate.execute(status ->
             agentJobRepository
                 .findById(jobId)
                 .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()))
         );
 
-        // Deliver outside transaction (may call external APIs like GitHub)
+        // Delivery leaves the database (GitHub/GitLab), so it must not run inside a transaction.
         JobTypeHandler handler = handlerRegistry.getHandler(job.getJobType());
         try {
             handler.deliver(job);
@@ -118,30 +100,17 @@ public class AgentJobLifecycleService {
             throw new AgentJobStateConflictException("Delivery retry failed: " + e.getMessage());
         }
 
-        return transactionTemplate.execute(status ->
-            agentJobRepository
-                .findByIdAndWorkspaceId(jobId, workspaceId)
-                .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()))
-        );
+        return transactionTemplate.execute(status -> requireJob(workspaceId, jobId));
     }
 
-    /** Outcome of the transactional cancel CAS — {@code dispatchCancel} gates the post-commit routing. */
     private record CancelOutcome(AgentJob job, boolean dispatchCancel) {}
 
     /**
-     * Cancel an agent job.
+     * Idempotent when the job is already CANCELLED; throws 409 for any other terminal state.
      *
-     * <p>Uses conditional UPDATE to prevent cancel/executor races. If the job was already
-     * cancelled, this is idempotent. If the job is in a terminal state, throws 409.
-     *
-     * <p>The ledger write runs INSIDE the status-transition transaction — {@link LlmUsageRecorder}'s
-     * append is {@code MANDATORY} precisely so accounting and the state change stand or fall together.
-     * Only the sandbox cancel runs after the commit, because it leaves the database; its failures are
-     * caught and logged and do not affect the already-committed CANCELLED status.
-     *
-     * @param workspaceId workspace ID
-     * @param jobId       job UUID
-     * @return the cancelled job
+     * <p>The ledger write runs INSIDE the status-transition transaction ({@link LlmUsageRecorder}'s
+     * append is {@code MANDATORY}) so accounting and the state change stand or fall together. Only the
+     * sandbox cancel runs after the commit, because it leaves the database.
      */
     public AgentJob cancel(Long workspaceId, UUID jobId) {
         CancelOutcome outcome = transactionTemplate.execute(status -> cancelTransition(workspaceId, jobId));
@@ -164,51 +133,44 @@ public class AgentJobLifecycleService {
         return outcome.job();
     }
 
-    /** The status-transition CAS + races, run inside {@link #transactionTemplate}. */
-    private CancelOutcome cancelTransition(Long workspaceId, UUID jobId) {
-        AgentJob job = agentJobRepository
+    private AgentJob requireJob(Long workspaceId, UUID jobId) {
+        return agentJobRepository
             .findByIdAndWorkspaceId(jobId, workspaceId)
             .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()));
+    }
 
-        if (job.getStatus() == AgentJobStatus.CANCELLED) {
-            return new CancelOutcome(job, false); // idempotent — already routed/recorded by the original caller
-        }
-
-        if (job.getStatus().isTerminal()) {
-            throw new AgentJobStateConflictException("Cannot cancel job " + jobId + " in status " + job.getStatus());
-        }
-
-        int updated = agentJobRepository.transitionStatus(
+    private int casToCancelled(UUID jobId) {
+        return agentJobRepository.transitionStatus(
             jobId,
             AgentJobStatus.CANCELLED,
             Instant.now(),
             null,
             ACTIVE_STATUSES
         );
+    }
 
-        if (updated == 0) {
-            // Executor raced us. Reload and check.
-            AgentJob raced = agentJobRepository
-                .findByIdAndWorkspaceId(jobId, workspaceId)
-                .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()));
+    /** The status-transition CAS + races, run inside {@link #transactionTemplate}. */
+    private CancelOutcome cancelTransition(Long workspaceId, UUID jobId) {
+        AgentJob job = requireJob(workspaceId, jobId);
+
+        if (job.getStatus() == AgentJobStatus.CANCELLED) {
+            return new CancelOutcome(job, false);
+        }
+
+        if (job.getStatus().isTerminal()) {
+            throw new AgentJobStateConflictException("Cannot cancel job " + jobId + " in status " + job.getStatus());
+        }
+
+        if (casToCancelled(jobId) == 0) {
+            AgentJob raced = requireJob(workspaceId, jobId);
             if (raced.getStatus().isTerminal()) {
                 throw new AgentJobStateConflictException(
                     "Cannot cancel job " + jobId + " — executor already moved it to " + raced.getStatus()
                 );
             }
-            // Job was claimed (QUEUED→RUNNING) between our read and CAS. Retry once.
-            updated = agentJobRepository.transitionStatus(
-                jobId,
-                AgentJobStatus.CANCELLED,
-                Instant.now(),
-                null,
-                ACTIVE_STATUSES
-            );
-            if (updated == 0) {
-                // Executor raced us twice. Reload and check terminal state.
-                AgentJob racedAgain = agentJobRepository
-                    .findByIdAndWorkspaceId(jobId, workspaceId)
-                    .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()));
+            // Still non-terminal, so the executor only claimed it (QUEUED→RUNNING); one retry suffices.
+            if (casToCancelled(jobId) == 0) {
+                AgentJob racedAgain = requireJob(workspaceId, jobId);
                 if (racedAgain.getStatus() != AgentJobStatus.CANCELLED) {
                     throw new AgentJobStateConflictException(
                         "Cannot cancel job " + jobId + " — executor moved it to " + racedAgain.getStatus()
@@ -218,19 +180,16 @@ public class AgentJobLifecycleService {
             }
         }
 
-        // Reload to read worker_id (set at claim) for cancel routing.
-        AgentJob fresh = agentJobRepository
-            .findByIdAndWorkspaceId(jobId, workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()));
+        // Reload to read worker_id, which is only set at claim.
+        AgentJob fresh = requireJob(workspaceId, jobId);
         recordUnverifiableUsageIfStarted(workspaceId, fresh);
         return new CancelOutcome(fresh, true);
     }
 
     /**
-     * Append an UNPRICED ledger row for a job this call just cancelled (or found already cancelled)
-     * that crossed the persisted execution boundary. A non-null {@code worker_id} proves only that a
-     * worker claimed the row; repository/context preparation before {@code execution_started_at} cannot
-     * incur provider usage and must not make the workspace's month unverifiable.
+     * Appends an UNPRICED ledger row only once the job crossed {@code execution_started_at}. A non-null
+     * {@code worker_id} proves only that a worker claimed the row, and preparation before that boundary
+     * cannot incur provider usage — booking it would make the workspace's month unverifiable for free.
      */
     private void recordUnverifiableUsageIfStarted(Long workspaceId, AgentJob job) {
         if (job.getExecutionStartedAt() == null) {
@@ -239,51 +198,26 @@ public class AgentJobLifecycleService {
         ConfigSnapshot snap = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
         LlmPriceSnapshot price =
             snap.priceSnapshot() != null ? snap.priceSnapshot() : LlmPriceSnapshot.unpricedInstance();
-        // A user cancel is issued from the API, which has no access to what the attempt consumed —
-        // the tokens the proxy already attributed to the row are billed by whichever executor path
-        // observes the cancellation. This row exists to say the attempt's spend is unknown.
+        // A cancel from the API cannot see what the attempt consumed; the executor path that observes
+        // the cancellation bills the proxy-attributed tokens. This row records that the spend is unknown.
         TerminalUsage.none().appendTo(usageRecorder, workspaceId, job, snap.upstreamModelId(), price);
         log.info("Recorded UNPRICED usage ledger entry (user-cancel): jobId={}", job.getId());
     }
 
     /**
-     * Delivery-recovery entry point, called ONLY by {@link
-     * AgentJobZombieSweeper#recoverStuckDeliveries} for a job stuck at {@code delivery_status=PENDING} —
-     * the executor crashed between the terminal-write transaction (which sets PENDING) and finishing the
-     * actual delivery. Unlike {@link #retryDelivery} (the operator-facing endpoint, which requires the
-     * FAILED CAS source), the caller here has ALREADY won the attempt-counter CAS ({@link
-     * AgentJobRepository#claimDeliveryRecoveryAttempt}) — {@code claimedAttempts} is the POST-increment
-     * value that CAS just wrote — so no further claim is needed here; this method performs the actual
-     * re-delivery attempt and records its outcome.
+     * Re-delivers a job stuck at {@code delivery_status=PENDING} because the executor crashed between
+     * the terminal write and the delivery itself. The caller has already won
+     * {@link AgentJobRepository#claimDeliveryRecoveryAttempt}, so no claim happens here.
      *
-     * <p><b>Tri-state dedup check.</b> Before re-attempting, asks the handler
-     * whether a delivery already landed for this exact job (the crash may have happened AFTER the comment
-     * posted but BEFORE {@code deliveryCommentId} was persisted — see {@link
-     * de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler#findExistingDelivery}):
-     * <ul>
-     *   <li>{@code FOUND} — records the existing comment id as DELIVERED without posting again.</li>
-     *   <li>{@code ABSENT} — confirmed not yet delivered; falls through to a normal {@link
-     *       de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler#deliver} attempt, exactly the path
-     *       {@link AgentJobExecutor#deliverResults} uses on the happy path.</li>
-     *   <li>{@code UNKNOWN} — could not determine either way; returns {@code false} WITHOUT posting.
-     *       Posting on an unconfirmed lookup risks exactly the duplicate this check exists to prevent —
-     *       the delivery stays PENDING for a later sweep pass (bounded by the attempt cap) instead.</li>
-     * </ul>
+     * <p>The crash may have happened after the comment posted but before {@code deliveryCommentId} was
+     * persisted, so the handler is asked first whether a delivery already landed. An {@code UNKNOWN}
+     * answer does not post: that would risk exactly the duplicate this check exists to prevent.
      *
-     * <p><b>Fenced terminal writes.</b> {@code delivery_attempts} is a
-     * counter, not a lease: a slow attempt spanning multiple sweep passes could otherwise be superseded
-     * by a later one that claims a NEW attempt while {@code delivery_status} is still PENDING, and
-     * whichever finishes LAST would win an unconditional write — including a stale FAILED clobbering an
-     * in-flight or already-succeeded DELIVERED. Every terminal write here is fenced via {@link
-     * AgentJobRepository#transitionDeliveryStatusFenced} on {@code claimedAttempts}, the token THIS call
-     * itself claimed — a superseded attempt's write matches no row and is logged, not silently lost.
-     *
-     * @param claimedAttempts the post-increment {@code delivery_attempts} value this call's CAS claim
-     *     just wrote — the fence token for this attempt's terminal write
-     * @return {@code true} if the job is now DELIVERED (either found already-posted, or delivered just
-     *     now) AND this attempt's write actually landed; {@code false} if the lookup was UNKNOWN, the
-     *     delivery attempt failed, or this attempt was superseded by a later one (delivery status is left
-     *     PENDING for the next sweep pass to retry, up to the sweeper's bounded attempt cap)
+     * @param claimedAttempts the post-increment {@code delivery_attempts} this call's CAS just wrote,
+     *     which fences its terminal write (see {@link
+     *     AgentJobRepository#transitionDeliveryStatusFenced})
+     * @return true if the job is now DELIVERED and this attempt's write landed; false leaves the
+     *     delivery PENDING for a later sweep pass, bounded by the sweeper's attempt cap
      */
     boolean recoverStuckDelivery(AgentJob job, short claimedAttempts) {
         JobTypeHandler handler = handlerRegistry.getHandler(job.getJobType());
@@ -341,20 +275,14 @@ public class AgentJobLifecycleService {
             }
             return won;
         } catch (Exception e) {
-            // No terminal write here: a failed attempt leaves delivery_status PENDING (already
-            // attempt-counted by this call's CAS claim)
-            // for the next sweep pass to retry. Only once AgentJobZombieSweeper#recoverStuckDeliveries
-            // observes the attempt cap exhausted does it write the terminal FAILED itself.
+            // No terminal write: leaving PENDING lets a later sweep pass retry. The sweeper writes the
+            // terminal FAILED once it observes the attempt cap exhausted.
             log.warn("Delivery recovery attempt failed: jobId={}, error={}", job.getId(), e.getMessage());
             return false;
         }
     }
 
-    /**
-     * Fenced terminal delivery-status write — see {@link
-     * #recoverStuckDelivery}'s javadoc. Logs (does not throw) when the fence is lost: a superseded
-     * attempt's write is expected to no-op, not fail loudly.
-     */
+    /** Logs rather than throws when the fence is lost: a superseded attempt is expected to no-op. */
     private boolean fencedDeliveryWrite(
         UUID jobId,
         DeliveryStatus newStatus,

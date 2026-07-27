@@ -17,13 +17,11 @@ import org.springframework.stereotype.Component;
  * SSRF egress guard for LLM provider connections.
  *
  * <p>Userinfo, query strings and fragments are rejected because that is how a gateway URL smuggles a
- * credential (e.g. {@code https://gw/v1?api-key=SECRET}) into snapshots, DTOs and logs. A blank
- * allowlist permits any public host.
+ * credential (e.g. {@code https://gw/v1?api-key=SECRET}) into snapshots, DTOs and logs.
  *
- * <p>Validating here is not sufficient on its own: the same {@link PrivateAddressGuard} predicate is
- * re-applied at connect time by the proxy's and probe's guarded resolver (see
- * {@code core.WebClientConnectors#resolverGroup}), closing the DNS-rebind/TOCTOU window a
- * validate-then-reconnect design would otherwise leave open.
+ * <p>Validating here is not sufficient on its own: the same {@link PrivateAddressGuard} predicate must
+ * stay re-applied at connect time by the proxy's and probe's guarded resolver, or a DNS rebind reopens
+ * the window between validation and connection.
  */
 @Component
 @WorkspaceAgnostic("Instance egress policy reads the global instance_llm_settings singleton, not tenant data")
@@ -37,10 +35,9 @@ public class EgressPolicy {
     private final InstanceLlmSettingsRepository settingsRepository;
 
     /**
-     * Off in production: an unconditional loopback allowance would let a workspace admin point their
-     * "provider" at host-local services. Read from {@link LlmProperties} rather than a local
-     * {@code @Value} so this guard and the probe's connect-time resolver cannot drift apart on what
-     * "loopback allowed" means.
+     * Off in production — a loopback "provider" would let a workspace admin reach host-local services.
+     * Read from {@link LlmProperties} so this guard and the probe's connect-time resolver cannot drift
+     * apart on what "loopback allowed" means.
      */
     private final boolean allowLoopback;
 
@@ -49,10 +46,6 @@ public class EgressPolicy {
         this.allowLoopback = llmProperties.egress().allowLoopback();
     }
 
-    /**
-     * @throws IllegalArgumentException with an operator-facing message when {@code baseUrl} is not a
-     *     permitted egress target. Mapped to HTTP 400 by the global {@code ProblemDetail} advice.
-     */
     public void validate(String baseUrl) {
         URI uri = parse(baseUrl);
         if (uri.getRawUserInfo() != null || uri.getRawQuery() != null || uri.getRawFragment() != null) {
@@ -90,7 +83,6 @@ public class EgressPolicy {
         }
     }
 
-    /** Unconditional — a non-public address is refused even when {@link #allowLoopback} is on. */
     private static void assertPublicAddress(String host) {
         InetAddress[] addresses;
         try {

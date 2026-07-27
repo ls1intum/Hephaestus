@@ -28,8 +28,7 @@ class ConfigAuditDiffTest {
             Arguments.of("{\"a\":1,\"b\":2}", "{\"a\":1,\"b\":3}", List.of("b"), "only the keys that differ"),
             // Drives no-op suppression: an idempotent PATCH must leave no row.
             Arguments.of("{\"a\":1}", "{\"a\":1}", List.of(), "identical snapshots yield no keys"),
-            // A cleared override is a real change, not an absent key. (That the mapper actually emits
-            // the null is ConfigAuditIntegrationTest's job.)
+            // A cleared override is a real change, not an absent key.
             Arguments.of(
                 "{\"cooldownMinutes\":30}",
                 "{\"cooldownMinutes\":null}",

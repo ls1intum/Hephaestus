@@ -22,8 +22,7 @@ import org.springframework.context.annotation.Import;
 @ConditionalOnProperty(name = RuntimeRole.WEBHOOK_PROPERTY, havingValue = "true", matchIfMissing = true)
 // Gate on the specifically-named webhook/sync connection, NOT any Connection: matching an arbitrary
 // Connection bean would activate these producers while `WebhookProducerBeans` still requires
-// @Qualifier("natsConnection"), failing the whole context. (The agent job queue runs on PostgreSQL —
-// ADR 0025 — so this is the only NATS connection in the app today; the name-gate keeps it honest.)
+// @Qualifier("natsConnection"), failing the whole context.
 @ConditionalOnBean(name = "natsConnection")
 @Import(WebhookProducerBeans.class)
 public class WebhookConfiguration {

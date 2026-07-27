@@ -8,19 +8,10 @@ import org.jspecify.annotations.Nullable;
 /**
  * Inputs for {@link PiRuntimeFactory#build(PiPlanSpec)}.
  *
- * <p><b>ONE credential path.</b> Every Pi sandbox talks to the in-app LLM proxy over
- * {@code $LLM_PROXY_URL}/{@code $LLM_PROXY_TOKEN} and NEVER holds a real provider API key.
- * {@code jobToken} is therefore always required — it is the job-scoped bearer credential the proxy
- * resolves server-side (see {@code LlmProxyController}), bounded by the job's timeout and revoked on
- * completion. The task prompt is carried by the {@code task.json} envelope written by the handler —
- * not by this request.
- *
- * @param apiProtocol Pi's own {@code api} token (e.g. {@code openai-completions}), passed through
- *     verbatim into the {@code hephaestus} provider registration — see {@code pi-provider.mjs}.
- * @param upstreamModelId the model id the sandbox requests; also {@code settings.json}'s
- *     {@code defaultModel}.
- * @param contextWindow optional capability hint written into {@code pi-provider.json}.
- * @param maxOutputTokens optional capability hint written into {@code pi-provider.json}.
+ * @param apiProtocol Pi's own {@code api} token (e.g. {@code openai-completions}), passed verbatim
+ *     into the {@code hephaestus} provider registration
+ * @param jobToken the job-scoped bearer credential the sandbox authenticates to the LLM proxy with;
+ *     required, because that proxy is the only path a sandbox has to a model
  */
 public record PiPlanSpec(
     String apiProtocol,
@@ -57,9 +48,8 @@ public record PiPlanSpec(
         if (jobToken == null || jobToken.isBlank()) {
             throw new IllegalArgumentException("jobToken is required — every sandbox talks to the LLM proxy");
         }
-        // Map.copyOf freezes the MAP, but byte[] values stay caller-mutable shared references — a caller could
-        // mutate file contents after validation passed. Clone each value too so the record is genuinely
-        // immutable (the keySet allowlist check below then runs over the defensive copy).
+        // Cloned, not just Map.copyOf'd: a frozen map still shares its byte[] values with the caller,
+        // who could then mutate file contents after the allowlist check below has passed.
         extraInputs =
             extraInputs != null
                 ? extraInputs

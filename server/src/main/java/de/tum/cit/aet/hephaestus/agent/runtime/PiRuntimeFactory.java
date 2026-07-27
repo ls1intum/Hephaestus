@@ -19,14 +19,12 @@ import tools.jackson.databind.ObjectMapper;
  * workspace inputs, base command, classpath resources, network policy) that every Pi-based agent
  * reuses.
  *
- * <p>Stays domain-agnostic: callers supply a {@link PiPlanSpec} (resolved LLM behaviour, job token,
- * runner filename, precompute step). Nothing here knows about practices or chat sessions.
+ * <p>Stays domain-agnostic: callers supply a {@link PiPlanSpec}. Nothing here knows about practices
+ * or chat sessions.
  *
- * <p><b>ONE credential path.</b> Every sandbox talks to the in-app LLM proxy over
- * {@code $LLM_PROXY_URL}/{@code $LLM_PROXY_TOKEN} (injected by the sandbox adapter from
- * {@link PiPlan#networkPolicy()}) and registers a single custom Pi provider named
- * {@code hephaestus} from {@link SandboxLayout#PROVIDER_CONFIG_FILENAME}, which this factory writes
- * from the resolved {@link PiPlanSpec}. The real provider API key never enters the container.
+ * <p>SECURITY: a sandbox reaches an LLM only through the in-app proxy at
+ * {@code $LLM_PROXY_URL}/{@code $LLM_PROXY_TOKEN}. The real provider API key never enters the
+ * container, so nothing written here may carry one.
  */
 @Component
 public class PiRuntimeFactory {
@@ -37,11 +35,9 @@ public class PiRuntimeFactory {
     public static final int TIMEOUT_BUFFER_SECONDS = 60;
 
     /**
-     * Floor for the self-watchdog budget (ms). A spec sitting just above the {@link PiPlanSpec} minimum
-     * (timeoutSeconds &gt; {@link #TIMEOUT_BUFFER_SECONDS}) yields a tiny computed budget once the buffer is
-     * subtracted; this floor keeps the watchdog budget at a sane minimum so it is never effectively zero.
-     * Kept strictly below {@code TIMEOUT_BUFFER_SECONDS * 1000} so the watchdog still fires before the SPI
-     * hard kill.
+     * Floor for the self-watchdog budget, so a spec just above the minimum timeout does not compute an
+     * effectively-zero one. Must stay below {@code TIMEOUT_BUFFER_SECONDS * 1000}: the watchdog has to
+     * fire before the sandbox hard kill.
      */
     static final long MIN_BUDGET_MS = (TIMEOUT_BUFFER_SECONDS - 1) * 1000L;
 
@@ -61,9 +57,8 @@ public class PiRuntimeFactory {
         inputFiles.put(SandboxLayout.PI_AGENT_PREFIX + "settings.json", buildPiSettingsJson(spec.upstreamModelId()));
         inputFiles.put(SandboxLayout.PROVIDER_CONFIG_FILENAME, buildProviderConfigJson(spec));
 
-        // The scaffolding is the run's prompt template; its digest is the job's prompt version. settings.json
-        // and pi-provider.json are deliberately EXCLUDED — they vary by model, which the job's config
-        // snapshot already pins.
+        // Digested as the run's prompt version, so settings.json and pi-provider.json stay out: they
+        // vary by model, which the job's config snapshot already pins.
         Map<String, byte[]> promptScaffolding = new LinkedHashMap<>();
         promptScaffolding.put(SandboxLayout.ORCHESTRATOR_PATH, loadClasspathResource("pi-orchestrator.md"));
         promptScaffolding.put(
@@ -94,10 +89,8 @@ public class PiRuntimeFactory {
             "mkdir -p " +
             SandboxLayout.OUTPUT_PATH +
             " /home/agent/.config /home/agent/.local/tmp && " +
-            // Pi SDK ESM imports resolve from /<workspace>/node_modules. The agent-pi Dockerfile
-            // exposes the SDK at /opt/pi-sdk/node_modules (a stable symlink to pnpm's
-            // content-addressed global install). NODE_PATH would NOT work here — Node's ESM
-            // resolver ignores NODE_PATH, only the CommonJS require() honors it.
+            // Pi SDK ESM imports resolve from <workspace>/node_modules, and Node's ESM resolver ignores
+            // NODE_PATH, so the SDK the image exposes at /opt/pi-sdk must be symlinked into place.
             "ln -sf /opt/pi-sdk/node_modules " +
             workspaceRoot +
             "/node_modules && " +
@@ -134,7 +127,7 @@ public class PiRuntimeFactory {
         return String.join(" ", flags) + " ";
     }
 
-    /** Renders env as {@code KEY=value} pairs. Values are NOT shell-quoted — add quoting here if a profile ever needs whitespace/metachars. */
+    /** Values are NOT shell-quoted — add quoting here if a profile ever needs whitespace/metachars. */
     private static String renderNodeEnv(Map<String, String> env) {
         if (env == null || env.isEmpty()) {
             return "";
@@ -147,13 +140,8 @@ public class PiRuntimeFactory {
     }
 
     /**
-     * Build the settings JSON Pi loads at session start. {@code defaultProvider} always resolves to
-     * the {@code hephaestus} provider that the runner script (pi-runner.mjs / pi-mentor-runner.mjs,
-     * via the shared {@code pi-provider.mjs} helper) registers directly on the ModelRegistry before
-     * {@code createAgentSession}, sidestepping the Pi 0.74.x race where findInitialModel runs ahead
-     * of extension loading. {@code defaultModel} is the verbatim upstream model id — gateway-routed
-     * deployments (for example, a gateway-qualified model id) and Pi's
-     * exact-match lookup against {@code modelRegistry.find} see the same string.
+     * The settings JSON Pi loads at session start. {@code defaultModel} is the upstream model id
+     * verbatim, because Pi looks it up by exact match.
      */
     public byte[] buildPiSettingsJson(String upstreamModelId) {
         Map<String, Object> settings = new LinkedHashMap<>();
@@ -174,11 +162,8 @@ public class PiRuntimeFactory {
     }
 
     /**
-     * Build {@code pi-provider.json} — the single, non-secret provider spec both runners read to
-     * register the {@code hephaestus} Pi provider. {@code baseUrl} is intentionally NOT included here:
-     * it is the sandbox-local {@code $LLM_PROXY_URL} env var, resolved by the sandbox adapter at
-     * container-start time (after {@code {appServerIp}} template substitution) — baking it into this
-     * classpath-shaped JSON would freeze a value the adapter has not resolved yet.
+     * The non-secret provider spec the runners read to register the {@code hephaestus} Pi provider.
+     * No {@code baseUrl}: the sandbox adapter only resolves {@code $LLM_PROXY_URL} at container start.
      */
     byte[] buildProviderConfigJson(PiPlanSpec spec) {
         Map<String, Object> provider = new LinkedHashMap<>();
@@ -198,9 +183,7 @@ public class PiRuntimeFactory {
         }
     }
 
-    /**
-     * Sandbox-layer fills in {@code llmProxyUrl} during PREPARE; this only emits the policy shape.
-     */
+    /** The sandbox layer fills in {@code llmProxyUrl} during PREPARE; this only shapes the policy. */
     static NetworkPolicy buildNetworkPolicy(String jobToken, boolean allowInternet) {
         return new NetworkPolicy(allowInternet, null, jobToken);
     }
@@ -219,10 +202,7 @@ public class PiRuntimeFactory {
     }
 
     /**
-     * Materialised Pi sandbox plan. Caller wraps in the appropriate per-agent spec record.
-     *
-     * @param promptDigest digest of the prompt scaffolding (orchestrator + runner + sidecars) — the run's
-     *     prompt version
+     * @param promptDigest digest of the prompt scaffolding — the run's prompt version
      */
     public record PiPlan(
         List<String> command,

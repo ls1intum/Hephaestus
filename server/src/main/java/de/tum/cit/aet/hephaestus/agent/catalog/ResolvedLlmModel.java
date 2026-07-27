@@ -3,21 +3,13 @@ package de.tum.cit.aet.hephaestus.agent.catalog;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The effective, non-secret runtime shape of an LLM model after a binding is resolved — the single
- * thing the runtime needs to talk to a provider, independent of whether the model came from the
- * instance catalog or a workspace's own (BYO) catalog.
+ * The runtime shape of an LLM model after a binding is resolved, whichever catalog it came from.
  *
- * <p>Deliberately carries NO credential. Records auto-generate {@code toString()} over every
- * component, so putting the API key here would leak it into any log line. The key is resolved
- * separately and live at the injection point (see {@code LlmModelResolver#resolveCredential}); this
- * also means credential rotation and revocation reach in-flight jobs instead of being frozen.
+ * <p>Deliberately carries NO credential: a record's generated {@code toString()} covers every
+ * component, so an API key here would leak into any log line. The key is resolved live and separately
+ * by {@link LlmModelResolver#resolveCredential}.
  *
- * <p>{@code apiProtocol} is Pi's own {@code api} token, stored and passed through verbatim
- * (e.g. {@code openai-completions}) — the Java server translates nothing.
- *
- * <p>Deliberately carries no funding source either: who pays is a fact about the CONNECTION the model
- * hangs off, and {@code LlmModelResolver.ConnectionRef#scope()} is its single source of truth. A second
- * copy here could only ever disagree with it.
+ * <p>{@code apiProtocol} is Pi's own {@code api} token, passed through verbatim.
  */
 public record ResolvedLlmModel(
     String baseUrl,

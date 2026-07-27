@@ -8,10 +8,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Resolves a {@link ModelBindingSource} binding to the effective {@link ResolvedLlmModel} the runtime
- * needs, collapsing the two catalog scopes (instance vs workspace BYO) behind one shape. The
- * credential is resolved separately and live (never frozen) via {@link #resolveCredential}.
- *
- * <p>Only catalog bindings are executable: a binding that names no catalog model cannot run.
+ * needs, collapsing the two catalog scopes (instance vs workspace BYO) behind one shape. The credential
+ * is resolved separately and live (never frozen) via {@link #resolveCredential}.
  */
 @Service
 @RequiredArgsConstructor
@@ -23,7 +21,6 @@ public class LlmModelResolver {
     private final WorkspaceLlmModelRepository workspaceLlmModelRepository;
     private final LlmModelWorkspaceGrantRepository grantRepository;
 
-    /** The effective, non-secret runtime shape for a config's bound model. */
     @Transactional(readOnly = true)
     public ResolvedLlmModel resolve(ModelBindingSource config) {
         LlmModel instance = config.getInstanceModel();
@@ -80,7 +77,6 @@ public class LlmModelResolver {
         return new IllegalStateException("The configured OpenAI-compatible model is not available");
     }
 
-    /** The live API key for a config's bound connection. Never frozen into a snapshot. */
     @Transactional(readOnly = true)
     public @Nullable String resolveCredential(ModelBindingSource config) {
         LlmModel instance = config.getInstanceModel();
@@ -96,10 +92,9 @@ public class LlmModelResolver {
 
     /**
      * Identifies WHICH connection row funds a config's binding, without exposing any credential
-     * material. Frozen into {@link de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot}
-     * so the proxy can re-resolve the live credential for an in-flight job without re-reading the
-     * config's (possibly since-changed) current binding. Both components {@code null} represent an
-     * unusable legacy snapshot.
+     * material. Frozen into {@link de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot} so the proxy
+     * can re-resolve the live credential for an in-flight job without re-reading the config's
+     * (possibly since-changed) current binding.
      */
     public record ConnectionRef(
         @Nullable FundingSource scope,
@@ -107,18 +102,16 @@ public class LlmModelResolver {
         @Nullable Long modelId,
         @Nullable Long workspaceId
     ) {
-        /** The unusable-snapshot shape: no scope, no connection, nothing to resolve. */
         public static final ConnectionRef NONE = new ConnectionRef(null, null, null, null);
     }
 
     /**
-     * The live routing + credential material the proxy injects — resolved TOGETHER from the live
-     * connection row. {@code baseUrl} deliberately does NOT come from the
-     * job's frozen {@code ConfigSnapshot}: repointing a connection's host must not be split-brained
-     * against its rotated key (an old-host + new-key mismatch would otherwise leak the new credential to
-     * whatever now answers at the stale host). {@code apiKey} is {@code null} for a deliberately keyless
-     * connection (self-hosted vLLM/Ollama gateways) — the caller forwards without an auth header rather
-     * than refusing.
+     * The live routing + credential material the proxy injects. Routing and credential must be resolved
+     * TOGETHER from the live connection row: taking {@code baseUrl} from a job's frozen snapshot while
+     * re-reading the key would send a rotated key to a since-abandoned host.
+     *
+     * @param apiKey {@code null} for a deliberately keyless connection (self-hosted vLLM/Ollama
+     *     gateway) — the caller forwards without an auth header rather than refusing
      */
     public record ProxyCredential(
         String baseUrl,
@@ -128,7 +121,6 @@ public class LlmModelResolver {
         @Nullable String apiKey
     ) {}
 
-    /** Which connection (if any) funds this config's current binding. See {@link ConnectionRef}. */
     @Transactional(readOnly = true)
     public ConnectionRef connectionRef(ModelBindingSource config) {
         LlmModel instance = config.getInstanceModel();
@@ -153,15 +145,9 @@ public class LlmModelResolver {
     }
 
     /**
-     * Re-resolves the LIVE base URL + credential + auth header material for a frozen
-     * {@link ConnectionRef} — used by the LLM proxy at call time, NEVER at job-dispatch time. Picks up
-     * key rotation/revocation, host repointing, and connection enable/disable all TOGETHER and
-     * immediately, unlike everything else in a job's {@code ConfigSnapshot} which is deliberately frozen
-     * at dispatch. The base URL is deliberately re-read here rather than taken from the snapshot: if it
-     * came from the snapshot while the credential is re-resolved live, a connection repointed to a new
-     * host after dispatch would send the NEW (rotated) key to the OLD (stale, frozen) host — routing and
-     * credential must come from the same live row. Returns empty when the model or connection is
-     * unavailable.
+     * Called by the LLM proxy at call time, NEVER at job-dispatch time: unlike the rest of a job's
+     * {@code ConfigSnapshot}, key rotation, host repointing and connection disabling must reach an
+     * in-flight job. Returns {@code null} when the model or connection is no longer usable.
      */
     @Transactional(readOnly = true)
     public @Nullable ProxyCredential resolveProxyCredential(ConnectionRef ref) {

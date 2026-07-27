@@ -31,11 +31,9 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
     Optional<Workspace> findByIdForUpdate(@Param("id") Long id);
 
     /**
-     * {@link #findByIdForUpdate} for a caller that only has the slug (the instance-admin budget
-     * write). Deliberately a single locking query rather than {@code findByWorkspaceSlug} followed by
-     * {@code findByIdForUpdate}: the second call would return the instance the first already put in
-     * the persistence context, WITHOUT refreshing its state, so the before-snapshot would still be the
-     * pre-lock read — exactly the staleness the lock exists to prevent.
+     * {@link #findByIdForUpdate} for a caller that only has the slug. One locking query, not a lookup
+     * followed by a locking read: the second call returns the persistence context's existing instance
+     * without refreshing it, leaving the caller holding exactly the pre-lock state.
      */
     @WorkspaceAgnostic("Locking read of the tenant root itself, by its own slug")
     @Lock(LockModeType.PESSIMISTIC_WRITE)

@@ -16,31 +16,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Bounds {@code agent_job} growth: with no retention, a busy instance accumulates roughly 3.65M
- * rows/year at 10k jobs/day, each carrying up to
- * 64KB of {@code container_logs}. Two passes, mirroring {@code integration.core.sync.SyncJobService}'s
- * retention style:
+ * Bounds {@code agent_job} growth in two passes: TERMINAL rows older than
+ * {@link AgentProperties#payloadRetention} keep everything but their bulky {@code container_logs} /
+ * {@code output}, and rows older than {@link AgentProperties#rowRetention} go entirely.
  *
- * <ol>
- *   <li><b>Strip</b> — TERMINAL rows older than {@link AgentProperties#payloadRetention} have their
- *       heavy payload columns ({@code container_logs}, {@code output}) set to {@code NULL}. The row
- *       (status, timing, LLM usage aggregates, delivery outcome) survives — only the bulky diagnostic
- *       payload goes.</li>
- *   <li><b>Delete</b> — TERMINAL rows older than {@link AgentProperties#rowRetention} are removed
- *       outright.</li>
- * </ol>
- *
- * <p>Both are batched (fixed {@link #BATCH_SIZE} per UPDATE/DELETE, looped until a batch returns fewer
- * than {@link #BATCH_SIZE} rows) rather than one unbounded statement — a single multi-million-row
- * UPDATE/DELETE would hold locks and generate WAL/dead-tuple pressure for an unacceptably long single
- * transaction (the brandur.org/postgres-queues dead-tuple death spiral this queue design otherwise
- * avoids by keeping every OTHER transaction span short).
- *
- * <p><b>Server role only</b>, on top of the feature flag — the house pattern for a sweeper
- * ({@code ExportRetentionSweeper}, {@code ConfigAuditRetentionJob}, {@code FxRateFetchScheduler}).
- * {@code ServerSchedulingConfig} silences the {@code @Scheduled} tick on the worker and webhook pods,
- * but gating the tick and not the bean leaves those pods holding a retention component and its two
- * counters for no reason; the sweep has exactly one owner and it is the server.
+ * <p>Both are batched rather than issued as one unbounded statement, so no single transaction holds
+ * locks or generates WAL/dead-tuple pressure long enough to hurt the queue sharing this table.
  */
 @ConditionalOnServerRole
 @Component
@@ -50,16 +31,9 @@ public class AgentJobRetentionService {
 
     private static final Logger log = LoggerFactory.getLogger(AgentJobRetentionService.class);
 
-    /** Rows touched per UPDATE/DELETE statement — bounds each individual transaction's duration/lock time. */
     private static final int BATCH_SIZE = 500;
 
-    /**
-     * Wall-clock budget per pass (strip, then delete): on a fresh backlog
-     * (e.g. retention just enabled against an already-large table) the batch loop could otherwise run for
-     * a very long time in one {@link #runRetention()} invocation. Stopping early once the budget is spent
-     * just means the remainder is worked off on the NEXT scheduled run (6h later) instead of blocking this
-     * one indefinitely — retention is a slow-moving background process, not a deadline-bound one.
-     */
+    /** Wall-clock budget per pass; whatever a first-enabled backlog leaves behind is worked off next run. */
     private static final Duration MAX_PASS_DURATION = Duration.ofMinutes(5);
 
     private final AgentJobRepository jobRepository;
@@ -86,15 +60,9 @@ public class AgentJobRetentionService {
     }
 
     /**
-     * Daily-ish cadence (every 6h) is plenty for a slow-moving retention window measured in days.
-     *
-     * <p>{@code @SchedulerLock} single-flights this across replicas:
-     * without it, every server-role replica fires this on its own 6h timer, all racing the same batched
-     * UPDATE/DELETE — each replica's batch loop mostly finds nothing left to do (wasted round-trips) or,
-     * worse, several replicas' batches interleave against the same backlog, multiplying lock/WAL pressure
-     * for no extra throughput (the batches are already serialized by row-level contention, not
-     * parallelizable). {@code lockAtMostFor} covers both passes' {@link #MAX_PASS_DURATION} budgets plus
-     * headroom; a crashed replica's stale lock still auto-clears well before the next 6h run.
+     * {@code @SchedulerLock} single-flights this across replicas: concurrent passes cannot go faster (the
+     * batches serialize on row-level contention anyway) and only multiply lock/WAL pressure.
+     * {@code lockAtMostFor} must stay above both passes' {@link #MAX_PASS_DURATION} budgets.
      */
     @Scheduled(fixedDelay = 6, initialDelay = 1, timeUnit = TimeUnit.HOURS)
     @SchedulerLock(name = "agent-job-retention", lockAtMostFor = "PT20M", lockAtLeastFor = "PT10S")

@@ -9,11 +9,6 @@ import java.util.stream.Collectors;
 /**
  * The trails an admin action can be recorded on — one constant per append-only table, each carrying
  * the vocabulary that table types its rows with.
- *
- * <p>"Which trail do I go read?" is the first question anyone asks of an {@link Audited} endpoint, so
- * it is the part of the declaration the compiler checks. The vocabulary lives here rather than in the
- * rule that validates it: a ledger and the constants it accepts are one fact, and splitting them is
- * how the two drift.
  */
 public enum AuditLedger {
     /** {@code config_audit_event} — per-workspace configuration changes. */
@@ -33,8 +28,7 @@ public enum AuditLedger {
 
     /**
      * The constants this ledger types its rows with. Empty for {@link #CONNECTION_AUDIT}, whose
-     * {@code event_type} is a free string composed at write time — there is no constant to name, which
-     * is why {@link Audited#type()} is optional.
+     * {@code event_type} is composed at write time — which is why {@link Audited#type()} is optional.
      */
     public Set<String> vocabulary() {
         return vocabulary;

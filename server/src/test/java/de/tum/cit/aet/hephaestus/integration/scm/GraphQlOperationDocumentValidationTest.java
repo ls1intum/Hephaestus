@@ -34,19 +34,13 @@ import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 /**
  * Validates every committed GitHub and GitLab operation document against that vendor's checked-in schema.
  *
- * <p>Why this exists: a malformed operation document fails at the vendor's API with a GraphQL error, and every
- * caller in this module treats a GraphQL error as an unknown/skip outcome. A typo therefore degrades to
- * behaviour indistinguishable from a healthy fail-closed path — a document can be broken from the day it is
- * written and no unit test, whose responses are mocked, will ever notice. This test is the mechanism that
- * notices: it runs the real GraphQL validator (the same {@code graphql-java} rules the vendors run) over the
- * exact document text the client sends, so an unknown field, a wrong argument name, a mistyped variable or a
- * missing fragment fails the build instead of silently disabling a feature in production.
+ * <p>A malformed document fails at the vendor's API with a GraphQL error — the same outcome every caller here
+ * treats as an unknown/skip result — so a typo can ship silently and never surface as a test failure. This runs
+ * the real graphql-java validator over the exact document text {@link FragmentMergingDocumentSource} (the
+ * production document source) assembles, so fragment resolution is checked too, not bypassed.
  *
- * <p>The document text is assembled by {@link FragmentMergingDocumentSource} — the production document source —
- * so fragment resolution is validated too, not bypassed.
- *
- * <p>Scope of the guarantee: this proves each document is valid <em>against the checked-in schema</em>. It
- * cannot prove the schema is current; a schema refresh is what catches vendor-side deprecation.
+ * <p>This only proves each document is valid against the checked-in schema; a schema refresh is what catches
+ * vendor-side deprecation.
  */
 class GraphQlOperationDocumentValidationTest extends BaseUnitTest {
 
@@ -113,19 +107,10 @@ class GraphQlOperationDocumentValidationTest extends BaseUnitTest {
     }
 
     /**
-     * The one validation rule this project's documents deliberately fail, because GitHub's own server does not
-     * enforce it.
-     *
-     * <p>{@code RequestedReviewerFields} selects {@code name} on both {@code User} ({@code String}) and
-     * {@code Team} ({@code String!}) inside one union selection. GraphQL §5.3.2 SameResponseShape says two
-     * fields sharing a response key must share nullability, and graphql-java enforces it; GitHub does not —
-     * the affected documents were executed against api.github.com and ran past static validation (to data, or
-     * to a field-level scope error) with no validation error. Failing the build on a rule the target API
-     * waives would make the guard cry wolf.
-     *
-     * <p>Scoped to that exact conflict — the {@code RequestedReviewer} union reached either through a
-     * {@code reviewers} connection or a single {@code requestedReviewer}. Any other {@code FieldsConflict},
-     * and any conflict on another path, still fails.
+     * GitHub's server does not enforce GraphQL's SameResponseShape rule (§5.3.2): {@code RequestedReviewerFields}
+     * selects {@code name} on both {@code User} ({@code String}) and {@code Team} ({@code String!}) inside one
+     * union selection, and the affected documents run fine against api.github.com. graphql-java does enforce it,
+     * so this carve-out is scoped to that exact conflict — any other {@code FieldsConflict} still fails the build.
      */
     private static boolean isAcceptedByTheVendor(ValidationError error) {
         if (error.getValidationErrorType() != ValidationErrorType.FieldsConflict) {

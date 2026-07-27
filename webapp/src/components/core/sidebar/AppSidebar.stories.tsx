@@ -71,10 +71,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * MEMBER: the workspace-admin nav is hidden outright rather than shown disabled — a member cannot
- * become an admin by clicking, so a disabled control would be a dead end.
- */
+/** A member never sees the workspace-admin nav: hidden outright, not shown disabled. */
 export const RegularUser: Story = {
 	args: {
 		username: "johndoe",
@@ -89,10 +86,7 @@ export const RegularUser: Story = {
 	},
 };
 
-/**
- * ADMIN/OWNER of the workspace, without instance-admin rights — the two roles are separate axes,
- * so the workspace-admin nav appears while the instance-admin entry does not.
- */
+/** Workspace admin without instance-admin rights: the two roles are separate axes. */
 export const WorkspaceAdminUser: Story = {
 	args: {
 		username: "admin",
@@ -109,9 +103,7 @@ export const WorkspaceAdminUser: Story = {
 	},
 };
 
-/**
- * Admin user sidebar with both workspace-admin and instance-admin privileges.
- */
+/** Both workspace-admin and instance-admin. */
 export const AdminUser: Story = {
 	args: {
 		username: "admin",

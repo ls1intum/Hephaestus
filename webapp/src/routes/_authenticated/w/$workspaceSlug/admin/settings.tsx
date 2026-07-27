@@ -38,11 +38,8 @@ function AdminSettings() {
 		...resetAndRecalculateLeaguesMutation(),
 		onSuccess: (_data, variables) => {
 			const resetSlug = variables.path.workspaceSlug;
-			// A reset re-derives every standing, so what goes stale is the leaderboard and the league
-			// stats beside it — not the workspace record. Both keys are built by the generated helpers
-			// and deliberately carry only `path`: TanStack matches a query key by prefix, so a key
-			// without `query` invalidates every time range and mode at once. The cast is what lets a
-			// *prefix* through a signature written for a *fetch*, which does need the query.
+			// Both keys deliberately carry only `path`, so every cached time range and mode goes at
+			// once. The cast is what lets a *prefix* through a signature written for a *fetch*.
 			for (const queryKey of [
 				getLeaderboardQueryKey({
 					path: { workspaceSlug: resetSlug },
@@ -56,7 +53,6 @@ function AdminSettings() {
 		},
 	});
 
-	// Update features mutation
 	const updateFeatures = useMutation({
 		...updateFeaturesMutation(),
 		onSuccess: () => {
@@ -80,7 +76,6 @@ function AdminSettings() {
 		return <NoWorkspace />;
 	}
 
-	// Handle feature toggle
 	const handleToggleFeature = (feature: FeatureKey, enabled: boolean) => {
 		if (!workspaceSlug) {
 			return;

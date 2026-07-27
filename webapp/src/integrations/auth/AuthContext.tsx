@@ -59,7 +59,6 @@ interface AuthProviderProps {
  * keycloak-js implementation so existing consumers keep working.
  */
 export function AuthProvider({ children }: AuthProviderProps) {
-	// Shared with the route guards so both read one cache entry on one schedule.
 	const userQuery = useQuery(currentUserQueryOptions());
 
 	const user = userQuery.data ?? null;

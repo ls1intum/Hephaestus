@@ -101,12 +101,9 @@ public final class SandboxLayout {
     public static final String RUNNER_SCRIPT_FILENAME = ".run-pi.mjs";
 
     /**
-     * Workspace-relative filename of the shared LLM-provider spec: a single JSON file
-     * the server writes from the job's {@code ConfigSnapshot} — wire protocol, the PROXY url the
-     * sandbox must call, the upstream model id, and its capability envelope. Both
-     * {@code pi-runner.mjs} and {@code pi-mentor-runner.mjs} read it through the shared
-     * {@code pi-provider.mjs} registration helper (see {@code PROVIDER_HELPER_FILENAME}) so the two
-     * runners can never drift on how they register the "hephaestus" Pi provider.
+     * Workspace-relative filename of the non-secret LLM-provider spec written by
+     * {@link PiRuntimeFactory#buildProviderConfigJson}: wire protocol, upstream model id, capability
+     * envelope. The proxy URL is not in it — that arrives as {@code $LLM_PROXY_URL}.
      */
     public static final String PROVIDER_CONFIG_FILENAME = "pi-provider.json";
 

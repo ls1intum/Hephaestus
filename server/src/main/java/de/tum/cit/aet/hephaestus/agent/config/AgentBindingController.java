@@ -23,12 +23,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 /**
- * A workspace's agents: what model, with what limits, runs practice detection and the mentor.
- *
- * <p>The resource is the agent itself, identified by its {@link AgentPurpose} — there is exactly one
- * of each per workspace, so the purpose is its natural key and {@code PUT} is a plain idempotent
- * configure. "Binding" is how the row is stored ({@link WorkspaceAgentBinding}); it is not something a
- * client needs to name. Job history for these agents lives one level down, at {@code /agents/jobs}.
+ * A workspace's agents: what model, with what limits, runs each {@link AgentPurpose}. There is
+ * exactly one agent per purpose, so the purpose is its natural key and {@code PUT} is idempotent.
  */
 @WorkspaceScopedController
 @RequestMapping("/agents")

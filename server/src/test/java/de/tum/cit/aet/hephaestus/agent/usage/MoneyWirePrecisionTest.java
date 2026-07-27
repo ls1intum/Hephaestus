@@ -13,37 +13,21 @@ import java.math.RoundingMode;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the claim the API description makes about money, against the values production actually
- * declares.
- *
- * <p>Money leaves this server as an exact decimal ({@code BigDecimal}, {@code NUMERIC} column) and
- * lands in the browser as a binary64 {@code number}, because JavaScript has no decimal type. That is
- * only honest if the conversion is lossless for every value we can produce, so each test below takes
- * a bound from the code that enforces it — the ledger's cost clamp, the cap request validator, the
- * mapped column scales — and puts that value through the trip.
- *
- * <p>Binary64 round-trips any decimal of at most 15 significant digits exactly ({@code DBL_DIG}).
- * Our amounts are quantised, so significant digits are just "integer digits + scale". Asserting the
- * property on invented literals would prove something about binary64 rather than about this system;
- * the point is that the values we can actually emit sit inside it, with the distance measured.
- *
- * <p>What none of this licenses is client-side arithmetic. A single value survives the trip; a sum of
- * thirty-one of them accumulates error the server never had. Totals are computed here and shipped as
- * fields for exactly that reason.
+ * Money leaves this server as an exact decimal ({@code BigDecimal}, {@code NUMERIC} column) and lands
+ * in the browser as a binary64 {@code number}, since JavaScript has no decimal type — so every value we
+ * can emit must round-trip through that conversion losslessly. Each test below takes its bound from the
+ * code that enforces it (the ledger's cost clamp, the cap request validator, the mapped column scales),
+ * not from an invented literal, so the round-trip is a claim about this system rather than about binary64.
  */
 class MoneyWirePrecisionTest extends BaseUnitTest {
 
-    /** Binary64's guaranteed decimal round-trip width. */
     private static final int SIGNIFICANT_DIGITS = 15;
 
     /**
-     * The ledger's own bounds, taken from the clamps rather than from a literal: whatever
-     * {@link LlmPriceSnapshot#calculateCost} is willing to store has to survive the wire, and these
-     * two calls are the only ways it produces a value it did not compute.
+     * The ledger's own bounds, taken from the clamps rather than a literal.
      *
      * <p>Kills widening {@code MAX_COST} to the column's real maximum: {@code 999999999999.999999}
-     * is eighteen significant digits and comes back from the browser as a different number, so the
-     * ledger would hold amounts the API cannot state.
+     * is eighteen significant digits and comes back from the browser as a different number.
      */
     @Test
     void everyCostTheLedgerWillStoreSurvivesTheWire() {
@@ -62,10 +46,9 @@ class MoneyWirePrecisionTest extends BaseUnitTest {
     }
 
     /**
-     * The cap is the one money field a human types, so it has two guards that must agree: the request
-     * validator that decides what is accepted, and the column that has to hold it. A validator wider
-     * than its column turns a typo into a database error instead of a 400; a validator wider than
-     * fifteen digits turns an accepted cap into a number the browser renders differently.
+     * The cap is the one money field a human types: its request validator and its column must agree,
+     * or a typo becomes a database error instead of a 400, or an accepted cap renders differently in
+     * the browser.
      *
      * <p>Kills {@code @Digits(integer = 9)} on the request (past the column) and
      * {@code precision = 9} on the column (under the request).
@@ -88,14 +71,11 @@ class MoneyWirePrecisionTest extends BaseUnitTest {
     }
 
     /**
-     * A frozen rate is copied from the catalog onto every ledger row it prices, so the two columns
-     * are one number in two places: a narrower ledger column would silently truncate the rate an
-     * event was actually billed at, and the provenance the ledger exists to keep would be a rounded
-     * version of the price the admin set.
+     * A frozen rate is copied from the catalog onto every ledger row it prices, so the two columns are
+     * one number in two places: a narrower ledger column would silently truncate the rate an event was
+     * actually billed at.
      *
-     * <p>Kills changing either column's {@code scale} without the other. Also pins that a rate
-     * carrying all of those decimal places is still exact on the wire across the range a catalog
-     * states — the tighter of the two cases, since each decimal place costs an integer digit.
+     * <p>Kills changing either column's {@code scale} without the other.
      */
     @Test
     void aFrozenRateIsTheSameNumberInTheCatalogAndTheLedger() throws NoSuchFieldException, NoSuchMethodException {

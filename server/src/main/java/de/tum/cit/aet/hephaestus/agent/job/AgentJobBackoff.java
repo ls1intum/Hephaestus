@@ -5,17 +5,11 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.random.RandomGenerator;
 
 /**
- * Backoff schedule for a requeued {@code agent_job} row: a job requeued after an
- * infra failure, orphan recovery, or worker drain becomes eligible again only after {@code available_at}
- * elapses, instead of instantly re-competing for a claim.
+ * How long a requeued {@code agent_job} row waits before it is eligible for a claim again, so a
+ * crash-looping job cannot burn its whole retry budget in seconds.
  *
- * <p>Quartic-with-jitter — the Sidekiq/Resque-descended industry default: {@code attempt^4 + 15}
- * seconds, capped at {@link #CAP} so a chronically failing job never waits longer than that, jittered
- * ±10% so a burst of jobs failing at the same instant (e.g. a shared dependency outage) does not then
- * all retry in the same instant again (the thundering-herd failure mode plain exponential backoff has).
- *
- * <p>Without this, a crash-looping job (e.g. a config pointing at a dead LLM endpoint) burns its entire
- * retry budget in seconds.
+ * <p>Quartic with jitter, the Sidekiq/Resque-descended default. The jitter is what keeps a burst of
+ * jobs that failed together (a shared dependency outage) from retrying together.
  */
 final class AgentJobBackoff {
 
@@ -24,13 +18,12 @@ final class AgentJobBackoff {
 
     private static final double JITTER_FRACTION = 0.10;
 
+    private static final long BASE_OFFSET_SECONDS = 15;
+
     /**
-     * Upper bound on {@code n} before computing {@code n^4}. {@code hephaestus.agent.max-retries} has no
-     * configured ceiling ({@code @PositiveOrZero} only), so a large operator-set value could otherwise
-     * reach {@code n} large enough for {@code n^4} to overflow {@code long}.
-     * 1000^4 (1e12) is comfortably inside {@code long} range and already far beyond {@link #CAP} once
-     * capped below, so clamping {@code n} here changes nothing about the OUTPUT for any realistic
-     * {@code max-retries} value — it only removes the overflow risk at the input.
+     * Clamps {@code n} before {@code n^4} is computed. {@code hephaestus.agent.max-retries} has no
+     * configured ceiling, so an operator-set value could otherwise overflow {@code long}; every value
+     * this large is capped to {@link #CAP} anyway, so the clamp cannot change an output.
      */
     private static final int MAX_ATTEMPT_FOR_POWER = 1000;
 
@@ -47,11 +40,10 @@ final class AgentJobBackoff {
     /** Seeded-random overload for deterministic unit testing. */
     static Duration compute(int attemptNumber, RandomGenerator random) {
         int n = Math.min(Math.max(0, attemptNumber), MAX_ATTEMPT_FOR_POWER);
-        long baseSeconds = ((long) n * n * n * n) + 15;
+        long baseSeconds = ((long) n * n * n * n) + BASE_OFFSET_SECONDS;
         double jitterMultiplier = 1.0 + ((random.nextDouble() * 2.0 - 1.0) * JITTER_FRACTION);
-        // Jitter applies to the UNCAPPED base and the cap is enforced AFTER it. Capping first would let
-        // the +10% leg push the result past CAP (a maxed-out 900s base jitters up to 990s); clamping
-        // last means no wait exceeds CAP whichever way the jitter goes.
+        // Jitter the UNCAPPED base and clamp afterwards, so the upward jitter leg cannot push a
+        // near-cap wait past CAP.
         long jitteredSeconds = Math.round(baseSeconds * jitterMultiplier);
         long cappedSeconds = Math.min(jitteredSeconds, CAP.toSeconds());
         return Duration.ofSeconds(Math.max(1, cappedSeconds));

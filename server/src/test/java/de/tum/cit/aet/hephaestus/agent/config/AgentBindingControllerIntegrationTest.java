@@ -23,12 +23,11 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 /**
  * The per-purpose binding endpoints over the real stack.
  *
- * <p>Exists mainly for the listing: it reports each binding's {@code ready}, which resolves the bound
- * model → connection AFTER the loading transaction closed (readiness is judged outside a transaction
- * on purpose — resolve() signals a revoked model by throwing, and catching that inside a shared
- * transaction would still mark it rollback-only). A plain finder there returns rows whose LAZY model
- * blows up on the first touch, so the endpoint 500s with LazyInitializationException instead of
- * answering. Unit tests cannot see it — they mock the repository and never cross a session boundary.
+ * <p>Exists mainly for the listing: readiness is judged outside the loading transaction on purpose —
+ * resolve() signals a revoked model by throwing, and catching that inside a shared transaction would
+ * still mark it rollback-only. A plain finder returns rows whose LAZY model blows up on first touch
+ * outside a session, so the endpoint 500s instead of answering; unit tests mock the repository and never
+ * cross that boundary.
  */
 class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 

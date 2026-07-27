@@ -7,48 +7,62 @@ import { Button } from "@/components/ui/button";
 
 type BudgetVerdict = WorkspaceLlmUsageReport["ownProviderBudgetVerdict"];
 
+/** `own` is the cap the workspace sets on its own provider; `shared` is the host's budget. */
+type CapScope = "shared" | "own";
+type PauseReason = "CAP_REACHED" | "NO_PRICE";
+
+/** The four pause banners. The two caps pause independently and are never merged into one. */
+const PAUSE_COPY: Record<
+	CapScope,
+	Record<PauseReason, { title: string; body: (parts: PauseCopyParts) => string }>
+> = {
+	own: {
+		CAP_REACHED: {
+			title: "Your provider cap is reached",
+			body: ({ resetDay }) =>
+				`Paused until ${resetDay} (UTC), or until you raise or remove the cap.`,
+		},
+		NO_PRICE: {
+			title: "Your provider cap can't be enforced",
+			body: ({ subject }) =>
+				`${subject} no price, so the cap can't be checked and your provider is paused. Add a price to resume, or remove the cap.`,
+		},
+	},
+	shared: {
+		CAP_REACHED: {
+			title: "Shared-model budget reached",
+			body: ({ resetDay }) =>
+				`Paused until ${resetDay} (UTC), or until your host raises the budget. Practice detection and Mentor can keep running on your own models.`,
+		},
+		NO_PRICE: {
+			title: "Shared-model spend can't be verified",
+			body: ({ subject }) =>
+				`${subject} no price, so the budget can't be checked and shared models are paused. Only your host can price them.`,
+		},
+	},
+};
+
+interface PauseCopyParts {
+	resetDay: string;
+	subject: string;
+}
+
 interface BudgetExhaustedAlertProps {
-	/**
-	 * Whose cap tripped. `"shared"` is the shared-model budget the host sets and pays for — the
-	 * workspace admin can't lift it, only move work off it. `"own"` is the workspace's own provider
-	 * cap, which they can raise or remove themselves.
-	 */
-	scope: "shared" | "own";
-	/**
-	 * The month's verdict for that cap — selects between "reached" and "can't be checked" copy.
-	 * Optional only so a story can omit it; every production call site passes it.
-	 */
-	verdict?: BudgetVerdict;
-	/**
-	 * ISO `yyyy-MM` month the pause belongs to. Defaults to the current UTC month, which is the only
-	 * month a live pause can be in — it exists so the banner can name the day the pause lifts by
-	 * itself instead of gesturing at "next month".
-	 */
+	scope: CapScope;
+	verdict: BudgetVerdict;
+	/** ISO `yyyy-MM`; defaults to the current UTC month, the only month a live pause can be in. */
 	month?: string;
-	/** Runs with no price on record this month; names the count instead of saying "some". */
 	unpricedEventCount?: number;
-	/**
-	 * Which surface is rendering the banner. It selects the action offered — never a word of the
-	 * sentence: the remedy the current page can perform itself, or a link to the page that owns it.
-	 */
+	/** Selects the action offered, never a word of the sentence. */
 	context: "usage" | "models";
 	workspaceSlug: string;
-	/** Opens the provider-cap editor. Used by `context="usage"`, where that cap is edited. */
 	onEditOwnProviderCap?: () => void;
 }
 
-/**
- * The one owner of the four pause banners: provider cap reached / unenforceable, shared-model budget
- * reached / unverifiable. The usage page and the AI models page both render it, so the sentences
- * cannot drift apart between them.
- *
- * <p>The two caps pause independently, so this is rendered once per paused side and never merges
- * them: a spent shared-model budget leaves work on the workspace's own provider running, and saying
- * otherwise would send the admin to the wrong person.
- */
+/** Rendered by both the AI usage page and the AI models page, once per paused cap. */
 export function BudgetExhaustedAlert({
 	scope,
-	verdict = "EXHAUSTED",
+	verdict,
 	month = currentMonthUtc(),
 	unpricedEventCount,
 	context,
@@ -56,29 +70,17 @@ export function BudgetExhaustedAlert({
 	onEditOwnProviderCap,
 }: BudgetExhaustedAlertProps) {
 	const noPriceSet = verdict === "UNVERIFIABLE";
-	const own = scope === "own";
-	const resetDay = budgetResetDayLabel(month);
+	const copy = PAUSE_COPY[scope][noPriceSet ? "NO_PRICE" : "CAP_REACHED"];
 	return (
-		<Alert variant={own ? "destructive" : "warning"} role="alert">
+		<Alert variant={scope === "own" ? "destructive" : "warning"} role="alert">
 			<TriangleAlert aria-hidden />
-			<AlertTitle>
-				{own
-					? noPriceSet
-						? "Your provider cap can't be enforced"
-						: "Your provider cap is reached"
-					: noPriceSet
-						? "Shared-model spend can't be verified"
-						: "Shared-model budget reached"}
-			</AlertTitle>
+			<AlertTitle>{copy.title}</AlertTitle>
 			<AlertDescription>
 				<p>
-					{own
-						? noPriceSet
-							? `${unpricedSubject(scope, unpricedEventCount)} no price, so the cap can't be checked and your provider is paused. Add a price to resume, or remove the cap.`
-							: `Paused until ${resetDay} (UTC), or until you raise or remove the cap.`
-						: noPriceSet
-							? `${unpricedSubject(scope, unpricedEventCount)} no price, so the budget can't be checked and shared models are paused. Only your host can price them.`
-							: `Paused until ${resetDay} (UTC), or until your host raises the budget. Practice detection and Mentor can keep running on your own models.`}
+					{copy.body({
+						resetDay: budgetResetDayLabel(month),
+						subject: unpricedRunsSubject(scope, unpricedEventCount),
+					})}
 				</p>
 				<PauseAction
 					scope={scope}
@@ -92,12 +94,8 @@ export function BudgetExhaustedAlert({
 	);
 }
 
-/**
- * "1 run on your models has" / "3 shared-model runs have" / "Some runs on your models have".
- *
- * The count is `unpricedEventCount` — runs, not the model calls a run may make several of.
- */
-function unpricedSubject(scope: "shared" | "own", count: number | undefined): string {
+/** "1 run on your models has" / "3 shared-model runs have" / "Some runs on your models have". */
+function unpricedRunsSubject(scope: CapScope, count: number | undefined): string {
 	const own = scope === "own";
 	if (count === 1) {
 		return own ? "1 run on your models has" : "1 shared-model run has";
@@ -110,18 +108,14 @@ function unpricedSubject(scope: "shared" | "own", count: number | undefined): st
 }
 
 interface PauseActionProps {
-	scope: "shared" | "own";
+	scope: CapScope;
 	noPriceSet: boolean;
 	context: "usage" | "models";
 	workspaceSlug: string;
 	onEditOwnProviderCap?: () => void;
 }
 
-/**
- * The remedy, offered in place where the current page owns it and as a link where it does not.
- * Prices are edited on AI models and caps on AI usage, so the usage page opens the cap editor itself
- * and links out for a price, and the models page does the reverse.
- */
+/** Caps are edited on AI usage and prices on AI models, so each page links out for the other. */
 function PauseAction({
 	scope,
 	noPriceSet,
@@ -159,8 +153,8 @@ function PauseAction({
 			</div>
 		);
 	}
-	// Nothing the workspace admin can do about a shared model's missing price, and on the AI models
-	// page the purposes they could switch are already below the banner.
+	// Only the host can price a shared model, and on the models page the purposes to switch are
+	// already below the banner.
 	if (noPriceSet || context === "models") {
 		return null;
 	}

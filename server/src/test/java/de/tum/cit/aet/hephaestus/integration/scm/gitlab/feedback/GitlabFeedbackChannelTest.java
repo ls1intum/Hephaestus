@@ -97,8 +97,7 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
 
     @Test
     void updateSummaryEscapesSlashCommands() {
-        // The edit path must escape just like the create path: a leading slash command in the new body
-        // reaches updateNote's `body` variable backtick-wrapped, so an in-place edit can't smuggle an action.
+        // The edit path must escape just like the create path, or an in-place edit could smuggle an action.
         FeedbackTarget target = gitlabTarget();
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
 
@@ -132,7 +131,6 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
         assertThat(GitlabFeedbackChannel.escapeSlashCommands("Please ask them to /approve it")).isEqualTo(
             "Please ask them to /approve it"
         );
-        // A multi-line body escapes each line-start command independently.
         assertThat(GitlabFeedbackChannel.escapeSlashCommands("/approve\n/merge")).isEqualTo("`/approve`\n`/merge`");
     }
 
@@ -160,9 +158,8 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
 
     @Test
     void postSummaryWrapsTransportErrorAsFeedbackDeliveryException() {
-        // A transport/timeout RuntimeException from .block() must surface as the channel's typed exception
-        // (consistent with updateSummary) so PullRequestCommentPoster's catch(FeedbackDeliveryException)
-        // wraps it uniformly instead of a raw RuntimeException bypassing that wrap.
+        // Must surface as the channel's typed exception so PullRequestCommentPoster's
+        // catch(FeedbackDeliveryException) wraps it uniformly instead of a raw RuntimeException bypassing that wrap.
         FeedbackTarget target = gitlabTarget();
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         when(mrResolver.resolve(1L, "group/project", 42)).thenReturn(
@@ -208,7 +205,6 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
 
     @Test
     void postSummaryRoutesIssueSubjectToIssueGid() {
-        // An issue subject ("path#iid") resolves the issue gid (not the MR path) and posts via createNote.
         FeedbackTarget issueTarget = new FeedbackTarget(
             new IntegrationRef(IntegrationKind.GITLAB, 1L, null),
             "group/project#7",
@@ -277,7 +273,6 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
             new FeedbackContent("body", "marker")
         );
 
-        // A deleted note → GONE so the caller posts fresh (NOT a throw, NOT a transient double-post).
         assertThat(outcome.kind()).isEqualTo(FeedbackChannel.UpdateOutcome.Kind.GONE);
     }
 
@@ -293,7 +288,6 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
             new FeedbackContent("body", "marker")
         );
 
-        // An unknown vendor error → TRANSIENT: keep the prior summary, do NOT re-post (no double-post).
         assertThat(outcome.kind()).isEqualTo(FeedbackChannel.UpdateOutcome.Kind.TRANSIENT);
     }
 
@@ -314,7 +308,6 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
     @Test
     void updateSummaryThrowsOnBlankExternalId() {
         FeedbackTarget target = gitlabTarget();
-        // A blank id is a data bug, not recoverable — still a hard error (checked before any rate-limit/transport).
         assertThatThrownBy(() -> channel.updateSummary(target, "  ", new FeedbackContent("body", "marker")))
             .isInstanceOf(FeedbackDeliveryException.class)
             .hasMessageContaining("external note id is missing");
@@ -434,8 +427,7 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
         ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), MARKER);
 
         assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.FOUND);
-        // The handle must be the NOTE's own global id — that is exactly what updateSummary passes to
-        // UpdateNote as `id`, so a FOUND handle is directly usable for an in-place edit.
+        // The handle is the note's own global id — exactly what updateSummary passes to UpdateNote as `id`.
         assertThat(result.handle().externalId()).isEqualTo("gid://gitlab/Note/2");
     }
 
@@ -477,7 +469,6 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
 
     @Test
     void findExistingSummary_pageBudgetExhaustedWithOlderNotesLeft_isUnknown_notAbsent() {
-        // hasPreviousPage=true on every page, all the way to the budget — absence is never confirmed.
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
         ClientGraphQlResponse page = mockMrNotesPage(
@@ -495,8 +486,6 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
 
     @Test
     void findExistingSummary_blankStartCursorWithOlderNotesLeft_isUnknown_notAbsent() {
-        // Older notes remain but the cursor to reach them is missing — the walk cannot continue and cannot
-        // claim the marker is gone.
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
         ClientGraphQlResponse page = mockMrNotesPage(List.of(note("gid://gitlab/Note/1", "unrelated")), true, "  ");
@@ -510,7 +499,6 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
 
     @Test
     void findExistingSummary_secondPageHasTheMatch_isFound() {
-        // The scan must follow the startCursor backwards into an older page, not stop at the newest one.
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
         ClientGraphQlResponse page1 = mockMrNotesPage(
@@ -525,14 +513,13 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
 
         assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.FOUND);
         assertThat(result.handle().externalId()).isEqualTo("gid://gitlab/Note/2");
-        // The older page must be requested with the previous page's startCursor as `before`.
         verify(spec).variable(eq("before"), eq("cursor-1"));
     }
 
     @Test
     void findExistingSummary_topLevelGraphQlError_isUnknown_notAbsent() {
-        // The page carries a complete, match-free, fully-scanned body AND an error: the error alone is what
-        // must stop this from reading as a confirmed absence.
+        // The page itself is a complete, match-free, fully-scanned body — the error alone must stop this from
+        // reading as a confirmed absence.
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
         ResponseError error = mock(ResponseError.class);
@@ -604,7 +591,6 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
 
     @Test
     void findExistingSummary_mergeRequestSubject_usesTheMergeRequestDocument() {
-        // The mirror of the issue case: a "!iid" subject must NOT be routed to the issue document.
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient client = mock(HttpGraphQlClient.class);
         HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
@@ -642,7 +628,6 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
 
     @Test
     void findExistingSummary_blankMarker_isUnknown() {
-        // No marker to match means nothing can be confirmed either way — never a licence to post.
         ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), "  ");
 
         assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.UNKNOWN);

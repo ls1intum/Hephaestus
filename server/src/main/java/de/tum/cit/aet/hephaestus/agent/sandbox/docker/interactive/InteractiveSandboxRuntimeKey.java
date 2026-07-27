@@ -29,9 +29,8 @@ record InteractiveSandboxRuntimeKey(
             .inputFiles()
             .entrySet()
             .stream()
-            // Both are cold-start snapshots. A warm runner owns the authoritative session, while
-            // per-turn context is refreshed through its fetch_context callback. Neither changes
-            // the frozen runtime and neither should restart the container on every turn.
+            // Excluded because both are cold-start snapshots a warm runner refreshes for itself;
+            // including them would restart the container on every turn.
             .filter(
                 entry ->
                     !entry.getKey().startsWith(SandboxLayout.SESSIONS_DIR_PREFIX) &&

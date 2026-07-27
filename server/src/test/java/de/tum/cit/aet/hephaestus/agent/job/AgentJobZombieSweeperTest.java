@@ -253,9 +253,8 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
             assertThat(sample.getValue().sourceAttempt()).isZero();
         }
 
-        // A job that never began executing carries no attributable spend. Both sweeps reach that
-        // through the same guard in recordUnverifiableUsage, asserted by
-        // ReapStaleRunning#shouldReapAJobStillInPreparationWithoutAttributingUsage.
+        // A job that never began executing carries no attributable spend — both sweeps reach that
+        // through the same guard in recordUnverifiableUsage.
 
         @Test
         @DisplayName("legacy jobs without an admission snapshot are recovered as explicitly unpriced")
@@ -376,7 +375,6 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
         }
     }
 
-    /** recoverStuckDeliveries — see AgentJobLifecycleServiceTest for the delivery attempt itself. */
     @Nested
     @DisplayName("recoverStuckDeliveries")
     class RecoverStuckDeliveries {

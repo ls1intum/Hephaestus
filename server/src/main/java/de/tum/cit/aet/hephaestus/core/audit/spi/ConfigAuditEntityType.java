@@ -14,18 +14,12 @@ public enum ConfigAuditEntityType {
     /** Which model, with what limits, runs practice detection / the mentor for a workspace. */
     AGENT_BINDING,
     /**
-     * Historical only. The named-agent-config aggregate this described no longer exists — per-purpose
-     * bindings replaced it; the value survives so rows recording what an operator once did to it keep
-     * rendering. Nothing writes it.
+     * Historical only. {@code trg_config_audit_event_block_mutation} makes this table append-only, so
+     * values no longer written still have to be readable: rewriting an old row to the current spelling is
+     * the exact mutation that trigger exists to refuse.
      */
     AGENT_CONFIG,
-    /**
-     * Historical only — the earlier spelling of {@link #AGENT_BINDING}. Rows written under the old
-     * name keep it: {@code trg_config_audit_event_block_mutation} makes this table append-only, so
-     * rewriting them to the current spelling is the exact mutation that trigger exists to refuse.
-     * Nothing writes this value any more; the UI renders it with the same label as
-     * {@link #AGENT_BINDING}.
-     */
+    /** Historical only — the earlier spelling of {@link #AGENT_BINDING}. See {@link #AGENT_CONFIG}. */
     AI_CONFIG_BINDING,
     /**
      * A member's role or roster visibility. Covers admin-initiated grants, changes and removals, and
@@ -46,28 +40,19 @@ public enum ConfigAuditEntityType {
     /** A practice being activated or deactivated, which gates whether it is reviewed at all. */
     PRACTICE_ACTIVE,
 
-    /**
-     * A workspace's monthly cap on HOST-funded LLM spend. Set by instance admins, and it gates whether
-     * detection and mentor turns run at all once spend reaches it — so "who raised this workspace's
-     * cap, and when" is exactly the accountability question this trail answers.
-     */
+    /** A workspace's monthly cap on HOST-funded LLM spend. Set by instance admins. */
     WORKSPACE_INSTANCE_LLM_BUDGET,
     /** A workspace's own cap on spend through its own connected provider. Set by its own admins. */
     WORKSPACE_OWN_PROVIDER_LLM_BUDGET,
-    /**
-     * Historical only — the earlier spellings of the two values above. Retained for the same reason as
-     * {@link #AI_CONFIG_BINDING}: this trail is append-only at the database level, so old rows keep the
-     * vocabulary they were written in. Nothing writes them.
-     */
+    /** Historical only — the earlier spellings of the two values above. See {@link #AGENT_CONFIG}. */
     WORKSPACE_LLM_BUDGET,
     /** Historical only — see {@link #WORKSPACE_LLM_BUDGET}. */
     WORKSPACE_BYO_LLM_BUDGET,
 
     /**
-     * A workspace's own "bring your own" LLM provider connection: the endpoint the workspace
-     * owns the key and the bill for. Workspace-admin-owned and tenant-scoped, unlike the instance
-     * catalog (which is GLOBAL and therefore audited on {@code auth_event} instead — this port cannot
-     * carry a null {@code workspace_id}).
+     * A workspace's own "bring your own" LLM provider connection. Tenant-scoped, unlike the instance
+     * catalog, which is GLOBAL and therefore audited on {@code auth_event} instead — this port cannot
+     * carry a null {@code workspace_id}.
      */
     WORKSPACE_LLM_CONNECTION,
     /** A model on a workspace's own BYO connection, including its inline price and enablement. */

@@ -11,8 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Loads on every runtime role, because the workspace BYO gate consumes it. {@link LlmSettingsAudit} is
- * therefore taken as an {@link ObjectProvider}: its sole implementation is
- * {@code @ConditionalOnServerRole}, and a hard dependency would fail the context on worker/webhook.
+ * therefore taken as an {@link ObjectProvider} — a hard dependency on its server-role-only
+ * implementation would fail the context on worker and webhook.
  */
 @Service
 @RequiredArgsConstructor
@@ -31,9 +31,6 @@ public class InstanceLlmSettingsService {
 
     @Transactional
     public InstanceLlmSettings update(UpdateInstanceLlmSettingsRequestDTO request) {
-        // Locked read: one row, two independently patchable fields, two admins. See the repository
-        // method for why an unlocked read-modify-write can silently re-enable workspace-supplied
-        // providers after another admin disabled them.
         InstanceLlmSettings settings = settingsRepository
             .findByIdForUpdate(SINGLETON_ID)
             .orElseGet(() -> {

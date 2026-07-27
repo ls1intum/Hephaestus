@@ -14,12 +14,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
- * Sole append path for the unified LLM usage ledger.
- *
- * <p>The caller supplies the price frozen at admission; completion never consults a mutable catalog and
- * never trusts a provider-reported model name for pricing. The insert participates in the caller's result
- * transaction, so accounting failure rolls that result back. Only an exact duplicate source attempt is
- * ignored by PostgreSQL's {@code ON CONFLICT DO NOTHING}.
+ * Sole append path for the LLM usage ledger. The caller supplies the price frozen at admission;
+ * completion never consults a mutable catalog and never trusts a provider-reported model name for
+ * pricing. The insert participates in the caller's result transaction, so accounting failure rolls that
+ * result back.
  */
 @Service
 public class LlmUsageRecorder {
@@ -63,40 +61,39 @@ public class LlmUsageRecorder {
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void recordUnverifiable(Long workspaceId, LlmUsageSample sample) {
-        LlmPriceSnapshot admitted = sample.price();
-        LlmPriceSnapshot unverifiable = new LlmPriceSnapshot(
-            admitted.fundingSource(),
-            PricingState.UNPRICED,
-            admitted.appliedPriceId(),
-            admitted.appliedWorkspaceModelId(),
-            admitted.per1mInputUsd(),
-            admitted.per1mOutputUsd(),
-            admitted.per1mCacheReadUsd(),
-            admitted.per1mCacheWriteUsd()
-        );
-        if (persist(workspaceId, sample, unverifiable)) {
+        if (persist(workspaceId, sample, asUnpriced(sample.price()))) {
             meterRegistry.counter("llm.usage.unverifiable").increment();
         }
     }
 
-    private boolean persist(Long workspaceId, LlmUsageSample sample, LlmPriceSnapshot price) {
-        if (
+    /** A rate the frozen price is missing cannot be charged, so the whole event stops being priced. */
+    private static boolean isPricedWithARateMissing(LlmUsageSample sample, LlmPriceSnapshot price) {
+        return (
             price.pricingState() == PricingState.PRICED &&
             ((sample.inputTokens() > 0 && price.per1mInputUsd() == null) ||
                 (sample.outputTokens() > 0 && price.per1mOutputUsd() == null) ||
                 (sample.cacheReadTokens() > 0 && price.per1mCacheReadUsd() == null) ||
                 (sample.cacheWriteTokens() > 0 && price.per1mCacheWriteUsd() == null))
-        ) {
-            price = new LlmPriceSnapshot(
-                price.fundingSource(),
-                PricingState.UNPRICED,
-                price.appliedPriceId(),
-                price.appliedWorkspaceModelId(),
-                price.per1mInputUsd(),
-                price.per1mOutputUsd(),
-                price.per1mCacheReadUsd(),
-                price.per1mCacheWriteUsd()
-            );
+        );
+    }
+
+    /** Keeps the frozen rates: they still say what the attempt would have cost. */
+    private static LlmPriceSnapshot asUnpriced(LlmPriceSnapshot price) {
+        return new LlmPriceSnapshot(
+            price.fundingSource(),
+            PricingState.UNPRICED,
+            price.appliedPriceId(),
+            price.appliedWorkspaceModelId(),
+            price.per1mInputUsd(),
+            price.per1mOutputUsd(),
+            price.per1mCacheReadUsd(),
+            price.per1mCacheWriteUsd()
+        );
+    }
+
+    private boolean persist(Long workspaceId, LlmUsageSample sample, LlmPriceSnapshot price) {
+        if (isPricedWithARateMissing(sample, price)) {
+            price = asUnpriced(price);
         }
         LlmPriceSnapshot.Cost computed = price.calculateCost(
             sample.inputTokens(),
@@ -150,11 +147,7 @@ public class LlmUsageRecorder {
     }
 
     /**
-     * A ledger amount that is not what the frozen rates produced is stated out loud. Both directions
-     * are rare enough to be worth a WARN: the low one over-bills by a fraction of a cent, the high one
-     * under-bills without limit and would make every budget check downstream read low.
-     *
-     * <p>Emitted before the insert, so the signal survives a failed write — a clamp is a fact about the
+     * Emitted before the insert, so the signal survives a failed write — a clamp is a fact about the
      * price and the token counts, not about whether the row landed.
      */
     private void reportClamp(LlmUsageSample sample, LlmPriceSnapshot.Cost computed) {
@@ -199,12 +192,8 @@ public class LlmUsageRecorder {
     }
 
     /**
-     * WARN once, on the event that took the instance-funded purse over its cap — the crossing, not the
-     * state, so a month that stays exhausted does not log on every subsequent event.
-     *
-     * <p>Reads the same {@link LlmBudgetService#headroom} the gates read rather than summing the month
-     * itself: an uncapped workspace then costs no query at all, and the amount named in the log is by
-     * construction the amount that paused the workspace.
+     * WARNs on the crossing, not the state, so a month that stays exhausted does not log on every
+     * subsequent event.
      */
     private void alertIfBudgetCrossed(Long workspaceId, BigDecimal eventCost) {
         LlmBudgetHeadroom headroom = budgetService.headroom(workspaceId);

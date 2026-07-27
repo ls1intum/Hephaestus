@@ -123,8 +123,6 @@ export function AdminTeamsTable({
 		return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
 	};
 
-	// Every other admin page opens with its own <h1>; this one is reached from the sidebar's "Teams"
-	// entry, so it names itself with the same word rather than leaving the page unlabelled.
 	const heading = (
 		<div>
 			<h1 className="text-3xl font-bold tracking-tight">Teams</h1>

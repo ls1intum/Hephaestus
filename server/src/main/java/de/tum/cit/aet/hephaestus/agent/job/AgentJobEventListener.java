@@ -29,21 +29,9 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * <p>Uses {@code @Async @TransactionalEventListener(AFTER_COMMIT)} to avoid blocking the webhook
  * processing thread and to ensure entities are committed before we read them.
  *
- * <p>Each handler follows a layered filtering strategy:
- * <ol>
- *   <li><b>Listener pre-checks</b> (data validity): sync events, closed/merged state, entity
- *       existence, branch info — cheap checks that reject invalid events before any DB work.</li>
- *   <li><b>Detection gate</b> (business policy): labels, drafts, workspace resolution, agent
- *       config, practice matching by trigger events, user roles — the full 9-step gate that
- *       decides whether practices warrant an agent review.</li>
- * </ol>
- *
- * <p><b>Transaction design:</b> Each handler runs in a {@code REQUIRES_NEW} transaction.
- * The gate's repository calls join this transaction, so the role lookup (gate steps 8–9)
- * holds the DB connection. This is acceptable because: the role check is a local
- * {@code account_feature} DB lookup (no external call), {@code @Async} prevents blocking the
- * webhook thread, and {@code runForAllUsers=true} skips the role check entirely.
- * See {@link PracticeReviewDetectionGate} for the standalone contract.
+ * <p>Filtering is layered: this listener rejects events that are not valid data (sync replays,
+ * terminal-state PRs, missing entity or branch info) before any policy is consulted, and
+ * {@link PracticeReviewDetectionGate} decides whether the workspace actually wants a review.
  *
  * <p>Only active when the agent job queue is enabled.
  */
@@ -95,13 +83,6 @@ public class AgentJobEventListener {
         handleReviewEvent(event.review(), event.context());
     }
 
-    /**
-     * RETROSPECTIVE trigger: the PR landed. Unlike the create/ready/sync handlers, this one runs
-     * <em>because</em> the PR is merged — MERGED is its expected terminal state, so it routes through the
-     * gate via {@link #handleRetrospectivePullRequestEvent} instead of {@code handlePullRequestEvent}
-     * (which short-circuits on closed/merged). A merged PR keeps its stored head/base refs and head SHA,
-     * and the handler resolves the diff from the merge commit's parent, so cloning still works post-merge.
-     */
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -114,18 +95,15 @@ public class AgentJobEventListener {
     }
 
     /**
-     * RETROSPECTIVE trigger: the PR was closed. On a MERGE the processors publish BOTH
-     * {@code PullRequestClosed(wasMerged=true)} AND {@code PullRequestMerged}; the merge path is owned by
-     * {@link #onPullRequestMerged}, so this handler returns early when {@code wasMerged} is true to avoid
-     * double-firing the gate for the same landing. It routes only the abandoned-close case
-     * ({@code wasMerged=false}) under {@code PULL_REQUEST_CLOSED}.
+     * A merge publishes BOTH {@code PullRequestClosed(wasMerged=true)} and {@code PullRequestMerged}, so
+     * this handler routes only the abandoned-close case and leaves the landing to
+     * {@link #onPullRequestMerged}.
      */
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestClosed(ScmDomainEvent.PullRequestClosed event) {
         if (event.wasMerged()) {
-            // The merge is handled by onPullRequestMerged; closing-as-merged here would duplicate the job.
             return;
         }
         handleRetrospectivePullRequestEvent(
@@ -142,30 +120,26 @@ public class AgentJobEventListener {
         EventContext context,
         String triggerEventName
     ) {
-        // 1. Skip sync events — agent reviews are for real-time activity only
+        // Agent reviews are for real-time activity only.
         if (context.isSync()) {
             return;
         }
 
-        // 2. Skip closed/merged PRs — event validity, not the gate's concern
-        if (prData.state() == Issue.State.CLOSED || prData.state() == Issue.State.MERGED || prData.isMerged()) {
+        if (isClosedOrMerged(prData.state(), prData.isMerged())) {
             return;
         }
 
         try {
-            // 3. Fetch entity with all associations needed by the gate
             PullRequest pr = pullRequestRepository.findByIdWithAllForGate(prData.id()).orElse(null);
             if (pr == null) {
                 log.warn("Cannot submit agent job: PR not found, prId={}", prData.id());
                 return;
             }
 
-            // 4. Validate branch info (headRefOid is null for GitLab webhooks)
             if (!hasBranchInfo(pr, prData.id())) {
                 return;
             }
 
-            // 5. Evaluate practice detection gate (workspace-aware business policy)
             switch (practiceReviewDetectionGate.evaluate(pr, triggerEventName, TriggerMode.AUTO)) {
                 case GateDecision.Skip skip -> log.debug(
                     "Agent job skipped by practice gate: prNumber={}, repoName={}, event={}, reason={}",
@@ -190,22 +164,18 @@ public class AgentJobEventListener {
     // Retrospective PR event handling (merged / closed-without-merge)
 
     /**
-     * Routes a terminal-state PR event through the same gate as the live handlers, but WITHOUT the
-     * closed/merged short-circuit — closed/merged IS the expected state here. Sync events are still
-     * skipped: a sync replays history en masse and would fire a retrospective review for every PR the
-     * repository ever merged, so retrospective detection is for real-time terminal transitions only.
+     * Routes a terminal-state PR event through the same gate as the live handlers, deliberately without
+     * their closed/merged short-circuit: here the terminal state IS the trigger's reason to run.
      */
     private void handleRetrospectivePullRequestEvent(
         ScmEventPayload.PullRequestData prData,
         EventContext context,
         String triggerEventName
     ) {
-        // 1. Skip sync events — a sync would replay EVERY historical merge as a fresh retrospective review.
+        // A sync would replay EVERY historical merge as a fresh retrospective review.
         if (context.isSync()) {
             return;
         }
-
-        // NOTE: intentionally NO closed/merged skip — the terminal state is this trigger's reason to run.
 
         try {
             PullRequest pr = pullRequestRepository.findByIdWithAllForGate(prData.id()).orElse(null);
@@ -214,10 +184,8 @@ public class AgentJobEventListener {
                 return;
             }
 
-            // A merged PR retains its stored head/base refs + head SHA; the handler resolves the diff from
-            // the merge commit's parent, so the clone target (head SHA, reachable via the merge commit) is
-            // still valid. We keep the branch-info guard: if those fields were never captured, there is
-            // nothing to clone or diff against.
+            // A merged PR keeps its stored refs, so the guard still holds post-merge: without them there
+            // is nothing to clone or diff against.
             if (!hasBranchInfo(pr, prData.id())) {
                 return;
             }
@@ -246,13 +214,12 @@ public class AgentJobEventListener {
     // Review event handling
 
     private void handleReviewEvent(ScmEventPayload.ReviewData reviewData, EventContext context) {
-        // 1. Skip sync events
         if (context.isSync()) {
             return;
         }
 
         try {
-            // 2. Fetch PR entity (ReviewSubmitted carries ReviewData, not PullRequestData)
+            // ReviewSubmitted carries ReviewData, not PullRequestData, so the PR is loaded here.
             PullRequest pr = pullRequestRepository.findByIdWithAllForGate(reviewData.pullRequestId()).orElse(null);
             if (pr == null) {
                 log.warn(
@@ -263,17 +230,15 @@ public class AgentJobEventListener {
                 return;
             }
 
-            // 3. Skip closed/merged — reviews can arrive on merged PRs (drive-by reviews)
-            if (pr.getState() == Issue.State.CLOSED || pr.getState() == Issue.State.MERGED || pr.isMerged()) {
+            // Reviews can arrive on already-merged PRs (drive-by reviews).
+            if (isClosedOrMerged(pr.getState(), pr.isMerged())) {
                 return;
             }
 
-            // 4. Validate branch info
             if (!hasBranchInfo(pr, pr.getId())) {
                 return;
             }
 
-            // 5. Evaluate practice detection gate
             switch (practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.REVIEW_SUBMITTED, TriggerMode.AUTO)) {
                 case GateDecision.Skip skip -> log.debug(
                     "Agent job skipped by practice gate for review: reviewId={}, prId={}, reason={}",
@@ -282,7 +247,6 @@ public class AgentJobEventListener {
                     skip.reason()
                 );
                 case GateDecision.Detect detect -> {
-                    // 6. Construct PullRequestData from entity (ReviewSubmitted does not carry it)
                     ScmEventPayload.PullRequestData prData = ScmEventPayload.PullRequestData.from(pr);
                     submitJob(prData, pr, detect, TriggerEventNames.REVIEW_SUBMITTED);
                 }
@@ -298,6 +262,10 @@ public class AgentJobEventListener {
     }
 
     // Shared helpers
+
+    private static boolean isClosedOrMerged(Issue.State state, boolean merged) {
+        return state == Issue.State.CLOSED || state == Issue.State.MERGED || merged;
+    }
 
     private boolean hasBranchInfo(PullRequest pr, Long prId) {
         if (pr.getHeadRefOid() == null || pr.getHeadRefName() == null || pr.getBaseRefName() == null) {

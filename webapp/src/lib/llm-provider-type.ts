@@ -1,8 +1,6 @@
 /**
- * Create-time presets for the two OpenAI wire APIs supported by Hephaestus.
- *
- * Presets are presentation only. Persisted connections keep only their endpoint, protocol and
- * credential shape, so the runtime stays provider-neutral and OpenAI-compatible.
+ * Create-time presets, presentation only: a persisted connection keeps its endpoint, protocol and
+ * credential shape but not the preset it was seeded from.
  */
 export type ProviderPreset = "OPENAI" | "AZURE_OPENAI_V1" | "OTHER";
 export type LlmAuthMode = "BEARER" | "API_KEY";
@@ -57,12 +55,12 @@ export interface OpenAiConnectionIdentity {
 	baseUrl: string;
 }
 
-/** Only recognizes OpenAI itself. Azure remains a create-time convenience, not inferred domain state. */
+/** Deliberately does not recognise Azure: nothing persisted distinguishes it from any other host. */
 export function presetForConnection(connection: OpenAiConnectionIdentity): ProviderPreset {
 	try {
 		if (new URL(connection.baseUrl).hostname.toLowerCase() === "api.openai.com") return "OPENAI";
 	} catch {
-		// Invalid legacy URLs remain editable as generic OpenAI-compatible endpoints.
+		// An unparseable stored URL stays editable as a generic endpoint.
 	}
 	return "OTHER";
 }

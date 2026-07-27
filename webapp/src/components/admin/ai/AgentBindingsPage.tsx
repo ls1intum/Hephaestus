@@ -48,26 +48,15 @@ const PURPOSES: PurposeMeta[] = [
 	},
 ];
 
-/** The purpose vocabulary as words, for anything that has to name a purpose outside this page. */
 export const PURPOSE_TITLES: Record<Purpose, string> = Object.fromEntries(
 	PURPOSES.map((meta) => [meta.purpose, meta.title]),
 ) as Record<Purpose, string>;
 
-/**
- * The range the server accepts for a per-run timeout. Both ends are stated here as well as on the
- * server, because the generated client carries the bound only as prose in a doc comment on
- * `AgentBindingRequest.timeoutSeconds` — there is no value to read. Keep in step with
- * `AgentBindingLimits` on the server if either end moves.
- */
+/** Mirrors `AgentBindingLimits` on the server, which the generated client carries only as prose. */
 const MIN_TIMEOUT_SECONDS = 30;
 const MAX_TIMEOUT_SECONDS = 3600;
 const MIN_CONCURRENT_JOBS = 1;
 
-/**
- * The ceiling, with the reason it exists rather than only the number: an hour is how long a run may
- * live before the sweep that reclaims abandoned runs closes it, so a longer timeout would never be
- * honoured.
- */
 const TIMEOUT_CEILING = {
 	max: MAX_TIMEOUT_SECONDS,
 	error: `Runs stop after an hour, so enter ${MAX_TIMEOUT_SECONDS} seconds or less.`,
@@ -85,16 +74,10 @@ function bindingToSelection(binding?: AgentBinding): ModelSelection | null {
  * collapsing to `Number("") === 0` and silently saving a zero.
  */
 interface ParsedNumber {
-	/** The value to submit, or `null` while the text isn't a usable number. */
 	value: number | null;
-	/** Why the text isn't usable — rendered as this field's `FieldError`, never as a toast. */
 	error: string | null;
 }
 
-/**
- * @param ceiling The upper bound, for a field that has one, carrying its own message: a range on its
- * own ("at most 3600") tells an admin nothing about why they cannot have more.
- */
 function parseWholeNumber(
 	raw: string,
 	min: number,

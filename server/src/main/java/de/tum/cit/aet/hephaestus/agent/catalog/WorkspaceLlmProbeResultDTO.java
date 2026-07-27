@@ -5,10 +5,8 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Workspace-framed "Test connection" result: answers only "does my key work?" — {@code
- * reachable} plus how many models the provider listed. Deliberately narrower than {@link
- * LlmProbeResultDTO}: the raw model id list is never surfaced to a workspace admin, only the count (see
- * the LLM-config glossary: "Connected — N models available", never a raw dump).
+ * Workspace-framed "Test connection" result. Deliberately narrower than {@link LlmProbeResultDTO}: a
+ * workspace admin sees the model count, never the provider's raw model id list.
  */
 @Schema(description = "Result of testing your AI provider connection")
 public record WorkspaceLlmProbeResultDTO(

@@ -15,16 +15,12 @@ export interface TablePaginationProps {
 	className?: string;
 }
 
-/** At or below this many pages every page gets its own token and no window is needed. */
 const WINDOW_THRESHOLD = 7;
 
 /**
- * Windowed page tokens: first, last, current ±1, with "ellipsis" gaps between.
- *
- * A gap of exactly one page renders that page instead of an ellipsis. At eight pages on page four
- * the window is `1 _ 3 4 5 _ 8`, and an ellipsis in the first hole stands for page 2 alone — wider
- * on screen than the number it replaces, and unclickable where the number is not. Filling it costs
- * one token and only ever in this shape, since a hole of two or more still elides.
+ * Windowed page tokens: first, last, current ±1, with "ellipsis" gaps between. A gap of exactly one
+ * page renders that page instead — an ellipsis standing for a single number is wider than the
+ * number it replaces, and unclickable where the number is not.
  */
 function paginationItems(current: number, total: number): (number | "ellipsis")[] {
 	if (total <= WINDOW_THRESHOLD) {
@@ -49,17 +45,11 @@ function paginationItems(current: number, total: number): (number | "ellipsis")[
 }
 
 /**
- * The one pager for a table that changes pages by calling back rather than by navigating, whether
- * the paging happens on the client or on the server.
+ * The pager for a table that changes pages by calling back rather than by navigating.
  *
- * Every control is a `<button disabled>`, not a styled `<a>`: the kit's `PaginationLink` is an anchor
- * for href-driven pagination, and an anchor with no `href` is neither focusable nor announced as a
- * control — dimming it with `pointer-events-none` leaves it reachable by keyboard and reported to a
- * screen reader as enabled, which is the WCAG 2.2 SC 4.1.2 failure the native `disabled` attribute
- * exists to avoid. This is the shape the shadcn data-table guide uses for action pagination.
- *
- * The numbered tokens also carry `aria-current="page"`, so a caller needs no separate "Page N of M"
- * line to say where the reader is.
+ * Every control is a `<button disabled>` rather than the kit's `PaginationLink`, which is an anchor:
+ * an `href`-less anchor dimmed with `pointer-events-none` stays in the tab order and is still
+ * announced as an available control (WCAG 2.2 SC 4.1.2).
  */
 export function TablePagination({
 	page,
@@ -73,11 +63,7 @@ export function TablePagination({
 
 	return (
 		<Pagination className={className}>
-			{/* The windowed pager fits one line at default text size (~206 px at a 320 px viewport), so
-			    this is not about the reflow width. It is about SC 1.4.4 Resize Text: the targets are
-			    `rem`-sized, so text-only zoom grows them while the viewport stays put, and past ~150 %
-			    they no longer fit. Wrapping absorbs that instead of pushing the page into horizontal
-			    scrolling. `justify-center` keeps the wrapped rows aligned with the nav. */}
+			{/* Wrapping absorbs text-only zoom (WCAG 2.2 SC 1.4.4) instead of scrolling horizontally. */}
 			<PaginationContent className="flex-wrap justify-center gap-y-1">
 				<PaginationItem>
 					<Button

@@ -89,10 +89,8 @@ class AgentBindingServiceTest extends BaseUnitTest {
         // Availability is checked by the resolver, not re-implemented here.
         verify(llmModelResolver).resolve(any(WorkspaceAgentBinding.class));
 
-        // Mirrors the delete-path assertion below: the audit row must name the purpose that was bound
-        // and the model it was now bound to, with a `before` that shows nothing was bound. The two
-        // model columns are interchangeable in shape but not in meaning — an entry that filed the id
-        // under workspaceModelId would claim the workspace pays for a model the instance owns.
+        // The two model columns are interchangeable in shape but not in meaning — an entry that filed
+        // the id under workspaceModelId would claim the workspace pays for a model the instance owns.
         ArgumentCaptor<ConfigAuditEntry> entry = ArgumentCaptor.forClass(ConfigAuditEntry.class);
         verify(configAudit).record(entry.capture());
         assertThat(entry.getValue().entityType()).isEqualTo(ConfigAuditEntityType.AGENT_BINDING);

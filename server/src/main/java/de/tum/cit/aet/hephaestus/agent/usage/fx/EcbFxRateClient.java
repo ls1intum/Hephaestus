@@ -25,9 +25,8 @@ import org.w3c.dom.NodeList;
  * foreign units per ONE euro, so the USD entry reads {@code 1.1377} = "1 EUR buys 1.1377 USD"; that
  * direction is stored verbatim and inverted once, on read, in {@link FxRateInfoDTO#fromEcbRate}.
  *
- * <p><b>Contract: this client never throws.</b> A timeout, a 5xx, an unparseable body or a missing USD
- * entry all come back as {@link Optional#empty()}, so a display-only nicety cannot fail a scheduled
- * tick and the last stored rate simply stays in place.
+ * <p>Never throws: every failure comes back as {@link Optional#empty()}, so a display-only nicety
+ * cannot fail a scheduled tick and the last stored rate simply stays in place.
  */
 @Component
 @WorkspaceAgnostic("Public reference rates are instance-wide reference data, not tenant data")
@@ -40,11 +39,9 @@ public class EcbFxRateClient {
     private final RestClient restClient;
     private final String dailyUrl;
 
-    /** The URL is overridable so an air-gapped instance can point at a local mirror. */
     public EcbFxRateClient(LlmProperties llmProperties) {
         this.dailyUrl = llmProperties.fx().dailyUrl();
-        // Its own short-timeout client: a slow ECB must never hold a scheduler thread, and this shares
-        // no configuration with the LLM proxy or any job-path client.
+        // Its own short-timeout client: a slow ECB must never hold a scheduler thread.
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(TIMEOUT);
         factory.setReadTimeout(TIMEOUT);
@@ -72,8 +69,7 @@ public class EcbFxRateClient {
 
     /**
      * Namespace-agnostic on purpose: the ECB puts {@code Cube} in a default namespace, so matching by
-     * local name survives the ECB renaming or dropping the prefix. External entities and DTDs are
-     * disabled — this is remote XML.
+     * local name survives the ECB renaming or dropping the prefix.
      */
     static Optional<EcbDailyRate> parseUsdRate(String xml) {
         try {

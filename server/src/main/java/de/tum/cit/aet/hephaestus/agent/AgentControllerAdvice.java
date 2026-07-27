@@ -17,20 +17,12 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /**
- * Error mapper for agent-module exceptions: the job lifecycle conflict plus the LLM catalog's
- * conflict types, which the instance- and workspace-scoped connection/model controllers throw alike.
- * Kept in the agent module to avoid a cyclic dependency between agent and workspace, and scoped to
- * this package tree per {@code docs/contributor/api-error-handling.md} — one advice per bounded
- * context, not a second global catch-all.
+ * Error mapper for agent-module exceptions, per {@code docs/contributor/api-error-handling.md}.
  *
- * <p><b>Why every conflict needs an explicit handler here.</b> These are plain
- * {@code RuntimeException}s, and a {@code @ResponseStatus} on the exception class is inert in this
- * application: {@code GlobalControllerAdvice} declares {@code @ExceptionHandler(Exception.class)}, and
- * Spring's {@code ExceptionHandlerExceptionResolver} picks the first {@code @ControllerAdvice} bean
- * (by {@code @Order}) with ANY matching handler, so the catch-all wins before
- * {@link org.springframework.web.servlet.mvc.support.ResponseStatusExceptionResolver} ever runs. An
- * exception with no method below therefore returns 500 no matter what it is annotated with.
- * {@code @Order(HIGHEST_PRECEDENCE)} puts this advice ahead of that fallback.
+ * <p>An agent exception without an explicit handler below returns 500 regardless of any
+ * {@code @ResponseStatus} on it: {@code GlobalControllerAdvice}'s
+ * {@code @ExceptionHandler(Exception.class)} catches it before
+ * {@link org.springframework.web.servlet.mvc.support.ResponseStatusExceptionResolver} can run.
  */
 @RestControllerAdvice(basePackageClasses = AgentControllerAdvice.class)
 @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -71,13 +63,7 @@ public class AgentControllerAdvice {
         );
     }
 
-    /**
-     * Every problem carries a stable {@code type} URI. Left unset, RFC 7807 defines the field as
-     * {@code about:blank}, which makes all six conflicts above indistinguishable to a client that does
-     * not parse English prose out of {@code title}. The {@code /problems/<slug>} shape matches
-     * {@code OutlineCollectionControllerAdvice}; the slug is API surface and must not be renamed
-     * casually.
-     */
+    /** The {@code type} slug is API surface clients match on — renaming one is a breaking change. */
     private ProblemDetail problem(HttpStatus status, String typeSlug, String title, Exception exception) {
         ProblemDetail problem = ProblemDetail.forStatus(status);
         problem.setType(URI.create("/problems/" + typeSlug));

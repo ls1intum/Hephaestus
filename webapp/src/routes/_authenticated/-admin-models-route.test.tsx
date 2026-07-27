@@ -5,18 +5,16 @@ import type { LlmConnection, LlmModel } from "@/api/types.gen";
 import { server } from "@/mocks/server";
 import { renderRouteAt, TRANSFORM_WAIT } from "@/test/router-harness";
 
-// Mounting the real route pulls in the whole admin layout and its lazy modules; observed ~3s alone
-// and over the 5s default when the rest of the suite is competing for the box.
+// Mounting the real route pulls in the whole admin layout and its lazy modules.
 vi.setConfig({ testTimeout: 20_000 });
 
-/** The four queries the page opens with. Any test that needs different answers overrides them after. */
 function mockPage(connections: LlmConnection[] = [], models: LlmModel[] = []) {
 	server.use(
 		http.get("*/admin/llm/connections", () => HttpResponse.json(connections)),
 		http.get("*/admin/llm/models", () => HttpResponse.json(models)),
 		http.get("*/admin/workspaces", () => HttpResponse.json([])),
-		// Without this the settings query falls through to a real fetch, errors, and the policy card's
-		// switch flips from controlled to uncontrolled mid-test — noise, not a finding.
+		// Unmocked this falls through to a real fetch, and the policy card's switch flips from
+		// controlled to uncontrolled mid-test.
 		http.get("*/admin/llm/settings", () =>
 			HttpResponse.json({ allowWorkspaceConnections: true, allowedEgressHosts: "" }),
 		),
@@ -68,11 +66,8 @@ describe("instance AI models route", () => {
 	});
 
 	it("keeps each connection's toggle pending independently when two run at once", async () => {
-		// The confirm closes on click and the PATCH runs in the background, so a second row can be
-		// toggled while the first request is still out — nothing on this page holds the admin still
-		// between the two. Connection 1's PATCH hangs, connection 2's answers at once. A single
-		// "which connection is mutating" id is cleared by 2 settling, which re-enables row 1's switch
-		// while its request is in flight — a second PATCH for a connection that is already off.
+		// The confirm closes on click and the PATCH runs on in the background, so nothing holds the
+		// admin still between two rows.
 		let releaseSlowToggle: (() => void) | undefined;
 		const slowToggle = new Promise<void>((resolve) => {
 			releaseSlowToggle = resolve;
@@ -104,14 +99,12 @@ describe("instance AI models route", () => {
 		await confirmTurnOff("Slow provider");
 		await waitFor(() => expect(slowToggleCalls).toBe(1));
 		await confirmTurnOff("Fast provider");
-		// The fast one settles and the list is refetched.
 		await waitFor(() =>
 			expect(screen.getByRole("switch", { name: "Fast provider" }).getAttribute("aria-busy")).toBe(
 				"false",
 			),
 		);
 
-		// The still-running row reads as busy and refuses input; the settled one is usable again.
 		expect(screen.getByRole("switch", { name: "Slow provider" }).getAttribute("aria-busy")).toBe(
 			"true",
 		);
@@ -127,9 +120,8 @@ describe("instance AI models route", () => {
 	});
 
 	it("lets the access dialog be dismissed while its save is still in flight", async () => {
-		// We set no request timeout, so against a provider that accepts the connection and
-		// never answers, a dialog that refuses to close while `isPending` is a trap: Escape, the close
-		// button and Cancel are all inert while the popup holds focus, and nothing releases it.
+		// We set no request timeout, so against a provider that never answers, a dialog that refuses to
+		// close while `isPending` traps focus with nothing left to release it.
 		let releaseSlowSharing: (() => void) | undefined;
 		const slowSharing = new Promise<void>((resolve) => {
 			releaseSlowSharing = resolve;
@@ -158,8 +150,7 @@ describe("instance AI models route", () => {
 		fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
 
 		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-		// The request was not cancelled, so the row it belongs to stays disabled — dismissing the
-		// dialog gives focus back without opening the door to a second save.
+		// The request was not cancelled, so the row stays disabled: no second save behind the dismissal.
 		expect(
 			(screen.getByRole("button", { name: "Manage access for GPT Test" }) as HTMLButtonElement)
 				.disabled,

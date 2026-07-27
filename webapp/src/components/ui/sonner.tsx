@@ -8,11 +8,7 @@ import {
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 import { useTheme } from "@/integrations/theme";
 
-/**
- * Every toast is announced politely, `toast.error` included: sonner offers no assertive path, so
- * error toasts arrive late rather than urgently — pinned by `toast-politeness.test.tsx`, which
- * fails the day upstream lifts the limitation.
- */
+/** Every toast announces politely, `toast.error` included: sonner exposes no assertive path. */
 const Toaster = ({ ...props }: ToasterProps) => {
 	const { theme = "system" } = useTheme();
 

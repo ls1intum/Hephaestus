@@ -43,15 +43,11 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Integration test for {@link PracticeReviewDetectionGate} exercising real PostgreSQL
- * queries for workspace resolution, practice-detection binding checking, and JSONB practice matching.
+ * Integration test for {@link PracticeReviewDetectionGate} against real PostgreSQL: workspace
+ * resolution, binding existence checks, and JSONB containment queries ({@code triggerEvents @> ?}).
  *
- * <p>Primary integration value: workspace resolver heuristic, the per-purpose binding existence
- * check, and JSONB containment query ({@code triggerEvents @> ?}) against real PostgreSQL.
- *
- * <p>Mocks only the role-check SPI ({@link UserRoleChecker}).
- * Label/draft/assignee checks operate on the in-memory PR object passed to the gate
- * (matching production behavior where the PR is loaded once by the caller).
+ * <p>Mocks only the role-check SPI ({@link UserRoleChecker}); label/draft/assignee checks run
+ * against the in-memory PR object, matching production where the PR is loaded once by the caller.
  */
 class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
 
@@ -127,7 +123,6 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
         workspaceModel.setEnabled(true);
         workspaceModel = workspaceLlmModelRepository.save(workspaceModel);
 
-        // Enabled practice-detection binding backed by a live catalog model.
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
         binding.setWorkspace(workspace);
         binding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
@@ -154,7 +149,6 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
         repo.setDefaultBranch("main");
         repo = repositoryRepository.save(repo);
 
-        // Mock role checker: healthy + assignee has role
         when(userRoleChecker.isHealthy()).thenReturn(true);
         // Role is resolved by the stable (gitProviderId, subject) identity; subject == User.nativeId.
         when(userRoleChecker.hasRole(anyLong(), eq(String.valueOf(assignee.getNativeId())), anyString())).thenReturn(
@@ -289,7 +283,6 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
             GateDecision decision = gate.evaluate(pr, "PullRequestCreated", TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            // No runnable practice config → gate skips before detection.
             assertThat(((GateDecision.Skip) decision).reason()).contains("no runnable practice-detection agent");
         }
 
@@ -348,7 +341,6 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
         void skipsUnresolvableWorkspace() {
             createPractice("orphan", "Orphan", List.of("PullRequestCreated"), true);
 
-            // Create a repo with unknown owner
             Repository unknownRepo = new Repository();
             unknownRepo.setNativeId(3099L);
             unknownRepo.setProvider(provider);

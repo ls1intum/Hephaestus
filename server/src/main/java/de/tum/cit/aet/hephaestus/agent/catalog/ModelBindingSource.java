@@ -4,10 +4,8 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Something that binds a workspace to exactly one catalog model plus an enabled flag — the
- * shape {@link LlmModelResolver} and {@code LlmAdmissionService} need to resolve and admit a model,
- * without depending on {@code agent.config}. The only implementor is the per-purpose
- * {@code WorkspaceAgentBinding}. Exactly one of the two model getters is non-null for a usable
+ * Binds a workspace to exactly one catalog model — the shape {@link LlmModelResolver} needs without
+ * depending on {@code agent.config}. Exactly one of the two model getters is non-null for a usable
  * binding.
  */
 public interface ModelBindingSource {

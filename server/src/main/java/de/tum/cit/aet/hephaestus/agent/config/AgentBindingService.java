@@ -17,15 +17,11 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Reads and writes each workspace's per-purpose {@link WorkspaceAgentBinding}s — the single
- * source the runtime resolves a model from.
- *
- * older config edits still reach the runtime during the transition; a direct binding write clears the
- * matching pointer so the two never fight.
+ * Reads and writes each workspace's per-purpose {@link WorkspaceAgentBinding}s — the single source
+ * the runtime resolves a model from.
  */
 @Service
 @RequiredArgsConstructor
@@ -40,17 +36,15 @@ public class AgentBindingService {
 
     @Transactional(readOnly = true)
     public List<WorkspaceAgentBinding> getBindings(WorkspaceContext workspaceContext) {
-        // Fetches the model + connection graph: the caller reports readiness per binding, which
-        // resolves those associations after this transaction has closed (see isReady).
+        // Fetch-joins the model + connection graph, which isReady walks after this transaction closes.
         return bindingRepository.findByWorkspaceIdWithModels(workspaceContext.id());
     }
 
     /**
      * True when the binding resolves to an available model right now (UI readiness).
      *
-     * <p>Deliberately NOT transactional: resolve() reports a revoked model by throwing, and catching
-     * that inside a shared transaction would still mark it rollback-only. The binding must therefore
-     * arrive with its model graph already fetched — {@link #getBindings} and the write paths do that.
+     * <p>Deliberately NOT transactional: swallowing the resolver's throw inside a shared transaction
+     * would leave it rollback-only, so the binding must arrive with its model graph already fetched.
      */
     public boolean isReady(WorkspaceAgentBinding binding) {
         if (!binding.isEnabled()) {
@@ -115,11 +109,6 @@ public class AgentBindingService {
             .ifPresent(binding -> {
                 BindingSnapshot before = BindingSnapshot.of(binding);
                 bindingRepository.delete(binding);
-                // DELETED, not UPDATED-to-an-empty-snapshot: ConfigAuditEntry derives the action from
-                // which side is null, so an all-null "after" would file this alongside genuine edits and
-                // read in the audit trail as "someone cleared every field", not "the binding is gone".
-                // Every other delete path in the codebase (workspace role, practice, workspace LLM
-                // model/connection) files DELETED; this one is the same event.
                 configAudit.record(
                     ConfigAuditEntry.deleted(ConfigAuditEntityType.AGENT_BINDING, purpose.name(), workspaceId, before)
                 );
@@ -150,8 +139,10 @@ public class AgentBindingService {
             binding.setWorkspaceModel(model);
             binding.setInstanceModel(null);
         }
-        // Availability (enabled + connection enabled + supported protocol + visibility/grant) is exactly
-        // what the resolver checks; reuse it instead of duplicating the rules.
+        requireModelAvailableToWorkspace(binding);
+    }
+
+    private void requireModelAvailableToWorkspace(WorkspaceAgentBinding binding) {
         try {
             llmModelResolver.resolve(binding);
         } catch (IllegalStateException unavailable) {

@@ -185,7 +185,6 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         AgentJob jobInA = createJob(workspaceA, AgentJobStatus.COMPLETED);
 
-        // Try to access workspace A's job via workspace B — should be 404 (IDOR protection)
         webTestClient
             .get()
             .uri("/workspaces/{slug}/agents/jobs/{id}", workspaceB.getWorkspaceSlug(), jobInA.getId())
@@ -299,7 +298,6 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         AgentJob jobInA = createJob(workspaceA, AgentJobStatus.QUEUED);
 
-        // IDOR protection: cancel workspace A's job via workspace B → 404
         webTestClient
             .post()
             .uri("/workspaces/{slug}/agents/jobs/{id}/cancel", workspaceB.getWorkspaceSlug(), jobInA.getId())

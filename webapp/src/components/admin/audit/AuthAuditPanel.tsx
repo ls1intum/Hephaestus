@@ -47,11 +47,6 @@ export interface AuthAuditPanelProps {
 	resolveWorkspaceName?: (id: number) => string | undefined;
 }
 
-/**
- * The sign-in and account trail: toolbar, CSV export, and table. Sibling of `ConfigAuditPanel` and
- * deliberately the same shape, so the two tabs of the audit log differ in content rather than in
- * how they are operated.
- */
 export function AuthAuditPanel({
 	search,
 	onSearchChange,
@@ -75,13 +70,12 @@ export function AuthAuditPanel({
 		...springPageParams,
 	});
 
-	// Deduped: offset pages over an append-only log re-serve rows written between fetches.
 	const events: AuthEventView[] = dedupeById(
 		listQuery.data?.pages.flatMap((p) => p.content ?? []) ?? [],
 	);
 	const total = listQuery.data?.pages[0]?.totalElements;
-	// From the NARROWED filter, not raw search: a stale link whose enum values no longer exist filters
-	// nothing, so "Reset" and "match the current filters" would both be lying.
+	// From the narrowed filter, not raw search: unrecognised enum values filter nothing, so they must
+	// not count as an active filter.
 	const hasFilter = Boolean(
 		filters.eventType ||
 			filters.result ||

@@ -29,9 +29,6 @@ describe("label mapping", () => {
 		expect(actionLabel("CREATED")).toBe("Created");
 	});
 	it("names which purse a budget row is about, under either spelling", () => {
-		// The two caps are different people's money and are never summed, and this column is the one
-		// place both appear together — a label that said only "AI budget" named neither. The pre-rename
-		// keys are the same purse, so they read the same: the trail is append-only, its labels are not.
 		expect(entityTypeLabel("WORKSPACE_INSTANCE_LLM_BUDGET")).toBe("Shared-model AI budget");
 		expect(entityTypeLabel("WORKSPACE_LLM_BUDGET")).toBe("Shared-model AI budget");
 		expect(entityTypeLabel("WORKSPACE_OWN_PROVIDER_LLM_BUDGET")).toBe("Own-provider AI cap");
@@ -39,8 +36,6 @@ describe("label mapping", () => {
 	});
 
 	it("falls back to the raw value for anything unknown", () => {
-		// A server enum added ahead of the client should still name the thing that changed; only a
-		// genuinely absent value has nothing to show.
 		expect(entityTypeLabel("FUTURE_TYPE")).toBe("FUTURE_TYPE");
 		expect(entityTypeLabel(undefined)).toBe("Unknown");
 		expect(actionLabel(undefined)).toBe("—");
@@ -60,7 +55,6 @@ describe("fieldChanges", () => {
 	});
 
 	it("renders a cleared override as 'not set', not an absent field", () => {
-		// The single most valuable row: admin cleared cooldown back to inherit.
 		const [change] = fieldChanges(
 			entry({
 				changedKeys: ["cooldownMinutes"],
@@ -83,8 +77,6 @@ describe("fieldChanges", () => {
 	});
 
 	it("masks a credential boolean end-to-end through fieldChanges, not just in formatLeaf isolation", () => {
-		// Pins the real bug: fieldChanges must pass the key path to formatLeaf, or llmApiKeySet renders
-		// "false → true". A false-positive guard rides along: publicKey must NOT be masked.
 		expect(
 			fieldChanges(
 				entry({
@@ -222,9 +214,6 @@ describe("actorDisplay", () => {
 					actingActor: { id: 7, displayName: "Grace" },
 				}),
 			),
-			// filterId asserted, not just the names: it drives "show everything this actor did", and pointing
-			// it at the impersonated account instead of the operator would attribute the operator's changes
-			// to their victim — the one misattribution this whole field exists to prevent.
 		).toEqual({
 			kind: "IMPERSONATED",
 			primary: "Grace",
@@ -237,8 +226,6 @@ describe("actorDisplay", () => {
 
 describe("degrading on unusable data", () => {
 	it("treats an unparseable snapshot as absent rather than blanking the row", () => {
-		// oldValue/newValue are JSONB written by an append-only table: if one is ever unreadable the row
-		// still has to say what kind of change it was, not render empty.
 		const broken = entry({ action: "UPDATED", oldValue: "{not json", newValue: "{also not json" });
 		expect(fieldChanges(broken)).toEqual([]);
 		expect(changeSummary(broken)).toBe("");

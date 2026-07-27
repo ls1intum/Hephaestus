@@ -9,20 +9,16 @@ import {
 } from "./reflow";
 
 /**
- * These helpers are only ever run by the Storybook browser tier, where the story's
- * `parameters.viewport.defaultViewport = "reflow"` supplies the narrow window. Nothing in a story
- * file forces that parameter to be present, so the helpers have to be the ones that notice — this
- * suite is what stops the guard from being deleted as redundant.
- *
- * jsdom's default window is 1024 x 768, i.e. exactly the desktop width a story would silently fall
- * back to, which makes it the right harness for the negative case.
+ * Nothing in a story file forces `parameters.viewport.defaultViewport = "reflow"` to be present, so
+ * the helpers have to notice its absence themselves. jsdom's default window is the desktop width a
+ * story would silently fall back to, which makes it the harness for that negative case.
  */
 describe("reflow assertions refuse to run at desktop width", () => {
 	const desktop = () => {
 		expect(window.innerWidth).toBeGreaterThan(REFLOW_WIDTH);
 	};
 
-	/** Passes every *other* assertion in the helpers: tiny, at the origin, inside a 1024 px window. */
+	/** Passes every *other* assertion in the helpers, so only the viewport guard can fail below. */
 	function tinyElement(): HTMLElement {
 		const element = document.createElement("div");
 		document.body.append(element);
@@ -40,7 +36,6 @@ describe("reflow assertions refuse to run at desktop width", () => {
 		await expect(run()).rejects.toThrow(/reflow viewport/);
 	});
 
-	// `expectTargetSize` is deliberately absent from the table: 24 px is 24 px at any width, so it
-	// carries no viewport guard and has nothing to fail here. Its own assertion is exercised by every
-	// story that calls it (`AgentJobsTable`, `AdminInstanceLlmUsageTable`, `AgentActivityPage`).
+	// `expectTargetSize` is absent from the table on purpose: it carries no viewport guard, so there
+	// is nothing here for it to fail.
 });

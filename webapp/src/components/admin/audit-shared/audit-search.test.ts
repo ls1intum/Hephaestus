@@ -10,8 +10,6 @@ import {
 
 describe("day bounds", () => {
 	it("sends the next midnight as the exclusive upper bound", () => {
-		// Not end-of-day: formatISO drops fractional seconds, so 23:59:59 against the server's
-		// `occurred_at < :to` silently discards the range's final second.
 		expect(String(dayEndIso(new Date(2026, 6, 15)))).toMatch(/^2026-07-16T00:00:00/);
 	});
 
@@ -62,7 +60,6 @@ describe("narrowToEnum", () => {
 
 describe("auditSearchSchema", () => {
 	it("opens the log rather than erroring on a hand-typed or stale link", () => {
-		// The page exists to be linked to; validateSearch throwing renders an error screen instead.
 		expect(auditSearchSchema.parse({ tab: "nope", accountId: "abc", from: 5 })).toEqual({
 			tab: "signins",
 			accountId: undefined,
@@ -71,8 +68,6 @@ describe("auditSearchSchema", () => {
 	});
 
 	it("accepts a single value where the API accepts repeated ones", () => {
-		// The server takes `?action=CREATED&action=DELETED`, so a hand-written `?action=CREATED` is the
-		// natural form to try; discarding it would filter nothing while showing no active filter.
 		expect(auditSearchSchema.parse({ action: "CREATED" }).action).toEqual(["CREATED"]);
 	});
 });

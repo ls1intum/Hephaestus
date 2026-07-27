@@ -62,20 +62,15 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Newest-first rows: accounts resolve to names, impersonation is attributed, failures show why. */
 export const Default: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		// Accounts render as human names, not numeric ids (Ada is the subject of two rows).
 		await expect(canvas.getAllByText("Ada Lovelace").length).toBeGreaterThan(0);
-		// Impersonated actions attribute the operator ("via Grace Hopper").
 		await expect(canvas.getAllByText("Grace Hopper").length).toBeGreaterThan(0);
-		// A failure shows its reason (not just a red badge), plus the destructive result badge.
 		await expect(canvas.getByText("Failure")).toBeInTheDocument();
 	},
 };
 
-/** Deleted accounts (no resolved identity) fall back to `#id` so the row stays attributable. */
 export const DeletedAccountFallback: Story = {
 	args: {
 		events: [
@@ -95,19 +90,16 @@ export const DeletedAccountFallback: Story = {
 	},
 };
 
-/** Opening a row reveals the full forensic record (user agent, workspace, pretty-printed details). */
 export const RowDetail: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		const buttons = canvas.getAllByRole("button", { name: /View details/i });
 		await userEvent.click(buttons[0]);
-		// The dialog renders in a portal → query the document, not just the canvas.
 		await expect(await screen.findByText("User agent")).toBeInTheDocument();
 		await expect(screen.getByText("Workspace")).toBeInTheDocument();
 	},
 };
 
-/** Nothing recorded yet — distinct from "your filter matched nothing", and it says what will appear. */
 export const EmptyInitial: Story = {
 	args: { events: [], hasFilter: false },
 	play: async ({ canvasElement }) => {
@@ -117,7 +109,6 @@ export const EmptyInitial: Story = {
 	},
 };
 
-/** A failed/loaded state with no rows under an active filter. */
 export const EmptyWithFilter: Story = {
 	args: { events: [], hasFilter: true },
 	play: async ({ canvasElement }) => {
@@ -126,7 +117,6 @@ export const EmptyWithFilter: Story = {
 	},
 };
 
-/** Error state when the page fails to load. */
 export const ErrorState: Story = {
 	args: { events: [], isError: true },
 	play: async ({ canvasElement }) => {
@@ -135,7 +125,6 @@ export const ErrorState: Story = {
 	},
 };
 
-/** Skeleton rows under the real header, so the column box is reserved and nothing shifts on resolve. */
 export const Loading: Story = {
 	args: { events: [], isLoading: true },
 	play: async ({ canvasElement }) => {
@@ -144,11 +133,6 @@ export const Loading: Story = {
 	},
 };
 
-/**
- * Header and body must declare the same number of columns. Responsive classes applied to `<th>` but
- * not the matching `<td>` silently shift every cell under the wrong header — invisible to a snapshot,
- * and wrong for `scope="col"` too.
- */
 export const ColumnCountMatchesHeader: Story = {
 	args: {},
 	play: async ({ canvasElement }) => {

@@ -102,11 +102,10 @@ class MentorChatServiceTest extends BaseUnitTest {
     private static final UUID THREAD_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
 
     /**
-     * Number of synchronous orchestrator preamble sends that precede the runner event stream:
-     * {@code Start} (1), {@code DataMentorStatus} (2), then the translator's {@code Start} + {@code StartStep}
-     * from Pi's first {@code message_start} (3, 4). A disconnect scheduled at this index lands on the FIRST
-     * mid-stream text chunk (the event-handler thread). Named so the intent survives a preamble refactor —
-     * a raw literal silently moves which frame throws.
+     * Sends before the runner event stream starts: {@code Start}, {@code DataMentorStatus}, then the
+     * translator's {@code Start} + {@code StartStep} from Pi's first {@code message_start}. A disconnect
+     * scheduled at this index lands on the first mid-stream text chunk. Named so the intent survives a
+     * preamble refactor — a raw literal would silently move which frame throws.
      */
     private static final int PREAMBLE_SEND_COUNT = 4;
 
@@ -162,9 +161,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         turnExec = directExecutor();
         sandbox = new FakeSandbox();
         proxyCredentialRegistry = new MentorProxyCredentialRegistry();
-        // Every real mentor sandbox is built with a proxy credential minted for its session, so the
-        // fixture mints one too: without it every turn would fail to bind, and the warning that says so
-        // would be the normal case here rather than the exception.
+        // Real sandboxes always get a minted proxy credential; without one here every turn would fail to bind.
         sessionToken = proxyCredentialRegistry.mint(
             sandbox.identity().sessionId(),
             new MentorProxyCredentialRegistry.Route(
@@ -206,13 +203,10 @@ class MentorChatServiceTest extends BaseUnitTest {
             proxyCredentialRegistry
         );
 
-        // Both purses open by default — the turn-level gate dereferences this decision, so an
-        // unstubbed null would NPE every unrelated test rather than reading as "not blocked".
+        // Both purses open by default; the turn-level gate dereferences this, so an unstubbed null
+        // would NPE every unrelated test rather than reading as "not blocked".
         when(llmBudgetService.decide(WORKSPACE_ID)).thenReturn(LlmBudgetDecision.ALLOWED);
 
-        // Default resolver stub — MentorLlmConfig.fromAdmission routes every agent binding through
-        // this; individual tests override where the resolved shape matters. Class-level
-        // Strictness.LENIENT (see @MockitoSettings above) covers any test that never resolves a binding.
         when(llmModelResolver.resolve(any())).thenReturn(
             new ResolvedLlmModel("https://api.openai.com", "openai-completions", "test-model", null, null, false)
         );
@@ -261,10 +255,8 @@ class MentorChatServiceTest extends BaseUnitTest {
         when(workspaceContextBuilder.build(any())).thenReturn(new LinkedHashMap<>());
         when(interactiveSandboxService.attach(any())).thenReturn(sandbox);
         when(mentorPiAdapter.buildSandboxSpec(any(), any(), any(), any())).thenReturn(stubSpec());
-        // augmentFinishWithCost passes through unchanged when the mock isn't told otherwise.
-        // Without this stub the default Mockito null return would replace the Finish chunk in the
-        // happy-path stream — the wire would lose its terminal frame and `turnComplete` would
-        // never resolve.
+        // Without this stub, Mockito's default null return would replace the Finish chunk in the
+        // happy-path stream, and `turnComplete` would never resolve.
         when(persistence.augmentFinishWithCost(any(UIMessageChunk.Finish.class), any())).thenAnswer(inv ->
             inv.getArgument(0, UIMessageChunk.Finish.class)
         );
@@ -281,7 +273,6 @@ class MentorChatServiceTest extends BaseUnitTest {
 
     @Test
     void runTurn_happyPath_emitsStartThenChunksThenFinish() throws Exception {
-        // Set up the runner-side drive: respond to control calls, then push the Pi event stream.
         scheduleHappyPathResponses(sandbox).run();
 
         runTurnSync();
@@ -301,15 +292,10 @@ class MentorChatServiceTest extends BaseUnitTest {
             "finish-step",
             "finish"
         );
-        // No error chunk on the happy path.
         assertThat(types).doesNotContain("error");
-        // Persistence completed via finalise (not interrupt).
         verify(persistence).finalise(any(), any(), any(UIMessageChunk.Finish.class));
         verify(persistence, never()).interrupt(any(), any(), any());
-        // Lock released — no leaked active keys.
         assertThat(turnLock.activeKeys()).isZero();
-        // The production path through MentorChatService must bump the SUCCESS
-        // counter — without this assertion the metrics wiring is decoupled from real flow.
         assertOutcomeRecorded(MentorChatMetrics.Outcome.SUCCESS);
         assertThat(meterRegistry.find("mentor.turn.duration").timer().count()).isEqualTo(1L);
     }
@@ -368,9 +354,7 @@ class MentorChatServiceTest extends BaseUnitTest {
 
     @Test
     void runTurn_webPromptIsVerbatimUserMessage_noSurfaceDirective() {
-        // WEB is the counterpart of the two SLACK_DM tests above: MentorTurnPromptFactory.forRunner
-        // must pass the developer's message straight through to the runner, with no [Surface: ...]
-        // directive wrapper and no thread-history block appended.
+        // Counterpart of the two SLACK_DM tests above: WEB gets no [Surface: ...] wrapper or history block.
         scheduleHappyPathResponses(sandbox).run();
 
         runTurnSync("What should I do next based on recent work?", ThreadSurface.WEB);
@@ -429,8 +413,8 @@ class MentorChatServiceTest extends BaseUnitTest {
     void runTurn_prefersBoundEnabledMentorConfig_overFallback() throws Exception {
         Workspace boundWs = new Workspace();
         WorkspaceAgentBinding boundBinding = new WorkspaceAgentBinding();
-        // Deliberately NOT the id the default setUp binding carries: only an assertion on the
-        // identity can tell "the workspace-scoped finder's binding was used" from "some binding was".
+        // Deliberately not the id setUp's default binding carries, so asserting on identity actually
+        // proves the workspace-scoped finder's binding was used, not just "some binding was".
         boundBinding.setId(4242L);
         boundBinding.setPurpose(AgentPurpose.MENTOR);
         boundBinding.setEnabled(true);
@@ -481,22 +465,18 @@ class MentorChatServiceTest extends BaseUnitTest {
 
         runTurnSync();
 
-        // Error surfaced on the wire (resolveLlmConfig threw before any runner work).
         assertThat(emitter.recordedTypes()).contains("error");
         assertThat(String.join("\n", emitter.rawData))
             .contains(
                 "Hephaestus is not ready to mentor in this workspace yet. Connect a mentor model, then try again."
             )
             .doesNotContain("workspace " + WORKSPACE_ID);
-        // Sandbox never attached — the failure precedes the cold-start attach.
         try {
             verify(interactiveSandboxService, never()).attach(any());
         } catch (InteractiveSandboxException e) {
             throw new AssertionError(e);
         }
-        // No runner persistence side effects past the in-flight row; neither finalise nor a sandbox close.
         verify(persistence, never()).finalise(any(), any(), any());
-        // Lock released cleanly and the ERROR outcome recorded.
         assertThat(turnLock.activeKeys()).isZero();
         assertOutcomeRecorded(MentorChatMetrics.Outcome.ERROR);
     }
@@ -698,60 +678,43 @@ class MentorChatServiceTest extends BaseUnitTest {
     @Test
     void runTurn_clientDisconnect_completesNormallyAndAbortsRunner() throws Exception {
         scheduleHappyPathResponses(sandbox).run();
-        // The preamble sends succeed (Start, DataMentorStatus, then translator's Start + StartStep from
-        // message_start); the next send throws IOException. By then the runner client is live, so the
-        // abort hook fires. The runner keeps streaming to Finish; persistence.finalise still
-        // runs from inside handleEvent — disconnects must NOT be reclassified as turn failures.
+        // Disconnect after the preamble sends, once the runner client is live, so the abort hook fires.
         emitter.disconnectAfterCalls = PREAMBLE_SEND_COUNT;
 
         runTurnSync();
 
-        // Abort was sent.
         assertThat(sandbox.methodsSent()).contains("abort");
-        // No error chunk emitted — disconnects are not surfaced as turn errors.
         assertThat(emitter.recordedTypes()).doesNotContain("error");
-        // Persistence ran finalise (not interrupt).
         verify(persistence, atLeastOnce()).finalise(any(), any(), any(UIMessageChunk.Finish.class));
         verify(persistence, never()).interrupt(any(), any(), any());
-        // Lock released.
         assertThat(turnLock.activeKeys()).isZero();
-        // Disconnect on the EVENT-HANDLER thread (call #5 = mid-stream chunk send) is
-        // intentionally swallowed inside handleEvent; the runner keeps draining; the turn
-        // completes naturally as SUCCESS even though the wire was already gone. The abort
-        // hook fired (verified above). CLIENT_DISCONNECT outcome is reserved for the rare
-        // case where the orchestrator's *synchronous* sends fail before the runner attaches —
-        // tested separately below.
+        // A disconnect on the event-handler thread is swallowed inside handleEvent; the runner keeps
+        // draining and the turn completes as SUCCESS even though the wire is gone. CLIENT_DISCONNECT
+        // is reserved for the synchronous-send failure case, tested separately below.
         assertOutcomeRecorded(MentorChatMetrics.Outcome.SUCCESS);
     }
 
     @Test
     void runTurn_clientDisconnectBeforeEventStream_stillAbortsAndFinalises() throws Exception {
         scheduleHappyPathResponses(sandbox).run();
-        // Disconnect lands on call #3 — the translator's FIRST chunk from Pi's message_start — i.e. before
-        // any text delta has streamed. This proves the abort hook + persistence.finalise still run when the
-        // disconnect precedes the bulk of the event stream, not only on a mid-text chunk. Decoupled from the
-        // exact preamble length so it survives a preamble refactor.
+        // Disconnect on the translator's first chunk, before any text delta — proves abort + finalise
+        // still run this early, not only on a mid-text chunk.
         emitter.disconnectAfterCalls = 2;
 
         runTurnSync();
 
-        // Abort fired and the runner drained to its terminal Finish despite the gone wire.
         assertThat(sandbox.methodsSent()).contains("abort");
         verify(persistence, atLeastOnce()).finalise(any(), any(), any(UIMessageChunk.Finish.class));
         verify(persistence, never()).interrupt(any(), any(), any());
         assertThat(turnLock.activeKeys()).isZero();
-        // Same as the mid-stream case: a disconnect swallowed inside handleEvent completes as SUCCESS.
         assertOutcomeRecorded(MentorChatMetrics.Outcome.SUCCESS);
     }
 
     @Test
     void runTurn_clientDisconnectOnSyncSend_recordsClientDisconnect() throws Exception {
-        // The orchestrator's two synchronous sends (Start, DataMentorStatus) happen BEFORE
-        // sandbox.attach. If either throws ClientDisconnectedException (e.g. the client
-        // already closed the socket between request acceptance and Tomcat dispatch), the
-        // catch sets outcome=CLIENT_DISCONNECT and the sandbox is never attached. This is
-        // the only path that records that outcome — without this test it would be
-        // dead-on-write.
+        // The orchestrator's two synchronous sends happen before sandbox.attach; if either throws
+        // ClientDisconnectedException, outcome=CLIENT_DISCONNECT and the sandbox is never attached.
+        // This is the only path that records that outcome — without this test it's dead-on-write.
         emitter.disconnectAfterCalls = 1; // call #2 (DataMentorStatus) throws
 
         runTurnSync();
@@ -786,13 +749,10 @@ class MentorChatServiceTest extends BaseUnitTest {
     // 3b. Per-turn proxy metering: the window in which a turn's calls are billable
 
     /**
-     * Wrap the scripted runner so that, at the moment the prompt goes out, we do what a real sandbox
-     * call does at the proxy: authenticate the session token, see which turn it names, post one call's
-     * tokens against that turn, and look again at what the gate would now be told.
-     *
-     * <p>The direct {@code accumulate} stands in for {@code MentorTurnUsageAccumulator}, which in
-     * production advances the meter only after the call's durable row write has landed. There is no
-     * database in this tier; the orchestrator behaviour under test is the binding, not the write.
+     * At the moment the prompt goes out, mimics what a real sandbox call does at the proxy: authenticate
+     * the session token, post one call's tokens against the turn it names, then re-check the gate.
+     * {@code accumulate} stands in for {@code MentorTurnUsageAccumulator} (no DB in this tier) — the
+     * orchestrator behaviour under test is the binding, not the write.
      */
     private void probeProxyDuringPrompt(String token, AtomicReference<ProxyRouting.BilledAttempt> seen) {
         Consumer<JsonNode> scripted = sandbox.onSend;
@@ -809,16 +769,6 @@ class MentorChatServiceTest extends BaseUnitTest {
         };
     }
 
-    /**
-     * The turn-scoped binding, from the orchestrator's side, and the whole point of it: mid-turn, the
-     * credential the sandbox is holding reports THIS turn and what THIS turn has already spent — which
-     * is what lets the budget gate refuse a turn before it has finished.
-     *
-     * <p>Kills "never call bindTurn": the probe sees no billing target, which is the state that let a
-     * turn spend without limit against an exhausted cap. Kills "never call unbindTurn": the session
-     * stays billable to a finished turn after it ends, so the NEXT turn's first calls land on the dead
-     * one.
-     */
     /** The default fixture admits a NO_CHARGE model; the spend assertion needs real rates. */
     private void admitAtTenDollarsPerMillionInputTokens() {
         when(llmAdmissionService.admit(any(WorkspaceAgentBinding.class))).thenReturn(
@@ -839,6 +789,14 @@ class MentorChatServiceTest extends BaseUnitTest {
         );
     }
 
+    /**
+     * Mid-turn, the credential the sandbox holds reports THIS turn and what it has already spent —
+     * which is what lets the budget gate refuse a turn before it finishes.
+     *
+     * <p>Kills "never call bindTurn" (probe sees no billing target, letting a turn spend unlimited
+     * against an exhausted cap) and "never call unbindTurn" (session stays billable to a finished
+     * turn, so the next turn's calls land on the dead one).
+     */
     @Test
     @DisplayName("mid-turn, the sandbox credential reports this turn and what it has already spent")
     void aTurnIsBoundToItsSandboxCredentialOnlyWhileItRuns() {
@@ -893,33 +851,28 @@ class MentorChatServiceTest extends BaseUnitTest {
         runTurnSync();
 
         List<String> types = emitter.recordedTypes();
-        // After Start, we hit the conflict path: data-mentor-status (conflict) + error.
         assertThat(types).contains("data-mentor-status").contains("error");
-        // No sandbox attach attempted — the SDK was never invoked because persistence threw first.
-        // (verify via Mockito on interactiveSandboxService.attach)
         try {
             verify(interactiveSandboxService, never()).attach(any());
         } catch (InteractiveSandboxException e) {
             throw new AssertionError(e);
         }
         assertThat(turnLock.activeKeys()).isZero();
-        // In-flight conflict tagged distinctly so SLO panels separate "real failure" from
-        // "load-shed retry". This persistence-throws path triggers the DB-index outcome —
-        // the JVM lock was acquired, so the conflict comes from the durable backstop.
+        // The JVM lock was acquired here, so this persistence-throws path is the DB-backstop outcome,
+        // distinct from the LOCAL lock-conflict outcome below.
         assertOutcomeRecorded(MentorChatMetrics.Outcome.IN_FLIGHT_CONFLICT_DB);
     }
 
     /**
-     * Asserts exactly one increment on {@code mentor.turn.completed{outcome=<expected>}} and
-     * exactly one increment on {@code mentor.turn.started}. Keeps started/completed in lockstep
-     * — if a future refactor lands one without the other, dashboards drift and SLO ratios lie.
+     * Asserts exactly one increment each on {@code mentor.turn.started} and the expected
+     * {@code mentor.turn.completed} outcome tag — keeps them in lockstep so a future refactor that
+     * lands one without the other doesn't drift SLO dashboards silently.
      */
     private void assertOutcomeRecorded(MentorChatMetrics.Outcome expected) {
         assertThat(meterRegistry.find("mentor.turn.started").counter().count()).as("mentor.turn.started").isEqualTo(1d);
         assertThat(meterRegistry.find("mentor.turn.completed").tag("outcome", expected.tag()).counter().count())
             .as("mentor.turn.completed{outcome=%s}", expected.tag())
             .isEqualTo(1d);
-        // No other outcome got bumped — proves the test asserts the RIGHT branch.
         long otherOutcomes = Arrays.stream(MentorChatMetrics.Outcome.values())
             .filter(o -> o != expected)
             .mapToLong(o ->
@@ -960,10 +913,9 @@ class MentorChatServiceTest extends BaseUnitTest {
             holder.join(2_000);
         }
 
-        // Persistence MUST NOT be called when the LOCAL lock rejects up front.
         verify(persistence, never()).persistInFlight(any(), any(), any(), any(), any());
-        // Distinct outcome metric so SLO dashboards separate same-JVM double-submit from the
-        // durable DB backstop (the latter signals JVM-lock leak across replicas).
+        // Distinct from IN_FLIGHT_CONFLICT_DB above: that one signals a JVM-lock leak across replicas,
+        // this one is a normal same-JVM double-submit.
         assertOutcomeRecorded(MentorChatMetrics.Outcome.IN_FLIGHT_CONFLICT_LOCAL);
     }
 

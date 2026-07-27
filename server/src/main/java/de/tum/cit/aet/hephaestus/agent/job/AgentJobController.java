@@ -25,12 +25,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
- * Job history for a workspace's agents.
- *
- * <p>Nested under {@code /agents} because a job is always a run of one of them. The literal
- * {@code jobs} segment and {@link AgentBindingController}'s {@code /agents/{purpose}} template share a
- * parent, which Spring resolves deterministically — a literal segment outranks a variable one — and
- * {@code AgentsPathDispatchIntegrationTest} pins that so the two can never trade places.
+ * Job history for a workspace's agents. The literal {@code jobs} segment collides with the sibling
+ * {@code /agents/{purpose}} template; Spring resolves it here because a literal segment outranks a
+ * variable one.
  */
 @WorkspaceScopedController
 @RequestMapping("/agents/jobs")

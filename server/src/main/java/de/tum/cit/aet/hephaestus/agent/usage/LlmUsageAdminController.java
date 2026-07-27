@@ -26,25 +26,9 @@ import org.springframework.web.bind.annotation.RestController;
  * Instance-admin LLM cost governance: the cross-workspace month rollup (spend totals only —
  * metadata, no tenant content) and the per-workspace monthly cap on host-funded spend.
  *
- * <h2>Why this cap is not on the workspace's own surface</h2>
- *
- * <p>Its twin, {@code PUT /workspaces/{workspaceSlug}/llm/budget}, has the same path tail, the same
- * body and the same audit shape — but a different parent, and deliberately so. <b>They write
- * different columns for different owners.</b> This one sets the host's cap on what the instance pays
- * for; the workspace-scoped one sets the workspace's cap on what the workspace itself pays for. A
- * workspace admin must never be able to raise the host's protection, so the two can never be one
- * endpoint distinguished only by caller role — the path says whose money is being capped.
- *
- * <p>This is <em>not</em> a statement about reachability. An {@code app_admin} does reach the
- * workspace-scoped surface without a membership: {@code WorkspaceContextFilter} elevates a super-admin
- * to workspace ADMIN when the role set comes back empty, which
- * {@code LlmUsageControllerIntegrationTest#instanceAdminCanReadAWorkspaceReportWithoutMembership}
- * pins. Both endpoints are therefore reachable by the operator; they differ in what they may set.
- *
- * <p>No {@code @WorkspaceAgnostic} here. The tenancy bypass belongs on the layer that actually
- * queries, and {@link LlmUsageAdminService} carries it; at class level on the controller it would
- * additionally have wrapped {@link #updateBudget}, a mutation that targets exactly one tenant's row
- * and needs no bypass at all.
+ * <p>Its twin at {@code PUT /workspaces/{workspaceSlug}/llm/budget} has the same body and the same
+ * audit shape but writes a different column: a workspace admin must never be able to raise the host's
+ * cap, so the path — not the caller's role — says whose money is being capped.
  */
 @RestController
 @RequestMapping("/admin")

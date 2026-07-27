@@ -79,22 +79,10 @@ public record AgentJobDTO(
     }
 
     /**
-     * A workspace admin (the {@code /agent-jobs} audience — {@link AgentJobController} requires only
-     * {@code RequireAtLeastWorkspaceAdmin}) must never see the full path/query detail of a base URL they
-     * don't themselves own end-to-end:
-     *
-     * <ul>
-     *   <li>{@code connectionScope=INSTANCE} — owned and configured by the instance admin, potentially
-     *       shared across many workspaces; its URL (an internal gateway, a vendor-specific deployment
-     *       path, …) is not this workspace admin's data to read.</li>
-     *   <li>{@code connectionScope=null} — only possible for a historical snapshot during a rolling
-     *       upgrade. It is non-routable, but its former URL is still reduced to host-only so an operator
-     *       endpoint path cannot leak while the row remains visible.</li>
-     * </ul>
-     *
-     * <p>{@code connectionScope=WORKSPACE} (BYO) is the workspace's own configuration, so it is left
-     * as-is. Reduces the frozen snapshot's {@code baseUrl} to {@code scheme://host} — enough to see
-     * which provider a job used without exposing path detail.
+     * The audience here is a workspace admin, who may see the full {@code baseUrl} only of a
+     * {@code WORKSPACE}-scoped (BYO) connection they configured themselves. Anything else — an INSTANCE
+     * connection, or a scope-less snapshot from a rolling upgrade — is cut back to {@code scheme://host}
+     * so an operator's gateway or deployment path cannot leak.
      */
     private static Object redactInstanceBaseUrl(JsonNode snapshot) {
         if (!(snapshot instanceof ObjectNode obj) || !obj.has("baseUrl")) {

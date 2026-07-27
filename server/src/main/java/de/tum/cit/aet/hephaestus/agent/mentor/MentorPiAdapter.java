@@ -41,11 +41,8 @@ public class MentorPiAdapter {
     private final MentorProxyCredentialRegistry proxyCredentialRegistry;
 
     /**
-     * Build the interactive sandbox spec for a mentor chat session. Sandbox is keyed by
-     * {@code (developerId, workspaceId)}; concurrent attaches reuse the live handle.
-     * When {@code sessionRestore} is non-null, the prior turn's JSONL is injected at
-     * {@code .sessions/<threadId>.jsonl} so Pi's {@code switchSession} restores byte-identical
-     * state for prompt-cache continuity.
+     * Build the interactive sandbox spec for a mentor chat session. A non-null {@code sessionRestore}
+     * injects the prior turn's JSONL so Pi restores it, keeping the prompt cache warm.
      */
     public InteractiveSandboxSpec buildSandboxSpec(
         MentorAgentRequest request,
@@ -66,28 +63,10 @@ public class MentorPiAdapter {
 
         String baseUrl = llmConfig.baseUrl();
 
-        // Clamped at BOTH ends, and the two ends answer to different owners.
-        //
-        // Up: the binding API floor (AgentBindingLimits.MIN_TIMEOUT_SECONDS=30) sits below PiPlanSpec's
-        // runtime floor (must exceed TIMEOUT_BUFFER_SECONDS=60), so a legitimately persisted 30-60s
-        // binding would otherwise throw from PiPlanSpec and surface as an ERROR on the chat stream.
-        //
-        // Down: this is where a turn's budget is fixed, so it is the one place that can make
-        // "no mentor turn outlives AgentBindingLimits.MAX_TIMEOUT_SECONDS" true of every turn rather
-        // than only of turns configured through the validated API. MentorInFlightReaper sizes its window
-        // from that ceiling and bills anything older as abandoned, so a row that got past validation —
-        // migrated from an older table, or written by hand — must not be able to outlive it.
-        int timeoutSeconds = Math.clamp(
-            llmConfig.timeoutSeconds(),
-            PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS + 1,
-            AgentBindingLimits.MAX_TIMEOUT_SECONDS
-        );
+        int timeoutSeconds = clampToRunnableTurnBudget(llmConfig.timeoutSeconds());
 
-        // ONE credential path: the mentor's interactive sandbox is not an AgentJob row,
-        // so it gets an equivalent proxy-scoped token from the in-memory mentor registry rather than a
-        // DB-backed job token. sessionId is generated here (rather than left to the InteractiveSandboxSpec
-        // constructor) so it can also key the mint — DockerInteractiveSandboxAdapter revokes this token by
-        // that same sessionId from its dispose path. See MentorProxyCredentialRegistry's javadoc.
+        // Generated here rather than inside InteractiveSandboxSpec so it can also key the mint: the
+        // sandbox adapter revokes this token by the same sessionId when it disposes the session.
         UUID sessionId = UUID.randomUUID();
         String proxyToken = proxyCredentialRegistry.mint(
             sessionId,
@@ -132,6 +111,18 @@ public class MentorPiAdapter {
         );
     }
 
+    /**
+     * The binding API's floor sits below the runtime's, and a binding that never went through that API
+     * could exceed its ceiling — so clamp both ends here, where a turn's budget is actually fixed.
+     */
+    private static int clampToRunnableTurnBudget(int configuredTimeoutSeconds) {
+        return Math.clamp(
+            configuredTimeoutSeconds,
+            PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS + 1,
+            AgentBindingLimits.MAX_TIMEOUT_SECONDS
+        );
+    }
+
     private static void validateContextInputs(Map<String, byte[]> contextInputs) {
         for (Map.Entry<String, byte[]> entry : contextInputs.entrySet()) {
             String key = entry.getKey();
@@ -143,8 +134,7 @@ public class MentorPiAdapter {
             if (!MentorContextKeys.ALLOWED_OUTPUT_KEYS.contains(key)) {
                 throw new IllegalArgumentException("unsupported mentor context input key: " + key);
             }
-            // Reject null bytes here so the failure names the offending key, rather than surfacing as an
-            // opaque NPE deep inside PiPlanSpec's Map.copyOf(extraInputs), which rejects null values.
+            // Checked here so the failure names the key, not as an NPE deep inside PiPlanSpec.
             if (entry.getValue() == null) {
                 throw new IllegalArgumentException("contextInputs value for '" + key + "' must not be null");
             }

@@ -164,7 +164,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             assertThat(result.logs()).isEqualTo("hello\n");
             assertThat(result.duration()).isPositive();
 
-            // Verify all 4 phases
             verify(networkManager).createJobNetwork(JOB_ID, false);
             verify(networkManager).connectAppServer(NETWORK_ID);
             verify(containerManager).createContainer(any());
@@ -174,7 +173,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             verify(workspaceManager).collectOutput(CONTAINER_ID, "/workspace/out");
             verify(containerManager).getLogs(CONTAINER_ID, 500);
 
-            // Verify cleanup
             verify(containerManager).forceRemove(CONTAINER_ID);
             verify(networkManager).disconnectAppServer(NETWORK_ID);
             verify(networkManager).removeNetwork(NETWORK_ID);
@@ -205,8 +203,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             verify(containerManager).createContainer(captor.capture());
 
             Map<String, String> env = captor.getValue().environment();
-            // No per-provider path segment — the connection is identified from the
-            // authenticated token, not the URL.
+            // No per-provider path segment — the connection is identified from the authenticated token, not the URL.
             assertThat(env).containsEntry("LLM_PROXY_URL", "http://172.18.0.2:8080/internal/llm");
             assertThat(env).containsEntry("LLM_PROXY_TOKEN", "token-123");
         }
@@ -332,7 +329,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             );
             verify(containerManager).createContainer(captor.capture());
 
-            // createSpec() passes Map.of("FOO", "bar")
             assertThat(captor.getValue().environment()).containsEntry("FOO", "bar");
         }
 
@@ -440,7 +436,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 "alpine:latest",
                 List.of("echo"),
                 Map.of("USER_VAR", "value"),
-                null, // null networkPolicy
+                null,
                 ResourceLimits.DEFAULT,
                 SecurityProfile.DEFAULT,
                 Map.of(),
@@ -451,7 +447,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             SandboxResult result = sandboxAdapter.execute(spec);
             assertThat(result.exitCode()).isZero();
 
-            // Verify no LLM proxy vars injected
             ArgumentCaptor<DockerOperations.ContainerSpec> captor = ArgumentCaptor.forClass(
                 DockerOperations.ContainerSpec.class
             );
@@ -551,7 +546,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
 
             assertThatThrownBy(() -> sandboxAdapter.execute(createSpec())).isInstanceOf(SandboxException.class);
 
-            // Network should still be cleaned up
             verify(networkManager).disconnectAppServer(NETWORK_ID);
             verify(networkManager).removeNetwork(NETWORK_ID);
         }
@@ -561,11 +555,9 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             setupHappyPath();
             doThrow(new SandboxException("Container stuck")).when(containerManager).forceRemove(CONTAINER_ID);
 
-            // Should not throw despite cleanup failure
             SandboxResult result = sandboxAdapter.execute(createSpec());
             assertThat(result.exitCode()).isZero();
 
-            // Other cleanup steps should still execute
             verify(networkManager).disconnectAppServer(NETWORK_ID);
             verify(networkManager).removeNetwork(NETWORK_ID);
         }
@@ -582,14 +574,12 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             );
             when(containerManager.getLogs(eq(CONTAINER_ID), anyInt())).thenReturn("error logs here");
 
-            // The failure must still reach the caller — capturing diagnostics may not swallow it.
             assertThatThrownBy(() -> sandboxAdapter.execute(createSpec()))
                 .isInstanceOf(SandboxException.class)
                 .hasMessageContaining("Docker daemon lost");
 
-            // Logs must be read while the container still exists, i.e. strictly before cleanup removes it,
-            // and with the full tail (mirrors DockerSandboxAdapter.LOG_TAIL_LINES) — a truncated tail is
-            // the same as no diagnostics for the operator.
+            // Logs must be read before cleanup removes the container, with the full tail
+            // (mirrors DockerSandboxAdapter.LOG_TAIL_LINES) — a truncated tail is no diagnostics at all.
             InOrder inOrder = inOrder(containerManager);
             inOrder.verify(containerManager).getLogs(CONTAINER_ID, 500);
             inOrder.verify(containerManager).forceRemove(CONTAINER_ID);
@@ -608,7 +598,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             when(workspaceManager.collectOutput(eq(CONTAINER_ID), anyString())).thenReturn(Map.of());
             when(containerManager.getLogs(eq(CONTAINER_ID), anyInt())).thenReturn("");
 
-            // Create spec with null securityProfile — should NOT NPE
             SandboxSpec specWithNullSecurity = new SandboxSpec(
                 JOB_ID,
                 "alpine:latest",
@@ -625,7 +614,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             SandboxResult result = sandboxAdapter.execute(specWithNullSecurity);
             assertThat(result.exitCode()).isZero();
 
-            // Verify SecurityProfile.DEFAULT was used
             ArgumentCaptor<SecurityProfile> secCaptor = ArgumentCaptor.forClass(SecurityProfile.class);
             verify(securityPolicy).buildHostConfig(secCaptor.capture(), any(), any());
             assertThat(secCaptor.getValue()).isEqualTo(SecurityProfile.DEFAULT);
@@ -637,8 +625,8 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
 
         @Test
         void shouldThrowOnCancellation() {
+            // Calling cancel() from inside the stub simulates cancellation racing with network creation.
             when(networkManager.createJobNetwork(eq(JOB_ID), eq(false))).thenAnswer(invocation -> {
-                // Simulate cancellation during network creation
                 sandboxAdapter.cancel(JOB_ID);
                 return NETWORK_ID;
             });
@@ -661,14 +649,12 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             when(securityPolicy.buildLabels(JOB_ID)).thenReturn(Map.of("hephaestus.managed", "true"));
             when(containerManager.createContainer(any())).thenReturn(CONTAINER_ID);
 
-            // Block on waitForCompletion until cancel is done
             when(containerManager.waitForCompletion(eq(CONTAINER_ID), any())).thenAnswer(inv -> {
                 containerStarted.countDown();
                 cancelDone.await(5, TimeUnit.SECONDS);
                 return new SandboxContainerManager.WaitOutcome(137, false);
             });
-            // No getLogs stub needed — cancel throws SandboxCancelledException before reaching
-            // the COLLECT phase or captureLogsOnError().
+            // No getLogs stub: cancel() throws before the COLLECT phase or captureLogsOnError() run.
 
             Thread bg = new Thread(() -> {
                 try {
@@ -686,15 +672,13 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             assertThat(bg.isAlive()).isFalse();
 
             verify(containerManager).stopContainer(CONTAINER_ID);
-            // After waitForCompletion returns, checkCancelled() should throw
             assertThat(thrownException.get()).isInstanceOf(SandboxCancelledException.class);
         }
 
         @Test
         void shouldNoOpForUnknownJob() {
             assertThatCode(() -> sandboxAdapter.cancel(UUID.randomUUID())).doesNotThrowAnyException();
-            // The real invariant of the else-branch: an unknown job id must not stop anyone else's
-            // container. "Did not throw" alone would still pass if cancel() stopped the wrong one.
+            // "Did not throw" alone would still pass if cancel() stopped the wrong container.
             verify(containerManager, never()).stopContainer(anyString());
         }
     }
@@ -824,14 +808,12 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
 
             assertThat(inExecution.await(5, TimeUnit.SECONDS)).isTrue();
 
-            // During execution, gauge should be 1
             assertThat(meterRegistry.get("sandbox.containers.active").gauge().value()).isEqualTo(1.0);
 
             release.countDown();
             bg.join(5000);
             assertThat(bg.isAlive()).isFalse();
 
-            // After execution, gauge should be 0
             assertThat(meterRegistry.get("sandbox.containers.active").gauge().value()).isZero();
         }
     }
@@ -844,7 +826,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             CountDownLatch enteredExecute = new CountDownLatch(1);
             CountDownLatch releaseBlock = new CountDownLatch(1);
 
-            // First execute blocks in network creation; signals when registered
             when(networkManager.createJobNetwork(eq(JOB_ID), eq(false))).thenAnswer(inv -> {
                 enteredExecute.countDown();
                 releaseBlock.await(5, TimeUnit.SECONDS);
@@ -858,10 +839,8 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             });
             bg.start();
 
-            // Wait deterministically for the first execute to register
             assertThat(enteredExecute.await(5, TimeUnit.SECONDS)).isTrue();
 
-            // Second execution with same jobId should be rejected
             assertThatThrownBy(() -> sandboxAdapter.execute(createSpec()))
                 .isInstanceOf(SandboxException.class)
                 .hasMessageContaining("already executing");
@@ -956,7 +935,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         void shouldInjectSecurityConfigsWithoutVolumeMounts() {
             setupHappyPath();
 
-            // createSpec() uses null volumeMounts → defaults to Map.of() (empty)
             sandboxAdapter.execute(createSpec());
 
             ArgumentCaptor<DockerOperations.ContainerSpec> captor = ArgumentCaptor.forClass(
@@ -966,11 +944,9 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
 
             Map<String, String> env = captor.getValue().environment();
 
-            // No volume mounts → COUNT equals security config count exactly
             int count = Integer.parseInt(env.get("GIT_CONFIG_COUNT"));
             assertThat(count).isEqualTo(DockerSandboxAdapter.GIT_SECURITY_CONFIGS.size());
 
-            // Verify each security config key-value PAIR at the correct index
             for (int i = 0; i < DockerSandboxAdapter.GIT_SECURITY_CONFIGS.size(); i++) {
                 var expected = DockerSandboxAdapter.GIT_SECURITY_CONFIGS.get(i);
                 assertThat(env.get("GIT_CONFIG_KEY_" + i)).isEqualTo(expected.getKey());
@@ -997,13 +973,11 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
 
             Map<String, String> env = captor.getValue().environment();
 
-            // First N entries are safe.directory for each mount
             assertThat(env.get("GIT_CONFIG_KEY_0")).isEqualTo("safe.directory");
             assertThat(env.get("GIT_CONFIG_VALUE_0")).isEqualTo("/workspace/repo1");
             assertThat(env.get("GIT_CONFIG_KEY_1")).isEqualTo("safe.directory");
             assertThat(env.get("GIT_CONFIG_VALUE_1")).isEqualTo("/workspace/repo2");
 
-            // Remaining entries are security configs (starting at idx 2)
             int securityStartIdx = mounts.size();
             for (int i = 0; i < DockerSandboxAdapter.GIT_SECURITY_CONFIGS.size(); i++) {
                 var expected = DockerSandboxAdapter.GIT_SECURITY_CONFIGS.get(i);
@@ -1034,7 +1008,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
 
         @Test
         void shouldBlockCallerGitConfigVars() {
-            // Verify at the unit level that GIT_CONFIG_* vars are prefix-blocked
             assertThat(SandboxEnvBlocklist.isBlocked("GIT_CONFIG_COUNT")).isTrue();
             assertThat(SandboxEnvBlocklist.isBlocked("GIT_CONFIG_KEY_0")).isTrue();
             assertThat(SandboxEnvBlocklist.isBlocked("GIT_CONFIG_VALUE_99")).isTrue();
@@ -1044,10 +1017,8 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         void shouldOverwriteSecurityEnvVarsViaOrdering() {
             setupHappyPath();
 
-            // GIT_TERMINAL_PROMPT and GIT_ATTR_NOSYSTEM are in BLOCKED_ENV_VARS, so a caller
-            // can't inject them. This test verifies the defense-in-depth: even if they somehow
-            // leaked through, the security injection at the end of buildEnvironment() wins.
-            // We test this by verifying the final values are always the security-hardened ones.
+            // Defense-in-depth: even if GIT_TERMINAL_PROMPT/GIT_ATTR_NOSYSTEM leaked past the
+            // blocklist, the security injection at the end of buildEnvironment() must still win.
             sandboxAdapter.execute(createSpec());
 
             ArgumentCaptor<DockerOperations.ContainerSpec> captor = ArgumentCaptor.forClass(
@@ -1057,7 +1028,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
 
             Map<String, String> env = captor.getValue().environment();
 
-            // Security values must always be present regardless of caller input
             assertThat(env).containsEntry("GIT_TERMINAL_PROMPT", "0");
             assertThat(env).containsEntry("GIT_ATTR_NOSYSTEM", "1");
             assertThat(env).containsKey("GIT_CONFIG_COUNT");

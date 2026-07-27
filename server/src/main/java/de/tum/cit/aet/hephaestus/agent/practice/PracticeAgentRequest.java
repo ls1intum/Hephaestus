@@ -4,9 +4,8 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Input for {@link PracticePiAdapter#buildSandboxSpec}. Every sandbox talks to the LLM proxy over
- * {@code jobToken} (ONE credential path); the task prompt is carried by the
- * {@code task.json} envelope written by the handler — not by this request.
+ * Input for {@link PracticePiAdapter#buildSandboxSpec}. Carries no prompt — that travels in the
+ * {@code task.json} envelope the handler writes.
  */
 public record PracticeAgentRequest(
     String apiProtocol,

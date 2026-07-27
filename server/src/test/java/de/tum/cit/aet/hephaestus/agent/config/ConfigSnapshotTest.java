@@ -178,7 +178,6 @@ class ConfigSnapshotTest extends BaseUnitTest {
             ConfigSnapshot original = ConfigSnapshot.from(binding, resolver);
             JsonNode json = original.toJson(OBJECT_MAPPER);
 
-            // Mutate schemaVersion to a future version
             ((tools.jackson.databind.node.ObjectNode) json).put("schemaVersion", 999);
 
             assertThatThrownBy(() -> ConfigSnapshot.fromJson(json, OBJECT_MAPPER))
@@ -193,7 +192,6 @@ class ConfigSnapshotTest extends BaseUnitTest {
             ConfigSnapshot original = ConfigSnapshot.from(binding, resolver);
             JsonNode json = original.toJson(OBJECT_MAPPER);
 
-            // Add an unknown field (simulates future schema addition)
             ((tools.jackson.databind.node.ObjectNode) json).put("futureField", "future-value");
 
             ConfigSnapshot deserialized = ConfigSnapshot.fromJson(json, OBJECT_MAPPER);
@@ -202,12 +200,10 @@ class ConfigSnapshotTest extends BaseUnitTest {
 
         @Test
         void shouldDeserializeV4SnapshotStillCarryingTheDroppedConfigFields() {
-            // Regression guard for agent_job.config_snapshot rows already in production databases: v4
-            // froze configId/configName, v5 dropped both components. Such a row must read through the
-            // CURRENT shape with the two dead keys simply ignored — and must NOT be routed to the
-            // pre-v4 legacy translation, which would null the connection identity and leave an
-            // in-flight job unroutable at the proxy. Every catalog field asserted below is one the
-            // legacy path would have nulled or defaulted away.
+            // Regression guard for agent_job.config_snapshot rows already in production: v4 froze
+            // configId/configName, v5 dropped both. Such a row must read through the CURRENT shape with
+            // the two dead keys ignored — not the pre-v4 legacy translation, which would null the
+            // connection identity and leave an in-flight job unroutable at the proxy.
             String v4 =
                 "{\"schemaVersion\":4,\"configId\":42,\"configName\":\"detection\"," +
                 "\"apiProtocol\":\"openai-completions\",\"baseUrl\":\"https://gpu.example.com/v1\"," +
@@ -224,7 +220,6 @@ class ConfigSnapshotTest extends BaseUnitTest {
             assertThat(snapshot.connectionId()).isEqualTo(7L);
             assertThat(snapshot.modelId()).isEqualTo(20L);
             assertThat(snapshot.workspaceId()).isEqualTo(1L);
-            // ...and so does everything else the row froze.
             assertThat(snapshot.schemaVersion()).isEqualTo(4);
             assertThat(snapshot.apiProtocol()).isEqualTo("openai-completions");
             assertThat(snapshot.baseUrl()).isEqualTo("https://gpu.example.com/v1");

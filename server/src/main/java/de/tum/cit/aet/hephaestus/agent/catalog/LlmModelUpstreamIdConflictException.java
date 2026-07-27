@@ -5,13 +5,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
 /**
- * Thrown when creating or updating a model whose (connection, upstream model id) pair already
- * belongs to another model on the same connection ({@code ux_llm_model_connection_upstream} /
- * {@code ux_ws_llm_model_connection_upstream}). Mapped to HTTP 409.
- *
- * <p>Without this guard, two catalog entries could point at the same upstream id (e.g. one NO_CHARGE, one
- * PRICED) and {@code LlmUsageRecorder} would nondeterministically match either one, letting a NO_CHARGE
- * sibling silently shadow a PRICED one for billing purposes.
+ * Two catalog entries pointing at the same upstream id would be matched nondeterministically when
+ * usage is priced, letting a NO_CHARGE sibling silently shadow a PRICED one for billing.
  */
 @ResponseStatus(HttpStatus.CONFLICT)
 public class LlmModelUpstreamIdConflictException extends RuntimeException {

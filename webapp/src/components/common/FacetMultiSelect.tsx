@@ -17,15 +17,13 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
 export interface FacetOption<TValue extends string | number = string> {
-	/** Wire value — an enum name or an id, not a label. */
 	value: TValue;
 	label: string;
-	/** Secondary text shown after the label and matched by the search: a slug, a code, a hint. */
+	/** Secondary text shown after the label and also matched by the search: a slug, a code, a hint. */
 	description?: string;
 }
 
 export interface FacetMultiSelectProps<TValue extends string | number> {
-	/** Names the facet: shown on the trigger and used as the popup's accessible name. */
 	title: string;
 	options: FacetOption<TValue>[];
 	selected: readonly TValue[];
@@ -39,21 +37,15 @@ export interface FacetMultiSelectProps<TValue extends string | number> {
 	id?: string;
 	disabled?: boolean;
 	className?: string;
-	/** Shown in place of the list when there is nothing to choose from at all. */
 	emptyLabel?: string;
 }
 
-/** Past this many selections the trigger shows a count instead of individual chips. */
 const MAX_INLINE_CHIPS = 2;
 
 /**
  * One facet of a filter or a form: a trigger opening a searchable multi-select list that summarises
- * the selection back onto itself. The shadcn faceted-filter pattern, on the Base UI Combobox this
- * registry ships — so matching is `Intl.Collator`-based (accents and case behave the way a reader
- * expects, not the way `toLowerCase()` does) and keyboard and ARIA behaviour come from the primitive.
- *
- * Multi-select because the question these are opened for is usually disjunctive: "did anyone touch
- * feature flags *or* roles last Tuesday", "grant this model to Alpha *or* Beta".
+ * the selection back onto itself. Matching goes through `Intl.Collator`, so accents and case behave
+ * the way a reader expects rather than the way `toLowerCase()` does.
  */
 export function FacetMultiSelect<TValue extends string | number>({
 	title,
@@ -71,8 +63,7 @@ export function FacetMultiSelect<TValue extends string | number>({
 	// Derived from `options`, not rebuilt: the primitive compares option identities.
 	const selectedOptions = options.filter((option) => selected.includes(option.value));
 
-	// The name carries the selection: the trigger's own text does too, but collapses to "3 selected"
-	// past two, which tells a screen-reader user nothing about what is filtered.
+	// Spells the selection out, where the trigger's own text collapses to "3 selected".
 	const accessibleName =
 		selectedOptions.length === 0
 			? title
@@ -91,8 +82,8 @@ export function FacetMultiSelect<TValue extends string | number>({
 			disabled={disabled}
 		>
 			<ComboboxTrigger
-				// The trigger is a `role="combobox"`, so it takes no name from its own text: without this
-				// it would be announced as an unnamed control (WCAG 2.2 SC 4.1.2).
+				// A `role="combobox"` takes no name from its own text; without this it is unnamed
+				// (WCAG 2.2 SC 4.1.2).
 				aria-label={variant === "toolbar" ? accessibleName : title}
 				render={
 					variant === "toolbar" ? (
@@ -131,9 +122,6 @@ export function FacetMultiSelect<TValue extends string | number>({
 							)}
 						</Button>
 					) : (
-						// The field trigger's own text is the *value* ("2 selected"), not a label, which is
-						// why the name is the facet's title and not that text (WCAG 2.2 SC 2.5.3 is about
-						// visible labels, and this control's label is the one beside it).
 						<Button
 							id={id}
 							type="button"
@@ -165,9 +153,8 @@ export function FacetMultiSelect<TValue extends string | number>({
 				<ComboboxList>
 					{(option: FacetOption<TValue>) => (
 						<ComboboxItem key={option.value} value={option} className="pr-1.5">
-							{/* keepMounted turns the indicator into a checkbox: a box that is present but empty
-							    when unselected. Without it only the selected row shows a mark, which reads as
-							    "this is the one you picked" — the single-select idiom. */}
+							{/* keepMounted turns the indicator into a checkbox: an empty box on unselected rows,
+							    rather than a mark on the one row that reads as the single-select idiom. */}
 							<ComboboxItemIndicator
 								keepMounted
 								className="relative right-auto mr-2 size-4 shrink-0 rounded-[4px] border border-input data-selected:border-primary data-selected:bg-primary data-selected:text-primary-foreground [&:not([data-selected])_svg]:invisible"
@@ -181,9 +168,7 @@ export function FacetMultiSelect<TValue extends string | number>({
 						</ComboboxItem>
 					)}
 				</ComboboxList>
-				{/* Without this the only way to widen one facet is Reset, which clears the others with it.
-				    Not Combobox.Clear: Base UI hard-codes tabIndex -1 on it (it is an input adornment, not
-				    a list action), so it would be reachable by mouse only. */}
+				{/* Without this the only way to widen one facet is Reset, which clears the others with it. */}
 				{selectedOptions.length > 0 && (
 					<>
 						<ComboboxSeparator />

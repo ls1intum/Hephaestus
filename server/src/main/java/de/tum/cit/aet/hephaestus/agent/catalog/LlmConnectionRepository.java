@@ -10,10 +10,6 @@ import org.springframework.data.repository.query.Param;
 public interface LlmConnectionRepository extends JpaRepository<LlmConnection, Long> {
     Optional<LlmConnection> findBySlug(String slug);
 
-    /**
-     * Immutable probe target, loaded so the "test connection" call can leave the transaction behind
-     * before it makes a network request. See {@link LlmConnectionProbeService}.
-     */
     @Query(
         "SELECT new de.tum.cit.aet.hephaestus.agent.catalog.LlmProbeTarget(c.baseUrl, c.authMode, c.apiKey) " +
             "FROM LlmConnection c WHERE c.id = :id"

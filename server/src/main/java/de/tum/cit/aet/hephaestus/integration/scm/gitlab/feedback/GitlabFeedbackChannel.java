@@ -215,32 +215,19 @@ public class GitlabFeedbackChannel implements FeedbackChannel {
         return UpdateOutcome.edited(new SummaryHandle(noteId));
     }
 
-    /** Page size per request for {@link #findExistingSummary}'s marker scan — GitLab caps page size at 100. */
+    /** GitLab caps a connection page at 100. */
     private static final int EXISTING_SUMMARY_SEARCH_PAGE_SIZE = 100;
 
-    /**
-     * Our cap, not GitLab's: the backwards walk already puts a just-posted marker on the first page, so the
-     * budget only bounds the rarer case of a marker buried under 300 newer notes — worth {@code UNKNOWN}
-     * (recovery retries) rather than an unbounded scan of a thousand-note thread on every lookup.
-     */
+    /** Our cap, not GitLab's: an unscanned tail answers {@code UNKNOWN}, so recovery retries rather than reposts. */
     private static final int EXISTING_SUMMARY_SEARCH_PAGE_BUDGET = 3;
 
     /**
-     * Dedup lookup for the delivery-recovery crash window: scans this MR/issue's notes for one whose body
-     * contains {@code marker}, walking the connection backwards from its newest end ({@code last}/{@code
-     * before}) — the summary a crashed delivery already posted is the newest note, so the scan finds it on the
-     * first request even on a thread far longer than the page budget. Returns the marker-bearing note's own id,
-     * the handle {@link #updateSummary} edits in place.
+     * Scans this MR/issue's notes for one whose body contains {@code marker}, walking the connection backwards
+     * from its newest end — the summary a crashed delivery already posted is the newest note.
      *
-     * <p>Reads the noteable's <em>flat</em> {@code notes} connection (both {@code Issue} and {@code MergeRequest}
-     * implement {@code NoteableInterface}, so one shape serves both) rather than {@code discussions { notes }}:
-     * the nested form pages notes at a fixed {@code first: 100} inside each discussion with no cursor of its own,
-     * so an over-long thread hides notes no cursor can reach. The flat connection has its own cursor, so every
-     * note is reachable and no thread is silently unscanned.
-     *
-     * <p>Only {@code ABSENT} is a green light to post; {@code UNKNOWN} leaves the delivery {@code PENDING} for a
-     * later attempt. Budget exhausted, a transport/GraphQL error, a missing cursor or the rate-limit guard
-     * therefore all yield {@code UNKNOWN} rather than {@code ABSENT}.
+     * <p>Reads the noteable's <em>flat</em> {@code notes} connection rather than {@code discussions { notes }}:
+     * the nested form pages notes at a fixed {@code first: 100} inside each discussion with no cursor of its
+     * own, so an over-long thread would hide notes no cursor can reach.
      */
     @Override
     public ExistingSummaryLookup findExistingSummary(FeedbackTarget target, String marker) {
@@ -318,10 +305,7 @@ public class GitlabFeedbackChannel implements FeedbackChannel {
         return ExistingSummaryLookup.unknown();
     }
 
-    /**
-     * A GitLab issue subject is {@code "project/path#iid"}, a merge request {@code "project/path!iid"} — the
-     * last separator wins, so a project path containing either character still classifies by its own suffix.
-     */
+    /** An issue subject is {@code "project/path#iid"}; a merge request is {@code "project/path!iid"}. */
     private static boolean isIssueSubject(String subjectExternalId) {
         return subjectExternalId != null && subjectExternalId.lastIndexOf('#') > subjectExternalId.lastIndexOf('!');
     }

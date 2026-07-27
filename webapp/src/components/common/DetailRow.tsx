@@ -4,13 +4,10 @@ export interface DetailRowProps {
 }
 
 /**
- * One label/value pair of a detail sheet's `<dl>` — the row renderer the "inspect this record"
- * sheets use, so a job sheet and an audit sheet read the same way.
- *
- * `dt`/`dd` is what associates the two programmatically; a pair of neighbouring spans reads as two
- * unrelated strings to a screen reader. The fixed label column aligns every row's value on one edge,
- * and `min-w-0` + `break-words` on the value is what makes unbroken tokens (model ids, error strings,
- * user agents) wrap instead of pushing the row past the sheet at phone widths.
+ * One label/value pair of a detail sheet's `<dl>`. `dt`/`dd` is what associates the two
+ * programmatically — a pair of neighbouring spans reads as two unrelated strings to a screen
+ * reader — and `min-w-0 break-words` is what wraps unbroken tokens (model ids, user agents)
+ * instead of pushing the row past the sheet.
  */
 export function DetailRow({ label, children }: DetailRowProps) {
 	return (

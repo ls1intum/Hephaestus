@@ -69,7 +69,6 @@ class InteractiveSandboxSpecTest extends BaseUnitTest {
         Map<String, String> env = new HashMap<>();
         env.put("OK_KEY", "good");
         InteractiveSandboxSpec s = spec(env);
-        // Mutate caller's map after validation.
         env.put("LD_PRELOAD", "/tmp/evil.so");
         env.remove("OK_KEY");
         assertThat(s.environment()).containsEntry("OK_KEY", "good").doesNotContainKey("LD_PRELOAD");

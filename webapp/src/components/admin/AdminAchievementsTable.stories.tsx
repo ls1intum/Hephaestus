@@ -55,11 +55,6 @@ export const Recalculating: Story = {
 	},
 };
 
-/**
- * Thirty members at ten a page, so the pager is on screen — the shared `TablePagination`, whose
- * window, gaps, current-page marking and boundary behaviour are stated once in its own stories
- * rather than re-checked on every table that mounts it.
- */
 export const ManyMembers: Story = {
 	args: { users: Array.from({ length: 30 }, (_, index) => member(index + 1)) },
 	play: async ({ canvasElement }) => {

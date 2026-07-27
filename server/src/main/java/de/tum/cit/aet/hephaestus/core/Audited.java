@@ -20,10 +20,8 @@ public @interface Audited {
     AuditLedger ledger();
 
     /**
-     * Which row type within {@link #ledger()}'s {@link AuditLedger#vocabulary() vocabulary}. Left
-     * empty only for a ledger that has none; {@code AuditByDefaultArchTest} fails the build on any
-     * other combination, since a token that names no constant would silently opt the endpoint out of
-     * the "does it actually reach a recorder?" rule.
+     * Which row type within {@link #ledger()}'s {@link AuditLedger#vocabulary() vocabulary}. Empty only
+     * for a ledger that has no vocabulary; any other combination fails the architecture test.
      */
     String type() default "";
 }

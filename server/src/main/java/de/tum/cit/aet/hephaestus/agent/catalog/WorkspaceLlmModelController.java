@@ -26,9 +26,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /**
- * Workspace-admin management of models on "your AI provider", plus the available-models
- * projection every workspace admin uses to bind a Task's model. Sibling to
- * {@link WorkspaceLlmConnectionController}; both share the {@code /llm} prefix.
+ * Workspace-admin management of models on "your AI provider", plus the available-models projection a
+ * workspace admin binds a Task's model from.
  */
 @WorkspaceScopedController
 @RequestMapping("/llm")

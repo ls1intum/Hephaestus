@@ -10,21 +10,10 @@ public final class TransactionCallbacks {
 
     /**
      * Run {@code action} once the current transaction has actually committed, or immediately when
-     * there is no transaction to wait for.
+     * there is no transaction to wait for. A caller for which "no transaction" is an error — one whose
+     * side effect would otherwise react to a row that may never land — must check that itself first.
      *
-     * <p>Not {@code @TransactionalEventListener(AFTER_COMMIT)}: that needs an event type for what is a
-     * same-class continuation, and moves the callback out of the class holding the invariant it
-     * protects. Not a lambda either — {@link TransactionSynchronization} has no abstract method, so it
-     * is not a functional interface.
-     *
-     * <p><b>Only the registration is shared; the precondition is not.</b> Whether "no transaction" is
-     * an error is the caller's question, and the four callers answer it differently on purpose:
-     * {@code LlmUsageRecorder} throws first, because a budget alert raised outside the source result's
-     * transaction would be reacting to spend that may never land, while
-     * {@code MentorTurnUsageAccumulator}, {@code AccountExportService} and
-     * {@code GitHubWorkspaceProvisioningAdapter} are each correct running inline. So callers that
-     * require a transaction say so themselves before calling; running immediately is the right default
-     * only where there is genuinely nothing to wait for.
+     * <p>{@link TransactionSynchronization} has no abstract method, so this cannot be a lambda.
      */
     public static void afterCommit(Runnable action) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {

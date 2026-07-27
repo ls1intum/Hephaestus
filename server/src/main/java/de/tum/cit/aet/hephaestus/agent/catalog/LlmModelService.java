@@ -20,14 +20,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * CRUD, pricing, and sharing for instance-owned LLM catalog models. GLOBAL, {@code
- * app_admin}-owned, so this service is {@link WorkspaceAgnostic}; access is gated by
- * {@code hasAuthority('app_admin')} on {@link LlmModelAdminController}.
+ * CRUD, pricing, and sharing for instance-owned LLM catalog models.
  *
- * <p>Audited on {@code auth_event} via the {@link LlmModelAudit} SPI port, same reasoning as
- * {@link LlmConnectionService}: this catalog is GLOBAL and {@code config_audit_event.workspace_id} is
- * NOT NULL. {@code @ConditionalOnServerRole} follows from the port's sole implementation being
- * server-role-only — nothing outside the admin controller consumes this service.
+ * <p>Audited on {@code auth_event} rather than {@code config_audit_event} because this catalog is
+ * global and {@code config_audit_event.workspace_id} is NOT NULL.
  */
 @Service
 @RequiredArgsConstructor
@@ -50,16 +46,11 @@ public class LlmModelService {
 
     @Transactional(readOnly = true)
     public LlmModel get(Long id) {
-        // Eager-fetches connection: every caller of get() (the admin controller's GET, and its
-        // toDTO() calls after update-price/other mutations) immediately reads connection.displayName
-        // via LlmModelDTO#from, which would otherwise throw LazyInitializationException once the
-        // transaction below has closed (OSIV is off).
         return modelRepository
             .findByIdWithConnection(id)
             .orElseThrow(() -> new EntityNotFoundException("LlmModel", id));
     }
 
-    /** Batched current-price lookup for {@link #list()}, keyed by model id. */
     @Transactional(readOnly = true)
     public Map<Long, LlmModelPrice> currentPricesByModelId(List<Long> modelIds) {
         if (modelIds.isEmpty()) {
@@ -71,7 +62,6 @@ public class LlmModelService {
             .collect(Collectors.toMap(price -> price.getModel().getId(), price -> price));
     }
 
-    /** Batched grant lookup for {@link #list()}, keyed by model id. */
     @Transactional(readOnly = true)
     public Map<Long, List<Long>> grantedWorkspaceIdsByModelId(List<Long> modelIds) {
         if (modelIds.isEmpty()) {
@@ -140,16 +130,8 @@ public class LlmModelService {
 
         LlmModel saved;
         try {
-            // saveAndFlush (not save): a generated-id entity like this one doesn't necessarily hit the
-            // DB inside save() — Hibernate can defer the INSERT to the transaction's implicit flush at
-            // commit, which is OUTSIDE this try/catch. A concurrent-create race would then surface the
-            // unique-constraint violation as an uncaught 500 instead of the 409 this catch exists to
-            // produce. Flushing synchronously here brings the violation back inside.
             saved = modelRepository.saveAndFlush(model);
         } catch (DataIntegrityViolationException e) {
-            // The fast-path checks above are racy; the unique constraints backstop the loser of a
-            // concurrent create. Report the same 409 rather than leaking a 500 — pick the exception that
-            // matches whichever constraint actually fired so the message names the right conflict.
             if (isUpstreamIdConflict(e)) {
                 throw new LlmModelUpstreamIdConflictException(connectionId, request.upstreamModelId());
             }
@@ -176,8 +158,6 @@ public class LlmModelService {
 
     @Transactional
     public LlmModel update(Long id, UpdateLlmModelRequestDTO request) {
-        // Eager-fetches connection — the controller converts the returned entity straight to
-        // LlmModelDTO after this transaction closes; see get()'s javadoc comment for why.
         LlmModel model = modelRepository
             .findByIdForUpdate(id)
             .orElseThrow(() -> new EntityNotFoundException("LlmModel", id));
@@ -201,10 +181,6 @@ public class LlmModelService {
             requireActivatable(model);
         }
 
-        // saveAndFlush (not save): flush inside this transaction so any constraint violation surfaces
-        // here rather than at the implicit end-of-transaction flush. No unique constraint can fire on
-        // this path — UpdateLlmModelRequestDTO carries neither connection nor upstream model id, the two
-        // columns of ux_llm_model_connection_upstream — so there is nothing to translate into a 409.
         LlmModel saved = modelRepository.saveAndFlush(model);
         llmModelAudit.modelUpdated(saved.getId(), saved.getConnection().getId(), saved.getSlug());
         return saved;
@@ -221,9 +197,8 @@ public class LlmModelService {
     }
 
     /**
-     * Repricing is temporal supersede-on-insert: close the current open row (if any) and insert the new
-     * one as the open row, both in this transaction — {@code ux_llm_model_price_open} allows at most one
-     * open row per model at a time.
+     * Repricing is temporal supersede-on-insert: {@code ux_llm_model_price_open} allows at most one open
+     * price row per model, so the current one must be closed before the replacement is inserted.
      */
     @Transactional
     public LlmModelPrice updatePrice(Long modelId, UpdateLlmModelPriceRequestDTO request) {
@@ -240,12 +215,9 @@ public class LlmModelService {
             .findByModelIdAndEffectiveToIsNull(modelId)
             .ifPresent(open -> {
                 open.setEffectiveTo(now);
-                // saveAndFlush, not save: the new row below is IDENTITY-generated, so persisting it
-                // issues its INSERT immediately — and Hibernate orders queued INSERTs ahead of queued
-                // UPDATEs at flush regardless. Either way the new open row would hit the database while
-                // the old one is still open, and ux_llm_model_price_open (one open price per model)
-                // would reject a perfectly legitimate reprice. Closing the old row first removes it
-                // from the index's partial predicate before the insert lands.
+                // saveAndFlush, not save: Hibernate orders queued INSERTs ahead of queued UPDATEs, so
+                // without an explicit flush the new open row reaches the database while this one is
+                // still open and ux_llm_model_price_open rejects the reprice.
                 priceRepository.saveAndFlush(open);
             });
 
@@ -275,14 +247,9 @@ public class LlmModelService {
         );
     }
 
-    /**
-     * Shares a model with all workspaces or replaces its grant set with exactly the given workspaces.
-     * Unknown workspace ids are rejected with a 400 rather than silently dropped.
-     */
+    /** Replaces the model's grant set with exactly the requested workspaces. */
     @Transactional
     public LlmModel updateSharing(Long modelId, UpdateLlmModelSharingRequestDTO request) {
-        // Serialize replace-all updates so concurrent admins cannot silently overwrite one another's
-        // grant changes or leave stale grants behind after switching to PUBLIC.
         LlmModel model = modelRepository
             .findByIdForUpdate(modelId)
             .orElseThrow(() -> new EntityNotFoundException("LlmModel", modelId));
@@ -359,11 +326,6 @@ public class LlmModelService {
         return value != null && value.isBlank() ? null : value;
     }
 
-    /**
-     * Matches the {@code ux_llm_model_connection_upstream} unique index by name so a save() failure is
-     * only reported as an upstream-id conflict when that specific constraint fired — any other integrity
-     * failure (e.g. a future NOT NULL column) should not be mislabelled.
-     */
     private static boolean isUpstreamIdConflict(DataIntegrityViolationException e) {
         Throwable cur = e;
         while (cur != null) {

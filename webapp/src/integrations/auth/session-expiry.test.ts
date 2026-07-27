@@ -108,7 +108,7 @@ describe("handlePossibleSessionExpiry", () => {
 		expect(new URL(assigned[0]).pathname).toBe("/login");
 	});
 
-	it("collapses concurrent 401s into a single refresh", async () => {
+	it("collapses concurrent 401s into a single refresh and handles all of them in place", async () => {
 		refreshMock.mockResolvedValue(true);
 		const { assigned } = stubLocation("/w/acme/overview");
 		const qc = makeQueryClient();
@@ -122,8 +122,6 @@ describe("handlePossibleSessionExpiry", () => {
 		];
 		await flush();
 
-		// All three are taken over by the recovery — none falls through to its caller as an
-		// unhandled 401 — and the one refresh that runs heals them in place, without a logout.
 		expect(handled).toEqual([true, true, true]);
 		expect(refreshMock).toHaveBeenCalledOnce();
 		expect(assigned).toHaveLength(0);

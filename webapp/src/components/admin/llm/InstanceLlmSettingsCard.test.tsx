@@ -35,7 +35,6 @@ describe("InstanceLlmSettingsCard", () => {
 		fireEvent.change(hostsField(), { target: { value: "llm.example.com" } });
 		expect(saveButton().disabled).toBe(false);
 
-		// Typed back to what the server holds: there is again nothing to send.
 		fireEvent.change(hostsField(), { target: { value: "api.openai.com" } });
 		expect(saveButton().disabled).toBe(true);
 	});
@@ -54,8 +53,6 @@ describe("InstanceLlmSettingsCard", () => {
 	});
 
 	it("saves the workspace-provider toggle the admin actually flipped", () => {
-		// Starts off, so `true` below can only come from operating the switch. Pre-set to `true`, this
-		// passed just as well with the control deleted and the field hard-coded into the payload.
 		const { onSave } = renderCard({ ...saved, allowWorkspaceConnections: false });
 
 		expect(ownProviderSwitch().getAttribute("aria-checked")).toBe("false");
@@ -80,10 +77,7 @@ describe("InstanceLlmSettingsCard", () => {
 
 		fireEvent.change(hostsField(), { target: { value: "llm.example.com" } });
 
-		// A background refetch lands — this tab regaining focus past the query's `staleTime` is enough
-		// — and a second admin has since changed the toggle. The form is seeded once, on mount:
-		// anything that copies props into state afterwards throws the typed host away and greys out
-		// Save on a form the admin is still in the middle of.
+		// A background refetch: a second admin has since changed the toggle.
 		rerender(
 			<InstanceLlmSettingsCard
 				settings={{ allowedEgressHosts: "api.openai.com", allowWorkspaceConnections: false }}

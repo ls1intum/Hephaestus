@@ -246,11 +246,8 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void persistInFlight_concurrentRace_exactlyOneWins() throws Exception {
-        // Sequential calls only prove the SQL `WHERE in_flight` semantics fire. The dual-lock
-        // defence (Java MentorTurnLock + DB partial unique index) is supposed to handle the
-        // case where two API replicas (or two virtual threads on one replica) race the same
-        // thread id. This test proves the DB half: even if the Java lock were stripped,
-        // exactly one writer wins at the row level.
+        // Proves the DB half of the dual-lock defence (Java MentorTurnLock + DB partial unique
+        // index): even if the Java lock were stripped, exactly one writer wins at the row level.
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
 
         ExecutorService pool = Executors.newFixedThreadPool(2);
@@ -268,7 +265,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
             };
             var fa = pool.submit(attempt);
             var fb = pool.submit(attempt);
-            // Wait until both threads are at the barrier, then release simultaneously.
             assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
             fire.countDown();
             Object resultA = fa.get(10, TimeUnit.SECONDS);
@@ -376,7 +372,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         JsonNode meta = chatMessageRepository.findById(assistantId).orElseThrow().getMetadata();
         assertThat(meta.path("usage").path("input").asLong()).isEqualTo(100);
         assertThat(meta.path("usage").path("output").asLong()).isEqualTo(50);
-        // The wire's 200 survives — not the 150 a naive input+output derivation would write.
         assertThat(meta.path("usage").path("totalTokens").asLong()).isEqualTo(200);
     }
 
@@ -410,10 +405,9 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void finalise_storesSessionJsonlAboveToastThreshold() {
-        // Postgres TOAST threshold is ~2KB; values above ~8KB go out-of-line into pg_toast.
-        // A 1MB payload exercises detoast on read — the path that would surface any
-        // encoding/transport regression introduced by JDBC stream handling. Far more
-        // realistic for a 20+ turn conversation than the byte-string fixtures above.
+        // Postgres TOAST threshold is ~2KB, so a 1MB payload exercises out-of-line storage and
+        // detoast on read — the path that would surface an encoding/transport regression in JDBC
+        // stream handling.
         UUID threadId = UUID.randomUUID();
         ChatThread thread = persistence.ensureThread(workspace.getId(), threadId, user, "hello");
         UUID assistantId = UUID.randomUUID();
@@ -591,11 +585,10 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void optimisticLocking_staleSnapshotSaveFails() throws Exception {
-        // Root-cause protection against the reaper-vs-late-finalise data corruption: a
-        // writer that loaded the entity at version=N can no longer overwrite a row the
-        // reaper bumped to N+1. Hibernate detects the version mismatch on the SQL UPDATE
-        // predicate (`WHERE id = ? AND version = ?`) and throws — the persistence service
-        // catches and skips, so the reaper's observation survives.
+        // Protects against reaper-vs-late-finalise corruption: a writer that loaded the entity at
+        // version=N can no longer overwrite a row the reaper bumped to N+1 — Hibernate's
+        // version-checked UPDATE throws, the persistence service catches it, and the reaper's
+        // observation survives.
         UUID assistantId = persistInFlightTurn("hello");
 
         // Simulate the in-flight runner: load a managed snapshot at the current version.
@@ -603,22 +596,17 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         Long versionBefore = stale.getVersion();
         assertThat(versionBefore).isNotNull();
 
-        // The real reaper sweeps the abandoned row and bumps its version.
         setCreatedAt(assistantId, Instant.now().minus(Duration.ofMinutes(80)));
         reaperWithAnUnsafeWindow().reap();
         ChatMessage afterReaper = chatMessageRepository.findById(assistantId).orElseThrow();
         assertThat(afterReaper.getVersion()).isEqualTo(versionBefore + 1L);
         assertThat(afterReaper.getStatus()).isEqualTo(ChatMessage.Status.interrupted);
 
-        // Stale-snapshot save attempt: Hibernate's UPDATE predicate fails on the version,
-        // surfaces as OptimisticLockingFailureException. The version mismatch is the single
-        // durable signal that another writer touched the row.
         stale.setStatus(ChatMessage.Status.completed);
         assertThatThrownBy(() -> {
             chatMessageRepository.saveAndFlush(stale);
         }).isInstanceOf(OptimisticLockingFailureException.class);
 
-        // After the failed save attempt, the row in the DB still reflects the reaper's observation.
         ChatMessage finalState = chatMessageRepository.findById(assistantId).orElseThrow();
         assertThat(finalState.getStatus()).isEqualTo(ChatMessage.Status.interrupted);
         assertThat(finalState.getMetadata().path("error").asString()).isEqualTo("server restart");
@@ -654,17 +642,12 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     /**
-     * The whole point of the durable per-call columns, driven end to end: a worker dies mid-turn, so
-     * there is no runner report and no in-process meter left anywhere — only what the LLM proxy wrote
-     * to the row as it served each call. The reaper must bill THAT.
+     * A worker dies mid-turn leaving no runner report — only what the LLM proxy wrote to the row per
+     * call. The reaper must bill from that.
      *
-     * <p>Kills "have the reaper keep calling {@code recordUnverifiable} with zeros": the workspace's
-     * month silently loses every crashed turn's spend, which is exactly the state this closes.
-     *
-     * <p>It does NOT prove the read has to come from the projection rather than the swept entity — the
-     * sweep loads that entity after these calls have committed, so both would agree here. What makes
-     * the projection the right read is the concurrent case, and the property that actually protects
-     * it is the read-only column mapping, pinned by
+     * <p>Kills "reaper falls back to {@code recordUnverifiable} with zeros", which would silently
+     * lose a crashed turn's spend. The read-only column mapping that actually protects the
+     * concurrent case is pinned separately by
      * {@code MentorTurnUsageAccumulatorIntegrationTest#aStaleEntityFlushDoesNotClobberTheCounters}.
      */
     @Test
@@ -737,14 +720,12 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     /**
-     * A reaper configured with a window below the safe floor, so what decides which rows are stale
-     * here is the clamp rather than the ten minutes asked for — the same thing an operator who sets
-     * the property too low gets.
+     * A reaper configured with a window below the safe floor, so the clamp — not the requested ten
+     * minutes — decides which rows are stale, matching what an operator who sets the property too low gets.
      *
-     * <p>Hand-built rather than the injected bean, whose {@code @SchedulerLock} advice needs the
-     * {@code shedlock} table that {@code ddl-auto=create} does not produce. The injected bean is still
-     * passed as the self-reference, so each turn is accounted in the {@code REQUIRES_NEW} transaction
-     * the proxy opens — the property the per-turn batch semantics depend on.
+     * <p>Hand-built because the injected bean's {@code @SchedulerLock} needs a {@code shedlock} table
+     * that {@code ddl-auto=create} doesn't produce; the injected bean is still passed as self-reference
+     * so each turn runs in the {@code REQUIRES_NEW} transaction the batch semantics depend on.
      */
     private MentorInFlightReaper reaperWithAnUnsafeWindow() {
         return new MentorInFlightReaper(
@@ -770,11 +751,10 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("chk_chat_message_status rejects values outside (in_flight,completed,interrupted)")
     void statusColumnCheckConstraintFires() throws Exception {
-        // Pin the production DB-level guard. The column CHECK is the only backstop that
-        // catches a future writer typo'ing `"in_flite"` or inventing a new status without a
-        // matching application-side state machine update. The integration test profile
-        // recreates the constraint in @BeforeEach so this assertion exercises the real
-        // predicate, not just a JPA enum validation.
+        // Pins the production DB-level guard: the CHECK constraint is the backstop that catches a
+        // future writer typo'ing `"in_flite"` or inventing a status without an app-side state
+        // machine update. @BeforeEach recreates the constraint so this exercises the real predicate,
+        // not just JPA validation.
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "constraint test");
         Assertions.assertThatThrownBy(() -> {
             try (
@@ -793,11 +773,10 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
             }
         })
             .isInstanceOf(java.sql.SQLException.class)
-            // The constraint name varies by environment: production ships our explicit
-            // `chk_chat_message_status` via Liquibase, while the test profile's ddl-auto=create
-            // also generates a Hibernate-implicit `chat_message_status_check` from the
-            // @Enumerated(EnumType.STRING) field. Either fires first — both encode the same
-            // enum invariant — so the assertion accepts either.
+            // The constraint name varies by environment: production ships the explicit
+            // `chk_chat_message_status` via Liquibase; ddl-auto=create also generates a
+            // Hibernate-implicit `chat_message_status_check`. Either can fire first, so the
+            // assertion accepts both.
             .satisfies(t ->
                 Assertions.assertThat(t.getMessage()).containsAnyOf(
                     "chk_chat_message_status",

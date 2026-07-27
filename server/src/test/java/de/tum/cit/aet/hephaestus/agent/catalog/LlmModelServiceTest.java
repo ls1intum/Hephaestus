@@ -418,10 +418,6 @@ class LlmModelServiceTest extends BaseUnitTest {
             verify(modelRepository, never()).saveAndFlush(any());
         }
 
-        // The rejection half of this guard — a second model reusing an upstream id already taken on the
-        // connection — is asserted end to end, together with the 409 ProblemDetail it must produce, by
-        // LlmModelAdminControllerIntegrationTest#aDuplicateUpstreamModelIdOnTheSameConnectionIs409WithAProblemDetail.
-
         @Test
         void createSucceedsWhenTheUpstreamIdIsUniqueOnTheConnection() {
             LlmConnection connection = new LlmConnection();

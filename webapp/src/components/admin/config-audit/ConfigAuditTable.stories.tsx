@@ -80,32 +80,23 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Newest first: each row shows the affected setting, who changed it, and the field-level diff. */
 export const Default: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		// The diff, not raw JSON: "cooldownMinutes: 30 → 10" surfaces in the row summary.
 		await expect(canvas.getByText(/cooldownMinutes: 30 → 10/)).toBeInTheDocument();
-		// A snapshot name enriches the subject rather than a bare "#5".
 		await expect(canvas.getAllByText(/GPT reviewer/).length).toBeGreaterThan(0);
 	},
 };
 
-/**
- * Impersonation is attributed to the operator with the assumed identity shown as "acting as …", and a
- * credential change renders masked (never the raw boolean).
- */
 export const Impersonation: Story = {
 	args: { entries: [entries[1]] },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByText(/acting as Ada Lovelace/)).toBeInTheDocument();
-		// llmApiKeySet: false → true must render as a mask, not "false → true".
 		await expect(canvas.getByText(/not set → ••••••/)).toBeInTheDocument();
 	},
 };
 
-/** A background change (seeder, scheduler) is labelled "System", never a blank or a numeric id. */
 export const SystemActor: Story = {
 	args: {
 		entries: [entries[3]],
@@ -116,7 +107,6 @@ export const SystemActor: Story = {
 	},
 };
 
-/** The instance-admin view adds a Workspace column that the workspace-scoped view omits. */
 export const WithWorkspaceColumn: Story = {
 	args: {
 		showWorkspace: true,
@@ -129,14 +119,11 @@ export const WithWorkspaceColumn: Story = {
 	},
 };
 
-/** Opening a row reveals the field-by-field before/after and the raw snapshots on demand. */
 export const RowDetail: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		const buttons = canvas.getAllByRole("button", { name: /View details/i });
 		await userEvent.click(buttons[0]);
-		// The sheet portals → scope to the dialog. "Changes" is also a column header, so assert on the
-		// field-level diff content: the changed key and its before/after values.
 		const dialog = within(await screen.findByRole("dialog"));
 		await expect(dialog.getByText("cooldownMinutes")).toBeInTheDocument();
 		await expect(dialog.getByText("30")).toBeInTheDocument();
@@ -144,7 +131,6 @@ export const RowDetail: Story = {
 	},
 };
 
-/** Filtered with no matches: distinct copy from the never-populated empty state. */
 export const EmptyWithFilter: Story = {
 	args: { entries: [], hasFilter: true },
 	play: async ({ canvasElement }) => {
@@ -153,7 +139,6 @@ export const EmptyWithFilter: Story = {
 	},
 };
 
-/** First run, nothing recorded yet — teaches what will show up here. */
 export const EmptyInitial: Story = {
 	args: { entries: [] },
 	play: async ({ canvasElement }) => {
@@ -162,7 +147,6 @@ export const EmptyInitial: Story = {
 	},
 };
 
-/** Error state with a Retry affordance. */
 export const ErrorState: Story = {
 	args: { entries: [], isError: true },
 	play: async ({ canvasElement }) => {
@@ -172,7 +156,6 @@ export const ErrorState: Story = {
 	},
 };
 
-/** More pages available — the Load more control appears and disables while fetching. */
 export const LoadMore: Story = {
 	args: { hasNextPage: true, isFetchingNextPage: true },
 	play: async ({ canvasElement }) => {
@@ -181,11 +164,6 @@ export const LoadMore: Story = {
 	},
 };
 
-/**
- * Header and body must declare the same number of columns. Responsive classes applied to `<th>` but
- * not the matching `<td>` silently shift every cell under the wrong header — invisible to a snapshot,
- * and wrong for `scope="col"` too.
- */
 export const ColumnCountMatchesHeader: Story = {
 	args: { showWorkspace: true },
 	play: async ({ canvasElement }) => {

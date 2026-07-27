@@ -56,9 +56,6 @@ describe("AdminLlmModelAccessDialog", () => {
 		fireEvent.click(screen.getByRole("combobox", { name: "Workspaces" }));
 		fireEvent.click(await screen.findByRole("option", { name: /beta/i }));
 
-		// What the admin can see before committing: both workspaces are ticked in the list, and the
-		// trigger summarises the same two. Without this the payload below could be right by accident
-		// while the control the admin reads showed something else.
 		expect(screen.getByRole("option", { name: /alpha/i }).getAttribute("aria-selected")).toBe(
 			"true",
 		);
@@ -85,16 +82,13 @@ describe("AdminLlmModelAccessDialog", () => {
 		};
 		const { rerender } = render(<AdminLlmModelAccessDialog {...props} model={granted} />);
 
-		// The admin revokes Beta and has not saved yet.
 		fireEvent.click(screen.getByRole("combobox", { name: "Workspaces" }));
 		fireEvent.click(await screen.findByRole("option", { name: /beta/i }));
 		expect(screen.getByRole("option", { name: /beta/i }).getAttribute("aria-selected")).toBe(
 			"false",
 		);
 
-		// A background refetch lands — same model, a fresh object, and another admin has since granted
-		// it more broadly. The open dialog is seeded once, on mount: anything that mirrors props into
-		// state on every render reinstates Beta here, and Save goes on to revoke nothing.
+		// A background refetch: same model, fresh object, granted more broadly since.
 		rerender(
 			<AdminLlmModelAccessDialog
 				{...props}
@@ -143,13 +137,11 @@ describe("AdminLlmModelAccessDialog", () => {
 			/>,
 		);
 
-		// The premise: the directory is down, so the selected-workspace list cannot be saved.
 		expect(screen.getByText("Could not load workspaces")).toBeTruthy();
 		expect(
 			(screen.getByRole("button", { name: "Save access" }) as HTMLButtonElement).disabled,
 		).toBe(true);
 
-		// "All workspaces" needs no directory, so it is still reachable.
 		fireEvent.click(screen.getByRole("radio", { name: /^All workspaces/i }));
 		const save = screen.getByRole("button", { name: "Save access" }) as HTMLButtonElement;
 		expect(save.disabled).toBe(false);

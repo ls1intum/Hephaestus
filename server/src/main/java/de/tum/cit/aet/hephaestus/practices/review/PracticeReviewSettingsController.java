@@ -19,12 +19,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
-/**
- * A workspace's practice-review policy: when a review runs and where its feedback lands.
- *
- * <p>The policy is a property of practice review, not of the AI configuration, so it lives beside the
- * practice catalogue — which also keeps its service free of any {@code agent} dependency.
- */
+/** A workspace's practice-review policy: when a review runs and where its feedback lands. */
 @WorkspaceScopedController
 @RequestMapping("/practices/review-settings")
 @Tag(name = "Practice Review Settings", description = "Workspace-scoped practice-review policy")

@@ -198,7 +198,7 @@ class AuditByDefaultArchTest extends HephaestusArchitectureTest {
 
     /**
      * Admin-gated = a workspace admin/owner gate or the instance-admin authority, on the method OR its
-     * controller. Class-level gates count: seven controllers declare the gate once on the class.
+     * controller. Class-level gates count, since some controllers declare the gate once on the class.
      */
     static boolean isAdminGated(JavaMethod method) {
         return (

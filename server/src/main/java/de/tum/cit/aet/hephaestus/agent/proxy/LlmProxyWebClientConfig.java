@@ -15,22 +15,14 @@ import reactor.netty.resources.ConnectionProvider;
 import reactor.netty.resources.LoopResources;
 
 /**
- * WebClient configuration for the LLM proxy.
+ * WebClient configuration for the LLM proxy. Separate from the mentor WebClient — different timeout
+ * profile (LLM responses can take minutes), no base URL (varies per provider per request), and an
+ * independent connection pool.
  *
- * <p>Separate from the mentor WebClient — different timeout profile (LLM responses can
- * take minutes), no base URL (varies per provider per request), and independent connection pool.
- *
- * <p>Pool settings follow the pattern established by {@code GitHubGraphQlConfig} and
- * {@code GitLabGraphQlConfig} in this codebase.
- *
- * <p><b>Connect-time SSRF guard:</b> {@code EgressPolicy} only validates the
- * upstream host at snapshot-write / call-entry time; without a guarded resolver here, a DNS-rebind
- * target (public answer during validation, private answer at connect time) would sail straight
- * through this WebClient. {@link WebClientConnectors#resolverGroup} pins the SAME check to the
- * actual connection, and threads the {@code allow-loopback} dev/e2e exemption through so it agrees
- * with {@code EgressPolicy}'s own literal-host allowance instead of re-blocking it. That flag is read
- * from {@link LlmProperties} — the one owner of its default — for the same reason {@code EgressPolicy}
- * reads it there: the validator and this dialler must not drift on what "loopback allowed" means.
+ * <p>Connect-time SSRF guard: {@code EgressPolicy} validates the upstream host before the call, so
+ * without a guarded resolver here a DNS-rebind target (public answer during validation, private answer
+ * at connect time) would sail straight through. The {@code allow-loopback} exemption is read from
+ * {@link LlmProperties} so the validator and this dialler cannot drift on what it means.
  */
 @Configuration
 class LlmProxyWebClientConfig {
@@ -66,12 +58,11 @@ class LlmProxyWebClientConfig {
             .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10_000)
             .resolver(WebClientConnectors.resolverGroup(allowLoopback))
             .doOnConnected(conn ->
-                // No ReadTimeoutHandler — LLM SSE streams go silent during model thinking.
-                // Stream duration is bounded by ProxyStreamingUtils.DEFAULT_SSE_TIMEOUT.
+                // No ReadTimeoutHandler — LLM SSE streams go silent during model thinking, so stream
+                // duration is bounded by ProxyStreamingUtils' own SSE timeout instead.
                 conn.addHandlerLast(new WriteTimeoutHandler(60))
             );
 
-        // 1MB buffer — we stream SSE, not buffer entire responses
         ExchangeStrategies strategies = ExchangeStrategies.builder()
             .codecs(cfg -> cfg.defaultCodecs().maxInMemorySize(1024 * 1024))
             .build();

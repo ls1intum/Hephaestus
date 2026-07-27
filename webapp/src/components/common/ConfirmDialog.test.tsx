@@ -12,7 +12,6 @@ interface Row {
 
 const row: Row = { id: 7, displayName: "GPT-5" };
 
-/** The caller's half: a row to act on, held in the caller's state exactly as every real one is. */
 function Harness({ onConfirm }: { onConfirm: (subject: Row) => void }) {
 	const [deleting, setDeleting] = useState<Row | null>(null);
 	return (
@@ -30,10 +29,7 @@ function Harness({ onConfirm }: { onConfirm: (subject: Row) => void }) {
 	);
 }
 
-/**
- * The popup outlives its own close by an exit animation, so "gone" is asserted rather than read off
- * the next line — `queryByRole` finds a closing dialog for one more tick.
- */
+/** The popup outlives its own close by an exit animation, so "gone" has to be waited for. */
 async function expectDismissed() {
 	await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
 }
@@ -47,10 +43,6 @@ function openConfirm(onConfirm = vi.fn()) {
 
 describe("ConfirmDialog", () => {
 	it("closes as it confirms, so the request cannot be sent a second time", async () => {
-		// `AlertDialogAction` is a plain Button, not the primitive's Close, so nothing closes this
-		// unless the dialog does. Miss that and the row vanishes behind a modal still offering an
-		// enabled Delete: a second click sends a second DELETE, which comes back 404 — an error toast
-		// for a delete that worked.
 		const onConfirm = openConfirm();
 
 		fireEvent.click(screen.getByRole("button", { name: "Delete" }));
@@ -60,8 +52,7 @@ describe("ConfirmDialog", () => {
 	});
 
 	it("lets Escape out while the confirmed request is still in flight", async () => {
-		// WCAG 2.2 SC 2.1.2, per ADR 0027: nothing here is disabled and nothing here reads the
-		// caller's pending state, so the keyboard trap has no state to live in.
+		// WCAG 2.2 SC 2.1.2: nothing here reads the caller's pending state, so no keyboard trap.
 		const onConfirm = vi.fn();
 		render(<Harness onConfirm={onConfirm} />);
 		fireEvent.click(screen.getByRole("button", { name: "Delete GPT-5" }));
@@ -85,8 +76,6 @@ describe("ConfirmDialog", () => {
 	});
 
 	it("takes the verb and its opposite from the caller", () => {
-		// "Cancel" is not the opposite of every destructive verb: refusing to turn a connection off is
-		// keeping it active, and a confirm whose two buttons don't oppose each other is a coin toss.
 		render(
 			<ConfirmDialog
 				subject={row}

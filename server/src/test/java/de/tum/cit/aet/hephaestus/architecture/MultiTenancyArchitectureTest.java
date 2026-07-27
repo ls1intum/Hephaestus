@@ -61,10 +61,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
     static final String INTEGRATION_GITHUB_PACKAGE = BASE_PACKAGE + ".integration.scm.github";
     static final String INTEGRATION_GITLAB_PACKAGE = BASE_PACKAGE + ".integration.scm.gitlab";
 
-    /**
-     * Checks if a class belongs to a workspace-agnostic package (integration.scm kernel
-     * or the per-vendor ETL handlers in integration.{github,gitlab}).
-     */
     private static boolean isInWorkspaceAgnosticPackage(JavaClass javaClass) {
         String pkg = javaClass.getPackageName();
         return (
@@ -90,9 +86,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
             .orElse(false);
     }
 
-    /**
-     * Schedulers that are legitimately workspace-agnostic.
-     */
     static final Set<String> WORKSPACE_AGNOSTIC_SCHEDULERS = Set.of();
 
     /**
@@ -116,19 +109,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
     @Nested
     class RepositoryWorkspaceFilteringTests {
 
-        /**
-         * Custom @Query methods should include workspace filtering.
-         *
-         * <p>All JPQL/HQL queries that return business data should filter
-         * by workspaceId to prevent cross-tenant data access.
-         *
-         * <p>Exceptions:
-         * <ul>
-         *   <li>Sync operations that look up by external GitHub ID</li>
-         *   <li>Workspace-agnostic lookup tables</li>
-         *   <li>Queries that already filter through repository.organization.workspaceId</li>
-         * </ul>
-         */
         @Test
         void queryMethodsIncludeWorkspaceFiltering() {
             ArchCondition<JavaMethod> includeWorkspaceFiltering = new ArchCondition<>(
@@ -236,12 +216,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
 
-        /**
-         * Repositories returning lists should have workspace-scoped alternatives.
-         *
-         * <p>Methods like findAll() are dangerous in multi-tenant systems.
-         * They should have workspace-scoped alternatives.
-         */
+        /** Methods like findAll() are dangerous in multi-tenant systems without a scoped alternative. */
         @Test
         void repositoriesHaveWorkspaceScopedAlternatives() {
             ArchCondition<JavaClass> haveWorkspaceScopedMethods = new ArchCondition<>(
@@ -378,19 +353,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
     @Nested
     class ScheduledJobContextTests {
 
-        /**
-         * Classes with @Scheduled methods should have workspace iteration logic.
-         *
-         * <p>Scheduled jobs run outside of any request context. They must:
-         * <ul>
-         *   <li>Iterate over all active workspaces</li>
-         *   <li>Set workspace context before processing each workspace</li>
-         *   <li>Clear context after processing</li>
-         * </ul>
-         *
-         * <p>Pattern: Use SyncTargetProvider or WorkspaceRepository to get workspaces,
-         * then use SyncContextProvider to set/clear context.
-         */
+        /** Scheduled jobs run outside any request context, so they must set up their own workspace iteration. */
         @Test
         void scheduledClassesHaveWorkspaceIterationDependencies() {
             ArchCondition<JavaClass> haveWorkspaceIterationCapability = new ArchCondition<>(
@@ -472,12 +435,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
 
-        /**
-         * @Scheduled methods should not directly access repositories without workspace filtering.
-         *
-         * <p>If a scheduled method accesses a repository directly, it must
-         * be through a workspace-scoped method or after setting workspace context.
-         */
         @Test
         void scheduledMethodsDontBypassWorkspaceContext() {
             ArchCondition<JavaMethod> notDirectlyAccessGlobalRepositoryMethods = new ArchCondition<>(
@@ -546,13 +503,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
     @Nested
     class EventListenerContextTests {
 
-        /**
-         * @TransactionalEventListener methods should receive events with workspace context.
-         *
-         * <p>Domain events should carry workspace information (workspaceId or through
-         * entity relationships) so that async handlers can operate in the correct
-         * tenant context.
-         */
         @Test
         void eventListenersReceiveWorkspaceContext() {
             ArchCondition<JavaMethod> handleEventsWithWorkspaceContext = new ArchCondition<>(
@@ -647,10 +597,8 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
         }
 
         /**
-         * Async event listeners that are known to carry workspace context through their event payloads.
-         *
-         * <p>These listeners handle domain events where workspace context is preserved via entity
-         * relationships in the event payload (e.g., Comment -> PullRequest -> Repository -> Organization -> workspaceId).
+         * Workspace context is preserved via entity relationships in the event payload (e.g., Comment ->
+         * PullRequest -> Repository -> Organization -> workspaceId).
          */
         static final Set<String> ASYNC_LISTENERS_WITH_PAYLOAD_CONTEXT = Set.of(
             // ActivityEventListener handles CommentCreated, ReviewSubmitted events which carry full entity graphs
@@ -672,13 +620,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
             "GitHubProjectActivityListener"
         );
 
-        /**
-         * @Async event listeners should not lose workspace context.
-         *
-         * <p>When @Async is combined with @TransactionalEventListener, the
-         * execution happens in a different thread. MDC and ThreadLocal context
-         * is lost unless explicitly propagated.
-         */
+        /** When @Async is combined with @TransactionalEventListener, MDC/ThreadLocal context is lost unless propagated. */
         @Test
         void asyncEventListenersPropagateContext() {
             ArchCondition<JavaClass> propagateContextInAsyncListeners = new ArchCondition<>(
@@ -714,8 +656,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                         .getConstructors()
                         .forEach(c -> c.getRawParameterTypes().forEach(p -> dependencies.add(p.getSimpleName())));
 
-                    // If the async listener class has repository dependencies, it should
-                    // also have context propagation or use events that carry full context
                     boolean hasRepositoryDependency = dependencies.stream().anyMatch(d -> d.endsWith("Repository"));
 
                     // Events with full entity snapshots (like ScmDomainEvent payloads) don't need
@@ -757,12 +697,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
     @Nested
     class ServiceWorkspaceAwarenessTests {
 
-        /**
-         * Public service methods returning entity lists should take workspace parameter.
-         *
-         * <p>Services that return lists of entities must be workspace-scoped
-         * to prevent accidentally returning data from all tenants.
-         */
         @Test
         void serviceListMethodsAreWorkspaceScoped() {
             ArchCondition<JavaMethod> beWorkspaceScopedIfReturningList = new ArchCondition<>(
@@ -807,7 +741,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                         // that are called with workspace context already established
                         String ownerName = method.getOwner().getSimpleName();
 
-                        // Skip workspace-agnostic services (user-scoped, system-wide, admin)
                         if (WORKSPACE_AGNOSTIC_SERVICES.contains(ownerName)) {
                             return;
                         }
@@ -850,16 +783,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
     @Nested
     class ControllerWorkspaceContextTests {
 
-        /**
-         * Controllers should resolve WorkspaceContext for all data endpoints.
-         *
-         * <p>Every endpoint that returns tenant-specific data should:
-         * <ul>
-         *   <li>Take WorkspaceContext as a parameter (resolved by argument resolver)</li>
-         *   <li>OR use @EnsureWorkspaceAccess or similar security annotation</li>
-         *   <li>OR be explicitly marked as workspace-agnostic (e.g., health endpoints)</li>
-         * </ul>
-         */
         @Test
         void dataEndpointsReceiveWorkspaceContext() {
             ArchCondition<JavaMethod> haveWorkspaceContextForDataEndpoints = new ArchCondition<>(

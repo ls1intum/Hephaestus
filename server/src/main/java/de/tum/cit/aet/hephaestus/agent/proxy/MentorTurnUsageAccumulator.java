@@ -21,26 +21,11 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code agent_job} one. Runs in its own {@code REQUIRES_NEW} transaction: the proxy servlet thread
  * has no ambient transaction, and the accounting write must commit independently of the passthrough.
  *
- * <h2>Why the row and not just the in-memory meter</h2>
+ * <p>The row, not the process-local {@link MentorTurnMeter}, is the record: a worker that dies would
+ * otherwise take the whole turn's spend with it.
  *
- * <p>{@link MentorTurnMeter} is process-local, so a worker that dies takes the whole turn's spend with
- * it and {@code MentorInFlightReaper} was left booking a zero-token UNVERIFIABLE event over calls that
- * really went out. The row survives that. The meter still exists, but only as the budget gate's read
- * model (see its class doc) — and it is advanced ONLY after the row write COMMITTED, so it can never
- * claim spend the durable record does not have.
- *
- * <h2>The fence</h2>
- *
- * <p>{@code status = 'in_flight'} in {@code ChatMessageRepository#accumulateLlmUsage} is what keeps
- * turns apart, and it is stronger than the in-process binding: a call carrying turn A's id can never
- * be added to turn B's row, whatever is bound at the time. A write that matches no row means the turn
- * ended while this call was in flight; those tokens are dropped rather than charged to whoever is
- * running now, which is the same trade the job path makes for a superseded attempt — under-bill by one
- * call rather than mis-bill it.
- *
- * <p><b>But a dropped write is money lost, not a no-op.</b> Every drop and every failure is
- * WARN-logged and counted, because these columns are the only record of a crashed turn's calls: a
- * non-zero rate on {@code llm.proxy.usage.mentor.superseded} or
+ * <p>A dropped write is money lost, not a no-op — these columns are the only record of a crashed
+ * turn's calls, so a non-zero rate on {@code llm.proxy.usage.mentor.superseded} or
  * {@code llm.proxy.usage.mentor.failure} means the ledger is under-billing.
  */
 @Service
@@ -63,18 +48,7 @@ public class MentorTurnUsageAccumulator {
         this.meterRegistry = meterRegistry;
     }
 
-    /**
-     * Record one served call against the turn's durable totals, then mirror it onto the turn's meter so
-     * the budget gate sees it on the next call.
-     *
-     * <p>Order matters: the row is the authoritative record and the meter is derived from it, so the
-     * meter is advanced only once a write that actually landed has COMMITTED. Never throws — a failed
-     * write is warned, counted, and swallowed so accounting can never break the proxied response.
-     *
-     * @param attempt the billing target resolved when this call's token was authenticated; no-op when
-     *     null (no turn was running)
-     * @param usage the call's tokens; no-op when null (the provider reported none)
-     */
+    /** Never throws, so accounting can never break the proxied response. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void accumulate(@Nullable BilledAttempt attempt, @Nullable ProxyTokenUsage usage) {
         if (attempt == null || usage == null) {
@@ -93,29 +67,25 @@ public class MentorTurnUsageAccumulator {
                 recordSuperseded(turnId);
                 return;
             }
-            // AFTER COMMIT, not here: inside the transaction the UPDATE has only been SENT. A commit
-            // that then fails would leave the meter holding spend the row never got — the one direction
-            // MentorTurnMeter's contract forbids, since the gate would refuse calls the workspace had
-            // headroom for. Post-commit the row is durable, so the mirror can only lag it.
-            //
-            // Best-effort mirror for the gate. A miss here is NOT an error and is not counted: it means
-            // the turn stopped owning its sandbox while this call was in flight (the client-disconnect
-            // drain), so nothing will consult the meter again anyway. The money is already on the row.
-            afterCommit(() -> credentialRegistry.accumulate(turnId, usage));
+            mirrorOntoMeterAfterCommit(turnId, usage);
         } catch (RuntimeException e) {
-            // Swallowed so the proxied response still reaches the runner, but never quietly: if this
-            // turn now dies without a runner report, these are the only tokens anyone would have billed.
             log.warn("Lost proxy usage accounting for mentor turn {} — this call may go unbilled", turnId, e);
             meterRegistry.counter("llm.proxy.usage.mentor.failure").increment();
         }
     }
 
     /**
-     * The fence rejected this write: the turn went terminal (finalised, interrupted, or reaped) after
-     * this call was authenticated, so its totals have already been read and billed. Adding to them now
-     * would either double-bill a turn that is done or, if the row were reused, charge one turn's tokens
-     * to another. Dropping under-bills by one call, which is the lesser error — the same choice
-     * {@code ProxyUsageAccumulator} makes for a superseded job attempt.
+     * A transaction that fails at commit must not leave the meter holding spend the row never got,
+     * which would refuse calls the workspace had headroom for. A miss is not an error: the turn has
+     * stopped owning its sandbox, and the money is already on the row.
+     */
+    private void mirrorOntoMeterAfterCommit(UUID turnId, ProxyTokenUsage usage) {
+        afterCommit(() -> credentialRegistry.accumulate(turnId, usage));
+    }
+
+    /**
+     * The turn went terminal after this call was authenticated, so its totals have already been billed.
+     * Adding now would double-bill; dropping under-bills by one call, the lesser error.
      */
     private void recordSuperseded(UUID turnId) {
         log.warn(

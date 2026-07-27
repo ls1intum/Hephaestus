@@ -16,16 +16,11 @@ import tools.jackson.databind.node.ObjectNode;
  * was admitted with, written at admission and read back when {@link MentorInFlightReaper} bills a turn
  * whose worker died mid-stream.
  *
- * <p>Both directions live here because they are one format. Numbers are written as JSON strings: the
- * block reaches the browser through {@code ChatMessageDTO}, and a per-1M rate read into a binary64
- * there would no longer be the rate the turn was priced with.
+ * <p>Rates are written as JSON strings: this block reaches the browser, and a per-1M rate read into a
+ * binary64 there would no longer be the rate the turn was priced with.
  *
- * <p>{@link #readPrice} never throws. It is called inside the reaper's per-turn transaction, and a
- * throw there fails that turn's reap on every future tick as well — a row that can never be reaped is
- * a turn that can never be billed, and a thread that can never take another turn (the partial unique
- * in-flight index refuses one while the stuck row is there). So an admission block that cannot be read
- * yields {@link LlmPriceSnapshot#unpricedInstance()}: the month reads unverifiable, which is the honest
- * verdict and a terminal one.
+ * <p>{@link #readPrice} must never throw — it runs inside the reaper's per-turn transaction, and a
+ * throw would strand the row unreapable, unbillable, and blocking the thread's next turn forever.
  */
 final class MentorAdmissionMetadata {
 
@@ -99,10 +94,8 @@ final class MentorAdmissionMetadata {
     }
 
     /**
-     * An absent field reads the same as an explicit null: both say this turn has no such rate. The
-     * absent half is the one that is easy to lose — {@code path} yields a missing node, whose
-     * {@code isNull()} is false and whose text is {@code ""}, so a null check alone sends the empty
-     * string on to {@code Long.valueOf}.
+     * Absent reads the same as explicitly null. Missing must be tested for separately: its
+     * {@code isNull()} is false and its text is {@code ""}, which would reach {@code Long.valueOf}.
      */
     private static @Nullable String textOrNull(JsonNode node, String field) {
         JsonNode value = node.path(field);

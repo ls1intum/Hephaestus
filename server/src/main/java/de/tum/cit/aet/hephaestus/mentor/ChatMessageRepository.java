@@ -12,11 +12,9 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
- * Workspace-agnostic by intent: the queries that are not workspace-scoped are either the global
- * crash-recovery sweep keyed by {@code created_at} or single-row access by an id the caller already
- * proved it owns; ownership is enforced upstream in {@link ChatThreadService} for every other access
- * path. Class-level {@link WorkspaceAgnostic} satisfies the architecture rule that requires either
- * workspace-scoped query methods or an explicit opt-out marker.
+ * Workspace-agnostic by intent: the queries that are not workspace-scoped are the global
+ * crash-recovery sweep and single-row access by an id the caller already proved it owns. Ownership is
+ * enforced upstream in {@link ChatThreadService} for every other access path.
  */
 @Repository
 @WorkspaceAgnostic("Crash-recovery sweep only; thread-scoped access goes through ChatThreadService")
@@ -49,21 +47,13 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
     List<ChatMessage> findStaleInFlightForAccounting(@Param("cutoff") Instant cutoff);
 
     /**
-     * Add ONE served proxy call's tokens to a mentor turn's running totals.
+     * Add ONE served proxy call's tokens to a mentor turn's running totals. A provider call can outlive
+     * the turn that issued it, so {@code status = 'in_flight'} fences the add: once the turn has gone
+     * terminal it has already been billed from these columns, and a late add would corrupt that record.
      *
-     * <p>{@code status = 'in_flight'} is the fence, and it is the exact counterpart of the
-     * {@code retry_count} + {@code status = 'RUNNING'} predicate on {@code agent_job}: a provider call
-     * can outlive the turn that issued it, and once the turn has gone terminal these columns are what
-     * the accounting paths read. Adding to them afterwards would corrupt the record of a turn that has
-     * already been billed, or — worse — charge one turn's tokens to a row someone else now owns. A
-     * superseded write matches no row, which the caller reports rather than swallows.
+     * <p>Native, and leaving {@code version} alone, because it is the single writer of columns that are
+     * {@code updatable = false} on the entity and must not race the orchestrator's terminal write.
      *
-     * <p>Native rather than JPQL because the mapped fields are deliberately {@code updatable = false}
-     * (see {@link ChatMessage}); this statement is their single writer. It leaves {@code version}
-     * alone on purpose — bumping it would turn every proxied call into a lost-update race against the
-     * orchestrator's terminal write.
-     *
-     * @param id the assistant {@code chat_message} id the call authenticated against
      * @return 1 if the turn is still running, 0 if it has ended (a safe no-op)
      */
     @Modifying
@@ -89,10 +79,9 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
     );
 
     /**
-     * The turn's accumulated proxy usage read straight from the row, so it reflects committed
-     * accumulations regardless of how stale the caller's entity is. Callers read this only AFTER
-     * writing the turn's terminal status, which locks the row and closes
-     * {@link #accumulateLlmUsage}'s fence — so what they read is final.
+     * The turn's accumulated proxy usage read straight from the row rather than from a possibly stale
+     * entity. Callers must read it only AFTER flushing the turn's terminal status, which locks the row
+     * and closes {@link #accumulateLlmUsage}'s fence — only then is the total final.
      */
     @Query(
         "SELECT new de.tum.cit.aet.hephaestus.mentor.MentorTurnLlmUsage(" +

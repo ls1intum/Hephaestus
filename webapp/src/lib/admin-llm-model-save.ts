@@ -8,7 +8,7 @@ import type {
 export interface AdminLlmModelSaveBody {
 	metadata: CreateLlmModelRequest | UpdateLlmModelRequest;
 	price: UpdateLlmModelPriceRequest;
-	/** Set during creation. Existing-model access is changed only through the dedicated access flow. */
+	/** Creation only; an existing model's access is changed through the dedicated access flow. */
 	sharing?: UpdateLlmModelSharingRequest;
 }
 
@@ -37,9 +37,9 @@ export class AdminLlmModelSaveError extends Error {
 }
 
 /**
- * Sequences the catalog's dedicated endpoints without ever exposing a partially configured model.
- * Newly created models stay inactive until pricing and sharing are saved. An active model being
- * revoked is disabled before its other properties change.
+ * Sequences the catalog's dedicated endpoints so a model is never live while half-configured: a new
+ * one is created inactive and turned on only once its price and sharing have landed, and an active
+ * one is disabled before anything else about it changes.
  */
 export async function saveAdminLlmModelSafely({
 	connectionId,

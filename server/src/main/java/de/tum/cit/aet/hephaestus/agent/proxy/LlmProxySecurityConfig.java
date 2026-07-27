@@ -13,16 +13,11 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Separate security filter chain for the internal LLM proxy endpoints.
+ * Separate security filter chain for the internal LLM proxy endpoints, ordered ahead of the main JWT
+ * chain so these requests authenticate with proxy-scoped bearer tokens instead of JWTs.
  *
- * <p>This chain uses {@code @Order(1)} and is evaluated before the main JWT chain
- * (which has no explicit {@code @Order} and defaults to lowest precedence).
- * Authenticates requests using proxy-scoped bearer tokens instead of JWTs.
- * The main chain for all other endpoints remains unchanged.
- *
- * <p><b>Gating:</b> the LLM proxy is the only credential path for both queued jobs
- * and interactive mentor sandboxes. It therefore follows the worker/sandbox capability, not the
- * practice-job feature flag: disabling practice reviews must not break mentor turns.
+ * <p>Gated on the worker/sandbox capability rather than the practice-job feature flag, because
+ * disabling practice reviews must not break mentor turns.
  */
 @Configuration
 @ConditionalOnProperty(name = RuntimeRole.WORKER_PROPERTY, havingValue = "true", matchIfMissing = true)

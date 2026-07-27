@@ -11,18 +11,11 @@ import org.springframework.data.repository.query.Param;
 public interface WorkspaceLlmModelRepository extends JpaRepository<WorkspaceLlmModel, Long> {
     List<WorkspaceLlmModel> findByWorkspaceId(Long workspaceId);
 
-    /**
-     * Like {@link #findByWorkspaceId}, but eager-fetches {@code connection} — needed for the admin list
-     * view, which converts every row straight to {@link WorkspaceLlmModelDTO} (reads
-     * {@code connection.displayName}) outside the owning transaction. See
-     * {@link #findByIdAndWorkspaceIdWithConnection} for the single-row equivalent.
-     */
     @Query(
         "SELECT m FROM WorkspaceLlmModel m JOIN FETCH m.connection WHERE m.workspace.id = :workspaceId ORDER BY m.id"
     )
     List<WorkspaceLlmModel> findByWorkspaceIdWithConnection(@Param("workspaceId") Long workspaceId);
 
-    /** Create-path conflict guard for {@code ux_ws_llm_model_connection_upstream}. */
     boolean existsByConnectionIdAndUpstreamModelId(Long connectionId, String upstreamModelId);
 
     Optional<WorkspaceLlmModel> findByWorkspaceIdAndSlug(Long workspaceId, String slug);
@@ -31,11 +24,8 @@ public interface WorkspaceLlmModelRepository extends JpaRepository<WorkspaceLlmM
     Optional<WorkspaceLlmModel> findByIdAndWorkspaceId(Long id, Long workspaceId);
 
     /**
-     * Like {@link #findByIdAndWorkspaceId}, but eager-fetches {@code connection} — needed wherever the
-     * loaded entity outlives the read transaction before being converted to {@link WorkspaceLlmModelDTO}
-     * (which reads {@code connection.displayName}). Without this, {@code WorkspaceLlmModelController}'s
-     * GET/PATCH endpoints throw {@code LazyInitializationException} once OSIV is off, since the plain
-     * lazy {@code connection} proxy is never touched inside the owning {@code @Transactional} method.
+     * {@code connection} is fetched eagerly because callers map the entity to a DTO after the
+     * transaction closes and OSIV is off.
      */
     @Query(
         "SELECT m FROM WorkspaceLlmModel m JOIN FETCH m.connection WHERE m.id = :id AND m.workspace.id = :workspaceId"
@@ -56,10 +46,8 @@ public interface WorkspaceLlmModelRepository extends JpaRepository<WorkspaceLlmM
         @Param("workspaceId") Long workspaceId
     );
 
-    /** Delete-conflict guard for {@code WorkspaceLlmConnectionService#delete}, scoped to the owning workspace. */
     boolean existsByConnectionIdAndWorkspaceId(Long connectionId, Long workspaceId);
 
-    /** Available-models projection: this workspace's own usable (active, active-connection) BYO models. */
     @Query(
         "SELECT m FROM WorkspaceLlmModel m JOIN FETCH m.connection c " +
             "WHERE m.workspace.id = :workspaceId AND m.enabled = true AND c.enabled = true ORDER BY m.id"

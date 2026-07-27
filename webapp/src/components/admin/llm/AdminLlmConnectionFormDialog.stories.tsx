@@ -47,7 +47,6 @@ export const Probing: Story = {
 	args: { isProbing: true },
 };
 
-/** "Test & fetch models" never gates saving — a 4xx/unreachable probe is an amber note, not a blocker. */
 export const DiscoveryUnsupported: Story = {
 	args: {
 		onProbe: fn((_request, callbacks) =>
@@ -69,15 +68,7 @@ export const ValidationError: Story = {
 	},
 };
 
-/**
- * At the WCAG 2.2 SC 1.4.10 reflow width (320 px).
- *
- * Preset, endpoint, auth mode, credential and the probe result come to ~900 px. Without
- * `DialogBody` the popup is unbounded and `position: fixed`, so it hangs off the top and the bottom
- * of every phone at once and neither the title nor "Save inactive connection" can be scrolled back
- * into view. `AdminLlmModelFormDialog` — taller still, past 1000 px — carries the full proof that
- * only the body scrolls; what matters here is that this one stays inside the shared bound.
- */
+/** At the WCAG 2.2 SC 1.4.10 reflow width (320 px): the dialog must stay inside the viewport. */
 export const MobileReflow: Story = {
 	parameters: {
 		viewport: { defaultViewport: "reflow" },

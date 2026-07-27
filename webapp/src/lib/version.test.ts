@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { resolveHeaderBadge } from "./version";
 
-// The header shows the release version in production (linked to its notes) and an
-// environment pill everywhere else — a commit SHA never belongs in the header.
 describe("resolveHeaderBadge", () => {
 	it("shows a production semver as a release linking to its GitHub tag", () => {
 		const badge = resolveHeaderBadge("0.73.2", "Production", true);
@@ -31,8 +29,7 @@ describe("resolveHeaderBadge", () => {
 		});
 	});
 
-	it("shows a pill, not a dead release link, when a build injected no version", () => {
-		// A source build that never set the version would otherwise link to /releases/tag/vnightly.
+	it("shows a pill, not a dead /releases/tag/vnightly link, when a build injected no version", () => {
 		expect(resolveHeaderBadge("nightly", "Production", true).kind).toBe("environment");
 	});
 });

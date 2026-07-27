@@ -14,9 +14,9 @@ import org.hibernate.annotations.ColumnDefault;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Instance LLM settings singleton: egress allowlist, the workspace-BYO enable flag, and the
- * workspace-provider-connection flag. GLOBAL. {@code id} is fixed to 1 (a DB CHECK enforces the singleton),
- * so it is never generated — the row is seeded by the changelog.
+ * Instance-wide LLM settings: the egress allowlist and the workspace-provider-connection flag.
+ * {@code id} is fixed to 1 (a DB CHECK enforces the singleton) and never generated — the changelog
+ * seeds the row.
  */
 @Entity
 @Table(name = "instance_llm_settings")
@@ -32,7 +32,7 @@ public class InstanceLlmSettings {
     @Column(name = "id", nullable = false)
     private Short id;
 
-    /** Comma/newline-delimited egress host allowlist; empty/null = allow all (non-breaking on upgrade). */
+    /** Comma/newline-delimited; empty or null allows any public host. */
     @Nullable
     @Column(name = "allowed_egress_hosts", columnDefinition = "TEXT")
     private String allowedEgressHosts;

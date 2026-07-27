@@ -5,10 +5,6 @@ import org.jspecify.annotations.Nullable;
 /**
  * Whether a workspace may still spend, decided separately for each funding source. "Is this workspace
  * blocked?" has no single answer — only "is THIS call blocked?", which depends on who is paying.
- *
- * <p>Keeping the two verdicts apart is what makes the ownership story hold: a workspace admin can
- * never loosen the instance's protection, because they cannot write anything the instance verdict
- * reads.
  */
 public record LlmBudgetDecision(LlmBudgetBlockReason instanceFunded, LlmBudgetBlockReason workspaceFunded) {
     public static final LlmBudgetDecision ALLOWED = new LlmBudgetDecision(
@@ -17,12 +13,9 @@ public record LlmBudgetDecision(LlmBudgetBlockReason instanceFunded, LlmBudgetBl
     );
 
     /**
-     * Why spend from {@code fundingSource} is blocked, and which purse decided it.
-     *
      * @param purse the purse that produced the block, or {@code null} when nothing is blocked. For an
      *     unattributable call this is the purse actually consulted, which is not always the one the
-     *     caller assumed — so log lines and metric tags must read it here rather than re-deriving it
-     *     from the requested funding source.
+     *     caller asked about — log lines and metric tags must read it here.
      */
     public record Block(@Nullable FundingSource purse, LlmBudgetBlockReason reason) {
         static final Block NONE = new Block(null, LlmBudgetBlockReason.NONE);
@@ -33,11 +26,8 @@ public record LlmBudgetDecision(LlmBudgetBlockReason instanceFunded, LlmBudgetBl
     }
 
     /**
-     * The verdict for spend funded by {@code fundingSource}.
-     *
-     * <p>An unknown funding source (a legacy row whose frozen snapshot predates funding attribution)
-     * is judged by BOTH caps — it might be either purse, so it may only proceed when neither is
-     * exhausted. Fail-safe, not fail-open: an unattributable call must not be a way around a cap.
+     * An unknown funding source is judged by BOTH caps — it might be either purse, so it may only
+     * proceed when neither is blocked. Fail-safe: an unattributable call is not a way around a cap.
      */
     public Block decideFor(@Nullable FundingSource fundingSource) {
         if (fundingSource == null) {
@@ -55,7 +45,6 @@ public record LlmBudgetDecision(LlmBudgetBlockReason instanceFunded, LlmBudgetBl
         return reason != LlmBudgetBlockReason.NONE ? new Block(fundingSource, reason) : Block.NONE;
     }
 
-    /** The reason spend from {@code fundingSource} is blocked, or {@link LlmBudgetBlockReason#NONE}. */
     public LlmBudgetBlockReason forFunding(@Nullable FundingSource fundingSource) {
         return decideFor(fundingSource).reason();
     }

@@ -8,6 +8,7 @@ import {
 	ScrollText,
 	Users,
 } from "lucide-react";
+import { ADMIN_NAV_LABELS } from "@/components/core/sidebar/admin-nav-labels";
 import {
 	SidebarGroup,
 	SidebarGroupLabel,
@@ -23,9 +24,6 @@ import {
  * so an admin can reach it even with zero workspaces. Distinct from `NavAdmin`, which is the
  * per-workspace admin nav.
  */
-// Ordered to share a spine with the per-workspace `NavAdmin`: people, then scope, then sign-in, then
-// the AI pair, then the log. Both consoles use the same word for the same object ("AI models",
-// "AI usage", "Audit log") — the sidebar's group label is what carries the scope.
 const ADMIN_SECTIONS = [
 	{ to: "/admin/users", label: "Users", icon: Users, tooltip: "Manage accounts" },
 	{ to: "/admin/workspaces", label: "Workspaces", icon: Building2, tooltip: "All workspaces" },
@@ -37,19 +35,19 @@ const ADMIN_SECTIONS = [
 	},
 	{
 		to: "/admin/models",
-		label: "AI models",
+		label: ADMIN_NAV_LABELS.models,
 		icon: BrainCircuit,
 		tooltip: "Providers and shared models",
 	},
 	{
 		to: "/admin/usage",
-		label: "AI usage",
+		label: ADMIN_NAV_LABELS.usage,
 		icon: CircleDollarSign,
 		tooltip: "AI spend and budget caps",
 	},
 	{
 		to: "/admin/audit",
-		label: "Audit log",
+		label: ADMIN_NAV_LABELS.audit,
 		icon: ScrollText,
 		tooltip: "Who did what, and when",
 	},

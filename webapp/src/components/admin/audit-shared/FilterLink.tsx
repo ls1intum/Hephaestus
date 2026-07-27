@@ -1,10 +1,7 @@
 import { Button } from "@/components/ui/button";
 
-/**
- * A value that filters the log when activated (e.g. an actor name). A real `<Button variant="link">` so
- * it carries the system's focus/hover/keyboard behaviour; the label is truncated in an inner block span
- * because `text-overflow` does not apply to the button's flex box.
- */
+/** The label truncates in an inner span because `text-overflow` does not apply to the button's own
+ * flex box. */
 export function FilterLink({
 	label,
 	title,

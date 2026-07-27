@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { problemDetailOf, problemStatusOf } from "./problem-detail";
 
-// `problemDetailOf` turns whatever the generated client throws into a human-readable string
-// for toasts/inline errors. Precedence (detail -> title -> legacy error -> caller's fallback) is
-// the contract the UI relies on, so it must not silently drift — and a thrown Error's own `message`
-// is deliberately outside it.
 describe("problemDetailOf", () => {
 	it("prefers RFC 9457 `detail` over everything else", () => {
 		expect(
@@ -36,9 +32,6 @@ describe("problemDetailOf", () => {
 	});
 
 	it("never shows a thrown Error's own message, however it was produced", () => {
-		// A bug inside a save handler reaches this the same way a network rejection does — both are a
-		// thrown `TypeError` — so reading `message` would put a stack-trace fragment under a toast
-		// about saving a model. Only wording the server chose is ever shown.
 		expect(
 			problemDetailOf(
 				new TypeError("Cannot read properties of undefined (reading 'id')"),
@@ -53,9 +46,7 @@ describe("problemDetailOf", () => {
 		);
 	});
 
-	it("still prefers the server's wording when the body carries both", () => {
-		// A ProblemDetail thrown as an Error subclass carries both fields. `message` is outside the
-		// precedence chain, but excluding it must not exclude the `detail` sitting beside it.
+	it("still prefers `detail` over a `message` sitting beside it", () => {
 		expect(problemDetailOf({ detail: "Model still bound to an agent", message: "boom" })).toBe(
 			"Model still bound to an agent",
 		);

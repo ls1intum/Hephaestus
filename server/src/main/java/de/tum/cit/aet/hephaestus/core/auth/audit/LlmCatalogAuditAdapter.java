@@ -5,24 +5,22 @@ import de.tum.cit.aet.hephaestus.core.auth.spi.LlmModelAudit;
 import de.tum.cit.aet.hephaestus.core.auth.spi.LlmSettingsAudit;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
-import org.jspecify.annotations.Nullable;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * In-{@code core.auth} implementation of {@link LlmConnectionAudit}, {@link LlmModelAudit} and
- * {@link LlmSettingsAudit} — mirrors {@link ResearchConsentAuditAdapter}'s role, but for the
- * instance LLM catalog rather than research consent. One adapter class for all three ports (they share
- * the {@link AuthEventLogger} plumbing and the JSON-escaping helper below); the ports themselves stay
- * split by consumer so each interface stays under the SPI method-count ceiling
- * ({@code CodeQualityTest.spiInterfacesAreFocused}). Keeps {@link AuthEventLogger} + the {@code LLM_*}
- * event types encapsulated inside {@code core.auth}; {@code agent.catalog} consumes only the SPI ports.
- *
- * <p>Best-effort by contract — {@link AuthEventLogger.Draft#record()} already swallows its own
- * failures, so an audit write never breaks the catalog mutation it describes.
+ * {@link LlmSettingsAudit}, so {@link AuthEventLogger} and the {@code LLM_*} event types stay
+ * encapsulated here and {@code agent.catalog} consumes only the ports. They stay split by consumer to
+ * keep each interface under the SPI method-count ceiling.
  */
 @ConditionalOnServerRole
 @Component
 public class LlmCatalogAuditAdapter implements LlmConnectionAudit, LlmModelAudit, LlmSettingsAudit {
+
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private final AuthEventLogger authEventLogger;
 
@@ -62,23 +60,14 @@ public class LlmCatalogAuditAdapter implements LlmConnectionAudit, LlmModelAudit
 
     @Override
     public void modelPriceChanged(Long modelId, String pricingMode) {
-        record(
-            AuthEvent.EventType.LLM_MODEL_PRICE_CHANGED,
-            "{\"modelId\":" + modelId + ",\"pricingMode\":\"" + jsonEscape(pricingMode) + "\"}"
-        );
+        record(AuthEvent.EventType.LLM_MODEL_PRICE_CHANGED, details("modelId", modelId, "pricingMode", pricingMode));
     }
 
     @Override
     public void modelSharingChanged(Long modelId, String visibility, int workspaceCount) {
         record(
             AuthEvent.EventType.LLM_MODEL_SHARING_CHANGED,
-            "{\"modelId\":" +
-                modelId +
-                ",\"visibility\":\"" +
-                jsonEscape(visibility) +
-                "\",\"workspaceCount\":" +
-                workspaceCount +
-                "}"
+            details("modelId", modelId, "visibility", visibility, "workspaceCount", workspaceCount)
         );
     }
 
@@ -86,33 +75,32 @@ public class LlmCatalogAuditAdapter implements LlmConnectionAudit, LlmModelAudit
     public void settingsChanged(boolean allowWorkspaceConnections) {
         record(
             AuthEvent.EventType.LLM_SETTINGS_CHANGED,
-            "{\"allowWorkspaceConnections\":" + allowWorkspaceConnections + "}"
+            details("allowWorkspaceConnections", allowWorkspaceConnections)
         );
     }
 
-    private void record(AuthEvent.EventType type, String details) {
+    private void record(AuthEvent.EventType type, Map<String, Object> details) {
         authEventLogger
             .event(type, AuthEvent.Result.SUCCESS)
             .actingAccount(SecurityUtils.getCurrentAccountId().orElse(null))
-            .details(details)
+            .details(JSON.writeValueAsString(details))
             .record();
     }
 
-    private static String connectionDetails(Long connectionId, String slug) {
-        return "{\"connectionId\":" + connectionId + ",\"slug\":\"" + jsonEscape(slug) + "\"}";
+    private static Map<String, Object> connectionDetails(Long connectionId, String slug) {
+        return details("connectionId", connectionId, "slug", slug);
     }
 
-    private static String modelDetails(Long modelId, Long connectionId, String slug) {
-        return (
-            "{\"modelId\":" + modelId + ",\"connectionId\":" + connectionId + ",\"slug\":\"" + jsonEscape(slug) + "\"}"
-        );
+    private static Map<String, Object> modelDetails(Long modelId, Long connectionId, String slug) {
+        return details("modelId", modelId, "connectionId", connectionId, "slug", slug);
     }
 
-    /** Minimal JSON string escaping for the free-text values embedded in the {@code details} object. */
-    private static String jsonEscape(@Nullable String value) {
-        if (value == null) {
-            return "";
+    /** Builds the {@code details} object from alternating key/value pairs, preserving declaration order. */
+    private static Map<String, Object> details(Object... keyValuePairs) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        for (int i = 0; i < keyValuePairs.length; i += 2) {
+            details.put((String) keyValuePairs[i], keyValuePairs[i + 1]);
         }
-        return value.replace("\\", "\\\\").replace("\"", "\\\"");
+        return details;
     }
 }

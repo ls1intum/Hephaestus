@@ -133,8 +133,6 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
 
     @Test
     void updateSummary_editsInPlace_returnsEdited() {
-        // GitHub re-review must edit the persistent summary in place (updateIssueComment) instead of
-        // posting a duplicate. A successful mutation returns EDITED carrying the comment node id.
         FeedbackTarget target = new FeedbackTarget(
             new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
             "owner/repo#42",
@@ -185,7 +183,6 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
 
     @Test
     void updateSummary_deletedComment_isGone_soCallerReposts() {
-        // A human-deleted comment surfaces as a NOT_FOUND top-level error → GONE (re-post), not TRANSIENT.
         FeedbackTarget target = new FeedbackTarget(
             new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
             "owner/repo#42",
@@ -212,8 +209,7 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
 
     @Test
     void postSummary_nullResponse_throwsNullResponse() {
-        // createComment must fail loudly on a null mutation response (partial-delivery guard), not return a
-        // SummaryHandle with a null id that the ledger would later try to edit.
+        // A null response is a partial delivery: fail loudly rather than hand back a handle the ledger can't edit.
         FeedbackTarget target = new FeedbackTarget(
             new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
             "owner/repo#42",
@@ -236,8 +232,7 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
 
     @Test
     void postSummary_nullCommentId_throwsNoCommentId() {
-        // A mutation that returns no comment node id is a malformed-model/partial response — fail, don't
-        // hand back a SummaryHandle wrapping a null external ref.
+        // Malformed response — fail rather than hand back a handle wrapping a null external ref.
         FeedbackTarget target = new FeedbackTarget(
             new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
             "owner/repo#42",
@@ -260,9 +255,7 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
     }
 
     @Test
-    void postSummary_malformedIssueSubject_throwsInvalidIssueSubject() {
-        // An ISSUE subject that does not match owner/repo/issues/N must fail with the issue-specific message,
-        // not be mis-routed to the PR resolver.
+    void postSummary_issueSubjectWithNonNumericId_fallsBackToPrValidation_throwsInvalidPrSubject() {
         FeedbackTarget target = new FeedbackTarget(
             new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
             "owner/issues/x",
@@ -277,8 +270,6 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
 
     @Test
     void parseIssueSubjectExternalId_rejectsSubjectWithoutNumber() {
-        // A subject that is not the owner/repo/issues/<number> form must throw the issue-specific error so a
-        // malformed model output fails loudly rather than resolving to a wrong node.
         assertThatThrownBy(() -> GithubFeedbackChannel.parseIssueSubjectExternalId("owner/issues/x"))
             .isInstanceOf(FeedbackDeliveryException.class)
             .hasMessageContaining("Invalid GitHub issue subjectExternalId");
@@ -296,8 +287,8 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
 
     @Test
     void issueAndPrSubjectIds_diverge_soTheChannelCanRouteThem_andRejectMalformedRepos() {
-        // PRs and issues share owner/repo#N on GitHub, so the internal issue subject MUST diverge or the
-        // channel cannot tell them apart and an issue would be sent to the PR resolver (and fail to post).
+        // owner/repo#N is shared by PRs and issues, so the issue subject must use a distinct form or the
+        // channel can't route them apart.
         assertThat(channel.formatIssueSubjectId("owner/repo", 7)).isEqualTo("owner/repo/issues/7");
         assertThat(channel.formatPullRequestSubjectId("owner/repo", 7)).isEqualTo("owner/repo#7");
         // GitHub requires a two-segment owner/repo — fail fast, not late in node-id resolution.
@@ -316,8 +307,8 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
 
     @Test
     void postSummary_forAnIssueSubject_resolvesViaIssueNodeId_notThePrResolver() {
-        // Regression: an ISSUE subject must route to resolveIssue (repository.issue), never resolve
-        // (repository.pullRequest) which returns null for an issue and fails the whole delivery.
+        // An ISSUE subject must route through resolveIssue — resolve() targets pullRequest and returns null
+        // for an issue, failing the whole delivery.
         FeedbackTarget target = new FeedbackTarget(
             new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
             "owner/repo/issues/42",
@@ -341,8 +332,6 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
         verify(prNodeIdResolver).resolveIssue(1L, "owner", "repo", 42);
         verify(prNodeIdResolver, never()).resolve(anyLong(), any(), any(), anyInt());
     }
-
-    // findExistingSummary, finding #6 (tri-state dedup + pagination)
 
     private static final FeedbackTarget PR_TARGET = new FeedbackTarget(
         new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
@@ -399,9 +388,8 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
 
     @Test
     void findExistingSummary_pagesFromTheNewestEnd_neverForwards() {
-        // The just-posted marker is the NEWEST comment, so the scan must ask for the tail of the connection
-        // (last/before). Asking for first/after starts at the oldest comment and can run out of budget before
-        // reaching the marker on a busy PR.
+        // The just-posted marker is the newest comment, so the scan asks for the tail (last/before); first/after
+        // would start at the oldest comment and can run out of budget before reaching the marker on a busy PR.
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
         ClientGraphQlResponse response = mockCommentsPageResponse(
@@ -447,8 +435,6 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
 
     @Test
     void findExistingSummary_markerOnTheNewestPage_isFoundInOneRequest() {
-        // The point of scanning backwards: even with thousands of older comments still unscanned
-        // (hasPreviousPage=true), the marker is on the newest page and costs exactly one request.
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
         ClientGraphQlResponse newestPage = mockCommentsPageResponse(
@@ -525,7 +511,6 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
 
     @Test
     void findExistingSummary_matchOnAnOlderPage_isFound() {
-        // The scan must actually follow the cursor into an older page, not just check the newest one.
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
         ClientGraphQlResponse newestPage = mockCommentsPageResponse(
@@ -551,7 +536,6 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
 
     @Test
     void findExistingSummary_missingCursorMidWalk_isUnknown_notAbsent() {
-        // hasPreviousPage=true but no cursor to continue with: older comments exist and cannot be scanned.
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
         ClientGraphQlResponse response = mockCommentsPageResponse(

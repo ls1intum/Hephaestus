@@ -297,7 +297,6 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
             }
             env.put("LLM_PROXY_URL", url);
         } else if (spec.networkPolicy() != null && appServerIp != null) {
-            // Unified proxy route: no per-provider path segment.
             env.put(
                 "LLM_PROXY_URL",
                 "http://" + appServerIp + ":" + sandboxProperties.resolvedLlmProxyPort(serverPort) + "/internal/llm"
@@ -365,9 +364,8 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
     }
 
     /**
-     * Single dispose choke point for every close reason (manual, idle-reap, error, shutdown): removes
-     * the session from the registry and revokes its mentor LLM-proxy token so a stale credential can't
-     * outlive the container it was minted for (see {@link MentorProxyCredentialRegistry}'s javadoc).
+     * The single dispose choke point for every close reason, so no proxy credential can outlive the
+     * container it was minted for.
      */
     private void onAttachedSandboxClosed(DockerAttachedSandboxAdapter sandbox) {
         registry.onSandboxClosed(sandbox);

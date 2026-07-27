@@ -13,28 +13,11 @@ import org.springframework.stereotype.Component;
 
 /**
  * Warns once at boot when a deployment still sets an env var that Hephaestus has retired and now
- * silently ignores — see {@code MIGRATION.md}. Reads the raw {@link Environment} values directly
- * rather than relying on a {@code @ConfigurationProperties} bean that no longer exists to fail
- * loudly, so a retired property never gets a second life by accident binding onto an unrelated
- * record.
+ * silently ignores — see {@code MIGRATION.md}.
  *
- * <p>Covers two retirements:
- * <ul>
- *   <li>LLM catalog: {@code HEPHAESTUS_WORKER_LLM_BASE_URL} / {@code
- *       HEPHAESTUS_WORKER_LLM_API_KEY} / {@code HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED} — LLM
- *       providers moved from env vars to the admin console.</li>
- *   <li>NATS→Postgres agent queue cutover: {@code AGENT_NATS_ENABLED} / {@code
- *       HEPHAESTUS_AGENT_NATS_SERVER} / {@code AGENT_NATS_MAX_ACK_PENDING} / {@code
- *       AGENT_NATS_FETCH_BATCH_SIZE} — the agent job queue is now the {@code agent_job} table,
- *       polled rather than pushed over NATS; every tuning knob the old JetStream consumer had
- *       (ack-pending, fetch batch size) has no poll-based equivalent and is simply dropped.</li>
- * </ul>
- *
- * <p>A WARN here means the operator's own deployment config still sets one of these. That only holds
- * while no shipped profile defines a retired key itself — Spring binds a {@code ${VAR:}} placeholder
- * to an empty string rather than leaving it absent, so a single leftover line in an
- * {@code application-*.yml} would make every boot of that profile warn. {@code
- * DeprecatedEnvVarStartupWarnerTest#noShippedProfileDefinesARetiredProperty} pins that.
+ * <p>A WARN must mean the operator's own config sets one of these, so no shipped profile may name a
+ * retired key: Spring binds a {@code ${VAR:}} placeholder to an empty string rather than leaving it
+ * absent, and one leftover line in an {@code application-*.yml} would warn on every boot.
  */
 @Component
 public class DeprecatedEnvVarStartupWarner {

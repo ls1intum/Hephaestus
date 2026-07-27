@@ -409,13 +409,11 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
 
         @Test
         void shouldReleaseBuffersOnPartialFluxError() {
-            // Track buffer allocation via a custom factory
             var buf1 = bufferFactory.allocateBuffer(16);
             buf1.write("data: ok\n\n".getBytes(StandardCharsets.UTF_8));
             var buf2 = bufferFactory.allocateBuffer(16);
             buf2.write("data: ok2\n\n".getBytes(StandardCharsets.UTF_8));
 
-            // Emit 2 buffers then error
             Flux<DataBuffer> dataFlux = Flux.just((DataBuffer) buf1, (DataBuffer) buf2).concatWith(
                 Flux.error(new RuntimeException("mid-stream failure"))
             );
@@ -426,7 +424,6 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
             // Should not throw — errors are caught internally
             ProxyStreamingUtils.streamSseToResponse(dataFlux, headers, response, 200);
 
-            // Verify the response received the data before the error
             assertThat(response.getStatus()).isEqualTo(200);
         }
 

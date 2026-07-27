@@ -20,19 +20,15 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Self-reports this worker's liveness into {@code worker_registry} on a timer (#1138).
+ * Self-reports this worker's liveness into {@code worker_registry} on a timer.
  *
- * <p>Liveness must track the JVM that actually executes jobs (queue poll + Docker sandbox), not the
- * WSS control channel — a worker can lose WSS while still running jobs, and orphaning those would
- * double-execute them. Driving the heartbeat from the worker itself makes "stale heartbeat" mean
- * "this executor is gone", which is the only safe trigger for {@link AgentJobZombieSweeper} to requeue
- * a RUNNING job to a sibling.
+ * <p>The heartbeat must come from the JVM that actually executes jobs, never from the WSS control
+ * channel: a worker can lose WSS while still running jobs, and orphaning those would double-execute
+ * them. Only "this executor is gone" is a safe trigger for {@link AgentJobZombieSweeper} to hand a
+ * RUNNING job to a sibling.
  *
- * <p>Uses a manual scheduler (not {@code @Scheduled}) because {@code @EnableScheduling} is server-role
- * only; this bean runs on worker pods. Worker identity always binds on the worker role independent of
- * the WSS endpoint, so every executing worker is registered. {@code @Order(1)} + a synchronous first
- * beat guarantee the registry row exists before the executor ({@code @Order(2)}) claims its first job,
- * so a freshly-claimed job is never seen as orphaned.
+ * <p>Manually scheduled rather than {@code @Scheduled}, because {@code @EnableScheduling} is server-role
+ * only and this bean runs on worker pods.
  */
 @Component
 @ConditionalOnExpression(
@@ -68,10 +64,11 @@ public class WorkerLivenessReporter {
             .register(meterRegistry);
     }
 
+    /** Must stay ordered ahead of {@code AgentJobExecutor.start()}, or its first claim looks orphaned. */
     @EventListener(ApplicationReadyEvent.class)
-    @Order(1) // before AgentJobExecutor.start() (@Order(2)) so the registry row exists pre-first-claim
+    @Order(1)
     public void start() {
-        beat(); // synchronous first heartbeat — registry row present before any job is claimed
+        beat(); // synchronous, so the registry row exists before any job can be claimed
         scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "worker-liveness");
             t.setDaemon(true);
@@ -93,8 +90,8 @@ public class WorkerLivenessReporter {
                 consecutiveFailures = 0;
             }
         } catch (Exception e) {
-            // Visible, not silent: a worker that can't heartbeat will be falsely orphaned and its jobs
-            // double-executed, so this must surface (WARN + metric), not hide at DEBUG.
+            // WARN, never DEBUG: a worker that cannot heartbeat gets falsely orphaned and its jobs
+            // double-executed.
             heartbeatFailures.increment();
             consecutiveFailures++;
             log.warn(
@@ -111,9 +108,9 @@ public class WorkerLivenessReporter {
         if (scheduler != null) {
             scheduler.shutdownNow();
         }
-        // Deliberately do NOT delete the registry row here. Drain is best-effort (cancelInFlight only
-        // logs on failure), so a job could still be RUNNING; deleting the row would immediately orphan
-        // it and a sibling would re-run it. Stopping the heartbeat lets the lease expire uniformly —
-        // genuinely-unfinished jobs are recovered after the 60s lease, the stale row is purged after 1h.
+        // Deliberately do NOT delete the registry row: drain is best-effort, so a job may still be
+        // RUNNING, and deleting the row would orphan it into an immediate re-run by a sibling. Stopping
+        // the heartbeat instead lets the lease expire, which recovers only genuinely-unfinished jobs.
+        // AgentJobZombieSweeper purges the row afterwards.
     }
 }

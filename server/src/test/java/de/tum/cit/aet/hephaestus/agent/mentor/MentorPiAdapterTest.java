@@ -128,12 +128,9 @@ class MentorPiAdapterTest extends BaseUnitTest {
     }
 
     /**
-     * This is where a turn's budget is fixed, so it is the only place that can make the sentence
-     * "no mentor turn outlives {@link AgentBindingLimits#MAX_TIMEOUT_SECONDS}" true of EVERY turn and
-     * not just of the ones configured through the validated API. {@code MentorInFlightReaper} sizes its
-     * window from that ceiling and bills anything older as abandoned, so a row that got past validation
-     * — copied from the pre-binding table, or written by hand — must not be able to outlive it.
-     *
+     * This is the only place that can guarantee no turn outlives {@link AgentBindingLimits#MAX_TIMEOUT_SECONDS},
+     * since a binding row that bypassed API validation (legacy data, manual edit) could otherwise slip through.
+     * {@code MentorInFlightReaper} sizes its abandonment window from that same ceiling.
      */
     @Test
     @DisplayName("a binding stored above the ceiling still produces a turn bounded by the ceiling")
@@ -148,9 +145,8 @@ class MentorPiAdapterTest extends BaseUnitTest {
     }
 
     /**
-     * The other end of the same clamp: the binding API floor sits below {@link PiPlanSpec}'s runtime
-     * floor, so a legitimately persisted 30-60s binding would otherwise throw out of the spec and reach
-     * the mentee as an ERROR on the chat stream instead of an answer.
+     * The binding API floor sits below {@link PiPlanSpec}'s runtime floor, so a legitimately persisted
+     * 30-60s binding would otherwise throw building the spec and reach the mentee as an ERROR instead of an answer.
      */
     @Test
     @DisplayName("a binding at the configurable floor still yields a buildable sandbox")

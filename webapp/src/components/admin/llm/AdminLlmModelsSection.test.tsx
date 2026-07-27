@@ -41,9 +41,6 @@ describe("AdminLlmModelsSection", () => {
 	});
 
 	it("closes the delete confirm on confirming, while the DELETE is still in flight", async () => {
-		// The row disappears the moment the list refetches. A confirm that stayed up would still be
-		// naming it, with Delete offered again — a second DELETE for a model that no longer exists,
-		// answered 404 and toasted "Could not delete the model" for a delete that had worked.
 		const onDelete = vi.fn();
 		const props = {
 			connectionDisplayName: "OpenAI",
@@ -62,7 +59,6 @@ describe("AdminLlmModelsSection", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Delete" }));
 		expect(onDelete).toHaveBeenCalledExactlyOnceWith(model);
 
-		// What the container does next: the row is now mid-write, and the refetched list has dropped it.
 		rerender(<AdminLlmModelsSection {...props} models={[]} mutatingIds={new Set([model.id])} />);
 
 		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());

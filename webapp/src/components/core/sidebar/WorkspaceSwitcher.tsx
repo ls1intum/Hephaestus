@@ -34,10 +34,7 @@ export function WorkspaceSwitcher({
 	onWorkspaceChange?: (workspace: WorkspaceListItem) => void;
 	onAddWorkspace?: () => void;
 	isLoading?: boolean;
-	/**
-	 * Instance admin, NOT workspace admin: this only gates the zero-workspace state, where there is
-	 * no workspace to hold a membership role — a workspace-role gate here is always false.
-	 */
+	/** Only gates the zero-workspace state, where no workspace exists to carry a membership role. */
 	isAppAdmin?: boolean;
 }) {
 	const { isMobile } = useSidebar();

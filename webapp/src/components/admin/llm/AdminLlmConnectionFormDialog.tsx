@@ -51,7 +51,6 @@ export interface AdminLlmConnectionFormDialogProps {
 	onProbed?: (models: string[]) => void;
 }
 
-/** Create or update an instance OpenAI-compatible connection. */
 export function AdminLlmConnectionFormDialog({
 	open,
 	onOpenChange,
@@ -72,10 +71,8 @@ export function AdminLlmConnectionFormDialog({
 	);
 }
 
-/**
- * Everything a probe's answer depends on. The display name is not among them, so naming a connection
- * after testing it does not throw the result away.
- */
+/** The display name is deliberately not among them: naming a connection after testing it must not
+ * discard the result. */
 function probeInputsDiffer(a: LlmConnectionFieldsValue, b: LlmConnectionFieldsValue): boolean {
 	return (
 		a.baseUrl !== b.baseUrl ||
@@ -109,9 +106,7 @@ function AdminLlmConnectionFormDialogContent({
 	// Invalidates an in-flight probe whose inputs have since changed, so a slow answer about the old
 	// endpoint cannot land as if it were about the new one.
 	const probeGeneration = useRef(0);
-	// A probe answer that arrives after the dialog closed must not reach `onProbed`, which would seed
-	// the model form's datalist from a discovery the admin walked away from. Closing unmounts this
-	// component, so "still open" is exactly "still mounted".
+	// A probe answer arriving after the dialog closed must not reach `onProbed`.
 	const isMounted = useRef(true);
 	useEffect(() => {
 		isMounted.current = true;

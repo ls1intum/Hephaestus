@@ -303,7 +303,6 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             assertThat(installed).isInstanceOf(JobTokenAuthentication.class);
             ProxyRouting routing = (ProxyRouting) ((JobTokenAuthentication) installed).getPrincipal();
             assertThat(routing.principalDescription()).isEqualTo("job:" + job.getId());
-            // …and the context is torn down again once the chain returns.
             assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
         }
 
@@ -354,7 +353,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             try {
                 filter.doFilterInternal(request, response, filterChain);
             } catch (jakarta.servlet.ServletException expected) {
-                // Expected
+                // no-op
             }
 
             assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
@@ -375,14 +374,14 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         @Test
         void shouldNotBeBypassedByXForwardedFor() throws Exception {
             var request = new MockHttpServletRequest();
-            request.setRemoteAddr("8.8.8.8"); // Public IP
-            request.addHeader("X-Forwarded-For", "10.0.0.2"); // Spoofed private IP
+            request.setRemoteAddr("8.8.8.8");
+            request.addHeader("X-Forwarded-For", "10.0.0.2");
             request.addHeader("Authorization", "Bearer " + VALID_TOKEN);
             var response = new MockHttpServletResponse();
 
             filter.doFilterInternal(request, response, filterChain);
 
-            // Should still reject — uses getRemoteAddr(), not X-Forwarded-For
+            // Uses getRemoteAddr(), not X-Forwarded-For
             assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_FORBIDDEN);
             verify(filterChain, never()).doFilter(any(), any());
         }
@@ -437,7 +436,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
-            request.addHeader("Authorization", "Bearer " + VALID_TOKEN); // never minted anywhere
+            request.addHeader("Authorization", "Bearer " + VALID_TOKEN);
             var response = new MockHttpServletResponse();
 
             filter.doFilterInternal(request, response, filterChain);

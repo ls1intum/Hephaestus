@@ -135,13 +135,8 @@ public final class ProxyStreamingUtils {
 
     /**
      * As {@link #streamSseToResponse(Flux, HttpHeaders, HttpServletResponse, int)}, but also hands
-     * each chunk's bytes to {@code tap} as they go past.
-     *
-     * <p>A tee, not a buffer: the client still receives every chunk written-then-flushed exactly as
-     * before, and nothing is held back waiting for the stream to end. The tap runs AFTER the flush,
-     * on the same {@code boundedElastic} worker, so it can add no latency to what the client sees; a
-     * tap that throws is logged and ignored rather than terminating the stream, because a passthrough
-     * proxy must never fail a response over its own bookkeeping.
+     * each chunk's bytes to {@code tap} as they go past. A tee, not a buffer: the tap runs after the
+     * chunk is flushed to the client, and a tap that throws is logged rather than failing the stream.
      *
      * @param tap receives a copy of each chunk's bytes; {@code null} to stream without observing
      */
@@ -195,8 +190,6 @@ public final class ProxyStreamingUtils {
                             try {
                                 tap.accept(bytes);
                             } catch (RuntimeException tapFailure) {
-                                // The client already has these bytes. Observing them is bookkeeping,
-                                // and bookkeeping never gets to break a response.
                                 log.warn("SSE tap failed; stream continues: {}", tapFailure.toString());
                             }
                         }

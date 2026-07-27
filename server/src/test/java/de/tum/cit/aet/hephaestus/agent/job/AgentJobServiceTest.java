@@ -337,7 +337,6 @@ class AgentJobServiceTest extends BaseUnitTest {
                 Optional.empty()
             );
 
-            // Simulate saveAndFlush succeeding
             when(agentJobRepository.saveAndFlush(any(AgentJob.class))).thenAnswer(inv -> {
                 AgentJob j = inv.getArgument(0);
                 j.prePersist(); // simulate @PrePersist generating UUID + token
@@ -564,7 +563,7 @@ class AgentJobServiceTest extends BaseUnitTest {
         @SuppressWarnings("unchecked")
         void submitPreparedRendersAnActionableMessageWhenNothingWasSubmitted() {
             // submitPrepared is invoked by the controller AFTER the prep transaction commits, so submit() runs
-            // outside any outer transaction (SYSTEMIC #5). With no enabled config it renders the no-job message.
+            // outside any outer transaction. With no enabled config it renders the no-job message.
             lenient()
                 .when(transactionTemplate.execute(any()))
                 .thenAnswer(inv -> {

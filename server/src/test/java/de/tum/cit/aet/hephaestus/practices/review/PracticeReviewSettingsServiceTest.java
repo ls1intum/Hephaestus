@@ -56,16 +56,15 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
 
     @Test
     void getSettingsReturnsEffectiveAndRawOverrideValues() {
-        workspace.getReviewSettings().setRunForAllUsers(true); // explicit override
+        workspace.getReviewSettings().setRunForAllUsers(true);
 
         PracticeReviewSettingsDTO view = service.getSettings(context);
 
-        assertThat(view.runForAllUsers()).isTrue(); // override wins
-        assertThat(view.skipDrafts()).isTrue(); // inherited from property
-        assertThat(view.cooldownMinutes()).isEqualTo(15); // inherited from property
-        // Raw overrides distinguish explicit-set from inherited.
+        assertThat(view.runForAllUsers()).isTrue();
+        assertThat(view.skipDrafts()).isTrue();
+        assertThat(view.cooldownMinutes()).isEqualTo(15);
         assertThat(view.runForAllUsersOverride()).isTrue();
-        assertThat(view.skipDraftsOverride()).isNull(); // inheriting
+        assertThat(view.skipDraftsOverride()).isNull();
         assertThat(view.cooldownMinutesOverride()).isNull();
     }
 
@@ -92,12 +91,8 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
         assertThat(workspace.getReviewSettings().getSkipDrafts()).isFalse();
         assertThat(workspace.getReviewSettings().getCooldownMinutes()).isEqualTo(30);
         assertThat(workspace.getReviewSettings().getRunForAllUsers()).isNull(); // untouched
-        // The returned view (what the UI consumes) reflects the patch.
+        // The returned view is what the UI consumes; assert it reflects the patch too.
         assertThat(view.skipDrafts()).isFalse();
         assertThat(view.cooldownMinutes()).isEqualTo(30);
     }
-
-    // Resetting a field back to inherit — override cleared, effective value falling back to the fleet
-    // default — is asserted through the endpoint an admin uses by
-    // PracticeReviewSettingsControllerIntegrationTest#overridesAndResetsPracticeReviewPolicy.
 }

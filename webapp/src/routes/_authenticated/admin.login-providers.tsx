@@ -27,10 +27,7 @@ export const Route = createFileRoute("/_authenticated/admin/login-providers")({
 	component: AdminLoginProvidersPage,
 });
 
-/**
- * Toggling and deleting a provider share one prefix, so one {@link usePendingMutationIds} lookup
- * covers both. Creation is not filed here; it has no row to disable.
- */
+/** One prefix for toggle and delete, so one lookup covers both. Creation has no row to disable. */
 const PROVIDER_WRITE_MUTATION_KEY = ["adminWriteLoginProvider"];
 
 function AdminLoginProvidersPage() {

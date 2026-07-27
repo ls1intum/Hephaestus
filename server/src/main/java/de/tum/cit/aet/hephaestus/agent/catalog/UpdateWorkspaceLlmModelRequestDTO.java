@@ -7,13 +7,11 @@ import java.math.BigDecimal;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Partial update of a model on a workspace's own AI provider connection. Every field is
- * optional; an absent (null) field keeps its current value.
+ * Partial update of a model on a workspace's own AI provider connection. Every field is optional; an
+ * absent field keeps its current value.
  *
- * <p>Pricing is all-or-nothing: the service only touches the price fields when {@code pricingMode} is
- * given, and then applies the rates/note exactly as supplied (an omitted rate is cleared, matching the
- * instance-side reprice endpoint's replace-not-merge semantics). Supplying a rate without a
- * {@code pricingMode} is a no-op — send the full price shape together.
+ * <p>Pricing is the exception: it is replaced wholesale, and only when {@code pricingMode} is given. A
+ * rate sent without a {@code pricingMode} is ignored; a rate omitted alongside one is cleared.
  */
 @Schema(description = "Update a model on your AI provider (all fields optional)")
 public record UpdateWorkspaceLlmModelRequestDTO(

@@ -26,7 +26,6 @@ type Story = StoryObj<typeof meta>;
 
 export const InstancePriced: Story = {};
 
-/** Instance admin: an intentional no-charge declaration, with the required note field. */
 export const InstanceNoCharge: Story = {
 	args: { value: { pricingMode: "NO_CHARGE", note: "self-hosted, no cost" } },
 };
@@ -35,7 +34,6 @@ export const InstanceUnpriced: Story = {
 	args: { value: { pricingMode: "UNPRICED" } },
 };
 
-/** Workspace admin: the provider has no metered API rate. */
 export const WorkspaceNoCharge: Story = {
 	args: {
 		audience: "workspace",

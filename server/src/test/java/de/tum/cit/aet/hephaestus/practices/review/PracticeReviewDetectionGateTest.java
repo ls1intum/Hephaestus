@@ -36,10 +36,8 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 
 /**
- * Unit tests for {@link PracticeReviewDetectionGate}.
- * <p>
- * Tests each gate check individually and verifies ordering guarantees
- * (cheap checks prevent expensive DB/network calls).
+ * Verifies each gate check individually, including ordering guarantees: cheap checks must
+ * short-circuit before the expensive DB/network calls.
  */
 class PracticeReviewDetectionGateTest extends BaseUnitTest {
 
@@ -143,7 +141,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         return practice;
     }
 
-    /** Sets up mocks through all gate checks to reach DETECT. Uses explicit mock setup per step. */
     private Workspace setupThroughPracticeMatching(PullRequest pr, Practice... practices) {
         Workspace workspace = createWorkspace();
         when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
@@ -194,12 +191,11 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
 
             PullRequest pr = createPullRequest();
             pr.setDraft(true);
-            // Set up enough mocks to progress past draft gate (workspace will fail -> SKIP)
+            // Draft gate bypassed; workspace resolution failing next drives the SKIP.
             when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.empty());
 
             GateDecision decision = noSkipGate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
-            // Should NOT be "draft PR" — draft gate was bypassed
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("no workspace");
         }
@@ -208,8 +204,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         void draftSkipShortCircuitsBeforeExpensiveChecks() {
             PullRequest pr = createPullRequest();
             pr.setDraft(true);
-            // The draft gate runs after (cheap) workspace resolution but before the expensive
-            // agent-config / practice / role checks — assert those are never touched.
+            // Runs after (cheap) workspace resolution but before the expensive agent/practice/role checks.
             when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(
                 Optional.of(createWorkspace())
             );
@@ -470,7 +465,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             PullRequest pr = createPullRequest();
             Practice practice = createPractice(TRIGGER_EVENT);
             setupThroughPracticeMatching(pr, practice);
-            // No assignees set (empty set from createPullRequest)
 
             GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 

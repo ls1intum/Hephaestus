@@ -4,28 +4,19 @@ import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
 /**
- * One proxied call's token counts, read off an OpenAI-compatible {@code usage} block.
+ * One proxied call's token counts, read off an OpenAI-compatible {@code usage} block — the single
+ * parser for both API shapes and both transports, so the buffered and streamed billing paths cannot
+ * drift apart on which bucket a token belongs in.
  *
- * <p>The single parser for both API shapes and both transports: a buffered response body, and the
- * usage frame the streaming tap lifts out of an SSE stream. Having exactly one reader is the point —
- * a second copy would be free to disagree about which bucket cache reads belong in, and the two
- * billing paths would drift apart silently.
- *
- * @param billableInputTokens prompt tokens MINUS the cached ones. Upstream reports the prompt count
- *     inclusive of cache reads; the ledger's input bucket is the non-cached remainder so a cache read
- *     is not billed at both the input rate and the cache-read rate.
- * @param reasoningTokens already counted inside {@link #outputTokens}; carried separately only so the
- *     row can report it, never added again when pricing.
+ * @param billableInputTokens prompt tokens MINUS the cached ones, because upstream reports the prompt
+ *     count inclusive of cache reads and a cache read must not be billed at both rates
+ * @param reasoningTokens already counted inside {@link #outputTokens}; reported, never priced twice
  */
 public record ProxyTokenUsage(int billableInputTokens, int outputTokens, int reasoningTokens, int cacheReadTokens) {
     /**
-     * Read the {@code usage} object out of {@code usageOwner}.
-     *
-     * @param usageOwner the node that CONTAINS a {@code usage} field — a buffered chat-completions or
-     *     responses body, or (for a stream) the {@code response} envelope of the terminal event.
-     * @param responsesProtocol true for the {@code /responses} token names, false for chat-completions
-     * @return {@code null} when there is no usage block to read, which is not an error: a provider may
-     *     omit it, and the caller records nothing rather than guessing.
+     * @param usageOwner the node that CONTAINS a {@code usage} field
+     * @return {@code null} when there is no usage block to read, which is not an error: the caller
+     *     records nothing rather than guessing
      */
     static @Nullable ProxyTokenUsage from(@Nullable JsonNode usageOwner, boolean responsesProtocol) {
         if (usageOwner == null) {

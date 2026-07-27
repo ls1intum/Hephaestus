@@ -426,11 +426,9 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
                 new NetworkPolicy(false, null, null)
             );
 
-            // Mandatory /tmp mount should use hardened options, not the caller's "exec"
+            // Enforces noexec on /tmp even though the caller's profile requested "exec"
             assertThat(config.tmpfsMounts().get("/tmp")).contains("noexec");
-            // Custom mount should be preserved
             assertThat(config.tmpfsMounts()).containsKey("/custom");
-            // All mandatory mounts present
             assertThat(config.tmpfsMounts()).containsKey("/run");
             assertThat(config.tmpfsMounts()).containsKey("/home/agent/.local");
         }
@@ -469,7 +467,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
             );
             ContainerSecurityPolicy policyWithRuntime = new ContainerSecurityPolicy(propsWithRuntime, null);
 
-            // Caller tries to downgrade to runc
             SecurityProfile runcProfile = new SecurityProfile("runc", "none", List.of("ALL"), Map.of());
 
             DockerOperations.HostConfigSpec config = policyWithRuntime.buildHostConfig(
@@ -478,7 +475,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
                 new NetworkPolicy(false, null, null)
             );
 
-            // Global "runsc" should be enforced, not the caller's "runc"
             assertThat(config.runtime()).isEqualTo("runsc");
         }
     }

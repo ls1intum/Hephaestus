@@ -41,17 +41,9 @@ class PullRequestCommentPoster {
     static final int MAX_SUMMARY_LENGTH = 200;
 
     /**
-     * Marker appended to summary posts so a re-review can locate and edit the prior summary in place.
-     *
-     * <p>This MUST be the exact prefix every production delivery path embeds. {@link
-     * de.tum.cit.aet.hephaestus.agent.handler.FeedbackDeliveryService#formatPracticeNote} (the
-     * PR-review and issue-review delivery pipelines both post through it) therefore calls {@link
-     * #summaryMarkerFor} for its embedded marker instead of hardcoding a string of its own, so the
-     * value used to FORMAT a comment and the value used to LOOK ONE UP ({@link
-     * #findExistingSummaryComment}) cannot drift apart. If they do, the dedup lookup matches no real
-     * posted comment and every delivery-recovery retry silently double-posts. {@code
-     * PullRequestCommentPosterTest} / {@code FeedbackDeliveryServiceTest} hold the round-trip test that
-     * enforces this (format via the real handler path, then find via the lookup path).
+     * Marker embedded in summary posts so a re-review can locate and edit the prior summary in place.
+     * Every path that formats a comment must build it through {@link #summaryMarkerFor}: if the
+     * formatted marker and the looked-up one drift, delivery recovery double-posts.
      */
     static final String SUMMARY_MARKER_PREFIX = "<!-- hephaestus:practice-review:";
 
@@ -212,9 +204,8 @@ class PullRequestCommentPoster {
         long workspaceId = job.getWorkspace().getId();
         IntegrationKind kind = job.getIntegrationKind();
         if (kind == null) {
-            // Integrity failure, not a cosmetic one: the agent ran (LLM cost incurred) but the job
-            // was never given a provider to deliver against. Fail LOUD so the executor marks the job
-            // FAILED instead of silently reporting "DELIVERED" with nothing posted.
+            // Loud on purpose: the agent already ran, so a silent skip would report DELIVERED with
+            // nothing posted.
             throw new JobDeliveryException(
                 "AgentJob.integrationKind is null — cannot resolve a delivery channel. jobId=" + job.getId()
             );
@@ -239,12 +230,8 @@ class PullRequestCommentPoster {
     }
 
     /**
-     * Edits an already-posted summary comment IN PLACE (ADR 0021 re-review UX): reuses the prior comment id
-     * so the PR/MR keeps a single, evolving overview thread across re-reviews rather than accumulating one
-     * comment per run. Returns the external id on success, or {@code null} when the edit cannot land — the
-     * channel is append-only or the prior comment is confirmed gone. The {@link UpdateResult} tells the caller
-     * which: {@code EDITED} (success), {@code GONE}/{@code UNSUPPORTED} (re-post), {@code TRANSIENT} (keep the
-     * prior summary, do NOT re-post — a flaky update must not double-post). A blank-id data bug still throws.
+     * Edits an already-posted summary in place so re-reviews keep one evolving thread. A
+     * {@code TRANSIENT} outcome means keep the prior summary: a flaky update must not double-post.
      *
      * @param externalRef the vendor comment id returned by a prior {@link #postFormattedBody}
      */
@@ -310,13 +297,7 @@ class PullRequestCommentPoster {
         }
     }
 
-    /**
-     * Posts an already-formatted body as a comment on the job's ISSUE (vs the MR path above). Reuses the
-     * same {@link FeedbackChannel#postSummary} call — only the subject is an issue ({@code path#iid})
-     * rather than a merge request. Returns the external comment id, or throws {@link JobDeliveryException}
-     * on an integrity failure (no channel / no id) so an undelivered issue review is not reported as
-     * "DELIVERED".
-     */
+    /** As {@link #postFormattedBody}, but the subject is an issue rather than a merge request. */
     @Nullable
     String postIssueFormattedBody(AgentJob job, String formattedBody) {
         long workspaceId = job.getWorkspace().getId();
@@ -359,15 +340,8 @@ class PullRequestCommentPoster {
     }
 
     /**
-     * Delivery-recovery dedup lookup: does an
-     * already-posted summary comment carrying THIS job's marker exist? See {@link JobDeliveryException}
-     * callers' {@code JobTypeHandler#findExistingDelivery} for why this matters — a crash between posting
-     * and recording {@code deliveryCommentId} leaves the DB unaware a comment already landed.
-     *
-     * <p>Handles both PR ({@code pr_number} metadata) and issue ({@code issue_number} metadata) subjects,
-     * mirroring {@link #buildTarget} / {@link #postIssueFormattedBody} respectively. Any missing metadata,
-     * unresolvable channel, or lookup failure is {@link ExistingDeliveryLookup.Kind#UNKNOWN} — the caller
-     * must not treat that as "confirmed not delivered" (see {@link ExistingDeliveryLookup}'s javadoc).
+     * Does an already-posted summary comment carrying THIS job's marker exist? Anything that cannot be
+     * answered — missing metadata, no channel, a failed lookup — is {@code UNKNOWN}, never "absent".
      */
     ExistingDeliveryLookup findExistingSummaryComment(AgentJob job) {
         IntegrationKind kind = job.getIntegrationKind();
@@ -430,8 +404,6 @@ class PullRequestCommentPoster {
         String repoFullName = requireMetadataText(metadata, "repository_full_name");
         int prNumber = requireMetadataInt(metadata, "pr_number");
 
-        // Vendor-specific subject formatting lives on the per-kind FeedbackChannel —
-        // see FeedbackChannel.formatPullRequestSubjectId.
         FeedbackChannel channel = requireChannel(kind);
         String subjectExternalId;
         try {
@@ -440,23 +412,13 @@ class PullRequestCommentPoster {
             throw new JobDeliveryException(e.getMessage());
         }
 
-        // Resource URL conveys the head commit SHA for inline-finding channels that
-        // need to anchor the review to a specific commit; null/absent for the summary path.
+        // Inline-finding channels anchor to this commit; the summary path leaves it null.
         String resourceUrl = optionalMetadataText(metadata, "commit_sha");
 
         IntegrationRef ref = new IntegrationRef(kind, workspaceId, /* instanceKey */ null);
         return new FeedbackTarget(ref, subjectExternalId, resourceUrl);
     }
 
-    // The dedup marker that actually lands is the one formatComment/formatPracticeNote embeds in the
-    // comment BODY (SUMMARY_MARKER_PREFIX). The FeedbackContent.marker() component passed below is NOT
-    // read by any summary channel today (GithubFeedbackChannel / GitlabFeedbackChannel use only
-    // content.body()); it is populated for parity so a future channel that wants out-of-band marker
-    // dedup has it available.
-    //
-    // Package-visible so FeedbackDeliveryService.formatPracticeNote — the
-    // actual production delivery template for PR review AND issue review — embeds THIS SAME marker
-    // rather than a second, independently-hardcoded literal that could drift out of sync again.
     static String summaryMarkerFor(AgentJob job) {
         return SUMMARY_MARKER_PREFIX + job.getId() + " -->";
     }
@@ -464,22 +426,9 @@ class PullRequestCommentPoster {
     // Sanitization
 
     /**
-     * Sanitizes untrusted agent output for safe inclusion in git provider comments.
-     *
-     * <p>Applied transformations (order matters):
-     * <ol>
-     *   <li>Normalize newlines ({@code \r\n} → {@code \n})</li>
-     *   <li>Strip invisible Unicode characters (bidi controls, zero-width spaces, BOM)</li>
-     *   <li>Strip HTML comments (hidden instruction injection prevention)</li>
-     *   <li>Protect markdown autolinks ({@code <https://...>}) from tag stripping</li>
-     *   <li>Allowlist HTML tags; strip all attributes from allowed tags (multi-pass)</li>
-     *   <li>Strip all markdown images — inline and reference-style (tracking pixel prevention)</li>
-     *   <li>Backtick-escape @mentions (notification spam prevention)</li>
-     *   <li>Remove standalone approval language ("LGTM", "approved", etc.)</li>
-     *   <li>Escape GitLab slash commands (/approve, /merge, /close, etc.)</li>
-     *   <li>Collapse excessive newlines</li>
-     *   <li>Truncate to {@link #MAX_BODY_LENGTH} characters</li>
-     * </ol>
+     * Sanitizes untrusted agent output for safe inclusion in git provider comments. The order of the
+     * steps below is load-bearing — autolinks must survive tag stripping, and stripping must reach a
+     * fixed point before the markdown passes run.
      */
     static String sanitize(String raw) {
         if (raw == null || raw.isEmpty()) {
@@ -488,22 +437,14 @@ class PullRequestCommentPoster {
 
         String result = raw;
 
-        // 1. Normalize newlines
         result = result.replace("\r\n", "\n").replace("\r", "\n");
-
-        // 2. Strip invisible characters (bidi controls, zero-width spaces, BOM)
         result = INVISIBLE_CHARS.matcher(result).replaceAll("");
-
-        // 3. Strip HTML comments (prevents hidden instructions for downstream AI tools)
         result = HTML_COMMENT.matcher(result).replaceAll("");
 
-        // 3b. Protect markdown autolinks (<https://...>) by converting to standard links
-        //     before HTML tag stripping would incorrectly remove them
+        // Autolinks become plain links first, so the tag stripping below does not eat them.
         result = AUTOLINK.matcher(result).replaceAll("$1");
 
-        // 4. Allowlist HTML tags; strip attributes from allowed tags, remove all others.
-        //    Loop until stable to prevent nested-tag reconstruction attacks
-        //    (e.g., <scr<script>ipt> → <script> after one pass).
+        // Loop until stable: one pass would let <scr<script>ipt> reassemble into <script>.
         String prev;
         do {
             prev = result;
@@ -512,7 +453,7 @@ class PullRequestCommentPoster {
                 if (!SAFE_HTML_TAGS.contains(tagName)) {
                     return "";
                 }
-                // Reconstruct tag without attributes (prevents onclick, onload, etc.)
+                // Reconstructed without attributes, so no onclick/onload survives.
                 String full = mr.group();
                 boolean isClosing = full.startsWith("</");
                 boolean isSelfClosing = full.endsWith("/>");
@@ -522,28 +463,14 @@ class PullRequestCommentPoster {
             });
         } while (!result.equals(prev));
 
-        // 5. Strip all markdown images (inline and reference-style)
         result = MARKDOWN_IMAGE_INLINE.matcher(result).replaceAll("");
         result = MARKDOWN_IMAGE_REF.matcher(result).replaceAll("");
-
-        // 5b. Strip markdown links with unsafe URL schemes (javascript:, data:, etc.)
-        //     Keeps the display text, removes only the link target.
         result = UNSAFE_MARKDOWN_LINK.matcher(result).replaceAll("$1");
-
-        // 6. Backtick-escape @mentions
         result = AT_MENTION.matcher(result).replaceAll("`@$1`");
-
-        // 7. Remove approval language (tolerates trailing punctuation)
         result = APPROVAL_LANGUAGE.matcher(result).replaceAll("");
-
-        // 8. Escape GitLab slash commands (/approve, /merge, /close, etc.)
-        //    Prefix with backtick to render as inline code instead of being executed
         result = GITLAB_SLASH_COMMAND.matcher(result).replaceAll("`$1`");
-
-        // 9. Collapse excessive newlines
         result = EXCESSIVE_NEWLINES.matcher(result).replaceAll("\n\n");
 
-        // 10. Truncate
         result = result.strip();
         if (result.length() > MAX_BODY_LENGTH) {
             result = result.substring(0, MAX_BODY_LENGTH) + "\n\n[... truncated — comment exceeded length limit]";
@@ -587,16 +514,12 @@ class PullRequestCommentPoster {
         return sb.toString();
     }
 
-    /** Appends the metadata footer (agent name, model, duration, disclaimer) to a comment being built. */
     static void appendMetadataFooter(StringBuilder sb, AgentJob job) {
         sb.append("<sub>Hephaestus Agent");
 
-        JsonNode configSnapshot = job.getConfigSnapshot();
-        if (configSnapshot != null && configSnapshot.has("model_name")) {
-            String modelName = configSnapshot.get("model_name").asString();
-            if (!modelName.isBlank()) {
-                sb.append(" &middot; ").append(escapeHtml(modelName));
-            }
+        String modelName = snapshotModelName(job.getConfigSnapshot());
+        if (modelName != null && !modelName.isBlank()) {
+            sb.append(" &middot; ").append(escapeHtml(modelName));
         }
 
         if (job.getStartedAt() != null && job.getCompletedAt() != null) {
@@ -606,6 +529,16 @@ class PullRequestCommentPoster {
 
         sb.append("</sub>\n");
         sb.append("<sub>AI-generated feedback can be inaccurate. React with 👍 or 👎 to give feedback.</sub>\n");
+    }
+
+    /** {@code model_name} is the pre-catalog key; a current snapshot carries {@code upstreamModelId}. */
+    @Nullable
+    private static String snapshotModelName(@Nullable JsonNode configSnapshot) {
+        if (configSnapshot == null) {
+            return null;
+        }
+        String current = optionalMetadataText(configSnapshot, "upstreamModelId");
+        return current != null ? current : optionalMetadataText(configSnapshot, "model_name");
     }
 
     static String formatDuration(Duration duration) {

@@ -28,19 +28,12 @@ import org.junit.jupiter.api.Test;
  */
 class IntegrationConsumerBoundaryTest extends HephaestusArchitectureTest {
 
-    /** Packages allowed to remain under {@code integration/scm/sync/}. */
     private static final List<String> ALLOWED_SYNC_SUBPACKAGES = List.of(
         // Historical-backfill scheduler + service stay here for the duration of this slice;
         // they are Slice-C territory and not in scope for the consumer dissolution.
         "de.tum.cit.aet.hephaestus.integration.scm.sync.backfill"
     );
 
-    /**
-     * Production code must not reside directly under {@code integration/scm/sync/}; only the
-     * allowed sub-packages ({@code backfill}) remain populated. New consumer or sync
-     * orchestration code belongs under {@code integration/consumer/} or
-     * {@code integration/<kind>/sync/}.
-     */
     @Test
     void scmSyncIsEmptyOfNonBackfillCode() {
         List<String> violations = classes
@@ -59,12 +52,6 @@ class IntegrationConsumerBoundaryTest extends HephaestusArchitectureTest {
             .isEmpty();
     }
 
-    /**
-     * The agent runtime role must not link against the integration consumer fleet. Consumer
-     * beans are server-role-only; the agent job queue is the {@code agent_job} Postgres
-     * table, polled by {@code AgentJobExecutor} — no NATS connection of its own at all. Mixing the
-     * two would break role isolation.
-     */
     @Test
     void agentDoesNotDependOnIntegrationConsumer() {
         noClasses()
@@ -82,10 +69,9 @@ class IntegrationConsumerBoundaryTest extends HephaestusArchitectureTest {
     }
 
     /**
-     * Strengthened boundary: the agent runtime role must not link
-     * against jnats AT ALL anymore — not even its own connection. The queue is the {@code agent_job}
-     * table; delivery is poll-based. A jnats import anywhere under {@code agent/} would mean the
-     * cutover regressed (e.g. a stray NATS-based feature re-added without going through the queue).
+     * Stronger than {@link #agentDoesNotDependOnIntegrationConsumer()}: the agent role must not link
+     * against jnats at all, not even its own connection. A jnats import anywhere under {@code agent/}
+     * would mean a NATS-based feature crept back in without going through the {@code agent_job} queue.
      */
     @Test
     void agentDoesNotDependOnJnats() {

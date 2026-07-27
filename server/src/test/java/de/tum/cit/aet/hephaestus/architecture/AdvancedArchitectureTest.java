@@ -45,12 +45,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
     @Nested
     class LayeredArchitectureTests {
 
-        /**
-         * Services should not depend on controllers.
-         *
-         * <p>This is a critical layering violation - services are lower
-         * in the stack and should not know about presentation layer.
-         */
         @Test
         void servicesDoNotDependOnControllers() {
             ArchRule rule = noClasses()
@@ -63,12 +57,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
 
-        /**
-         * Repositories should not depend on services.
-         *
-         * <p>Repositories are the data layer - they should not call
-         * business logic in services.
-         */
         @Test
         void repositoriesDoNotDependOnServices() {
             ArchRule rule = noClasses()
@@ -88,12 +76,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
     @DisplayName("DTO Boundaries")
     class DtoBoundaryTests {
 
-        /**
-         * Entities should not depend on DTOs.
-         *
-         * <p>Domain entities are the core of the application and should
-         * not be polluted with DTO dependencies. DTOs exist at the boundaries.
-         */
         @Test
         void entitiesDoNotDependOnDtos() {
             ArchRule rule = noClasses()
@@ -106,12 +88,7 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
 
-        /**
-         * DTOs should be immutable records or have no business logic.
-         *
-         * <p>DTOs are data carriers - they should not contain complex
-         * business logic. Factory methods (fromEntity) are acceptable.
-         */
+        /** Factory methods like {@code fromEntity} are fine; this only checks immutability. */
         @Test
         void dtosAreImmutableRecords() {
             ArchRule rule = classes()
@@ -125,18 +102,7 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
 
-        /**
-         * DTOs should reside in dto packages or be colocated with their domain.
-         *
-         * <p>This codebase uses "Package by Feature" - DTOs can live with their domain entities.
-         * Valid patterns:
-         * <ul>
-         *   <li>DTOs in dto packages (traditional)</li>
-         *   <li>Record DTOs colocated with domain (inherently immutable)</li>
-         *   <li>InfoDTO suffix for colocated lightweight DTOs</li>
-         *   <li>Nested class DTOs scoped to their outer class</li>
-         * </ul>
-         */
+        /** This codebase uses "Package by Feature" - DTOs may live colocated with their domain. */
         @Test
         void dtosInDtoPackages() {
             ArchRule rule = classes()
@@ -160,12 +126,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
     @Nested
     class SecurityTests {
 
-        /**
-         * All REST controller public methods should have security annotations.
-         *
-         * <p>Every endpoint must explicitly declare its security requirements
-         * via @PreAuthorize at class or method level. No exceptions allowed.
-         */
         @Test
         void controllerMethodsHaveSecurityAnnotations() {
             ArchRule rule = methods()
@@ -187,12 +147,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
     @DisplayName("DDD Patterns")
     class DddPatternTests {
 
-        /**
-         * Domain events should be immutable records.
-         *
-         * <p>Events represent facts that happened - they should be immutable
-         * and use record types for automatic equals/hashCode/toString.
-         */
         @Test
         void domainEventsAreRecords() {
             ArchRule rule = classes()
@@ -208,14 +162,7 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
 
-        /**
-         * Event listeners are within the application package.
-         *
-         * <p>This codebase uses "Package by Feature" - listeners are colocated with their domain.
-         * We only verify they're within our application package structure.
-         *
-         * <p>NOTE: Previously had 6 orShould() clauses. Simplified: we trust domain colocation.
-         */
+        /** This codebase uses "Package by Feature" - listeners are colocated with their domain. */
         @Test
         void eventListenersInApplicationPackages() {
             ArchRule rule = classes()
@@ -233,12 +180,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
 
-        /**
-         * SPI implementations should be in adapter packages.
-         *
-         * <p>Service Provider Interface implementations are adapters
-         * that connect modules - they belong in adapter packages.
-         */
         @Test
         void spiImplementationsInAdapterPackages() {
             ArchCondition<JavaClass> implementSpiInterfaces = new ArchCondition<>("implement SPI interfaces properly") {
@@ -327,12 +268,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
     @DisplayName("Controller Patterns")
     class ControllerPatternTests {
 
-        /**
-         * Controllers should not have complex business logic.
-         *
-         * <p>Controllers should be thin - they validate input, delegate
-         * to services, and format responses. Complex logic belongs in services.
-         */
         @Test
         void controllersDoNotAccessJpaDirectly() {
             ArchRule rule = noClasses()
@@ -345,14 +280,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
 
-        // NOTE: @Transactional check moved to ArchitectureTest.transactionalNotOnControllers()
-
-        /**
-         * Controllers should return response types, not entities.
-         *
-         * <p>Returning JPA entities from controllers can cause lazy loading
-         * issues and exposes internal structure. Use DTOs instead.
-         */
         @Test
         void controllersDoNotReturnEntities() {
             ArchCondition<JavaMethod> notReturnEntity = new ArchCondition<>("not return JPA entity") {
@@ -370,7 +297,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                     }
 
                     String returnType = method.getRawReturnType().getName();
-                    // Check if return type is in entity packages
                     if (
                         returnType.contains(".integration.scm.") &&
                         !returnType.endsWith("DTO") &&
@@ -409,9 +335,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
     @Nested
     class PackageStructureTests {
 
-        /**
-         * Each module should have consistent subpackage structure.
-         */
         @Test
         void noCyclesWithinFeatureModules() {
             ArchRule rule = slices()
@@ -422,17 +345,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
 
-        /**
-         * Utility classes should be in util, common, or core packages.
-         *
-         * <p>Valid locations for utilities:
-         * <ul>
-         *   <li>util packages (traditional)</li>
-         *   <li>common packages (shared utilities)</li>
-         *   <li>core packages (infrastructure utilities like LoggingUtils)</li>
-         *   <li>Root package for cross-cutting utilities (SecurityUtils)</li>
-         * </ul>
-         */
         @Test
         void utilityClassesInUtilPackages() {
             ArchRule rule = classes()
@@ -457,14 +369,8 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
         }
 
         /**
-         * Exception classes should be in domain-appropriate packages.
-         *
-         * <p>This codebase uses "Package by Feature" - exceptions are colocated with their domain.
-         * The only restriction: exceptions must be RuntimeException subclasses (enforced in ModuleBoundaryTest).
-         *
-         * <p>NOTE: Previously had 7 orShould() clauses listing every valid package.
-         * Simplified: we trust developers to colocate exceptions appropriately.
-         * The actual enforcement is that custom exceptions extend RuntimeException.
+         * This codebase uses "Package by Feature" - exceptions are colocated with their domain. The
+         * only restriction: exceptions must be RuntimeException subclasses (enforced in ModuleBoundaryTest).
          */
         @Test
         void exceptionsInApplicationPackage() {
@@ -495,15 +401,8 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
          */
         private static final Set<String> SCHEMA_OWNING_TESTS = Set.of("LegacyAgentConfigMigrationIntegrationTest");
 
-        /**
-         * Integration tests should extend base test classes or be annotated with @SpringBootTest.
-         *
-         * <p>Using shared base classes ensures consistent setup and
-         * database cleanup between tests.
-         */
         @Test
         void integrationTestsExtendBaseClasses() {
-            // Base classes that are excluded from the check
             Set<String> baseClassNames = Set.of(
                 "AbstractWorkspaceIntegrationTest",
                 "AbstractGitHubLiveSyncIntegrationTest",
@@ -511,7 +410,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                 "BaseIntegrationTest"
             );
 
-            // Recognized base classes that integration tests should extend
             Set<String> validBaseClasses = Set.of(
                 "de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest",
                 "de.tum.cit.aet.hephaestus.integration.scm.github.AbstractGitHubLiveSyncIntegrationTest",
@@ -559,9 +457,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
             rule.check(classesWithTests);
         }
 
-        /**
-         * Test classes should follow naming conventions.
-         */
         @Test
         void testClassesEndWithTestSuffix() {
             ArchRule rule = classes()

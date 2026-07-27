@@ -2,29 +2,21 @@ import { z } from "zod";
 import type { PricingMode } from "@/lib/llm-pricing";
 
 /**
- * Client-side validation for the LLM connection and model forms.
+ * Client-side validation for the LLM connection and model forms, which set `noValidate` so their
+ * messages render in `FieldError` rather than an unstylable browser bubble — leaving `required`,
+ * `min`, `step` and `type="url"` inert and this the only thing enforcing them.
  *
- * Zod + `safeParse`, the same shape the workspace-creation wizard uses
- * (`components/workspace/create-workspace/schemas.ts`), because the forms set `noValidate` — a
- * deliberate choice, so the messages render in `FieldError` rather than in an unstylable browser
- * bubble — which also makes `required`, `min`, `step` and `type="url"` inert. Something has to
- * enforce them, and it may as well be the same something for every field.
- *
- * The rules mirror the server's (`CreateWorkspaceLlmModelRequestDTO`, `LlmPriceValidation`,
- * `EgressPolicy`) so a form the browser accepts is one the server accepts. Deliberately *not*
- * mirrored: anything that depends on server state — whether a host resolves publicly, whether it is
- * on the instance's egress allowlist, whether loopback is permitted. Those can only be answered by
- * the server, and guessing at them here would reject setups an operator has legitimately enabled.
+ * Deliberately not mirrored from the server: anything depending on instance state (does the host
+ * resolve, is it on the egress allowlist, is loopback permitted). Guessing at those here would
+ * reject setups an operator has legitimately enabled.
  */
 
-/** Reported back per field, keyed the way the form's own error state is keyed. */
 export type FieldErrors<TField extends string> = Partial<Record<TField, string>>;
 
-function fieldErrorsOf<TField extends string>(error: z.ZodError): FieldErrors<TField> {
+function firstIssuePerField<TField extends string>(error: z.ZodError): FieldErrors<TField> {
 	const errors: FieldErrors<TField> = {};
 	for (const issue of error.issues) {
 		const field = issue.path[0] as TField | undefined;
-		// First issue per field wins: it is the one closest to what the reader typed.
 		if (field !== undefined && errors[field] === undefined) {
 			errors[field] = issue.message;
 		}
@@ -39,9 +31,8 @@ const displayNameSchema = z
 	.max(128, "Use 128 characters or fewer.");
 
 /**
- * Shape only. A URL the browser cannot parse, or one carrying a credential or a query string, is
- * wrong no matter how the instance is configured — `EgressPolicy` rejects the second outright,
- * because that is how a gateway URL smuggles an API key into logs and snapshots.
+ * Credentials, query string and fragment are rejected because that is how a gateway URL smuggles an
+ * API key into logs and snapshots. The server refuses them too.
  */
 const baseUrlSchema = z
 	.string()
@@ -77,7 +68,6 @@ const baseUrlSchema = z
 /** The server stores these as a Java `int`, which rejects anything larger at deserialisation. */
 const MAX_TOKEN_COUNT = 2_147_483_647;
 
-/** An `<input type="number">` hands back a string; empty means the admin left it out. */
 const tokenCountSchema = z
 	.string()
 	.trim()
@@ -99,7 +89,7 @@ export type LlmConnectionFormField = "displayName" | "baseUrl";
 
 export interface LlmConnectionFormValue {
 	displayName: string;
-	/** Omitted when editing: the endpoint is immutable, so the form never sends one. */
+	/** Omitted when editing: the endpoint is immutable. */
 	baseUrl?: string;
 }
 
@@ -112,7 +102,7 @@ export function validateLlmConnectionForm(
 	value: LlmConnectionFormValue,
 ): FieldErrors<LlmConnectionFormField> {
 	const result = llmConnectionFormSchema.safeParse(value);
-	return result.success ? {} : fieldErrorsOf<LlmConnectionFormField>(result.error);
+	return result.success ? {} : firstIssuePerField<LlmConnectionFormField>(result.error);
 }
 
 export type LlmModelFormField =
@@ -126,7 +116,7 @@ export type LlmModelFormField =
 
 export interface LlmModelFormValue {
 	displayName: string;
-	/** Omitted when editing: the upstream id is immutable, so the form never sends one. */
+	/** Omitted when editing: the upstream id is immutable. */
 	upstreamModelId?: string;
 	contextWindow: string;
 	maxOutputTokens: string;
@@ -178,9 +168,9 @@ const llmModelFormSchema = z
 					message: "Required when the model has a price.",
 				});
 			}
-			// An all-zero price is not a price: it would record verified $0 spend forever, which is what
-			// the free option is for. The server refuses it, so refuse it here rather than at submit.
-			if (rates.every((rate) => rate == null || rate === 0) && value.per1mInputUsd != null) {
+			const everyRateIsZero = rates.every((rate) => rate == null || rate === 0);
+			const inputRateAlreadyFlagged = value.per1mInputUsd == null;
+			if (everyRateIsZero && !inputRateAlreadyFlagged) {
 				ctx.addIssue({
 					code: z.ZodIssueCode.custom,
 					path: ["per1mInputUsd"],
@@ -199,5 +189,5 @@ const llmModelFormSchema = z
 
 export function validateLlmModelForm(value: LlmModelFormValue): FieldErrors<LlmModelFormField> {
 	const result = llmModelFormSchema.safeParse(value);
-	return result.success ? {} : fieldErrorsOf<LlmModelFormField>(result.error);
+	return result.success ? {} : firstIssuePerField<LlmModelFormField>(result.error);
 }

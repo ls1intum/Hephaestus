@@ -13,10 +13,7 @@ type Vars = { id: number };
 
 const KEY = ["thing"];
 
-/**
- * Stands in for a generated `@hey-api` mutation helper — with the one difference that matters here:
- * it supplies a `mutationKey` of its own, which is what the generator is free to start doing.
- */
+/** A generated `@hey-api` helper as it would look if the generator started keying mutations itself. */
 function generatedMutation(): UseMutationOptions<void, Error, Vars> {
 	return {
 		mutationKey: ["generated", "its", "own", "key"],
@@ -24,7 +21,6 @@ function generatedMutation(): UseMutationOptions<void, Error, Vars> {
 	};
 }
 
-/** Two mutations filed under one prefix — the shape a panel uses for update and delete of a row. */
 function Harness({ releaseFast }: { releaseFast: Promise<void> }) {
 	const slow = useMutation({
 		mutationKey: [...KEY, "slow"],
@@ -34,7 +30,6 @@ function Harness({ releaseFast }: { releaseFast: Promise<void> }) {
 		mutationKey: [...KEY, "fast"],
 		mutationFn: (_variables: Vars) => releaseFast,
 	});
-	// Filed the way every route files a generated mutation, against a helper that brings its own key.
 	const generated = useMutation({
 		...filedUnder([...KEY, "generated"], generatedMutation()),
 	});
@@ -70,7 +65,7 @@ function renderHarness() {
 	return () => release();
 }
 
-/** `<output>` carries an implicit `role="status"`, so the readout needs no test id to be found. */
+// `<output>` carries an implicit `role="status"`, so the readout needs no test id.
 const pendingIds = () => screen.getByRole("status").textContent;
 const click = (name: string) => fireEvent.click(screen.getByRole("button", { name }));
 
@@ -81,8 +76,6 @@ describe("usePendingMutationIds", () => {
 	});
 
 	it("keeps reporting a call that is still running after a sibling settles", async () => {
-		// The whole point: one `useState("which row is busy")` would be cleared by the fast call
-		// settling, putting the slow row back to looking idle while its request is still out.
 		const releaseFast = renderHarness();
 
 		click("start slow");
@@ -96,10 +89,6 @@ describe("usePendingMutationIds", () => {
 	});
 
 	it("still finds a call whose generated helper brought a mutation key of its own", async () => {
-		// Filed the other way round — `{ mutationKey: KEY, ...generatedMutation() }` — the helper's key
-		// would win, this call would fall outside the prefix, and the row it belongs to would look idle
-		// with its request still out. Nothing else on the screen would change, so nothing else can
-		// catch it.
 		renderHarness();
 
 		click("start generated");
@@ -110,13 +99,8 @@ describe("usePendingMutationIds", () => {
 
 describe("generated mutation helpers", () => {
 	it("still file no mutation key of their own, so every filedUnder key is the only one", () => {
-		// A canary, not a requirement: `filedUnder` is correct either way. But the day this fails the
-		// generator has started keying mutations itself, and every `useMutation` on the branch that
-		// files no key of its own silently joins a key space it was never reviewed against.
-		//
-		// Scoped to that one property. An `toEqual({ mutationFn })` here would also fail on a `meta`,
-		// `retry` or `networkMode` the generator starts emitting — none of which touch key space, so
-		// the failure would not mean what the sentence above says it means.
+		// A canary, not a requirement — `filedUnder` is correct either way. When this fails, every
+		// `useMutation` that files no key of its own has joined an unreviewed key space.
 		expect(adminUpdateLlmConnectionMutation()).not.toHaveProperty("mutationKey");
 		expect(adminUpdateLlmConnectionMutation().mutationFn).toEqual(expect.any(Function));
 	});

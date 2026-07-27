@@ -34,8 +34,7 @@ import org.springframework.context.annotation.Configuration;
 /**
  * OpenAPI configuration: processes server DTOs (strips the {@code DTO} suffix from schema
  * names and {@code $ref}s), normalises paths (workspace-slug parameter, tag cleanup,
- * WorkspaceContext filtering) and declares exact decimals as such
- * ({@link #declareExactDecimals}).
+ * WorkspaceContext filtering) and declares exact decimals as such.
  */
 @Configuration
 @OpenAPIDefinition(
@@ -91,9 +90,8 @@ public class OpenAPIConfiguration {
     private static final List<String> SAFE_DOMAIN_SUFFIXES = List.of("AchievementProgress");
 
     /**
-     * Zalando's non-standard-but-conventional format for a number that is an exact decimal rather than a
-     * binary float, adopted for the reason they give: it stops a generator from binding the value to
-     * {@code double}. See the "Money and exact decimals" section of the API description.
+     * Zalando's non-standard-but-conventional {@code format} for an exact decimal, which stops a client
+     * generator binding the value to {@code double}.
      */
     private static final String DECIMAL_FORMAT = "decimal";
 
@@ -248,19 +246,9 @@ public class OpenAPIConfiguration {
     }
 
     /**
-     * Declares every exact decimal on the API as one, so the spec stops being silent about which of its
-     * numbers are money.
-     *
-     * <p>The mapping is exact rather than a guess, and it is exact because springdoc has already done the
-     * work: a Java {@code double}/{@code Double} arrives here as {@code type: number, format: double} and a
-     * {@code float} as {@code format: float}, so the ONLY thing that produces a bare formatless
-     * {@code type: number} is a {@code BigDecimal}. Setting {@code decimal} on exactly those — and never
-     * overwriting a format that is already there — therefore labels every exact decimal and nothing else,
-     * with no per-field annotation to remember on the next money field somebody adds.
-     *
-     * <p>Deliberately not {@code format: double}: that would assert binary64 as the contract, which is the
-     * one thing the server does not do. Deliberately not a string-encoded decimal either — see the "Money
-     * and exact decimals" section of the API description for the bound that makes the number safe.
+     * Labels every {@code BigDecimal} on the API as an exact decimal. springdoc emits
+     * {@code format: double}/{@code float} for the binary types, so a bare formatless {@code type: number}
+     * can only have come from a {@code BigDecimal}.
      */
     private void declareExactDecimals(OpenAPI openApi) {
         if (openApi.getComponents() == null || openApi.getComponents().getSchemas() == null) {
@@ -275,7 +263,6 @@ public class OpenAPIConfiguration {
 
     @SuppressWarnings({ "rawtypes", "unchecked" })
     private void declareExactDecimals(Schema schema, Set<Schema> seen) {
-        // Composition and self-referential schemas can cycle; visit each node once.
         if (schema == null || !seen.add(schema)) {
             return;
         }
@@ -300,9 +287,8 @@ public class OpenAPIConfiguration {
     }
 
     /**
-     * OpenAPI 3.1 moved the type to the {@code types} set (a nullable field is {@code [number, null]}),
-     * and {@code getType()} is only populated in the 3.0 shape — so both have to be read or the pass
-     * silently matches nothing.
+     * OpenAPI 3.1 moved the type into the {@code types} set (a nullable number is {@code [number, null]})
+     * and leaves {@code getType()} populated only in the 3.0 shape, so both have to be read.
      */
     @SuppressWarnings("rawtypes")
     private boolean isFormatlessNumber(Schema schema) {

@@ -11,10 +11,6 @@ import java.util.Map;
  * preparing workspace context, and delivering results. The executor pipeline and sandbox
  * manager remain completely domain-agnostic.
  *
- * <p>Handlers are registered in {@link de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry}
- * and looked up by {@link AgentJobType}. Handlers are plain objects with constructor-injected
- * dependencies — no Spring annotations on the interface or its methods.
- *
  * <h2>Lifecycle (called by executor)</h2>
  * <ol>
  *   <li>{@link #createSubmission} — event listener extracts metadata + idempotency key</li>
@@ -58,9 +54,6 @@ public interface JobTypeHandler {
      * entirely handler-specific: posting a PR comment, sending an email, creating a ticket,
      * updating a dashboard, etc.
      *
-     * <p>Default implementation is a no-op. Handlers override when delivery logic is ready
-     * (see issue #748).
-     *
      * @param job the completed job (output is available via {@link AgentJob#getOutput()})
      */
     default void deliver(AgentJob job) {
@@ -68,28 +61,12 @@ public interface JobTypeHandler {
     }
 
     /**
-     * Best-effort dedup check for delivery recovery: has a delivery for THIS job
-     * already landed at the provider, even though {@code deliveryCommentId} was never persisted? This
-     * covers the crash window between {@link #deliver} actually posting a comment and the caller
-     * persisting its id — without this check, a delivery-recovery retry (see
-     * {@code AgentJobZombieSweeper#recoverStuckDeliveries}) would blindly call {@link #deliver} again and
-     * post a duplicate.
+     * Has a delivery for THIS job already landed at the provider, even though its id was never
+     * persisted? Covers the crash window between {@link #deliver} posting and the caller recording
+     * what it posted, so recovery does not re-post a duplicate.
      *
-     * <p><b>Tri-state, not {@code Optional}.</b> The caller ({@code
-     * AgentJobLifecycleService#recoverStuckDelivery}) treats the three outcomes very differently: {@link
-     * ExistingDeliveryLookup.Kind#FOUND} records the found comment id as delivered WITHOUT re-posting;
-     * {@link ExistingDeliveryLookup.Kind#ABSENT} proceeds to a normal {@link #deliver} attempt (confirmed
-     * safe to post); {@link ExistingDeliveryLookup.Kind#UNKNOWN} does NEITHER — it leaves the delivery
-     * {@code PENDING} for a later recovery pass rather than guessing, since guessing wrong in the "post"
-     * direction risks a duplicate on exactly the crash-recovery path this exists to protect. An {@code
-     * Optional} cannot carry this: it would make "could not determine" indistinguishable from
-     * "confirmed absent", so every lookup failure would fall through to re-posting.
-     *
-     * <p>Default {@code UNKNOWN} — a handler whose delivery channel supports searching for the embedded
-     * job marker overrides this with a real {@code FOUND}/{@code ABSENT}/{@code UNKNOWN} answer; one that
-     * can't (or doesn't post externally at all, e.g. conversation review) leaves the default, and the
-     * caller never auto-reposts for it — only ever records a confirmed match or exhausts the recovery
-     * attempt cap.
+     * <p>Defaults to {@code UNKNOWN}, which never re-posts: a handler that cannot search its channel
+     * for the job marker must not be guessed into posting twice.
      */
     default ExistingDeliveryLookup findExistingDelivery(AgentJob job) {
         return ExistingDeliveryLookup.unknown();

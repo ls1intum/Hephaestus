@@ -108,10 +108,8 @@ class LlmProxyController {
         HttpHeaders incomingHeaders,
         byte[] body
     ) {
-        // Nothing can record what nothing owns: with no attempt there is no row to accumulate onto, so
-        // a served call's tokens would reach neither the ledger nor the cap that reads it. Refuse it
-        // instead — a failed call the caller sees beats spend nobody can account for. Only a mentor
-        // session between turns gets here; a job token always names its attempt.
+        // With no attempt there is no row to accumulate onto, so a served call's tokens would reach
+        // neither the ledger nor the cap that reads it.
         ProxyRouting.BilledAttempt attempt = routing.attempt();
         if (attempt == null) {
             accounting.recordUnbillableRefusal(routing.apiProtocol());
@@ -119,10 +117,7 @@ class LlmProxyController {
             return ResponseEntity.status(403).body("This credential is not running a billable execution");
         }
 
-        // In-flight budget backstop: once a workspace has crossed its monthly cap — counting what THIS
-        // attempt has already consumed but not yet had recorded — refuse NEW upstream calls before
-        // resolving any credential or hitting the network. Never interrupts a call already streaming.
-        // Reads a short-TTL cached ledger verdict so this is not a per-call month-window SUM.
+        // Before any credential is resolved or the network touched. Never interrupts a live stream.
         if (accounting.refuseForBudget(routing)) {
             return ResponseEntity.status(429).body(budgetReachedMessage(routing.connectionScope()));
         }
@@ -168,9 +163,7 @@ class LlmProxyController {
         try {
             upstream = callUpstream(upstreamUri, upstreamHeaders, prepared.body());
             if (rejectedOurUsageRequest(upstream, prepared)) {
-                // Degrade, don't fail: asking for usage is OUR addition to the caller's payload, so a
-                // provider that refuses the flag must cost the caller nothing more than our blindness
-                // to that call's tokens. Retried once, with the body the caller actually sent.
+                // Asking for usage is OUR addition, so refusing it must cost the caller nothing.
                 log.info(
                     "Upstream rejected stream_options.include_usage for principal {}; retrying without it — " +
                         "this call's tokens will not be metered",
@@ -203,10 +196,6 @@ class LlmProxyController {
         }
         boolean served = upstream.status() >= 200 && upstream.status() < 300;
         if (upstream.sseBody() != null) {
-            // Streamed calls are metered by teeing the bytes as they pass, NOT by buffering the
-            // response: the client sees the same frames, at the same time, flushed the same way. The
-            // usage frame is the last one, so a stream that dies before it bills nothing — what it
-            // observed — rather than a guess from the deltas.
             ProxyStreamUsageTap tap = served ? new ProxyStreamUsageTap(objectMapper, responsesProtocol) : null;
             ProxyStreamingUtils.streamSseToResponse(
                 upstream.sseBody(),
@@ -216,15 +205,11 @@ class LlmProxyController {
                 tap
             );
             if (tap != null) {
-                // After the stream ends for ANY reason — natural end, client disconnect, upstream
-                // timeout — so whatever the tap managed to observe is still recorded.
                 accounting.recordUsage(attempt, tap.observed());
             }
             return null;
         }
-        // Crash-safe accounting: attribute this non-streaming call's tokens to the execution now, so a
-        // job or turn that dies before its terminal write still bills the calls it actually made.
-        // Best-effort — never affects the returned response.
+        // Attributed now, not at the run's terminal write, so an execution that dies still bills.
         if (upstream.body() != null && served) {
             accounting.recordUsage(attempt, upstream.body(), responsesProtocol);
         }
@@ -244,12 +229,7 @@ class LlmProxyController {
             .block(BLOCK_TIMEOUT);
     }
 
-    /**
-     * Whether this rejection is one WE caused by asking for streamed usage. Deliberately narrow: only
-     * when we actually added the flag, only on the status range a provider uses to reject an unknown
-     * request field, and only when it names the field. A blanket retry on 4xx would double every
-     * genuinely bad request the runner makes.
-     */
+    /** Narrow on purpose: a blanket retry on 4xx would double every bad request the runner makes. */
     private static boolean rejectedOurUsageRequest(@Nullable UpstreamResult upstream, PreparedBody prepared) {
         if (upstream == null || prepared.withoutUsageRequest() == null) return false;
         if (upstream.status() != 400 && upstream.status() != 422) return false;
@@ -284,12 +264,8 @@ class LlmProxyController {
     }
 
     /**
-     * The body to send upstream, and — when we added the streamed-usage request to it — the same body
-     * without that addition, so a provider that rejects the flag can be retried on what the caller
-     * actually sent.
-     *
-     * @param withoutUsageRequest {@code null} when we added nothing, i.e. there is nothing to fall
-     *     back to and a 400 from upstream is the caller's own
+     * @param withoutUsageRequest the body as the caller sent it; {@code null} when we added nothing, so
+     *     a rejection is the caller's own and there is nothing to retry
      */
     record PreparedBody(byte[] body, byte@Nullable [] withoutUsageRequest) {
         byte[] withoutUsageRequestOrBody() {
@@ -301,14 +277,8 @@ class LlmProxyController {
      * Lock the model, strip what the sandbox may not ask for, and — on a streaming chat-completions
      * request — ask the provider to report usage.
      *
-     * <p>That last step is the only alteration the caller can observe, and it is deliberate: an
-     * OpenAI-compatible stream reports no usage at all unless the request carries
-     * {@code stream_options.include_usage}, so without it every streamed call is unbillable. The
-     * responses API needs no equivalent flag — it puts usage on its terminal {@code response.completed}
-     * event by default — which is why this is asked for on one protocol and not the other.
-     *
-     * @param includeStreamingUsage true for chat-completions (see above); the flag is only actually
-     *     added when the request is streaming
+     * @param includeStreamingUsage true for chat-completions, whose streams report no usage unless the
+     *     request carries {@code stream_options.include_usage}; the responses API reports it regardless
      * @return {@code null} when the body is not a JSON object or asks for a capability the proxy
      *     refuses to forward
      */
@@ -336,9 +306,8 @@ class LlmProxyController {
                 existing != null && existing.isObject() ? (ObjectNode) existing : object.putObject("stream_options");
             options.put("include_usage", true);
             byte[] withUsage = objectMapper.writeValueAsBytes(object);
-            // Nothing was added when the caller already asked for usage itself — then a rejection is
-            // theirs to own and there is no degraded form to retry.
-            return new PreparedBody(withUsage, Arrays.equals(asSent, withUsage) ? null : asSent);
+            boolean weAddedTheFlag = !Arrays.equals(asSent, withUsage);
+            return new PreparedBody(withUsage, weAddedTheFlag ? asSent : null);
         } catch (Exception e) {
             return null;
         }
@@ -396,10 +365,7 @@ class LlmProxyController {
         throw new IllegalStateException("Expected JobTokenAuthentication on security context");
     }
 
-    /**
-     * The 429 body names WHICH purse stopped the call, because the two have different remedies: the
-     * workspace can raise its own cap itself, while a shared-model cap is the host's to raise.
-     */
+    /** Names WHICH purse stopped the call, because the two have different remedies. */
     private static String budgetReachedMessage(@Nullable FundingSource fundingSource) {
         return fundingSource == FundingSource.WORKSPACE
             ? "Own-provider budget reached. Paused until an admin raises the cap or the month rolls over."

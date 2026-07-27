@@ -1,9 +1,5 @@
 import type { AuditRef } from "./ref-label";
 
-/**
- * The display name for an account id, taken from the rows already on screen — the audit rows embed
- * their actor refs precisely so a filter pill needs no second fetch.
- */
 export function nameForRef(
 	rows: readonly { account?: AuditRef; actor?: AuditRef; actingActor?: AuditRef }[],
 	id: number,

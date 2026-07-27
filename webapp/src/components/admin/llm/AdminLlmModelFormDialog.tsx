@@ -36,7 +36,6 @@ export interface AdminLlmModelFormDialogProps {
 	onOpenChange: (open: boolean) => void;
 	editing: LlmModel | null;
 	workspaceOptions: WorkspaceOption[];
-	/** Model ids discovered by the connection's last successful probe, offered as a datalist. */
 	probedModelIds: string[];
 	isSubmitting: boolean;
 	onSave: (body: AdminLlmModelSaveBody) => void;
@@ -53,10 +52,8 @@ function priceValueOf(model: LlmModel | null): PriceModeValue {
 	};
 }
 
-/**
- * Create/edit an instance catalog model. Creation includes initial access; later access
- * changes use the dedicated access dialog so their immediate impact cannot be bypassed.
- */
+/** Create/edit an instance catalog model. Creation includes initial access; a later access change
+ * goes through the dedicated dialog, which states its immediate impact. */
 export function AdminLlmModelFormDialog({
 	open,
 	onOpenChange,
@@ -91,8 +88,6 @@ function AdminLlmModelFormDialogContent({
 	const [fields, setFields] = useState<LlmModelFieldsValue>(() =>
 		modelFieldsValueOf(editing, priceValueOf(editing)),
 	);
-	// The same shape and the same control as the dedicated access editor: "who may use this model" is
-	// one question, and two screens of one feature answering it two ways reads as two settings.
 	const [accessScope, setAccessScope] = useState<ModelAccessScope>(
 		editing?.visibility === "PUBLIC" ? "ALL" : "SELECTED",
 	);
@@ -163,8 +158,6 @@ function AdminLlmModelFormDialogContent({
 					/>
 
 					{!isEdit && (
-						// A fieldset, not a Field: one question, several answers, and then the answer's own
-						// input — which is what a legend is for. Same shape as `PriceModeEditor` above.
 						<FieldSet>
 							<FieldLegend variant="label">Initial workspace access</FieldLegend>
 							<ModelAccessScopeChoice

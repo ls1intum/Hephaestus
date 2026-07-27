@@ -11,17 +11,9 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Everything the LLM proxy records or decides about a request's cost: whether the workspace
- * may still spend, what the call actually consumed, and how the hop performed.
- *
- * <p>These three concerns travel together — a blocked call is counted, a served call is accumulated,
- * and both are timed — so they live behind one collaborator instead of three constructor parameters
- * on {@link LlmProxyController}, which must stay a thin forwarding surface.
- */
-// Same worker gate as LlmProxyController and ProxyUsageAccumulator: this sits between them, so an
-// ungated bean here would demand the worker-only accumulator in every tier that runs with the worker
-// role off (server, webhook) and fail their context on startup.
+/** Everything the LLM proxy records or decides about a request's cost. */
+// Gated like the worker-only accumulators it depends on; an ungated bean here would fail the context
+// of every tier that runs with the worker role off.
 @Component
 @ConditionalOnProperty(name = RuntimeRole.WORKER_PROPERTY, havingValue = "true", matchIfMissing = true)
 public class ProxyAccounting {
@@ -49,10 +41,8 @@ public class ProxyAccounting {
     }
 
     /**
-     * Whether the payer of THIS call has crossed their monthly cap — counting what the calling attempt
-     * has already spent, which the ledger cannot see until the run ends — so it must be refused. Reads
-     * a short-TTL cached ledger verdict, so this is not a per-call month-window SUM. Counts the refusal
-     * itself, so "blocked" is observable without the caller touching a registry.
+     * Whether the payer of THIS call has crossed their monthly cap, counting the calling attempt's own
+     * spend, which the ledger cannot see until the run ends.
      */
     public boolean refuseForBudget(ProxyRouting routing) {
         if (!budgetGate.isBlocked(routing)) {
@@ -63,25 +53,17 @@ public class ProxyAccounting {
     }
 
     /**
-     * A credential authenticated but named no execution to bill, so the call was refused unserved.
-     * Counted because the rate is a defect signal, not a usage statistic: a sandbox calling outside
-     * the window its turn owns means either a binding that failed (see
-     * {@code MentorProxyCredentialRegistry#bindTurn}) or a runner still working after its turn ended.
+     * A credential authenticated but named no execution to bill. The rate is a defect signal, not a
+     * usage statistic: a sandbox is calling outside the window its turn owns.
      */
     public void recordUnbillableRefusal(String apiProtocol) {
         meterRegistry.counter("llm.proxy.unbillable.refused", "apiProtocol", apiProtocol).increment();
     }
 
     /**
-     * Attribute a served NON-STREAMING call's tokens to the execution that made it. Never throws: a
-     * body this cannot read must not turn a call the provider already served — and already charged us
-     * for — into an error for the runner.
-     *
-     * <p>But it is not free either. A 2xx body that is not the JSON we expect means this call's tokens
-     * were never billed to anyone, so it is WARNed and counted on
-     * {@code llm.proxy.usage.unparseable} exactly as the accumulators count their own dropped writes:
-     * a non-zero rate means the ledger is under-billing, and the fix is a gateway or protocol change
-     * rather than a retry.
+     * Never throws: a body this cannot read must not turn a call the provider already served — and
+     * already charged us for — into an error for the runner. Counted instead, since an unreadable body
+     * means this call's tokens were billed to nobody.
      */
     public void recordUsage(ProxyRouting.BilledAttempt attempt, byte[] upstreamBody, boolean responsesProtocol) {
         try {
@@ -93,16 +75,7 @@ public class ProxyAccounting {
         }
     }
 
-    /**
-     * Attribute one served call's already-parsed tokens to the execution that made it — the shared
-     * tail of the buffered and streamed paths.
-     *
-     * <p>Routes by the attempt's source type, because the two kinds of execution keep their running
-     * totals on different rows: an agent job on its {@code agent_job} row, a mentor turn on its
-     * {@code chat_message} one. Both writes are fenced on the execution's identity and both survive
-     * the worker that made the call, and a fenced-out write is COUNTED rather than swallowed: a
-     * non-zero rate means the ledger is under-billing.
-     */
+    /** The shared tail of the buffered and streamed paths. */
     public void recordUsage(ProxyRouting.BilledAttempt attempt, @Nullable ProxyTokenUsage usage) {
         if (usage == null) {
             return;
@@ -113,7 +86,6 @@ public class ProxyAccounting {
         }
     }
 
-    /** Start timing one proxied request; stop the returned sample with {@link #stopTimer}. */
     public Timer.Sample startTimer() {
         return Timer.start();
     }
@@ -132,10 +104,8 @@ public class ProxyAccounting {
     }
 
     /**
-     * An upstream refused the streamed-usage request the proxy adds, so the call was retried without
-     * it and its tokens cannot be read off the stream. Counted rather than only logged because a
-     * sustained rate means every streamed call against that connection is under-billed, and the fix is
-     * a provider or model change, not a code one.
+     * An upstream refused the streamed-usage request the proxy adds, so its tokens cannot be read off
+     * the stream. A sustained rate means every streamed call on that connection is under-billed.
      */
     public void recordStreamUsageUnsupported(String apiProtocol) {
         meterRegistry.counter("llm.proxy.stream.usage.unsupported", "apiProtocol", apiProtocol).increment();

@@ -22,16 +22,10 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.transaction.support.TransactionSynchronizationUtils;
 
 /**
- * WHEN the in-memory meter is advanced relative to the durable row's commit.
- *
- * <p>{@link MentorTurnMeter} states an invariant: the meter can lag the row but "can never claim spend
- * the durable record does not have", because over-claiming would refuse calls a workspace had headroom
- * for. Advancing the meter inline — inside the still-open {@code REQUIRES_NEW} transaction — does not
- * deliver that. At that moment the UPDATE has only been SENT; a commit that then fails leaves the meter
- * holding tokens the row never got, which is precisely the forbidden direction.
- *
- * <p>So the ordering is the behaviour, and it is asserted directly: nothing reaches the meter until
- * {@code afterCommit} fires. The same instrument {@code LlmUsageRecorder} uses for its budget alert.
+ * {@link MentorTurnMeter} states an invariant: the meter can lag the row but must never claim spend
+ * the durable record does not have. Advancing it inline, inside the still-open {@code REQUIRES_NEW}
+ * transaction, breaks that — a commit that then fails would leave the meter holding tokens the row
+ * never got. So the ordering is the behaviour: nothing reaches the meter until {@code afterCommit} fires.
  */
 class MentorTurnMeterCommitOrderingTest extends BaseUnitTest {
 

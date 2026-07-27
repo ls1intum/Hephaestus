@@ -368,8 +368,7 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
     }
 
     // ─── Access control ────────────────────────────────────────────────────────────────────────
-    // Every endpoint on this controller is @RequireAtLeastWorkspaceAdmin. The matrix mirrors
-    // WorkspaceLlmConnectionControllerIntegrationTest, its sibling under the same /llm prefix.
+    // Every endpoint on this controller is @RequireAtLeastWorkspaceAdmin.
 
     @Test
     @WithMentorUser

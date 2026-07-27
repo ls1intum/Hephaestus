@@ -6,8 +6,7 @@ import { currentUser } from "@/mocks/fixtures/auth";
 import { server } from "@/mocks/server";
 import { routeTree } from "@/routeTree.gen";
 
-// `router.load()` lazily imports each matched route's module, so a case can pay the one-off cost of
-// transforming a heavy page. Observed several seconds against the 5s default.
+// `router.load()` lazily imports each matched route's module, so a case pays its transform cost.
 vi.setConfig({ testTimeout: 15_000 });
 
 function newRouter(url?: string) {
@@ -35,14 +34,13 @@ async function land(url: string) {
 }
 
 /**
- * The instance-admin twin of `w/$workspaceSlug/admin/-route.test.ts`: same bypass class (a route
- * mapping to an /admin URL without nesting under the gated layout), same enumerate-and-drive shape.
+ * The bypass this guards against: a route mapping to an /admin URL without nesting under the gated
+ * layout. Nothing about the file it lives in would say so, so the URLs are driven for real.
  */
 describe("instance-admin route gate", () => {
 	it("enumerates the instance-admin routes rather than trusting a hand-written list", () => {
-		// A filter that matched nothing would leave every case below vacuously green, and one that
-		// matched a subset would quietly shrink the coverage this suite exists for. Raise the floor
-		// when routes are added; never lower it (`webapp/AGENTS.md`, "do not weaken it").
+		// A filter that matched nothing leaves every case below vacuously green. Raise the floor when
+		// routes are added; never lower it.
 		expect(adminUrls.length).toBeGreaterThanOrEqual(6);
 		expect(adminUrls).toContain("/admin/users");
 		expect(adminUrls).toContain("/admin/usage");
@@ -60,8 +58,8 @@ describe("instance-admin route gate", () => {
 });
 
 /**
- * Both consoles deliberately use the same page names ("AI models", "AI usage", "Audit log"), so the
- * tab title is the only thing that separates two open admin tabs. Guard that they actually differ.
+ * Both consoles deliberately reuse page names, so the tab title is the only thing separating two
+ * open admin tabs.
  */
 describe("admin tab titles", () => {
 	async function titleOf(url: string) {

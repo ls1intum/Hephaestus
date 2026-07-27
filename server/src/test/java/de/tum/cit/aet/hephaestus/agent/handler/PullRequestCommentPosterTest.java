@@ -394,8 +394,6 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
         void throwsWhenIntegrationKindMissing() {
             AgentJob job = createTestJob(null);
 
-            // Integrity failure (not an NPE): the agent ran but the job has no provider to deliver
-            // against. Surfaces as JobDeliveryException so the executor marks the job FAILED loudly.
             assertThatThrownBy(() -> poster.postComment(job, "Review body", "Summary"))
                 .isInstanceOf(JobDeliveryException.class)
                 .hasMessageContaining("integrationKind is null");
@@ -414,7 +412,7 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
         @Test
         void shouldThrowWhenMetadataFieldMissing() {
             AgentJob job = createTestJob(IntegrationKind.GITHUB);
-            job.setMetadata(objectMapper.createObjectNode()); // empty metadata
+            job.setMetadata(objectMapper.createObjectNode());
 
             assertThatThrownBy(() -> poster.postComment(job, "Review body", "Summary"))
                 .isInstanceOf(JobDeliveryException.class)
@@ -486,9 +484,7 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
             metadata.put("pr_number", 42);
             job.setMetadata(metadata);
 
-            // Validation lives on the per-kind FeedbackChannel SPI. Stub it to reject the
-            // malformed input the way GithubFeedbackChannel does; the poster wraps the
-            // IllegalArgumentException as a JobDeliveryException.
+            // Mimics GithubFeedbackChannel rejecting the malformed input; the poster wraps it as JobDeliveryException.
             when(githubChannel.formatPullRequestSubjectId("repo-without-owner", 42)).thenThrow(
                 new IllegalArgumentException("GitHub repoFullName must be 'owner/repo': repo-without-owner")
             );

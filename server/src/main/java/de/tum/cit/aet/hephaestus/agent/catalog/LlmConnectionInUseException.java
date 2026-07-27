@@ -4,7 +4,6 @@ import java.io.Serial;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
-/** Thrown when deleting an LLM connection that still has models referencing it. Mapped to HTTP 409. */
 @ResponseStatus(HttpStatus.CONFLICT)
 public class LlmConnectionInUseException extends RuntimeException {
 

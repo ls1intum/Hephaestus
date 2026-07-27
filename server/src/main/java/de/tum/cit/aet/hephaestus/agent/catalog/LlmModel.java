@@ -32,8 +32,8 @@ import org.jspecify.annotations.Nullable;
 @Table(
     name = "llm_model",
     uniqueConstraints = {
-        // Declared so the ddl-auto test schema matches production, where the changelog creates the
-        // same constraint. LlmModelService#create catches this name when two concurrent creates race.
+        // Named here so the ddl-auto test schema matches the changelog's: the create path catches this
+        // constraint by name.
         @UniqueConstraint(
             name = "ux_llm_model_connection_upstream",
             columnNames = { "connection_id", "upstream_model_id" }

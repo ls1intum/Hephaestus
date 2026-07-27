@@ -43,15 +43,8 @@ import tools.jackson.databind.ObjectMapper;
  * <p>Every mutation evicts the {@link LoginProviderClientRegistrationRepository} cache so an admin's
  * edit/enable/disable takes effect immediately rather than after the 60s TTL.
  *
- * <p>The three admin mutations write to the {@code auth_event} trail an instance admin reads at
- * {@code /admin/audit}. That is the ledger's own subject matter, not a fallback for
- * {@code config_audit_event} being workspace-scoped: adding, editing or removing a login provider
- * changes how every person signs in to this instance, which is the same class of fact as
- * {@code APP_ROLE_CHANGED} and the impersonation pair. Only the field <em>names</em> that changed are
- * recorded, never their values — {@code clientSecret} in the {@code changed} list says the secret was
- * rotated without putting it, or any part of it, in the trail. Env seeding is deliberately not audited:
- * it is a deploy-time fact of the compose file with no authenticated principal behind it, and it is
- * already reported on the boot log.
+ * <p>The three admin mutations write to the instance-scoped {@code auth_event} trail; env seeding does
+ * not, having no authenticated principal behind it.
  */
 @ConditionalOnServerRole
 @Service
@@ -212,13 +205,8 @@ public class LoginProviderService {
     }
 
     /**
-     * Record an admin login-provider mutation on the {@code auth_event} trail. Best-effort by
-     * contract — {@link AuthEventLogger.Draft#record()} swallows its own failures, so the audit write
-     * can never break the mutation it describes.
-     *
-     * <p>{@code changed} is the list of field names a PATCH touched, and is omitted for create/delete
-     * where every field is implied. Values are never recorded: the registration id, the provider type
-     * and the enabled flag are the whole payload, so nothing here can carry a client secret.
+     * Record an admin login-provider mutation on the {@code auth_event} trail. {@code changed} carries
+     * the field names a PATCH touched — never their values, so no secret can reach the trail.
      */
     private void audit(AuthEvent.EventType type, LoginProvider provider, @Nullable List<String> changed) {
         Map<String, Object> details = new LinkedHashMap<>();

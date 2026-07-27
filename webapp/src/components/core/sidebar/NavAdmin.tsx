@@ -16,6 +16,7 @@ import {
 	Trophy,
 	Users,
 } from "lucide-react";
+import { ADMIN_NAV_LABELS } from "@/components/core/sidebar/admin-nav-labels";
 import { GithubIcon, GitlabIcon, OutlineIcon, SlackIcon } from "@/components/icons/brand";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
@@ -33,17 +34,10 @@ export interface NavAdminProps {
 	workspaceSlug: string;
 	achievementsEnabled?: boolean;
 	practicesEnabled?: boolean;
-	mentorEnabled?: boolean;
 	/** Drives the Integrations sub-item's label + icon (GitHub vs GitLab). Defaults to GitHub. */
 	scmProviderType?: "GITHUB" | "GITLAB";
 }
 
-// "Practices" nests as a collapsible sub-tree because it owns several surfaces (the catalog, review
-// settings, and the run log). "AI models" is a separate item, shared with the mentor, rather than
-// living under Practices. Individual practices are not sidebar entries — there are dozens; the catalog
-// is their home and each drills down to its own detail page.
-// Labels are nouns, never verb phrases, and match the instance console word-for-word wherever the two
-// point at the same kind of object ("AI models", "AI usage", "Audit log"); the shell carries the scope.
 export function NavAdmin({
 	workspaceSlug,
 	achievementsEnabled = true,
@@ -268,15 +262,15 @@ export function NavAdmin({
 						</SidebarMenuSub>
 					</CollapsibleContent>
 				</Collapsible>
-				{/* Provider credentials and model bindings still need maintenance while consuming features are
-				    off, and admins should be able to configure them before enabling a feature. */}
+				{/* Not feature-gated: credentials and model bindings have to be configurable before the
+				    features that consume them are switched on, and after they are switched off again. */}
 				<SidebarMenuItem>
 					<SidebarMenuButton
-						tooltip="AI models"
+						tooltip={ADMIN_NAV_LABELS.models}
 						render={<Link to="/w/$workspaceSlug/admin/models" params={{ workspaceSlug }} />}
 					>
 						<Bot />
-						<span>AI models</span>
+						<span>{ADMIN_NAV_LABELS.models}</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
 				<SidebarMenuItem>
@@ -285,11 +279,9 @@ export function NavAdmin({
 						render={<Link to="/w/$workspaceSlug/admin/usage" params={{ workspaceSlug }} />}
 					>
 						<CircleDollarSign />
-						<span>AI usage</span>
+						<span>{ADMIN_NAV_LABELS.usage}</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
-				{/* Deliberately not feature-gated: a change history must stay reachable after a feature is
-				    turned off, since the record of past changes still exists. */}
 				<SidebarMenuItem>
 					<SidebarMenuButton
 						tooltip="Settings changes in this workspace"
@@ -298,7 +290,7 @@ export function NavAdmin({
 						}
 					>
 						<ScrollText />
-						<span>Audit log</span>
+						<span>{ADMIN_NAV_LABELS.audit}</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
 			</SidebarMenu>

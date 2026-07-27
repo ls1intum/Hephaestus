@@ -37,8 +37,6 @@ describe("AdminLlmConnectionsTable", () => {
 
 		const manage = screen.getByRole("button", { name: "Manage models for OpenAI production" });
 		manage.focus();
-		// Focusability is the claim: a clickable row or a bare <div> takes no focus, so the keystroke
-		// below would land on <body> and the assertion after it would pass for the wrong reason.
 		expect(document.activeElement).toBe(manage);
 
 		await userEvent.keyboard("{Enter}");
@@ -71,8 +69,6 @@ describe("AdminLlmConnectionsTable", () => {
 
 		fireEvent.click(screen.getByRole("switch", { name: "OpenAI production" }));
 
-		// The confirmation is the point of the test, so it is the confirmation that gets read: it names
-		// the connection and how many models stop with it, which is the number the admin is deciding on.
 		const confirm = screen.getByRole("alertdialog");
 		expect(within(confirm).getByRole("heading").textContent).toBe("Turn off “OpenAI production”?");
 		expect(confirm.textContent).toContain(
@@ -85,8 +81,6 @@ describe("AdminLlmConnectionsTable", () => {
 	});
 
 	it("counts one model as one", () => {
-		// The sentence special-cases one. Two is the arity that reads correctly however the number is
-		// interpolated, so a fixture of two alone would let "all 1 models on this connection" through.
 		renderTable({ 1: 1 });
 
 		fireEvent.click(screen.getByRole("switch", { name: "OpenAI production" }));
@@ -97,8 +91,6 @@ describe("AdminLlmConnectionsTable", () => {
 	});
 
 	it("turns off a connection with no models without asking", () => {
-		// The confirm exists to name what stops. With no models on the connection it names nothing,
-		// and the sentence it would render is about nothing.
 		const { onToggleEnabled } = renderTable({});
 
 		fireEvent.click(screen.getByRole("switch", { name: "OpenAI production" }));
@@ -124,12 +116,10 @@ describe("AdminLlmConnectionsTable", () => {
 			/>,
 		);
 
-		// Announced as unavailable and out of the tab order, not merely greyed (WCAG 2.2 SC 4.1.2)…
 		const toggle = screen.getByRole("switch", { name: "OpenAI production" });
 		await expectUnavailable(toggle);
 		expect(screen.getByRole("cell", { name: "—" })).toBeTruthy();
 
-		// …and pressing it anyway neither opens the confirm nor turns the connection off behind it.
 		fireEvent.click(toggle);
 		expect(screen.queryByRole("alertdialog")).toBeNull();
 		expect(toggle.getAttribute("aria-checked")).toBe("true");

@@ -27,11 +27,9 @@ public final class WebClientConnectors {
     }
 
     /**
-     * Like {@link #ssrfGuarded()} but, when {@code allowLoopback} is {@code true}, exempts a RESOLVED
-     * loopback address from the block — for outbound calls whose upstream policy layer has already
-     * decided loopback is an acceptable dev/e2e target (see {@code EgressPolicy#allowLoopback}). Every
-     * other private/reserved range stays blocked either way, so DNS rebinding to a non-loopback
-     * private address is closed regardless of the flag.
+     * Like {@link #ssrfGuarded()} but, when {@code allowLoopback} is {@code true}, exempts a resolved
+     * loopback address — see {@link SsrfGuardedResolverGroup#LOOPBACK_EXEMPT_INSTANCE}. Every other
+     * private/reserved range stays blocked either way.
      */
     public static ClientHttpConnector ssrfGuarded(boolean allowLoopback) {
         return new ReactorClientHttpConnector(HttpClient.create().resolver(resolverGroup(allowLoopback)));

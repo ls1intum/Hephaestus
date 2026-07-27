@@ -41,13 +41,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
     class GodClassTests {
 
         /**
-         * Services should not have excessive constructor parameters.
-         *
-         * <p>More than 12 dependencies indicates a God class that needs splitting.
-         *
-         * <p><strong>Exceptions:</strong> Orchestrator services that coordinate many sub-services
-         * (e.g., GithubDataSyncService) may legitimately have more dependencies.
-         * These should be explicitly named here with justification.
+         * Orchestrator services that coordinate many sub-services may legitimately exceed the
+         * threshold; each exemption below carries its own justification.
          */
         @Test
         void servicesHaveLimitedConstructorParams() {
@@ -74,9 +69,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
 
-        /**
-         * Controllers should be thin with limited dependencies.
-         */
         @Test
         @DisplayName("Controllers have max 5 dependencies")
         void controllersAreThin() {
@@ -89,12 +81,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
 
-        /**
-         * Services should not have excessive business methods.
-         *
-         * <p>Classes with too many business methods violate SRP and should be split.
-         * Business methods exclude getters, setters, equals, hashCode, toString, and constructors.
-         */
+        /** Business methods exclude getters, setters, equals, hashCode, toString, and constructors. */
         @Test
         void servicesHaveLimitedBusinessMethods() {
             ArchRule rule = classes()
@@ -112,22 +99,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
     @Nested
     class MethodComplexityTests {
 
-        /** Maximum parameters per method - indicates complex method. */
         private static final int MAX_METHOD_PARAMETERS = 6;
 
-        /**
-         * Methods should not have too many parameters.
-         *
-         * <p>Too many parameters indicates complex methods that are hard
-         * to test and maintain. Consider using parameter objects.
-         *
-         * <p><strong>Exceptions:</strong>
-         * <ul>
-         *   <li>@Recover methods (Spring Retry requires matching signatures)</li>
-         *   <li>Static factory methods (e.g., `simple()`, `of()`, `from()`)</li>
-         *   <li>Overloaded internal methods with a command-object based alternative</li>
-         * </ul>
-         */
         @Test
         void methodsHaveLimitedParameters() {
             // Methods that have command-object overloads but need many params for internal processing
@@ -233,12 +206,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
 
-        /**
-         * Public methods in services should not have excessive nesting indicators.
-         *
-         * <p>Methods with many boolean parameters often indicate high cyclomatic complexity.
-         * This is a proxy check since ArchUnit cannot directly measure cyclomatic complexity.
-         */
+        /** Boolean-parameter count is a proxy here since ArchUnit cannot measure cyclomatic complexity directly. */
         @Test
         void serviceMethodsAvoidExcessiveBooleanParams() {
             ArchCondition<JavaClass> avoidManyBooleans = new ArchCondition<>(
@@ -288,17 +256,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
     @DisplayName("Security Patterns")
     class SecurityPatternTests {
 
-        /**
-         * Services handling tokens should be in appropriate security-related packages.
-         *
-         * <p>Token services are sensitive and should be in one of:
-         * <ul>
-         *   <li>Security packages (auth, security) - for authentication tokens</li>
-         *   <li>App packages - for session tokens</li>
-         *   <li>Common packages - for shared token utilities</li>
-         *   <li>GitHub packages - for GitHub-specific token handling</li>
-         * </ul>
-         */
         @Test
         void tokenServicesInSecurityPackages() {
             ArchCondition<JavaClass> beInTokenAppropriatePackage = new ArchCondition<>(
@@ -343,12 +300,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
     @Nested
     class InterfaceSegregationTests {
 
-        /**
-         * Interfaces should have limited methods.
-         *
-         * <p>Fat interfaces force implementations to provide methods they
-         * don't need. Prefer small, focused interfaces.
-         */
         @Test
         void interfacesHaveLimitedMethods() {
             ArchCondition<JavaClass> haveLimitedMethods = new ArchCondition<>(
@@ -410,11 +361,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         }
 
         /**
-         * SPI interfaces should be particularly focused.
-         *
-         * <p>Service Provider Interfaces define module contracts - they should be minimal.
-         *
-         * <p><b>Width = abstract + default instance methods.</b> Counting only {@code abstract}
+         * <b>Width = abstract + default instance methods.</b> Counting only {@code abstract}
          * methods would let an interface hide its true surface behind {@code default} no-op
          * bodies — a default no-op is still part of the contract every caller can invoke, so it
          * counts toward ISP width exactly like an abstract method. Static and private (helper)
@@ -432,8 +379,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     int methodCount = (int) javaClass
                         .getMethods()
                         .stream()
-                        // Implementable contract surface: every non-static, non-private instance
-                        // method a caller can invoke or an implementer can override — abstract OR default.
                         .filter(m -> !m.getModifiers().contains(JavaModifier.STATIC))
                         .filter(m -> !m.getModifiers().contains(JavaModifier.PRIVATE))
                         .count();
@@ -470,12 +415,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
     @Nested
     class DependencyInversionTests {
 
-        /**
-         * Limit ObjectProvider usage for lazy resolution / cycle breaking.
-         *
-         * <p>ObjectProvider is a valid way to break cycles, but should
-         * be used sparingly. Known usages are documented here.
-         */
+        /** ObjectProvider is a valid way to break cycles, but new usages must justify themselves below. */
         @Test
         void objectProviderUsageIsLimited() {
             Set<String> knownCycleBreakers = Set.of(
@@ -535,11 +475,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
     @Nested
     class LiskovSubstitutionTests {
 
-        /**
-         * Services should not declare generic Exception in methods.
-         *
-         * <p>LSP principle: methods should declare specific exceptions.
-         */
         @Test
         void serviceMethodsDoNotDeclareGenericException() {
             ArchCondition<JavaClass> notDeclareGenericException = new ArchCondition<>(
@@ -586,15 +521,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         }
 
         /**
-         * Service implementations should not throw UnsupportedOperationException.
-         *
-         * <p>LSP principle: a subtype should be substitutable for its supertype.
-         * Throwing UnsupportedOperationException indicates the implementation doesn't
-         * properly fulfill its contract - violating LSP.
-         *
-         * <p><strong>Detection method:</strong> This check scans method bytecode for
-         * instantiation of UnsupportedOperationException, which catches both direct throws
-         * and throws via utility methods.
+         * Scans method bytecode for instantiation of UnsupportedOperationException, which catches
+         * both direct throws and throws via utility methods.
          */
         @Test
         void serviceImplementationsDoNotThrowUnsupportedOperationException() {

@@ -38,24 +38,16 @@ export interface ConfigAuditTableProps {
 	isLoading: boolean;
 	isError: boolean;
 	hasFilter: boolean;
-	/** Clears every filter — the only way out of an over-filtered empty state. */
 	onResetFilters?: () => void;
 	hasNextPage: boolean;
 	isFetchingNextPage: boolean;
 	onLoadMore: () => void;
 	onRetry?: () => void;
-	/** Filter the log to an actor's changes (click their name). */
 	onFilterActor?: (id: number) => void;
-	/** Show the Workspace column (instance-admin view spans workspaces). */
 	showWorkspace?: boolean;
-	/** Resolve a workspace id to its name (client-side, from the admin workspace list). */
 	resolveWorkspaceName?: (id: number) => string | undefined;
 }
 
-/**
- * Read-only table of configuration changes (newest first): who changed which setting, when, and — via
- * the field-level diff the server computed — from what to what. Open a row for the full before/after.
- */
 export function ConfigAuditTable({
 	entries,
 	isLoading,

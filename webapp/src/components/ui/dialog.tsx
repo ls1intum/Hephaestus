@@ -7,20 +7,13 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
- * ⚠️ Diverges from the shadcn registry. Re-vendoring this file (`shadcn add dialog`) drops the
- * changes below; re-apply them, or the reflow story tests that pin them will fail.
+ * ⚠️ Diverges from the shadcn registry — `shadcn add dialog` drops the following; re-apply them.
  *
- * 1. `DialogContent` is height-bound and scrollable. Upstream's popup is `fixed` and centred with no
- *    `max-height`, so anything taller than the viewport hangs off both edges with no way to reach it
- *    — the page cannot scroll a fixed element back into view, which clips the title and the submit
- *    button on every phone-sized viewport (WCAG 2.2 SC 1.4.10).
- * 2. `DialogBody` — an opt-in scrollable middle, with `DialogHeader`/`DialogFooter` pinned around it.
- *    Upstream's answer is an unnamed `div` with the same five utility classes copy-pasted into every
- *    tall dialog (`examples/base/dialog-sticky-footer.tsx`); naming it means the next tall dialog
- *    cannot get it subtly wrong. The `has-data-[slot=…]` switch is this registry's own idiom for
- *    descendant-driven layout — see `AlertDialogHeader`, `CardHeader`, `Attachment`, `ComboboxChips`.
- * 3. `DialogForm` — the form wrapper a dialog whose footer submits must use, so the wrapping does
- *    not cost the pinned-header/scrolling-body column.
+ * 1. `DialogContent` is height-bound and scrollable. Upstream's popup is `fixed` with no
+ *    `max-height`, and a fixed element taller than the viewport cannot be scrolled back into view,
+ *    so its title and submit button are unreachable on a phone (WCAG 2.2 SC 1.4.10).
+ * 2. `DialogBody` — an opt-in scrollable middle, with header and footer pinned around it.
+ * 3. `DialogForm` — a `display: contents` form wrapper, so a submitting footer costs no layout box.
  */
 function Dialog({ ...props }: DialogPrimitive.Root.Props) {
 	return <DialogPrimitive.Root data-slot="dialog" {...props} />;
@@ -66,10 +59,9 @@ function DialogContent({
 				data-slot="dialog-content"
 				className={cn(
 					"bg-background data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-foreground/10 grid max-w-[calc(100%-2rem)] gap-4 rounded-xl p-4 text-sm ring-1 duration-100 sm:max-w-sm fixed top-1/2 left-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2 outline-none",
-					// `svh` rather than `dvh`: mobile browser chrome expands and collapses while scrolling,
-					// and `dvh` would resize the dialog under the user's finger.
+					// `svh`, not `dvh`: mobile browser chrome collapses while scrolling, and `dvh` would
+					// resize the dialog under the user's finger.
 					"max-h-[calc(100svh-2rem)] overflow-y-auto overscroll-contain",
-					// `has-*` wins on specificity, so this overrides the `grid`/`overflow-y-auto` above.
 					"has-data-[slot=dialog-body]:flex has-data-[slot=dialog-body]:flex-col has-data-[slot=dialog-body]:overflow-hidden",
 					className,
 				)}
@@ -92,8 +84,7 @@ function DialogContent({
 
 function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
 	return (
-		// `shrink-0`: `DialogBody` is `flex-1` off a zero basis and contributes nothing to shrink
-		// distribution, so without this the header is what gets squashed.
+		// `shrink-0`: `DialogBody` is `flex-1` off a zero basis, so the header is what would be squashed.
 		<div
 			data-slot="dialog-header"
 			className={cn("gap-2 flex shrink-0 flex-col", className)}
@@ -103,12 +94,9 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
 }
 
 /**
- * The scrollable middle of a tall dialog; its presence is what switches {@link DialogContent} to
- * "only the body scrolls".
- *
- * `min-h-0` is load-bearing: a flex item's automatic minimum size is its content, so without it the
- * body refuses to shrink and the popup overflows again. The negative inline margin lets content sit
- * flush against the scrollbar while keeping the popup's padding.
+ * The scrollable middle of a tall dialog; its presence switches {@link DialogContent} to
+ * "only the body scrolls". `min-h-0` is load-bearing — a flex item's automatic minimum size is its
+ * content, so without it the body refuses to shrink and the popup overflows again.
  */
 function DialogBody({ className, ...props }: React.ComponentProps<"div">) {
 	return (
@@ -121,13 +109,12 @@ function DialogBody({ className, ...props }: React.ComponentProps<"div">) {
 }
 
 /**
- * A `<form>` that wraps a dialog's header, body and footer — so a footer button submits it — without
- * becoming a layout box between {@link DialogContent} and them. `display: contents` is what keeps
- * the three as the popup's own flex children; a form with a box of its own defeats the
- * pinned-header/scrolling-body column.
+ * A `<form>` wrapping a dialog's header, body and footer so a footer button submits it.
+ * `display: contents` keeps the three as {@link DialogContent}'s own flex children; a form with a
+ * box of its own would defeat the pinned-header/scrolling-body column.
  *
- * `noValidate` because these forms report their own errors: the browser's bubble is unstyled,
- * announces nothing to a screen reader, and stops at the first offending field.
+ * `noValidate` because these forms report their own errors: the browser's bubble announces nothing
+ * to a screen reader and stops at the first offending field.
  */
 function DialogForm({ className, ...props }: React.ComponentProps<"form">) {
 	return <form className={cn("contents", className)} noValidate {...props} />;
@@ -145,7 +132,6 @@ function DialogFooter({
 		<div
 			data-slot="dialog-footer"
 			className={cn(
-				// `shrink-0` for the same reason as `DialogHeader`.
 				"bg-muted/50 -mx-4 -mb-4 rounded-b-xl border-t p-4 flex shrink-0 flex-col-reverse gap-2 sm:flex-row sm:justify-end",
 				className,
 			)}

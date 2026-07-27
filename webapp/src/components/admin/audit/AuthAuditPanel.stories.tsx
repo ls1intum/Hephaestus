@@ -55,14 +55,6 @@ const handlers = (content: AuthEventView[] = events) => [
 	http.get("*/admin/audit", () => HttpResponse.json(page(content))),
 ];
 
-/**
- * The sign-in and account trail: toolbar, CSV export, and table. Sibling of `ConfigAuditPanel` and
- * deliberately the same shape, so the two tabs of the audit log differ in content rather than in how
- * they are operated.
- *
- * Every filter lives in the URL — the panel takes the selection in and reports changes out — because
- * an audit view exists to be cited.
- */
 const meta = {
 	component: AuthAuditPanel,
 	parameters: { layout: "padded", msw: { handlers: handlers() } },
@@ -77,7 +69,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** A routine sign-in, a failure, and a privilege change — each at a different severity. */
 export const Default: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
@@ -91,13 +82,11 @@ export const Empty: Story = {
 	parameters: { msw: { handlers: handlers([]) } },
 };
 
-/** A filter is active, so the empty result explains itself as "narrowed", not "nothing happened". */
 export const FilteredToNothing: Story = {
 	args: { search: { tab: "signins", outcome: ["FAILURE"], from: "2026-07-01" } },
 	parameters: { msw: { handlers: handlers([]) } },
 };
 
-/** Filters restored from the URL show as active facets — a shared link arrives already narrowed. */
 export const FiltersFromUrl: Story = {
 	args: { search: { tab: "signins", eventType: ["LOGIN_FAILED"], outcome: ["FAILURE"] } },
 	parameters: { msw: { handlers: handlers([events[1]]) } },

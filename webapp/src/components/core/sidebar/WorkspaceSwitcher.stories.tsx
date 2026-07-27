@@ -192,8 +192,7 @@ export const NoWorkspacesAppAdmin: Story = {
 	parameters: {
 		docs: {
 			description: {
-				story:
-					"Displays a 'Create workspace' button for instance admins. The gate is instance-admin, not workspace-admin: with zero workspaces there is no membership to carry a workspace role.",
+				story: "Displays a 'Create workspace' button for instance admins.",
 			},
 		},
 	},

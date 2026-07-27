@@ -29,7 +29,6 @@ export interface AdminLlmModelsSectionProps {
 	connectionEnabled: boolean;
 	workspaceOptions: WorkspaceOption[];
 	models: LlmModel[];
-	/** Ids of the models with a write in flight — see {@link usePendingMutationIds}. */
 	mutatingIds: ReadonlySet<number>;
 	onAdd: () => void;
 	onEdit: (model: LlmModel) => void;
@@ -59,7 +58,6 @@ function shareLabel(model: LlmModel, workspaces: WorkspaceOption[]): string {
 		: `${firstName} + ${model.grantedWorkspaceIds.length - 1} more`;
 }
 
-/** Models under one instance connection, including an explicit workspace-access action. */
 export function AdminLlmModelsSection({
 	connectionDisplayName,
 	connectionEnabled,

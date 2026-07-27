@@ -21,8 +21,7 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Contract: the probe never throws on an upstream failure — a 4xx, 5xx or timeout comes back as an
  * advisory {@link LlmProbeResultDTO} with {@code reachable=false}. Only the egress guard may reject the
- * request, before any network call. The upstream body is never echoed back; only {@code data[].id} is
- * extracted.
+ * request, before any network call.
  */
 @Service
 @WorkspaceAgnostic("Instance LLM connection probe reads the global connection catalog, not tenant data")
@@ -45,20 +44,14 @@ public class LlmConnectionProbeService {
         ObjectMapper objectMapper,
         LlmProperties llmProperties
     ) {
-        // Shared with EgressPolicy's validate-time guard, so the two layers cannot drift apart on what
-        // "loopback allowed" means.
         boolean allowLoopback = llmProperties.egress().allowLoopback();
         this.connectionRepository = connectionRepository;
         this.egressPolicy = egressPolicy;
         this.objectMapper = objectMapper;
-        // Dedicated short-timeout client, independent of any job/proxy timeout.
-        //
         // followRedirect(false): only the initial URL is egress-validated, and the auth header would
-        // otherwise survive a cross-origin redirect and exfiltrate the credential to whatever host the
-        // 3xx points at. A redirect surfaces as an ordinary non-2xx probe result.
-        //
-        // The guarded resolver re-runs EgressPolicy's private-address check on the resolution actually
-        // used to connect, closing the DNS-rebind TOCTOU window that validate-time checking leaves open.
+        // otherwise survive a cross-origin redirect and hand the credential to whatever the 3xx names.
+        // The guarded resolver re-runs the private-address check on the resolution actually connected
+        // to, closing the DNS-rebind window that validate-time checking leaves open.
         HttpClient httpClient = HttpClient.create()
             .resolver(WebClientConnectors.resolverGroup(allowLoopback))
             .followRedirect(false);
@@ -69,10 +62,8 @@ public class LlmConnectionProbeService {
     }
 
     /**
-     * Deliberately NOT {@code @Transactional}: the credential is loaded in the repository's own short
-     * transaction so the outbound request holds no JDBC connection. Wrapping the method would park a
-     * pooled connection for the full network timeout per probe, letting a few admins testing one
-     * stalled provider starve the pool for the whole instance.
+     * Deliberately NOT {@code @Transactional}: wrapping it would park a pooled JDBC connection for the
+     * full network timeout of every probe.
      */
     public LlmProbeResultDTO probeStored(Long connectionId) {
         LlmProbeTarget target = connectionRepository
@@ -82,7 +73,6 @@ public class LlmConnectionProbeService {
         return probe(target.baseUrl(), target.authMode(), target.apiKey());
     }
 
-    /** The supplied credential is never persisted. */
     public LlmProbeResultDTO probeDraft(ProbeLlmConnectionRequestDTO request) {
         egressPolicy.validate(request.baseUrl());
         LlmAuthMode authMode = request.authMode() != null ? request.authMode() : LlmAuthMode.BEARER;

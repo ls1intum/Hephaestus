@@ -12,15 +12,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 /**
- * CRUD for instance-owned LLM connections. GLOBAL, {@code app_admin}-owned, so this service is
- * {@link WorkspaceAgnostic}; access is gated by {@code hasAuthority('app_admin')} on
- * {@link LlmConnectionAdminController}. Every persisted base URL is vetted by {@link EgressPolicy}.
+ * CRUD for instance-owned LLM connections.
  *
- * <p>Audited on {@code auth_event} (not {@code config_audit_event}) via the {@link LlmConnectionAudit} SPI
- * port: this catalog is GLOBAL, and {@code config_audit_event.workspace_id} is NOT NULL, so a
- * workspace-less change cannot land there. The port's sole implementation is
- * {@code @ConditionalOnServerRole}, so this service — nothing outside the admin controller consumes it
- * — is gated the same way, matching {@code AccountAdminController}'s pattern for the same ledger.
+ * <p>Audited on {@code auth_event} rather than {@code config_audit_event} because this catalog is
+ * global and {@code config_audit_event.workspace_id} is NOT NULL.
  */
 @Service
 @RequiredArgsConstructor
@@ -68,8 +63,6 @@ public class LlmConnectionService {
         try {
             saved = connectionRepository.save(connection);
         } catch (DataIntegrityViolationException e) {
-            // The slug fast-path above is racy; the unique constraint backstops the loser of a concurrent
-            // create. Report the same 409 rather than leaking a 500.
             throw new LlmConnectionSlugConflictException(slug);
         }
         llmConnectionAudit.connectionCreated(saved.getId(), saved.getSlug());
@@ -89,8 +82,6 @@ public class LlmConnectionService {
         if (request.displayName() != null) {
             connection.setDisplayName(request.displayName());
         }
-        // Clearing wins over supplying: a request that sets clearApiKey drops the stored key even if it
-        // also carries a new one, so an ambiguous request can never leave a credential behind.
         if (Boolean.TRUE.equals(request.clearApiKey())) {
             connection.setApiKey(null);
         } else if (request.apiKey() != null) {

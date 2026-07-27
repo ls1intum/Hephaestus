@@ -7,9 +7,8 @@ import jakarta.validation.constraints.Min;
 import java.util.Set;
 
 /**
- * PATCH body for per-workspace practice-review policy; {@code null} fields are unchanged. Fields
- * named in {@code reset} are cleared back to the inherited fleet default — reset is applied before
- * the value patch, so a field can be reset and re-set in one request.
+ * PATCH body for per-workspace practice-review policy; {@code null} fields are unchanged. Reset is
+ * applied before the value patch, so a field can be reset and re-set in one request.
  */
 @Schema(description = "Update per-workspace practice-review policy. Null fields unchanged; 'reset' clears to inherit.")
 public record UpdatePracticeReviewSettingsRequestDTO(

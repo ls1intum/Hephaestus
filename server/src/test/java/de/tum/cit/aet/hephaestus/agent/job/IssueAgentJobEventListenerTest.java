@@ -120,7 +120,6 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
         return issue;
     }
 
-    /** Sets up a valid issue mock and a gate Detect decision for happy-path tests. */
     private Issue setupHappyPath() {
         Issue issue = createIssue(Issue.State.OPEN);
         when(issueRepository.findByIdWithRepositoryAndAssignees(ISSUE_ID)).thenReturn(Optional.of(issue));
@@ -236,7 +235,6 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
         @Test
         void shouldUseWorkspaceIdFromGateNotContext() {
             var issueData = createIssueData(Issue.State.OPEN);
-            // Context has scopeId=99, but the gate resolves workspace with id=42
             var event = new ScmDomainEvent.IssueCreated(issueData, webhookContext(99L));
 
             Issue issue = createIssue(Issue.State.OPEN);

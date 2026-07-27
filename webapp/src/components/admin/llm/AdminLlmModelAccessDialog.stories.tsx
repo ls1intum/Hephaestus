@@ -40,11 +40,6 @@ type Story = StoryObj<typeof meta>;
 
 export const SelectedWorkspaces: Story = {};
 
-/**
- * The workspace directory failed to load. A faithful RFC 9457 ProblemDetail: the server puts `status`
- * in the body, which is what the generated client throws, and `QueryErrorAlert` reads both — a 503 is
- * retryable, so it offers Retry and repeats the server's own reason.
- */
 export const WorkspaceListError: Story = {
 	args: {
 		workspacesError: {
@@ -57,15 +52,9 @@ export const WorkspaceListError: Story = {
 	},
 };
 
-/**
- * A real instance's worth of workspaces at the WCAG 2.2 SC 1.4.10 reflow width (320 px). Two option
- * cards, the picker and the "access is reduced" alert overflow a phone, so the popup has to stay
- * inside the viewport. That only the body scrolls is `DialogBody`'s doing, proved once on the
- * tallest dialog (`AdminLlmModelFormDialog`).
- */
+/** At the WCAG 2.2 SC 1.4.10 reflow width (320 px): the dialog must stay inside the viewport. */
 export const MobileReflow: Story = {
 	args: {
-		// PUBLIC today, so opening on "Selected workspaces" also raises the consequence alert.
 		model: { ...model, visibility: "PUBLIC", grantedWorkspaceIds: [] },
 		workspaceOptions: Array.from({ length: 14 }, (_, index) => ({
 			id: index + 1,
@@ -78,8 +67,6 @@ export const MobileReflow: Story = {
 		chromatic: { viewports: [320, 375, 768] },
 	},
 	play: async () => {
-		// Narrowing access is what makes this dialog tall: it adds the picker and the consequence
-		// alert. Reviewing the "All workspaces" state alone would review the short half of it.
 		await userEvent.click(await screen.findByRole("radio", { name: /^Selected workspaces/i }));
 		await screen.findByRole("button", { name: /save access/i });
 		await expectDialogFitsViewport();

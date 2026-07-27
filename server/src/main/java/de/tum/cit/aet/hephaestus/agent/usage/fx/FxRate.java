@@ -18,12 +18,11 @@ import lombok.ToString;
 
 /**
  * One day's ECB euro foreign-exchange reference rate, stored in the published direction:
- * {@code usdPerEur} is US dollars per ONE euro (e.g. {@code 1.1377}). Inverting on write would bake a
- * rounding step into the historical record, so the single inversion happens on read, in
- * {@link FxRateInfoDTO#fromEcbRate}.
+ * {@code usdPerEur} is US dollars per ONE euro. Inverting on write would bake a rounding step into the
+ * historical record, so the single inversion happens on read, in {@link FxRateInfoDTO#fromEcbRate}.
  *
  * <p>Display-only: nothing in this table ever reaches a budget gate, an admission decision or the
- * usage ledger. {@code LlmBudgetFxIsolationArchTest} pins that separation.
+ * usage ledger.
  */
 @Entity
 @Table(name = "fx_rate", uniqueConstraints = @UniqueConstraint(name = "ux_fx_rate_date", columnNames = { "rate_date" }))

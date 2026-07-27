@@ -6,12 +6,9 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Binds {@link WorkerProperties} whenever the worker role is enabled — independent of whether the WSS
- * control channel is configured. Worker identity ({@code resolvedWorkerId()}) is a job-execution
- * concern (job ownership + orphan recovery, #1138), not a WSS concern; gating it on the WSS endpoint
- * (as {@link WorkerConfiguration} does for the control-channel beans) would silently disable orphan
- * recovery on a worker with no control endpoint. This keeps the two concerns separate so identity is always present
- * wherever {@code AgentJobExecutor} / {@code WorkerLivenessReporter} run.
+ * Binds {@link WorkerProperties} whenever the worker role is enabled — deliberately NOT also gated on
+ * the WSS endpoint the way {@link WorkerConfiguration} is. Worker identity drives job ownership and
+ * orphan recovery, which a worker without a control channel still needs.
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(name = RuntimeRole.WORKER_PROPERTY, havingValue = "true", matchIfMissing = true)

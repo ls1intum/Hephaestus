@@ -97,9 +97,6 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "LlmModelWorkspaceGrant"
     );
 
-    /**
-     * Entities that are legitimately global (not workspace-scoped).
-     */
     private static final Set<String> GLOBAL_ENTITIES = Set.of(
         "User", // Users can belong to multiple workspaces
         "UserPreferences", // Belongs to User which is global
@@ -135,10 +132,8 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
     class EntityWorkspaceRelationshipTests {
 
         /**
-         * JPA entities should have a path to workspace for data isolation.
-         *
-         * <p>Every entity that contains business data must be traceable to a workspace
-         * either directly (workspace field) or through relationships (repository.organization.workspaceId).
+         * Every entity that contains business data must be traceable to a workspace either
+         * directly (workspace field) or through relationships (repository.organization.workspaceId).
          */
         @Test
         void entitiesHaveWorkspaceRelationshipPath() {
@@ -149,17 +144,14 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
                 public void check(JavaClass javaClass, ConditionEvents events) {
                     String entityName = javaClass.getSimpleName();
 
-                    // Skip known global entities
                     if (GLOBAL_ENTITIES.contains(entityName)) {
                         return;
                     }
 
-                    // Skip if known to be workspace-scoped
                     if (WORKSPACE_SCOPED_ENTITIES.contains(entityName)) {
                         return;
                     }
 
-                    // Check for direct workspace field
                     boolean hasDirectWorkspace = javaClass
                         .getFields()
                         .stream()
@@ -167,7 +159,6 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
                             f -> f.getRawType().getSimpleName().equals("Workspace") || f.getName().equals("workspaceId")
                         );
 
-                    // Check for workspace-scoped parent relationships
                     Set<String> fieldTypes = javaClass
                         .getFields()
                         .stream()
@@ -214,18 +205,12 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         }
 
         /**
-         * Entities with Workspace field should not be null.
-         *
-         * <p>If an entity has a direct Workspace relationship, it should
-         * use @NotNull or equivalent to prevent orphaned data.
-         */
-        /**
          * Targeted tenancy proof for the Slack integration tables.
          *
          * <p>The four {@code slack_*}/{@code mentor_slack_thread} entities are workspace-scoped by a direct
-         * {@code workspace_id} scalar column (no FK chain). This is the single assertion the finish plan calls
-         * for: each Slack entity must resolve to a real {@code workspaceId} field so {@code WorkspaceScopedTables}
-         * classifies it scoped and the {@code StatementInspector} rides a tenancy predicate on every query.
+         * {@code workspace_id} scalar column (no FK chain); each must resolve to a real {@code workspaceId}
+         * field so {@code WorkspaceScopedTables} classifies it scoped and the {@code StatementInspector}
+         * rides a tenancy predicate on every query.
          */
         @Test
         void slackEntitiesCarryDirectWorkspaceId() {
@@ -289,13 +274,6 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
     @Nested
     class DtoWorkspaceContextTests {
 
-        /**
-         * DTOs used in responses should not include cross-workspace references.
-         *
-         * <p>When mapping entities to DTOs, workspace-scoped data should
-         * remain within that workspace. DTOs should not accidentally include
-         * data from other workspaces through eager fetching or incorrect joins.
-         */
         @Test
         void dtosDoNotExposeCrossWorkspaceReferences() {
             ArchCondition<JavaClass> notExposeCrossWorkspaceData = new ArchCondition<>(
@@ -303,15 +281,13 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
             ) {
                 @Override
                 public void check(JavaClass javaClass, ConditionEvents events) {
-                    // Check record components or fields
                     Set<String> fieldTypes = javaClass
                         .getFields()
                         .stream()
                         .map(f -> f.getRawType().getSimpleName())
                         .collect(Collectors.toSet());
 
-                    // Dangerous: exposing User directly could leak user's other workspace data
-                    // Dangerous: exposing Organization could include data from all workspaces
+                    // User leaks a user's other-workspace data; Organization spans all its workspaces.
                     Set<String> dangerousTypes = Set.of("User", "Organization");
 
                     Set<String> exposedDangerousTypes = fieldTypes
@@ -368,13 +344,6 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
     @Nested
     class RepositoryReturnTypeSafetyTests {
 
-        /**
-         * Repository methods returning entities should be workspace-scoped.
-         *
-         * <p>Methods that return full entity objects (not projections) should
-         * always filter by workspace. Unscoped methods returning full entities
-         * are a data isolation risk.
-         */
         @Test
         void entityReturningMethodsAreWorkspaceScoped() {
             ArchCondition<JavaMethod> beWorkspaceScopedIfReturningEntity = new ArchCondition<>(
@@ -402,7 +371,6 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
                         return;
                     }
 
-                    // Skip if repo is globally-scoped
                     if (MultiTenancyArchitectureTest.WORKSPACE_AGNOSTIC_REPOSITORIES.contains(repoName)) {
                         return;
                     }
@@ -412,17 +380,14 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
                         return;
                     }
 
-                    // Skip methods or classes annotated with @WorkspaceAgnostic
                     if (method.isAnnotatedWith(WorkspaceAgnostic.class)) {
                         return;
                     }
 
-                    // Skip if the repository class is annotated as workspace-agnostic
                     if (method.getOwner().isAnnotatedWith(WorkspaceAgnostic.class)) {
                         return;
                     }
 
-                    // Check if method returns an entity (not DTO or projection)
                     String returnType = method.getRawReturnType().getSimpleName();
                     boolean returnsEntity = WORKSPACE_SCOPED_ENTITIES.stream().anyMatch(
                         e ->
@@ -433,17 +398,15 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
                     );
 
                     if (!returnsEntity) {
-                        return; // Not returning an entity
+                        return;
                     }
 
-                    // Check for workspace filtering
                     boolean isWorkspaceScoped =
                         methodName.contains("Workspace") ||
                         methodName.contains("workspace") ||
                         methodName.contains("ByWorkspace") ||
                         methodName.contains("ForWorkspace");
 
-                    // Check parameters for workspace
                     boolean hasWorkspaceParam = method
                         .getRawParameterTypes()
                         .stream()
@@ -453,7 +416,6 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
                                 p.getSimpleName().equals("Workspace")
                         );
 
-                    // Check @Query annotation for workspace filter
                     boolean hasQueryWithWorkspaceFilter = false;
                     if (method.isAnnotatedWith(Query.class)) {
                         Query q = method.getAnnotationOfType(Query.class);
@@ -498,13 +460,6 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
     @Nested
     class CascadeDeleteSafetyTests {
 
-        /**
-         * Workspace cascade deletes should only affect workspace-scoped entities.
-         *
-         * <p>When a workspace is deleted, only data belonging to that workspace
-         * should be removed. Global entities (User, Organization) should not
-         * be cascade-deleted from workspace.
-         */
         @Test
         void workspaceDoesNotCascadeDeleteGlobalEntities() {
             ArchCondition<JavaClass> notCascadeDeleteGlobalEntities = new ArchCondition<>(
@@ -521,12 +476,10 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
                         .forEach(field -> {
                             String fieldType = field.getRawType().getSimpleName();
 
-                            // Check if this is a global entity
                             if (!GLOBAL_ENTITIES.contains(fieldType)) {
                                 return;
                             }
 
-                            // Check for cascade delete annotations
                             boolean hasCascadeDelete = field
                                 .getAnnotations()
                                 .stream()

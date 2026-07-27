@@ -53,12 +53,8 @@ export const Route = createFileRoute("/_authenticated/admin/models")({
 	component: AdminLlmPage,
 });
 
-/**
- * Enabling and deleting a connection share one prefix, so one {@link usePendingMutationIds} lookup
- * covers both. Creation is not filed here; it has no row to disable.
- */
+/** One prefix per row kind, so a delete cannot un-disable a row whose own write is still in flight. */
 const CONNECTION_WRITE_MUTATION_KEY = ["adminWriteLlmConnection"];
-/** Same reason for models: deleting one must not un-disable the row whose access is still saving. */
 const MODEL_WRITE_MUTATION_KEY = ["adminWriteLlmModel"];
 
 function AdminLlmPage() {
@@ -383,11 +379,9 @@ function AdminLlmPage() {
 
 			<AdminLlmModelAccessDialog
 				open={accessModel != null}
-				// Dismissal is always allowed, including while the PUT is in flight. Refusing it leaves
-				// Escape, the close button and Cancel inert with focus held inside the popup, and we set no
-				// request timeout — against a black-holed connection there is then no way out.
-				// The request is not cancelled: its toast reports the outcome, and the row it belongs to
-				// stays disabled until it settles, so the dialog cannot be reopened onto a second save.
+				// Dismissal is allowed while the PUT is in flight: we set no request timeout, so refusing
+				// it would trap focus in the popup against a connection that never answers. The request
+				// runs on and its row stays disabled, so this cannot reopen onto a second save.
 				onOpenChange={(open) => {
 					if (!open) setAccessModel(null);
 				}}

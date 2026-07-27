@@ -29,8 +29,7 @@ function renderLoginProvidersRoute() {
 describe("instance login providers route", () => {
 	it("keeps each provider's toggle pending independently when two run at once", async () => {
 		// Nothing gates this switch — no confirm, no modal — so a second row can be toggled while the
-		// first PATCH is still open. GitHub's hangs, GitLab's answers at once. A single "which provider
-		// is mutating" id is cleared by GitLab settling, which re-enables GitHub's switch mid-request.
+		// first PATCH is still open.
 		let releaseSlowToggle: (() => void) | undefined;
 		const slowToggle = new Promise<void>((resolve) => {
 			releaseSlowToggle = resolve;
@@ -49,7 +48,7 @@ describe("instance login providers route", () => {
 			),
 		);
 
-		await renderLoginProvidersRoute();
+		renderLoginProvidersRoute();
 
 		fireEvent.click(await screen.findByRole("switch", { name: "Disable GitHub" }, TRANSFORM_WAIT));
 		await waitFor(() => expect(slowToggleCalls).toBe(1));
@@ -60,7 +59,6 @@ describe("instance login providers route", () => {
 			),
 		);
 
-		// The still-running row reads as busy and refuses input; the settled one is usable again.
 		expect(screen.getByRole("switch", { name: "Disable GitHub" }).getAttribute("aria-busy")).toBe(
 			"true",
 		);

@@ -71,7 +71,6 @@ class MentorAdmissionMetadataTest extends BaseUnitTest {
         rates.put("fundingSource", "INSTANCE");
         rates.put("pricingState", "PRICED");
         rates.put("per1mInputUsd", "2.000000");
-        // appliedPriceId, appliedWorkspaceModelId and the other three rates are simply not there.
 
         LlmPriceSnapshot price = MentorAdmissionMetadata.readPrice(admissionWith(rates));
 

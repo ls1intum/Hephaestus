@@ -269,8 +269,8 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             verify(commentPoster).postFormattedBody(eq(agentJob), any(String.class));
             verify(diffNotePoster).reconcileInlineNotes(eq(agentJob), any());
 
-            // DeliveryStatus and DB persistence happen in AgentJobExecutor.persistDeliveryStatus(), not in
-            // handler.deliver() — so on the in-memory object the commentId is set but the status stays null.
+            // DeliveryStatus persistence happens in AgentJobExecutor, not handler.deliver(), so the
+            // in-memory status stays null even though commentId is set.
             assertThat(agentJob.getDeliveryCommentId()).isEqualTo("comment-123");
             assertThat(agentJob.getDeliveryStatus()).isNull();
         }
@@ -305,15 +305,12 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
             assertThat(observationRepository.findAll()).hasSize(2);
 
-            // Approval comment posted (no negatives → approval summary). Assert the BODY: a findings
-            // summary and an approval reach this same call, so only the text separates "we found
-            // nothing" from "we found things" — posting the wrong one to a clean PR is the defect.
+            // Both a findings summary and an approval reach this same call; only the body text
+            // distinguishes them, so assert on it rather than just the call count.
             var body = ArgumentCaptor.forClass(String.class);
             verify(commentPoster).postFormattedBody(eq(agentJob), body.capture());
             assertThat(body.getValue()).contains("nothing to change here");
 
-            // Inline notes are reconciled unconditionally on an OPEN PR with an EMPTY list — clearing
-            // any prior run's stale line-numbered notes while posting no new ones.
             verify(diffNotePoster).reconcileInlineNotes(eq(agentJob), eq(List.of()));
         }
     }
@@ -369,7 +366,6 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
             handler.deliver(agentJob);
 
-            // 2 persisted (known slugs), 1 discarded (unknown)
             List<Observation> findings = observationRepository.findAll();
             assertThat(findings).hasSize(2);
 
@@ -424,14 +420,12 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
             handler.deliver(agentJob);
 
-            // Findings ARE persisted (deliver() persists first, then posts)
+            // Findings are still persisted: deliver() persists first, then posts.
             assertThat(observationRepository.findAll()).hasSize(2);
 
-            // Comment NOT posted (FeedbackDeliveryService skips closed PRs)
             verify(commentPoster, never()).postFormattedBody(any(), any());
             verify(diffNotePoster, never()).reconcileInlineNotes(any(), any());
 
-            // Delivery status not set (feedback was skipped)
             assertThat(agentJob.getDeliveryCommentId()).isNull();
             assertThat(agentJob.getDeliveryStatus()).isNull();
         }
@@ -452,18 +446,17 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             handler.deliver(agentJob);
             assertThat(observationRepository.findAll()).hasSize(2);
 
-            // Re-delivering the same job inserts no duplicates (ON CONFLICT DO NOTHING).
             handler.deliver(agentJob);
             assertThat(observationRepository.findAll()).hasSize(2);
 
-            // Event published once per deliver() call.
+            // An event is published on every deliver() call, even when everything discards as a duplicate.
             List<PracticeDetectionCompletedEvent> events = applicationEvents
                 .stream(PracticeDetectionCompletedEvent.class)
                 .toList();
             assertThat(events).hasSize(2);
             assertThat(events.get(0).findingsInserted()).isEqualTo(2);
             assertThat(events.get(1).findingsInserted()).isZero();
-            assertThat(events.get(1).findingsDiscarded()).isEqualTo(2); // duplicates
+            assertThat(events.get(1).findingsDiscarded()).isEqualTo(2);
         }
     }
 }

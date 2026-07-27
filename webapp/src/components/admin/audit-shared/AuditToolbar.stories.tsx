@@ -9,18 +9,12 @@ import { FacetMultiSelect } from "@/components/common/FacetMultiSelect";
 import { AuditDateFacet } from "./AuditDateFacet";
 import { AuditToolbar } from "./AuditToolbar";
 
-// The production label maps, not retyped copies — a story asserting a label the app never renders
-// documents nothing.
 const ENTITY_OPTIONS = Object.entries(ENTITY_TYPE_LABELS).map(([value, label]) => ({
 	value,
 	label,
 }));
 const ACTION_OPTIONS = Object.entries(ACTION_LABELS).map(([value, label]) => ({ value, label }));
 
-/**
- * Stateful harness — the toolbar is fully controlled in the app (its state lives in the URL), so the
- * stories own the state the routes normally own.
- */
 function ToolbarHarness({
 	initialEntityTypes = [],
 	initialActions = [],
@@ -71,7 +65,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Nothing selected: dashed triggers only, and no Reset to click. */
 export const Empty: Story = {
 	args: {},
 	play: async ({ canvasElement }) => {
@@ -81,7 +74,6 @@ export const Empty: Story = {
 	},
 };
 
-/** One selection per facet — each trigger carries its own chip. */
 export const WithSelection: Story = {
 	args: { initialEntityTypes: ["WORKSPACE_FEATURES"], initialActions: ["UPDATED"] },
 	play: async ({ canvasElement }) => {
@@ -92,7 +84,6 @@ export const WithSelection: Story = {
 	},
 };
 
-/** Past two selections the trigger collapses to a count rather than growing without bound. */
 export const CollapsesToCount: Story = {
 	args: {
 		initialEntityTypes: ["WORKSPACE_FEATURES", "AGENT_CONFIG", "WORKSPACE_ROLE"],
@@ -103,7 +94,6 @@ export const CollapsesToCount: Story = {
 	},
 };
 
-/** Selecting a second value adds to the filter rather than replacing it — the multi-select promise. */
 export const SelectsMultiple: Story = {
 	args: {},
 	play: async ({ canvasElement }) => {
@@ -120,7 +110,6 @@ export const SelectsMultiple: Story = {
 	},
 };
 
-/** Reset clears every facet at once and disappears with the last of them. */
 export const ResetClearsEverything: Story = {
 	args: { initialEntityTypes: ["WORKSPACE_FEATURES"], initialActions: ["UPDATED"] },
 	play: async ({ canvasElement }) => {
@@ -133,16 +122,13 @@ export const ResetClearsEverything: Story = {
 	},
 };
 
-/** Clearing one facet leaves the others standing, and the control is reachable by keyboard. */
 export const ClearsOneFacetOnly: Story = {
 	args: { initialEntityTypes: ["WORKSPACE_FEATURES"], initialActions: ["UPDATED"] },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await userEvent.click(canvas.getByRole("combobox", { name: /^Setting/i }));
-		// Tabbed to, not clicked: Base UI's own Combobox.Clear carries tabIndex -1, so reaching it by
-		// mouse says nothing about whether a keyboard user can. The popup moves focus to its search
-		// field asynchronously, so wait for that first — tabbing before it lands measures from the
-		// wrong starting point.
+		// Base UI's Combobox.Clear carries tabIndex -1, and the popup moves focus to its search field
+		// asynchronously, so tab from there rather than clicking.
 		const clear = await screen.findByRole("button", { name: /clear selection/i });
 		const search = await screen.findByPlaceholderText("Search…");
 		await waitFor(() => expect(search).toHaveFocus());
@@ -156,7 +142,6 @@ export const ClearsOneFacetOnly: Story = {
 	},
 };
 
-/** The selection is part of the trigger's accessible name, so it is not sighted-only. */
 export const SelectionIsAnnounced: Story = {
 	args: { initialEntityTypes: ["WORKSPACE_FEATURES"] },
 	play: async ({ canvasElement }) => {
@@ -169,11 +154,6 @@ export const SelectionIsAnnounced: Story = {
 	},
 };
 
-/**
- * A date range counts as a filter: the toolbar offers Reset for it, exactly as it does for the facet
- * pickers. How the range itself reads on the trigger is `AuditDateFacet.stories.tsx`'s to say, in
- * both its closed and open-ended shapes.
- */
 export const DateRangeSelected: Story = {
 	args: {
 		initialRange: { from: new Date("2026-07-01"), to: new Date("2026-07-08") },
@@ -184,7 +164,6 @@ export const DateRangeSelected: Story = {
 	},
 };
 
-/** A half-chosen range is still a filter, so Reset is still offered. */
 export const DateRangeOpenEnded: Story = {
 	args: { initialRange: { from: new Date("2026-07-01"), to: undefined } },
 	play: async ({ canvasElement }) => {

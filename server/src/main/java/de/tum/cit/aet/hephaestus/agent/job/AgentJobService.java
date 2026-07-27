@@ -100,11 +100,9 @@ public class AgentJobService {
     // Submit
 
     /**
-     * Build a detached PR review submission request from an already-loaded entity. Reads the PR's lazy
-     * associations (repository/author via {@link ScmEventPayload.PullRequestData#from}), so it MUST be called
-     * inside the caller's open session/transaction. Returns {@code null} when the branch refs needed to
-     * clone/diff are absent (a merged PR retains them). Callers must then submit OUTSIDE that
-     * transaction via {@link #submitPrepared}, honouring {@link #submit}'s no-outer-transaction contract.
+     * Build a detached PR review submission request. Reads the PR's lazy associations, so it MUST be
+     * called inside the caller's open session/transaction and the resulting request submitted OUTSIDE it
+     * via {@link #submitPrepared}. Null when the branch refs needed to clone/diff are absent.
      */
     @Nullable
     PullRequestReviewSubmissionRequest buildReviewRequest(PullRequest pr, @Nullable String triggerEvent) {
@@ -121,11 +119,7 @@ public class AgentJobService {
         );
     }
 
-    /**
-     * Build a detached issue-detection submission request from an already-loaded entity. Reads the issue's
-     * lazy repository, so it MUST be called inside the caller's open session/transaction. Returns
-     * {@code null} when the issue has no repository. Companion to {@link #buildReviewRequest}.
-     */
+    /** Issue-shaped companion to {@link #buildReviewRequest}, with the same session requirement. */
     @Nullable
     IssueReviewSubmissionRequest buildIssueRequest(Issue issue, @Nullable String triggerEvent) {
         if (issue.getRepository() == null) {
@@ -145,11 +139,7 @@ public class AgentJobService {
         );
     }
 
-    /**
-     * Submit a prepared dev request and render the result message. Invoked by the dev-trigger controller
-     * AFTER the load/gate/build transaction has committed, honouring {@link #submit}'s
-     * no-outer-transaction contract.
-     */
+    /** Submit a prepared dev request and render the result message. Call only after the build transaction commits. */
     public String submitPrepared(Long workspaceId, AgentJobType jobType, JobSubmissionRequest request) {
         Optional<AgentJob> job = submit(workspaceId, jobType, request);
         return job
@@ -164,14 +154,10 @@ public class AgentJobService {
      * Submit the workspace's practice-detection job for one reviewable artifact, if it has an enabled
      * binding and the purse funding that binding still has room.
      *
-     * <p><strong>Not {@code @Transactional}</strong>: {@link #submitForBinding} opens its own
-     * transaction, so the idempotency-key race it absorbs (a concurrent submit winning the partial
-     * unique index) rolls back only that insert. An outer transaction would be joined instead, and the
-     * race would then poison the caller's whole unit of work — so callers MUST NOT wrap this.
+     * <p><strong>Callers MUST NOT wrap this in a transaction.</strong> {@link #submitForBinding} opens
+     * its own so the idempotency-key race it absorbs rolls back only that insert; joined to an outer
+     * transaction, the same race would poison the caller's whole unit of work.
      *
-     * @param workspaceId workspace ID
-     * @param jobType     the job type
-     * @param request     handler-specific submission request
      * @return the created (or existing, deduplicated) job; empty when the workspace has no enabled
      *     practice-detection binding, or the cap funding it is reached
      */
@@ -189,12 +175,9 @@ public class AgentJobService {
             return Optional.empty();
         }
 
-        // Monthly budget cap: this is THE choke point for all sandboxed LLM work —
-        // webhook detection, retrospective replays, dev/bot manual triggers, conversation
-        // reviews — so one check pauses them all. Scoped to whoever pays for THIS binding, so an
-        // exhausted host budget never pauses work the workspace funds itself (and vice versa);
-        // that is why the binding is resolved first. Eventually consistent: in-flight jobs that
-        // haven't been costed yet may overshoot slightly (accepted by design).
+        // THE choke point for all sandboxed LLM work, scoped to whoever pays for THIS binding — which is
+        // why the binding is resolved first: an exhausted host budget must not pause work the workspace
+        // funds itself, or vice versa. Eventually consistent; uncosted in-flight jobs may overshoot.
         if (llmBudgetService.blockSubmission(workspace, jobType.name(), binding.getFundingSource())) {
             return Optional.empty();
         }
@@ -206,10 +189,8 @@ public class AgentJobService {
     }
 
     /**
-     * Submit exactly one practice-detection job for the workspace's {@code PRACTICE_DETECTION} binding.
-     * No binding, or a bound-but-disabled/unavailable model, means detection is off — there is no
-     * implicit fan-out. The binding (and its lazy model) is re-fetched inside the transaction because
-     * the discovery read above runs detached.
+     * Submit exactly one practice-detection job — never a fan-out. The binding is re-fetched inside the
+     * transaction because the discovery read in {@link #submit} runs detached.
      */
     private @Nullable AgentJob submitForBinding(Workspace workspace, AgentJobType jobType, JobSubmission submission) {
         String detectionKey = submission.idempotencyKey() + ":detection";
@@ -223,7 +204,7 @@ public class AgentJobService {
                 return null; // unbound or disabled since discovery
             }
 
-            // Idempotency check — application-level (partial unique index is safety net)
+            // Application-level idempotency; the partial unique index is the safety net.
             Optional<AgentJob> existing = agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(
                 workspace.getId(),
                 detectionKey,
@@ -238,12 +219,10 @@ public class AgentJobService {
                 return existing.get();
             }
 
-            // Cooldown check — prevent rapid re-triggering for the same (PR, phase)/config.
-            // Strips the trailing freshness segment (commit SHA / updatedAt) to match any freshness.
+            // Cooldown: refuse a re-trigger of the same subject at ANY freshness, not just this one.
             int cooldown = workspace.getReviewSettings().resolveCooldownMinutes(reviewProperties.cooldownMinutes());
             if (cooldown > 0) {
                 String rawPrefix = extractCooldownKeyPrefix(submission.idempotencyKey());
-                // Escape SQL LIKE wildcards in the prefix to prevent unintended pattern matching
                 String escaped = rawPrefix.replace("%", "\\%").replace("_", "\\_");
                 String cooldownPrefix = escaped + "%:detection";
                 Instant cutoff = Instant.now().minus(java.time.Duration.ofMinutes(cooldown));
@@ -268,8 +247,6 @@ public class AgentJobService {
             job.setWorkspace(workspace);
             job.setPurpose(AgentPurpose.PRACTICE_DETECTION);
             job.setJobType(jobType);
-            // Explicit subject discriminator drives downstream dispatch (e.g. DiffNotePoster
-            // short-circuits when subjectClass != PULL_REQUEST).
             job.setSubjectClass(subjectClassFor(jobType));
             job.setMetadata(submission.metadata());
             job.setIdempotencyKey(detectionKey);
@@ -282,11 +259,8 @@ public class AgentJobService {
                 );
                 return null;
             }
-            // The SCM kind drives delivery (which channel posts the comment/diff notes). Resolve it
-            // from the workspace's active connection so EVERY path (events + dev-trigger) sets it —
-            // a null integrationKind made the comment poster NPE and silently drop delivery. We log
-            // loudly when it can't be resolved: the job will still run (LLM cost) but delivery will
-            // fail at the poster, so surfacing it here makes the misconfiguration diagnosable up front.
+            // Resolved here rather than per-path so EVERY submission carries a delivery channel; without
+            // one the job still costs LLM spend but its feedback is dropped at the poster.
             var resolvedKind = connectionService.findActiveProviderKind(workspace.getId());
             if (resolvedKind.isPresent()) {
                 job.setIntegrationKind(resolvedKind.get());
@@ -299,14 +273,14 @@ public class AgentJobService {
                 );
             }
 
-            // The credential is NEVER frozen onto the job: there is ONE credential path, resolved live
-            // by the proxy from the config snapshot's catalog connection reference on every call.
+            // The credential is NEVER frozen onto the job: the proxy resolves it live from the snapshot's
+            // catalog connection reference on every call.
 
             try {
                 agentJobRepository.saveAndFlush(job);
             } catch (DataIntegrityViolationException e) {
-                // Partial unique index race: another concurrent submit won.
-                // Mark rollback so the broken Hibernate Session is properly cleaned up.
+                // Partial unique index race: another concurrent submit won. Mark rollback so the broken
+                // Hibernate Session is cleaned up.
                 log.info("Idempotency constraint caught concurrent duplicate: key={}", detectionKey);
                 status.setRollbackOnly();
                 return null;
@@ -319,17 +293,10 @@ public class AgentJobService {
                 workspace.getId()
             );
 
-            // The QUEUED insert above IS the enqueue — AgentJobExecutor's poll loop discovers it
-            // directly from the agent_job table, so there is nothing further to dispatch.
-
             return job;
         });
     }
 
-    /**
-     * The persisted {@link SubjectClass} discriminator for a job type. Exhaustive over
-     * {@link AgentJobType} so a new job type must declare its subject class here (compile gate).
-     */
     private static SubjectClass subjectClassFor(AgentJobType jobType) {
         return switch (jobType) {
             case PULL_REQUEST_REVIEW -> SubjectClass.PULL_REQUEST;

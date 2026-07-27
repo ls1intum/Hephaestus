@@ -19,12 +19,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Keeps {@code fx_rate} current: one ECB fetch a day, plus a catch-up fetch at boot when nothing
- * usable is stored.
- *
- * <p>{@link ConditionalOnServerRole} keeps this bean — and with it the only outbound dependency this
- * feature has — off the worker and webhook tiers, which would otherwise crash-loop on an egress
- * dependency they have no business having. {@link SchedulerLock} then stops two server replicas from
- * both fetching.
+ * usable is stored. {@link ConditionalOnServerRole} keeps this feature's only outbound dependency off
+ * the worker and webhook tiers; {@link SchedulerLock} stops two server replicas from both fetching.
  */
 @ConditionalOnServerRole
 @Component
@@ -50,11 +46,7 @@ public class FxRateFetchScheduler {
         this.clock = clock;
     }
 
-    /**
-     * The ECB publishes at around 16:00 CET on TARGET working days; 16:30 leaves headroom for a late
-     * publication without waiting a whole day. A TARGET holiday produces a no-op fetch, well inside the
-     * staleness window.
-     */
+    /** The ECB publishes at around 16:00 CET on TARGET working days; the extra half hour is headroom. */
     @Scheduled(cron = "0 30 16 * * MON-FRI", zone = "Europe/Berlin")
     @SchedulerLock(name = "fx-rate-fetch", lockAtMostFor = "PT5M", lockAtLeastFor = "PT30S")
     public void fetchDaily() {
@@ -62,14 +54,8 @@ public class FxRateFetchScheduler {
     }
 
     /**
-     * Covers the first start after an operator sets {@code hephaestus.llm.display-currency}, and an
-     * instance returning from an outage long enough to have gone stale. Makes no outbound request at
-     * all under the default configuration.
-     *
-     * <p><b>Cannot fail the boot.</b> An exception thrown from an {@link ApplicationReadyEvent}
-     * listener aborts {@code SpringApplication.run}, so without this guard an unreachable database or
-     * an ECB outage at the wrong moment would crash-loop the server — over a number that is only ever
-     * shown beside the USD one. The next scheduled fetch retries; until then the UI simply shows USD.
+     * Catches everything: an exception thrown from an {@link ApplicationReadyEvent} listener aborts
+     * {@code SpringApplication.run}, and a display-only rate must never crash-loop the server.
      */
     @EventListener(ApplicationReadyEvent.class)
     public void fetchOnStartupIfMissing() {
@@ -89,21 +75,18 @@ public class FxRateFetchScheduler {
         }
         Optional<EcbDailyRate> fetched = client.fetchLatestUsdRate();
         if (fetched.isEmpty()) {
-            // Already warned by the client; the stored rate stays untouched.
             return;
         }
         store(fetched.get(), trigger);
     }
 
     /**
-     * Deliberately untransacted: each statement is atomic on its own and the daily unique index is the
-     * real arbiter of a two-replica race, so an enclosing transaction would only hold a connection open
-     * across an HTTP fetch.
+     * Deliberately untransacted: the daily unique index is the real arbiter of a two-replica race, and a
+     * transaction here would hold a connection open across an HTTP fetch.
      */
     void store(EcbDailyRate rate, String trigger) {
         LocalDate today = LocalDate.now(clock.withZone(ZoneOffset.UTC));
         if (rate.date().isAfter(today.plusDays(1))) {
-            // A date from the future means we are not reading what we think we are reading.
             log.warn("fx: ignoring ECB rate dated {} — later than today ({})", rate.date(), today);
             return;
         }
@@ -116,8 +99,6 @@ public class FxRateFetchScheduler {
         try {
             fxRateRepository.save(row);
         } catch (DataIntegrityViolationException e) {
-            // Another replica inserted the same day between our read and our write; its row is
-            // identical to ours, so there is nothing to reconcile.
             log.debug("fx: concurrent insert for {} — keeping the row that won", rate.date());
             return;
         }

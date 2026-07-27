@@ -18,11 +18,6 @@ const baseEntry: ConfigAuditEntryView = {
 	newValue: JSON.stringify({ timeoutSeconds: 900, maxConcurrentJobs: 3, allowInternet: false }),
 };
 
-/**
- * Full record of one configuration change: the field-by-field before/after first, then the raw
- * snapshots behind a disclosure. A right-hand Sheet keeps the change list visible behind it, which
- * is what makes "inspect this row" feel like inspecting rather than navigating away.
- */
 const meta = {
 	component: ConfigAuditDetailSheet,
 	parameters: { layout: "fullscreen" },
@@ -38,27 +33,20 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** A settings edit by a named admin: two fields changed, both listed with old and new values. */
 export const Default: Story = {
 	play: async () => {
 		const body = within(document.body);
-		// The workspace is named *and* numbered, so a row stays identifiable after a rename.
 		await expect(await body.findByText("Acme (#3)")).toBeInTheDocument();
 		await expect(await body.findByText(/timeoutSeconds/)).toBeInTheDocument();
 	},
 };
 
-/**
- * A change nobody signed: `actorKind: SYSTEM` means a process did it, which must stay distinct from
- * "we no longer know who did it" (an account that has since been deleted).
- */
 export const SystemActor: Story = {
 	args: {
 		entry: { ...baseEntry, actorKind: "SYSTEM", actor: undefined, actorAccountId: undefined },
 	},
 };
 
-/** Made while impersonating: both identities are on the record, never just the effective one. */
 export const Impersonated: Story = {
 	args: {
 		entry: {
@@ -70,7 +58,6 @@ export const Impersonated: Story = {
 	},
 };
 
-/** A creation has no "before", so the sheet shows the new snapshot without inventing an old one. */
 export const Created: Story = {
 	args: {
 		entry: {
@@ -83,19 +70,16 @@ export const Created: Story = {
 	},
 };
 
-/** A deletion: the last known state, and nothing after it. */
 export const Deleted: Story = {
 	args: {
 		entry: { ...baseEntry, action: "DELETED", newValue: undefined, changedKeys: undefined },
 	},
 };
 
-/** An instance-scoped change — no workspace to name. */
 export const NoWorkspace: Story = {
 	args: { entry: { ...baseEntry, workspaceId: undefined } },
 };
 
-/** The raw JSON snapshots are a disclosure, so the readable change list leads. */
 export const RawSnapshotsRevealed: Story = {
 	play: async () => {
 		const body = within(document.body);

@@ -426,7 +426,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 List<GitRepositoryManager.CommitInfo> commits = manager.walkCommits(1L, null, headSha);
 
                 GitRepositoryManager.CommitInfo commit = commits.get(0);
-                // Initial commit: README.md has 1 line "# Test Repository\n"
                 assertThat(commit.additions()).isPositive();
                 assertThat(commit.deletions()).isZero();
                 assertThat(commit.changedFiles()).isEqualTo(1);
@@ -465,7 +464,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
             try (Git sourceGit = createSourceRepo()) {
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
 
-                // Add another commit to source
                 Path file = sourceRepoPath.resolve("file2.txt");
                 Files.writeString(file, "content");
                 sourceGit.add().addFilepattern("file2.txt").call();
@@ -477,7 +475,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                     .call()
                     .getName();
 
-                // Fetch updates
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
                 String result = manager.resolveDefaultBranchHead(1L, "master");
 
@@ -486,15 +483,13 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldReturnNullForNonExistentBranch() throws Exception {
+        void shouldFallBackToHeadForNonExistentBranch() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
 
                 String result = manager.resolveDefaultBranchHead(1L, "nonexistent-branch");
 
-                // Falls through to HEAD fallback, which should resolve
-                // Since there IS a HEAD, this returns a value
                 assertThat(result).isNotNull();
             }
         }
@@ -503,7 +498,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         void shouldReturnNullForNonExistentRepository() {
             manager = createManager(true);
 
-            // Repository 999 doesn't exist on disk, so Git.open will throw IOException
             String result = manager.resolveDefaultBranchHead(999L, "main");
 
             assertThat(result).isNull();
@@ -554,7 +548,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
 
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
 
-                // Read from first commit — should NOT contain file2.txt
                 Map<String, byte[]> filesAtFirst = manager.readFilesAtCommit(1L, firstSha, 50L * 1024 * 1024);
                 assertThat(filesAtFirst).containsKey("README.md");
                 assertThat(filesAtFirst).doesNotContainKey("file2.txt");

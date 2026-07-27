@@ -107,9 +107,9 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
 
         @Test
         void promptDigest_isStableAcrossBuilds_andIndependentOfModel() {
-            // The prompt-version provenance (issue #1363): same scaffolding → same digest, regardless of the
-            // model/workspace the run used — an evaluation groups runs by this value. settings.json and
-            // pi-provider.json are deliberately excluded from the digested scaffolding.
+            // Same scaffolding must yield the same digest regardless of model/workspace, since an
+            // evaluation groups runs by this value. settings.json and pi-provider.json are
+            // deliberately excluded from the digested scaffolding.
             String first = factory.build(spec("openai-completions", "model-a", false)).promptDigest();
             String second = factory.build(spec("openai-completions", "model-b", false)).promptDigest();
 

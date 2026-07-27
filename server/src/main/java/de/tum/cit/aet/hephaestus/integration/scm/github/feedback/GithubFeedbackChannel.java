@@ -33,6 +33,12 @@ public class GithubFeedbackChannel implements FeedbackChannel {
 
     private static final Logger log = LoggerFactory.getLogger(GithubFeedbackChannel.class);
 
+    /** GitHub caps a connection page at 100. */
+    private static final int EXISTING_SUMMARY_SEARCH_PAGE_SIZE = 100;
+
+    /** Our cap, not GitHub's: an unscanned tail answers {@code UNKNOWN}, so recovery retries rather than reposts. */
+    private static final int EXISTING_SUMMARY_SEARCH_PAGE_BUDGET = 3;
+
     private final GitHubGraphQlClientProvider gitHubProvider;
     private final GithubPrNodeIdResolver prNodeIdResolver;
 
@@ -173,14 +179,8 @@ public class GithubFeedbackChannel implements FeedbackChannel {
     }
 
     /**
-     * Dedup lookup for the delivery-recovery crash window: scans this PR/issue's comments for one whose body
-     * contains {@code marker}, walking the connection backwards from its newest end ({@code last}/{@code
-     * before}) — the summary a crashed delivery already posted is the newest comment, so the scan finds it on
-     * the first request even on a thread far longer than the page budget.
-     *
-     * <p>Budget exhausted, a transport/GraphQL error, a missing cursor or the rate-limit guard all yield
-     * {@code UNKNOWN} rather than {@code ABSENT}: an unscanned comment may still carry the marker, and only
-     * {@code ABSENT} licenses the caller to post a second summary.
+     * Scans this PR/issue's comments for one whose body contains {@code marker}, walking the connection
+     * backwards from its newest end — the summary a crashed delivery already posted is the newest comment.
      */
     @Override
     public ExistingSummaryLookup findExistingSummary(FeedbackTarget target, String marker) {
@@ -265,15 +265,6 @@ public class GithubFeedbackChannel implements FeedbackChannel {
         }
         return ExistingSummaryLookup.unknown();
     }
-
-    private static final int EXISTING_SUMMARY_SEARCH_PAGE_SIZE = 100;
-
-    /**
-     * Our cap, not GitHub's: the backwards walk already puts a just-posted marker on the first page, so the
-     * budget only bounds the rarer case of a marker buried under 300 newer comments — worth {@code UNKNOWN}
-     * (recovery retries) rather than an unbounded scan of a thousand-comment thread on every lookup.
-     */
-    private static final int EXISTING_SUMMARY_SEARCH_PAGE_BUDGET = 3;
 
     /** Conservative NOT_FOUND heuristic: GitHub signals a deleted comment via a free-text top-level error. */
     static boolean looksGone(List<String> errors) {

@@ -7,12 +7,10 @@ import java.time.LocalDate;
 import org.jspecify.annotations.NonNull;
 
 /**
- * Display estimate only — never an input to a budget, a price or the ledger; every amount in the
- * response it rides along with stays USD.
+ * Display estimate only — never an input to a budget, a price or the ledger.
  *
- * <p><b>Direction.</b> The ECB publishes USD per 1 EUR ({@code 1.1377}); clients need the opposite,
- * EUR per 1 USD. {@link #fromEcbRate} is the single place that inversion happens — a second inversion
- * downstream is the classic FX bug.
+ * <p>The ECB publishes USD per 1 EUR; clients need the opposite. {@link #fromEcbRate} is the single
+ * place that inversion happens.
  */
 @Schema(
     description = "Display-only currency conversion for the USD amounts in this response. Multiply a USD " +
@@ -42,15 +40,9 @@ public record FxRateInfoDTO(
     String source
 ) {
     /**
-     * The only publisher this codebase can currently report.
-     *
-     * <p>It is a fact about the payload, not a guess the UI makes, and it survives the one knob that
-     * looks like it could falsify it: {@code hephaestus.llm.fx.daily-url} is overridable, but only so an
-     * air-gapped instance can fetch a MIRROR of the same document. {@code EcbFxRateClient} parses the
-     * ECB's {@code Cube}/{@code time}/{@code currency} grammar and reads a quote per 1 EUR, and
-     * {@link #fromEcbRate} inverts on that assumption — point it at any other feed and it returns empty
-     * rather than a rate from somewhere else. So the URL changes where the copy is fetched from, never
-     * who published it.
+     * The only publisher this codebase can report: {@code hephaestus.llm.fx.daily-url} is overridable
+     * only so an air-gapped instance can fetch a mirror of the same ECB document, and
+     * {@link EcbFxRateClient} returns empty for anything that is not one.
      */
     public static final String ECB_SOURCE = "ECB";
 
@@ -59,11 +51,7 @@ public record FxRateInfoDTO(
 
     /**
      * Inverts an ECB quote (USD per 1 EUR) into the direction clients multiply by (display currency per
-     * 1 USD). The ONLY inversion in the codebase.
-     *
-     * <p>It is also the only place {@link #ECB_SOURCE} is stamped: the factory that knows the quote is an
-     * ECB one is the factory that says so, so a second provider would arrive as a second factory rather
-     * than as a caller passing the wrong string.
+     * 1 USD). The only inversion in the codebase, and the only place {@link #ECB_SOURCE} is stamped.
      */
     public static FxRateInfoDTO fromEcbRate(String currencyCode, BigDecimal usdPerDisplayUnit, LocalDate rateDate) {
         return new FxRateInfoDTO(

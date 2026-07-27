@@ -47,20 +47,16 @@ public final class TranslatorState {
     /** Did we emit at least one {@code Start} chunk? Defensive — runner may replay an event. */
     private boolean started = false;
 
-    /** True once the prompt request has been handed to the live runner. */
     private boolean llmCallStarted = false;
 
     /** Step counter — Pi internally tracks turns; we surface them as AI SDK steps for grouping. */
     private int stepDepth = 0;
 
-    /** Sum of final usage snapshots for completed assistant calls in this turn. */
     private final ObjectNode completedUsage = nodes.objectNode();
 
-    /** Latest running snapshot for the current assistant call, if it has not completed yet. */
     @Nullable
     private JsonNode currentUsage;
 
-    /** Number of completed assistant calls represented by {@link #completedUsage}. */
     private int completedCallCount;
 
     /** Model id observed on the first AssistantMessage; used for pricing lookup. */
@@ -80,13 +76,8 @@ public final class TranslatorState {
     private byte[] observedSessionJsonl;
 
     /**
-     * Which connection funds this turn's LLM calls, frozen at turn start from the resolved
-     * {@code MentorLlmConfig} — mirrors {@code ConfigSnapshot.connectionScope}/
-     * {@code connectionId} for detection jobs. Read by {@code MentorTurnPersistence} to resolve the
-     * ledger's server-side cost for the same catalog binding the turn actually used. Both null means
-     * a legacy, pre-catalog config. Set once via {@link #bindConnection} right after construction —
-     * not synchronized like the streaming mutators below since it's written once before any runner
-     * event can race it.
+     * Which connection funds this turn's LLM calls, frozen at turn start. Unsynchronized unlike the
+     * streaming mutators below: written once, before any runner event can race it.
      */
     @Nullable
     private FundingSource connectionScope;
@@ -104,7 +95,6 @@ public final class TranslatorState {
         this.assistantMessageId = assistantMessageId;
     }
 
-    /** Record the catalog binding funding this turn. See the field doc above. */
     public void bindConnection(@Nullable FundingSource connectionScope, @Nullable Long connectionId) {
         this.connectionScope = connectionScope;
         this.connectionId = connectionId;
@@ -230,14 +220,12 @@ public final class TranslatorState {
         return partsAccumulator.deepCopy();
     }
 
-    /** Record the latest running usage snapshot for the current assistant call. */
     public synchronized void observeUsage(JsonNode usage) {
         if (usage != null && usage.isObject() && !usage.isEmpty()) {
             this.currentUsage = usage.deepCopy();
         }
     }
 
-    /** Add one assistant call's final usage to the turn total. */
     public synchronized void completeUsage(JsonNode usage) {
         if (usage != null && usage.isObject() && !usage.isEmpty()) {
             addUsage(completedUsage, usage);
@@ -246,10 +234,7 @@ public final class TranslatorState {
         currentUsage = null;
     }
 
-    /**
-     * Replace streaming observations with the authoritative assistant messages carried by
-     * {@code agent_end}. A runner may omit that list, in which case the message-end totals remain.
-     */
+    /** Authoritative totals from {@code agent_end}; a runner may omit them, keeping what was streamed. */
     public synchronized void replaceCompletedUsage(List<JsonNode> usages) {
         if (usages.isEmpty()) return;
         completedUsage.removeAll();
@@ -267,7 +252,6 @@ public final class TranslatorState {
         }
     }
 
-    /** Callers hold this instance's monitor already — {@link #observedUsage()} is the only caller. */
     private boolean hasObservedUsage() {
         return !completedUsage.isEmpty() || currentUsage != null;
     }

@@ -37,9 +37,8 @@ interface MyRouterContext {
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
-	// Fallback tab title; every route that sets its own `head` overrides this (the deepest match wins).
-	// React 19 hoists the rendered <title> ahead of the static one in index.html, which stays as the
-	// pre-hydration placeholder.
+	// Fallback tab title; the deepest match that sets its own `head` wins. The static <title> in
+	// index.html stays as the pre-hydration placeholder.
 	head: () => ({ meta: [{ title: "Hephaestus" }] }),
 	component: () => {
 		const { pathname } = useLocation();

@@ -17,15 +17,9 @@ interface AuditEventDetailSheetProps {
 	event: AuthEventView | null;
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	/** Resolve a workspace id to its name (client-side, from the admin workspace list). */
 	resolveWorkspaceName?: (id: number) => string | undefined;
 }
 
-/**
- * Full forensic view of a single audit event — every field the row can't fit (workspace, user agent,
- * pretty-printed details) plus both identities. A right-hand Sheet keeps the audit
- * table visible behind it, matching the "inspect a row" model.
- */
 export function AuditEventDetailSheet({
 	event,
 	open,

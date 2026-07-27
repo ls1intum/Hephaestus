@@ -212,7 +212,6 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             assertThat(job.getMetadata().get("pr_number").asInt()).isEqualTo(10);
             assertThat(job.getMetadata().get("commit_sha").asString()).isEqualTo("abc123");
 
-            // Verify persisted in DB
             AgentJob fromDb = agentJobRepository.findById(job.getId()).orElseThrow();
             assertThat(fromDb.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
         }
@@ -240,7 +239,6 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             assertThat(second).isPresent();
             assertThat(second.get().getId()).isEqualTo(first.get().getId());
 
-            // Only 1 row in DB
             assertThat(agentJobRepository.findAll()).hasSize(1);
         }
 
@@ -283,7 +281,6 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             existing.setConfigSnapshot(OBJECT_MAPPER.createObjectNode());
             agentJobRepository.saveAndFlush(existing);
 
-            // Submit through service — application-level check finds the existing job
             var request = createRequest("race123");
             Optional<AgentJob> result = agentJobService.submit(
                 workspace.getId(),
@@ -346,11 +343,9 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             var snapshot = result.get().getConfigSnapshot();
             assertThat(snapshot.get("timeoutSeconds").asInt()).isEqualTo(300);
 
-            // Change the binding after submission
             agentBinding.setTimeoutSeconds(900);
             agentBindingRepository.save(agentBinding);
 
-            // Re-load the job from DB — snapshot should still reflect the original
             AgentJob fromDb = agentJobRepository.findById(result.get().getId()).orElseThrow();
             assertThat(fromDb.getConfigSnapshot().get("timeoutSeconds").asInt()).isEqualTo(300);
         }

@@ -34,26 +34,17 @@ import {
 	usesResponsesApi,
 } from "@/lib/llm-provider-type";
 
-/**
- * How an OpenAI-compatible endpoint is described, asked identically by the instance console and by a
- * workspace connecting its own provider.
- *
- * Only the description lives here. The two dialogs around it differ in ways that do not reduce to a
- * flag — the instance one can probe an unsaved draft to seed a model datalist, the workspace one owns
- * an active/inactive switch — so they stay two components and compose this in.
- */
 export interface LlmConnectionFieldsValue {
 	displayName: string;
 	baseUrl: string;
 	preset: ProviderPreset;
 	useResponsesApi: boolean;
 	authMode: LlmAuthMode;
-	/** Always starts blank, even when editing: a stored key is never read back to the browser. */
+	/** Always blank on open: a stored key is never read back to the browser. */
 	apiKey: string;
 	clearApiKey: boolean;
 }
 
-/** The routing columns both `LlmConnection` and `WorkspaceLlmConnection` carry under the same names. */
 type EditedConnection = OpenAiConnectionIdentity & {
 	displayName: string;
 	authMode?: LlmAuthMode;
@@ -73,33 +64,22 @@ export function connectionFieldsValueOf(
 	};
 }
 
-/**
- * The shared rules, not a presence check of either form's own: `noValidate` makes `type="url"` inert,
- * and an endpoint carrying a credential or a query string is rejected by the server whichever console
- * pasted it.
- */
 export function validateConnectionFields(
 	value: LlmConnectionFieldsValue,
 	isEdit: boolean,
 ): FieldErrors<LlmConnectionFormField> {
 	return validateLlmConnectionForm({
 		displayName: value.displayName,
-		// The endpoint is immutable, so an edit neither sends one nor validates one.
+		// Immutable once created, so an edit neither sends nor validates it.
 		baseUrl: isEdit ? undefined : value.baseUrl,
 	});
 }
 
 export interface LlmConnectionFieldsProps {
 	value: LlmConnectionFieldsValue;
-	/**
-	 * Called with the whole next value, not a per-field setter, so a caller can react to *any* change
-	 * — the instance dialog invalidates a probe result whose inputs have since moved — without each
-	 * control needing to know about it.
-	 */
 	onChange: (value: LlmConnectionFieldsValue) => void;
 	errors: FieldErrors<LlmConnectionFormField>;
 	isEdit: boolean;
-	/** The saved connection has a credential, so the field offers to keep or remove it. */
 	hasApiKey: boolean;
 	apiKeyLast4?: string;
 }
@@ -114,8 +94,6 @@ export function LlmConnectionFields({
 }: LlmConnectionFieldsProps) {
 	const update = (patch: Partial<LlmConnectionFieldsValue>) => onChange({ ...value, ...patch });
 
-	// `useId()` rather than hand-spelled ids, the house rule `BudgetAmountDialog` set: the two dialogs
-	// that render this spell out the same field names, and two forms cannot own one id.
 	const displayNameId = useId();
 	const presetId = useId();
 	const responsesApiId = useId();
@@ -126,15 +104,15 @@ export function LlmConnectionFields({
 	const displayNameErrorId = useId();
 	const baseUrlErrorId = useId();
 
-	/** Picking a preset fills in what it implies, but never overwrites a URL that was typed by hand. */
-	const applyPreset = (next: ProviderPreset) =>
+	const applyPreset = (next: ProviderPreset) => {
+		const baseUrlWasTypedByHand =
+			Boolean(value.baseUrl) && value.baseUrl !== baseUrlDefaultFor(value.preset);
 		update({
 			preset: next,
 			authMode: authModeDefaultFor(next),
-			...(!value.baseUrl || value.baseUrl === baseUrlDefaultFor(value.preset)
-				? { baseUrl: baseUrlDefaultFor(next) }
-				: {}),
+			...(baseUrlWasTypedByHand ? {} : { baseUrl: baseUrlDefaultFor(next) }),
 		});
+	};
 
 	return (
 		<>
@@ -145,8 +123,7 @@ export function LlmConnectionFields({
 					value={value.displayName}
 					onChange={(event) => update({ displayName: event.target.value })}
 					placeholder="e.g. Production OpenAI"
-					// `required` is semantics only — the form is `noValidate`, so the browser never acts on
-					// it — but it is what tells a screen reader the field is required before submit (SC 3.3.2).
+					// Inert under `noValidate`, but it is what announces the field as required (SC 3.3.2).
 					required
 					aria-invalid={Boolean(errors.displayName)}
 					aria-describedby={errors.displayName ? displayNameErrorId : undefined}
@@ -268,8 +245,6 @@ export function LlmConnectionFields({
 							id={clearApiKeyId}
 							checked={value.clearApiKey}
 							onCheckedChange={(checked) =>
-								// Removing the key and typing a replacement are two different intents; holding both
-								// would send a key the field no longer shows.
 								update({ clearApiKey: checked === true, ...(checked === true && { apiKey: "" }) })
 							}
 						/>

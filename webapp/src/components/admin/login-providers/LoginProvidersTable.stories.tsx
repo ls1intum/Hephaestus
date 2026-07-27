@@ -103,10 +103,7 @@ export const ConfirmDelete: Story = {
 	play: async ({ args, canvasElement }) => {
 		const canvas = within(canvasElement);
 		await userEvent.click(canvas.getByRole("button", { name: /Delete ACME Outline/i }));
-		// The dialog renders in a portal → query the document.
 		const dialog = await screen.findByRole("alertdialog");
-		// Every row's trigger opens this one hoisted dialog, so naming the provider in its heading is
-		// the only thing on screen that says which one is about to go.
 		await expect(within(dialog).getByRole("heading")).toHaveTextContent("Delete “ACME Outline”?");
 
 		const confirm = within(dialog).getByRole("button", { name: "Delete" });

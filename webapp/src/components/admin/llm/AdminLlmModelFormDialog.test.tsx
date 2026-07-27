@@ -25,8 +25,6 @@ describe("AdminLlmModelFormDialog", () => {
 		const onSave = renderDialog();
 		const active = screen.getByRole("switch", { name: "Active" }) as HTMLButtonElement;
 		expect(active.getAttribute("aria-checked")).toBe("false");
-		// And it cannot be flipped on the way in: announced as unavailable, out of the tab order, and
-		// unmoved by a press — a new model is created inactive and turned on afterwards or not at all.
 		await expectUnavailable(active);
 		fireEvent.click(active);
 		expect(active.getAttribute("aria-checked")).toBe("false");
@@ -76,7 +74,6 @@ describe("AdminLlmModelFormDialog", () => {
 	});
 
 	it("refuses an all-zero price, which the free option is for", () => {
-		// The server refuses it too: an all-zero PRICED model records verified $0 spend forever.
 		const onSave = renderDialog();
 		fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "GPT-5" } });
 		fireEvent.change(screen.getByLabelText("Upstream model id"), { target: { value: "gpt-5" } });
@@ -86,8 +83,6 @@ describe("AdminLlmModelFormDialog", () => {
 
 		fireEvent.click(screen.getByRole("button", { name: "Add model" }));
 
-		// The wording is `llm-form-validation`'s and is stated there; what this dialog is answerable
-		// for is that the shared rule runs at all and that its words reach the reader unaltered.
 		const rejection = validateLlmModelForm({
 			displayName: "GPT-5",
 			upstreamModelId: "gpt-5",
@@ -113,9 +108,6 @@ describe("AdminLlmModelFormDialog", () => {
 
 		fireEvent.click(screen.getByRole("button", { name: "Add model" }));
 
-		// The wording is `llm-form-validation`'s; what this dialog is answerable for is that a rule it
-		// enforces reaches the reader at all. Without this the submit was a dead end: validation
-		// failed, nothing was saved, and the screen said nothing.
 		const rejected = validateLlmModelForm({
 			displayName: "GPT-5",
 			upstreamModelId: "gpt-5",
@@ -131,7 +123,6 @@ describe("AdminLlmModelFormDialog", () => {
 			rejected.contextWindow,
 			rejected.maxOutputTokens,
 		]);
-		// Announced *on the way back to the field*, which `aria-invalid` alone never does (SC 3.3.1).
 		for (const [field, alert] of [
 			[contextWindow, alerts[0]],
 			[maxOutput, alerts[1]],
@@ -140,7 +131,6 @@ describe("AdminLlmModelFormDialog", () => {
 			expect(field.getAttribute("aria-describedby")).toBe(alert?.id);
 		}
 
-		// And the form is not wedged: correcting the value gets the admin through.
 		fireEvent.change(contextWindow, { target: { value: "200000" } });
 		fireEvent.change(maxOutput, { target: { value: "8000" } });
 		fireEvent.click(screen.getByRole("button", { name: "Add model" }));

@@ -15,18 +15,14 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
  * Pins the one ambiguity the {@code /agents} namespace creates: {@code GET /agents/jobs} (a literal
- * segment on {@code AgentJobController}) and {@code GET /agents/{purpose}} (a template on
- * {@code AgentBindingController}) are both two-segment patterns under the same parent.
+ * segment) and {@code GET /agents/{purpose}} (a template) are both two-segment patterns under the same
+ * parent. Spring's {@code PathPattern} comparator ranks the literal above the variable, so {@code jobs}
+ * can never be swallowed as a purpose — if that ordering ever flipped, the job-history screen would
+ * start failing enum conversion with a 400, while both controllers kept passing their own suites in
+ * isolation.
  *
- * <p>Spring's {@code PathPattern} specificity comparator ranks a literal above a variable, so
- * {@code jobs} can never be swallowed as a purpose. That is load-bearing rather than incidental: if the
- * ordering ever flipped, {@code /agents/jobs} would reach the binding controller and fail enum
- * conversion, turning the whole job-history screen into a 400 that no unit test would catch — both
- * controllers would still pass their own suites in isolation.
- *
- * <p>Both assertions matter. The first proves the literal wins; the second proves the template is still
- * reachable and still rejects a non-purpose, i.e. the win is precedence and not a route that shadows
- * its sibling entirely.
+ * <p>Both assertions matter: the first proves the literal wins, the second proves the template is still
+ * reachable and still rejects a non-purpose.
  */
 class AgentsPathDispatchIntegrationTest extends AbstractWorkspaceIntegrationTest {
 

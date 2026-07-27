@@ -11,12 +11,8 @@ import java.math.BigDecimal;
 
 /**
  * Object-mother for the instance LLM catalog entities, the sibling of {@link TestEntities} and
- * {@link WorkspaceTestFixtures}.
- *
- * <p>A dozen test classes each grew their own private {@code seedInstanceModel(...)} that built the
- * same enabled, PUBLIC model on the same {@code openai-completions} connection. They agreed on the
- * shape by accident, which means a new required field on either entity has to be discovered a dozen
- * times. One factory, one place to change.
+ * {@link WorkspaceTestFixtures}. One factory for the shared enabled/PUBLIC shape so a new required
+ * field only needs to be discovered once, instead of in every test that seeds one.
  *
  * <p>Both factories return <b>unsaved</b> entities with only the fields the catalog actually requires
  * — persist them through the repository the test already has, and set anything else on the returned

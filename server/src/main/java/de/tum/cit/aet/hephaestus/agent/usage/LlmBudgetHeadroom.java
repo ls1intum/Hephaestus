@@ -4,22 +4,16 @@ import java.math.BigDecimal;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A workspace's two caps and what the LEDGER says has been spent against each — the inputs of the cap
- * comparison, kept as numbers instead of a finished verdict.
- *
- * <p>{@link LlmBudgetDecision} answers "is this workspace blocked by what has been recorded?".
- * A ledger row is only written when an agent job or a mentor turn ENDS, so that question is blind to
- * a running execution's own spend. This record exists for the one caller that can see that spend —
- * the LLM proxy, which knows how many tokens the attempt on the other end of the request has already
- * consumed — and lets it add that amount before the comparison rather than after the money is gone.
+ * A workspace's two caps and what the ledger says has been spent against each, kept as numbers so a
+ * caller that can see spend the ledger cannot yet — the LLM proxy, mid-attempt — can add it before the
+ * comparison rather than after the money is gone.
  *
  * <p>A {@code null} budget is an uncapped purse: never blocked, and its spend is never even queried,
  * so the matching {@code spent} field is {@code null} too.
  *
- * <p><b>Why {@code hasUnpricedSpend} may read {@code false} on an exhausted purse.</b> The producer
- * skips the unpriced probe once the ledger alone already reaches the cap. That stays correct here
- * because in-flight spend is never negative: a purse that is EXHAUSTED on ledger spend alone is
- * EXHAUSTED for every in-flight amount, and EXHAUSTED already outranks UNVERIFIABLE.
+ * <p>{@code hasUnpricedSpend} may read {@code false} on a purse that is already exhausted on ledger
+ * spend alone, because the producer skips the probe there. Harmless: in-flight spend is never negative,
+ * so such a purse stays exhausted, and EXHAUSTED outranks UNVERIFIABLE.
  */
 public record LlmBudgetHeadroom(
     @Nullable BigDecimal instanceSpentUsd,
@@ -29,10 +23,9 @@ public record LlmBudgetHeadroom(
     @Nullable BigDecimal workspaceBudgetUsd,
     boolean workspaceHasUnpricedSpend
 ) {
-    /** Neither purse is capped — the verdict for any in-flight amount is ALLOWED. */
     public static final LlmBudgetHeadroom UNCAPPED = new LlmBudgetHeadroom(null, null, false, null, null, false);
 
-    /** The verdict on recorded spend alone — what every non-proxy gate asks. */
+    /** The verdict on recorded spend alone. */
     public LlmBudgetDecision decide() {
         return decideWith(null, BigDecimal.ZERO);
     }
@@ -40,9 +33,8 @@ public record LlmBudgetHeadroom(
     /**
      * The verdict once {@code inFlightUsd} of not-yet-recorded spend is charged to {@code purse}.
      *
-     * @param purse who pays for the in-flight spend; {@code null} means unattributable, and — exactly
-     *     as {@link LlmBudgetDecision#decideFor} judges an unattributable call against BOTH caps — the
-     *     amount is then charged to both purses rather than to neither. Fail-safe, not fail-open.
+     * @param purse who pays; {@code null} means unattributable, and the amount is then charged to both
+     *     purses rather than to neither. Fail-safe, not fail-open.
      * @param inFlightUsd already-incurred spend the ledger cannot see yet; never negative
      */
     public LlmBudgetDecision decideWith(@Nullable FundingSource purse, BigDecimal inFlightUsd) {

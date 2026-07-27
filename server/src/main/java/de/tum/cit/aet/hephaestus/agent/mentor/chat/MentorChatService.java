@@ -227,16 +227,11 @@ public class MentorChatService implements MentorTurnRunner {
         MentorChannel channel,
         AtomicReference<MentorRunnerClient> clientHolder
     ) {
-        // Admission precedes every thread/message/session read or write. A revoked binding leaves no
-        // partial mentor turn and never warms/attaches a sandbox.
+        // Both gates run before ANYTHING persists, so a refused turn leaves no partial rows and never
+        // warms a sandbox. Budget runs after admission: which purse applies depends on who pays for
+        // the bound model.
         MentorLlmConfig llmConfig = resolveLlmConfig(request.workspaceId());
 
-        // Monthly budget cap: transport-neutral gate covering web SSE and Slack turns. Runs
-        // AFTER admission because the cap that applies depends on who pays for the bound model — a
-        // workspace on its own provider is governed by its own cap, not the host's. Still before
-        // ANYTHING persists, so a blocked turn leaves no user message or in-flight assistant row
-        // behind; it surfaces as a user-facing error chunk via userFacingError. A capped purse whose
-        // month is unverifiable blocks exactly like an exhausted one.
         FundingSource mentorFunding = llmConfig.connectionScope();
         LlmBudgetBlockReason blockReason = llmBudgetService.decide(request.workspaceId()).forFunding(mentorFunding);
         if (blockReason == LlmBudgetBlockReason.EXHAUSTED) {
@@ -257,10 +252,8 @@ public class MentorChatService implements MentorTurnRunner {
         Optional<byte[]> priorSessionBytes = chatThreadRepository.findSessionJsonl(thread.getId());
 
         UUID assistantMessageId = UUID.randomUUID();
-        // The budget gate's read model for this turn: it makes the turn's own completed calls visible
-        // to the gate WHILE the turn is still running. What actually gets billed is the turn's row,
-        // which the proxy writes per served call; this is bound to the sandbox session below for
-        // exactly as long as this turn owns that sandbox.
+        // Read model only: it makes this turn's completed calls visible to the budget gate while the
+        // turn is still running. Billing comes from the turn's row, which the proxy writes per call.
         MentorTurnMeter proxyMeter = new MentorTurnMeter(assistantMessageId, llmConfig.priceSnapshot());
         MentorTurnPersistence.TurnPersistenceCookie cookie = persistence.persistInFlight(
             thread,
@@ -270,9 +263,7 @@ public class MentorChatService implements MentorTurnRunner {
             llmConfig
         );
         TranslatorState state = new TranslatorState(assistantMessageId);
-        // Freeze the catalog binding onto the turn state so MentorTurnPersistence's ledger write
-        // resolves the SAME price the runner actually used — mirrors ConfigSnapshot
-        // doing the same for detection jobs.
+        // Frozen onto the turn so the ledger bills the price the runner actually ran at.
         state.bindConnection(llmConfig.connectionScope(), llmConfig.connectionId());
         state.bindAdmission(llmConfig.upstreamModelId(), llmConfig.priceSnapshot());
 
@@ -284,12 +275,8 @@ public class MentorChatService implements MentorTurnRunner {
         boolean poisoned = false;
         MentorChatMetrics.Outcome outcome = MentorChatMetrics.Outcome.ERROR;
         try {
-            // Emit Start (with assistantMessageId) BEFORE sandbox.attach so the AI-SDK
-            // reducer creates the placeholder message immediately — sandbox cold start can
-            // take several seconds and the user otherwise stares at a blank screen. Mark the
-            // translator started here so it suppresses the duplicate Start it would otherwise
-            // emit on Pi's first message_start; the translator still fires StartStep per
-            // assistant message (the two are decoupled — see handleMessageStart).
+            // Start goes out BEFORE sandbox.attach so the client renders a placeholder during the
+            // multi-second cold start; markStarted then suppresses the translator's duplicate Start.
             channel.send(new UIMessageChunk.Start(assistantMessageId, null));
             state.markStarted();
             channel.send(UIMessageChunk.DataMentorStatus.of("warming-up", "container-cold"));
@@ -320,14 +307,9 @@ public class MentorChatService implements MentorTurnRunner {
             sandbox = runner.sandbox();
             client = runner.client();
 
-            // Per-sandbox FIFO serialisation: Pi's AgentSessionRuntime is single-session.
-            // `runtime.switchSession(...)` (fired by every `open_thread`) unsubscribes the
-            // prior session — so if tab-B sends open_thread while tab-A is mid-prompt on the
-            // same (userId, workspaceId) sandbox, tab-A's in-flight LLM stream is orphaned.
-            // Serialise the open_thread → terminal-chunk window per sandbox to make tab-B
-            // wait for tab-A to finish. Different-user / different-workspace turns are
-            // unaffected (different SandboxKey). The per-thread lock above remains as the
-            // outer single-flight guard (concurrent SAME-thread attempts return 409).
+            // Per-sandbox FIFO: Pi's runtime is single-session, so a second open_thread on the same
+            // sandbox unsubscribes — and orphans — a turn already streaming. Serialising the
+            // open_thread → terminal-chunk window makes the second turn wait instead.
             MentorTurnLock.SandboxKey sandboxKey = new MentorTurnLock.SandboxKey(request.workspaceId(), user.getId());
             try (var ignored = turnLock.acquireSandboxLock(sandboxKey)) {
                 try {
@@ -366,12 +348,9 @@ public class MentorChatService implements MentorTurnRunner {
                     client = runner.client();
                     client.openThread(request.threadId()).get(10, TimeUnit.SECONDS);
                 }
-                // Meter this turn for exactly the window in which it owns the sandbox. Binding and
-                // unbinding INSIDE the sandbox lock is what makes the window exclusive: the next turn
-                // on this sandbox cannot bind until this one has released, so no call can ever be
-                // attributed to the wrong turn. The cost is that a runner still calling after the lock
-                // is released (the client-disconnect drain) is refused by the proxy: outside the window
-                // there is no row to bill, and serving it would spend money nothing records.
+                // Bind and unbind INSIDE the sandbox lock: that exclusivity is what stops a call being
+                // attributed to the wrong turn. A late call outside the window has no row to bill and
+                // the proxy refuses it.
                 UUID sandboxSessionId = sandbox.identity().sessionId();
                 if (!proxyCredentialRegistry.bindTurn(sandboxSessionId, proxyMeter)) {
                     log.warn(
@@ -397,9 +376,6 @@ public class MentorChatService implements MentorTurnRunner {
                         TimeUnit.MILLISECONDS
                     );
                 } finally {
-                    // Stops NEW calls landing on this meter. Nothing reads it afterwards: the terminal
-                    // write bills from the turn's row, which is durable and does not depend on this
-                    // process still being alive.
                     proxyCredentialRegistry.unbindTurn(sandboxSessionId, proxyMeter);
                 }
             }
@@ -422,11 +398,8 @@ public class MentorChatService implements MentorTurnRunner {
             channel.completeWithError("Mentor turn timed out before completion.");
             outcome = MentorChatMetrics.Outcome.TIMEOUT;
         } catch (ClientDisconnectedException disconnect) {
-            // Browser closed mid-turn (tab close, refresh, network blip). This is NOT a turn
-            // failure: the runner subscription keeps draining and `handleEvent` will still call
-            // `persistence.finalise(...)` (or `interrupt(...)` on a runner-side error) when the
-            // terminal Finish/Error chunk arrives. Do not poison the sandbox, do not interrupt
-            // the row. The abort-Pi hook fired via the channel — no manual abort needed.
+            // Not a turn failure: the runner subscription keeps draining and still finalises the row
+            // when the terminal chunk arrives, so do not poison the sandbox or interrupt the row.
             log.info(
                 "Mentor client disconnected mid-turn; runner draining to natural finish: {}",
                 disconnect.getMessage()
@@ -448,11 +421,8 @@ public class MentorChatService implements MentorTurnRunner {
             outcome = poisoned ? MentorChatMetrics.Outcome.POISONED : MentorChatMetrics.Outcome.ERROR;
         } finally {
             channel.close();
-            // Skip closeThread on client-disconnect: the runner already received `abort` via
-            // the channel's disconnect hook and will free its slot when its watchdog fires.
-            // Issuing closeThread here would force a sandbox round-trip and the .join() can
-            // chain on top of the 20s drain timeout — under load that lets a single dead
-            // client hold the per-thread lock for tens of seconds.
+            // Skip closeThread on client-disconnect: the runner was already aborted via the channel,
+            // and this round-trip would chain onto the drain timeout, holding the per-thread lock.
             boolean skipCloseThread = outcome == MentorChatMetrics.Outcome.CLIENT_DISCONNECT;
             if (client != null) {
                 if (!skipCloseThread) {
@@ -745,13 +715,10 @@ public class MentorChatService implements MentorTurnRunner {
     }
 
     /**
-     * Resolve exactly the workspace's explicit mentor binding. Missing, foreign, disabled, or revoked
-     * bindings fail closed; silently switching to another enabled config would change provider, model,
-     * and price in the middle of a conversation.
-     *
-     * <p>The bound id is always loaded via the workspace-scoped finder — never a bare
-     * {@code findById} — because prod tenancy enforcement is advisory ({@code log}), so the
-     * scoped query is the only real cross-tenant guard.
+     * Resolve exactly the workspace's own mentor binding, failing closed rather than substituting
+     * another — a silent swap would change provider, model and price mid-conversation. SECURITY: the
+     * workspace-scoped finder, never a bare {@code findById}: prod tenancy enforcement only logs, so
+     * this query is the real cross-tenant guard.
      */
     private MentorLlmConfig resolveLlmConfig(long workspaceId) {
         WorkspaceAgentBinding binding = agentBindingRepository

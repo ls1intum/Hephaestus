@@ -96,12 +96,8 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
 
     /**
      * The turn binding: what makes a mentor turn's spend visible while the turn is still running.
-     *
-     * <p>Before it existed, {@code validate} returned no billing target at all, so a turn at the cap
-     * could make an unbounded number of calls and nothing observed a cent of it until the turn ended.
-     * The bound these tests pin is the one stated on the class: a turn is refused as soon as its OWN
-     * completed calls have consumed the ledger's last-known headroom, and no call can ever be billed
-     * to a turn other than the one that authenticated it.
+     * Before it existed, {@code validate} returned no billing target at all, so a turn at the cap
+     * could make unbounded calls before anything observed a cent of it.
      */
     @Nested
     class TurnBinding {

@@ -34,38 +34,14 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * The upgrade path for an instance that already has workspaces configured.
  *
  * <p>Retiring {@code agent_config} destroys the only copy of every workspace's LLM endpoint, model
- * name and encrypted API key unless the migration carries them into the new catalog first. No other
- * tier can catch a regression there: every other test builds its schema with {@code ddl-auto: create}
- * and never executes a changelog, and {@code ConfigAuditImmutabilityIntegrationTest} — the one test
- * that does run the real changelog — starts from an empty database, where a data migration is
- * indistinguishable from a no-op.
+ * name and encrypted API key unless the migration carries them into the new catalog first. Every other
+ * test builds its schema with {@code ddl-auto: create} and never runs a changelog, and the one test
+ * that does starts from an empty database, where a data migration is indistinguishable from a no-op —
+ * so this is the only tier that can catch a regression here.
  *
- * <p>So this test stops the migration where the release branch begins, writes the rows a real
- * upgrading instance would have, and then finishes the migration and asserts what survived. The split
- * point is derived from the changelog itself rather than hard-coded: everything outside {@code
- * RELEASE_CHANGELOG} is "the old schema", so a changelog that lands on {@code main} while this branch
- * is in review moves the boundary by itself instead of silently turning this into a no-op.
- *
- * <p>The fixture is built around what the OLD code actually did, not around what the pointer columns
- * suggest. {@code practice_config_id} / {@code mentor_config_id} were written by one explicit UI
- * action and by nothing else — the startup seeder ({@code AGENT_DEFAULT_CONFIG_*}, the documented
- * default provisioning route) left both NULL and relied on the resolvers' fallbacks. So the shape
- * that must survive the upgrade is an <em>enabled</em> config with <em>no</em> pointer at all, and
- * every case below exists to pin one branch of those resolvers:
- *
- * <ul>
- *   <li>{@code legacy-seeded} — the seeder shape: enabled, both pointers NULL, serving both features.
- *   <li>{@code legacy-bound} — one config both pointers name explicitly.
- *   <li>{@code legacy-orphan} — disabled AND unreferenced: unreachable then, legitimately dropped now.
- *   <li>{@code legacy-anthropic} — a provider whose public endpoint the migration has to supply.
- *   <li>{@code legacy-nomodel} — no model name and no endpoint: both placeholders, limits still kept.
- *   <li>{@code legacy-fanout} — two enabled configs, no pointer: detection fanned out over both.
- *   <li>{@code legacy-paused} — a pointer at a DISABLED config, which paused detection but not the
- *       mentor.
- * </ul>
- *
- * <p>Tests are ordered: the assertions run first, then the re-run, then the rollback, because the
- * last two mutate the database they inspect.
+ * <p>The test seeds the old schema with the rows a real upgrading instance would have, runs the
+ * migration, and asserts what survived. Tests are ordered because the last two mutate the database
+ * they inspect.
  */
 @Testcontainers
 @Tag("integration")
@@ -110,11 +86,9 @@ class LegacyAgentConfigMigrationIntegrationTest {
     }
 
     /**
-     * The regression this whole class exists for. An instance provisioned through
-     * {@code AGENT_DEFAULT_CONFIG_*} — the documented default, and the very variables MIGRATION.md
-     * tells the operator to delete — has an enabled config with both pointers NULL that is actively
-     * serving the mentor and detection. Carrying over only pointed-at configs skips it, and the drop
-     * of {@code agent_config} then destroys its key with no way to read it back.
+     * An instance provisioned through {@code AGENT_DEFAULT_CONFIG_*} (MIGRATION.md's documented
+     * default) has an enabled config with both pointers NULL that actively serves the mentor and
+     * detection; carrying over only pointed-at configs would skip it and lose its key for good.
      */
     @Test
     @Order(2)
@@ -179,8 +153,8 @@ class LegacyAgentConfigMigrationIntegrationTest {
     }
 
     /**
-     * The provider fallbacks. Both arms matter: an endpoint the migration gets wrong is an endpoint a
-     * disabled row silently carries until someone re-enables it and the key leaves for the wrong host.
+     * A wrong fallback endpoint would sit silently in a disabled row until someone re-enables it, then
+     * send the key to the wrong host.
      */
     @Test
     @Order(5)
@@ -222,10 +196,9 @@ class LegacyAgentConfigMigrationIntegrationTest {
     }
 
     /**
-     * Carrying a config with no model name over as a connection alone would drop that workspace's
-     * timeout, concurrency and internet limits — values that exist nowhere but {@code agent_config},
-     * which the very next changeSet drops. So the binding is created regardless, with a placeholder
-     * model name.
+     * Carrying this config over as a connection alone would drop its timeout/concurrency/internet
+     * limits, which live nowhere but the {@code agent_config} row the next changeSet drops — so the
+     * binding is created too, with a placeholder model name.
      */
     @Test
     @Order(8)
@@ -243,9 +216,9 @@ class LegacyAgentConfigMigrationIntegrationTest {
     }
 
     /**
-     * Detection with no pointer fanned out to every enabled config. One binding per (workspace,
-     * purpose) cannot express that, so it collapses to the oldest — but every config still arrives as
-     * a connection and a model, so no key is lost and the operator can bind another.
+     * Detection with no pointer fanned out to every enabled config, which one binding per (workspace,
+     * purpose) can't express, so it collapses to the oldest config while every config still arrives as
+     * a connection so no key is lost.
      */
     @Test
     @Order(9)
@@ -263,9 +236,9 @@ class LegacyAgentConfigMigrationIntegrationTest {
     }
 
     /**
-     * The deliberate asymmetry in the old resolvers: a bound-but-disabled config PAUSED detection,
-     * while the mentor fell through to the oldest enabled config so a user mid-conversation still got
-     * an answer.
+     * A bound-but-disabled config paused detection, while the mentor fell through to the oldest
+     * enabled config so a user mid-conversation still got an answer — the old resolvers' deliberate
+     * asymmetry.
      */
     @Test
     @Order(10)
@@ -294,10 +267,9 @@ class LegacyAgentConfigMigrationIntegrationTest {
     }
 
     /**
-     * The one config that is still legitimately dropped. Disabled AND unreferenced means neither
-     * resolver could ever select it: the mentor's fallback and detection's fan-out both filter on
-     * enabled, and no pointer named it. Note the fixture — the row is DISABLED. An unreferenced
-     * <em>enabled</em> config is exactly the seeder shape and must survive (see the test above).
+     * Disabled and unreferenced means neither resolver could ever select it, since both filter on
+     * enabled and no pointer named it — unlike an unreferenced but enabled config, which is the seeder
+     * shape and must survive.
      */
     @Test
     @Order(12)
@@ -311,10 +283,9 @@ class LegacyAgentConfigMigrationIntegrationTest {
     }
 
     /**
-     * The FK hardening that rides along with the retirement: {@code feedback.agent_job_id} used to
-     * CASCADE, which took feedback, its observations, its placements and its reactions — append-only
-     * research data — with any agent_job delete. The seeded job has feedback hanging off it, so the
-     * refusal is exercised rather than asserted from the catalog alone.
+     * {@code feedback.agent_job_id} used to CASCADE, deleting append-only research data with any
+     * agent_job delete; this exercises the RESTRICT hardening rather than just asserting it from the
+     * catalog.
      */
     @Test
     @Order(13)
@@ -327,10 +298,8 @@ class LegacyAgentConfigMigrationIntegrationTest {
     }
 
     /**
-     * Pre-release spend is attributed to the instance purse, uniformly and by explicit literal. Which
-     * purse really paid is not recoverable — the worker-pod key override that beat the per-workspace
-     * key lived in an environment variable — so the choice is a documented assumption, and a
-     * documented assumption has to be pinned or it drifts.
+     * Which purse really paid pre-release is not recoverable (the key override lived in an env var), so
+     * attributing it to the instance purse is a documented assumption that must stay pinned.
      */
     @Test
     @Order(14)
@@ -350,9 +319,8 @@ class LegacyAgentConfigMigrationIntegrationTest {
 
     /**
      * The deploy log is the only place an operator learns which workspaces the carry-over could not
-     * reproduce faithfully — {@code agent_config} is gone by the time they read it, so nothing can be
-     * reconstructed afterwards. PostgreSQL writes {@code RAISE WARNING} to its server log, which the
-     * container captures, so the warnings are assertable rather than taken on trust.
+     * reproduce faithfully, since {@code agent_config} is gone by the time they'd look — PostgreSQL's
+     * {@code RAISE WARNING} lands in the server log the container captures, so it's assertable here.
      */
     @Test
     @Order(15)
@@ -374,8 +342,7 @@ class LegacyAgentConfigMigrationIntegrationTest {
     }
 
     /**
-     * Re-running the release changelog against a database it has already upgraded must change
-     * nothing. That is what every {@code MARK_RAN} precondition in the file is for, and it is the
+     * Every {@code MARK_RAN} precondition in the file exists so a second pass changes nothing — the
      * recovery an operator reaches for when a deploy's tracking is in doubt.
      */
     @Test

@@ -32,7 +32,6 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-/** Every host allowed (blank allowlist) and workspace connections turned off. */
 export const NoAllowlistOwnProviderDisabled: Story = {
 	args: {
 		settings: { allowWorkspaceConnections: false },
@@ -43,12 +42,6 @@ export const Loading: Story = {
 	args: { settings: undefined, isLoading: true },
 };
 
-/**
- * The card mid-edit, with the workspace-provider policy flipped and not yet saved.
- *
- * That Save is offered only once something differs from the settings on record — including typing a
- * value back to what the server holds — is asserted in `InstanceLlmSettingsCard.test.tsx`.
- */
 export const EditedButUnsaved: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);

@@ -296,7 +296,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         event.putArray("messages");
         List<UIMessageChunk> out = translator.translate(event, state);
         UIMessageChunk.Finish finish = (UIMessageChunk.Finish) out.get(out.size() - 1);
-        // No model, no usage, no top-level cost — the Finish carries null metadata.
         assertThat(finish.messageMetadata()).isNull();
     }
 
@@ -491,7 +490,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         translator.translate(messageEnd, state);
         assertThat(state.observedStopReason()).isEqualTo("length");
 
-        // agent_end with NO stopReason on messages[] uses the captured value.
         ObjectNode agentEnd = mapper.createObjectNode();
         agentEnd.put("type", "agent_end");
         agentEnd.putArray("messages");
@@ -531,7 +529,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     void stateAccumulatesPartsAcrossDeltas() throws Exception {
         translator.translate(fixture("message_start_assistant.json"), state);
         translator.translate(fixture("message_update_text_delta.json"), state);
-        // Append another delta with same contentIndex
         ObjectNode second = (ObjectNode) fixture("message_update_text_delta.json").deepCopy();
         ((ObjectNode) second.get("assistantMessageEvent")).put("delta", "lo");
         translator.translate(second, state);

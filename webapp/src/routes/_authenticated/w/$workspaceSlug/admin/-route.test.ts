@@ -9,8 +9,7 @@ import { routeTree } from "@/routeTree.gen";
 const WORKSPACE_HOME = "/w/acme";
 
 // `router.load()` lazily imports each matched route's module, so a case can pay the one-off cost of
-// transforming a heavy page (the achievement designer pulls in ReactFlow). Observed ~4s against the
-// 5s default, which is a flake waiting to happen on a loaded CI box.
+// transforming a heavy page (the achievement designer pulls in ReactFlow).
 vi.setConfig({ testTimeout: 15_000 });
 
 function newRouter(url?: string) {
@@ -49,16 +48,14 @@ async function land(url: string) {
 }
 
 /**
- * Drives admin URLs through the real router as each role, which makes the gate structural rather
- * than a convention: a route that maps to an /admin URL without nesting under the layout — a
- * sibling, a dot-notation path, an `admin_` un-nesting suffix — skips the guard silently, and
- * nothing about the file it lives in says so.
+ * The bypass this guards against: a route mapping to an /admin URL without nesting under the gated
+ * layout — a sibling, a dot-notation path, an `admin_` un-nesting suffix — skips the guard silently,
+ * and nothing about the file it lives in says so.
  */
 describe("workspace-admin route gate", () => {
 	it("enumerates the admin routes rather than trusting a hand-written list", () => {
-		// A filter that matched nothing would leave every case below vacuously green, and one that
-		// matched a subset would quietly shrink the coverage this suite exists for. Raise the floor
-		// when routes are added; never lower it (`webapp/AGENTS.md`, "do not weaken it").
+		// A filter that matched nothing leaves every case below vacuously green. Raise the floor when
+		// routes are added; never lower it.
 		expect(adminUrls.length).toBeGreaterThanOrEqual(19);
 		expect(adminUrls).toContain("/w/acme/admin/settings");
 		expect(adminUrls).toContain("/w/acme/admin/achievement-designer");

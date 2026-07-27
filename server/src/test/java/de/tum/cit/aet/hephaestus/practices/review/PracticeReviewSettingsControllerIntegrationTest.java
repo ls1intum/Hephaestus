@@ -45,14 +45,12 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
             .expectStatus()
             .isOk()
             .expectBody()
-            // A fresh workspace overrides nothing, so every raw override is absent and the effective
-            // value is the fleet default.
             .jsonPath("$.skipDraftsOverride")
             .doesNotExist()
             .jsonPath("$.skipDrafts")
             .isEqualTo(true)
-            // The workspace's feature flags are not review policy, and every client already holds them
-            // on the workspace itself, so this response carries the policy alone — asserted, not assumed.
+            // Feature flags aren't review policy and already live on the workspace itself; assert
+            // this response carries the policy alone rather than assuming it.
             .jsonPath("$.practicesEnabled")
             .doesNotExist()
             .jsonPath("$.mentorEnabled")
@@ -116,9 +114,6 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
     }
 
     // ─── Access control ────────────────────────────────────────────────────────────────────────
-    // Both handlers are @RequireAtLeastWorkspaceAdmin, and gating this policy IS the controller's
-    // reason to exist — the read tells you what the fleet default is and the PATCH changes whether
-    // reviews run at all. Three @WithAdminUser happy paths said nothing about that gate.
 
     @Test
     @WithMentorUser

@@ -12,13 +12,9 @@ final class CatalogSlug {
     private CatalogSlug() {}
 
     /**
-     * The slug to store for a newly created catalog row.
-     *
-     * <p>A caller-supplied slug is taken as given — including one that is already taken. The uniqueness
-     * scopes differ per entity ({@code taken} carries that), and every one of them is backed by a UNIQUE
-     * constraint, so the loser of a concurrent create is reported as a conflict rather than silently
-     * renamed behind the caller's back. Only a slug WE derived from a display name may be renamed,
-     * because nobody asked for that one.
+     * A caller-supplied slug is stored as given even when taken, so the loser of the backing UNIQUE
+     * constraint is reported as a conflict; only a slug derived here from the display name is
+     * de-duplicated, because nobody asked for that one.
      */
     static String unique(@Nullable String requested, String displayName, Predicate<String> taken) {
         if (StringUtils.hasText(requested)) return requested;

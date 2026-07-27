@@ -23,7 +23,6 @@ export interface AdminLlmModelAccessDialogProps {
 	model: LlmModel | null;
 	workspaceOptions: WorkspaceOption[];
 	isLoadingWorkspaces?: boolean;
-	/** The workspace-directory query's error, when it failed; its ProblemDetail is shown to the admin. */
 	workspacesError?: unknown;
 	onRetryWorkspaces?: () => void;
 	isSubmitting: boolean;
@@ -34,9 +33,8 @@ export interface AdminLlmModelAccessDialogProps {
  * Dedicated access editor for an instance model. Access changes take effect at request time.
  *
  * The form is mounted only while the dialog is open and keyed by the model, so its selection seeds
- * from that model exactly once — at open — rather than being copied in by an effect. An effect would
- * re-run on every background refetch and silently discard an unsaved edit the moment another admin
- * touched the model, or the tab regained focus past the query's `staleTime`.
+ * once, at open. An effect copying the model into state would re-run on a background refetch and
+ * discard an unsaved edit.
  */
 export function AdminLlmModelAccessDialog({
 	open,

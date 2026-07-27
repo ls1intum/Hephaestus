@@ -97,8 +97,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             feedbackLedgerRecorder,
             observationTrendService
         );
-        // Inline reconciliation runs on every OPEN-PR delivery — even with zero diff notes — to clear an
-        // earlier run's stale notes. Default it to a benign result so tests that don't pin it don't NPE.
+        // Reconciliation runs on every OPEN-PR delivery even with zero diff notes; default it benign
+        // so tests that don't pin it don't NPE.
         org.mockito.Mockito.lenient()
             .when(
                 diffNotePoster.reconcileInlineNotes(
@@ -165,7 +165,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         void editsPriorSummaryInPlace() {
             AgentJob job = createJob();
             stubOpenPr();
-            // A live summary already exists on this continuity line → edit it, do not post anew.
             when(feedbackLedgerRecorder.priorLiveSummaryRef(eq(job))).thenReturn(Optional.of("IC_prior"));
             when(commentPoster.updateFormattedBody(eq(job), eq("IC_prior"), any(String.class))).thenReturn(
                 new PullRequestCommentPoster.UpdateResult(PullRequestCommentPoster.UpdateResult.Kind.EDITED, "IC_prior")
@@ -300,8 +299,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
         @Test
         void deliversToMergedPrWhenWorkspaceOverridesProperty() {
-            // Split-brain guard: fleet property deliverToMerged=false, but this workspace overrides it
-            // to true → the merged PR must still be delivered. Gate and delivery must agree per-workspace.
             AgentJob job = createJob();
             var pr = createOpenPr();
             pr.setState(Issue.State.MERGED);
@@ -317,9 +314,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
             var body = ArgumentCaptor.forClass(String.class);
             verify(commentPoster).postFormattedBody(eq(job), body.capture());
-            // The posted id landing on the job is the persisted trace that delivery really happened.
             assertThat(job.getDeliveryCommentId()).isEqualTo("IC_comment789");
-            // Body is sanitized and wrapped with a marker + footer, so assert containment.
+            // Body is wrapped with a marker + footer, so assert containment rather than equality.
             assertThat(body.getValue()).contains("Fix stuff.");
         }
 
@@ -378,8 +374,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
         @Test
         void blankAfterSanitize_noInlineLanded_recordsEmptyAfterSanitize() {
-            // The composed body sanitises to blank and no inline note lands → NOTHING reached the developer.
-            // The run must be ledgered SUPPRESSED (EMPTY_AFTER_SANITIZE), never as a phantom DELIVERED unit.
+            // Nothing reached the developer, so this must ledger SUPPRESSED, never a phantom DELIVERED unit.
             AgentJob job = createJob();
             stubOpenPr();
 
@@ -403,8 +398,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
         @Test
         void blankAfterSanitize_inlineLanded_recordsDeliveredWithoutSummary() {
-            // Blank summary but a posted inline note: the run IS a (summary-less) delivery — the ledger
-            // records DELIVERED (the recorder skips the SUMMARY placement since no comment id exists).
+            // Recorded as DELIVERED even though summary is blank: the recorder skips SUMMARY placement
+            // when there's no comment id, but the inline note landing still counts as delivery.
             AgentJob job = createJob();
             stubOpenPr();
             var note = new DiffNote("src/Foo.java", 10, null, "Fix this", "ck-foo");
@@ -422,8 +417,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             var delivery = new DeliveryContent("", List.of(note), List.of());
             service.deliverFeedback(job, delivery);
 
-            // The signal list is the payload the ledger bills provenance against; asserting it exactly
-            // is the point of the test, so it is named rather than matched with any().
+            // Signal list asserted exactly (not any()) since it's the payload the ledger bills provenance against.
             verify(feedbackLedgerRecorder).record(
                 eq(job),
                 eq(delivery),
@@ -436,8 +430,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
         @Test
         void throwsWhenSummaryPostReturnsNoId() {
-            // Integrity failure: a real, non-blank summary body was submitted but the provider
-            // returned no comment id — the developer sees nothing, so the job must fail loud.
+            // No comment id back from the provider means the developer sees nothing, so fail loud.
             AgentJob job = createJob();
             stubOpenPr();
             when(commentPoster.postFormattedBody(any(), any())).thenReturn(null);
@@ -448,16 +441,14 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException.class
             );
             assertThat(job.getDeliveryCommentId()).isNull();
-            // The composed body is persisted as FAILED (auditable + dashboard-visible) BEFORE the exception
-            // propagates — a failed direct delivery must not discard it.
+            // Must persist as FAILED before the exception propagates, not get discarded with it.
             verify(feedbackLedgerRecorder).recordUndelivered(eq(job), eq(delivery));
         }
 
         @Test
         void summaryLandedThenInlineFailed_doesNotRecordFalseUndelivered() {
-            // Partial success: the summary posted (developer saw the findings), then the inline-notes step threw
-            // JobDeliveryException. recordUndelivered must NOT run — a FAILED unit + conversation re-signal here
-            // would falsely mark the landed summary undelivered and double-raise its loci.
+            // Summary already posted when the inline-notes step throws; recordUndelivered must not run,
+            // or it would falsely mark the landed summary undelivered and double-raise its loci.
             AgentJob job = createJob();
             stubOpenPr();
             when(commentPoster.postFormattedBody(any(), any())).thenReturn("IC_summary_1");
@@ -489,7 +480,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             service.deliverFeedback(job, delivery);
 
             assertThat(job.getDeliveryCommentId()).isEqualTo("IC_comment456");
-            // No author → no per-user preference lookup is possible; absence is the observable state.
             verifyNoInteractions(userPreferencesRepository);
         }
 
@@ -526,8 +516,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
         @Test
         void emptyDiffNotesStillReconcilesToClearStaleNotesOnOpenPr() {
-            // A re-review that produces ZERO inline notes must STILL reconcile so an earlier run's stale
-            // line-numbered notes are cleared (the empty-diff pathology) — the clear half of clear-then-post.
+            // Zero inline notes must still reconcile, or an earlier run's stale notes never get cleared.
             AgentJob job = createJob();
             stubOpenPr();
             when(commentPoster.postFormattedBody(any(), any())).thenReturn("IC_comment789");
@@ -539,8 +528,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
         @Test
         void suppressedPrNeverReconciles_noDataLoss() {
-            // Symmetric guard: a CLOSED PR is suppressed upstream and must NEVER reach reconciliation —
-            // otherwise a re-run on a closed PR would wipe the delivered review (data loss).
+            // A suppressed CLOSED PR must never reach reconciliation, or a re-run would wipe the delivered review.
             AgentJob job = createJob();
             var pr = createOpenPr();
             pr.setState(Issue.State.CLOSED);
@@ -612,8 +600,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 List.of(new DiffNote("src/Foo.java", 10, null, "x")),
                 List.of()
             );
-            // The recomposer must be CALLED with exactly the delivered key set, and its output must be what
-            // gets edited in place — a no-op that ignored the signals would never invoke updateFormattedBody.
             service.deliverFeedback(job, delivery, deliveredKeys -> {
                 assertThat(deliveredKeys).containsExactly("corr-1");
                 return "Demoted summary body.";
@@ -630,7 +616,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_summary");
-            // Inline reconcile produced ZERO delivered signals (default benign stub, no signals).
             boolean[] recomposed = { false };
 
             service.deliverFeedback(job, new DeliveryContent("Full-line summary.", List.of(), List.of()), keys -> {
@@ -696,10 +681,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
             String formatted = FeedbackDeliveryService.formatPracticeNote("Some review content", job);
 
-            // This is EXACTLY what GithubFeedbackChannel#findExistingSummary does to decide a match
-            // (node.getBody().contains(marker)) — asserting the round trip here, rather than only that
-            // each side individually embeds "some" marker, is what catches a re-introduced drift between
-            // the format side and the lookup side.
+            // Mirrors GithubFeedbackChannel#findExistingSummary's own match check
+            // (node.getBody().contains(marker)); asserting the round trip catches format/lookup drift.
             String lookupMarker = PullRequestCommentPoster.summaryMarkerFor(job);
             assertThat(formatted).contains(lookupMarker);
         }

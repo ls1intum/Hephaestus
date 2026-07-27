@@ -29,19 +29,14 @@ import { PROVIDER_PRESET_LABELS, presetForConnection } from "@/lib/llm-provider-
 
 export interface AdminLlmConnectionsTableProps {
 	connections: LlmConnection[];
-	/** Model count per connection id, computed by the container from the (unscoped) models list. */
 	modelCounts: Record<number, number>;
-	/**
-	 * False while the model catalog is unavailable, so the counts read `—`. Turning a connection *off*
-	 * is blocked while it is false, because that confirm has to count the models it stops. Delete stays
-	 * offered: the server refuses a connection that still has models on it, whatever the client knows.
-	 */
+	/** False while the model catalog is unavailable: counts read `—` and a connection cannot be turned
+	 * off, because that confirm has to count the models it stops. */
 	modelCountsAvailable?: boolean;
 	isLoading: boolean;
 	isError: boolean;
 	error?: unknown;
 	onRetry?: () => void;
-	/** Ids of the connections with a write in flight — see {@link usePendingMutationIds}. */
 	mutatingIds: ReadonlySet<number>;
 	selectedId: number | null;
 	onSelect: (connection: LlmConnection) => void;
@@ -59,18 +54,8 @@ function hostOf(baseUrl: string): string {
 	}
 }
 
-/**
- * One width per column, so the placeholder reserves the real column box instead of promising a
- * uniform grid. `null` for the trailing action slot: it has nothing to promise.
- */
 const SKELETON_COLUMNS = ["w-40", "w-24", "w-6", "w-9", null];
 
-/**
- * Mounted by both the loading and the loaded table, so the skeleton lines up with the real columns.
- *
- * `scope="col"` on every header, like every other table on these surfaces: it is what lets a screen
- * reader announce the column a cell belongs to (WCAG SC 1.3.1).
- */
 function ConnectionsTableHeader() {
 	return (
 		<TableHeader>
@@ -87,7 +72,6 @@ function ConnectionsTableHeader() {
 	);
 }
 
-/** Instance-admin provider connections list. Credentials are never shown here at all. */
 export function AdminLlmConnectionsTable({
 	connections,
 	modelCounts,
@@ -175,17 +159,13 @@ export function AdminLlmConnectionsTable({
 											checked={connection.enabled}
 											disabled={busy || (connection.enabled && !modelCountsAvailable)}
 											aria-busy={busy}
-											// Names the object, not the action: a `switch` carries its own state in
-											// `aria-checked`, and a name that flips as the user toggles is announced
-											// as "Turn off Production OpenAI, switch, on" (APG, WAI-ARIA switch).
+											// Names the object, not the action: the switch already carries its state in
+											// `aria-checked`, and a label that flips reads as part of that state.
 											aria-label={connection.displayName}
 											onCheckedChange={(checked) => {
-												if (checked) onToggleEnabled(connection, true);
-												// A connection with no models on it stops nothing, so there is nothing to
-												// confirm. The switch is already disabled while the count is unknown, so
-												// zero here means zero. Turning it back on is one click away.
-												else if (modelsOn(connection) === 0) onToggleEnabled(connection, false);
-												else setTurningOff(connection);
+												const stopsWork = !checked && modelsOn(connection) > 0;
+												if (stopsWork) setTurningOff(connection);
+												else onToggleEnabled(connection, checked);
 											}}
 										/>
 										{busy && <Spinner className="size-3.5 text-muted-foreground" />}
@@ -198,11 +178,8 @@ export function AdminLlmConnectionsTable({
 											variant="outline"
 											size="sm"
 											disabled={busy}
-											// The button discloses the models section below the table. `aria-expanded`
-											// rather than `aria-pressed`, which would re-announce it as a toggle; no
-											// `aria-controls`, because the route swaps that region between a spinner,
-											// an error alert and the section, and an IDREF that dangles for two of the
-											// three is worse than none.
+											// No `aria-controls`: the route swaps that region between a spinner, an error
+											// alert and the models section, so the IDREF would dangle for two of the three.
 											aria-expanded={selectedId === connection.id}
 											aria-label={`Manage models for ${connection.displayName}`}
 											onClick={() => onSelect(connection)}
@@ -252,9 +229,6 @@ export function AdminLlmConnectionsTable({
 				title={(connection) => `Turn off “${connection.displayName}”?`}
 				description={(connection) => (
 					<>
-						{/* The confirm is only reached with at least one model on the connection, so the
-						    sentence never has to describe nothing — but it does have to count: "all 1
-						    models" is not English. */}
 						This immediately stops requests through{" "}
 						{modelsOn(connection) === 1 ? "the model" : `all ${modelsOn(connection)} models`} on
 						this connection. Practice detection and Mentor can't run on them until you turn the

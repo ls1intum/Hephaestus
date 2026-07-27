@@ -27,16 +27,15 @@ import org.hibernate.annotations.ColumnDefault;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Workspace-owned BYO model with inline current price. Tenant-scoped: {@code workspace_id}
- * is denormalized so every query carries a workspace predicate for the tenancy inspector. Price is
- * the current rate only (no audit history); tri-state {@code pricing_mode} mirrors the instance side.
+ * Workspace-owned BYO model with its current price inline (no history). {@code workspace_id} is
+ * denormalized so every query can carry a workspace predicate for the tenancy inspector.
  */
 @Entity
 @Table(
     name = "workspace_llm_model",
     uniqueConstraints = {
-        // Declared so the ddl-auto test schema matches production, where the changelog creates the
-        // same constraint. WorkspaceLlmModelService#create catches this name when two concurrent creates race.
+        // Named here so the ddl-auto test schema matches the changelog's: the create path catches this
+        // constraint by name.
         @UniqueConstraint(
             name = "ux_ws_llm_model_connection_upstream",
             columnNames = { "connection_id", "upstream_model_id" }

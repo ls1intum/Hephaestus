@@ -35,7 +35,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Nothing chosen yet — the trigger is just the facet's name. */
 export const Empty: Story = {};
 
 /** Up to two selections ride on the trigger as chips, so the filter reads without being opened. */
@@ -48,7 +47,7 @@ export const ManySelected: Story = {
 	args: { selected: ["LOGIN_SUCCESS", "LOGIN_FAILURE", "ROLE_CHANGED"] },
 };
 
-/** The form presentation: full width, a placeholder, and a chevron, matching the `Select` beside it. */
+/** The form presentation, matching the `Select` beside it. */
 export const FieldVariant: Story = {
 	args: {
 		variant: "field",
@@ -66,10 +65,7 @@ export const NoOptions: Story = {
 	args: { variant: "field", title: "Workspaces", options: [], emptyLabel: "No workspaces yet" },
 };
 
-/**
- * Matching is `Intl.Collator` base-sensitivity, so "arzt" finds "Ärztliche" — which a
- * `toLowerCase().includes()` filter never would.
- */
+/** "arzt" finds "Ärztliche", which a `toLowerCase().includes()` filter never would. */
 export const AccentInsensitiveSearch: Story = {
 	args: {
 		variant: "field",

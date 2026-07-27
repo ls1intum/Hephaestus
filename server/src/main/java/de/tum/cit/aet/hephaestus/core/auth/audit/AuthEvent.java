@@ -113,8 +113,7 @@ public class AuthEvent {
         EXPORT_REQUESTED,
         APP_ROLE_CHANGED,
         RESEARCH_CONSENT_REVOKED,
-        // Instance LLM catalog: app_admin-owned, GLOBAL — config_audit_event cannot carry it
-        // (workspace_id is NOT NULL there), so this global admin surface audits to auth_event instead.
+        // Instance LLM catalog: GLOBAL, so config_audit_event cannot carry it (workspace_id is NOT NULL).
         LLM_CONNECTION_CREATED,
         LLM_CONNECTION_UPDATED,
         LLM_CONNECTION_DELETED,
@@ -124,10 +123,7 @@ public class AuthEvent {
         LLM_MODEL_PRICE_CHANGED,
         LLM_MODEL_SHARING_CHANGED,
         LLM_SETTINGS_CHANGED,
-        // Instance login providers: app_admin-owned, GLOBAL, and belonging to no workspace, so
-        // config_audit_event cannot carry them either. They belong here on the merits regardless —
-        // this is the AUTHENTICATION trail, and adding, editing or removing a login provider changes
-        // how every person signs in to this instance.
+        // Instance login providers: GLOBAL, and they change how everyone signs in to this instance.
         LOGIN_PROVIDER_CREATED,
         LOGIN_PROVIDER_UPDATED,
         LOGIN_PROVIDER_DELETED,

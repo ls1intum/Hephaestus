@@ -173,9 +173,7 @@ public class PracticeReviewDetectionGate {
             return new GateDecision.Skip("manual trigger disabled for workspace");
         }
 
-        // 3. Agent gate: a PRACTICE_DETECTION binding that will ACTUALLY run must exist, so a
-        // bound-but-disabled or unresolvable agent skips here instead of detecting (LLM cost) only for
-        // submission to resolve to zero jobs.
+        // 3. Agent gate: skip rather than incur LLM cost for a detection run that would submit no jobs.
         if (!practiceDetectionReadiness.hasRunnableAgent(workspace.getId())) {
             log.debug(
                 "Practice review gate: SKIP, reason=noRunnableDetectionAgent, prId={}, workspaceId={}",

@@ -8,22 +8,11 @@ import java.time.Duration;
 import org.springframework.stereotype.Component;
 
 /**
- * In-flight budget backstop for the LLM proxy. The submit and claim gates
- * ({@code AgentJobService.submit}, {@code AgentJobExecutor}) only decide whether a job may
- * <em>start</em>; once a job or mentor turn is running it can make many upstream calls, and the ledger
- * those gates read gains nothing until the run ENDS. This gate is what bounds a run in progress: it
- * refuses new calls for a workspace whose cap is already reached.
- *
- * <p>The contract, for every agent-job attempt AND every mentor turn:
- *
- * <blockquote>An execution is refused as soon as its OWN completed calls have consumed the headroom
- * the ledger last showed. So it can overshoot the cap by at most the calls it had already dispatched
- * when that last forward was admitted — one call for a sequential runner or Pi's agent loop — never by
- * the whole run.</blockquote>
- *
- * <p>Why that holds, why the verdict is cached but the attempt's own spend is not, and what the bound
- * does NOT cover: {@code docs/decisions/0026-per-purpose-agent-bindings-and-llm-governance.md}.
- * {@code ProxyBudgetGateTest} pins the claim above.
+ * In-flight budget backstop for the LLM proxy: the submit and claim gates only decide whether a job
+ * may <em>start</em>, and the ledger they read gains nothing until the run ENDS. An execution is
+ * refused as soon as its OWN completed calls have consumed the headroom the ledger last showed, so it
+ * can overshoot the cap by at most the calls already dispatched — never by the whole run. Why that
+ * holds: {@code docs/decisions/0026-per-purpose-agent-bindings-and-llm-governance.md}.
  */
 @Component
 class ProxyBudgetGate {
@@ -43,15 +32,8 @@ class ProxyBudgetGate {
     }
 
     /**
-     * True when calls funded the way {@code routing} is funded have crossed their payer's monthly cap
-     * (or that payer's month is capped-and-unverifiable), counting what the calling attempt has already
-     * spent. A {@code null} workspace id (legacy, unattributable route) fails open — never blocks. The
-     * per-key loader collapses a concurrent burst for one workspace into a single ledger lookup.
-     *
-     * <p>Judged per funding source so an exhausted host budget cannot 429 calls the workspace pays for
-     * through its own provider — the two purses pause independently. An attempt whose own funding
-     * source is unknown has its in-flight spend charged to both purses, matching how an unattributable
-     * call is judged against both caps.
+     * An unattributable route (no workspace id) fails open. Judged per funding source so an exhausted
+     * host budget cannot 429 calls the workspace pays for through its own provider.
      */
     boolean isBlocked(ProxyRouting routing) {
         Long workspaceId = routing.workspaceId();

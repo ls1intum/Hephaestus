@@ -7,9 +7,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * Audit snapshot of a workspace's practice-review policy overrides.
  *
- * <p>Every field stays nullable and is serialized even when null: null means "inherit the fleet
- * default", so an override being cleared back to inherit is a real change and must show up in the
- * diff rather than looking like an absent key.
+ * <p>Every field is serialized even when null: null means "inherit the fleet default", so clearing
+ * an override is a real change and must show in the diff rather than look like an absent key.
  */
 record PracticeReviewSnapshot(
     @Nullable Boolean runForAllUsers,

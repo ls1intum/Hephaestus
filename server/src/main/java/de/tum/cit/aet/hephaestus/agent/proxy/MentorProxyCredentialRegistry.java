@@ -18,66 +18,29 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * Mints and validates proxy-scoped bearer tokens for the mentor's long-lived interactive sandbox.
- * {@code AgentJob} rows carry their own DB-backed job token; the mentor sandbox is NOT an
- * {@code AgentJob} (it is a reused, developer-attached session, not a one-shot {@code agent_job} row),
- * so it needs an equivalent credential minted outside that table.
+ * Mints and validates proxy-scoped bearer tokens for the mentor's interactive sandbox, which is a
+ * reused developer-attached session rather than an {@code agent_job} row and so cannot use the
+ * DB-backed job token. A token grants exactly what a job token grants: the proxy will resolve ONE
+ * connection's credential for the holder, nothing else. Process-local, like the interactive sandbox
+ * registry it shadows.
  *
- * <p>In-memory, process-local — mirrors the fact that the interactive sandbox registry itself
- * (mentor sessions are keyed by {@code (developerId, workspaceId)} and attached per worker process)
- * is already process-local. A token grants exactly what an {@code AgentJob} token grants: the caller
- * can ask the LLM proxy to resolve ONE connection's credential, nothing else.
+ * <p>A mentor token has no terminal event of its own, so the sandbox adapter {@link #revoke(UUID)}s it
+ * on any dispose path and {@link #TTL} is the backstop for a hard crash. The TTL must therefore expire
+ * on the wall clock rather than on read: a token whose sandbox never attached is never presented, so a
+ * check-on-read would never fire and both index entries would leak for the worker's lifetime.
  *
- * <h2>Revoke-on-teardown</h2>
+ * <p>The credential is per SESSION and a session outlives many turns, so it names no billing target on
+ * its own. A turn {@link #bindTurn binds} its {@link MentorTurnMeter} for the window in which it holds
+ * the per-sandbox lock and {@link #unbindTurn unbinds} at the end, so at most one turn is bound at any
+ * instant and {@link #validate} can report the call's billing target. A call that authenticates after
+ * its turn unbound is dropped by the turn-id fence in {@link #accumulate} rather than charged to
+ * whoever is bound now.
  *
- * <p>Unlike an {@code AgentJob} token — whose TTL is the job timeout and which is revoked the moment
- * the job transitions terminal — a mentor token has no natural terminal event of its own, so
- * {@link #mint} is also keyed by the sandbox's {@code sessionId}:
- * {@code agent.sandbox.docker.interactive.DockerInteractiveSandboxAdapter}
- * calls {@link #revoke(UUID)} from its dispose path (any close reason — manual, idle-reap, error, or
- * app-server shutdown) the moment the underlying container is gone. {@link #TTL} remains a backstop for
- * the case a sandbox never reaches that callback (e.g. a hard process crash).
+ * <p>The meter is only the budget gate's read model; the billed record is the turn's
+ * {@code chat_message} row, so a worker that dies mid-turn still bills what the proxy recorded.
  *
- * <h2>Why the TTL is a real expiry, not a check-on-read</h2>
- *
- * <p>The backstop only backstops if it runs on its own. A token whose sandbox never attached (the
- * plan failed, the container never came up) is never presented and never revoked, so a TTL enforced
- * only when that exact token is offered would never fire — and neither entry would ever be dropped.
- * Caffeine expires by wall clock instead, and its eviction listener drops the session index entry in
- * the same step, so a mint that goes nowhere costs bounded memory rather than a leak that lives as
- * long as the worker. {@code maximumSize} is the second bound: a mint storm cannot outgrow it.
- *
- * <h2>Which turn a session's calls belong to</h2>
- *
- * <p>The credential is per SANDBOX SESSION and a session outlives many turns, so on its own it names
- * no billing target — which is what left a mentor turn unmetered for its whole length: it could make
- * an unbounded number of provider calls against an exhausted cap and nothing observed the spend until
- * the turn was over. A turn therefore {@link #bindTurn binds} its {@link MentorTurnMeter} onto the
- * session for the window in which it owns that sandbox, and {@link #unbindTurn unbinds} at the end of
- * that window; {@link #validate} reports the bound turn as the call's billing target.
- *
- * <blockquote>A mentor turn is refused as soon as its OWN completed calls have consumed the headroom
- * the ledger last showed, so it can overshoot the cap by at most the calls it had already dispatched
- * when the last admitted forward happened — one call for Pi's sequential agent loop — never by the
- * whole turn.</blockquote>
- *
- * <p>Why that holds and what it does NOT cover:
+ * <p>Overshoot bound and what it does not cover:
  * {@code docs/decisions/0026-per-purpose-agent-bindings-and-llm-governance.md}.
- *
- * <p>Two turns cannot contaminate each other. The binding window is the window in which the turn holds
- * the per-sandbox lock, so at most one turn is bound to a session at any instant, and a call that
- * authenticates after its turn unbound is dropped by the turn-id fence in {@link #accumulate} rather
- * than added to whoever is bound now. The durable half of the same rule is stronger still: the
- * {@code status = 'in_flight'} predicate on {@code ChatMessageRepository#accumulateLlmUsage} means a
- * call carrying turn A's id can only ever reach turn A's row, whatever is bound at the time. Both are
- * the ledger's {@code UNIQUE(source_type, source_id, source_attempt)} rule applied one step earlier,
- * to the mutable accumulators.
- *
- * <p><b>A turn's spend survives the worker that made it.</b> The meter here is only the gate's read
- * model; the record that gets billed is the turn's {@code chat_message} row, written per call by
- * {@code MentorTurnUsageAccumulator}. So a worker that dies mid-turn no longer loses the turn's
- * spend — {@code MentorInFlightReaper} bills the calls the proxy recorded instead of booking a
- * zero-token UNVERIFIABLE event.
  */
 @Component
 public class MentorProxyCredentialRegistry {
@@ -86,20 +49,13 @@ public class MentorProxyCredentialRegistry {
 
     private static final Duration TTL = Duration.ofHours(12);
 
-    /**
-     * Far above any plausible count of concurrent mentor sandboxes on one worker — this bounds a
-     * pathological mint loop, it is not a working-set limit.
-     */
+    /** Bounds a pathological mint loop; far above any real concurrent-sandbox working set. */
     private static final int MAX_ENTRIES = 10_000;
 
     private final Cache<String, Entry> byTokenHash;
     private final Map<UUID, String> tokenHashBySession = new ConcurrentHashMap<>();
 
-    /**
-     * The meters currently accepting usage, by turn id. Populated by {@link #bindTurn} and removed by
-     * {@link #unbindTurn}, so a lookup miss IS the fence: a call whose turn has ended finds nothing
-     * and is dropped rather than landing on the turn that is bound now.
-     */
+    /** A lookup miss here IS the fence: a call whose turn has ended is dropped, not re-targeted. */
     private final Map<UUID, MentorTurnMeter> meterByTurn = new ConcurrentHashMap<>();
 
     public MentorProxyCredentialRegistry() {
@@ -111,16 +67,12 @@ public class MentorProxyCredentialRegistry {
             .maximumSize(MAX_ENTRIES)
             .expireAfterWrite(TTL)
             .ticker(ticker)
-            // Synchronous (unlike removalListener) and fired for expiry and size eviction alike, so the
-            // reverse index can never outlive the token it points at. The value-matching remove keeps a
-            // re-mint for the same session safe: if this session has since minted a newer token, the
-            // index already points at that hash and the stale eviction leaves it alone.
+            // evictionListener, not removalListener: synchronous, so the reverse index can never
+            // outlive the token it points at. The removes are value-matching so a re-mint for the same
+            // session is left alone when the stale entry is finally evicted.
             .<String, Entry>evictionListener((hash, entry, cause) -> {
                 if (entry != null) {
                     tokenHashBySession.remove(entry.sessionId(), hash);
-                    // A session whose credential expired can no longer serve calls, so its meter can
-                    // no longer receive any: drop it here too rather than leave the turn index holding
-                    // a meter nothing will ever unbind.
                     MentorTurnMeter bound = entry.currentTurn().getAndSet(null);
                     if (bound != null) {
                         meterByTurn.remove(bound.turnId(), bound);
@@ -141,12 +93,8 @@ public class MentorProxyCredentialRegistry {
     ) {}
 
     /**
-     * Routing for a minted mentor proxy token, plus the session it belongs to and the turn — if any —
-     * currently spending on it.
-     *
      * @param currentTurn the meter calls on this token are billed to right now; {@code null} between
-     *     turns. Mutable because the routing is fixed for the session's whole life while the turn
-     *     underneath it changes many times.
+     *     turns. Mutable because the routing is fixed for the session's life while the turn is not.
      */
     private record Entry(
         UUID sessionId,
@@ -160,10 +108,8 @@ public class MentorProxyCredentialRegistry {
     ) {}
 
     /**
-     * Mint a fresh token for a mentor sandbox build. Never returns the same token twice.
-     *
-     * @param sessionId the sandbox's {@code InteractiveSandboxSpec#sessionId} — the correlation key
-     *     {@link #revoke(UUID)} uses to find this token again at sandbox teardown
+     * @param sessionId the sandbox's {@code InteractiveSandboxSpec#sessionId}, which {@link
+     *     #revoke(UUID)} uses to find this token again at teardown
      */
     public String mint(UUID sessionId, Route route) {
         String token = AgentJob.generateJobToken();
@@ -181,8 +127,7 @@ public class MentorProxyCredentialRegistry {
                 new AtomicReference<>()
             )
         );
-        // A re-mint for the same session orphans the previous token; drop it now rather than leaving
-        // two live credentials for one sandbox until the older one's TTL runs out.
+        // Drop the orphaned token now rather than leaving two live credentials for one sandbox.
         String previous = tokenHashBySession.put(sessionId, hash);
         if (previous != null && !previous.equals(hash)) {
             byTokenHash.invalidate(previous);
@@ -191,12 +136,10 @@ public class MentorProxyCredentialRegistry {
     }
 
     /**
-     * Validate a bearer token. Empty when unknown or expired.
-     *
-     * <p>The routing names the turn bound to this session at the instant the call authenticates, and
-     * carries what that turn has already spent — which is what makes the turn's own in-flight spend
-     * visible to {@code ProxyBudgetGate}. A call that arrives between turns names no turn, and
-     * {@code LlmProxyController} refuses it: nothing would record its tokens.
+     * Empty when the token is unknown or expired. The routing carries what the bound turn has already
+     * spent, which is what makes a turn's own in-flight spend visible to {@code ProxyBudgetGate}. A
+     * call arriving between turns names no turn and {@code LlmProxyController} refuses it, because
+     * nothing would record its tokens.
      */
     public Optional<ProxyRouting> validate(String token) {
         Entry entry = byTokenHash.getIfPresent(AgentJob.computeTokenHash(token));
@@ -227,16 +170,12 @@ public class MentorProxyCredentialRegistry {
     }
 
     /**
-     * Start billing this session's calls to {@code meter}, for as long as the turn owns the sandbox.
+     * Starts billing this session's calls to {@code meter}. Replaces any previously bound turn rather
+     * than refusing — the caller holds the per-sandbox lock, so a leftover binding means an earlier
+     * turn failed to unbind — and drops the displaced meter from the turn index in the same step.
      *
-     * <p>Replaces any previously bound turn rather than refusing: the caller is the turn that holds
-     * the per-sandbox lock, so a leftover binding means an earlier turn failed to unbind, and the
-     * live turn is the correct target. The displaced meter is removed from the turn index in the same
-     * step so it stops accepting usage — it never silently keeps collecting under a turn that ended.
-     *
-     * @return false when the session has no live credential (revoked, or expired past {@link #TTL}).
-     *     The turn then has no billing target, so every call it makes is refused by the proxy rather
-     *     than served unbilled — it spends nothing, and it also achieves nothing.
+     * @return false when the session has no live credential. The turn then has no billing target, so
+     *     the proxy refuses its calls rather than serving them unbilled.
      */
     public boolean bindTurn(UUID sessionId, MentorTurnMeter meter) {
         String hash = tokenHashBySession.get(sessionId);
@@ -260,11 +199,9 @@ public class MentorProxyCredentialRegistry {
     }
 
     /**
-     * Stop billing new calls to {@code meter}. Idempotent, and value-matching on both indexes so a
-     * late unbind from a turn that has already been displaced cannot detach the turn running now.
-     *
-     * <p>Does NOT clear what the meter observed: the terminal write still reads the whole turn from
-     * the reference it holds.
+     * Idempotent, and value-matching on both indexes so a late unbind from an already-displaced turn
+     * cannot detach the turn running now. Does not clear what the meter observed — the terminal write
+     * still reads it from the reference it holds.
      */
     public void unbindTurn(UUID sessionId, MentorTurnMeter meter) {
         meterByTurn.remove(meter.turnId(), meter);
@@ -276,14 +213,13 @@ public class MentorProxyCredentialRegistry {
     }
 
     /**
-     * Mirror one served call's tokens onto the turn that authenticated it, so the gate sees them on
-     * the next call. Call this only for a call already recorded on the turn's row — the row is the
-     * billing record and this is derived from it, never the other way round.
+     * Mirrors one served call's tokens onto the turn that authenticated it, so the gate sees them on
+     * the next call. Only ever call this for a call already recorded on the turn's {@code chat_message}
+     * row; that row is the billing record and this is derived from it, never the reverse.
      *
-     * @return false when that turn is no longer bound. Nothing is billed or lost by that: the money is
-     *     already on the row, and a turn that has stopped owning its sandbox will not be gated again.
-     *     It matters only that the tokens are not silently added to whatever turn IS bound — that
-     *     would make the gate refuse a different turn for spend it never incurred.
+     * @return false when the turn is no longer bound. Nothing is lost — the money is already on the
+     *     row — but the tokens must not land on whatever turn IS bound, which would gate a different
+     *     turn for spend it never incurred.
      */
     public boolean accumulate(UUID turnId, ProxyTokenUsage usage) {
         MentorTurnMeter meter = meterByTurn.get(turnId);
@@ -294,10 +230,7 @@ public class MentorProxyCredentialRegistry {
         return true;
     }
 
-    /**
-     * Revoke the token minted for a sandbox session, if any. Idempotent — a second call (or a call for
-     * a session that never minted a token, e.g. it lost the concurrent-attach race) is a harmless no-op.
-     */
+    /** Idempotent; a session that never minted a token (e.g. it lost the attach race) is a no-op. */
     public void revoke(UUID sessionId) {
         String hash = tokenHashBySession.remove(sessionId);
         if (hash != null) {
@@ -312,17 +245,15 @@ public class MentorProxyCredentialRegistry {
         }
     }
 
-    /** Test seam: run pending expiry work so a {@link Ticker} advance takes effect deterministically. */
+    /** Test seam: Caffeine defers expiry work, so a {@link Ticker} advance alone evicts nothing. */
     void runPendingEviction() {
         byTokenHash.cleanUp();
     }
 
-    /** Test seam: how many session-index entries are currently held. */
     int trackedSessions() {
         return tokenHashBySession.size();
     }
 
-    /** Test seam: how many turns are currently accepting usage. */
     int boundTurns() {
         return meterByTurn.size();
     }

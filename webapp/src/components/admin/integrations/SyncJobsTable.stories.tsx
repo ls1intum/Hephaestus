@@ -205,11 +205,6 @@ export const Paged: Story = {
 	args: { jobs, page: 1, totalPages: 4, onPageChange: fn() },
 };
 
-/**
- * The job history pages through the shared `TablePagination`. The pager carries where the reader is
- * in `aria-current`, so this table needs no "Page N of M" line of its own — and the window, the gaps
- * and the boundary behaviour are stated once, in `TablePagination.stories.tsx`.
- */
 export const FirstPage: Story = {
 	args: { jobs, page: 0, totalPages: 4, onPageChange: fn() },
 	play: async ({ canvasElement }) => {

@@ -75,10 +75,7 @@ export const Default: Story = {
 	},
 };
 
-/**
- * Staging deployment: an amber environment pill instead of a version — the exact
- * build (commit, branch, deploy time) is shown in the footer.
- */
+/** Outside production the header shows the environment, not a version. */
 export const Staging: Story = {
 	args: {
 		isAuthenticated: true,
@@ -88,9 +85,6 @@ export const Staging: Story = {
 	},
 };
 
-/**
- * PR preview deployment: a violet environment pill.
- */
 export const Preview: Story = {
 	args: {
 		isAuthenticated: true,
@@ -100,9 +94,6 @@ export const Preview: Story = {
 	},
 };
 
-/**
- * Local development: a neutral environment pill.
- */
 export const Development: Story = {
 	args: {
 		isAuthenticated: true,

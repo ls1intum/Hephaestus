@@ -6,19 +6,9 @@ import java.net.URISyntaxException;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Audit snapshot of a workspace's "bring your own" LLM connection — "who rotated the key",
- * "who repointed the endpoint". A connection row is the one place a credential lives, so the snapshot
- * records only non-secret facts about it:
- *
- * <ul>
- *   <li>{@code WorkspaceLlmConnection.apiKey} is encrypted at rest, but its getter returns plaintext, so
- *       snapshotting the entity would write the key in the clear into a table that cannot be edited
- *       afterwards. {@link #llmApiKeySet} records only whether a key is present.</li>
- *   <li>{@code baseUrl} is free text and a gateway URL may legitimately carry userinfo or an API key in
- *       the query string; {@link #of} strips both (and any fragment) before the value is snapshotted.</li>
- * </ul>
- *
- * <p>Enforced by {@code ConfigAuditSnapshotArchTest}.
+ * Audit snapshot of a workspace's "bring your own" LLM connection. A connection row is the one place a
+ * credential lives and the audit table cannot be edited afterwards, so the snapshot records only
+ * non-secret facts: {@link #llmApiKeySet} instead of the key, and a credential-free {@code baseUrl}.
  */
 record WorkspaceLlmConnectionSnapshot(
     String slug,
@@ -42,9 +32,8 @@ record WorkspaceLlmConnectionSnapshot(
     }
 
     /**
-     * Reduces a base URL to scheme, host, port and path, dropping userinfo, query and fragment — the
-     * three places a credential can hide in a URL. Unparseable input collapses to a marker rather than
-     * being passed through, so a malformed value cannot smuggle a credential past this.
+     * Drops userinfo, query and fragment — the three places a credential can hide in a URL. Unparseable
+     * input collapses to a marker rather than being passed through.
      */
     private static @Nullable String credentialFreeBaseUrl(@Nullable String url) {
         if (url == null) {

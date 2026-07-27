@@ -18,31 +18,13 @@ import tools.jackson.databind.ObjectMapper;
  * The executor reads this snapshot instead of the live binding so that in-flight jobs are not
  * affected by binding changes.
  *
- * <h2>Deliberately excluded fields</h2>
- *
- * <p>Everything here is non-secret, frozen BEHAVIOUR: the wire protocol, the model id, and its
- * capability envelope. The credential itself — and any authentication-header material — is
- * deliberately NEVER frozen here.
- * {@link #connectionScope}/{@link #connectionId} instead identify WHICH connection row funds the job,
- * so the LLM proxy can re-resolve the live credential at call time via
- * {@link LlmModelResolver#resolveProxyCredential}, picking up rotation/revocation immediately. A
- * pre-v4 snapshot carries no connection identity and therefore fails closed at the proxy.
- *
- * <h3>{@link #baseUrl} is split: frozen here, but NOT what the proxy routes on</h3>
- *
- * <p>{@link #baseUrl} is frozen at dispatch and stays that way for non-proxy consumers (e.g. runner
- * config that needs a host to render into the sandbox at build time, before any credential exists). The
- * LLM proxy, however, deliberately does NOT read {@link #baseUrl} — it re-resolves the base URL LIVE,
- * from the same connection row the credential comes from, via
- * {@link LlmModelResolver#resolveProxyCredential}. Routing and credential must travel together: if a
- * connection is repointed to a new host after a job's snapshot was frozen, resolving the credential live
- * while trusting this frozen {@link #baseUrl} would send the connection's NEW (rotated) key to the OLD
- * (stale) host — a split-brain that leaks the new credential to whatever now answers at the old address.
- *
- * <ul>
- *   <li>{@code maxConcurrentJobs} — concurrency gate read live from the binding so admin
- *       changes take effect immediately</li>
- * </ul>
+ * <p>SECURITY: everything frozen here is non-secret behaviour. The credential is never frozen —
+ * {@link #connectionScope}/{@link #connectionId} only identify which connection row funds the job, so
+ * the proxy re-resolves credential AND base URL live via
+ * {@link LlmModelResolver#resolveProxyCredential}. The two must travel together: resolving a rotated
+ * key while routing on this frozen {@link #baseUrl} would send the new key to a host the connection
+ * no longer points at. {@link #baseUrl} is frozen only for non-proxy consumers that need a host
+ * before any credential exists.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ConfigSnapshot(
@@ -50,10 +32,7 @@ public record ConfigSnapshot(
     String apiProtocol,
     String baseUrl,
     String upstreamModelId,
-    // Read-only carry-over: the model version/snapshot date the retired named agent config let an admin
-    // type. fromJson still reads it so a snapshot frozen before the model catalog existed keeps stating
-    // what it ran on; from() writes null, because the catalog identifies a model by its upstream id and
-    // has no version concept to source this from. Expect null on everything dispatched since.
+    // Read-only carry-over from pre-catalog snapshots; from() writes null.
     @Nullable String modelVersion,
     @Nullable Integer contextWindow,
     @Nullable Integer maxOutputTokens,
@@ -67,31 +46,14 @@ public record ConfigSnapshot(
     @Nullable LlmPriceSnapshot priceSnapshot
 ) {
     /**
-     * Current schema version. Bump only for breaking changes (field removal, type change,
-     * semantic reinterpretation). Additive nullable fields are forward- AND backward-compatible
-     * thanks to {@code @JsonIgnoreProperties(ignoreUnknown = true)} on read and Jackson's
-     * default null-fill on missing fields — those do NOT need a bump.
-     *
-     * <p>v4 replaced {@code llmProvider}/{@code credentialMode}/{@code llmBaseUrl}/
-     * {@code modelName} with the resolver's non-secret behaviour shape + a connection reference — a
-     * genuine reshape, not an additive change, so {@link #fromJson} translates v1-v3 payloads
-     * explicitly instead of relying on Jackson's default-null fill (see {@link #fromLegacyJson}).
-     *
-     * <p>v5 dropped {@code configId}/{@code configName}, the last two fields of the deleted
-     * named-agent-config model. Nothing read them, so a persisted v4 row needs no translation — its
-     * two extra keys are simply ignored on the way in (see {@link #CATALOG_SHAPE_MIN_VERSION}).
+     * Bump only for a reshape (field removal, type change, semantic reinterpretation). Adding a
+     * nullable field is compatible both ways and needs no bump.
      */
     public static final int SCHEMA_VERSION = 5;
 
     /**
-     * Oldest version whose payload already uses the catalog shape this record maps directly. Versions
-     * at or above it deserialize straight through (unknown keys ignored); anything older is a
-     * different shape and must go through {@link #fromLegacyJson}.
-     *
-     * <p>This is the constant that makes "drop a field" cheap and "rename a field" expensive: the gap
-     * between it and {@link #SCHEMA_VERSION} is exactly the set of persisted versions that differ from
-     * the current record by dropped keys alone. A rename would have to move this floor up and grow a
-     * translation step, a removal does not.
+     * Oldest persisted version that already uses this record's shape: at or above it a payload
+     * deserializes straight through, below it {@link #fromLegacyJson} must translate.
      */
     private static final int CATALOG_SHAPE_MIN_VERSION = 4;
 
@@ -104,10 +66,6 @@ public record ConfigSnapshot(
         }
     }
 
-    /**
-     * Create a snapshot from a live {@link ModelBindingSource}, resolving its instance or workspace
-     * catalog model via {@link LlmModelResolver}.
-     */
     public static ConfigSnapshot from(ModelBindingSource source, LlmModelResolver resolver) {
         Objects.requireNonNull(source, "source must not be null");
         Objects.requireNonNull(resolver, "resolver must not be null");
@@ -153,19 +111,13 @@ public record ConfigSnapshot(
         );
     }
 
-    /**
-     * Serialize to {@link JsonNode} for JSONB storage.
-     */
     public JsonNode toJson(ObjectMapper objectMapper) {
         return objectMapper.valueToTree(this);
     }
 
     /**
-     * Deserialize from JSONB. Rejects snapshots from a newer schema version to prevent
-     * silent data corruption during rolling deploys. Snapshots persisted before v4 (schemaVersion
-     * 0-3) use the pre-catalog shape (llmProvider/credentialMode/llmBaseUrl/modelName) and are
-     * translated via {@link #fromLegacyJson} only for structural deserialization. Since such a row has
-     * no catalog identity, proxy credential resolution rejects it.
+     * Deserialize from JSONB, rejecting a newer schema version so a rolling deploy cannot silently
+     * misread a row an upgraded node wrote.
      */
     public static ConfigSnapshot fromJson(JsonNode node, ObjectMapper objectMapper) {
         Objects.requireNonNull(node, "node must not be null");
@@ -185,9 +137,8 @@ public record ConfigSnapshot(
     }
 
     /**
-     * Translates a pre-v4 snapshot (llmProvider/credentialMode/llmBaseUrl/modelName) into the current
-     * shape so historical rows remain readable. {@code connectionScope}/{@code connectionId} are
-     * always null, which deliberately makes such a job non-routable at the proxy.
+     * Translates a pre-catalog snapshot into the current shape so historical rows stay readable.
+     * {@code connectionScope}/{@code connectionId} stay null, so the proxy fails such a job closed.
      */
     private static ConfigSnapshot fromLegacyJson(JsonNode node) {
         String provider = node.path("llmProvider").asString("OPENAI");

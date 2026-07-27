@@ -11,12 +11,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
-/**
- * What the instance's LLM policy permits in this workspace.
- *
- * <p>Mirrors {@code GET /admin/llm/settings} one scope down: same noun, same shape, no write side
- * because the policy is not this workspace's to change.
- */
+/** What the instance's LLM policy permits in this workspace; read-only, the policy is instance-wide. */
 @WorkspaceScopedController
 @RequestMapping("/llm/settings")
 @Tag(
@@ -36,11 +31,8 @@ public class WorkspaceLlmSettingsController {
     )
     @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<WorkspaceLlmSettingsDTO> get(WorkspaceContext workspaceContext) {
-        // The policy this answers with is instance-wide, so the context is not read. It is declared
-        // anyway because every workspace-scoped handler declares it (enforced by
-        // WorkspaceScopedControllerComplianceIntegrationTest): resolving it is what proves the caller belongs to
-        // the workspace in the path, and "this one happens not to need the id" is exactly the
-        // assumption that rule exists to stop anyone making silently.
+        // workspaceContext is unused on purpose: resolving it is what proves the caller belongs to the
+        // workspace in the path.
         return ResponseEntity.ok(
             new WorkspaceLlmSettingsDTO(instanceLlmSettingsService.get().isAllowWorkspaceConnections())
         );

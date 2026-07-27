@@ -12,7 +12,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** With a name resolved from the loaded rows — what an admin should normally see. */
 export const WithName: Story = {
 	args: { name: "Grace Hopper" },
 	play: async ({ canvasElement }) => {
@@ -21,7 +20,6 @@ export const WithName: Story = {
 	},
 };
 
-/** No name available (e.g. the filter matches zero rows) — the id is all there is to show. */
 export const IdOnly: Story = {
 	args: {},
 	play: async ({ canvasElement }) => {
@@ -30,7 +28,6 @@ export const IdOnly: Story = {
 	},
 };
 
-/** Only the X clears; the label is not a control, and the X says what it clears. */
 export const ClearIsTheOnlyControl: Story = {
 	args: { name: "Grace Hopper" },
 	play: async ({ canvasElement, args }) => {

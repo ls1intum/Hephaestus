@@ -19,22 +19,9 @@ import {
 import type { LlmAudience } from "@/lib/llm-pricing";
 import { PriceModeEditor, type PriceModeValue } from "./PriceModeEditor";
 
-/**
- * Everything both model forms ask, and the one place they ask it.
- *
- * The instance catalog and a workspace's own provider are two different things to own, but "what is
- * this model called, what is it called upstream, how big is it, what does it cost, is it on" is one
- * question asked twice. Held apart, the two forms drifted: the instance one rendered no message for
- * a rejected token count, so an out-of-range number made Save do nothing at all.
- *
- * Price is part of the value rather than a second piece of state, because the two are not
- * independent: a model whose price becomes unknown cannot stay active, and that rule now has one
- * place to live instead of one per form.
- */
 export interface LlmModelFieldsValue {
 	displayName: string;
 	upstreamModelId: string;
-	/** An `<input type="number">` hands back a string; empty means the admin left it out. */
 	contextWindow: string;
 	maxOutputTokens: string;
 	supportsReasoning: boolean;
@@ -42,7 +29,6 @@ export interface LlmModelFieldsValue {
 	price: PriceModeValue;
 }
 
-/** The metadata columns both `LlmModel` and `WorkspaceLlmModel` carry under the same names. */
 type EditedModel = {
 	displayName: string;
 	upstreamModelId: string;
@@ -52,13 +38,6 @@ type EditedModel = {
 	enabled?: boolean;
 };
 
-/**
- * Seeds the form from the model being edited, or from nothing when creating one.
- *
- * The price is passed in rather than read off the model: the instance catalog keeps it in a
- * `currentPrice` record and a workspace model keeps it in flat columns, which is the one part of the
- * two shapes that genuinely differs.
- */
 export function modelFieldsValueOf(
 	model: EditedModel | null,
 	price: PriceModeValue,
@@ -74,17 +53,13 @@ export function modelFieldsValueOf(
 	};
 }
 
-/**
- * The shared rules, not either form's own: a rule the workspace console enforces and the instance
- * console does not is a rule an admin discovers from a 400.
- */
 export function validateModelFields(
 	value: LlmModelFieldsValue,
 	isEdit: boolean,
 ): FieldErrors<LlmModelFormField> {
 	return validateLlmModelForm({
 		displayName: value.displayName,
-		// The upstream id is immutable, so an edit neither sends one nor validates one.
+		// Immutable once created, so an edit neither sends nor validates it.
 		upstreamModelId: isEdit ? undefined : value.upstreamModelId,
 		contextWindow: value.contextWindow,
 		maxOutputTokens: value.maxOutputTokens,
@@ -92,10 +67,14 @@ export function validateModelFields(
 	});
 }
 
-/**
- * The sentences that differ between the two scopes, side by side so a change to one is made next to
- * the other. Every other difference between the two forms turned out to be an accident.
- */
+const canBeActive = (price: PriceModeValue) => price.pricingMode !== "UNPRICED";
+
+const withPrice = (value: LlmModelFieldsValue, price: PriceModeValue): LlmModelFieldsValue => ({
+	...value,
+	price,
+	enabled: value.enabled && canBeActive(price),
+});
+
 const COPY = {
 	instance: {
 		displayNamePlaceholder: "e.g. GPT-5",
@@ -121,17 +100,13 @@ const COPY = {
 } satisfies Record<LlmAudience, Record<string, string>>;
 
 export interface LlmModelFieldsProps {
-	/** Instance admin edits the shared catalog; a workspace admin edits their own provider's models. */
 	audience: LlmAudience;
-	/** Prefixes every control id, so two of these can never collide on one page. */
 	idPrefix: string;
 	isEdit: boolean;
-	/** The model was active before this edit began, so switching it off is a consequence to warn about. */
 	wasEnabled: boolean;
 	value: LlmModelFieldsValue;
 	onChange: (value: LlmModelFieldsValue) => void;
 	errors: FieldErrors<LlmModelFormField>;
-	/** Model ids from the connection's last successful probe, offered as a datalist. */
 	upstreamIdSuggestions?: string[];
 }
 
@@ -163,8 +138,7 @@ export function LlmModelFields({
 					value={value.displayName}
 					onChange={(e) => update({ displayName: e.target.value })}
 					placeholder={copy.displayNamePlaceholder}
-					// `required` is semantics only — the form is `noValidate`, so the browser never acts on
-					// it — but it is what tells a screen reader the field is required before submit (SC 3.3.2).
+					// Inert under `noValidate`, but it is what announces the field as required (SC 3.3.2).
 					required
 					aria-invalid={Boolean(errors.displayName)}
 					aria-describedby={errors.displayName ? displayNameErrorId : undefined}
@@ -265,7 +239,7 @@ export function LlmModelFields({
 				<Switch
 					id={`${idPrefix}-enabled`}
 					checked={value.enabled}
-					disabled={!isEdit || value.price.pricingMode === "UNPRICED"}
+					disabled={!isEdit || !canBeActive(value.price)}
 					onCheckedChange={(enabled) => update({ enabled })}
 				/>
 			</Field>
@@ -282,10 +256,7 @@ export function LlmModelFields({
 				audience={audience}
 				idPrefix={`${idPrefix}-price`}
 				value={value.price}
-				// A model nobody can price cannot stay active, so the switch follows the price down.
-				onChange={(price) =>
-					update(price.pricingMode === "UNPRICED" ? { price, enabled: false } : { price })
-				}
+				onChange={(price) => onChange(withPrice(value, price))}
 				errors={errors}
 			/>
 		</>

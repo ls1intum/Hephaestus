@@ -112,7 +112,6 @@ class DockerSandboxLiveTest {
                 });
         } catch (Exception ignored) {}
 
-        // Cleanup orphaned networks
         try {
             networkManager
                 .listOrphanedNetworks()
@@ -135,7 +134,6 @@ class DockerSandboxLiveTest {
         void shouldRunAndCollectOutput() {
             UUID jobId = UUID.randomUUID();
 
-            // Create a script that writes output
             String script =
                 "#!/bin/sh\nmkdir -p /workspace/out\necho '{\"status\":\"ok\"}' > /workspace/out/result.json\necho 'done'";
 
@@ -263,7 +261,6 @@ class DockerSandboxLiveTest {
 
             sandboxAdapter.execute(spec);
 
-            // Verify no managed containers remain
             assertThat(
                 containerManager
                     .listManagedContainers()
@@ -272,7 +269,6 @@ class DockerSandboxLiveTest {
                     .toList()
             ).isEmpty();
 
-            // Verify no orphaned networks remain for this job
             assertThat(
                 networkManager
                     .listOrphanedNetworks()

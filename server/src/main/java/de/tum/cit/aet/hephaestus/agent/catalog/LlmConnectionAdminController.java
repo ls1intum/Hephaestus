@@ -27,13 +27,11 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /**
- * Instance-admin management of the LLM provider connection catalog: CRUD plus a "test &amp;
- * fetch models" probe. GLOBAL — gated by {@code app_admin}, not workspace context.
+ * Instance-admin management of the LLM provider connection catalog: CRUD plus a "test &amp; fetch
+ * models" probe.
  *
- * <p>No {@code @WorkspaceAgnostic} here. A class-level tenancy bypass on a controller opens for every
- * statement any handler reaches, including future ones; the bypass belongs on the repository that
- * actually runs a cross-tenant query, where a reviewer can see which query it excuses. The catalog
- * repositories below carry their own.
+ * <p>Deliberately no class-level {@code @WorkspaceAgnostic} — a controller-wide tenancy bypass would
+ * excuse every statement any handler ever reaches; the cross-tenant repository queries carry it.
  */
 @RestController
 @RequestMapping("/admin/llm/connections")

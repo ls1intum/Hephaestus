@@ -20,7 +20,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Real-Postgres proof of the multi-replica orphan-recovery SQL (#1138) — the logic that makes
+ * Real-Postgres proof of the multi-replica orphan-recovery SQL — the logic that makes
  * running more than one worker replica safe. Mock-based unit tests cannot exercise the native
  * liveness query (DB-clock {@code now()}, {@code NOT EXISTS} on {@code worker_registry}) or the CAS
  * {@code requeueOrphan}, so the actual coordination guarantees live here.

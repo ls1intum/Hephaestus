@@ -62,9 +62,8 @@ async function renderSettingsRoute() {
 	);
 
 	const queryClient = testQueryClient();
-	// Two already-fetched league surfaces, the way they sit in the cache when an admin opens settings
-	// in another tab. `staleTime: Infinity` is what makes the assertion mean something: only an
-	// invalidation can mark these stale.
+	// Two already-fetched league surfaces, as they sit in the cache when an admin opens settings in
+	// another tab. `staleTime: Infinity` leaves invalidation as the only thing that can mark them stale.
 	for (const queryKey of [LEADERBOARD_KEY, LEAGUE_STATS_KEY]) {
 		queryClient.setQueryData(queryKey, []);
 		queryClient.setQueryDefaults(queryKey, { staleTime: Number.POSITIVE_INFINITY });
@@ -77,16 +76,11 @@ async function renderSettingsRoute() {
 
 describe("workspace settings route", () => {
 	/**
-	 * A reset re-derives every standing on the server, so the leaderboard and the league stats beside
-	 * it are stale the moment it returns. Invalidating a hand-typed `["workspace"]` is not the shape
-	 * the generated helpers produce and matches no query at all: the button does its work on the
-	 * server and the screen keeps showing the old table.
+	 * A hand-typed `["workspace"]` is not the shape the generated helpers produce and matches no query
+	 * at all, so the reset lands on the server and the screen keeps the old table.
 	 *
-	 * A cache-contract assertion, deliberately. The honest form — count the requests the refetch makes
-	 * — is not available here: neither the leaderboard nor the league-stats surface is mounted on the
-	 * settings route, so an invalidation correctly fires no request at all. What can be checked is
-	 * that the two keys the mounted surfaces hold are the two keys this route marks stale, which is
-	 * exactly what the hand-typed key got wrong.
+	 * Asserted against the cache rather than by counting refetch requests, because neither league
+	 * surface is mounted on the settings route: a correct invalidation here fires no request at all.
 	 */
 	it("marks the leaderboard and league stats stale after a reset", async () => {
 		const { queryClient, resetCalls } = await renderSettingsRoute();

@@ -198,7 +198,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
         lenient().when(llmBudgetService.decide(anyLong())).thenReturn(LlmBudgetDecision.ALLOWED);
         lenient().when(jobRepository.markExecutionStarted(any(), any(), any())).thenReturn(1);
 
-        // Default: transactionTemplate.execute invokes the callback
         lenient()
             .when(transactionTemplate.execute(any()))
             .thenAnswer(inv -> {
@@ -222,8 +221,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
         lenient().when(transactionManager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
 
         // Dispatch of a claimed job's execution runs on the sandbox executor; run it inline so
-        // processJob() is synchronously observable, so the test observes the run
-        // entirely on the calling (test) thread.
+        // processJob() is synchronously observable on the calling (test) thread.
         lenient()
             .doAnswer(inv -> {
                 Runnable task = inv.getArgument(0);
@@ -241,15 +239,9 @@ class AgentJobExecutorTest extends BaseUnitTest {
     }
 
     /**
-     * A terminal-write-stage job the way {@code persistTerminalState} re-reads it: real jobType +
-     * workspace, matching the invariant a persisted {@link AgentJob} always has both (never null in
-     * production). Needed because the terminal path reads both unconditionally when no agent-reported
-     * usage is present, to write the UNPRICED ledger fallback.
-     */
-    /**
-     * The reload the terminal write performs. It carries {@code job}'s CURRENT config snapshot because
-     * in production it is the same row: a fixture that quietly handed back an unpriced snapshot would
-     * let a test claim it exercised the priced billing path while exercising the unpriced one.
+     * The reload the terminal write performs: real jobType + workspace (never null in production,
+     * and read unconditionally by the terminal path), carrying {@code job}'s CURRENT config snapshot
+     * so a test can't quietly exercise the unpriced billing path while claiming to test the priced one.
      */
     private AgentJob freshJob() {
         AgentJob freshJob = new AgentJob();
@@ -412,7 +404,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
             return new LlmBudgetDecision(reason, LlmBudgetBlockReason.NONE);
         }
 
-        /** Bind the job's purpose to a model funded by {@code fundingSource}. */
         private void bindFundedBy(FundingSource fundingSource) {
             if (fundingSource == FundingSource.INSTANCE) {
                 binding.setInstanceModel(new de.tum.cit.aet.hephaestus.agent.catalog.LlmModel());
@@ -566,8 +557,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
         @Test
         void heldPreStartJobNeverWritesAUsageLedgerEntry() {
             // A budget-blocked pre-start job must leave NO ledger trace at all — distinct from the
-            // cancelled-after-start / malformed-usage cases, which DO record UNPRICED (see
-            // UnpricedUsageLedgerFallback below).
+            // cancelled-after-start / malformed-usage cases, which DO record UNPRICED.
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             bindFundedBy(FundingSource.INSTANCE);
             when(llmBudgetService.decide(99L)).thenReturn(instanceBlocked(LlmBudgetBlockReason.EXHAUSTED));
@@ -1157,10 +1147,9 @@ class AgentJobExecutorTest extends BaseUnitTest {
     }
 
     /**
-     * a job that started executing (past claim+RUNNING) but ends with no
-     * parseable usage must still leave a ledger trace — an UNPRICED entry, so the month turns
-     * UNVERIFIABLE instead of looking falsely fully accounted for. Never for jobs refused before
-     * RUNNING — see {@code ClaimTimeBudgetRecheck#refusedPreStartJobNeverWritesAUsageLedgerEntry}.
+     * A job that started executing (past claim+RUNNING) but ends with no parseable usage must still
+     * leave a ledger trace — an UNPRICED entry, so the month turns UNVERIFIABLE instead of looking
+     * falsely fully accounted for. Never for jobs held before RUNNING (see {@code ClaimTimeBudgetRecheck}).
      */
     @Nested
     @DisplayName("Unpriced usage ledger fallback")

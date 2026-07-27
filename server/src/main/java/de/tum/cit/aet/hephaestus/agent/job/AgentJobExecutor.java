@@ -86,16 +86,11 @@ import tools.jackson.databind.ObjectMapper;
  * insert is the enqueue. Claim runs synchronously on the poll thread; execution is handed to the
  * {@code sandboxExecutor} so the poll thread is never blocked by a running sandbox.
  *
- * <p>Transaction boundaries are deliberately narrow:
- * <ul>
- *   <li><b>Claim</b> (~5ms): SKIP LOCKED → set RUNNING → commit</li>
- *   <li><b>Execute</b> (minutes): No transaction, no DB connection held</li>
- *   <li><b>Complete</b> (~5ms): Set terminal status → commit</li>
- * </ul>
+ * <p>Claim and terminal write each get their own short transaction; execution runs between them with
+ * no transaction and no DB connection held.
  */
 @Component
-// Wires when the agent job queue is enabled AND the worker role isn't explicitly disabled. Combined
-// into @ConditionalOnExpression because Spring honors only ONE @ConditionalOnProperty per element.
+// Expression rather than two @ConditionalOnProperty: Spring honors only one of those per element.
 @ConditionalOnExpression(
     "${" + RuntimeRole.AGENT_ENABLED_PROPERTY + ":false} and ${" + RuntimeRole.WORKER_PROPERTY + ":true}"
 )
@@ -110,19 +105,15 @@ public class AgentJobExecutor {
     private static final int MAX_CONTAINER_LOGS_CHARS = 65536; // 64KB
     // How long a claim-blocked job waits before the poll loop re-evaluates the cap.
     private static final Duration BUDGET_HOLD_INTERVAL = Duration.ofHours(1);
-    // Age — measured from submission, not from when the hold started — past which a still-blocked job is
-    // cancelled instead of held again. The work it would produce is what goes stale, so the job's own age
-    // is the thing worth bounding; measuring the hold instead would let an old job be held indefinitely
-    // as long as each individual hold was short.
+    // Measured from submission, not from when the hold started: what goes stale is the work the job
+    // would produce, and bounding the hold instead would let short repeated holds run forever.
     private static final Duration BUDGET_HOLD_MAX_JOB_AGE = Duration.ofDays(7);
 
     /**
-     * Which failures make the terminal accounting write worth re-attempting. NOT the same question as
-     * {@link #isRetryableInfraFailure}, which decides whether the whole JOB is requeued for a fresh
-     * run — conflating the two would charge twice for a job that already spent money.
-     *
-     * <p>{@code includes} matches nested causes, which is what makes it usable directly: a
-     * {@code TransactionTemplate} and JPA both surface the underlying failure wrapped.
+     * When the terminal accounting write is worth re-attempting. NOT the same question as
+     * {@link #isRetryableInfraFailure}, which requeues the whole JOB — conflating the two would charge
+     * twice for a job that already spent money. {@code includes} matches nested causes, which is what
+     * makes these usable directly against JPA's and {@code TransactionTemplate}'s wrapping.
      */
     static final RetryPolicy TERMINAL_PERSIST_POLICY = RetryPolicy.builder()
         .includes(
@@ -132,17 +123,15 @@ public class AgentJobExecutor {
             CannotCreateTransactionException.class
         )
         .maxRetries(2)
-        // Growing, since a lock timeout or a failover needs more than the microseconds an immediate
-        // retry gives it.
+        // Growing: a lock timeout or a failover needs more than an immediate retry gives it.
         .delay(Duration.ofMillis(200))
         .multiplier(2)
         .build();
 
     /**
-     * Any failure of the pool-rejection requeue is worth another try: the write is one statement with
-     * no side effect to undo, and not landing it strands a job until the zombie sweeper notices.
-     *
-     * <p>Runs on the {@code agent-job-poll} thread, so a full exhaustion parks polling for 400 ms.
+     * Any failure of the pool-rejection requeue is worth another try: one statement, no side effect to
+     * undo, and not landing it strands a job until the zombie sweeper notices. Runs on the poll thread,
+     * so full exhaustion parks polling for the summed delay.
      */
     private static final RetryPolicy REQUEUE_REJECTED_CLAIM_POLICY = RetryPolicy.builder()
         .includes(Exception.class)
@@ -164,11 +153,8 @@ public class AgentJobExecutor {
     private final LlmBudgetService llmBudgetService;
     private final @Nullable LlmAdmissionService llmAdmissionService;
 
-    /**
-     * The two writes this class re-attempts. Both go through {@link RetryTemplate} rather than
-     * {@code @Retryable}: each wraps a private method called from inside this class, and a
-     * self-invocation never reaches the proxy the annotation needs.
-     */
+    // RetryTemplate, not @Retryable: both wrap private methods called from inside this class, and a
+    // self-invocation never reaches the proxy the annotation needs.
     private final RetryTemplate terminalPersistRetries = retryTemplate(TERMINAL_PERSIST_POLICY);
     private final RetryTemplate requeueRetries = retryTemplate(REQUEUE_REJECTED_CLAIM_POLICY);
 
@@ -178,19 +164,13 @@ public class AgentJobExecutor {
     private final AtomicBoolean running = new AtomicBoolean(false);
     private volatile Thread pollThread;
     private final Phaser inFlight = new Phaser(1); // 1 = the executor itself; deregistered on stop
-    /**
-     * Job ids this worker is currently executing. Drain and hub-initiated cancels act only on jobs in
-     * this set, never on sibling workers' jobs, and the poll loop reads it as its free-capacity signal.
-     */
+    /** Scopes drain and hub-initiated cancels to this worker's own jobs; also its free-capacity signal. */
     private final Set<UUID> localRunningJobs = ConcurrentHashMap.newKeySet();
     private final Optional<WorkerCapacityState> capacityState;
     private final Optional<WorkerProperties> workerProperties;
     /** Null only when the worker role is off; stamped on claimed jobs to fence terminal writes. */
     private final String workerId;
-    /**
-     * Poll-thread-owned: written and read only from the single poll thread (or, in tests, the single
-     * calling thread), so no synchronization is needed.
-     */
+    /** Poll-thread-owned, hence unsynchronized. */
     private boolean lastClaimPoolRejected;
 
     @Autowired
@@ -262,11 +242,10 @@ public class AgentJobExecutor {
     /**
      * Stops the poll loop so no new jobs are claimed. Idempotent.
      *
-     * <p>Joining the poll thread is what closes the drain admission race: a claim already in flight when
-     * {@code running} flips false can otherwise still register with {@link #inFlight} <em>after</em> the
-     * drain coordinator called {@link #awaitInFlight(Duration)}. Phaser puts that late registration in
-     * the NEXT phase, so the coordinator's await on the old (already-complete) phase returns at once
-     * believing drain was clean, and the late-claimed job is neither awaited nor cancelled.
+     * <p>Joining the poll thread is what closes the drain admission race: an in-flight claim could
+     * otherwise register with {@link #inFlight} after {@link #awaitInFlight(Duration)} was called, and
+     * the Phaser would put that registration in the NEXT phase — so the coordinator's await returns at
+     * once believing drain was clean, and the late-claimed job is neither awaited nor cancelled.
      */
     public void stopAcceptingNewJobs() {
         running.set(false);
@@ -312,13 +291,9 @@ public class AgentJobExecutor {
     }
 
     /**
-     * Stops the containers of the jobs THIS worker is currently running and hands each one back to the
-     * queue for a sibling to pick up, per the drain contract in docs/admin/runtime-roles.mdx. Scoped to
-     * {@link #localRunningJobs} so sibling workers' jobs are untouched.
-     *
-     * <p>A worker-fenced requeue is attempted first ({@link AgentJobRepository#requeueOrphan}, capped by
-     * {@code max-retries}). Only when that CAS loses — the job left this worker's ownership, or the
-     * retry cap is exhausted — does it fall back to a terminal cancel, so an exhausted job ends up
+     * Stops this worker's own containers and hands each job back to the queue for a sibling to pick up,
+     * per the drain contract in docs/admin/runtime-roles.mdx. Falls back to a terminal cancel only when
+     * the worker-fenced requeue loses its CAS or the retry cap is exhausted, so an exhausted job ends up
      * CANCELLED rather than requeued forever.
      */
     public void cancelInFlight(AgentJobCancellationReason reason) {
@@ -330,8 +305,7 @@ public class AgentJobExecutor {
                 transactionTemplate.executeWithoutResult(status -> {
                     AgentJob job = jobRepository.findByIdWithWorkspaceForUpdate(jobId).orElse(null);
                     if (job == null) return;
-                    // Snapshot the token counts BEFORE requeuing: the requeue zeroes the row's
-                    // accumulators atomically, so a post-requeue re-read would bill zero.
+                    // BEFORE requeuing: the requeue zeroes the accumulators, so a later read bills zero.
                     AgentJobLlmUsage drainCounts =
                         job.getExecutionStartedAt() != null ? jobRepository.findLlmUsageById(jobId).orElse(null) : null;
                     int updated =
@@ -371,11 +345,10 @@ public class AgentJobExecutor {
     }
 
     /**
-     * The authoritative {@code agent_job} status transition is performed hub-side before the
-     * {@code CancelJob} frame is dispatched; this only stops the container. No-op if this worker does
-     * not own the job, which is how job-scoped cancellation stays safe across replicas.
+     * Stops the container only; the authoritative status transition already happened hub-side before
+     * the {@code CancelJob} frame was dispatched.
      *
-     * @return {@code true} if this worker owns the job and a stop was requested
+     * @return true if this worker owns the job and a stop was requested
      */
     public boolean cancelLocalJob(UUID jobId, String reason) {
         if (!localRunningJobs.contains(jobId)) {
@@ -480,13 +453,13 @@ public class AgentJobExecutor {
     }
 
     /**
-     * @return {@code true} if the job was actually claimed and dispatched; {@code false} if it was
-     *     skipped for any reason, leaving it QUEUED for the next poll to reconsider.
+     * @return true if the job was claimed and dispatched. Anything else leaves it QUEUED for the next
+     *     poll, except the two {@link ClaimOutcome}s {@link #claimJob} has already cancelled outright.
      */
     boolean processJob(UUID jobId) {
-        Optional<ClaimResult> claimed;
+        ClaimAttempt attempt;
         try {
-            claimed = dispatchClaimResult(jobId, claimJob(jobId));
+            attempt = claimJob(jobId);
         } catch (CannotAcquireLockException e) {
             log.debug("Lock timeout during claim for job {}, will retry on next poll", jobId);
             return false;
@@ -494,10 +467,10 @@ public class AgentJobExecutor {
             log.warn("Claim failed for job {}, will retry on next poll: {}", jobId, e.getMessage());
             return false;
         }
-        if (claimed.isEmpty()) {
+        if (!(attempt instanceof ClaimResult claim)) {
             return false;
         }
-        dispatchExecution(jobId, claimed.get());
+        dispatchExecution(jobId, claim);
         return true;
     }
 
@@ -598,26 +571,6 @@ public class AgentJobExecutor {
         };
     }
 
-    private Optional<ClaimResult> dispatchClaimResult(UUID jobId, Object claimResult) {
-        if (
-            claimResult == ClaimOutcome.ALREADY_CLAIMED ||
-            claimResult == ClaimOutcome.BUDGET_BLOCKED ||
-            claimResult == ClaimOutcome.MODEL_UNAVAILABLE
-        ) {
-            return Optional.empty();
-        }
-        if (claimResult == ClaimOutcome.CONCURRENCY_FULL || claimResult == ClaimOutcome.BUDGET_HELD) {
-            // Job stays QUEUED — concurrency will free up, or the budget hold's available_at will
-            // mature and the poll loop re-evaluates the cap on the next eligible poll.
-            return Optional.empty();
-        }
-        if (claimResult instanceof ClaimResult claim) {
-            return Optional.of(claim);
-        }
-        log.warn("Unexpected claim result for job {}, leaving QUEUED for the next poll", jobId);
-        return Optional.empty();
-    }
-
     // Everything below runs on the sandbox executor, not the poll thread.
 
     private void runClaimedJob(UUID jobId, ClaimResult claim) {
@@ -631,10 +584,9 @@ public class AgentJobExecutor {
             log.info("Executing agent job: jobId={}, jobType={}", jobId, job.getJobType());
 
             SandboxSpec sandboxSpec = prepareSandboxSpec(jobId, job, claim.snapshot);
-            // From this boundary onward provider usage may exist even when execute() throws before
-            // returning a result. Persist it so cancellation/recovery on another process can make the
-            // same accounting distinction. A lost fence means the job was cancelled or requeued while
-            // preparation ran; do not start its sandbox.
+            // Past this boundary provider usage may exist even if execute() throws, so it is persisted
+            // for recovery on another process. A lost fence means the job was cancelled or requeued
+            // while preparation ran, so its sandbox must not start.
             if (!markExecutionStarted(jobId)) {
                 metricOutcome = "OWNERSHIP_LOST";
                 log.info("Skipped sandbox start after execution fence was lost: jobId={}", jobId);
@@ -675,10 +627,6 @@ public class AgentJobExecutor {
         return updated != null && updated == 1;
     }
 
-    /**
-     * Tag cardinality is bounded: {@code jobType} is a small closed enum and {@code outcome} is a
-     * terminal {@link AgentJobStatus} name plus {@code "REQUEUED"} and {@code "unknown"}.
-     */
     private void recordExecutionDuration(AgentJobType jobType, String outcome, Duration duration) {
         Timer.builder("agent.job.execution.duration")
             .description("Total duration of agent job execution")
@@ -692,10 +640,8 @@ public class AgentJobExecutor {
     private SandboxSpec prepareSandboxSpec(UUID jobId, AgentJob job, ConfigSnapshot snapshot) {
         JobTypeHandler handler = handlerRegistry.getHandler(job.getJobType());
 
-        // Wrap in a read-only transaction so prepareInputFiles/buildPrompt can
-        // resolve lazy JPA proxies (e.g. PullRequest.author) on this sandbox thread.
-        // Re-fetch the job WITH workspace eagerly loaded to avoid LazyInitializationException
-        // (the original job object is detached from the claim transaction).
+        // The claim transaction is long gone, so the handler needs a transaction of its own here to
+        // resolve lazy JPA proxies, and a re-fetch that eagerly loads the workspace.
         TransactionTemplate readOnlyTx = new TransactionTemplate(transactionTemplate.getTransactionManager());
         readOnlyTx.setReadOnly(true);
         record PrepareResult(Map<String, byte[]> files, Map<String, String> volumeMounts) {}
@@ -706,8 +652,8 @@ public class AgentJobExecutor {
             return new PrepareResult(files, volumes);
         });
 
-        // ONE credential path: every sandbox, app-server and worker pod alike, talks to the in-app LLM
-        // proxy via the job's own token. There is no worker-side BYO-LLM override.
+        // Every sandbox reaches the provider through the in-app LLM proxy with the job's own token;
+        // there is no worker-side BYO-LLM override.
         PracticeAgentRequest adapterRequest = new PracticeAgentRequest(
             snapshot.apiProtocol(),
             snapshot.upstreamModelId(),
@@ -732,9 +678,8 @@ public class AgentJobExecutor {
     }
 
     /**
-     * Deliberately NOT best-effort, unlike every other provenance side-effect here: an observation that
-     * cannot be tied to the inputs that produced it is unfixable evaluation data, so a failed digest
-     * write fails the run before any LLM cost accrues.
+     * Deliberately not best-effort: an observation that cannot be tied to the inputs that produced it
+     * is unfixable evaluation data, so a failed write fails the run before any LLM cost accrues.
      */
     private void persistProvenanceDigests(UUID jobId, @Nullable String promptDigest, Map<String, byte[]> inputFiles) {
         String inputsDigest = ProvenanceDigest.inputsDigestHex(inputFiles, jobId);
@@ -754,11 +699,10 @@ public class AgentJobExecutor {
         PracticeSandboxSpec agentSpec,
         ConfigSnapshot snapshot
     ) {
-        // Merge handler + adapter input files (adapter takes precedence on collision)
+        // The adapter takes precedence on collision.
         Map<String, byte[]> allInputFiles = new HashMap<>(handlerFiles);
         allInputFiles.putAll(agentSpec.inputFiles());
 
-        // Merge handler + adapter volume mounts with collision detection
         Map<String, String> allVolumeMounts = new HashMap<>(handlerVolumeMounts);
         for (var entry : agentSpec.volumeMounts().entrySet()) {
             String existing = allVolumeMounts.put(entry.getKey(), entry.getValue());
@@ -771,7 +715,6 @@ public class AgentJobExecutor {
                 );
             }
         }
-        // Detect multiple host paths mapped to the same container path
         Set<String> containerPaths = new HashSet<>(allVolumeMounts.values());
         if (containerPaths.size() < allVolumeMounts.size()) {
             log.warn("Multiple host paths mapped to the same container path: {}", allVolumeMounts);
@@ -811,20 +754,15 @@ public class AgentJobExecutor {
         log.info("Agent job cancelled: jobId={}", jobId);
     }
 
-    /**
-     * Bills a job that ended without a clean terminal write, re-reading the token counts from the row
-     * so a stale in-memory {@code job} cannot hide the proxy's committed accumulations. Safe only on
-     * terminal (non-requeue) paths — see the overload.
-     */
+    /** Reads the counts itself, so this overload is safe only on terminal (non-requeue) paths. */
     private void billTerminatedJob(AgentJob job, String reason) {
         billTerminatedJob(job, reason, jobRepository.findLlmUsageById(job.getId()).orElse(null));
     }
 
     /**
      * {@code counts} MUST be read BEFORE any requeue of this job: {@link
-     * AgentJobRepository#requeueOrphan} atomically ZEROes the row's token accumulators so the next
-     * attempt bills only its own calls, and a caller that requeues first would then bill zero and
-     * silently drop this attempt's spend.
+     * AgentJobRepository#requeueOrphan} zeroes the row's token accumulators, so a caller that requeues
+     * first would bill zero and silently drop this attempt's spend.
      */
     private void billTerminatedJob(AgentJob job, String reason, @Nullable AgentJobLlmUsage counts) {
         ConfigSnapshot snapshot = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
@@ -851,11 +789,6 @@ public class AgentJobExecutor {
     }
 
     /**
-     * Only a provably-infra failure is requeued; everything else fails terminally at once.
-     * Under-classifying costs one job's retry budget on a usually self-healing blip, whereas a
-     * false-positive lets a permanently broken job (say a misconfigured LLM endpoint) retry
-     * {@code max-retries} times, burning time and budget — so this errs conservative.
-     *
      * @param sandboxExecutionStarted whether provider execution may have started; only then can an
      *     unverifiable usage event be truthful
      * @return the {@code agent.job.execution.duration} outcome tag
@@ -871,8 +804,7 @@ public class AgentJobExecutor {
         if (workerId != null && isRetryableInfraFailure(e)) {
             int currentRetryCount = job.getRetryCount();
             Integer updated = transactionTemplate.execute(status -> {
-                // Snapshot the token counts BEFORE requeuing: the requeue zeroes the row's
-                // accumulators atomically, so a post-requeue re-read would bill zero.
+                // BEFORE requeuing: the requeue zeroes the accumulators, so a later read bills zero.
                 AgentJobLlmUsage retryCounts = sandboxExecutionStarted
                     ? jobRepository.findLlmUsageById(jobId).orElse(null)
                     : null;
@@ -911,9 +843,8 @@ public class AgentJobExecutor {
 
     /**
      * Deliberately narrower than {@link SandboxException}, which also covers deterministic
-     * validation/config failures and {@code DockerSandboxAdapter}'s catch-all wrap of an unknown defect
-     * — retrying either would burn the budget on a failure that was never going to resolve itself.
-     * {@link SandboxCancelledException} is excluded without a check for the same reason.
+     * validation/config failures and a catch-all wrap of an unknown defect: retrying either would burn
+     * the retry budget on a failure that was never going to resolve itself.
      */
     static boolean isRetryableInfraFailure(Exception e) {
         return e instanceof SandboxInfrastructureException || e instanceof IOException;
@@ -939,8 +870,10 @@ public class AgentJobExecutor {
         );
     }
 
-    /** Sentinel values for claimJob results that require post-transaction handling. */
-    private enum ClaimOutcome {
+    /** What one claim attempt produced: either a claimed job or the reason there is none. */
+    private sealed interface ClaimAttempt {}
+
+    private enum ClaimOutcome implements ClaimAttempt {
         ALREADY_CLAIMED,
         CONCURRENCY_FULL,
         BUDGET_BLOCKED,
@@ -948,13 +881,10 @@ public class AgentJobExecutor {
         MODEL_UNAVAILABLE,
     }
 
-    private record ClaimResult(AgentJob job, ConfigSnapshot snapshot) {}
+    private record ClaimResult(AgentJob job, ConfigSnapshot snapshot) implements ClaimAttempt {}
 
-    /** @return a {@link ClaimResult} on success, otherwise a {@link ClaimOutcome} sentinel. */
-    private Object claimJob(UUID jobId) {
+    private @Nullable ClaimAttempt claimJob(UUID jobId) {
         return transactionTemplate.execute(status -> {
-            // SKIP LOCKED: if another poller has this row locked, returns empty. available_at is
-            // re-checked here too — see the query's javadoc.
             Optional<AgentJob> locked = jobRepository.findByIdQueuedForUpdateSkipLocked(jobId, Instant.now());
             if (locked.isEmpty()) {
                 log.debug("Job already claimed or not QUEUED: jobId={}", jobId);
@@ -963,64 +893,16 @@ public class AgentJobExecutor {
 
             AgentJob job = locked.get();
 
-            // Rechecked here even though submit already gated: a workspace can pre-queue jobs faster
-            // than the cap updates, and every one queued before the cap was crossed would otherwise
-            // still run. Never re-checked past this point — no mid-execution kill on budget alone.
-            //
-            // HELD, not cancelled: exhaustion is temporary (the cap resets at the UTC month rollover,
-            // or an admin raises it), so pushing available_at out and staying QUEUED lets the poll loop
-            // resume the job automatically, which is what the paused-work copy promises the user.
-            // retry_count is untouched — this is not an execution failure. A job still blocked once it is
-            // older than BUDGET_HOLD_MAX_JOB_AGE is cancelled instead: week-old feedback is noise, and a
-            // bound that never trips would hold forever. Scoped to who pays for this purpose, so the host's exhausted budget cannot
-            // hold work the workspace funds through its own provider, or vice versa.
             LlmBudgetBlockReason blockReason = llmBudgetService
                 .decide(job.getWorkspace().getId())
                 .forFunding(claimedFundingSource(job));
             if (blockReason != LlmBudgetBlockReason.NONE) {
-                Instant now = Instant.now();
-                boolean tooOldToHold =
-                    job.getCreatedAt() != null &&
-                    Duration.between(job.getCreatedAt(), now).compareTo(BUDGET_HOLD_MAX_JOB_AGE) > 0;
-                if (tooOldToHold) {
-                    String message =
-                        "Cancelled: over the monthly AI budget, and this job is more than " +
-                        BUDGET_HOLD_MAX_JOB_AGE.toDays() +
-                        " days old.";
-                    job.setStatus(AgentJobStatus.CANCELLED);
-                    job.setCompletedAt(now);
-                    job.setErrorMessage(message);
-                    job.setCancellationReason(AgentJobCancellationReason.BUDGET_EXHAUSTED);
-                    jobRepository.save(job);
-                    log.info(
-                        "Cancelling claim — over budget and older than {} days: jobId={}, workspaceId={}, blockReason={}",
-                        BUDGET_HOLD_MAX_JOB_AGE.toDays(),
-                        jobId,
-                        job.getWorkspace().getId(),
-                        blockReason
-                    );
-                    meterRegistry.counter("agent.job.budget.refused").increment();
-                    return ClaimOutcome.BUDGET_BLOCKED;
-                }
-                job.setAvailableAt(now.plus(BUDGET_HOLD_INTERVAL));
-                // Marks this as a budget hold specifically, so raising the cap can release it at once
-                // instead of leaving the admin to wait out BUDGET_HOLD_INTERVAL.
-                job.setHoldReason(AgentJob.HOLD_REASON_BUDGET);
-                jobRepository.save(job);
-                log.info(
-                    "Holding claim — monthly LLM budget {}: jobId={}, workspaceId={}, retryAt={}",
-                    blockReason == LlmBudgetBlockReason.EXHAUSTED ? "exhausted" : "unverifiable (cap set)",
-                    jobId,
-                    job.getWorkspace().getId(),
-                    job.getAvailableAt()
-                );
-                meterRegistry.counter("agent.job.budget.held").increment();
-                return ClaimOutcome.BUDGET_HELD;
+                return holdOrCancelOverBudget(job, blockReason);
             }
 
-            // Lock and live-revalidate the exact catalog binding immediately before RUNNING. Submit-time
-            // behaviour stays frozen; only availability/grants and the price are refreshed, and a changed
-            // binding is refused rather than silently switching the queued job to another model.
+            // Live-revalidate the catalog binding immediately before RUNNING. Submit-time behaviour
+            // stays frozen; only availability/grants and the price are refreshed, and a changed binding
+            // is refused rather than silently switching the queued job to another model.
             AgentPurpose purpose = job.getPurpose();
             WorkspaceAgentBinding binding =
                 purpose == null
@@ -1098,6 +980,57 @@ public class AgentJobExecutor {
             capacityState.ifPresent(WorkerCapacityState::claimReview);
             return new ClaimResult(job, snapshot);
         });
+    }
+
+    /**
+     * The budget is re-checked at claim even though submit already gated, because a workspace can
+     * pre-queue jobs faster than the cap updates. It is never re-checked past this point — there is no
+     * mid-execution kill on budget alone.
+     *
+     * <p>Held rather than cancelled, because exhaustion is temporary (month rollover, or an admin
+     * raises the cap) and {@code retry_count} is untouched — this is not an execution failure. A job
+     * still blocked once it is older than {@link #BUDGET_HOLD_MAX_JOB_AGE} is cancelled instead, so a
+     * bound that never trips cannot hold it forever.
+     */
+    private ClaimOutcome holdOrCancelOverBudget(AgentJob job, LlmBudgetBlockReason blockReason) {
+        Instant now = Instant.now();
+        boolean tooOldToHold =
+            job.getCreatedAt() != null &&
+            Duration.between(job.getCreatedAt(), now).compareTo(BUDGET_HOLD_MAX_JOB_AGE) > 0;
+        if (tooOldToHold) {
+            job.setStatus(AgentJobStatus.CANCELLED);
+            job.setCompletedAt(now);
+            job.setErrorMessage(
+                "Cancelled: over the monthly AI budget, and this job is more than " +
+                    BUDGET_HOLD_MAX_JOB_AGE.toDays() +
+                    " days old."
+            );
+            job.setCancellationReason(AgentJobCancellationReason.BUDGET_EXHAUSTED);
+            jobRepository.save(job);
+            log.info(
+                "Cancelling claim — over budget and older than {} days: jobId={}, workspaceId={}, blockReason={}",
+                BUDGET_HOLD_MAX_JOB_AGE.toDays(),
+                job.getId(),
+                job.getWorkspace().getId(),
+                blockReason
+            );
+            meterRegistry.counter("agent.job.budget.refused").increment();
+            return ClaimOutcome.BUDGET_BLOCKED;
+        }
+        job.setAvailableAt(now.plus(BUDGET_HOLD_INTERVAL));
+        // Marks this as a budget hold specifically, so raising the cap can release it at once instead
+        // of leaving the admin to wait out BUDGET_HOLD_INTERVAL.
+        job.setHoldReason(AgentJob.HOLD_REASON_BUDGET);
+        jobRepository.save(job);
+        log.info(
+            "Holding claim — monthly LLM budget {}: jobId={}, workspaceId={}, retryAt={}",
+            blockReason == LlmBudgetBlockReason.EXHAUSTED ? "exhausted" : "unverifiable (cap set)",
+            job.getId(),
+            job.getWorkspace().getId(),
+            job.getAvailableAt()
+        );
+        meterRegistry.counter("agent.job.budget.held").increment();
+        return ClaimOutcome.BUDGET_HELD;
     }
 
     private ClaimOutcome refuseUnavailableModel(AgentJob job) {

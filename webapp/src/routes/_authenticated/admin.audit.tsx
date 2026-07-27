@@ -18,15 +18,12 @@ function AdminAuditPage() {
 	const search = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 
-	// Every filter change is a navigation, so the current view is always the thing in the address bar
-	// and always shareable. Filter churn uses `replace` so a long session does not bury the previous
-	// page under dozens of entries; the tab switch below deliberately does not, because it discards
-	// the other tab's selection and Back is the only way to undo that.
+	// `replace`, so filter churn does not bury the previous page under dozens of history entries. The
+	// tab switch below deliberately does not: it discards the other tab's selection, and Back is the
+	// only way to undo that.
 	const patchSearch = (patch: Partial<AuditSearch>) =>
 		navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
 
-	// Workspace names are resolved client-side from the admin workspace list (dozens at most), so the
-	// audit services don't have to reach into the workspace module just to label a row.
 	const workspacesQuery = useQuery(adminListWorkspacesOptions());
 	const workspaceNames = new Map(
 		(workspacesQuery.data ?? []).map((w) => [w.id, w.displayName || w.workspaceSlug] as const),
@@ -50,8 +47,8 @@ function AdminAuditPage() {
 				className="gap-4"
 				value={search.tab}
 				onValueChange={(value) =>
-					// The two tabs filter different dimensions; carrying one tab's selection into the other
-					// would silently return an unrelated, empty result. Actor and date span both, so they stay.
+					// The tabs filter different dimensions, so only actor and date carry across; the rest
+					// would silently return an unrelated, empty result.
 					navigate({
 						search: (prev) => ({
 							tab: value as AuditSearch["tab"],

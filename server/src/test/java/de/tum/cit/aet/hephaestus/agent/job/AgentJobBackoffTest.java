@@ -81,7 +81,7 @@ class AgentJobBackoffTest extends BaseUnitTest {
     @Test
     @DisplayName("jitter is bounded to +/-10% of the uncapped base")
     void jitterIsBoundedToTenPercent() {
-        Duration base = AgentJobBackoff.compute(3, NO_JITTER); // 96s
+        Duration base = AgentJobBackoff.compute(3, NO_JITTER);
         Duration maxUp = AgentJobBackoff.compute(3, MAX_POSITIVE_JITTER);
         Duration maxDown = AgentJobBackoff.compute(3, MAX_NEGATIVE_JITTER);
 

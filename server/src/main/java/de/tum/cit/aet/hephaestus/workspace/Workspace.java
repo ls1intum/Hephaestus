@@ -253,32 +253,19 @@ public class Workspace {
     // AI configuration
 
     /**
-     * Monthly cap in USD on this workspace's INSTANCE-funded spend — the shared models the
-     * host pays for. {@code null} = uncapped. When the workspace's calendar-month (UTC)
-     * instance-funded spend in the {@code llm_usage_event} ledger reaches this cap, work running on
-     * shared models pauses until the month rolls over or an instance admin raises the cap.
-     *
-     * <p>Set exclusively by instance admins — a workspace admin raising this would defeat the
-     * host's cost backstop. Work the workspace pays for itself is governed by
-     * {@link #monthlyByoLlmBudgetUsd} instead and is unaffected by this cap.
+     * Monthly cap in USD on this workspace's INSTANCE-funded spend — the shared models the host pays
+     * for. {@code null} = uncapped; reaching it pauses work on shared models until the calendar month
+     * (UTC) rolls over. Set exclusively by instance admins, since it is the host's cost backstop.
      */
     @Column(name = "monthly_llm_budget_usd", precision = 10, scale = 2)
     private BigDecimal monthlyLlmBudgetUsd;
 
     /**
-     * Monthly cap in USD on this workspace's OWN-provider (BYO) spend. {@code null} =
-     * uncapped. The mirror of {@link #monthlyLlmBudgetUsd} for the other purse: this is the
-     * workspace's own money, so the workspace admin sets it and only work on the workspace's own
-     * connected provider pauses when it is reached.
+     * Monthly cap in USD on this workspace's OWN-provider (BYO) spend, set by the workspace's own
+     * admins. {@code null} = uncapped. The two caps are different people's money and are
+     * <b>never summed</b> — see {@code docs/contributor/llm-cost-vocabulary.md}, rule 2.
      *
-     * <p>The two caps are different people's money and are <b>never summed</b>; each may only be
-     * blocked by a blind spot its own owner can clear (an unpriced shared model is the host's to fix;
-     * an unpriced own-provider model is the workspace's). See {@code docs/contributor/llm-cost-vocabulary.md},
-     * rule 2.
-     *
-     * <p>The API and the UI say "ownProvider"; this keeps the column's "byo" because renaming a
-     * released column costs a two-release deprecate-then-remove migration for no operator-visible
-     * benefit. The field follows the column so the mapping stays greppable both ways.
+     * <p>The API and the UI say "ownProvider"; the field keeps the released column's "byo" spelling.
      */
     @Column(name = "monthly_byo_llm_budget_usd", precision = 10, scale = 2)
     private BigDecimal monthlyByoLlmBudgetUsd;

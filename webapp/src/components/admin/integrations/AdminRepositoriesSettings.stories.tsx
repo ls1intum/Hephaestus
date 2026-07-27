@@ -197,9 +197,6 @@ export const LoadError: Story = {
 	args: {
 		repositories: [],
 		isLoading: false,
-		// Carries a ProblemDetail, like everything the generated client throws and like the sibling
-		// story below: an `Error`'s own `message` is never shown to a reader, only wording the server
-		// chose. (The prop is typed `Error`, hence the `Object.assign`.)
 		error: Object.assign(new Error("request failed"), {
 			status: 503,
 			detail: "The repositories service is unavailable.",

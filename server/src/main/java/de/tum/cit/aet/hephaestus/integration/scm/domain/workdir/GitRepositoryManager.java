@@ -186,9 +186,8 @@ public class GitRepositoryManager {
                 if (!isRepositoryCloned(repositoryId)) {
                     cloneRepository(repoPath, cloneUrl, token);
                 } else if (!hasOrigin(repoPath, cloneUrl)) {
-                    // The checkout is a cache keyed by a database id. Database restores can reuse that
-                    // id for a different upstream repository; fetching the old origin would mix tenants'
-                    // source histories. Reclone instead of retargeting so no old objects survive.
+                    // The checkout is a cache keyed by a database id, and a restore can reuse that id for
+                    // a different upstream. Reclone rather than retarget so no old objects survive.
                     log.warn("Repository origin changed; rebuilding checkout: repoId={}", repositoryId);
                     cloneRepository(repoPath, cloneUrl, token);
                 } else {
@@ -261,9 +260,9 @@ public class GitRepositoryManager {
     }
 
     /**
-     * Fetches a provider-owned synthetic pull/merge-request ref and verifies that it resolves to
-     * the commit pinned in the job metadata. This is required for reviews submitted from forks:
-     * those commits are intentionally absent from the target repository's normal branch refs.
+     * Fetches a provider-owned synthetic pull/merge-request ref and verifies it resolves to
+     * {@code expectedSha}. Needed for reviews submitted from forks, whose commits are absent from the
+     * target repository's own branch refs.
      */
     public boolean fetchRemoteCommit(Long repositoryId, String remoteRef, String expectedSha, @Nullable String token) {
         if (!properties.enabled()) {

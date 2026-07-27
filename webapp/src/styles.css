@@ -42,11 +42,8 @@ code {
   --accent-foreground: oklch(0.21 0.006 285.885);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
-  /* Light-mode success/warning are darkened from their palette-default lightness so that
-     `text-success` / `text-warning` clear WCAG 2.2 SC 1.4.3 (4.5:1) on --card: at the stock
-     0.596/0.646 they measured 3.67:1 and 3.38:1, and these two tokens carry the entire
-     "your budget is about to pause your AI" vocabulary. Now 4.92:1 and 5.20:1. Darkening also
-     improves --*-foreground (white) sitting on the matching bg-* fill. */
+  /* Darkened from the palette default: at stock lightness `text-success` / `text-warning` miss
+     WCAG 2.2 SC 1.4.3 (4.5:1) against --card. */
   --success: oklch(0.52 0.145 163.225);
   --success-foreground: oklch(0.985 0 0);
   --warning: oklch(0.54 0.153 70.08);

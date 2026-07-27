@@ -4,9 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeDetectionReadiness;
 import org.springframework.stereotype.Component;
 
-/**
- * Implementation of {@link PracticeDetectionReadiness} backed by the per-purpose binding table.
- */
+/** {@link PracticeDetectionReadiness} backed by the per-purpose binding table. */
 @Component
 public class PracticeDetectionReadinessAdapter implements PracticeDetectionReadiness {
 
@@ -22,10 +20,8 @@ public class PracticeDetectionReadinessAdapter implements PracticeDetectionReadi
     }
 
     @Override
-    // Keep this boundary non-transactional: resolve() reports revocation with an exception. Catching that
-    // exception inside a shared transaction would still mark the transaction rollback-only. That is why
-    // the lookup fetches the model + connection graph eagerly — resolving a lazily-loaded binding after
-    // the session closed would throw LazyInitializationException instead of answering the question.
+    // Must stay non-transactional: isModelAvailable swallows the resolver's throw, which inside a
+    // shared transaction would leave it rollback-only. Hence the graph-fetching lookup.
     public boolean hasRunnableAgent(Long workspaceId) {
         return bindingRepository
             .findByWorkspaceIdAndPurposeWithModels(workspaceId, AgentPurpose.PRACTICE_DETECTION)

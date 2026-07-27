@@ -90,10 +90,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
          * different people behind them. Which purse the gate consults is
          * {@code ProxyBudgetGateTest}'s subject; here the routing's funding source is what the body
          * must be worded from.
-         *
-         * <p>The status alone proves the credential was never resolved: a call that reaches the
-         * resolver gets nothing back from it and returns 502, as {@link #doesNotRejectACallTheGateAllows}
-         * shows.
          */
         @Test
         void the429BodyNamesTheSharedPurseForASharedModelCall() {
@@ -178,8 +174,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
             );
 
             assertThat(result.getStatusCode().value()).isEqualTo(403);
-            // Never resolved a credential, so it never reached a provider: refused before the money,
-            // not after it.
+            // Refused before the money, not after it — no credential resolved, no provider reached.
             verifyNoInteractions(resolver);
             verifyNoInteractions(mentorTurnUsageAccumulator);
             verifyNoInteractions(usageAccumulator);

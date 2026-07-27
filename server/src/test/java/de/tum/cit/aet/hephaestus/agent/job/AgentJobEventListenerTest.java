@@ -141,7 +141,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         );
     }
 
-    /** Sets up a valid PR mock and gate Detect decision for happy-path tests. */
     private PullRequest setupHappyPath() {
         PullRequest pr = mockPullRequest("abc123", "feature/test", "main");
         when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
@@ -306,7 +305,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         @Test
         void shouldUseWorkspaceIdFromGateNotContext() {
             var prData = createPrData(Issue.State.OPEN, false, false);
-            // Context has scopeId=99, but gate resolves workspace with id=42
             var event = new ScmDomainEvent.PullRequestCreated(prData, webhookContext(99L));
 
             PullRequest pr = mockPullRequest("abc123", "feature/test", "main");
@@ -370,7 +368,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onPullRequestCreated(event);
 
-            // Gate was called (listener did not short-circuit on draft)
             verify(practiceReviewDetectionGate).evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED, TriggerMode.AUTO);
             verify(agentJobService, never()).submit(any(), any(), any());
         }
@@ -785,9 +782,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             }
         }
 
-        /**
-         * Creates a real PR for collaboration tests with the fields the gate reads set.
-         */
         private PullRequest setupCollaborationPR() {
             PullRequest pr = new PullRequest();
             pr.setId(PR_ID);

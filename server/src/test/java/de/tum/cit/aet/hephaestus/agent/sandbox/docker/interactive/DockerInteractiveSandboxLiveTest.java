@@ -340,7 +340,6 @@ class DockerInteractiveSandboxLiveTest {
                     assertThat(metrics.ringBufferDropped.count() - before).isEqualTo((double) expectedDrops)
                 );
 
-            // Late subscriber's snapshot must hold the NEWEST ringCapacity ticks, not any prefix.
             CopyOnWriteArrayList<JsonNode> snapshot = new CopyOnWriteArrayList<>();
             sb.subscribe(snapshot::add);
             await()
@@ -677,9 +676,8 @@ class DockerInteractiveSandboxLiveTest {
                     AGENT_PI_IMAGE +
                     " docker/agents/pi/"
             );
-            // Uses the real PiRuntimeFactory command (mkdir + ln + cp + LD_PRELOAD + node).
-            // If any step in the sh -c chain fails (missing dir, bad symlink, missing cp source),
-            // the runner never starts, the pump sees EOF with non-zero exit, and attach() throws.
+            // If any step of the real bootstrap chain fails, the runner never starts, the pump
+            // sees EOF with a non-zero exit, and attach() throws.
             AttachedSandbox sb = adapter.attach(buildMentorSpec("u_boot", "w_boot"));
             CopyOnWriteArrayList<JsonNode> frames = new CopyOnWriteArrayList<>();
             sb.subscribe(frames::add);
@@ -705,7 +703,6 @@ class DockerInteractiveSandboxLiveTest {
             CopyOnWriteArrayList<JsonNode> frames = new CopyOnWriteArrayList<>();
             sb.subscribe(frames::add);
 
-            // Wait for the runner to be ready before sending any RPC.
             await()
                 .atMost(RPC_TIMEOUT)
                 .untilAsserted(() ->
@@ -760,7 +757,6 @@ class DockerInteractiveSandboxLiveTest {
                     ).isTrue()
                 );
 
-            // hello
             String helloId = UUID.randomUUID().toString();
             sb.send(
                 MAPPER.createObjectNode()
@@ -775,7 +771,6 @@ class DockerInteractiveSandboxLiveTest {
                     assertThat(frames.stream().anyMatch(f -> helloId.equals(f.path("id").asString()))).isTrue()
                 );
 
-            // open_thread
             String threadId = UUID.randomUUID().toString();
             String openId = UUID.randomUUID().toString();
             sb.send(
@@ -797,7 +792,6 @@ class DockerInteractiveSandboxLiveTest {
                     assertThat(openResp.path("result").path("threadId").asString()).isEqualTo(threadId);
                 });
 
-            // prompt (stub emits: agent_start → message_update/text_delta → agent_end)
             String promptId = UUID.randomUUID().toString();
             sb.send(
                 MAPPER.createObjectNode()

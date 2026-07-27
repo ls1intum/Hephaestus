@@ -3,10 +3,6 @@ package de.tum.cit.aet.hephaestus.agent.catalog;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Partial update of the instance LLM settings singleton. Every field is optional; an absent
- * (null) field keeps its current value.
- */
 @Schema(description = "Update instance-wide LLM governance settings (all fields optional)")
 public record UpdateInstanceLlmSettingsRequestDTO(
     @Nullable

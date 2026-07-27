@@ -29,13 +29,8 @@ import tools.jackson.databind.ObjectMapper;
  * tokens: an {@code AgentJob}'s job token, or a mentor session's registry-minted token (the mentor's
  * interactive sandbox is not an {@code AgentJob} row).
  *
- * <p>Agent containers send their token as the standard {@code Authorization: Bearer} header (Pi's
- * custom-provider convention — see {@code pi-provider.mjs}). This filter validates it against the
- * job table first, then the mentor registry, and sets a {@link JobTokenAuthentication} carrying the
- * resolved {@link ProxyRouting} on the security context.
- *
- * <p>Defense-in-depth: rejects requests from non-private IPs (only Docker-internal
- * traffic should reach these endpoints).
+ * <p>Defense-in-depth: rejects requests from non-private IPs, since only Docker-internal traffic
+ * should reach these endpoints.
  */
 public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
 
@@ -63,7 +58,6 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
         throws ServletException, IOException {
-        // Defense-in-depth: only accept requests from private IPs
         if (!isPrivateIp(request.getRemoteAddr())) {
             log.warn("LLM proxy request from non-private IP: {}", request.getRemoteAddr());
             response.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden");
@@ -76,7 +70,6 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        // Validate format: must be valid Base64-URL
         if (!BASE64_URL_PATTERN.matcher(token).matches()) {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid token format");
             return;
@@ -98,12 +91,8 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
 
     /**
      * Look up an {@code AgentJob} by token and translate its frozen {@link ConfigSnapshot} into routing.
-     *
-     * <p>This lookup is also where the attempt's identity and its spend-so-far are read, because this
-     * is the only place both are already in hand: the row it loads carries the {@code retry_count} that
-     * names the attempt and the token accumulators the proxy has been adding to, and the snapshot it
-     * parses carries the rates those tokens were admitted at. Everything the budget gate and the usage
-     * accumulator need about "who is calling and what have they spent" therefore costs no extra query.
+     * The attempt's identity and spend-so-far are read here because the row and snapshot already loaded
+     * carry both, so the budget gate costs no extra query.
      */
     private Optional<ProxyRouting> resolveJobRouting(String token) {
         String hash = AgentJob.computeTokenHash(token);
@@ -112,7 +101,6 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
             return Optional.empty();
         }
         AgentJob job = optionalJob.get();
-        // Constant-time comparison of actual token (belt-and-suspenders after hash match)
         if (!MessageDigest.isEqual(token.getBytes(), job.getJobToken().getBytes())) {
             log.warn("Token hash matched but constant-time comparison failed — possible collision");
             return Optional.empty();
@@ -148,13 +136,9 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
     }
 
     /**
-     * Price the calls this attempt has already made, from the row's running token totals and the rates
-     * frozen onto it at admission.
-     *
-     * <p>Reasoning tokens are deliberately absent from the arguments: they are already counted inside
-     * the output bucket, exactly as {@code LlmUsageRecorder} prices a finished attempt. Same inputs,
-     * same rates, same method — so what the gate judges an attempt on cannot drift from what the ledger
-     * will eventually charge it.
+     * Priced at the rates frozen onto the row at admission, so what the gate judges an attempt on
+     * cannot drift from what the ledger will charge it. Reasoning tokens are deliberately absent from
+     * the arguments: they are already counted inside the output bucket.
      */
     private static BigDecimal spentSoFarUsd(AgentJob job, ConfigSnapshot snapshot) {
         LlmPriceSnapshot price = snapshot.priceSnapshot();
@@ -177,10 +161,8 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
     }
 
     /**
-     * Extract the proxy-scoped token from the one supported sandbox authentication shape. Provider
-     * credentials may use a custom upstream header, but the sandbox itself always authenticates to
-     * Hephaestus with {@code Authorization: Bearer}; accepting provider-key headers here would blur
-     * those two trust boundaries.
+     * {@code Authorization: Bearer} is the only shape accepted: also honouring provider-key headers
+     * would blur the sandbox's trust boundary with the upstream provider's.
      */
     private String extractProxyToken(HttpServletRequest request) {
         String auth = request.getHeader("Authorization");

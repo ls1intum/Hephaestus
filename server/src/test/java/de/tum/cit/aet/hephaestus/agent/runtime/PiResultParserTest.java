@@ -28,7 +28,6 @@ class PiResultParserTest extends BaseUnitTest {
     @DisplayName("emits agent.pi.result.parse.failure{stage=usage} when usage.json is invalid")
     void emitsParseFailureMetric() {
         var bad = "not-json".getBytes(StandardCharsets.UTF_8);
-        // Trigger via usage parse path.
         parser.parseUsage(bad);
         assertThat(meterRegistry.counter("agent.pi.result.parse.failure", "stage", "usage").count()).isEqualTo(1d);
     }

@@ -58,7 +58,6 @@ describe("validateLlmModelForm", () => {
 	});
 
 	it("rejects a token count the server's int column cannot hold", () => {
-		// 2^31 exactly: accepted here, it fails at deserialisation with no field to attach it to.
 		expect(
 			validateLlmModelForm({ ...validModel, contextWindow: "2147483648" }).contextWindow,
 		).toMatch(/2,147,483,647 tokens or fewer/);

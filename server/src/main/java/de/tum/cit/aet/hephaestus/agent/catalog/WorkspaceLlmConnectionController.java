@@ -27,8 +27,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /**
- * Workspace-admin management of "your AI provider" — a workspace's own, tenant-scoped LLM connection
- *. Mutations are gated on the instance-wide {@code allow_workspace_connections} switch inside
+ * Workspace-admin management of "your AI provider" — a workspace's own, tenant-scoped LLM connection.
+ * Mutations are gated on the instance-wide {@code allow_workspace_connections} switch inside
  * {@link WorkspaceLlmConnectionService}.
  */
 @WorkspaceScopedController

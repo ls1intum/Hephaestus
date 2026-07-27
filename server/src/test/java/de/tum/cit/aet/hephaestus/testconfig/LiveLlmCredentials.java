@@ -13,8 +13,8 @@ import java.util.Map;
  */
 public record LiveLlmCredentials(String baseUrl, String apiKey, String model) {
     /**
-     * Load credentials from the environment. Caller must already be JUnit-gated via
-     * {@link LiveLlmTest}; we throw rather than skip so a misconfigured override surfaces loudly.
+     * Caller must already be JUnit-gated via {@link LiveLlmTest}; throws rather than skips so a
+     * misconfigured override surfaces loudly.
      */
     public static LiveLlmCredentials fromEnv() {
         return from(System.getenv());

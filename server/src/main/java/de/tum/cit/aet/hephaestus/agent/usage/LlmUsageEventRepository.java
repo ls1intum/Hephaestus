@@ -12,11 +12,9 @@ import org.springframework.data.repository.query.Param;
 
 public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UUID> {
     /**
-     * Idempotent append. A duplicate source attempt is the only write intentionally ignored.
-     *
-     * <p>The column list, the VALUES list and {@link LlmUsageInsert}'s components are one list written
-     * three times; {@code LlmUsageInsertContractTest} checks all three against {@link LlmUsageEvent}
-     * position by position, and explains there why this is hand-written SQL rather than a {@code save}.
+     * Idempotent append. The column list, the VALUES list and {@link LlmUsageInsert}'s components are
+     * one list written three times, checked against each other position by position by
+     * {@code LlmUsageInsertContractTest}.
      */
     @Modifying
     @Query(
@@ -43,13 +41,7 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
     )
     int insertIfAbsent(@Param("event") LlmUsageInsert event);
 
-    /**
-     * Month-to-date (or any window) BUDGETED spend for one workspace: only
-     * instance-funded, confirmed-priced events count — this is the sum the monthly budget cap
-     * compares against. A workspace's own BYO (bring-your-own) spend NEVER counts toward its
-     * instance-set budget (see {@link #sumByoCost}), and an UNPRICED event contributes nothing
-     * (see {@link #existsUnpricedInstanceFunded} for the "verdict can't be trusted" signal).
-     */
+    /** The sum the instance cap compares against. Own-provider spend is a different purse. */
     @Query(
         value = "SELECT COALESCE(SUM(e.cost_usd), 0) FROM llm_usage_event e " +
             "WHERE e.workspace_id = :workspaceId AND e.occurred_at >= :from AND e.occurred_at < :to " +
@@ -59,15 +51,8 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
     BigDecimal sumCost(@Param("workspaceId") Long workspaceId, @Param("from") Instant from, @Param("to") Instant to);
 
     /**
-     * This workspace's confirmed own-provider (BYO) spend for the window — what its own cap is
-     * measured against, and never summed into the instance-funded total (the two are different
-     * people's money).
-     *
-     * <p>The {@code pricing_state = 'PRICED'} predicate is explicit rather than implied by
-     * "UNPRICED rows have a NULL cost": this sum now decides whether a workspace is paused, so the
-     * rule it enforces has to be readable in the query rather than inferred from a column's
-     * nullability. Unpriced BYO usage is reported through
-     * {@link #existsUnpricedWorkspaceFunded} instead, exactly as its instance-funded mirror.
+     * The sum the workspace's own-provider cap compares against — never summed into the instance total,
+     * the two are different people's money.
      */
     @Query(
         value = "SELECT COALESCE(SUM(e.cost_usd), 0) FROM llm_usage_event e " +
@@ -77,11 +62,7 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
     )
     BigDecimal sumByoCost(@Param("workspaceId") Long workspaceId, @Param("from") Instant from, @Param("to") Instant to);
 
-    /**
-     * Events whose cost could not be resolved (unknown model pricing), any funding source. They
-     * contribute nothing to {@link #sumCost} / {@link #sumByoCost}, so the report surfaces the
-     * count so that blind spot is visible rather than silent.
-     */
+    /** Events either sum leaves out because no price could be resolved, so the blind spot is visible. */
     @Query(
         value = "SELECT COUNT(*) FROM llm_usage_event e " +
             "WHERE e.workspace_id = :workspaceId AND e.occurred_at >= :from AND e.occurred_at < :to " +
@@ -90,11 +71,7 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
     )
     long countUncosted(@Param("workspaceId") Long workspaceId, @Param("from") Instant from, @Param("to") Instant to);
 
-    /**
-     * True when at least one INSTANCE-funded event this window has no resolved price.
-     * This is what turns a budget verdict from WITHIN into UNVERIFIABLE — spend that could push the
-     * workspace over its cap but that {@link #sumCost} cannot see.
-     */
+    /** What turns the instance verdict from WITHIN into UNVERIFIABLE: spend {@link #sumCost} cannot see. */
     @Query(
         value = "SELECT EXISTS(SELECT 1 FROM llm_usage_event e " +
             "WHERE e.workspace_id = :workspaceId AND e.occurred_at >= :from AND e.occurred_at < :to " +
@@ -108,14 +85,8 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
     );
 
     /**
-     * The BYO mirror of {@link #existsUnpricedInstanceFunded}: at least one own-provider event this
-     * window has no resolved price, so {@link #sumByoCost} cannot prove the workspace is under its
-     * own cap.
-     *
-     * <p>Only the workspace admin can fix this one — BYO prices are set on the workspace's own model
-     * (see {@code WorkspaceLlmModel}), which is why an unpriced BYO model may pause BYO work but
-     * never instance-funded work, and vice versa. Each cap is only ever blocked by a blind spot its
-     * own owner can clear.
+     * The own-provider mirror of {@link #existsUnpricedInstanceFunded}. Kept separate so each cap is
+     * only ever blocked by a blind spot its own owner can clear.
      */
     @Query(
         value = "SELECT EXISTS(SELECT 1 FROM llm_usage_event e " +
@@ -129,11 +100,6 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
         @Param("to") Instant to
     );
 
-    /**
-     * Per-job-type breakdown, split the same way the top-level totals are: a
-     * budgeted (priced, instance-funded) sum, a separate BYO sum, and an unpriced-event count — never
-     * one blind {@code SUM(cost_usd)} mixing funding sources and pricing states.
-     */
     @Query(
         value = "SELECT e.job_type AS jobType, " +
             "COALESCE(SUM(e.cost_usd) FILTER (WHERE e.pricing_state = 'PRICED' AND e.funding_source = 'INSTANCE'), 0) " +
@@ -155,9 +121,6 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
         @Param("to") Instant to
     );
 
-    /**
-     * Per-day breakdown, split the same way as {@link #aggregateByJobType}.
-     */
     @Query(
         value = "SELECT (e.occurred_at AT TIME ZONE 'UTC')::date AS day, " +
             "COALESCE(SUM(e.cost_usd) FILTER (WHERE e.pricing_state = 'PRICED' AND e.funding_source = 'INSTANCE'), 0) " +
@@ -178,19 +141,9 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
     );
 
     /**
-     * Instance-admin cross-tenant rollup: one row per workspace (workspaces without spend
-     * included via LEFT JOIN so the admin sees budgets even at zero usage). Joins workspace
-     * metadata SQL-side — this stays a metadata-only view (no tenant content). Splits budgeted
-     * (instance-funded, priced) spend from BYO spend the same way {@link #sumCost} /
-     * {@link #sumByoCost} do, so the admin list never sums shared + own-provider
-     * spend into one figure.
-     *
-     * <p><b>Unpaged on purpose.</b> The row count is the instance's workspace count, not its event
-     * count — a self-hosted Hephaestus is a university or a company, so this is tens to low hundreds
-     * of rows of five scalars each, aggregated in one indexed pass over the month window. Paging it
-     * would also break the page: the admin's question is "who is spending", which needs the whole
-     * month ranked before it can be truncated. Revisit if an instance ever passes ~10k workspaces —
-     * at which point the fix is a materialised monthly rollup, not a page cursor.
+     * Instance-admin cross-tenant rollup: every workspace, including those with no spend this window.
+     * Unpaged — the row count is the instance's workspace count, and ranking by spend needs the whole
+     * month anyway.
      */
     @Query(
         value = "SELECT w.id AS workspaceId, w.slug AS workspaceSlug, w.display_name AS displayName, " +

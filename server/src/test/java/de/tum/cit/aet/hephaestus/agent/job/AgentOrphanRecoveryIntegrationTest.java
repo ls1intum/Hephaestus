@@ -35,7 +35,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * End-to-end proof of multi-replica orphan recovery against REAL Postgres (#1138) — the path mocks
+ * End-to-end proof of multi-replica orphan recovery against REAL Postgres — the path mocks
  * can't cover: a dead worker's RUNNING job is detected,
  * CAS-requeued back to QUEUED, and becomes claimable by a live poller.
  *
@@ -145,13 +145,9 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         assertThat(requeued.getWorkerId()).isNull();
         assertThat(requeued.getRetryCount()).isEqualTo(1);
 
-        // the requeue backs the job off (available_at = now + AgentJobBackoff), so it
-        // is deliberately NOT yet a poll candidate — see jobWithFutureAvailableAtIsNotClaimed below for
-        // that assertion. processJob's own SKIP LOCKED claim also gates
-        // on available_at <= now (closing the stale-poll-result race — see
-        // AgentJobRepository#findByIdQueuedForUpdateSkipLocked's javadoc), so a direct claim attempt
-        // made WHILE still backed off correctly does NOT succeed. Simulate the backoff having elapsed
-        // (a later poll, after available_at has passed) by fast-forwarding it directly.
+        // The requeue backs the job off, so it is deliberately not yet a poll candidate; processJob's
+        // own SKIP LOCKED claim also gates on available_at <= now. Fast-forward past the backoff to
+        // simulate a later poll attempting the claim.
         fastForwardAvailableAt(jobId);
 
         boolean claimed = executor.processJob(jobId);
@@ -181,9 +177,8 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         // for the old token even before considering the hash change.
         assertThat(jobRepository.findByJobTokenHashAndStatus(oldTokenHash, AgentJobStatus.RUNNING)).isEmpty();
 
-        // The new token authenticates once the job is claimed (RUNNING) again. (Finding
-        // #3): the claim now also gates on available_at, so fast-forward past the requeue's backoff
-        // first — see orphanRecoveryRequeuesAndBecomesClaimable's comment for the full reasoning.
+        // The new token authenticates once the job is claimed (RUNNING) again; the claim also gates on
+        // available_at, so fast-forward past the requeue's backoff first.
         fastForwardAvailableAt(jobId);
 
         boolean claimed = executor.processJob(jobId);

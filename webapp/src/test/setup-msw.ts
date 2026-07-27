@@ -26,8 +26,7 @@ if (typeof globalThis.ResizeObserver === "undefined") {
 	};
 }
 
-// jsdom has no `matchMedia`; the toaster asks it for `prefers-reduced-motion` on mount, so any test
-// that renders the app shell needs one. Reports "no match", which is the conservative answer.
+// jsdom has no `matchMedia`; the toaster asks it for `prefers-reduced-motion` on mount.
 if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
 	window.matchMedia = (query: string) =>
 		({

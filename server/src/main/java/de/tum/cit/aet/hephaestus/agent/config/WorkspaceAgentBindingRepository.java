@@ -12,12 +12,8 @@ public interface WorkspaceAgentBindingRepository extends JpaRepository<Workspace
     List<WorkspaceAgentBinding> findByWorkspaceId(Long workspaceId);
 
     /**
-     * Every binding of a workspace with its catalog model and that model's connection already
-     * fetched. The listing endpoint reports each binding's readiness, which resolves model →
-     * connection AFTER the loading transaction has closed (readiness must be judged outside a
-     * transaction — resolve() signals a revoked model by throwing, which would mark a shared
-     * transaction rollback-only). Without the fetch the detached rows would throw
-     * LazyInitializationException instead of answering.
+     * Every binding of a workspace with its model → connection graph fetched, so a caller can resolve
+     * readiness after the loading transaction has closed instead of hitting a lazy-init failure.
      */
     @Query(
         "SELECT b FROM WorkspaceAgentBinding b " +
@@ -29,15 +25,7 @@ public interface WorkspaceAgentBindingRepository extends JpaRepository<Workspace
 
     Optional<WorkspaceAgentBinding> findByWorkspaceIdAndPurpose(Long workspaceId, AgentPurpose purpose);
 
-    /**
-     * The binding with its catalog model AND that model's connection already fetched, for callers that
-     * run OUTSIDE a transaction. Both model associations are {@code LAZY}, and resolving a binding
-     * walks model → connection, so a plain lookup followed by {@code LlmModelResolver.resolve} throws
-     * {@code LazyInitializationException} once the session closes with the row. Fetching the whole
-     * graph in one query lets the readiness check stay non-transactional (which it must: resolve()
-     * signals revocation with an exception, and catching that inside a shared transaction would still
-     * mark it rollback-only).
-     */
+    /** As {@link #findByWorkspaceIdWithModels}, for one purpose. */
     @Query(
         "SELECT b FROM WorkspaceAgentBinding b " +
             "LEFT JOIN FETCH b.instanceModel im LEFT JOIN FETCH im.connection " +
@@ -57,12 +45,6 @@ public interface WorkspaceAgentBindingRepository extends JpaRepository<Workspace
         @Param("purpose") AgentPurpose purpose
     );
 
-    /**
-     * Is ANY workspace bound to this instance-catalog model? Asked by the instance admin before
-     * deleting the model, so it is deliberately cross-tenant: a binding in a workspace the operator
-     * has never heard of is exactly the one that must block the delete. Returns a boolean, never a
-     * row, so no tenant data crosses the boundary.
-     */
     @WorkspaceAgnostic("Instance-admin delete guard: a catalog model is in use if ANY workspace binds it")
     boolean existsByInstanceModelId(Long instanceModelId);
 

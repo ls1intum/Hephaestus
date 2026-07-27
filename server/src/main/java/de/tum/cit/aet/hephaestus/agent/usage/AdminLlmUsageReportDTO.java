@@ -7,12 +7,8 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The instance-admin cross-tenant rollup for one month.
- *
- * <p>An envelope rather than a bare array because {@code month} and {@code fx} are facts about the
- * REQUEST, not about any workspace in it: one month resolves to exactly one rate, so carrying them
- * per row would repeat one value N times and force a client to reach into {@code rows[0]} for a
- * response-level fact. Here there is exactly one place each of them can be read from.
+ * The instance-admin cross-tenant rollup for one month. An envelope rather than a bare array because
+ * {@code month} and {@code fx} are facts about the request, not about any workspace in it.
  */
 @Schema(description = "Instance-admin per-workspace month rollup (metadata only, no tenant content)")
 public record AdminLlmUsageReportDTO(
@@ -24,6 +20,6 @@ public record AdminLlmUsageReportDTO(
     )
     FxRateInfoDTO fx,
     @NonNull
-    @Schema(description = "One row per workspace with ledger activity this month")
+    @Schema(description = "One row per workspace, including workspaces with no ledger activity this month")
     List<AdminWorkspaceLlmUsageDTO> workspaces
 ) {}

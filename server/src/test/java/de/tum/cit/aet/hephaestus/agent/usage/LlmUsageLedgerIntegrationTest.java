@@ -461,10 +461,6 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(decision.workspaceFunded()).isEqualTo(LlmBudgetBlockReason.NONE);
     }
 
-    // The mirror of the case above — an unpriced OWN-PROVIDER event pausing only the workspace's own
-    // purse — is asserted through the report an admin actually reads by
-    // LlmUsageControllerIntegrationTest#anUnpricedOwnProviderEventPausesOnlyTheOwnProviderPurse.
-
     @Test
     void unverifiableUsageRetainsAdmissionProvenanceWithoutInventingACost() {
         Workspace workspace = setupWorkspace("ledger-uncosted");
@@ -479,13 +475,6 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(event.getAppliedPriceId()).isEqualTo(42L);
         assertThat(meterRegistry.counter("llm.usage.uncosted").count()).isEqualTo(uncostedBefore + 1);
     }
-
-    // An unpriced INSTANCE-funded month blocking the host's purse is asserted above, against the same
-    // SQL, by theWorkspacesOwnCapReadsOnlyOwnProviderLedgerRows; that the operator sees it as
-    // UNVERIFIABLE and paused is LlmUsageControllerIntegrationTest's
-    // usagePausedIsTrueOnAnUnverifiableMonthForACappedWorkspace. verdictFor's own table is
-    // LlmBudgetServiceTest.Verdict, and a zero cap pausing a submission with no spend at all is
-    // submitIsBlockedByTheWorkspacesOwnCapForOwnProviderDetection above.
 
     /**
      * raising or clearing either cap releases exactly the jobs the claim loop parked on that

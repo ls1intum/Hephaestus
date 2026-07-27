@@ -29,13 +29,11 @@ import lombok.ToString;
 import org.hibernate.annotations.ColumnDefault;
 
 /**
- * What model, and with what execution limits, a workspace runs a given {@link AgentPurpose} on
- *. Exactly one binding per {@code (workspace, purpose)} — the object the admin configures IS
- * the purpose→model binding, not a separately-named profile that is wired up elsewhere.
+ * What model, and with what execution limits, a workspace runs a given {@link AgentPurpose} on.
  *
- * <p>Routing and credentials live in the selected catalog model; this entity only binds that model to
- * execution limits. Exactly one of {@link #instanceModel} / {@link #workspaceModel} is set (a DB
- * CHECK enforces it); no row for a purpose means it is unconfigured (off).
+ * <p>Routing and credentials live in the selected catalog model. Exactly one of
+ * {@link #instanceModel} / {@link #workspaceModel} is set ({@code ck_workspace_agent_binding_single_model}
+ * enforces it); no row for a purpose means it is unconfigured (off).
  */
 @Entity
 @Table(
@@ -86,10 +84,6 @@ public class WorkspaceAgentBinding implements ModelBindingSource {
     @Column(name = "allow_internet", nullable = false)
     private boolean allowInternet = false;
 
-    /**
-     * Instance-catalog model this binding uses. Exactly one of {@code instanceModel} /
-     * {@code workspaceModel} is set (a DB CHECK enforces it).
-     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(
         name = "instance_model_id",
@@ -98,7 +92,6 @@ public class WorkspaceAgentBinding implements ModelBindingSource {
     @ToString.Exclude
     private LlmModel instanceModel;
 
-    /** Workspace BYO model this binding uses. Mutually exclusive with {@code instanceModel}. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(
         name = "workspace_model_id",
@@ -114,13 +107,8 @@ public class WorkspaceAgentBinding implements ModelBindingSource {
     private Instant updatedAt;
 
     /**
-     * Who pays for work run on this binding — the host (a shared instance-catalog model) or the
-     * workspace itself (its own connected provider). Exactly one of the two models is set, so this
-     * is total.
-     *
-     * <p>Safe on a detached binding: testing a lazy {@code @ManyToOne} field for {@code null} reads
-     * the association's presence, which Hibernate already knows from the row's foreign key — it does
-     * not dereference the proxy, so no session is required.
+     * Who pays for work run on this binding. Safe on a detached binding: null-testing a lazy
+     * {@code @ManyToOne} reads the foreign key Hibernate already holds and never touches the session.
      */
     public FundingSource getFundingSource() {
         return instanceModel != null ? FundingSource.INSTANCE : FundingSource.WORKSPACE;

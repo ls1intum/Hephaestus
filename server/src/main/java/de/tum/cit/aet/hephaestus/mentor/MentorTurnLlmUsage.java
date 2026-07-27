@@ -1,13 +1,8 @@
 package de.tum.cit.aet.hephaestus.mentor;
 
 /**
- * A mentor turn's accumulated LLM token totals, read from the {@code chat_message} row as a
- * projection rather than off a loaded entity — so it reflects every proxy call that has COMMITTED,
- * including ones that landed after the caller loaded the message.
- *
- * <p>The mentor counterpart of {@code AgentJobLlmUsage}. Read by the accounting paths that have to
- * bill a turn whose runner reported nothing: {@code MentorTurnPersistence} on interrupt, and
- * {@code MentorInFlightReaper} for a turn whose worker died without either.
+ * A mentor turn's accumulated LLM token totals, projected from the {@code chat_message} row rather
+ * than read off a loaded entity, so it reflects every proxy call that has committed.
  */
 public record MentorTurnLlmUsage(
     int totalCalls,

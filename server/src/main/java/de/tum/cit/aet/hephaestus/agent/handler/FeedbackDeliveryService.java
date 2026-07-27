@@ -85,13 +85,7 @@ class FeedbackDeliveryService {
         deliverFeedback(job, delivery, null);
     }
 
-    /**
-     * Delivery-recovery dedup lookup — see
-     * {@link PullRequestCommentPoster#findExistingSummaryComment}. Exposed here so {@link
-     * de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewHandler} (which only holds a reference to
-     * this service, not {@code PullRequestCommentPoster} directly) can implement {@link
-     * de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler#findExistingDelivery}.
-     */
+    /** @see PullRequestCommentPoster#findExistingSummaryComment */
     ExistingDeliveryLookup findExistingDeliveryCommentId(AgentJob job) {
         return commentPoster.findExistingSummaryComment(job);
     }
@@ -499,10 +493,7 @@ class FeedbackDeliveryService {
 
     static String formatPracticeNote(String sanitizedBody, AgentJob job) {
         var sb = new StringBuilder(sanitizedBody.length() + 512);
-        // the canonical marker helper — shared with
-        // PullRequestCommentPoster#findExistingSummaryComment's dedup lookup so a delivery-recovery
-        // retry's marker scan can actually match what this method just posted. See
-        // PullRequestCommentPoster#SUMMARY_MARKER_PREFIX's javadoc for the incident this fixes.
+        // Via the shared helper, never a literal: the dedup scan must match what this posts.
         sb.append(PullRequestCommentPoster.summaryMarkerFor(job)).append("\n");
         sb.append(sanitizedBody).append("\n\n");
         appendFooter(sb, job);

@@ -16,12 +16,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 /**
- * The workspace's own monthly cap on spend through its own connected provider.
- *
- * <p>The exact instrument an instance admin has over the host-funded purse
- * ({@code PUT /admin/workspaces/{workspaceSlug}/llm/budget}), for the money this workspace actually
- * pays: same path tail, same body, same audit shape. It cannot touch the host-funded cap, so a
- * workspace admin can only ever restrict their own spending, never loosen the instance's protection.
+ * The workspace's own monthly cap on spend through its own connected provider. The host-funded purse
+ * has its own cap at {@code PUT /admin/workspaces/{workspaceSlug}/llm/budget}, which this cannot touch.
  */
 @WorkspaceScopedController
 @RequestMapping("/llm/budget")

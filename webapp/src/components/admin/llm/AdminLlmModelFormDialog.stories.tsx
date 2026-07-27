@@ -60,7 +60,6 @@ export const EditModel: Story = {
 	args: { editing: mockModel },
 };
 
-/** Existing-model access is intentionally managed only through the dedicated Access dialog. */
 export const EditKeepsAccessSeparate: Story = {
 	args: { editing: mockModel },
 	play: async () => {
@@ -77,13 +76,8 @@ export const ValidationError: Story = {
 };
 
 /**
- * Seven fields, the price editor and the workspace picker — past 1000 px — at the WCAG 2.2
- * SC 1.4.10 reflow width (320 px). Only the body scrolls, so the title stays pinned and "Add model"
- * stays reachable.
- *
- * The tallest dialog in the app, which is why the full proof lives here: `DialogBody` is shared, so
- * whatever bounds this one bounds every shorter dialog too. The other four only check they fit the
- * viewport — the assertion that would fail first if one of them ever outgrew that shared bound.
+ * At the WCAG 2.2 SC 1.4.10 reflow width (320 px). Proves `DialogBody`'s bound: only the body
+ * scrolls, so the title stays pinned and "Add model" reachable.
  */
 export const MobileReflow: Story = {
 	parameters: {

@@ -6,16 +6,12 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
- * ⚠️ Diverges from the shadcn registry.
+ * ⚠️ Diverges from the shadcn registry — re-vendoring drops the following; re-apply them.
  *
- * 1. `AlertDialogContent`: a `w-[calc(100%-2rem)]` gutter (upstream's `w-full` runs edge to edge at
- *    exactly 320 px, where `max-w-xs` stops clamping) and the same height bound `DialogContent`
- *    carries, for the same reason (WCAG 2.2 SC 1.4.10). Alert dialogs are short by contract, so the
- *    whole popup scrolls and there is no body to pin.
- * 2. `AlertDialogClose` — exported here, absent from the registry's own export block, for callers
- *    that need a dismiss control outside the Cancel/Action pair.
- *
- * Re-vendoring drops both; re-apply them.
+ * 1. `AlertDialogContent` gets a gutter (upstream's `w-full` runs edge to edge at exactly 320 px,
+ *    where `max-w-xs` stops clamping) and the height bound `DialogContent` carries, for the same
+ *    reason (WCAG 2.2 SC 1.4.10).
+ * 2. `AlertDialogClose` is exported, for callers needing a dismiss outside the Cancel/Action pair.
  */
 function AlertDialog({ ...props }: AlertDialogPrimitive.Root.Props) {
 	return <AlertDialogPrimitive.Root data-slot="alert-dialog" {...props} />;
@@ -57,9 +53,7 @@ function AlertDialogContent({
 				data-size={size}
 				className={cn(
 					"data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 bg-background ring-foreground/10 gap-4 rounded-xl p-4 ring-1 duration-100 data-[size=default]:max-w-xs data-[size=sm]:max-w-xs data-[size=default]:sm:max-w-sm group/alert-dialog-content fixed top-1/2 left-1/2 z-50 grid -translate-x-1/2 -translate-y-1/2 outline-none",
-					// A gutter at every width, without fighting the `data-[size=…]` max-widths on specificity.
-					"w-[calc(100%-2rem)]",
-					"max-h-[calc(100svh-2rem)] overflow-y-auto overscroll-contain",
+					"w-[calc(100%-2rem)] max-h-[calc(100svh-2rem)] overflow-y-auto overscroll-contain",
 					className,
 				)}
 				{...props}

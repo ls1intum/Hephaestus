@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.core.spi;
 
 import java.util.Objects;
-import java.util.Optional;
 
 /**
  * Root feedback SPI — every kind that declares {@link Capability#FEEDBACK_DELIVERY}
@@ -35,28 +34,12 @@ public interface FeedbackChannel {
     }
 
     /**
-     * Best-effort dedup lookup for the delivery-recovery crash window: search the target's
-     * existing comments for one carrying {@code marker} (the invisible HTML-comment marker every summary
-     * post embeds, e.g. {@code PullRequestCommentPoster.SUMMARY_MARKER_PREFIX + jobId}), so a
-     * delivery-recovery retry can record the already-posted comment's id instead of posting a duplicate.
+     * Search the target's existing comments for one carrying {@code marker}, so a delivery-recovery retry
+     * after a crash can record the already-posted comment instead of posting a duplicate.
      *
-     * <p><b>Tri-state, not a boolean.</b> A prior {@link Optional}-based
-     * signature collapsed "confirmed absent" and "could not determine" into the same empty value — every
-     * lookup failure (rate limit, transport error, GraphQL error) or unsupported channel silently fell
-     * through to "proceed and post", which is only safe for a CONFIRMED absence. On an actual error, that
-     * meant every crash-then-recover cycle risked a duplicate post instead of erring toward "leave it
-     * PENDING and try again later". {@link ExistingSummaryLookup.Kind#FOUND} is the only signal a caller
-     * should record-and-skip-posting on; {@link ExistingSummaryLookup.Kind#ABSENT} is the only signal a
-     * caller should proceed to post on; {@link ExistingSummaryLookup.Kind#UNKNOWN} means neither — the
-     * caller must leave the delivery {@code PENDING} for a later recovery attempt (and, once the attempt
-     * cap is exhausted, fail the delivery with a clear message rather than guess).
-     *
-     * <p>Default {@code UNKNOWN} — a channel implements {@code FOUND}/{@code ABSENT} only when a
-     * cheap-enough existing-listing query is available AND can distinguish "searched everything, nothing
-     * matched" from "could not search". A channel that keeps the default never auto-reposts: it can only
-     * record a found match or exhaust its attempt cap. Deliberately NOT called
-     * on the normal (non-recovery) delivery path — it costs an extra provider call, which is only worth
-     * paying when a crash has already put a job's delivery status in doubt.
+     * <p>Only {@code ABSENT} licenses posting: a channel that cannot distinguish "searched everything,
+     * nothing matched" from "could not search" must answer {@code UNKNOWN} (the default), and the caller
+     * must then leave the delivery {@code PENDING} rather than risk a second summary.
      */
     default ExistingSummaryLookup findExistingSummary(FeedbackTarget target, String marker) {
         return ExistingSummaryLookup.unknown();
@@ -94,10 +77,6 @@ public interface FeedbackChannel {
     /** Vendor-side post identifier recorded on {@code FeedbackPlacement.external_ref} for edit-in-place (ADR 0021 C6). */
     record SummaryHandle(String externalId) {}
 
-    /**
-     * Tri-state result of {@link #findExistingSummary} — see that method's
-     * javadoc for why this is not a boolean/{@link Optional}.
-     */
     record ExistingSummaryLookup(Kind kind, SummaryHandle handle) {
         public enum Kind {
             /** A comment carrying the marker was found. */

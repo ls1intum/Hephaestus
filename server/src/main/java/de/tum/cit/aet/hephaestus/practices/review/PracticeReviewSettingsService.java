@@ -59,9 +59,8 @@ public class PracticeReviewSettingsService {
     }
 
     /**
-     * Locking variant for the audited writes: the before-snapshot and the mutation must be serialized,
-     * or two concurrent PATCHes both snapshot the same prior state and the audit trail records a
-     * transition the second write silently reverts.
+     * Locking variant for the audited write: unserialized, two concurrent PATCHes snapshot the same
+     * prior state and the audit trail records a transition the second write silently reverts.
      */
     private Workspace requireWorkspaceForUpdate(WorkspaceContext workspaceContext) {
         return workspaceRepository

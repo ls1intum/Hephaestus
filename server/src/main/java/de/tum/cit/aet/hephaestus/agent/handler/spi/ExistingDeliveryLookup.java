@@ -3,12 +3,9 @@ package de.tum.cit.aet.hephaestus.agent.handler.spi;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Tri-state result of {@link JobTypeHandler#findExistingDelivery} —
- * mirrors {@code FeedbackChannel.ExistingSummaryLookup} one layer up, at the handler/delivery-recovery
- * boundary. See {@link JobTypeHandler#findExistingDelivery}'s javadoc for why a boolean/{@code Optional}
- * is not enough here: collapsing "confirmed not delivered" and "could not determine" into the same value
- * made every dedup-lookup failure silently fall through to "post again", risking a duplicate on exactly
- * the crash-recovery path this check exists to protect.
+ * Tri-state result of {@link JobTypeHandler#findExistingDelivery}. Deliberately not an
+ * {@code Optional}: collapsing "confirmed absent" and "could not determine" makes every failed lookup
+ * fall through to posting again.
  */
 public record ExistingDeliveryLookup(Kind kind, @Nullable String commentId) {
     public enum Kind {

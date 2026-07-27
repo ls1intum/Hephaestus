@@ -34,36 +34,34 @@ public class LlmAdmissionService {
             binding.getId() != null
                 ? bindingRepository
                       .findByWorkspaceIdAndPurposeForUpdate(binding.getWorkspace().getId(), binding.getPurpose())
-                      .orElseThrow(() ->
-                          new IllegalStateException("The configured OpenAI-compatible model is not available")
-                      )
+                      .orElseThrow(LlmAdmissionService::modelUnavailable)
                 : binding;
         return admitLocked(locked);
     }
 
+    private static IllegalStateException modelUnavailable() {
+        return new IllegalStateException("The configured OpenAI-compatible model is not available");
+    }
+
     private AdmittedLlmModel admitLocked(ModelBindingSource locked) {
         if (!locked.isEnabled()) {
-            throw new IllegalStateException("The configured OpenAI-compatible model is not available");
+            throw modelUnavailable();
         }
-        // The same row lock is taken by activation/repricing. Admission therefore observes one
-        // executable model+price state, never an activation/reprice half-state.
+        // The same row lock is taken by activation/repricing, so admission never observes an
+        // activation/reprice half-state.
         if (locked.getInstanceModel() != null) {
             modelRepository
                 .findByIdForUpdate(locked.getInstanceModel().getId())
-                .orElseThrow(() ->
-                    new IllegalStateException("The configured OpenAI-compatible model is not available")
-                );
+                .orElseThrow(LlmAdmissionService::modelUnavailable);
         } else if (locked.getWorkspaceModel() != null) {
             workspaceModelRepository
                 .findByIdAndWorkspaceIdForUpdate(locked.getWorkspaceModel().getId(), locked.getWorkspace().getId())
-                .orElseThrow(() ->
-                    new IllegalStateException("The configured OpenAI-compatible model is not available")
-                );
+                .orElseThrow(LlmAdmissionService::modelUnavailable);
         }
         var resolved = resolver.resolve(locked);
         var ref = resolver.connectionRef(locked);
         if (ref.scope() == null || ref.modelId() == null || ref.workspaceId() == null) {
-            throw new IllegalStateException("The configured OpenAI-compatible model is not available");
+            throw modelUnavailable();
         }
         LlmPriceSnapshot price = switch (ref.scope()) {
             case INSTANCE -> instancePrice(ref.modelId());
@@ -82,7 +80,7 @@ public class LlmAdmissionService {
     private LlmPriceSnapshot workspacePrice(Long modelId, Long workspaceId) {
         WorkspaceLlmModel model = workspaceModelRepository
             .findByIdAndWorkspaceId(modelId, workspaceId)
-            .orElseThrow(() -> new IllegalStateException("The configured OpenAI-compatible model is not available"));
+            .orElseThrow(LlmAdmissionService::modelUnavailable);
         return snapshot(model.getPricingMode(), FundingSource.WORKSPACE, null, model.getId(), model);
     }
 
@@ -134,11 +132,6 @@ public class LlmAdmissionService {
         @Nullable BigDecimal cacheRead,
         @Nullable BigDecimal cacheWrite
     ) {
-        // Exhaustive switch, not valueOf(mode.name()): the declared intent (PricingMode) and the
-        // recorded outcome (PricingState) are separate enums that evolve on their own schedules, and
-        // a name-identity translation would turn a new PricingMode constant into an
-        // IllegalArgumentException inside this @Transactional admission. Here the compiler refuses to
-        // build until the new constant has an answer.
         PricingState state = switch (mode) {
             case PRICED -> PricingState.PRICED;
             case NO_CHARGE -> PricingState.NO_CHARGE;

@@ -94,10 +94,8 @@ class SsrfGuardedResolverGroupTest extends BaseUnitTest {
     }
 
     /**
-     * the loopback-exempt variant (used by the LLM proxy/probe when
-     * {@code hephaestus.llm.egress.allow-loopback=true}) lets a resolved loopback address through but
-     * still blocks every other private/reserved range — a rebind to a non-loopback private address must
-     * not be laundered through the exemption.
+     * Used by the LLM proxy/probe when {@code hephaestus.llm.egress.allow-loopback=true}: a rebind to a
+     * non-loopback private address must not be laundered through the exemption.
      */
     @Nested
     class LoopbackExemption {

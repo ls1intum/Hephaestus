@@ -21,7 +21,6 @@ export interface PriceModeValue {
 }
 
 export interface PriceModeEditorProps {
-	/** Instance admin sets a price for everyone; a workspace admin sets it for their own connection. */
 	audience: "instance" | "workspace";
 	value: PriceModeValue;
 	onChange: (value: PriceModeValue) => void;
@@ -29,13 +28,8 @@ export interface PriceModeEditorProps {
 	idPrefix: string;
 }
 
-/**
- * The price radio + fields shared by the instance model form and the workspace's own-provider model
- * form. The two "no rate" options are worded by {@link priceLabel}, the one owner of
- * that vocabulary, so the radio a model's price was chosen on and the label the tables print for it
- * cannot drift: an instance model with no price reads "No price set" and a workspace model reads
- * "Price not set", in both places.
- */
+/** The price radio + fields shared by both model forms. The "no rate" options are worded by
+ * {@link priceLabel} so the radio and the label the tables print cannot drift apart. */
 export function PriceModeEditor({
 	audience,
 	value,
@@ -100,9 +94,6 @@ export function PriceModeEditor({
 	];
 
 	return (
-		// A fieldset, not a Field: these are one question with several answers and then the answer's own
-		// inputs, which is what a legend is for. The RadioGroup still carries its own name — a
-		// `role="radiogroup"` element is not named by the enclosing legend.
 		<FieldSet>
 			<FieldLegend variant="label">Price</FieldLegend>
 			<FieldDescription>

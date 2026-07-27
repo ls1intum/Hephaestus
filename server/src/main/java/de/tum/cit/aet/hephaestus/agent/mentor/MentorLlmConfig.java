@@ -9,14 +9,8 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Slim projection of the LLM fields that {@link MentorPiAdapter} needs to build a sandbox spec.
- * Decouples the mentor module from the workspace's agent binding.
- *
- * <p>Routes through {@link LlmModelResolver} — the same resolved, non-secret behaviour shape
- * ({@code ResolvedLlmModel}) the practice-review path freezes into {@code ConfigSnapshot}. It carries
- * the resolved capabilities (context window, max output tokens) rather than having the mentor runner
- * hardcode them, and gives the mentor the SAME connection-scoped, live credential resolution the
- * proxy performs for one-shot jobs.
+ * Slim projection of the LLM fields that {@link MentorPiAdapter} needs to build a sandbox spec — the
+ * same resolved, non-secret shape the practice-review path freezes into {@code ConfigSnapshot}.
  */
 public record MentorLlmConfig(
     String apiProtocol,

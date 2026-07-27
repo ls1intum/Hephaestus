@@ -197,14 +197,8 @@ export const UsersWithoutTeams: Story = {
 	},
 };
 
-/**
- * Fifty users at ten a page, so the pager is on screen — the shared `TablePagination`, whose window,
- * gaps and boundary behaviour are stated once in its own stories rather than re-checked here.
- */
 export const ManyUsers: Story = {
 	args: {
-		// Deterministic team assignment: this story is a Chromatic snapshot, and `Math.random()` here
-		// would repaint the Teams column on every run.
 		users: Array.from({ length: 50 }, (_, i) => ({
 			id: i + 10,
 			login: `user${i + 1}`,

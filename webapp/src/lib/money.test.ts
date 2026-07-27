@@ -3,8 +3,6 @@ import { formatCapUsd, formatCostUsd, formatRateUsd } from "./money";
 
 describe("formatCostUsd", () => {
 	it("renders nothing spent as $0, with no decimals at all", () => {
-		// Zero is the one amount worth stating flat: "$0.00" reads as a measurement that came back
-		// zero, "$0" as nothing having happened, which is what it means on a spend column.
 		expect(formatCostUsd(0)).toBe("$0");
 	});
 
@@ -38,8 +36,6 @@ describe("formatCapUsd", () => {
 
 describe("formatRateUsd", () => {
 	it("keeps the digits the provider published rather than clamping to cents", () => {
-		// A rate is not a spend figure. Clamped to cents, a real $0.075 / 1M rate reads as "$0.08" —
-		// 6.7% off the number the admin is asked to check against their provider's price list.
 		expect(formatRateUsd(0.075)).toBe("$0.075");
 		expect(formatRateUsd(0.003)).toBe("$0.003");
 		expect(formatCostUsd(0.003)).toBe("<$0.01");

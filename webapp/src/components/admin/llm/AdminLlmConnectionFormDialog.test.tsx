@@ -67,9 +67,6 @@ describe("AdminLlmConnectionFormDialog", () => {
 		const onProbeSaved = vi.fn();
 		renderDialog({ editing: connection, onProbe, onProbeSaved });
 
-		// Typing a key relabels the one test control, so the admin is told which credential is about to
-		// be tried before pressing it. The label is the whole affordance — without it the two probes
-		// are indistinguishable on screen.
 		expect(screen.getByRole("button", { name: "Test saved connection" })).toBeTruthy();
 		fireEvent.change(screen.getByLabelText("API key"), { target: { value: "replacement-key" } });
 		expect(screen.queryByRole("button", { name: "Test saved connection" })).toBeNull();
@@ -84,8 +81,6 @@ describe("AdminLlmConnectionFormDialog", () => {
 	});
 
 	it("refuses an endpoint that smuggles a credential into the URL", () => {
-		// `noValidate` makes `type="url"` inert, so nothing native catches this; a query string on a
-		// gateway URL is how an API key ends up in logs and snapshots, and the server rejects it.
 		const onCreate = vi.fn();
 		renderDialog({ onCreate });
 		fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "Gateway" } });
@@ -95,8 +90,6 @@ describe("AdminLlmConnectionFormDialog", () => {
 
 		fireEvent.click(screen.getByRole("button", { name: "Save inactive connection" }));
 
-		// The wording is `llm-form-validation`'s and is stated there; what this dialog is answerable
-		// for is that the shared rule runs on this field and that its words reach the reader unaltered.
 		const rejection = validateLlmConnectionForm({
 			displayName: "Gateway",
 			baseUrl: "https://gw.example.com/v1?api-key=SECRET",
@@ -107,9 +100,6 @@ describe("AdminLlmConnectionFormDialog", () => {
 	});
 
 	it("keeps a probe result while the connection is being named", () => {
-		// The probe answers a question about an endpoint and a credential; the display name is not one
-		// of its inputs, so naming the connection afterwards must not throw the discovery away — the
-		// model form's datalist is seeded from it.
 		const onProbe = vi.fn();
 		const onProbed = vi.fn();
 		renderDialog({ onProbe, onProbed });

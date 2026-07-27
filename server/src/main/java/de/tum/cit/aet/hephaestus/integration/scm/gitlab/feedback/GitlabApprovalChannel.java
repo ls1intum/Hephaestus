@@ -21,10 +21,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  * GitLab adapter for {@link ApprovalChannel}: approves a merge request through the REST
  * {@code POST /projects/:id/merge_requests/:iid/approve} endpoint.
  *
- * <p>REST, not GraphQL, because GitLab has no approval mutation — the same reason
- * {@link de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabWebhookClient} uses REST for webhooks.
- * (This channel previously sent a {@code mergeRequestApprove} mutation, which GitLab's schema has never
- * defined; every approval failed with an undefined-field error.)
+ * <p>REST, not GraphQL, because GitLab's schema defines no approval mutation.
  *
  * <p>Gated on {@code hephaestus.integration.gitlab.enabled=true} to track {@link GitLabGraphQlClientProvider}.
  */
@@ -74,8 +71,7 @@ public class GitlabApprovalChannel implements ApprovalChannel {
                 .toBodilessEntity()
                 .block(REQUEST_TIMEOUT);
         } catch (WebClientResponseException e) {
-            // GitLab answers 401 when the token's user may not approve this MR at all — most often because it
-            // authored it. Naming that keeps a permanent, unretryable condition from reading as a flaky call.
+            // GitLab answers 401, not 403, when the token's user may not approve this MR — usually its author.
             throw new FeedbackDeliveryException(
                 "GitLab approve failed for " +
                     mr.projectPath() +
@@ -98,10 +94,9 @@ public class GitlabApprovalChannel implements ApprovalChannel {
     }
 
     /**
-     * Builds the approval endpoint as a ready-made {@link URI} so no URI-template expansion can re-encode the
-     * {@code %2F} separators: GitLab addresses a project by its full path only in percent-encoded form, and a
-     * double-encoded {@code %252F} resolves to no project at all. Project and namespace paths are restricted
-     * to unreserved characters, so escaping the separators is the whole encoding.
+     * A ready-made {@link URI} so no template expansion re-encodes the {@code %2F} separators GitLab requires
+     * in a project's full path — a double-encoded {@code %252F} resolves to no project at all. Namespace and
+     * project paths are restricted to unreserved characters, so escaping the separators is the whole encoding.
      */
     private static URI approvalUri(String serverUrl, MrCoordinates mr) {
         String base = serverUrl.endsWith("/") ? serverUrl.substring(0, serverUrl.length() - 1) : serverUrl;

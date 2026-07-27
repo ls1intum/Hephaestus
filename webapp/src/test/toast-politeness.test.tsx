@@ -4,13 +4,10 @@ import { describe, expect, it } from "vitest";
 import { Toaster } from "@/components/ui/sonner";
 
 /**
- * A tripwire on a dependency, not a test of our own code.
- *
- * `ui/sonner.tsx` carries the reasoning: sonner offers no way to announce an error toast
- * assertively, so every toast in the app is polite. That verdict is only trustworthy while it stays
- * true, and a silent `pnpm update` is exactly how it would stop being true without anyone noticing.
- * Each assertion below therefore fails *when upstream fixes this* — a red suite here means go read
- * emilkowalski/sonner#765, route `toast.error` to an assertive region, and delete this file.
+ * A tripwire on the dependency, not a test of our own code: sonner offers no way to announce an
+ * error toast assertively, so every toast in the app is polite. These fail *when upstream fixes
+ * that* — then route `toast.error` to an assertive region (emilkowalski/sonner#765) and delete this
+ * file.
  */
 describe("sonner toast politeness", () => {
 	it("announces an error toast politely, because there is no per-toast role to set", async () => {
@@ -21,16 +18,12 @@ describe("sonner toast politeness", () => {
 		const region = document.querySelector("section[aria-live]");
 		expect(region?.getAttribute("aria-live")).toBe("polite");
 
-		// And nothing inside it announces itself either: an error toast enters the accessible tree as
-		// text in a polite region, never as an alert. The day sonner gives the toast a role of its own,
-		// this fails and the verdict above needs revisiting.
+		// Nor does the toast announce itself: the day sonner gives it a role, this fails.
 		expect(screen.queryByRole("alert")).toBeNull();
 	});
 
 	it("drops an aria-live override rather than forwarding it to the container", async () => {
-		// `ToasterProps` has no politeness prop, and the container is built from a closed set of
-		// attributes with no rest-spread — so even smuggling one past the type system changes nothing.
-		// If this ever lands on the DOM, sonner has gained the passthrough and the verdict is stale.
+		// The cast smuggles a prop past `ToasterProps`, which has none for politeness.
 		render(<Toaster {...({ "aria-live": "assertive" } as object)} />);
 		toast.error("Could not save the model");
 

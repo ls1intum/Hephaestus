@@ -171,8 +171,6 @@ class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         assertThat(afterSecondPrice.currentPrice().per1mInputUsd()).isEqualByComparingTo("3.00");
         assertThat(afterSecondPrice.currentPrice().per1mOutputUsd()).isEqualByComparingTo("4.00");
 
-        // GET after two supersedes still reports exactly the current (second) price — the superseded
-        // first price row is never surfaced through this endpoint.
         LlmModelDTO fetched = webTestClient
             .get()
             .uri("/admin/llm/models/{id}", model.id())
@@ -216,7 +214,6 @@ class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         assertThat(afterGrant.grantedWorkspaceIds()).containsExactly(workspaceA.getId());
         assertThat(afterGrant.grantedWorkspaceIds()).doesNotContain(workspaceB.getId());
 
-        // Replacing the selected set drops the old grant and keeps only the new one.
         var replaceRequest = new UpdateLlmModelSharingRequestDTO(ModelVisibility.GRANTED, List.of(workspaceB.getId()));
         LlmModelDTO afterReplace = webTestClient
             .put()
@@ -233,7 +230,6 @@ class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         assertThat(afterReplace).isNotNull();
         assertThat(afterReplace.grantedWorkspaceIds()).containsExactly(workspaceB.getId());
 
-        // Switching back to PUBLIC clears the grant set entirely.
         var publicRequest = new UpdateLlmModelSharingRequestDTO(ModelVisibility.PUBLIC, null);
         LlmModelDTO afterPublic = webTestClient
             .put()

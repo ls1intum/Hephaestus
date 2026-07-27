@@ -16,27 +16,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Monthly LLM budget cap evaluation. The cap is a backstop, not a hard reservation: checks read the
- * ledger directly (indexed month-window SUM, no cache), and the ledger only gains a row when an agent
- * job or mentor turn ENDS — so work that is running right now has spent nothing as far as {@link
- * #decide} is concerned. That eventual consistency is an accepted property of the design for the
- * admission gates, which only decide whether a job may START. The one gate that must also bound a run
- * already in progress — the LLM proxy — reads {@link #headroom} instead and adds the calling attempt's
- * consumed-but-unrecorded spend itself.
+ * Monthly LLM budget cap evaluation over calendar months in UTC.
  *
- * <p>Budget months are calendar months in UTC. A budget of exactly 0 is an immediate pause switch;
- * {@code null} is uncapped.
- *
- * <p><b>The policy, stated once.</b> There are two purses, each judged against its own cap and never
- * summed: the host's shared models and the workspace's own provider. The host's exhausted budget must
- * not pause work the workspace pays for itself, and vice versa. An uncapped purse is never blocked. A
- * capped purse whose month is UNVERIFIABLE — some event funded from it has no resolvable price, so its
- * true spend cannot be confirmed — is blocked exactly like an exhausted one, because a cap you cannot
+ * <p>There are two purses, each judged against its own cap and never summed: the host's shared models
+ * and the workspace's own provider. A capped purse whose month is UNVERIFIABLE — some event funded from
+ * it has no resolvable price — is blocked exactly like an exhausted one, because a cap you cannot
  * verify is not a cap.
  *
- * <p>Enforced at {@code AgentJobService.submit} (all sandboxed detection work),
- * {@code AgentJobExecutor}'s claim-time recheck, and {@code MentorChatService.runTurnInternal} (web SSE
- * and Slack turns alike).
+ * <p>The ledger only gains a row when an agent job or mentor turn ENDS, so {@link #decide} is blind to
+ * work running right now. A gate that must also bound a run already in progress reads {@link #headroom}
+ * and adds the in-flight spend itself.
  */
 @Service
 public class LlmBudgetService {
@@ -58,26 +47,19 @@ public class LlmBudgetService {
     }
 
     /**
-     * <b>The submission gate.</b> Asks {@link #decide}'s question and also performs the block's
-     * observability, so no caller has to remember to log and count a refusal.
-     *
-     * @return true when work funded by {@code fundingSource} is blocked; the caller simply skips the
-     *     submission, since the block is already logged and counted here.
+     * The submission gate: logs and counts the refusal itself, so a caller that gets {@code true} back
+     * simply skips the submission.
      */
     @Transactional(readOnly = true)
     public boolean blockSubmission(Workspace workspace, String jobType, @Nullable FundingSource fundingSource) {
-        // Both the log word and the metric tag name the purse that ACTUALLY blocked. An unattributable
-        // call is judged against both caps, so the blocking purse is not always the one the caller
-        // assumed — deriving the label from the requested funding source would file a BYO block under
-        // the instance cap.
         LlmBudgetDecision.Block block = headroom(workspace).decide().decideFor(fundingSource);
         if (!block.blocked()) {
             return false;
         }
         log.info(
             "Skipping agent job submission — {} monthly LLM budget {}: workspaceId={}, jobType={}",
-            block.purse() == FundingSource.WORKSPACE ? "own-provider" : "shared-model",
-            block.reason() == LlmBudgetBlockReason.EXHAUSTED ? "exhausted" : "unverifiable (some spend has no price)",
+            purseLabel(block.purse()),
+            reasonLabel(block.reason()),
             workspace.getId(),
             jobType
         );
@@ -85,25 +67,26 @@ public class LlmBudgetService {
         return true;
     }
 
+    private static String purseLabel(@Nullable FundingSource purse) {
+        return purse == FundingSource.WORKSPACE ? "own-provider" : "shared-model";
+    }
+
+    private static String reasonLabel(LlmBudgetBlockReason reason) {
+        return reason == LlmBudgetBlockReason.EXHAUSTED ? "exhausted" : "unverifiable (some spend has no price)";
+    }
+
     private static String capTag(@Nullable FundingSource purse) {
         return purse == FundingSource.WORKSPACE ? "byo" : "instance";
     }
 
-    /**
-     * <b>Is this workspace blocked, and why?</b> The verdict every gate that only decides whether work
-     * may START asks — job submission, the claim-time recheck, and a mentor turn.
-     */
     @Transactional(readOnly = true)
     public LlmBudgetDecision decide(Long workspaceId) {
         return headroom(workspaceId).decide();
     }
 
     /**
-     * <b>How much room is left, as numbers?</b> The same month-window reads as {@link #decide}, handed
-     * back before they become a verdict, so a caller that can see spend the ledger cannot — today only
-     * the LLM proxy, which knows the calling attempt's already-consumed tokens — can add it before the
-     * cap comparison. Every verdict this class produces comes from this one read, so the gate that
-     * pauses work and the number an admin is shown can never come from different arithmetic.
+     * The same month-window reads as {@link #decide}, handed back as numbers, so a caller that can see
+     * spend the ledger cannot yet — the LLM proxy, mid-attempt — can add it before the cap comparison.
      */
     @Transactional(readOnly = true)
     public LlmBudgetHeadroom headroom(Long workspaceId) {
@@ -146,8 +129,8 @@ public class LlmBudgetService {
     }
 
     /**
-     * A purse already EXHAUSTED on recorded spend alone never runs the unpriced probe: EXHAUSTED
-     * outranks UNVERIFIABLE, and adding in-flight spend can only keep it exhausted.
+     * A purse already exhausted on recorded spend alone skips the probe: EXHAUSTED outranks
+     * UNVERIFIABLE, and adding in-flight spend can only keep it exhausted.
      */
     private static boolean probeUnpriced(
         @Nullable BigDecimal spentUsd,
@@ -161,34 +144,14 @@ public class LlmBudgetService {
     }
 
     /**
-     * <b>The cap comparison, written once.</b> Both the live gate ({@link LlmBudgetHeadroom#decideWith},
-     * which pauses work) and the reported verdict ({@link #verdictFor}, which tells the admin why) ask
-     * this one question, so the number a workspace sees can never disagree with the number that paused
-     * it.
-     *
-     * <p>Inclusive: reaching the cap exhausts it. That makes a cap of exactly 0 an immediate pause
-     * switch, which is the only reading under which "set the budget to zero" stops anything.
-     *
-     * @param confirmedSpendUsd this window's priced spend from the purse being judged
-     * @param budgetUsd that purse's cap; {@code null} = uncapped, never reached
+     * The cap comparison, written once so the live gate and the reported verdict can never disagree.
+     * Inclusive: a cap of exactly 0 is therefore an immediate pause switch.
      */
     static boolean capReached(BigDecimal confirmedSpendUsd, @Nullable BigDecimal budgetUsd) {
         return budgetUsd != null && confirmedSpendUsd.compareTo(budgetUsd) >= 0;
     }
 
-    /**
-     * <b>What does a month look like, given its numbers?</b> The one entry point that takes the spend
-     * instead of reading it, for the two rollups that already have it from a GROUP BY — the
-     * workspace-scoped and instance-admin usage reports. {@code EXHAUSTED} outranks
-     * {@code UNVERIFIABLE}: both pause a capped purse, and a month already over its cap on confirmed
-     * spend alone names the reason an admin can act on, so the softer wording only surfaces while the
-     * ledger still cannot rule EXHAUSTED out.
-     *
-     * @param confirmedSpendUsd this window's confirmed spend from the purse being judged
-     * @param hasUnpricedEvent whether an event funded from that purse this window has no resolvable price
-     * @param monthlyBudgetUsd that purse's cap; {@code null} = uncapped (never EXHAUSTED, and
-     *     UNVERIFIABLE there is a data-quality note only — an uncapped purse is never paused)
-     */
+    /** The verdict for a purse whose spend the caller already has, rather than read here. */
     public static LlmBudgetVerdict verdictFor(
         BigDecimal confirmedSpendUsd,
         boolean hasUnpricedEvent,

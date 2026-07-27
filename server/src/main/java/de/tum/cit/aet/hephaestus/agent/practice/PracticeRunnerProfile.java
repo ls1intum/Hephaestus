@@ -14,11 +14,7 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
 
     public static final String SCRIPT = "pi-runner.mjs";
 
-    /**
-     * {@code pi-runner.mjs} imports {@code ./pi-finding-normalize.mjs} and the shared
-     * {@code ./pi-provider.mjs} provider-registration helper — stage both beside the
-     * runner.
-     */
+    /** Imported by {@link #SCRIPT} with a relative specifier, so both must be staged beside it. */
     private static final List<String> SIDECARS = List.of(
         "pi-finding-normalize.mjs",
         SandboxLayout.PROVIDER_HELPER_FILENAME
