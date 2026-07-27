@@ -9,7 +9,6 @@ import jakarta.persistence.ForeignKey;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
@@ -32,17 +31,13 @@ import org.jspecify.annotations.Nullable;
 @Entity
 @Table(
     name = "llm_model",
-    indexes = {
-        // A unique INDEX, not a unique constraint: that is how the changelog creates it, and the
-        // drift check compares like for like. Enforcement is identical, and #create catches this
-        // name when two concurrent creates race.
-        @Index(
-            name = "ux_llm_model_connection_upstream",
-            columnList = "connection_id, upstream_model_id",
-            unique = true
-        ),
-    },
     uniqueConstraints = {
+        // Declared so the ddl-auto test schema matches production, where the changelog creates the
+        // same constraint. LlmModelService#create catches this name when two concurrent creates race.
+        @UniqueConstraint(
+            name = "ux_llm_model_connection_upstream",
+            columnNames = { "connection_id", "upstream_model_id" }
+        ),
         @UniqueConstraint(name = "ux_llm_model_connection_slug", columnNames = { "connection_id", "slug" }),
     }
 )

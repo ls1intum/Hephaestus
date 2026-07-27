@@ -510,10 +510,8 @@
         <createIndex tableName="llm_model" indexName="idx_llm_model_connection">
             <column name="connection_id"/>
         </createIndex>
-        <createIndex tableName="llm_model" indexName="ux_llm_model_connection_upstream" unique="true">
-            <column name="connection_id"/>
-            <column name="upstream_model_id"/>
-        </createIndex>
+        <addUniqueConstraint tableName="llm_model" columnNames="connection_id, upstream_model_id"
+            constraintName="ux_llm_model_connection_upstream"/>
         <sql splitStatements="false"><![CDATA[
             ALTER TABLE llm_model ADD CONSTRAINT ck_llm_model_visibility
                 CHECK (visibility IN ('PUBLIC','GRANTED'));
@@ -710,10 +708,8 @@
         <createIndex tableName="workspace_llm_model" indexName="idx_ws_llm_model_connection">
             <column name="connection_id"/>
         </createIndex>
-        <createIndex tableName="workspace_llm_model" indexName="ux_ws_llm_model_connection_upstream" unique="true">
-            <column name="connection_id"/>
-            <column name="upstream_model_id"/>
-        </createIndex>
+        <addUniqueConstraint tableName="workspace_llm_model" columnNames="connection_id, upstream_model_id"
+            constraintName="ux_ws_llm_model_connection_upstream"/>
         <sql splitStatements="false"><![CDATA[
             ALTER TABLE workspace_llm_model ADD CONSTRAINT ck_ws_llm_model_pricing_mode
                 CHECK (pricing_mode IN ('PRICED','NO_CHARGE','UNPRICED'));
