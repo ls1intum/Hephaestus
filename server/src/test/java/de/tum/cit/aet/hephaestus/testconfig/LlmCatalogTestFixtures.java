@@ -10,17 +10,12 @@ import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import java.math.BigDecimal;
 
 /**
- * Object-mother for the instance LLM catalog entities, the sibling of {@link TestEntities} and
- * {@link WorkspaceTestFixtures}. One factory for the shared enabled/PUBLIC shape so a new required
- * field only needs to be discovered once, instead of in every test that seeds one.
- *
- * <p>Both factories return <b>unsaved</b> entities with only the fields the catalog actually requires
- * — persist them through the repository the test already has, and set anything else on the returned
- * instance (both entities are fully mutable).
+ * Object-mother for the instance LLM catalog entities. Both factories return <b>unsaved</b> entities
+ * with only the fields the catalog requires — persist them through the repository the test already
+ * has, and set anything else on the returned instance (both entities are fully mutable).
  */
 public final class LlmCatalogTestFixtures {
 
-    /** The protocol every catalog fixture speaks unless a test is specifically about protocols. */
     public static final String OPENAI_COMPLETIONS = "openai-completions";
 
     /**
@@ -31,7 +26,6 @@ public final class LlmCatalogTestFixtures {
 
     private LlmCatalogTestFixtures() {}
 
-    /** An unsaved, enabled instance connection: {@code slug}, an {@code .example} host, no API key. */
     public static LlmConnection connection(String slug) {
         LlmConnection connection = new LlmConnection();
         connection.setSlug(slug);
@@ -42,12 +36,10 @@ public final class LlmCatalogTestFixtures {
         return connection;
     }
 
-    /** An unsaved, enabled, {@link ModelVisibility#PUBLIC} model on {@code connection}. */
     public static LlmModel model(LlmConnection connection, String slug, String upstreamModelId) {
         return model(connection, slug, upstreamModelId, ModelVisibility.PUBLIC, true);
     }
 
-    /** As {@link #model(LlmConnection, String, String)}, with visibility and enablement chosen. */
     public static LlmModel model(
         LlmConnection connection,
         String slug,
@@ -66,13 +58,9 @@ public final class LlmCatalogTestFixtures {
     }
 
     /**
-     * What {@code LlmAdmissionService} hands a mentor turn: a resolved instance model carrying the
-     * price frozen at admission. Input alone is priced, at $10 per million tokens, so a turn's
-     * expected cost reads directly off its input-token count.
-     *
-     * <p>There is deliberately no unpriced variant. Admission refuses to start a turn without a price
-     * snapshot, so a fixture that produced one would let tests exercise a state the system cannot
-     * reach.
+     * Input alone is priced, at $10 per million tokens, so a turn's expected cost reads directly off
+     * its input-token count. There is deliberately no unpriced variant: admission refuses to start a
+     * turn without a price snapshot, so one would let tests exercise an unreachable state.
      */
     public static MentorLlmConfig admittedMentorConfig() {
         return new MentorLlmConfig(

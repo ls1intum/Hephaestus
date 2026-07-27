@@ -33,7 +33,38 @@ Alongside this, the monthly budget cap (#1368) had correctness gaps: over-cap qu
 cancelled although the UI promised they would resume; the proxy was ungated in flight; a crashed job
 recorded zero cost; and a blind `WARN`/`BLOCK` policy knob let unpriced spend evade a cap.
 
+## Decision drivers
+
+- The object an admin creates should be the object that decides behaviour. A configuration that
+  needs a second, separate pointer to mean anything is a shape that invites the fan-out bug.
+- Ownership must follow blast radius, not convenience: whoever can edit a base URL or a price can
+  redirect a server-held credential or move the numerator of their own cap.
+- A cap must be enforceable while a run is in flight, not only between runs — the ledger a gate
+  reads gains nothing until the run ends.
+- Two parties' money must never be conflated, in either direction: an exhausted host budget must not
+  stop work a workspace pays for, and a workspace's own cap must not draw on the host's.
+- Prefer a structural invariant (a table boundary, a DB CHECK) to a WHERE-clause promise, because the
+  cross-tenant leak class recurs whenever isolation depends on remembering a predicate.
+
+## Considered options
+
+1. **Keep `agent_config`, fix the fan-out** — make the pointer mandatory and default it on write.
+   Smallest change, but leaves the credential/base-URL/price ownership problem untouched and keeps
+   two objects (profile + pointer) where one would do.
+2. **One catalog table with a nullable `workspace_id`** — instance rows have NULL, workspace rows
+   carry a tenant. Fewer tables, but every read of it becomes a query that leaks instance keys the
+   moment a predicate is forgotten, and the credential blast radius stops being visible in the
+   schema.
+3. **Two-scope catalog plus a per-purpose binding row** — instance and workspace catalogs as separate
+   tables, and one `workspace_agent_binding` row per (workspace, purpose) that names exactly one
+   model and its execution limits.
+4. **Per-purpose binding, but enforce the cap only at submit/claim** — simplest gate, no proxy
+   involvement. Rejected: it bounds when a run *starts*, not what a running job spends, so one
+   admitted run can spend arbitrarily far past the cap.
+
 ## Decision
+
+Option 3, with the in-flight proxy gate from the rejection of option 4.
 
 **A two-scope catalog, owned where security requires.** Instance administrators own an
 `app_admin`-scoped catalog (`llm_connection` → `llm_model`, with pricing and per-workspace sharing
@@ -62,7 +93,7 @@ authoritative price history. The legacy per-1k `model_pricing` table is retired.
 
 **A budget cap that is honest.** The monthly cap holds queued detection jobs (re-eligible via
 `available_at`) instead of cancelling them on the spot; the hold is bounded — `AgentJobExecutor`'s
-`BUDGET_HOLD_MAX_AGE` cancels a job that is still over cap seven days after it was queued, because a
+`BUDGET_HOLD_MAX_JOB_AGE` cancels a job that is still over cap seven days after it was queued, because a
 month-old review is noise and an unbounded hold loops forever. The proxy refuses new calls once a
 workspace is over cap,
 a crashed job bills the calls it made from proxy-accumulated counters, and enforcement is structural:
@@ -134,3 +165,17 @@ gate never kills a call already streaming; it acts only pre-forward.
 - Credential isolation is structural, not a WHERE-clause promise: a workspace-scoped query can never
   select an instance key, and the proxy resolves the URL and key together from the live row so a
   repointed host can never be paired with a rotated key.
+- The cost of the two-table split is duplicated shape: connection/model/price exist twice, and every
+  new field on one has to be considered for the other. `ModelBindingSource` and `LlmModelResolver`
+  absorb that at the read seam, but the write seams stay doubled.
+- Detection's three job types share one binding, so a deployment that wants a cheaper model for issue
+  review than for pull-request review cannot express it until a new purpose value is added.
+
+## Revisit trigger
+
+A third funding source appears (for example a per-team purse, or a workspace reselling capacity), so
+that "the two purses" stops being two and the never-summed rule needs restating as an N-purse rule;
+or a purpose needs more than one model (fallback chains, per-job-type routing), at which point
+`UNIQUE(workspace_id, purpose)` is the constraint that has to give; or provider contracts beyond the
+OpenAI Chat Completions and Responses shapes become load-bearing, which would move protocol out of
+the connection row and into its own negotiation.

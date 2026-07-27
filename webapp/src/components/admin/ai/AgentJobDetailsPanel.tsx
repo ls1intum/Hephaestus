@@ -182,9 +182,7 @@ export function AgentJobDetailsPanel({
 												</AlertDialogDescription>
 											</AlertDialogHeader>
 											<AlertDialogFooter>
-												{/* Never disabled: a popup with both footer buttons out has no operable
-											    control at all. The trigger behind it stays disabled until the request
-											    settles. ADR 0027. */}
+												{/* Never disabled: both footer buttons out leaves no operable control (ADR 0027). */}
 												<AlertDialogCancel>Keep running</AlertDialogCancel>
 												<AlertDialogAction
 													variant="destructive"

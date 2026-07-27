@@ -27,7 +27,6 @@ const WORKSPACE = {
 	practiceReviewManualTriggerEnabled: true,
 };
 
-/** The exact key a mounted leaderboard holds: one workspace, one time range, one mode. */
 const LEADERBOARD_KEY = getLeaderboardQueryKey({
 	path: { workspaceSlug: "acme" },
 	query: {
@@ -62,8 +61,7 @@ async function renderSettingsRoute() {
 	);
 
 	const queryClient = testQueryClient();
-	// Two already-fetched league surfaces, as they sit in the cache when an admin opens settings in
-	// another tab. `staleTime: Infinity` leaves invalidation as the only thing that can mark them stale.
+	// `staleTime: Infinity` leaves invalidation as the only thing that can mark these stale.
 	for (const queryKey of [LEADERBOARD_KEY, LEAGUE_STATS_KEY]) {
 		queryClient.setQueryData(queryKey, []);
 		queryClient.setQueryDefaults(queryKey, { staleTime: Number.POSITIVE_INFINITY });
@@ -75,13 +73,8 @@ async function renderSettingsRoute() {
 }
 
 describe("workspace settings route", () => {
-	/**
-	 * A hand-typed `["workspace"]` is not the shape the generated helpers produce and matches no query
-	 * at all, so the reset lands on the server and the screen keeps the old table.
-	 *
-	 * Asserted against the cache rather than by counting refetch requests, because neither league
-	 * surface is mounted on the settings route: a correct invalidation here fires no request at all.
-	 */
+	// Asserted against the cache, not by counting refetches: neither league surface is mounted here,
+	// so a correct invalidation fires no request at all.
 	it("marks the leaderboard and league stats stale after a reset", async () => {
 		const { queryClient, resetCalls } = await renderSettingsRoute();
 

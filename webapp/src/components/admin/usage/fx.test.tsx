@@ -14,7 +14,6 @@ import {
 } from "./fx";
 import { LlmUsageByDayTable } from "./LlmUsageBreakdownTables";
 
-/** Already inverted by the server, so USD × rate is the display amount. */
 const eur: FxRateInfo = {
 	currencyCode: "EUR",
 	ratePerUsd: 0.878966,
@@ -27,11 +26,6 @@ const eurClosed: FxRateInfo = {
 	rateDate: new Date("2026-06-30T00:00:00.000Z"),
 };
 
-/**
- * The month's spend as the server computed it, alongside the day rows. The totals are arguments
- * rather than a sum of `byDay`, because that is exactly the coupling the table must not have: the
- * footer prints what the server sent, not what the client can re-derive.
- */
 function dayReport(
 	byDay: LlmUsageByDay[],
 	instanceTotalCostUsd: number,
@@ -64,14 +58,11 @@ describe("spend conversion", () => {
 	});
 
 	it("leaves a sub-cent bound unconverted", () => {
-		// "<$0.01" is a bound, not an amount, so a converted bound would be false precision.
 		expect(spendConversion(0.004, eur)).toBeNull();
 	});
 
 	it("converts the smallest amount that is still a figure rather than a bound", () => {
-		// Half a cent is exactly where `formatCostUsd` stops printing "<$0.01" and starts printing a
-		// number, so it is the first amount there is something honest to convert. A rate big enough
-		// that the result clears the currency's own smallest unit, or the second guard would decide it.
+		// Half a cent is where `formatCostUsd` stops printing "<$0.01" and starts printing a number.
 		const jpy: FxRateInfo = { ...eur, currencyCode: "JPY", ratePerUsd: 157.2 };
 		expect(spendConversion(0.005, jpy)).not.toBeNull();
 	});
@@ -84,8 +75,6 @@ describe("spend conversion", () => {
 
 describe("cap conversion", () => {
 	it("rounds a converted cap to whole units", () => {
-		// 50 × 0.878966 = 43.9483 — "€43.95" beside a round "$50" would claim precision this estimate
-		// does not have.
 		expect(capConversion(50, eur)?.text).toBe("≈ €44");
 	});
 
@@ -97,9 +86,6 @@ describe("cap conversion", () => {
 		["free", 0.4, "≈ €0"],
 		["nearly double", 0.6, "≈ €1"],
 	])("says nothing rather than call a small cap %s", (_name, capUsd, wrongText) => {
-		// $0.40 is €0.35 and $0.60 is €0.53; at whole units those render as the amounts named here,
-		// neither of which a reader can discount as a rounding wobble. Below the first whole unit there
-		// is no honest figure at this precision, so there is no figure.
 		expect(capConversion(capUsd, eur)?.text).not.toBe(wrongText);
 		expect(capConversion(capUsd, eur)).toBeNull();
 	});
@@ -117,8 +103,8 @@ describe("ambiguous currency symbols", () => {
 	});
 
 	it("keeps a currency's own glyph when it cannot be confused with USD", () => {
-		// The policy is "a symbol without `$` in it keeps the symbol"; which glyph ICU picks for GBP is
-		// the platform's business, so what is asserted is that the code was not substituted for it.
+		// Which glyph ICU picks for GBP is the platform's business; what is asserted is that the ISO
+		// code was not substituted for it.
 		const gbp: FxRateInfo = { ...eur, currencyCode: "GBP" };
 		expect(capConversion(50, gbp)?.text).not.toContain("GBP");
 	});
@@ -150,10 +136,7 @@ describe("X of Y lines", () => {
 });
 
 describe("totals convert the USD sum", () => {
-	/**
-	 * Each row rounds up on its own, so `Σ convert(row)` is €2.04 while `convert(Σ USD)` is €2.02 —
-	 * the cent that would make a footer disagree with the column above it.
-	 */
+	/** Each row rounds up on its own, so `Σ convert(row)` is €2.04 while `convert(Σ USD)` is €2.02. */
 	const rows = [0.575, 0.575, 0.575, 0.575];
 
 	it("renders the breakdown footer from the USD total", () => {
@@ -175,7 +158,6 @@ describe("totals convert the USD sum", () => {
 });
 
 describe("page disclosure", () => {
-	/** The sentence as a reader sees it, with the parenthetical rate spliced back in. */
 	function disclosureText(fx: Fx, isCurrentMonth: boolean): string | null {
 		const { container } = render(<FxDisclosure fx={fx} isCurrentMonth={isCurrentMonth} />);
 		return container.textContent === "" ? null : container.textContent;
@@ -193,9 +175,6 @@ describe("page disclosure", () => {
 		);
 	});
 
-	// The attribution is the payload's claim, not ours. A source this build has no name for — an older
-	// client meeting a newer server — drops back to the unattributed wording rather than crediting the
-	// ECB for someone else's rate.
 	it("declines to name a publisher it does not recognise", () => {
 		const unknownSource = { ...eur, source: "SNB" as FxRateInfo["source"] };
 		expect(disclosureText(unknownSource, true)).toBe(
@@ -231,7 +210,6 @@ describe("nothing to convert renders no node", () => {
 
 describe("the live hint under a cap field", () => {
 	it("rounds to whole units, like every other cap figure", () => {
-		// `€43.95` beside a round `$50` claims a precision the estimate does not have.
 		expect(fxCapHint(50, eur, true)).toEqual({
 			conversion: { text: "≈ €44", label: "approximately 44 euros" },
 			tail: " at today's rate.",
@@ -261,7 +239,6 @@ describe("screen-reader wording", () => {
 		render(<FxAmount conversion={spendConversion(4.5, eur)} />);
 		const amount = screen.getByLabelText("approximately 3.96 euros");
 		expect(amount.textContent).toBe("(≈ €3.96)");
-		// `aria-label` is dropped on a bare generic span, so the wrapper must carry a role.
 		expect(amount.getAttribute("role")).toBe("img");
 	});
 });
@@ -279,7 +256,6 @@ describe("without a configured currency", () => {
 		];
 		const { container } = render(<LlmUsageByDayTable report={dayReport(rows, 4.25, 1.75)} />);
 
-		// Nothing is announced as a converted figure, and nothing is shown as one.
 		expect(screen.queryAllByRole("img")).toHaveLength(0);
 		expect(container.textContent).not.toContain("€");
 		expect(container.textContent).not.toContain("reference rate");

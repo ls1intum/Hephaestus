@@ -102,7 +102,7 @@ describe("PracticeDetectionPolicyCard model binding", () => {
 		expect(await screen.findByRole("button", { name: "Retry" })).toBeTruthy();
 	});
 
-	it("does not let an admin switch triggers on while nothing can run", async () => {
+	it("puts the triggers out of reach, not merely grey, while nothing can run", async () => {
 		const onUpdateFeatures = vi.fn();
 		renderCard({
 			detectionBinding: undefined,
@@ -114,11 +114,9 @@ describe("PracticeDetectionPolicyCard model binding", () => {
 		const auto = await screen.findByRole("switch", { name: "Automatic reviews" });
 		const manual = screen.getByRole("switch", { name: "Manual reviews" });
 
-		// Announced as unavailable and out of the tab order, not merely greyed…
 		await expectUnavailable(auto);
 		await expectUnavailable(manual);
 
-		// …and pressing one anyway turns nothing on and asks the server for nothing.
 		fireEvent.click(auto);
 		expect(auto.getAttribute("aria-checked")).toBe("false");
 		expect(onUpdateFeatures).not.toHaveBeenCalled();

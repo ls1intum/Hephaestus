@@ -33,11 +33,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-/**
- * {@code GET /workspaces/{slug}/llm/usage} — the workspace-admin month rollup. Verifies the
- * month-window filter, by-job-type and by-day grouping, the over-budget flag, and that a plain
- * member is 403'd.
- */
 @Tag("integration")
 // Pins the unconfigured half of the display-currency feature, mirroring
 // LlmUsageFxDisplayIntegrationTest's EUR. Stated rather than inherited: application.yml imports an
@@ -122,7 +117,6 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         usageRepository.save(event);
     }
 
-    /** An own-provider call whose model has no price — the workspace admin's blind spot to clear. */
     private void seedUnpricedByoEvent(Workspace workspace, LlmUsageJobType type, YearMonth month, int day) {
         LlmUsageEvent event = new LlmUsageEvent();
         event.setId(UUID.randomUUID());
@@ -282,10 +276,6 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             .isEqualTo(true);
     }
 
-    /**
-     * the report carries both caps, judged separately. An exhausted own-provider cap pauses
-     * own-provider work only — the shared-model purse is a different person's money and stays open.
-     */
     @Test
     @WithAdminUser
     void theTwoPursesAreReportedAndPausedIndependently() {
@@ -318,10 +308,6 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             .isEqualTo(true);
     }
 
-    /**
-     * The blind-spot rule end to end: an unpriced OWN-PROVIDER event is the workspace admin's to
-     * clear, so it may pause own-provider work but must leave the shared-model purse alone.
-     */
     @Test
     @WithAdminUser
     void anUnpricedOwnProviderEventPausesOnlyTheOwnProviderPurse() {
@@ -447,12 +433,6 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             .isOk();
     }
 
-    /**
-     * {@code PUT /workspaces/{slug}/llm/budget} — the workspace admin's own cap on
-     * the money the workspace itself pays. It is the exact mirror of the instance admin's cap, with
-     * the ownership boundary the whole two-purse design rests on: setting it can only restrict the
-     * workspace's own spending, and it grants no reach whatsoever over the shared-model budget.
-     */
     @Test
     @WithAdminUser
     void workspaceAdminSetsAndClearsTheirOwnProviderCap() {
@@ -571,11 +551,6 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getMonthlyByoLlmBudgetUsd()).isNull();
     }
 
-    /**
-     * The ownership boundary, stated as a test: owning the own-provider cap grants no reach over the
-     * instance's cap. A workspace admin who is not an instance admin is refused there, so nothing
-     * they can do loosens the host's backstop.
-     */
     @Test
     @WithMentorUser
     void aWorkspaceAdminCannotTouchTheInstanceCap() {
@@ -589,7 +564,6 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         );
         ensureWorkspaceMembership(workspace, admin, WorkspaceMembership.WorkspaceRole.ADMIN);
 
-        // Allowed on their own cap …
         webTestClient
             .put()
             .uri("/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
@@ -600,7 +574,6 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             .expectStatus()
             .isNoContent();
 
-        // … and refused on the instance's.
         webTestClient
             .put()
             .uri("/admin/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
@@ -614,10 +587,8 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     }
 
     /**
-     * Zero-regression guard for the display-currency feature. An instance that has not set
-     * {@code hephaestus.llm.display-currency} — the default, and the overwhelming majority — must get
-     * back exactly the response it got before the feature existed. The fixture stores a perfectly
-     * fresh rate first, so the only thing that can be suppressing {@code fx} is the unset property.
+     * The fixture stores a perfectly fresh rate first, so the only thing that can be suppressing
+     * {@code fx} is the unset property.
      */
     @Test
     @WithAdminUser
@@ -650,10 +621,8 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     }
 
     /**
-     * The money-mutating mirror of {@link #workspaceAdminCannotReadAnotherWorkspacesReport}. Being an
-     * admin somewhere is not being an admin here — and this is the write, so a gap would let one
-     * tenant lift or slam another tenant's spending cap. The cap is asserted untouched afterwards
-     * because a 403 with the row already written would be the worst of both.
+     * The cap is asserted untouched afterwards because a 403 with the row already written would be the
+     * worst of both.
      */
     @Test
     @WithMentorUser
@@ -692,7 +661,6 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         ).isEqualByComparingTo("5.00");
     }
 
-    /** A plain member of THIS workspace may not set its cap either — read access is not write access. */
     @Test
     @WithMentorUser
     void plainMemberCannotSetTheOwnProviderCap() {

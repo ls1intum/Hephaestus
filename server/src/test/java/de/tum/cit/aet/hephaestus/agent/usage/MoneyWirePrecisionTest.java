@@ -24,10 +24,8 @@ class MoneyWirePrecisionTest extends BaseUnitTest {
     private static final int SIGNIFICANT_DIGITS = 15;
 
     /**
-     * The ledger's own bounds, taken from the clamps rather than a literal.
-     *
-     * <p>Kills widening {@code MAX_COST} to the column's real maximum: {@code 999999999999.999999}
-     * is eighteen significant digits and comes back from the browser as a different number.
+     * Kills widening {@code MAX_COST} to the column's real maximum: {@code 999999999999.999999} is
+     * eighteen significant digits and comes back from the browser as a different number.
      */
     @Test
     void everyCostTheLedgerWillStoreSurvivesTheWire() {
@@ -99,7 +97,6 @@ class MoneyWirePrecisionTest extends BaseUnitTest {
         assertRoundTrips(largestAt(acceptedRate.integer() + acceptedRate.fraction(), acceptedRate.fraction()));
     }
 
-    /** The amount {@link LlmPriceSnapshot#calculateCost} substitutes for what {@code rate} really produced. */
     private static BigDecimal clampedCost(BigDecimal per1mInputUsd, long inputTokens) {
         LlmPriceSnapshot price = new LlmPriceSnapshot(
             FundingSource.INSTANCE,

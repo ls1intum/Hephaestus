@@ -13,13 +13,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
- * {@code GET /workspaces/{slug}/llm/settings} — the workspace-scoped read of the instance's
- * LLM policy.
- *
- * <p>The access-control matrix carries the weight here. The endpoint answers with an instance-wide
- * fact and therefore never reads its {@link de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext},
- * which makes it the one endpoint on this surface where a broken membership gate would leave no other
- * symptom: the body is identical whoever asks, so only the status code can tell you the gate ran.
+ * The endpoint answers with an instance-wide fact and never reads its
+ * {@link de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext}, so the body is identical
+ * whoever asks: only the status code can tell you the membership gate ran.
  */
 class WorkspaceLlmSettingsControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
@@ -77,7 +73,7 @@ class WorkspaceLlmSettingsControllerIntegrationTest extends AbstractWorkspaceInt
 
     @Test
     @WithMentorUser
-    void aWorkspaceAdminWithNoMembershipInAnotherWorkspaceIsForbiddenThere() {
+    void aWorkspaceAdminIsForbiddenInAnotherWorkspaceButStillAdmittedInTheirOwn() {
         // A genuine (non-superadmin) workspace ADMIN: @WithAdminUser carries the instance-wide
         // app_admin elevation, which would admit this call for the wrong reason.
         User admin = persistUser("mentor");
@@ -100,8 +96,6 @@ class WorkspaceLlmSettingsControllerIntegrationTest extends AbstractWorkspaceInt
             .expectStatus()
             .isForbidden();
 
-        // Sanity: the same principal IS admitted in the workspace it actually administers — so the
-        // refusal above is the membership gate, not a globally broken endpoint.
         webTestClient
             .get()
             .uri("/workspaces/{slug}/llm/settings", own.getWorkspaceSlug())

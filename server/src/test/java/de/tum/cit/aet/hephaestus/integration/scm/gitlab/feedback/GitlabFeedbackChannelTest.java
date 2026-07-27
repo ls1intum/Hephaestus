@@ -97,7 +97,6 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
 
     @Test
     void updateSummaryEscapesSlashCommands() {
-        // The edit path must escape just like the create path, or an in-place edit could smuggle an action.
         FeedbackTarget target = gitlabTarget();
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
 
@@ -360,11 +359,8 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
         assertThat(outcome.kind()).isEqualTo(FeedbackChannel.UpdateOutcome.Kind.GONE);
     }
 
-    // findExistingSummary — tri-state delivery-recovery dedup, walking the flat notes connection backwards
-
     private static final String MARKER = "<!-- hephaestus-summary:job-1 -->";
 
-    /** Sets up the {@code forScope(...).documentName(...).variable(...)} chain used by every page fetch. */
     private HttpGraphQlClient.RequestSpec mockRequestChain() {
         HttpGraphQlClient client = mock(HttpGraphQlClient.class);
         HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
@@ -374,10 +370,7 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
         return spec;
     }
 
-    /**
-     * One page of the flat {@code notes} connection, keyed by the response path the channel reads for the
-     * given noteable — so a test that stubs the MR path fails outright if the channel queries the issue path.
-     */
+    /** Keyed by response path, so a test that stubs the MR path fails outright if the channel reads the issue path. */
     private ClientGraphQlResponse mockNotesPage(
         String notesPath,
         List<Map<String, Object>> notes,
@@ -432,9 +425,8 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
     }
 
     /**
-     * The just-posted summary is the newest note, so the newest-end page must be requested FIRST — with no
-     * {@code before} cursor and a {@code last} page size. A forward walk would ask for {@code first}/{@code
-     * after} and only reach the marker after paging through the whole thread.
+     * The just-posted summary is the newest note, so the newest end is requested first — no {@code before}
+     * cursor, a {@code last} page size. A forward walk would only reach the marker after the whole thread.
      */
     @Test
     void findExistingSummary_walksTheNewestEndFirst() {

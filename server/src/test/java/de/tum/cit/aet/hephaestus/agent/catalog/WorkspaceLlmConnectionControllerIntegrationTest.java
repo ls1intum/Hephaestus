@@ -15,11 +15,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-/**
- * Workspace-admin CRUD for "your AI provider" ({@code /workspaces/{slug}/llm/connections}):
- * membership gate, cross-workspace tenancy isolation, the instance-wide BYO kill switch, and API-key
- * redaction.
- */
 class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
@@ -176,7 +171,7 @@ class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceI
 
     @Test
     @WithAdminUser
-    void anAdminOfAnotherWorkspaceCannotReachThisWorkspacesConnections() {
+    void aConnectionIdFromAnotherWorkspaceIsNotFoundThroughYourOwnSlug() {
         Workspace workspaceA = setupWorkspace("byo-tenancy-a");
         WorkspaceLlmConnectionDTO connectionInA = createConnection(workspaceA, "conn-in-a");
 
@@ -190,8 +185,6 @@ class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceI
         );
         ensureAdminMembership(workspaceB);
 
-        // Admin of workspace B, reading through workspace B's own slug, must not see A's connection —
-        // proves the lookup is scoped by workspace id, not a bare findById.
         webTestClient
             .get()
             .uri("/workspaces/{slug}/llm/connections/{id}", workspaceB.getWorkspaceSlug(), connectionInA.id())
@@ -203,7 +196,7 @@ class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceI
 
     @Test
     @WithMentorUser
-    void aWorkspaceAdminWithNoMembershipInAnotherWorkspaceIsForbiddenThere() {
+    void aWorkspaceAdminIsForbiddenInAnotherWorkspaceButStillAdmittedInTheirOwn() {
         // A genuine (non-superadmin) workspace ADMIN — app_admin JWT authority is a separate,
         // instance-wide elevation (see WithAdminUser's javadoc); this proves the ordinary
         // membership-scoped path independent of that bypass.
@@ -233,7 +226,6 @@ class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceI
             .expectStatus()
             .isForbidden();
 
-        // Sanity: the same principal IS admitted in the workspace it actually administers.
         webTestClient
             .get()
             .uri("/workspaces/{slug}/llm/connections", workspace.getWorkspaceSlug())

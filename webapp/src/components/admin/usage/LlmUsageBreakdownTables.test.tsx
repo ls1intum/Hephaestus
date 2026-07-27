@@ -5,12 +5,8 @@ import type { WorkspaceLlmUsageReport } from "@/api/types.gen";
 import { LlmUsageByDayTable, LlmUsageByJobTypeTable } from "./LlmUsageBreakdownTables";
 
 /**
- * Deliberately inconsistent with its own rows: the day and job-type rows come to $9.00 and $3.00,
- * while the report's month totals say $4.25 and $1.75. Only a table that prints the server's figure
- * can show 4.25 — one that re-adds the rows shows 9.00.
- *
- * Real payloads agree, of course. The disagreement here is the instrument: it is the only way to see
- * *which* of the two numbers a footer is made of.
+ * Deliberately inconsistent with its own rows, which is the only way to see which number a footer is
+ * made of: the rows come to $9.00 and $3.00, while the report's month totals say $4.25 and $1.75.
  */
 const report: WorkspaceLlmUsageReport = {
 	month: "2026-07",
@@ -71,7 +67,6 @@ function totalsRowOf(tableName: string): HTMLElement {
 }
 
 describe("usage breakdown totals", () => {
-	// The same claim about both breakdowns, so it is made once: neither footer may re-add its rows.
 	it.each<[string, () => ReactElement, string]>([
 		["day", () => <LlmUsageByDayTable report={report} />, "AI spend by day"],
 		["run type", () => <LlmUsageByJobTypeTable report={report} />, "AI spend by run type"],
@@ -89,8 +84,8 @@ describe("usage breakdown totals", () => {
 		render(<LlmUsageByJobTypeTable report={report} />);
 
 		const footer = totalsRowOf("AI spend by run type");
-		// Server money, then client counts: 1+2 unpriced, 1000+3000 input, 200+400 output, 12+24
-		// calls, 10+20 runs. The blended average is deliberately absent (two purses, one dash).
+		// Server money, then client counts: 3 unpriced, 4,000 input, 600 output, 36 calls, 30 runs —
+		// and a dash where a blended average would be, because there are two purses.
 		expect(footer.textContent).toBe("Total$4.25$1.75—34,0006003630");
 	});
 

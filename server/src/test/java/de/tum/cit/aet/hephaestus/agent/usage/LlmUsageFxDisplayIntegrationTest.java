@@ -25,11 +25,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
- * The configured half of the display-currency feature: with
- * {@code hephaestus.llm.display-currency=EUR} set, both month-scoped usage endpoints carry the
- * rate — and both carry the SAME rate, inverted once, with the true publication date.
- *
- * <p>Deliberately its own Spring context so the default one keeps proving the zero-regression case
+ * Deliberately its own Spring context so the default one keeps proving the zero-regression case
  * ({@code LlmUsageControllerIntegrationTest#reportOmitsFxEntirelyWhenNoDisplayCurrencyConfigured}).
  */
 @Tag("integration")
@@ -112,10 +108,9 @@ class LlmUsageFxDisplayIntegrationTest extends AbstractWorkspaceIntegrationTest 
     }
 
     /**
-     * The admin envelope's reason for existing. {@code month} and {@code fx} are facts about
-     * the REQUEST, not about any workspace in it: one month resolves to exactly one rate. With TWO
-     * workspaces spending, they must therefore appear ONCE — on the envelope — and not be copied onto
-     * every row, which is what forced a client to reach into {@code rows[0]} for a response-level fact.
+     * {@code month} and {@code fx} are facts about the REQUEST, not about any workspace in it, so with
+     * TWO workspaces spending they must appear ONCE — on the envelope — and not be copied onto every
+     * row, which is what forced a client to reach into {@code rows[0]} for a response-level fact.
      */
     @Test
     void theAdminRollupReportsMonthAndRateOnceOnTheEnvelopeAndNeverOnARow() {
@@ -158,12 +153,10 @@ class LlmUsageFxDisplayIntegrationTest extends AbstractWorkspaceIntegrationTest 
     /**
      * The value-level half of {@code LlmBudgetFxIsolationArchTest}, which can only prove that the
      * enforcement classes do not IMPORT fx — not that a rollup service never converts a number on its
-     * way into a verdict.
-     *
-     * <p>The fixture is built so the two currencies disagree about the answer. Spend is $9.00 against
-     * a $8.00 cap: exhausted in USD. At the seeded ECB rate the same spend is €7.91, comfortably under
-     * a cap of 8 — so any code that converted before comparing would report WITHIN and quietly unpause
-     * a workspace that is over its budget. Asserting EXHAUSTED here fails the moment that happens.
+     * way into a verdict. The fixture is built so the two currencies disagree about the answer: spend
+     * is $9.00 against a $8.00 cap, exhausted in USD, while at the seeded ECB rate the same spend is
+     * €7.91, comfortably under a cap of 8 — so any code that converted before comparing would report
+     * WITHIN and quietly unpause a workspace that is over its budget.
      */
     @Test
     @WithAdminUser

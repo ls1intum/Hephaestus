@@ -77,8 +77,8 @@ describe("WorkspaceLlmProviderPanel", () => {
 	});
 
 	it("keeps each provider's probe pending independently when two run at once", async () => {
-		// Connection 2 answers immediately; connection 1 is left hanging. A single "which row is
-		// probing" flag would be cleared by 2 settling and would put row 1 back to idle mid-flight.
+		// A single "which row is probing" flag would be cleared by the fast one and put the slow row
+		// back to idle mid-flight.
 		let releaseSlowProbe: (() => void) | undefined;
 		const slowProbe = new Promise<void>((resolve) => {
 			releaseSlowProbe = resolve;
@@ -96,8 +96,6 @@ describe("WorkspaceLlmProviderPanel", () => {
 		);
 		renderPanel();
 
-		// Each card is a region named by its own provider, so this reaches one by the same route
-		// assistive tech does rather than by a kit-internal `data-slot`.
 		const openAiCard = await screen.findByRole("region", { name: "OpenAI production" });
 		const gpuCard = screen.getByRole("region", { name: "Local GPU" });
 
@@ -106,10 +104,8 @@ describe("WorkspaceLlmProviderPanel", () => {
 		);
 		fireEvent.click(within(gpuCard).getByRole("button", { name: "Test connection to Local GPU" }));
 
-		// The fast one settles first.
 		expect(await within(gpuCard).findByText(/1 model available/)).toBeTruthy();
 
-		// The slow one must still read as in flight, and must still refuse a second click.
 		const slowButton = within(openAiCard).getByRole("button", {
 			name: "Testing… OpenAI production",
 		});
@@ -120,10 +116,8 @@ describe("WorkspaceLlmProviderPanel", () => {
 	});
 
 	it("keeps each model's delete pending independently when two run at once", async () => {
-		// Model 10's DELETE hangs; model 20's answers at once. A single "which model is mutating" id
-		// is cleared by 20 settling, which re-enables row 10's Delete while its request is still in
-		// flight — a second DELETE and a "Could not delete the model" toast for a model that was in
-		// fact deleted.
+		// A single "which model is mutating" id would be cleared by the fast one, re-enabling the slow
+		// row's Delete mid-flight: a second DELETE, and a failure toast for a model that was deleted.
 		let releaseSlowDelete: (() => void) | undefined;
 		const slowDelete = new Promise<void>((resolve) => {
 			releaseSlowDelete = resolve;
@@ -152,7 +146,6 @@ describe("WorkspaceLlmProviderPanel", () => {
 		await confirmDelete("Slow model");
 		await waitFor(() => expect(slowDeleteCalls).toBe(1));
 		await confirmDelete("Fast model");
-		// The fast one settles and the list is refetched.
 		await waitFor(() => expect(screen.queryByText("Fast model")).not.toBeNull());
 
 		const slowRowDelete = screen.getByRole("button", { name: "Delete Slow model" });

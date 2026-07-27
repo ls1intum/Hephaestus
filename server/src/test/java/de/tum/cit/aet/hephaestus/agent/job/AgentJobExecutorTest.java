@@ -112,12 +112,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
     private AgentJobExecutor executor;
 
-    /**
-     * These tests drive the executor with a pre-frozen (or deliberately absent) price snapshot rather
-     * than through live catalog admission, so they pass no {@code LlmAdmissionService}. Named instead
-     * of a bare {@code null} so each construction says WHY it is opting out — the executor's
-     * production wiring always has one.
-     */
     private static final de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService NO_LIVE_ADMISSION = null;
 
     private static final AgentProperties AGENT_PROPS = new AgentProperties(
@@ -192,9 +186,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
         job.setStatus(AgentJobStatus.QUEUED);
         job.setWorkspace(workspaceStub());
 
-        // Claim-time budget recheck: default to "both purses open" so every
-        // pre-existing claim test keeps its original meaning. An unstubbed mock would return null
-        // here, and the executor would NPE dereferencing it — so this default is load-bearing.
         lenient().when(llmBudgetService.decide(anyLong())).thenReturn(LlmBudgetDecision.ALLOWED);
         lenient().when(jobRepository.markExecutionStarted(any(), any(), any())).thenReturn(1);
 
@@ -216,12 +207,9 @@ class AgentJobExecutorTest extends BaseUnitTest {
             .when(transactionTemplate)
             .executeWithoutResult(any());
 
-        // readOnlyTx in prepareSandboxSpec is built from getTransactionManager(); stub the bridge.
         lenient().when(transactionTemplate.getTransactionManager()).thenReturn(transactionManager);
         lenient().when(transactionManager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
 
-        // Dispatch of a claimed job's execution runs on the sandbox executor; run it inline so
-        // processJob() is synchronously observable on the calling (test) thread.
         lenient()
             .doAnswer(inv -> {
                 Runnable task = inv.getArgument(0);
@@ -238,11 +226,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
         return workspace;
     }
 
-    /**
-     * The reload the terminal write performs: real jobType + workspace (never null in production,
-     * and read unconditionally by the terminal path), carrying {@code job}'s CURRENT config snapshot
-     * so a test can't quietly exercise the unpriced billing path while claiming to test the priced one.
-     */
     private AgentJob freshJob() {
         AgentJob freshJob = new AgentJob();
         freshJob.prePersist();
@@ -352,7 +335,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
             boolean claimed = executor.processJob(jobId);
 
             assertThat(claimed).isFalse();
-            // No status write at all — the row is untouched, still QUEUED; the next poll retries it.
             verify(jobRepository, never()).save(any());
             verify(sandboxManager, never()).execute(any());
         }
@@ -385,21 +367,10 @@ class AgentJobExecutorTest extends BaseUnitTest {
         }
     }
 
-    /**
-     * Claim-time budget recheck: a workspace can pre-queue jobs faster than the cap updates,
-     * so every claim rechecks {@code llmBudgetService.decide} before letting a job start. A blocked
-     * job is HELD (available_at pushed into the future, still QUEUED, marked {@code hold_reason=BUDGET})
-     * so the poll loop re-evaluates the cap and resumes it automatically once the workspace is back
-     * within budget — only a job held past the max age is cancelled terminally.
-     *
-     * <p>The recheck is scoped to whoever pays for the job's purpose, so an exhausted host budget
-     * never holds work the workspace funds through its own provider (and vice versa).
-     */
     @Nested
     @DisplayName("Claim-time budget recheck")
     class ClaimTimeBudgetRecheck {
 
-        /** A decision that blocks only the host's purse. */
         private LlmBudgetDecision instanceBlocked(LlmBudgetBlockReason reason) {
             return new LlmBudgetDecision(reason, LlmBudgetBlockReason.NONE);
         }
@@ -422,8 +393,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             boolean claimed = executor.processJob(jobId);
 
-            // Held, not executed and not terminal: the job stays QUEUED with a future available_at,
-            // no cancellation reason, and never reaches the sandbox stage.
             assertThat(claimed).isFalse();
             verify(sandboxManager, never()).execute(any());
 
@@ -496,8 +465,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         @DisplayName("a job whose binding is gone is judged against BOTH caps — never a way around one")
-        void anUnattributableJobIsHeldByEitherCap() {
-            // No binding row: the funding source is unknown, so a single blocked purse still holds it.
+        void aJobWithNoBindingRowIsHeldByEitherCap() {
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(llmBudgetService.decide(99L)).thenReturn(
                 new LlmBudgetDecision(LlmBudgetBlockReason.NONE, LlmBudgetBlockReason.EXHAUSTED)
@@ -556,8 +524,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         void heldPreStartJobNeverWritesAUsageLedgerEntry() {
-            // A budget-blocked pre-start job must leave NO ledger trace at all — distinct from the
-            // cancelled-after-start / malformed-usage cases, which DO record UNPRICED.
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             bindFundedBy(FundingSource.INSTANCE);
             when(llmBudgetService.decide(99L)).thenReturn(instanceBlocked(LlmBudgetBlockReason.EXHAUSTED));
@@ -752,7 +718,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldMarkFailedOnNonZeroExitCode() {
+        void shouldMarkFailedWithAnErrorMessageNamingTheExitCode() {
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
                 Optional.of(binding)
@@ -776,7 +742,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             executor.processJob(jobId);
 
-            // The reason the operator reads must name the exit code that produced it.
             verify(jobRepository).transitionStatus(
                 eq(jobId),
                 eq(AgentJobStatus.FAILED),
@@ -894,7 +859,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldMarkFailedOnGenericException() {
+        void shouldMarkFailedCarryingTheThrownMessageOntoTheRow() {
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
                 Optional.of(binding)
@@ -912,9 +877,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             executor.processJob(jobId);
 
-            // The thrown message must survive onto the row — an operator debugging a FAILED job has
-            // nothing else. transitionTerminal takes the POLL jobId (not job.getId()); see the ledger
-            // sourceId note in AgentJobExecutor.
             verify(jobRepository).transitionStatus(
                 eq(jobId),
                 eq(AgentJobStatus.FAILED),
@@ -1027,7 +989,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
             // that token may still be held by a stuck container.
             assertThat(newToken.getValue()).isNotEqualTo("test-token").isNotBlank();
             assertThat(newTokenHash.getValue()).isEqualTo(AgentJob.computeTokenHash(newToken.getValue()));
-            // Never falls through to a terminal FAILED write when the requeue CAS won.
             verify(jobRepository, never()).transitionStatus(any(), eq(AgentJobStatus.FAILED), any(), any(), any());
             verify(jobRepository, never()).transitionStatusOwnedBy(
                 any(),
@@ -1146,11 +1107,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
         }
     }
 
-    /**
-     * A job that started executing (past claim+RUNNING) but ends with no parseable usage must still
-     * leave a ledger trace — an UNPRICED entry, so the month turns UNVERIFIABLE instead of looking
-     * falsely fully accounted for. Never for jobs held before RUNNING (see {@code ClaimTimeBudgetRecheck}).
-     */
     @Nested
     @DisplayName("Unpriced usage ledger fallback")
     class UnpricedUsageLedgerFallback {
@@ -1169,7 +1125,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 )
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-            // The transition wins (job really was RUNNING-and-ours) — the ledger write is gated on this.
             when(jobRepository.transitionStatus(any(), eq(AgentJobStatus.CANCELLED), any(), any(), any())).thenReturn(
                 1
             );
@@ -1195,8 +1150,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
         @Test
         @DisplayName("a crashed job that made priced proxy calls bills them PRICED, not zero")
         void cancelledAfterStart_withProxyMeteredCalls_recordsPricedLedgerEntry() {
-            // The proxy accumulated real calls onto the row before the crash, and the frozen price is
-            // PRICED — the crash accounting must bill those tokens instead of a zero-token UNPRICED row.
             var priced = new de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot(
                 de.tum.cit.aet.hephaestus.agent.usage.FundingSource.INSTANCE,
                 de.tum.cit.aet.hephaestus.agent.usage.PricingState.PRICED,
@@ -1248,9 +1201,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
             "a cancellation fence loss does not write usage outside the transaction that won the state transition"
         )
         void cancelledAfterStart_fenceLost_doesNotRecordOutsideWinningTransaction() {
-            // transitionStatus returns 0 (job no longer RUNNING-and-ours — e.g. a concurrent user-cancel
-            // or worker-drain path already won the CAS). That winning path owns the attempt-aware ledger
-            // write in its transaction; this losing executor must not create a detached accounting write.
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
                 Optional.of(binding)
@@ -1376,7 +1326,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
         }
 
         @Test
-        void reportedCallWithZeroTokens_recordsAnUnpricedLedgerEntry() {
+        void reportedCallWithZeroTokens_recordsAnUnpricedLedgerEntryThatKeepsTheCall() {
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
                 Optional.of(binding)
@@ -1408,8 +1358,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             executor.processJob(jobId);
 
-            // A reported call with all-zero tokens is evidence of nothing priceable, so the row must be
-            // UNPRICED — but it must still carry the call as telemetry rather than vanishing.
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample = ArgumentCaptor.forClass(
                 LlmUsageRecorder.LlmUsageSample.class
             );
@@ -1425,9 +1373,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
         @Test
         @DisplayName("a clean finish with no runner usage still bills the calls the proxy watched go out")
         void cleanCompletionWithoutRunnerUsage_billsTheProxyAccumulators() {
-            // The provider was really called and really charged for — the proxy recorded each call as it
-            // happened — but the runner never wrote a usable usage.json. Reading only the runner would
-            // book this month as free and let the workspace keep spending past its cap.
             job.setConfigSnapshot(snapshot.withPriceSnapshot(pricedSnapshot()).toJson(objectMapper));
             stubClaimableJob();
             setupFullExecution(); // AgentResult with no usage at all
@@ -1452,8 +1397,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
             assertThat(sample.getValue().inputTokens()).isEqualTo(900);
             assertThat(sample.getValue().outputTokens()).isEqualTo(600);
             assertThat(sample.getValue().cacheReadTokens()).isEqualTo(100);
-            // Billed at the price frozen at admission — this is the priced path, not a null-cost row
-            // that merely happens to carry token counts.
             assertThat(sample.getValue().price().pricingState()).isEqualTo(
                 de.tum.cit.aet.hephaestus.agent.usage.PricingState.PRICED
             );
@@ -1505,8 +1448,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
         @Test
         @DisplayName("a deterministic failure is attempted once, not three times")
         void deterministicFailureIsNotRetried() {
-            // Re-running the same transaction with the same inputs cannot produce a different answer;
-            // it only delays the give-up handling the sweeper depends on.
             stubClaimableJob();
             setupFullExecution();
             when(jobRepository.transitionStatus(any(), eq(AgentJobStatus.COMPLETED), any(), any(), any())).thenReturn(
@@ -1550,9 +1491,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             verify(jobRepository, times(2)).transitionStatus(any(), eq(AgentJobStatus.COMPLETED), any(), any(), any());
 
-            // The retried attempt must not bill twice, and the one sample that lands must carry the
-            // job's real token counts — a retry that re-ran the usage read with a partial result would
-            // charge the workspace for tokens it did not spend.
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample = ArgumentCaptor.forClass(
                 LlmUsageRecorder.LlmUsageSample.class
             );
@@ -1626,8 +1564,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
             "the practice request carries the snapshot's resolved behaviour + the job's own token — ONE credential path"
         )
         void requestCarriesSnapshotBehaviourAndJobToken() {
-            // There is no worker-side BYO-LLM override — every host (app-server AND
-            // worker) reaches the LLM proxy the same way, via the job's own token.
             executor = new AgentJobExecutor(
                 AGENT_PROPS,
                 jobRepository,
@@ -1664,7 +1600,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
             AgentJob freshJob = freshJob();
             when(jobRepository.findById(any(UUID.class))).thenReturn(Optional.of(freshJob));
             when(jobRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
-            // Worker identity is set ("test-worker"), so the terminal write is fenced to the owner.
             when(jobRepository.transitionStatusOwnedBy(any(), any(), any(), any(), any(), any())).thenReturn(1);
 
             executor.processJob(jobId);
@@ -1774,8 +1709,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
         @Test
         @DisplayName("empty candidate list means no claim is even attempted")
         void emptyPollAttemptsNoClaims() throws Exception {
-            // Drive the real poll thread: the latch fires from inside the executor's own query, so the
-            // assertion below observes the production loop rather than the stub.
             var polled = new CountDownLatch(1);
             when(jobRepository.findQueuedIdsOldestFirst(anyInt())).thenAnswer(invocation -> {
                 polled.countDown();
@@ -1890,13 +1823,12 @@ class AgentJobExecutorTest extends BaseUnitTest {
             assertThat(claimed).isTrue(); // claim itself won; dispatch was rejected afterwards
             verify(jobRepository).requeueRejectedClaim(jobId, "rejecting-worker");
             verify(jobRepository, never()).requeueOrphan(any(), any(), anyInt(), any(), any(), any());
-            // The claimed job must not still be tracked as locally running / holding capacity.
             verify(sandboxManager, never()).execute(any());
         }
 
         @Test
         @DisplayName("retries the requeue write a bounded number of times before giving up")
-        void retriesTheRequeueWriteOnTransientFailure() {
+        void retriesTheRequeueWriteOnTransientFailureButWritesOnlyOnce() {
             executor = new AgentJobExecutor(
                 AGENT_PROPS,
                 jobRepository,
@@ -1930,9 +1862,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
             doThrow(new java.util.concurrent.RejectedExecutionException("pool saturated"))
                 .when(sandboxExecutor)
                 .execute(any());
-            // First two requeue attempts fail (transient — the transaction itself throws before the
-            // callback runs), third succeeds and actually invokes the callback (so the underlying
-            // repository call happens exactly once, on the winning attempt).
             java.util.concurrent.atomic.AtomicInteger attempts = new java.util.concurrent.atomic.AtomicInteger();
             doAnswer(inv -> {
                 if (attempts.incrementAndGet() <= 2) {
@@ -2072,8 +2001,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
         @Test
         @DisplayName("stopAcceptingNewJobs() joins the poll thread before returning — no thread left running")
         void stopAcceptingNewJobsJoinsThePollThread() {
-            // An empty candidate list keeps the poll loop harmlessly sleeping/spinning without ever
-            // reaching a real claim — this test is about the join, not claim behaviour.
             lenient().when(jobRepository.findQueuedIdsOldestFirst(anyInt())).thenReturn(List.of());
 
             executor.start();
@@ -2131,9 +2058,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
         }
     }
 
-    // Helpers
-
-    /** The claim-path stubs every "run one job end to end" test needs. */
     private void stubClaimableJob() {
         when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
         when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
@@ -2145,7 +2069,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
         when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
 
-    /** A frozen admission price, so a billed sample is PRICED rather than unverifiable-by-price. */
     private static de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot pricedSnapshot() {
         return new de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot(
             de.tum.cit.aet.hephaestus.agent.usage.FundingSource.INSTANCE,

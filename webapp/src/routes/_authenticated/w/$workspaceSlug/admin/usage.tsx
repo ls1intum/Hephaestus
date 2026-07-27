@@ -63,7 +63,6 @@ function AdminUsageContainer() {
 			queryClient.invalidateQueries({
 				queryKey: getLlmUsageReportQueryKey({ path: { workspaceSlug } }),
 			});
-			// The proxy caches its answer for about 30s, so "resumes now" would be a small lie.
 			toast.success(
 				variables.body.monthlyBudgetUsd == null
 					? "Cap removed. New calls resume within a minute."

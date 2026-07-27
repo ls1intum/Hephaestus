@@ -8,11 +8,7 @@ import {
 	REFLOW_WIDTH,
 } from "./reflow";
 
-/**
- * Nothing in a story file forces `parameters.viewport.defaultViewport = "reflow"` to be present, so
- * the helpers have to notice its absence themselves. jsdom's default window is the desktop width a
- * story would silently fall back to, which makes it the harness for that negative case.
- */
+/** jsdom's default window is the desktop width a story that forgot the viewport falls back to. */
 describe("reflow assertions refuse to run at desktop width", () => {
 	const desktop = () => {
 		expect(window.innerWidth).toBeGreaterThan(REFLOW_WIDTH);
@@ -35,7 +31,4 @@ describe("reflow assertions refuse to run at desktop width", () => {
 		desktop();
 		await expect(run()).rejects.toThrow(/reflow viewport/);
 	});
-
-	// `expectTargetSize` is absent from the table on purpose: it carries no viewport guard, so there
-	// is nothing here for it to fail.
 });

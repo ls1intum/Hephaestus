@@ -33,11 +33,8 @@ function cardOf(name: RegExp): HTMLElement {
 }
 
 /**
- * The whole card of the chosen answer is tinted and takes a primary border, not just the radio dot.
- *
- * Asserted against computed style rather than a class name because the tint is a `has-data-checked:`
- * rule on the kit's `FieldLabel`: the class only pays out if the checked radio is actually a
- * descendant of the label carrying it, which is the part a hand-rolled card gets wrong.
+ * The tint is a `has-data-checked:` rule on `FieldLabel`, so it only pays out if the checked radio
+ * really is a descendant of that label — hence computed style rather than a class name.
  */
 export const AllWorkspaces: Story = {
 	play: async () => {
@@ -55,7 +52,6 @@ export const AllWorkspaces: Story = {
 	},
 };
 
-/** The same highlight follows the choice to the second card. */
 export const SelectedWorkspaces: Story = {
 	args: { value: "SELECTED" },
 	play: async () => {

@@ -22,14 +22,6 @@ const detectionBinding: AgentBinding = {
 	allowInternet: false,
 };
 
-/**
- * The binding cards take everything they render as a prop, so a test states the situation directly
- * instead of standing up a QueryClient and five request mocks to arrive at the same screen.
- *
- * `ownProviderAllowed: false` is not incidental: the provider panel this page also renders still
- * fetches and mutates on its own, so it is the one part of this screen a test cannot reach without a
- * QueryClient. Everything asserted here is above that line.
- */
 function renderPage(overrides: Partial<AgentBindingsPageProps> = {}) {
 	const onSave = vi.fn();
 	const onTurnOff = vi.fn();
@@ -38,11 +30,8 @@ function renderPage(overrides: Partial<AgentBindingsPageProps> = {}) {
 			workspaceSlug="demo"
 			bindings={[detectionBinding]}
 			availableModels={[model]}
-			// Whether a purpose may run at all is a property of the workspace, not of the AI config.
 			practicesEnabled
 			mentorEnabled
-			// Registering providers of your own is an instance-level permission, asked for separately.
-			ownProviderAllowed={false}
 			isLoading={false}
 			isError={false}
 			loadError={null}
@@ -56,10 +45,7 @@ function renderPage(overrides: Partial<AgentBindingsPageProps> = {}) {
 	return { onSave, onTurnOff };
 }
 
-/**
- * One card per purpose, each with its own "Active" switch and model picker, so an assertion about
- * practice detection has to be scoped to its card rather than to the first match on the page.
- */
+/** One card per purpose, so an assertion has to be scoped to a card, not to the page. */
 function practiceDetectionCard(): HTMLElement {
 	const field = screen.getByLabelText("Practice detection runs on");
 	const form = field.closest("form");
@@ -79,11 +65,9 @@ describe("AgentBindingsPage", () => {
 		expect(screen.getByText("Not ready")).toBeTruthy();
 	});
 
-	it("saves the bound model id when the admin clicks Save", () => {
+	it("shows the binding it saves, so the payload cannot disagree with the controls", () => {
 		const { onSave } = renderPage();
 
-		// The card shows the binding it is about to send back: the bound model by name, and Active on.
-		// Without this the payload could be right while the controls the admin reads showed otherwise.
 		const card = within(practiceDetectionCard());
 		expect(card.getByLabelText("Practice detection runs on").textContent).toContain("GPT Test");
 		expect(card.getByRole("switch", { name: "Active" }).getAttribute("aria-checked")).toBe("true");
@@ -106,7 +90,6 @@ describe("AgentBindingsPage", () => {
 		fireEvent.click(trigger);
 
 		expect(trigger.getAttribute("aria-expanded")).toBe("true");
-		// The panel the trigger claims to control is the one that actually holds the fields.
 		const panelId = trigger.getAttribute("aria-controls");
 		expect(panelId).toBeTruthy();
 		const timeout = screen.getByLabelText("Timeout (seconds)");
@@ -122,8 +105,6 @@ describe("AgentBindingsPage", () => {
 
 		expect(screen.getByText("Enter a number of seconds.")).toBeTruthy();
 		expect(screen.getByLabelText("Timeout (seconds)").getAttribute("aria-invalid")).toBe("true");
-		// Nothing is sent: an empty field is a field left blank, never a `timeoutSeconds: 0` that would
-		// time every run out instantly.
 		expect(onSave).not.toHaveBeenCalled();
 	});
 
@@ -147,7 +128,7 @@ describe("AgentBindingsPage", () => {
 		);
 	});
 
-	it("rejects a timeout above the ceiling and says why an hour is the limit", () => {
+	it("rejects a timeout above the ceiling, says why, and accepts the ceiling itself", () => {
 		const { onSave } = renderPage();
 
 		fireEvent.click(screen.getAllByRole("button", { name: /Advanced/ })[0]);
@@ -155,16 +136,12 @@ describe("AgentBindingsPage", () => {
 		fireEvent.change(timeout, { target: { value: "7200" } });
 		fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
 
-		// The reason, not just the range: a run that outlives an hour is stopped, so the number cannot
-		// be honoured however it is typed.
 		expect(
 			screen.getByText("Runs stop after an hour, so enter 3600 seconds or less."),
 		).toBeTruthy();
 		expect(timeout.getAttribute("aria-invalid")).toBe("true");
-		// Nothing is sent, so the admin never meets the server's bare 400 for this.
 		expect(onSave).not.toHaveBeenCalled();
 
-		// The ceiling itself is allowed — it is a maximum, not a value just short of one.
 		fireEvent.change(timeout, { target: { value: "3600" } });
 		fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
 
@@ -179,7 +156,6 @@ describe("AgentBindingsPage", () => {
 
 		fireEvent.click(screen.getAllByRole("button", { name: /Advanced/ })[0]);
 		fireEvent.change(screen.getByLabelText("Max concurrent runs"), { target: { value: "0" } });
-		// Collapse it again, so the invalid field is out of sight when Save is pressed.
 		fireEvent.click(screen.getAllByRole("button", { name: /Advanced/ })[0]);
 		expect(screen.queryByLabelText("Max concurrent runs")).toBeNull();
 
@@ -191,9 +167,6 @@ describe("AgentBindingsPage", () => {
 	it("offers Turn off only for a purpose that is actually bound", () => {
 		const { onTurnOff } = renderPage();
 
-		// Two cards are on screen and only practice detection has a binding, so only it has something
-		// to turn off — Mentor's card offers Save alone. `getByRole` (singular) is the assertion: a
-		// second Turn off anywhere on the page fails it.
 		const turnOff = screen.getByRole("button", { name: "Turn off" });
 		expect(screen.getAllByRole("button", { name: "Save" })).toHaveLength(2);
 		expect(turnOff.closest("form")?.textContent).toContain("Practice detection");

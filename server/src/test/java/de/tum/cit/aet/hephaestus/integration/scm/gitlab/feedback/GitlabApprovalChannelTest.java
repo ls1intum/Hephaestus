@@ -61,10 +61,10 @@ class GitlabApprovalChannelTest extends BaseUnitTest {
     }
 
     /**
-     * The endpoint contract, pinned: GitLab addresses a project by its percent-encoded full path, so the
-     * request line must carry {@code %2F} — not a bare slash (a different, non-existent route) and not
-     * {@code %252F} (double encoding, which resolves to no project). A live GitLab 19.1 instance answers 201
-     * to exactly this request; the previous {@code mergeRequestApprove} GraphQL mutation does not exist there.
+     * GitLab addresses a project by its percent-encoded full path, so the request line must carry
+     * {@code %2F} — not a bare slash (a different, non-existent route) and not {@code %252F} (double
+     * encoding, which resolves to no project). A live GitLab 19.1 instance answers 201 to exactly this
+     * request; the previous {@code mergeRequestApprove} GraphQL mutation does not exist there.
      */
     @Test
     void approvePostsToThePercentEncodedProjectPath() throws InterruptedException {
@@ -81,7 +81,7 @@ class GitlabApprovalChannelTest extends BaseUnitTest {
 
     /**
      * GitLab answers 401 when the token's user may not approve the merge request — most often because it
-     * authored it. That is a permanent condition, and the failure must say so rather than surface a bare 401.
+     * authored it, which is permanent rather than retryable.
      */
     @Test
     void approveSurfacesTheReasonOnUnauthorized() {

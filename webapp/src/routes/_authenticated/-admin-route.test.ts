@@ -18,7 +18,6 @@ function newRouter(url?: string) {
 	});
 }
 
-/** Every instance-admin URL, read from the generated tree so a new one is covered automatically. */
 const adminUrls = Object.values(newRouter().routesById)
 	.filter((route) => route.fullPath?.startsWith("/admin/"))
 	.map((route) => route.fullPath);
@@ -33,14 +32,10 @@ async function land(url: string) {
 	return router.state.location.pathname;
 }
 
-/**
- * The bypass this guards against: a route mapping to an /admin URL without nesting under the gated
- * layout. Nothing about the file it lives in would say so, so the URLs are driven for real.
- */
+/** Guards the bypass a route file cannot show: an /admin URL that does not nest under the gate. */
 describe("instance-admin route gate", () => {
 	it("enumerates the instance-admin routes rather than trusting a hand-written list", () => {
-		// A filter that matched nothing leaves every case below vacuously green. Raise the floor when
-		// routes are added; never lower it.
+		// A filter that matched nothing would leave every case below vacuously green.
 		expect(adminUrls.length).toBeGreaterThanOrEqual(6);
 		expect(adminUrls).toContain("/admin/users");
 		expect(adminUrls).toContain("/admin/usage");
@@ -57,14 +52,10 @@ describe("instance-admin route gate", () => {
 	});
 });
 
-/**
- * Both consoles deliberately reuse page names, so the tab title is the only thing separating two
- * open admin tabs.
- */
+/** Both consoles reuse page names, so the title is all that separates two open admin tabs. */
 describe("admin tab titles", () => {
 	async function titleOf(url: string) {
 		mockAppRole("APP_ADMIN");
-		// The per-workspace console gates on membership, not on the app role.
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/members/me", () =>
 				HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
@@ -72,12 +63,11 @@ describe("admin tab titles", () => {
 		);
 		const router = newRouter(url);
 		await router.load();
-		// The deepest match's title wins, so read the last one the matched routes contributed.
-		const titles = router.state.matches
+		const titlesOutsideIn = router.state.matches
 			.flatMap((match) => match.meta ?? [])
 			.map((tag) => tag?.title)
 			.filter((title): title is string => typeof title === "string");
-		return titles.at(-1);
+		return titlesOutsideIn.at(-1);
 	}
 
 	it.each([

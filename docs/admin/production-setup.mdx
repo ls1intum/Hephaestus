@@ -27,8 +27,8 @@ Set the following secrets before starting the stack:
 | --- | --- |
 | `HEPHAESTUS_SECURITY_ENCRYPTION_KEY` | **Required.** AES-256 key (EXACTLY 32 chars) for credentials encrypted at rest in the `connection` table. Must be set **before the first deploy** of the unified integration framework — the Liquibase backfill re-encrypts existing credentials on boot and fails fast (or HALTs the migration) without it. Keep it stable; rotating requires re-encrypting all rows. Generate: `openssl rand -base64 24 \| cut -c1-32`. |
 | `WEBHOOK_SECRET` | HMAC secret for GitHub and GitLab webhooks (prefer SHA-256; e.g., `openssl rand -hex 32`) |
-| `GITHUB_OAUTH_CLIENT_ID` | GitHub OAuth app client ID (callback `https://<host>/api/login/oauth2/code/github`) |
-| `GITHUB_OAUTH_CLIENT_SECRET` | GitHub OAuth app client secret |
+| `GH_OAUTH_CLIENT_ID` | GitHub OAuth app client ID (callback `https://<host>/api/login/oauth2/code/github`). In `docker/.env` the key is `GH_OAUTH_CLIENT_ID` — GitHub Actions reserves the `GITHUB_` prefix, so Compose maps it to the server's `GITHUB_OAUTH_CLIENT_ID`. Setting `GITHUB_OAUTH_CLIENT_ID` in `docker/.env` has no effect and the provider is silently skipped. |
+| `GH_OAUTH_CLIENT_SECRET` | GitHub OAuth app client secret (same `GH_`-prefix rule). |
 | `HEPHAESTUS_AUTH_ISSUER` | Public issuer origin, e.g. `https://<host>` (sets the JWT `iss` + `/.well-known` issuer) |
 | `HEPHAESTUS_AUTH_STATE_COOKIE_KEY` | Base64 32-byte AES key sealing the OAuth state cookies (`openssl rand -base64 32`) |
 | `HEPHAESTUS_INTEGRATION_SLACK_ENABLED` | Optional: enables the Slack OAuth admin surface (per-workspace connect) |
@@ -108,7 +108,7 @@ mirror. The key is encrypted at rest in the `connection` table.
 | Variable | Purpose |
 | --- | --- |
 | `HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED` | Enables the Outline beans (connect, sync, webhook, content projection). Every Outline bean is gated on it and defaults to **off**, so an unset flag means the integration is entirely absent — no admin surface, no sync, no webhook verification. |
-| `OUTLINE_OAUTH_BASE_URL` | Outline instance the account-linking flow federates to, e.g. `https://wiki.example.com`. **Required whenever `OUTLINE_OAUTH_CLIENT_ID` is set** — Outline is self-hosted, so there is no default origin. Blank or invalid, the provider seed is skipped with only a `WARN` (the app still boots; the linking button is simply never there). |
+| `OUTLINE_OAUTH_BASE_URL` | Outline instance the account-linking flow federates to, e.g. `https://wiki.example.com`. **Required whenever `OUTLINE_OAUTH_CLIENT_ID` is set** — Outline is self-hosted, so there is no default origin. Blank or invalid, the provider seed is skipped and the reason is logged at `ERROR` naming the offending variable (the app still boots; the linking button is simply never there). |
 | `OUTLINE_OAUTH_CLIENT_ID` | Outline OAuth app client ID (redirect `https://<host>/api/login/oauth2/code/outline`) |
 | `OUTLINE_OAUTH_CLIENT_SECRET` | Outline OAuth app client secret |
 | `OUTLINE_OAUTH_DISPLAY_NAME` | Label shown on the account-linking button (defaults to `Outline`) |
@@ -300,6 +300,46 @@ second reasoning rate would double-count the same work.
 
 **Webhook secret:** Set `WEBHOOK_SECRET` to the secret configured on your GitHub and GitLab webhooks. Prefer SHA-256 (`X-Hub-Signature-256`) and generate with `openssl rand -hex 32` (base64 also works).
 
+### A workspace stopped running practice reviews
+
+Nothing errors when practice review stops — the workspace simply goes quiet, so this is the one
+failure you have to go looking for. Work down the list; the first four are per-workspace and the last
+two are instance-wide, so if several workspaces went quiet at once, start at the bottom.
+
+1. **Is a detection model bound and enabled?** Workspace → Administration → **AI models**, the
+   "Detection runs on …" card. A workspace with no binding runs no reviews at all — this is the
+   expected state immediately after upgrading from named agent configurations, where everything is
+   carried over switched off (see `MIGRATION.md`). The card's readiness indicator also covers the
+   next case.
+2. **Is the bound model still usable?** A model is only usable if the model *and* its connection are
+   both enabled, the protocol is supported, and — for a shared instance model — the workspace still
+   has a grant. Revoking a grant or disabling a connection stops every workspace bound to it, and the
+   binding stays in place looking correct.
+3. **Is a budget exhausted?** Administration → **AI usage** names which purse paused the workspace
+   and who can lift it. Jobs already queued are *held*, not cancelled, and released automatically
+   when the cap is raised or the month rolls over — but a job still over cap seven days after it was
+   queued is cancelled rather than held forever. Note that a held job carries a future
+   `available_at`, and `agent.queue.depth` counts only jobs eligible to run *now* — so a
+   budget-paused workspace shows a queue depth of zero, not a backlog. Depth alone cannot distinguish
+   "idle" from "everything is held".
+4. **Is the feature or the workspace switched off?** Practice review is a workspace feature flag, and
+   a paused workspace runs nothing regardless of its AI configuration.
+5. **Is `AGENT_ENABLED=true` on every role that needs it?** It defaults to `false` and gates
+   submission, execution *and* orphan recovery independently of the worker role. Set on the worker
+   only, jobs are submitted by nobody; set on the server only, they queue and are never claimed.
+   Confirm by presence, not value: if the flag never reached a pod, `agent.queue.depth`,
+   `agent.queue.oldest_age_seconds` and `agent.queue.running` are absent from that pod's metrics
+   rather than reading zero.
+6. **Are jobs being claimed at all?** Watch `agent.queue.oldest_age_seconds`. It should rise and
+   fall. Climbing monotonically means the server is submitting and no worker is claiming — check
+   `AGENT_ENABLED` and the worker role on the worker pod. Reviews also need `GIT_CHECKOUT_ENABLED`;
+   it and `AGENT_ENABLED` must be true together.
+
+The per-workspace job list under Administration → **Practices → Runs** shows each run's status, the
+model it ran on, and its error message — the fastest way to tell "never submitted" from "submitted
+and failed". Note it does not surface *why* a job is held: a budget-held job renders as an ordinary
+queued row, so confirm step 3 on the AI usage page rather than from this table.
+
 ### Data sync and backfill
 
 The sync scheduler fetches recent GitHub activity (issues, PRs, reviews) for monitored repositories. Backfill optionally syncs historical data in batches to avoid rate limit exhaustion.
@@ -323,7 +363,7 @@ The sync scheduler fetches recent GitHub activity (issues, PRs, reviews) for mon
 
 1. **Provision infrastructure:** Ensure PostgreSQL, NATS, and storage volumes are ready.
 2. **Configure authentication:**
-   - Copy `server/.env.example` to `server/.env`, then populate `GITHUB_OAUTH_CLIENT_ID`, `GITHUB_OAUTH_CLIENT_SECRET`, `HEPHAESTUS_AUTH_ISSUER`, and `HEPHAESTUS_AUTH_STATE_COOKIE_KEY`. The GitHub OAuth app's callback must be `https://<host>/api/login/oauth2/code/github`.
+   - Copy `docker/.env.example` to `docker/.env`, then populate `GH_OAUTH_CLIENT_ID`, `GH_OAUTH_CLIENT_SECRET`, `HEPHAESTUS_AUTH_ISSUER`, and `HEPHAESTUS_AUTH_STATE_COOKIE_KEY`. The GitHub OAuth app's callback must be `https://<host>/api/login/oauth2/code/github`. (`server/.env` is the local-development file for `mvn spring-boot:run`; no Compose service reads it.)
    - Confirm the GitHub identity provider requests the `user:email` scopes and disable username/password login flows to keep authentication SSO-only.
    - If rolling out GitLab login, set `GITLAB_OAUTH_CLIENT_ID/SECRET` (callback `.../api/login/oauth2/code/gitlab`), plus `GITLAB_OAUTH_BASE_URL` (defaults to `https://gitlab.com`; point it at a self-hosted instance such as `https://gitlab.lrz.de`) and optionally `GITLAB_OAUTH_DISPLAY_NAME`. This env-seeds the default GitLab login provider on first boot. Additional GitLab instances are added at runtime by an instance admin under **Instance admin → Login providers** (one OAuth app per instance) — no redeploy. The screen shows the exact redirect URI to register on the upstream GitLab OAuth app.
 3. **Bootstrap secrets:** Load environment variables into your secret manager or `.env` files consumed by Docker/Kubernetes.

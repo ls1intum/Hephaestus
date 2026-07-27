@@ -35,17 +35,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * End-to-end proof of multi-replica orphan recovery against REAL Postgres — the path mocks
- * can't cover: a dead worker's RUNNING job is detected,
- * CAS-requeued back to QUEUED, and becomes claimable by a live poller.
- *
- * <p>The queue IS the {@code agent_job} table now, so there is no separate transport to verify a
- * republish onto — recovery is proven entirely through row state: {@link AgentJobZombieSweeper}
- * requeues the orphan (RUNNING → QUEUED, ownership cleared, {@code retry_count} bumped), and
- * {@link AgentJobExecutor#processJob} (same package, called directly for a deterministic assertion
- * instead of racing the background poll loop) proves the requeued row is actually claimable again.
- *
- * <p>{@code hephaestus.agent.poll-interval} is set to an hour so the executor's own background poll
+ * {@code hephaestus.agent.poll-interval} is set to an hour so the executor's own background poll
  * thread stays quiescent for the duration of the test — every claim in this test is driven explicitly.
  * The Docker host points at a socket that can never exist so the worker-role sandbox beans wire
  * (lazy clients, no I/O at construction) without needing a real Docker daemon; any resulting async
@@ -122,7 +112,6 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         price.setEffectiveFrom(Instant.now().minusSeconds(60));
         priceRepository.save(price);
 
-        // The workspace's PRACTICE_DETECTION binding: what the executor admits at claim time.
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
         binding.setWorkspace(workspace);
         binding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
@@ -139,15 +128,11 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
 
         sweeper.recoverOrphanedJobs();
 
-        // DB: the job is back on the queue, ownership cleared, retry bumped.
         AgentJob requeued = jobRepository.findById(jobId).orElseThrow();
         assertThat(requeued.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
         assertThat(requeued.getWorkerId()).isNull();
         assertThat(requeued.getRetryCount()).isEqualTo(1);
 
-        // The requeue backs the job off, so it is deliberately not yet a poll candidate; processJob's
-        // own SKIP LOCKED claim also gates on available_at <= now. Fast-forward past the backoff to
-        // simulate a later poll attempting the claim.
         fastForwardAvailableAt(jobId);
 
         boolean claimed = executor.processJob(jobId);
@@ -177,8 +162,6 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         // for the old token even before considering the hash change.
         assertThat(jobRepository.findByJobTokenHashAndStatus(oldTokenHash, AgentJobStatus.RUNNING)).isEmpty();
 
-        // The new token authenticates once the job is claimed (RUNNING) again; the claim also gates on
-        // available_at, so fast-forward past the requeue's backoff first.
         fastForwardAvailableAt(jobId);
 
         boolean claimed = executor.processJob(jobId);
@@ -241,18 +224,9 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         AgentJob failed = jobRepository.findById(jobId).orElseThrow();
         assertThat(failed.getStatus()).isEqualTo(AgentJobStatus.FAILED);
         assertThat(failed.getErrorMessage()).contains("retry limit reached");
-        // Never went back through QUEUED — no poll candidate left behind.
         assertThat(jobRepository.findQueuedIdsOldestFirst(10)).doesNotContain(jobId);
     }
 
-    /**
-     * {@code requeueOrphan} CASes on worker ownership, not on {@code status='RUNNING'} alone. A belated
-     * requeue attempt — e.g. a slow/duplicate sweeper pass working from a stale {@link OrphanedJobRef}
-     * snapshot — could match a row that a LIVE sibling has since legitimately re-claimed: status is
-     * RUNNING again, just under a different {@code worker_id}. Without the {@code worker_id} fence,
-     * that belated write would silently steal the sibling's in-progress job back to QUEUED. This
-     * proves the fence holds at the repository level directly (no need to orchestrate an actual race).
-     */
     @Test
     @DisplayName(
         "requeueOrphan is fenced on worker_id — a stale caller cannot steal a job a live sibling has re-claimed"
@@ -260,9 +234,8 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     void requeueOrphanDoesNotStealAJobReclaimedBySomeoneElse() {
         UUID jobId = runningJobOwnedBy("live-sibling", Instant.now(), 0);
 
-        // A stale sweeper pass believes the job is still owned by a worker that has since died AND been
-        // superseded — "dead-replica" is not the row's actual current owner. @Modifying queries need an
-        // active transaction (the sweeper normally provides one via TransactionTemplate); wrap here too.
+        // @Modifying queries need an active transaction (the sweeper normally provides one via
+        // TransactionTemplate); wrap here too.
         String candidateNewToken = AgentJob.generateJobToken();
         int updated = transactionTemplate.execute(s ->
             jobRepository.requeueOrphan(
@@ -306,8 +279,6 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         assertThat(unchanged.getStatus()).isEqualTo(AgentJobStatus.RUNNING);
         assertThat(unchanged.getRetryCount()).isEqualTo(5);
     }
-
-    // ── helpers ──
 
     private UUID runningJobOwnedBy(String workerId, Instant startedAt, int retryCount) {
         AgentJob job = new AgentJob();
@@ -361,12 +332,6 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         workerRegistryRepository.saveAndFlush(w);
     }
 
-    /**
-     * Simulates the requeue's backoff having elapsed: moves
-     * {@code available_at} into the past directly, standing in for "time passed and a later poll
-     * iteration is now attempting the claim" without actually sleeping out the backoff window in the
-     * test.
-     */
     private void fastForwardAvailableAt(UUID jobId) {
         transactionTemplate.executeWithoutResult(status -> {
             AgentJob job = jobRepository.findById(jobId).orElseThrow();

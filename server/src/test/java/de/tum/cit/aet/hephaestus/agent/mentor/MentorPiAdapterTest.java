@@ -62,7 +62,6 @@ class MentorPiAdapterTest extends BaseUnitTest {
         return new MentorPiAdapter(runtimeFactory, new AgentImageProperties("test-image:latest", null), proxyRegistry);
     }
 
-    /** A legacy (pre-catalog) mentor config — connectionScope/connectionId are null. */
     private static MentorLlmConfig llmConfig(String rawBaseUrl) {
         return llmConfig(rawBaseUrl, false);
     }
@@ -98,7 +97,6 @@ class MentorPiAdapterTest extends BaseUnitTest {
         return captor.getValue();
     }
 
-    /** The captured spec's jobToken is a registry-minted token — resolve it back to its routing. */
     private ProxyRouting routingFor(PiPlanSpec spec) {
         return proxyRegistry.validate(spec.jobToken()).orElseThrow();
     }
@@ -127,11 +125,6 @@ class MentorPiAdapterTest extends BaseUnitTest {
             .hasMessageContaining("unsupported mentor context input key");
     }
 
-    /**
-     * This is the only place that can guarantee no turn outlives {@link AgentBindingLimits#MAX_TIMEOUT_SECONDS},
-     * since a binding row that bypassed API validation (legacy data, manual edit) could otherwise slip through.
-     * {@code MentorInFlightReaper} sizes its abandonment window from that same ceiling.
-     */
     @Test
     @DisplayName("a binding stored above the ceiling still produces a turn bounded by the ceiling")
     void turnBudgetIsClampedDownToTheConfigurableCeiling() {

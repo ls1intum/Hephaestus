@@ -25,21 +25,12 @@ import { LlmUsageByDayTable, LlmUsageByJobTypeTable } from "./LlmUsageBreakdownT
 import { budgetUsedPercent, projectBudget } from "./usage-utils";
 
 export interface AdminInstanceLlmUsageTableProps {
-	/** Per-workspace month rollups, already sorted by the container (cost desc). */
 	rows: AdminWorkspaceLlmUsage[];
-	/** ISO `yyyy-MM` month shown; the burn-rate projections in the detail panel are scoped to it. */
+	/** ISO `yyyy-MM`. */
 	month: string;
 	now?: Date;
-	/**
-	 * The month's display-currency rate, taken from the report envelope rather than from any row:
-	 * a month with no workspaces in it has no `rows[0]` to read it off and still has a rate.
-	 */
 	fx?: Fx;
-	/**
-	 * Whether the shown month is the current calendar month (UTC). The verdicts compare a
-	 * workspace's *current* caps against the selected month's spend, so they only describe a real
-	 * pause for the current month.
-	 */
+	/** UTC. The verdicts read *current* caps, so only the current month can show a real pause. */
 	isCurrentMonth: boolean;
 	isLoading: boolean;
 	error: unknown;
@@ -50,14 +41,11 @@ export interface AdminInstanceLlmUsageTableProps {
 	detailError: unknown;
 	onRetryDetail?: () => void;
 	onToggleDetails: (workspace: AdminWorkspaceLlmUsage) => void;
-	/** Edits the *shared-model budget*. There is deliberately no counterpart for the provider cap. */
-	onEditBudget: (workspace: AdminWorkspaceLlmUsage) => void;
+	onEditSharedModelBudget: (workspace: AdminWorkspaceLlmUsage) => void;
 }
 
-/** One entry per header column; `null` is the action slot, which promises no fixed width. */
 const SKELETON_COLUMNS = ["w-32", "w-16", "w-24", "w-16", "w-24", "w-28", "w-12", null];
 
-/** Stable target for the toggle's `aria-controls` and the panel's own `id`. */
 function detailPanelId(workspaceSlug: string): string {
 	return `workspace-usage-details-${workspaceSlug}`;
 }
@@ -67,15 +55,14 @@ function detailPanelId(workspaceSlug: string): string {
  * streams are different people's money and are never summed.
  */
 interface CapUsage {
-	/** Undefined when this stream is uncapped. */
 	cap?: number;
 	spend: number;
-	/** Share of the cap consumed, or undefined when uncapped. Can exceed 100. */
+	/** Share of the cap consumed. Can exceed 100. */
 	percent?: number;
 	paused: boolean;
 	state: CapState;
-	/** Some usage on this stream has no price set, so the spend shown is a floor. */
-	unverifiable: boolean;
+	/** The spend shown is a floor: some of this stream's usage has no price set. */
+	hasUnpricedUsage: boolean;
 }
 
 function capUsage(input: {
@@ -94,7 +81,7 @@ function capUsage(input: {
 		percent,
 		paused: isPaused,
 		state: capState(percent, isPaused, isCurrentMonth),
-		unverifiable: isCurrentMonth && verdict === "UNVERIFIABLE",
+		hasUnpricedUsage: isCurrentMonth && verdict === "UNVERIFIABLE",
 	};
 }
 
@@ -118,7 +105,7 @@ export function AdminInstanceLlmUsageTable({
 	detailError,
 	onRetryDetail,
 	onToggleDetails,
-	onEditBudget,
+	onEditSharedModelBudget,
 }: AdminInstanceLlmUsageTableProps) {
 	if (error != null) {
 		return <QueryErrorAlert error={error} title="Couldn't load AI usage" onRetry={onRetry} />;
@@ -137,8 +124,7 @@ export function AdminInstanceLlmUsageTable({
 	}
 
 	// Detail lives *beside* the table, not in a `colSpan` row: nested, its own two tables would each
-	// open a horizontal scroller inside the table's, which is the two-dimensional scrolling WCAG 2.2
-	// SC 1.4.10 rules out. `aria-controls` ties them together regardless of where it sits.
+	// open a horizontal scroller inside the table's — two-dimensional scrolling (WCAG 2.2 SC 1.4.10).
 	const expandedRow = rows.find((row) => row.workspaceSlug === expandedWorkspaceSlug);
 	const hasConversion = rows.some(
 		(row) =>
@@ -148,7 +134,6 @@ export function AdminInstanceLlmUsageTable({
 
 	return (
 		<div className="space-y-4">
-			{/* Said once above the table, because a control that is simply absent explains nothing. */}
 			{!isCurrentMonth && <CapIsNotMonthScoped subject="budget" />}
 			<Table containerClassName="rounded-md border">
 				<TableCaption className="sr-only">
@@ -210,7 +195,6 @@ export function AdminInstanceLlmUsageTable({
 											{row.workspaceSlug}
 										</div>
 									</TableCell>
-									{/* The cap columns stay USD-only: a cap is a number someone typed in USD. */}
 									<TableCell className="text-right tabular-nums">
 										<MoneyCell>{formatCostUsd(row.instanceTotalCostUsd)}</MoneyCell>
 										<FxSpendLine usd={row.instanceTotalCostUsd} fx={fx} />
@@ -245,17 +229,15 @@ export function AdminInstanceLlmUsageTable({
 												{isExpanded ? <ChevronDown aria-hidden /> : <ChevronRight aria-hidden />}
 												Details
 											</Button>
-											{/* Every row's button reads "Set budget", so the accessible name adds which
-											    workspace and which purse — and must still *start* with the visible label
-											    for speech control (WCAG 2.2 SC 2.5.3 Label in Name).
-											    Current month only: a budget is not month-scoped, so editing one from a
+											{/* Current month only: a budget is not month-scoped, so editing one from a
 											    closed month would quietly change what runs today. */}
 											{isCurrentMonth && (
 												<Button
 													variant="outline"
 													size="sm"
+													// Must start with the visible label for speech control (WCAG SC 2.5.3).
 													aria-label={`Set budget for ${row.displayName} (shared models)`}
-													onClick={() => onEditBudget(row)}
+													onClick={() => onEditSharedModelBudget(row)}
 												>
 													Set budget
 												</Button>
@@ -288,7 +270,6 @@ export function AdminInstanceLlmUsageTable({
 	);
 }
 
-/** Which purse, in the same words as the two spend columns. */
 type CapScope = "shared" | "provider";
 
 interface CapPace {
@@ -298,11 +279,6 @@ interface CapPace {
 	percent: number;
 }
 
-/**
- * The streams close enough to their cap that the month's pace is worth showing. Read off the detail
- * report rather than the table row, so the figures under the alert are the ones the breakdowns
- * below it add up to.
- */
 function pacesWorthWarningAbout(
 	report: WorkspaceLlmUsageReport | undefined,
 	isCurrentMonth: boolean,
@@ -339,10 +315,7 @@ interface WorkspaceUsageDetailsProps {
 	isLoading: boolean;
 	error: unknown;
 	onRetry?: () => void;
-	/**
-	 * The table's rate, handed down rather than read off the detail report: nothing enforces that the
-	 * two responses agree, and two rates on one screen is a bug nobody would spot.
-	 */
+	/** The table's own rate, not the detail report's: nothing enforces that the two responses agree. */
 	fx: Fx;
 	month: string;
 	now: Date;
@@ -350,9 +323,6 @@ interface WorkspaceUsageDetailsProps {
 }
 
 /**
- * The expanded workspace's breakdowns, rendered under the table rather than inside it, so it names
- * the workspace in its own heading.
- *
  * The two breakdown tables stack until `xl`: side by side they would each be too narrow to avoid a
  * horizontal scroller of their own, which is two-dimensional scrolling (WCAG 2.2 SC 1.4.10).
  */
@@ -375,8 +345,7 @@ function WorkspaceUsageDetails({
 			aria-labelledby={`${panelId}-heading`}
 			className="space-y-4 rounded-md border bg-muted/20 p-4"
 		>
-			{/* `h2`, not `h3`: `CardTitle` above renders a `<div>`, so nothing sits between this and the
-			    page's `h1` and an `h3` would skip a level (WCAG SC 1.3.1). */}
+			{/* `h2`, not `h3`: `CardTitle` renders a `<div>`, so an `h3` would skip a level (SC 1.3.1). */}
 			<h2 id={`${panelId}-heading`} className="font-medium">
 				Usage details · {workspace.displayName}
 			</h2>
@@ -422,17 +391,10 @@ function WorkspaceUsageDetails({
 
 interface HelpHeaderProps {
 	children: string;
-	/** Whose money this column is — the two caps are easy to confuse. */
 	help: string;
 }
 
-/**
- * A column header that explains itself on hover/focus. The header text is the trigger rather than a
- * separate icon button, so the column's accessible name stays exactly the visible label.
- *
- * `min-h-6` is the 24 px WCAG 2.2 SC 2.5.8 target size; the header's own ~20 px line height would
- * otherwise leave the trigger conforming only via the Spacing exception.
- */
+/** `min-h-6` is the 24 px target size (WCAG 2.2 SC 2.5.8); the header's line height is only ~20 px. */
 function HelpHeader({ children, help }: HelpHeaderProps) {
 	return (
 		<Tooltip>
@@ -447,15 +409,10 @@ function HelpHeader({ children, help }: HelpHeaderProps) {
 
 interface CapCellProps {
 	usage: CapUsage;
-	/** Which cap this is, for the meter's accessible name. */
 	label: string;
 	workspace: string;
 }
 
-/**
- * A cap as an amount *and* a fill: "how close is this workspace" is the question an admin has, and a
- * binary in-budget pill can only answer it once the trouble has arrived.
- */
 function CapCell({ usage, label, workspace }: CapCellProps) {
 	if (usage.cap == null) {
 		return (
@@ -481,8 +438,7 @@ function CapCell({ usage, label, workspace }: CapCellProps) {
 					capUsd={usage.cap}
 					label={`${label} used by ${workspace}`}
 				/>
-				{/* The meter's tone never carries the state alone — this line says it in words
-				    (WCAG SC 1.4.1). */}
+				{/* The meter's tone never carries the state alone — this line says it in words (SC 1.4.1). */}
 				<span className="text-xs text-muted-foreground tabular-nums">
 					<MoneyCell>{formatCostUsd(usage.spend)}</MoneyCell> · {rounded}%
 					{usage.state != null && ` · ${CAP_STATE_LABELS[usage.state]}`}
@@ -511,11 +467,6 @@ const BADGE_VARIANTS: Record<(typeof BADGE_STATES)[number], "destructive" | "war
 	near: "warning",
 };
 
-/**
- * Which cap, if any, is currently holding the workspace back. Naming the cap is the point: the
- * admin can only raise one of the two, and the other is not theirs to touch — so both caps badge
- * independently and the badges stack.
- */
 function StatusCell({ shared, provider, isCurrentMonth }: StatusCellProps) {
 	if (!isCurrentMonth) {
 		return <span className="text-muted-foreground">—</span>;
@@ -534,9 +485,8 @@ function StatusCell({ shared, provider, isCurrentMonth }: StatusCellProps) {
 				variant: BADGE_VARIANTS[state],
 			})),
 	);
-	const noPriceSet = shared.unverifiable || provider.unverifiable;
+	const noPriceSet = shared.hasUnpricedUsage || provider.hasUnpricedUsage;
 
-	// Nothing to report is not a state: the two cap cells beside this one already show the amounts.
 	if (badges.length === 0 && !noPriceSet) {
 		return <span className="text-muted-foreground">—</span>;
 	}

@@ -148,7 +148,6 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Test
     @WithAdminUser
     void filteringByChangedKeyNarrowsToOneControl() {
-        // Without changed_keys this is unanswerable server-side, and a client cannot filter after paging.
         Workspace workspace = setupWorkspace("audit-filter");
         patchPracticeReview(workspace, Map.of("cooldownMinutes", 45));
         patchPracticeReview(workspace, Map.of("skipDrafts", true));
@@ -235,7 +234,6 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Test
     @WithMentorUser
     void aNonInstanceAdminIsRefusedTheCrossWorkspaceView() {
-        // app_admin is the only thing between a signed-in user and every workspace's configuration history.
         webTestClient
             .get()
             .uri("/admin/config-audit")
@@ -429,10 +427,7 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
             .isOk();
     }
 
-    /**
-     * A second producer, of a different entity type and with a CREATED action, so the filter matrix
-     * below can prove each predicate narrows rather than matching everything.
-     */
+    /** A second producer, of a different entity type and action, so the filter matrix proves each predicate narrows. */
     private void createConnection(Workspace workspace, String slug) {
         webTestClient
             .post()

@@ -70,7 +70,6 @@ class MentorLiveLlmTest {
     /** Pi SDK version pinned in pi-mentor-runner.mjs. Bump in lockstep with the runner. */
     private static final String PI_SDK_VERSION = "0.74.0";
 
-    /** Per-test wall-clock cap for a real remote model. */
     private static final Duration TURN_TIMEOUT = Duration.ofSeconds(90);
 
     /** Project-relative location of the SDK install. Build output, never vendored. Gitignored. */
@@ -641,12 +640,10 @@ class MentorLiveLlmTest {
         ProcessBuilder pb = new ProcessBuilder();
         Map<String, String> env = pb.environment();
         env.putAll(creds.asProcessEnv()); // OPENAI_API_KEY + OPENAI_BASE_URL (legacy back-compat)
-        // The runner reads LLM_PROXY_URL / LLM_PROXY_TOKEN — the same env vars the
-        // sandbox adapter sets in production (via NetworkPolicy). There is no real proxy in front of
-        // this live test, so we point LLM_PROXY_URL directly at the upstream gateway and LLM_PROXY_TOKEN
-        // at the real credential; the runner cannot tell the difference. Without these the hephaestus
-        // provider registration in pi-provider.mjs no-ops and this test fails loud downstream (no model
-        // resolves).
+        // The runner reads LLM_PROXY_URL / LLM_PROXY_TOKEN — the same env vars the sandbox adapter sets
+        // in production (via NetworkPolicy). No real proxy sits in front of this live test, so these point
+        // straight at the upstream gateway and the real credential; the runner cannot tell the difference.
+        // Without them the provider registration in pi-provider.mjs no-ops and no model resolves.
         env.put("LLM_PROXY_URL", creds.baseUrl());
         env.put("LLM_PROXY_TOKEN", creds.apiKey());
         // Pi looks for settings under PI_CODING_AGENT_DIR; pin it inside our temp dir so the

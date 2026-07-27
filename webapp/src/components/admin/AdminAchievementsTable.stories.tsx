@@ -45,7 +45,6 @@ export const NoMembers: Story = {
 	args: { users: [] },
 };
 
-/** A row mid-recalculation keeps its own button busy; the others stay usable. */
 export const Recalculating: Story = {
 	args: { recalculatingUsers: new Set(["member2"]) },
 	play: async ({ canvasElement }) => {

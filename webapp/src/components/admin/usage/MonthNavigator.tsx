@@ -43,10 +43,7 @@ export function MonthNavigator({
 			>
 				<ChevronLeft />
 			</Button>
-			{/* Deliberately not a live region. Stepping a month is the reader's own action and reloads
-			    the whole report — both cap meters, every row, the rate disclosure — so announcing the
-			    month alone described the smallest thing that changed and implied the rest had not
-			    (SC 4.1.3). A status message is for something the reader did not ask for. */}
+			{/* Not a live region: stepping a month is the reader's own action (SC 4.1.3). */}
 			<span className="w-32 text-center text-sm font-medium tabular-nums">{label}</span>
 			<Button
 				variant="outline"

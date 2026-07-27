@@ -39,9 +39,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * that does starts from an empty database, where a data migration is indistinguishable from a no-op —
  * so this is the only tier that can catch a regression here.
  *
- * <p>The test seeds the old schema with the rows a real upgrading instance would have, runs the
- * migration, and asserts what survived. Tests are ordered because the last two mutate the database
- * they inspect.
+ * <p>Tests are ordered because the last two mutate the database they inspect.
  */
 @Testcontainers
 @Tag("integration")
@@ -85,11 +83,6 @@ class LegacyAgentConfigMigrationIntegrationTest {
         assertThat(scalar("SELECT to_regclass('agent_config')::text")).isNull();
     }
 
-    /**
-     * An instance provisioned through {@code AGENT_DEFAULT_CONFIG_*} (MIGRATION.md's documented
-     * default) has an enabled config with both pointers NULL that actively serves the mentor and
-     * detection; carrying over only pointed-at configs would skip it and lose its key for good.
-     */
     @Test
     @Order(2)
     void theSeederShapeSurvivesEvenThoughNoPointerNamesIt() throws SQLException {
@@ -152,10 +145,6 @@ class LegacyAgentConfigMigrationIntegrationTest {
             .isEqualTo("1");
     }
 
-    /**
-     * A wrong fallback endpoint would sit silently in a disabled row until someone re-enables it, then
-     * send the key to the wrong host.
-     */
     @Test
     @Order(5)
     void aProviderWithNoRecordedEndpointGetsItsDocumentedPublicOne() throws SQLException {
@@ -195,11 +184,6 @@ class LegacyAgentConfigMigrationIntegrationTest {
             .containsExactly(new String[] { "openai-completions", "BEARER" });
     }
 
-    /**
-     * Carrying this config over as a connection alone would drop its timeout/concurrency/internet
-     * limits, which live nowhere but the {@code agent_config} row the next changeSet drops — so the
-     * binding is created too, with a placeholder model name.
-     */
     @Test
     @Order(8)
     void aConfigThatNeverNamedAModelStillKeepsItsExecutionLimits() throws SQLException {
@@ -266,11 +250,6 @@ class LegacyAgentConfigMigrationIntegrationTest {
             .isEqualTo("0");
     }
 
-    /**
-     * Disabled and unreferenced means neither resolver could ever select it, since both filter on
-     * enabled and no pointer named it — unlike an unreferenced but enabled config, which is the seeder
-     * shape and must survive.
-     */
     @Test
     @Order(12)
     void aDisabledConfigNothingCouldReachIsNotCarriedOver() throws SQLException {
@@ -341,10 +320,6 @@ class LegacyAgentConfigMigrationIntegrationTest {
             .contains("are dropped with the old table: legacy-orphan/Orphan");
     }
 
-    /**
-     * Every {@code MARK_RAN} precondition in the file exists so a second pass changes nothing — the
-     * recovery an operator reaches for when a deploy's tracking is in doubt.
-     */
     @Test
     @Order(90)
     void reRunningTheReleaseChangelogChangesNothing() throws Exception {

@@ -63,7 +63,6 @@ class LlmAdmissionServiceTest extends BaseUnitTest {
         return binding;
     }
 
-    /** A binding onto the workspace's own (BYO) catalog: the other funding source entirely. */
     private static WorkspaceAgentBinding byoBinding() {
         WorkspaceAgentBinding binding = binding(AgentPurpose.PRACTICE_DETECTION);
         binding.setInstanceModel(null);
@@ -112,10 +111,9 @@ class LlmAdmissionServiceTest extends BaseUnitTest {
     }
 
     /**
-     * The BYO admission arm — the branch that decides which purse pays. A workspace-owned model must
-     * be priced from the workspace's own catalog row (never from the instance price table) and the
-     * snapshot must be stamped WORKSPACE, or the workspace's provider spend would be charged against
-     * the host's shared-model cap.
+     * A workspace-owned model must be priced from the workspace's own catalog row and stamped
+     * WORKSPACE, or the workspace's provider spend would be charged against the host's shared-model
+     * cap.
      */
     @Test
     void freezesTheWorkspacesOwnPriceAndFundingSourceForABoundByoModel() {
@@ -146,7 +144,6 @@ class LlmAdmissionServiceTest extends BaseUnitTest {
         assertThat(admitted.price().appliedPriceId()).isNull();
         assertThat(admitted.price().per1mInputUsd()).isEqualByComparingTo("0.50");
         assertThat(admitted.price().per1mOutputUsd()).isEqualByComparingTo("2.00");
-        // The instance price table is not the source of truth for a BYO model and must not be read.
         verifyNoInteractions(priceRepository);
     }
 

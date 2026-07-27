@@ -46,8 +46,7 @@ describe("ModelPicker", () => {
 		render(<ModelPicker availableModels={models} value={null} onChange={vi.fn()} />);
 		fireEvent.click(screen.getByRole("combobox"));
 
-		// The price wording is `priceLabel`'s and is stated in `llm-pricing.test.ts`; what the picker
-		// is answerable for is that it ends up in the *name*, not only in sighted text beside it.
+		// The picker is answerable for the price reaching the accessible *name*, not just the text.
 		for (const model of models) {
 			expect(
 				screen.getByRole("option", {

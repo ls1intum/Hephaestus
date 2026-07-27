@@ -15,10 +15,7 @@ import { formatCostUsd, formatRateUsd } from "@/lib/money";
 import { type Fx, FxSpendLine } from "./fx";
 import { formatUsageDay, JOB_TYPE_LABELS } from "./usage-utils";
 
-/**
- * Only ever applied to counts — events, calls, tokens, unpriced rows. Those are integers well inside
- * `Number.MAX_SAFE_INTEGER`, so adding them is exact. Money never goes through here: see the footers.
- */
+/** Counts only — integers, so adding them is exact. Money never goes through here: see the footers. */
 function sumBy<T>(rows: T[], pick: (row: T) => number): number {
 	return rows.reduce((total, row) => total + pick(row), 0);
 }
@@ -38,27 +35,18 @@ const DAY_SKELETON_COLUMNS = ["w-16", "w-16", "w-16", "w-16", "w-12"];
 
 export interface LlmUsageByJobTypeTableProps {
 	/**
-	 * The whole report, not a bare `rows` array — that is what makes the money rule impossible to
-	 * forget. Re-adding the row costs in float would drift from the exact figure the server already
-	 * put on the same payload, and become a second source of truth for a number the budget gate
-	 * enforces against. Omit while it loads, to keep the table shell stable.
+	 * The whole report, not a bare `rows` array: re-adding the row costs in float would drift from the
+	 * exact total the server put on the same payload, which is what the budget gate enforces against.
 	 */
 	report?: WorkspaceLlmUsageReport;
-	/**
-	 * Display-only conversion for the totals row. Body cells stay USD-only: they are sub-dollar
-	 * figures in an already wide table, and an estimate on each would cost the column width that
-	 * makes the table readable at all.
-	 */
+	/** Totals row only. Body cells stay USD-only — an estimate on each would cost the column width. */
 	fx?: Fx;
 }
 
 /** Per-job-type usage with spend split by who pays for the model. */
 export function LlmUsageByJobTypeTable({ report, fx }: LlmUsageByJobTypeTableProps) {
 	const rows = report?.byJobType;
-	// Money comes off the report; only the counts are added up here. And convert the total, never the
-	// sum of converted rows — rounding each row first and adding those up produces a figure that
-	// disagrees with the USD total sitting right next to it.
-	// One row needs no footer: its "total" would restate the line directly above it.
+	// Money comes off the report; only counts are added up here. One row earns no footer.
 	const totals =
 		report == null || rows == null || rows.length < 2
 			? null
@@ -150,8 +138,7 @@ export function LlmUsageByJobTypeTable({ report, fx }: LlmUsageByJobTypeTablePro
 							<MoneyCell>{formatCostUsd(totals.ownProvider)}</MoneyCell>
 							<FxSpendLine usd={totals.ownProvider} fx={fx} />
 						</TableCell>
-						{/* No blended average: the two money streams are different money and averaging
-						    across job types on top of that would mean nothing to anyone. */}
+						{/* No blended average: the two money streams are different money. */}
 						<TableCell className="text-right text-muted-foreground">—</TableCell>
 						<TableCell className="text-right tabular-nums">
 							{totals.unpriced.toLocaleString()}
@@ -176,15 +163,10 @@ export function LlmUsageByJobTypeTable({ report, fx }: LlmUsageByJobTypeTablePro
 }
 
 /**
- * What one unit of this work costs on average — the figure people actually reason with ("a review
- * costs me about $0.14"), which a monthly total never gives them. The two money streams keep their
- * own averages: they are different money and are never added together, so when both are in play the
- * cell shows two labelled lines rather than one blended number.
+ * What one unit of this work costs on average, per money stream — the two are never blended.
  *
- * An average is a rate, not an amount spent, so it renders through `formatRateUsd`: rounding it to
- * cents — or worse, flooring it to the `<$0.01` bound — destroys the exact number this column
- * exists to give. And no `≈`: on this page that glyph means "converted currency" (see `fx.tsx`),
- * the header already says "Avg", and a bare `≈` is announced as "tilde operator" anyway.
+ * An average is a rate, not an amount spent, so it renders through `formatRateUsd`: rounding to cents
+ * destroys the number this column exists to give. And no `≈` — on this page that means "converted".
  */
 function AvgPerRun({ row }: { row: LlmUsageByJobType }) {
 	const parts = [
@@ -222,8 +204,6 @@ export interface LlmUsageByDayTableProps {
 /** Daily usage with the same two money streams as the job-type rollup. */
 export function LlmUsageByDayTable({ report, fx }: LlmUsageByDayTableProps) {
 	const rows = report?.byDay;
-	// Same rules as the job-type rollup: the server's month totals, one conversion applied to the USD
-	// total, and no footer for a single row.
 	const totals =
 		report == null || rows == null || rows.length < 2
 			? null

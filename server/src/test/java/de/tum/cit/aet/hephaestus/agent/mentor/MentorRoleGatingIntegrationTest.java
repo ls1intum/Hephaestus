@@ -10,7 +10,6 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
-/** Proves mentor infrastructure remains usable when practice-job execution is disabled. */
 class MentorRoleGatingIntegrationTest extends BaseIntegrationTest {
 
     @DynamicPropertySource

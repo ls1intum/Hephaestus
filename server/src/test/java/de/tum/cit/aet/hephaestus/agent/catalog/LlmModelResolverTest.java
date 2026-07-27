@@ -58,7 +58,6 @@ class LlmModelResolverTest extends BaseUnitTest {
         lenient().when(instanceModels.findById(20L)).thenReturn(Optional.of(model));
     }
 
-    /** A per-purpose binding for workspace 30 with no model bound yet. */
     private static WorkspaceAgentBinding binding() {
         Workspace workspace = new Workspace();
         workspace.setId(30L);
@@ -69,13 +68,11 @@ class LlmModelResolverTest extends BaseUnitTest {
     }
 
     /**
-     * The file's one positive case, and it has to assert the payload field by field: this credential is
-     * what the proxy dials with, and every field is the same shape as its neighbour. Swapping
-     * {@code baseUrl} for {@code apiProtocol}, or handing back the connection's id where the model's
-     * upstream id belongs, produces a perfectly non-null credential that talks to the wrong provider.
+     * Every field of the credential is the same shape as its neighbour, so a swapped {@code baseUrl}
+     * and {@code apiProtocol} still produces a non-null credential that talks to the wrong provider.
      */
     @Test
-    void shouldResolveActivePublicInstanceModelForWorkspace() {
+    void shouldResolveEveryCredentialFieldForAnActivePublicInstanceModel() {
         var ref = new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 10L, 20L, 30L);
 
         LlmModelResolver.ProxyCredential credential = resolver.resolveProxyCredential(ref);
@@ -90,10 +87,8 @@ class LlmModelResolverTest extends BaseUnitTest {
     }
 
     /**
-     * A connection saved with an empty key is not a connection with an empty key: an empty
-     * {@code Authorization: Bearer} header is a request the provider rejects with a confusing 401,
-     * whereas no key at all lets the proxy fall through to whatever unauthenticated access the
-     * provider offers, which is the honest representation of "no credential configured".
+     * An empty {@code Authorization: Bearer} header is a request the provider rejects with a confusing
+     * 401, whereas no key at all lets the proxy fall through to unauthenticated access.
      */
     @Test
     void shouldReportABlankApiKeyAsNoCredentialAtAll() {
@@ -166,8 +161,6 @@ class LlmModelResolverTest extends BaseUnitTest {
 
     @Test
     void shouldNotResolveACredentialForABindingWithoutACatalogModel() {
-        // The credential only ever comes from the bound model's connection — an unbound binding has no
-        // other place a key could come from, so resolution fails closed.
         WorkspaceAgentBinding binding = binding();
 
         assertThat(resolver.resolveCredential(binding)).isNull();

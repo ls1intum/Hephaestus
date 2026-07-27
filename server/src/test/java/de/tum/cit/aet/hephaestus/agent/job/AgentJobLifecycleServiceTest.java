@@ -81,9 +81,6 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
         workspace.setId(1L);
         workspace.setWorkspaceSlug("test-ws");
 
-        // cancel() runs its status-transition CAS and attempt-ledger write through the same
-        // transactionTemplate.execute callback. Lenient:
-        // RetryDelivery's own nested setup re-stubs the same methods for its own tests.
         lenient()
             .when(transactionTemplate.execute(any()))
             .thenAnswer(inv -> {
@@ -169,9 +166,6 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
 
             AgentJob result = service.cancel(1L, jobId);
 
-            // Both halves of the name: the row really transitions, AND the running container is told.
-            // Stopping the sandbox without persisting CANCELLED would leave a job the UI still calls
-            // running with nothing behind it.
             assertThat(result.getStatus()).isEqualTo(AgentJobStatus.CANCELLED);
             verify(sandboxManager).cancel(jobId);
         }
@@ -216,7 +210,6 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
             UUID jobId = job.getId();
 
             when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
-            // Executor already transitioned to COMPLETED
             when(agentJobRepository.transitionStatus(any(), any(), any(), any(), any())).thenReturn(0);
 
             AgentJob completedJob = createJobWithStatus(AgentJobStatus.COMPLETED);
@@ -232,7 +225,6 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
         }
     }
 
-    /** The CAS winner records an attempt-scoped ledger row in the same transaction. */
     @Nested
     @DisplayName("Unpriced usage ledger write on user-cancel")
     class UnverifiableUsageLedger {
@@ -305,7 +297,6 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
 
         @Test
         void cancellingAJobThatNeverStarted_neverTouchesTheLedger() {
-            // QUEUED and never claimed — no worker_id — so cancelling it must not attribute any spend.
             AgentJob job = createJobWithStatus(AgentJobStatus.QUEUED);
             UUID jobId = job.getId();
 
@@ -347,8 +338,6 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
 
         @Test
         void idempotentCancelOfAnAlreadyCancelledStartedJob_doesNotWriteOutsideWinningTransaction() {
-            // The original transition winner owns the atomic ledger write. An idempotent read of the
-            // already-terminal row must not create a detached accounting transaction.
             AgentJob job = createJobWithStatus(AgentJobStatus.CANCELLED);
             job.setWorkerId("worker-1");
             UUID jobId = job.getId();
@@ -383,7 +372,6 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
             jobId = completedJob.getId();
 
             handler = mock(JobTypeHandler.class);
-            // Lenient: not all tests reach the delivery path that calls getHandler
             lenient().when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
         }
 
@@ -452,7 +440,6 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
         }
     }
 
-    /** {@code recoverStuckDelivery}: the tri-state dedup lookup and the fenced terminal write. */
     @Nested
     @DisplayName("recoverStuckDelivery")
     class RecoverStuckDelivery {

@@ -16,12 +16,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.springframework.beans.factory.ObjectProvider;
 
-/**
- * Unit coverage of {@link InstanceLlmSettingsService}'s {@code auth_event} audit wiring. {@link LlmSettingsAudit} is reached through an {@link ObjectProvider} (this service must
- * stay loadable on the worker/webhook roles, where the port's sole implementation is absent) — both
- * branches are exercised: available (the normal server-role case) and absent (defensive; the DI-shape
- * reason this service uses a provider at all).
- */
 class InstanceLlmSettingsServiceTest extends BaseUnitTest {
 
     @Mock
@@ -47,13 +41,6 @@ class InstanceLlmSettingsServiceTest extends BaseUnitTest {
     @Nested
     class AuditWiring {
 
-        /**
-         * The audited flag must be the value that was PERSISTED, not the one that arrived on the
-         * request. A partial patch makes the two differ: this request touches only the egress hosts and
-         * leaves {@code allowWorkspaceConnections} null, so the persisted row keeps its existing
-         * {@code true} and that is what belongs in the audit trail. Auditing the request field instead
-         * would record "workspace providers were turned off" for an edit that never touched them.
-         */
         @Test
         void updateAuditsThePersistedFlagNotTheRequestedOne() {
             InstanceLlmSettings existing = new InstanceLlmSettings();
@@ -64,7 +51,6 @@ class InstanceLlmSettingsServiceTest extends BaseUnitTest {
             );
             when(settingsRepository.save(any(InstanceLlmSettings.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            // allowWorkspaceConnections left null: an egress-hosts-only patch.
             InstanceLlmSettings saved = settingsService.update(
                 new UpdateInstanceLlmSettingsRequestDTO("api.openai.com", null)
             );
@@ -85,8 +71,6 @@ class InstanceLlmSettingsServiceTest extends BaseUnitTest {
         void updateSucceedsWithoutAuditingWhenThePortIsAbsent() {
             // The worker/webhook shape: LlmSettingsAudit's sole impl is @ConditionalOnServerRole, so a
             // role that still loads this (ungated) service must degrade to "no audit" rather than NPE.
-            // Nothing on this path today actually calls update() off the server role, but the DI shape
-            // must not crash if it ever does.
             when(llmSettingsAuditProvider.getIfAvailable()).thenReturn(null);
             when(settingsRepository.findByIdForUpdate(InstanceLlmSettingsService.SINGLETON_ID)).thenReturn(
                 Optional.of(new InstanceLlmSettings())

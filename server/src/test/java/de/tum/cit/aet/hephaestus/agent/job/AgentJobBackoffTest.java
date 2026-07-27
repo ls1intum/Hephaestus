@@ -8,10 +8,6 @@ import java.util.random.RandomGenerator;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/**
- * quartic-with-jitter backoff math. A seeded {@link RandomGenerator} makes the
- * jitter deterministic for assertions instead of asserting a range every time.
- */
 class AgentJobBackoffTest extends BaseUnitTest {
 
     /** Always returns the midpoint (0.5) — i.e. zero jitter, exact base value. */
@@ -65,14 +61,9 @@ class AgentJobBackoffTest extends BaseUnitTest {
         assertThat(AgentJobBackoff.compute(1000, NO_JITTER)).isEqualTo(Duration.ofMinutes(15));
     }
 
-    /**
-     * Jitter multiplies the UNCAPPED base and the cap clamps the jittered value — that order, and not
-     * the other. Capping first would leave the +10% leg free to carry a maxed-out 900s wait to 990s,
-     * which is a wait longer than the cap this class promises.
-     */
     @Test
     @DisplayName("the cap is applied after jitter, so even maximum positive jitter cannot exceed 15 minutes")
-    void maximumPositiveJitterNeverExceedsTheCap() {
+    void capIsAppliedAfterJitterSoMaximumPositiveJitterNeverExceedsIt() {
         assertThat(AgentJobBackoff.compute(100, MAX_POSITIVE_JITTER))
             .as("no wait may exceed the cap, whichever way the jitter goes")
             .isLessThanOrEqualTo(Duration.ofMinutes(15));

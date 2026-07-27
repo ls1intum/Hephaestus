@@ -38,8 +38,6 @@ const detailReport: WorkspaceLlmUsageReport = {
 			cacheReadTokens: 0,
 			cacheWriteTokens: 0,
 			totalCalls: 4,
-			// Two events, so the per-event averages ($2.125 and $0.875) can't collide with the spend
-			// figures they are derived from and each assertion below names one cell.
 			events: 2,
 		},
 	],
@@ -71,12 +69,11 @@ function renderTable(
 			isDetailLoading={false}
 			detailError={null}
 			onToggleDetails={() => {}}
-			onEditBudget={() => {}}
+			onEditSharedModelBudget={() => {}}
 		/>,
 	);
 }
 
-/** The body row for the single-workspace fixtures below. */
 function firstDataRow() {
 	return screen.getAllByRole("row")[1];
 }
@@ -88,8 +85,6 @@ describe("AdminInstanceLlmUsageTable", () => {
 			<AdminInstanceLlmUsageTable
 				rows={[workspace]}
 				month="2026-07"
-				// Pinned like every other render here: the fixture's month is July 2026, and falling back
-				// to the real clock would quietly turn this into a different test on 1 August.
 				now={new Date("2026-07-10T12:00:00.000Z")}
 				isCurrentMonth
 				isLoading={false}
@@ -98,7 +93,7 @@ describe("AdminInstanceLlmUsageTable", () => {
 				isDetailLoading={false}
 				detailError={null}
 				onToggleDetails={onToggleDetails}
-				onEditBudget={() => {}}
+				onEditSharedModelBudget={() => {}}
 			/>,
 		);
 
@@ -108,7 +103,7 @@ describe("AdminInstanceLlmUsageTable", () => {
 			name: "View usage details for Example Workspace",
 		});
 		expect(toggle.getAttribute("aria-expanded")).toBe("false");
-		// The detail row doesn't exist yet, so nothing may point at it.
+		// Collapsed, so there is no detail row for `aria-controls` to point at.
 		expect(toggle.getAttribute("aria-controls")).toBeNull();
 
 		fireEvent.click(toggle);
@@ -135,7 +130,6 @@ describe("AdminInstanceLlmUsageTable", () => {
 		expect(
 			row.getByRole("progressbar", { name: "Shared-model budget used by Example Workspace" }),
 		).toBeTruthy();
-		// Being inside both caps is not a state: the cap cells already say it, in amounts.
 		expect(screen.queryByText("Within budget")).toBeNull();
 	});
 
@@ -144,7 +138,7 @@ describe("AdminInstanceLlmUsageTable", () => {
 
 		const row = within(firstDataRow());
 		expect(row.getByText("Near cap · shared models")).toBeTruthy();
-		// The tone alone must never carry the state (WCAG SC 1.4.1).
+		// The amber tone alone must never carry the state (WCAG SC 1.4.1).
 		expect(row.getByText("$41.00 · 82% · Near cap")).toBeTruthy();
 	});
 
@@ -197,16 +191,13 @@ describe("AdminInstanceLlmUsageTable", () => {
 		]);
 	});
 
-	it("withdraws the budget editor on a closed month, which it would silently change today", () => {
+	it("withdraws the budget editor on a closed month and says why, once, above the table", () => {
 		renderTable([workspace], { isCurrentMonth: false });
 
 		const buttons = within(firstDataRow())
 			.getAllByRole("button")
 			.map((button) => button.getAttribute("aria-label") ?? button.textContent);
-		// A budget is not month-scoped: saved from June's view it takes effect now. The month's figures
-		// are still readable — only the control that would change the present is gone.
 		expect(buttons).toEqual(["View usage details for Example Workspace"]);
-		// …and it says why, once, above the table. A control that is simply absent explains nothing.
 		expect(screen.getByText(/applies from the moment it is saved/i)).toBeTruthy();
 	});
 
@@ -230,7 +221,7 @@ describe("AdminInstanceLlmUsageTable", () => {
 				isDetailLoading={false}
 				detailError={null}
 				onToggleDetails={() => {}}
-				onEditBudget={() => {}}
+				onEditSharedModelBudget={() => {}}
 			/>,
 		);
 
@@ -247,7 +238,7 @@ describe("AdminInstanceLlmUsageTable", () => {
 		expect(within(byDay).getByText("$4.25")).toBeTruthy();
 	});
 
-	it("projects a near-cap month in the panel, the way the workspace's own console does", () => {
+	it("projects a near-cap month in the panel, in the third person the host is reading in", () => {
 		render(
 			<AdminInstanceLlmUsageTable
 				rows={[workspace]}
@@ -265,18 +256,14 @@ describe("AdminInstanceLlmUsageTable", () => {
 				isDetailLoading={false}
 				detailError={null}
 				onToggleDetails={() => {}}
-				onEditBudget={() => {}}
+				onEditSharedModelBudget={() => {}}
 			/>,
 		);
 
-		// Third person here, second person on the workspace's own page ("You've used …% of your …"):
-		// the instance admin is reading about someone else's budget, and the sentence says so. The
-		// projection underneath is person-neutral, because it is one text under both subjects.
 		expect(
 			screen.getByText("Example Workspace has used 84% of its shared-model budget"),
 		).toBeTruthy();
 		expect(screen.getByText(/At this pace, the budget is reached around July 12\./)).toBeTruthy();
-		// The provider cap is nowhere near its own, so it stays quiet.
 		expect(screen.queryByText(/of its provider cap/)).toBeNull();
 	});
 
@@ -289,11 +276,9 @@ describe("AdminInstanceLlmUsageTable", () => {
 		};
 
 		it("converts both spend columns, not just the one the host pays for", () => {
-			// The rate arrives with the month, not on any row — the rows below carry none.
 			renderTable([workspace], { fx: eur });
 
 			const row = within(firstDataRow());
-			// Converting the shared spend and not the workspace's own reads as "these differ in kind".
 			expect(row.getByLabelText("approximately 3.74 euros")).toBeTruthy();
 			expect(row.getByLabelText("approximately 1.54 euros")).toBeTruthy();
 		});
@@ -307,16 +292,13 @@ describe("AdminInstanceLlmUsageTable", () => {
 		});
 
 		it("survives a month with no workspaces in it", () => {
-			// The rate belongs to the month, not to any row, so it is still known on a month with no
-			// workspaces in it. Nothing on screen converted, so nothing is disclosed — a deliberate
-			// silence, not a missing rate.
 			renderTable([], { fx: eur });
 
 			expect(screen.getByText("No workspaces on this instance yet")).toBeTruthy();
 			expect(screen.queryByText(/reference rate published on/)).toBeNull();
 		});
 
-		it("hands the table's own rate to the expanded breakdown", () => {
+		it("hands the table's own rate and the server's own total to the expanded breakdown", () => {
 			render(
 				<AdminInstanceLlmUsageTable
 					rows={[workspace]}
@@ -327,8 +309,6 @@ describe("AdminInstanceLlmUsageTable", () => {
 					isLoading={false}
 					error={null}
 					expandedWorkspaceSlug={workspace.workspaceSlug}
-					// One month resolves to one rate, so the two agree today — but nothing enforces it, and
-					// two rates on one screen is a bug nobody would spot. The panel renders the table's.
 					detailReport={{
 						...detailReport,
 						fx: { ...eur, currencyCode: "GBP", ratePerUsd: 0.5 },
@@ -346,7 +326,7 @@ describe("AdminInstanceLlmUsageTable", () => {
 					isDetailLoading={false}
 					detailError={null}
 					onToggleDetails={() => {}}
-					onEditBudget={() => {}}
+					onEditSharedModelBudget={() => {}}
 				/>,
 			);
 
@@ -354,8 +334,6 @@ describe("AdminInstanceLlmUsageTable", () => {
 			const footer = within(byDay).getByRole("row", { name: /^Total/ });
 			expect(footer.textContent).toContain("€");
 			expect(footer.textContent).not.toContain("£");
-			// And the money itself is the server's month total, not a re-addition of the two day rows:
-			// the rows here come to $8.50 while the report says $4.25, so only one of them can show.
 			expect(footer.textContent).toContain("$4.25");
 			expect(footer.textContent).not.toContain("$8.50");
 		});

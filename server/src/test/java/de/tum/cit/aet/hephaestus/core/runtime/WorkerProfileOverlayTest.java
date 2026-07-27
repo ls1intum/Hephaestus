@@ -12,10 +12,8 @@ import org.springframework.core.env.PropertySource;
 import org.springframework.core.io.ClassPathResource;
 
 /**
- * Reads {@code application-worker.yml} itself. Every other role test asserts which beans wire under a
- * hand-written property set; the two values below are regressions that a hand-written property set
- * cannot catch, because the mistake would be IN the file the deployment loads and no test that sets
- * its own properties ever reads it.
+ * Reads {@code application-worker.yml} itself: the two values below are regressions no test that sets
+ * its own properties can catch, because the mistake would be IN the file the deployment loads.
  */
 class WorkerProfileOverlayTest extends BaseUnitTest {
 
@@ -28,11 +26,9 @@ class WorkerProfileOverlayTest extends BaseUnitTest {
     }
 
     /**
-     * The LLM proxy is the only path a sandbox has to a provider key (ADR 0006), and it is served by
-     * this pod's own HTTP connector. {@code server.port: -1} disables that connector: the beans still
-     * wire, so every context test stays green, while the sandbox's
-     * {@code http://<pod>:<port>/internal/llm} target resolves to a negative port and every job this
-     * worker claims fails to reach its model.
+     * The LLM proxy is the only path a sandbox has to a provider key (ADR 0006) and it is served by this
+     * pod's own HTTP connector, which {@code server.port: -1} disables. The beans still wire, so every
+     * context test stays green while every job this worker claims fails to reach its model.
      */
     @Test
     void servesTheLlmProxyOnARealPort() throws IOException {
@@ -40,10 +36,9 @@ class WorkerProfileOverlayTest extends BaseUnitTest {
     }
 
     /**
-     * A worker inherits {@code AGENT_ENABLED} from the base configuration, where it is off. Pinning it
-     * on here would make a pod started outside compose — with none of the env vars the operator was
-     * told to set — claim jobs and spend LLM budget the operator believed inert. Compose passes the
-     * variable explicitly, so only a non-compose deployment could ever have hit that.
+     * A worker inherits {@code AGENT_ENABLED} from the base configuration, where it is off. Pinning it on
+     * in the overlay would make a pod started outside compose — with none of the env vars the operator was
+     * told to set — claim jobs and spend LLM budget the operator believed inert.
      */
     @Test
     void doesNotTurnJobExecutionOnByItself() throws IOException {

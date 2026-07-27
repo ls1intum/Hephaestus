@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback;
 
+import static de.tum.cit.aet.hephaestus.integration.scm.GraphQlResponseStubValidator.Vendor.GITLAB;
+import static de.tum.cit.aet.hephaestus.integration.scm.GraphQlResponseStubValidator.assertVendorCouldReturn;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -37,6 +39,18 @@ import reactor.core.publisher.Mono;
 class GitlabInlineFindingChannelTest extends BaseUnitTest {
 
     private static final String MARKER = "<!-- hephaestus-diff-note -->";
+
+    /** The committed mutation document whose payload each stubbed response path belongs to. */
+    private static final Map<String, String> MUTATION_DOCUMENTS = Map.of(
+        "createDiffNote",
+        "CreateDiffNote",
+        "createNote",
+        "CreateMergeRequestNote",
+        "updateNote",
+        "UpdateNote",
+        "destroyNote",
+        "DestroyNote"
+    );
 
     @Mock
     private GitLabGraphQlClientProvider gitLabProvider;
@@ -376,6 +390,12 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
         List<Map<String, Object>> discussions,
         GitLabPageInfo pageInfo
     ) {
+        assertVendorCouldReturn(
+            GITLAB,
+            "GetMergeRequestDiscussions",
+            "project.mergeRequest.discussions.nodes",
+            discussions
+        );
         ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
         ClientResponseField nodesField = mock(ClientResponseField.class);
         when(response.field("project.mergeRequest.discussions.nodes")).thenReturn(nodesField);
@@ -418,9 +438,17 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
     }
 
     private static void stubField(ClientGraphQlResponse response, String path, Object value) {
+        assertVendorCouldReturn(GITLAB, mutationDocument(path), path, value);
         ClientResponseField field = mock(ClientResponseField.class);
         when(response.field(path)).thenReturn(field);
         when(field.getValue()).thenReturn(value);
+    }
+
+    private static String mutationDocument(String path) {
+        String payloadRoot = path.substring(0, path.indexOf('.'));
+        String document = MUTATION_DOCUMENTS.get(payloadRoot);
+        assertThat(document).as("no GitLab mutation document is known for payload root '%s'", payloadRoot).isNotNull();
+        return document;
     }
 
     private static Map<String, Object> note(String id, String body, boolean system) {

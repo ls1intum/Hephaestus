@@ -133,11 +133,6 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
         return issue;
     }
 
-    /**
-     * Captures the one submission request the listener handed to the job service for
-     * {@code workspaceId}. The job type and workspace id are identical across every issue trigger,
-     * so only the payload distinguishes them.
-     */
     private IssueReviewSubmissionRequest captureSubmission(Long workspaceId) {
         var captor = ArgumentCaptor.forClass(IssueReviewSubmissionRequest.class);
         verify(agentJobService).submit(eq(workspaceId), eq(AgentJobType.ISSUE_REVIEW), captor.capture());
@@ -376,7 +371,7 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
     class RetrospectiveIssueClosedTests {
 
         @Test
-        void onIssueClosed_routesClosedIssueThroughGateDespiteClosedState() {
+        void onIssueClosed_routesThroughGateAndCarriesTheClosedTriggerOntoTheJob() {
             // The closed terminal state IS this trigger's reason to run — it must reach the gate, unlike the
             // live create/labeled handlers that short-circuit on a closed issue.
             Issue issue = createIssue(Issue.State.CLOSED);
@@ -392,7 +387,6 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
             listener.onIssueClosed(new ScmDomainEvent.IssueClosed(issueData, "completed", webhookContext(1L)));
 
             verify(practiceReviewDetectionGate).evaluateIssue(issue, TriggerEventNames.ISSUE_CLOSED, TriggerMode.AUTO);
-            // The trigger the gate saw must be the trigger the job carries.
             assertThat(captureSubmission(WORKSPACE_ID).triggerEvent()).isEqualTo(TriggerEventNames.ISSUE_CLOSED);
         }
 

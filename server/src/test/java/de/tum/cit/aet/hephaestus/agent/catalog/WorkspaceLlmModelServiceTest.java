@@ -94,7 +94,6 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
         return createRequest(null, null, null);
     }
 
-    /** Live on arrival with no price — the shape the activation guard has to refuse. */
     private CreateWorkspaceLlmModelRequestDTO enabledUnpricedCreateRequest() {
         return new CreateWorkspaceLlmModelRequestDTO(
             "gpt-5",
@@ -113,7 +112,6 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
         );
     }
 
-    /** slug/displayName/upstreamModelId fixed to "gpt-5"/"GPT-5"/"gpt-5"; only pricing varies per test. */
     private CreateWorkspaceLlmModelRequestDTO createRequest(
         PricingMode pricingMode,
         BigDecimal per1mInputUsd,
@@ -121,26 +119,18 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
     ) {
         return new CreateWorkspaceLlmModelRequestDTO(
             "gpt-5",
-            // slug
             "GPT-5",
-            // displayName
             "gpt-5",
-            // modality
-            null,
-            // contextWindow
-            null,
-            // maxOutputTokens
             null,
             null,
-            // enabled
+            null,
+            null,
             pricingMode,
             per1mInputUsd,
             per1mOutputUsd,
             null,
-            // per1mCacheReadUsd
             null,
-            // per1mReasoningUsd
-            null // priceNote
+            null
         );
     }
 
@@ -159,9 +149,8 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
 
         @Test
         void availableModelsRemainsAvailableWhenWorkspaceConnectionsAreDisabled() {
-            // Read-only: the gate guards writes only, so a workspace whose BYO switch is off can still
-            // read the catalogue and existing bindings stay explicable. Adding requireByoEnabled() to
-            // availableModels throws AccessForbiddenException here.
+            // The gate guards writes only: a workspace whose BYO switch is off can still read the
+            // catalogue, so existing bindings stay explicable.
             byoEnabled(false);
             when(instanceModelRepository.findVisibleEnabledModels(1L)).thenReturn(List.of());
             when(modelRepository.findEnabledWithEnabledConnection(1L)).thenReturn(List.of());
@@ -217,14 +206,6 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             assertThat(entry.getValue().action()).isEqualTo(ConfigAuditAction.CREATED);
         }
 
-        /**
-         * The one thing this class owes the shared validator: that BYO create routes a workspace
-         * admin's rates through it at all. The rules themselves — required rates, all-zero, the Free
-         * note, rates on an unpriced model — are tabled once, against the same
-         * {@code LlmPriceValidation}, in {@code LlmModelServiceTest.PriceSupersede}. Deleting the
-         * {@code LlmPriceValidation.validate(...)} call from {@code WorkspaceLlmModelService#create}
-         * fails only here.
-         */
         @Test
         void pricedModeReusesTheSharedPriceValidationAndRejectsAMissingOutputRate() {
             byoEnabled(true);
@@ -239,12 +220,6 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             verify(modelRepository, never()).saveAndFlush(any());
         }
 
-        /**
-         * The BYO activation guard, mirroring the instance-side one. An unpriced model that is live is
-         * a model the ledger cannot cost: admission refuses it, so the work never runs, and the
-         * workspace admin sees jobs that never start with no explanation. Refusing at activation is what
-         * turns that into an error message they can act on.
-         */
         @Test
         void refusesToCreateAnActiveModelWithNoPrice() {
             byoEnabled(true);
@@ -262,11 +237,6 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             verifyNoInteractions(configAudit);
         }
 
-        /**
-         * The other half of the same guard: a model whose own price is fine but whose connection is
-         * switched off cannot reach the provider, so activating it would produce the same silent
-         * non-start.
-         */
         @Test
         void refusesToCreateAnActiveModelOnADisabledConnection() {
             byoEnabled(true);
@@ -315,25 +285,16 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
 
             UpdateWorkspaceLlmModelRequestDTO request = new UpdateWorkspaceLlmModelRequestDTO(
                 "New name",
-                // modality
-                null,
-                // contextWindow
-                null,
-                // maxOutputTokens
                 null,
                 null,
-                // enabled
                 null,
-                // pricingMode
                 null,
-                // per1mInputUsd
                 null,
-                // per1mOutputUsd
                 null,
-                // per1mCacheReadUsd
                 null,
-                // per1mCacheWriteUsd
-                null // priceNote
+                null,
+                null,
+                null
             );
 
             WorkspaceLlmModel result = modelService.update(workspaceContext, 7L, request);
@@ -385,25 +346,16 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
 
             UpdateWorkspaceLlmModelRequestDTO request = new UpdateWorkspaceLlmModelRequestDTO(
                 "Renamed",
-                // modality
-                null,
-                // contextWindow
-                null,
-                // maxOutputTokens
                 null,
                 null,
-                // enabled
                 null,
-                // pricingMode
                 null,
-                // per1mInputUsd
                 null,
-                // per1mOutputUsd
                 null,
-                // per1mCacheReadUsd
                 null,
-                // per1mCacheWriteUsd
-                null // priceNote
+                null,
+                null,
+                null
             );
 
             WorkspaceLlmModel result = modelService.update(workspaceContext, 7L, request);
@@ -412,10 +364,9 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
         }
 
         /**
-         * the fast-path {@code existsByConnectionIdAndUpstreamModelId} check is racy;
-         * the unique constraint {@code ux_ws_llm_model_connection_upstream} is the real backstop but only
-         * fires on an actual flush — {@code saveAndFlush()} (not {@code save()}) forces that inside the
-         * try/catch so the violation becomes a 409 instead of an uncaught 500.
+         * The fast-path {@code existsByConnectionIdAndUpstreamModelId} check is racy; the unique
+         * constraint {@code ux_ws_llm_model_connection_upstream} is the real backstop but only fires on
+         * an actual flush, which is why the service calls {@code saveAndFlush()} inside the try/catch.
          */
         @Test
         void createTranslatesAFlushTimeConstraintViolationInto409() {

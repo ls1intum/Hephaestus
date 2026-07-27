@@ -35,10 +35,6 @@ import org.mockito.Mock;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 
-/**
- * Verifies each gate check individually, including ordering guarantees: cheap checks must
- * short-circuit before the expensive DB/network calls.
- */
 class PracticeReviewDetectionGateTest extends BaseUnitTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();

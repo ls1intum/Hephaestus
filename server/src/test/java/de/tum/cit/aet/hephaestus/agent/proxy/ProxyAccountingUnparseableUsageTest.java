@@ -18,12 +18,9 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * What happens to a served call whose 2xx body the proxy cannot read.
- *
- * <p>The tokens are gone either way — there is nothing to parse, so nothing can be billed. What this
- * pins is that the loss is OBSERVABLE: a gateway that starts wrapping responses stops the ledger from
- * seeing an entire connection's usage, and without a counter the first symptom is a suspiciously cheap
- * month.
+ * The tokens of an unreadable 2xx body are gone either way — there is nothing to parse. What matters is
+ * that the loss is OBSERVABLE: without a counter, the first symptom of a gateway that starts wrapping
+ * responses is a suspiciously cheap month.
  */
 class ProxyAccountingUnparseableUsageTest extends BaseUnitTest {
 
@@ -49,14 +46,12 @@ class ProxyAccountingUnparseableUsageTest extends BaseUnitTest {
             1,
             BigDecimal.ZERO
         );
-        // What a gateway in front of the provider actually returns when it decides to be helpful.
         byte[] notJson = "<html>502 upstream</html>".getBytes(StandardCharsets.UTF_8);
 
         assertThatCode(() -> accounting.recordUsage(attempt, notJson, false))
             .as("accounting must never turn a call the provider already charged us for into an error")
             .doesNotThrowAnyException();
 
-        // Revert this to log.debug with no counter and the assertion below is what fails.
         assertThat(meterRegistry.counter("llm.proxy.usage.unparseable", "sourceType", "AGENT_JOB").count())
             .as("a non-zero rate is the only signal that the ledger is under-billing")
             .isEqualTo(1.0);
@@ -87,11 +82,9 @@ class ProxyAccountingUnparseableUsageTest extends BaseUnitTest {
         assertThat(meterRegistry.counter("llm.proxy.usage.unparseable", "sourceType", "AGENT_JOB").count())
             .as("the counter must mean 'unbilled', not 'a call happened'")
             .isZero();
-        // The amount billed is the point of "still bills". Component order is
-        // (billableInput, output, reasoning, cacheRead) and the input bucket is the
+        // Component order is (billableInput, output, reasoning, cacheRead), and the input bucket is the
         // NON-cached remainder: 10 prompt tokens of which 4 were cache reads bills 6 at the input rate,
-        // not 10, or a cache read is charged at both rates. The intuitive
-        // (in, out, cacheRead, reasoning) reading mis-asserts and passes.
+        // not 10 — the intuitive (in, out, cacheRead, reasoning) reading mis-asserts and still passes.
         verify(usageAccumulator).accumulate(attempt, new ProxyTokenUsage(6, 5, 2, 4));
     }
 }

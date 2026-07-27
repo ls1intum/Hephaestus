@@ -452,20 +452,14 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         }
     }
 
-    /**
-     * The tee an accounting caller hangs off the stream. Both properties below are the reason it is a
-     * tee and not a buffer: the client's bytes are unchanged and unheld, and the observer cannot break
-     * them.
-     */
     @Nested
     class StreamSseToResponseWithTap {
 
         private final DefaultDataBufferFactory bufferFactory = new DefaultDataBufferFactory();
 
         /**
-         * Kills "drop the {@code tap.accept(bytes)} call": the client still gets a perfect stream, so
-         * nothing else in the suite notices, and every streamed call silently goes unbilled — which is
-         * precisely the state this seam was added to end.
+         * A dropped {@code tap.accept(bytes)} call is invisible everywhere else — the client still gets a
+         * perfect stream — while every streamed call silently goes unbilled.
          */
         @Test
         @DisplayName("the tap sees exactly the bytes the client received")
@@ -485,10 +479,6 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
             assertThat(tapped.toString()).isEqualTo("data: one\n\ndata: two\n\n");
         }
 
-        /**
-         * Accounting is best-effort and never gets to fail a response. Kills "let the tap's exception
-         * propagate out of doOnNext": the second frame would never reach the client.
-         */
         @Test
         @DisplayName("a tap that throws does not interrupt the stream to the client")
         void aThrowingTapCannotBreakTheStream() throws IOException {
@@ -505,10 +495,6 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
             assertThat(response.getContentAsString()).isEqualTo("data: one\n\ndata: two\n\n");
         }
 
-        /**
-         * A stream that dies part-way still hands over what it delivered, so the caller bills the calls
-         * it observed rather than nothing.
-         */
         @Test
         @DisplayName("the tap keeps what it saw when the stream errors mid-flight")
         void tapKeepsWhatItSawBeforeAMidStreamError() {

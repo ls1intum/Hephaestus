@@ -99,8 +99,7 @@ describe("usePendingMutationIds", () => {
 
 describe("generated mutation helpers", () => {
 	it("still file no mutation key of their own, so every filedUnder key is the only one", () => {
-		// A canary, not a requirement — `filedUnder` is correct either way. When this fails, every
-		// `useMutation` that files no key of its own has joined an unreviewed key space.
+		// A canary, not a requirement: `filedUnder` is correct either way.
 		expect(adminUpdateLlmConnectionMutation()).not.toHaveProperty("mutationKey");
 		expect(adminUpdateLlmConnectionMutation().mutationFn).toEqual(expect.any(Function));
 	});

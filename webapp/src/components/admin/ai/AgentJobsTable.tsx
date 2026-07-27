@@ -165,10 +165,8 @@ export function AgentJobsTable({
 										{job.llmModel ?? job.llmModelVersion ?? "—"}
 									</TableCell>
 									<TableCell className="text-muted-foreground">
-										{/* The shared ticking clock, like every other standalone timestamp: a queue is
-										    read while it is moving, so a "2 minutes ago" that froze on paint is worse
-										    than no reading. No tooltip: its trigger is a button, and one per row would
-										    put a tab stop between every row and its Details action. */}
+										{/* No tooltip: its trigger is a button, and one per row would put a tab stop
+										    between every row and its Details action. */}
 										<RelativeTime value={job.createdAt} tooltip={false} />
 									</TableCell>
 									<TableCell>
@@ -193,9 +191,8 @@ export function AgentJobsTable({
 											<Button
 												variant="ghost"
 												size="icon-sm"
-												// Named by what the row *is*, not by when it happened: a relative phrase in an
-												// accessible name goes stale the moment the shared clock ticks past it, and
-												// the created cell beside this button already announces the instant.
+												// Never the relative phrase: an accessible name would go stale the moment the
+												// shared clock ticked past it.
 												aria-label={`View details for the ${STATUS_LABELS[job.status].toLowerCase()} ${modelLabel(job)} run`}
 												onClick={() => onSelectJob(job)}
 											>

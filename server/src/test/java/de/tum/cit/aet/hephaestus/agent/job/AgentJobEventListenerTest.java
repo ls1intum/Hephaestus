@@ -154,11 +154,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         return pr;
     }
 
-    /**
-     * Captures the one submission request the listener handed to the job service for
-     * {@code workspaceId}. Every submitting path must assert on the payload, not on the fact that
-     * a call happened — the job type and workspace id are identical across all six triggers.
-     */
     private PullRequestReviewSubmissionRequest captureSubmission(Long workspaceId) {
         var captor = ArgumentCaptor.forClass(PullRequestReviewSubmissionRequest.class);
         verify(agentJobService).submit(eq(workspaceId), eq(AgentJobType.PULL_REQUEST_REVIEW), captor.capture());
@@ -667,7 +662,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        void onPullRequestMerged_routesThroughGateDespiteMergedState() {
+        void onPullRequestMerged_routesThroughGateAndCarriesTheMergedTriggerOntoTheJob() {
             // The merged terminal state IS the reason this trigger runs — it must reach the gate, unlike the
             // live create/ready/sync handlers that short-circuit on merged.
             PullRequest pr = mergedPullRequest();
@@ -683,8 +678,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             listener.onPullRequestMerged(new ScmDomainEvent.PullRequestMerged(prData, webhookContext(1L)));
 
             verify(practiceReviewDetectionGate).evaluate(pr, TriggerEventNames.PULL_REQUEST_MERGED, TriggerMode.AUTO);
-            // The trigger the gate saw must be the trigger the job carries, or the runner selects
-            // the wrong practice set for a retrospective review.
             assertThat(captureSubmission(WORKSPACE_ID).triggerEvent()).isEqualTo(TriggerEventNames.PULL_REQUEST_MERGED);
         }
 
@@ -800,7 +793,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        void listenerWithRealGateSubmitsOnDetect() {
+        void listenerWithRealGateSubmitsOnDetectCarryingTheGatesTrigger() {
             var fixture = CollaborationFixture.create(agentJobService, pullRequestRepository);
 
             Workspace workspace = new Workspace();
@@ -826,8 +819,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             var event = new ScmDomainEvent.PullRequestCreated(prData, webhookContext(1L));
             fixture.listener().onPullRequestCreated(event);
 
-            // The practice this fixture registers triggers on PULL_REQUEST_CREATED only, so the
-            // real gate's Detect must carry that trigger through to the submitted job.
             var request = captureSubmission(WORKSPACE_ID);
             assertThat(request.triggerEvent()).isEqualTo(TriggerEventNames.PULL_REQUEST_CREATED);
             assertThat(request.pullRequest().repository().nameWithOwner()).isEqualTo("owner/repo");

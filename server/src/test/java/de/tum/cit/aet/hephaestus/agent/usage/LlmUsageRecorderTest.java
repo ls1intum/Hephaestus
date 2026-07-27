@@ -161,15 +161,10 @@ class LlmUsageRecorderTest extends BaseUnitTest {
 
         assertThat(event.get().pricingState()).isEqualTo("UNPRICED");
         assertThat(event.get().costUsd()).isNull();
-        // The frozen rates that DID exist are still preserved on the row, so the gap is diagnosable.
         assertThat(event.get().appliedPer1mInputUsd()).isEqualByComparingTo("1");
         assertThat(registry.counter("llm.usage.uncosted").count()).isEqualTo(1.0);
     }
 
-    /**
-     * The two directions the stored amount can differ from what the rates produced, and the counter an
-     * operator uses to find those rows. Both are silent under-/over-billing without it.
-     */
     @Test
     void aCostTooSmallForTheColumnIsRoundedUpAndCounted() {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
@@ -322,7 +317,6 @@ class LlmUsageRecorderTest extends BaseUnitTest {
         );
     }
 
-    /** A repository that captures the one insert it is handed and reports it as landed. */
     private static LlmUsageEventRepository capturing(AtomicReference<LlmUsageInsert> event) {
         return mock(LlmUsageEventRepository.class, invocation -> {
             if (invocation.getMethod().getName().equals("insertIfAbsent")) {

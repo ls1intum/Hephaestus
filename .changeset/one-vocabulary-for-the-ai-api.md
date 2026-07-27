@@ -30,5 +30,6 @@ The rest of the AI area is new in this release rather than moved, so nothing cal
 bindings — `GET /workspaces/{slug}/agents` to list them, `PUT`/`DELETE
 /workspaces/{slug}/agents/{purpose}` to set or clear one.
 
-The workspace console's retired `/admin/ai/*` browser URLs no longer redirect either; those pages have
-been at `/admin/models` and `/admin/practices` since the previous release.
+The workspace console's retired `/w/{slug}/admin/ai/*` browser URLs no longer redirect either; those
+pages have been at `/w/{slug}/admin/models` and `/w/{slug}/admin/practices` since the previous
+release.

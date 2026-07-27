@@ -86,7 +86,6 @@ class AgentBindingServiceTest extends BaseUnitTest {
         assertThat(saved.getMaxConcurrentJobs()).isEqualTo(2);
         assertThat(saved.isAllowInternet()).isTrue();
         assertThat(saved.isEnabled()).isTrue();
-        // Availability is checked by the resolver, not re-implemented here.
         verify(llmModelResolver).resolve(any(WorkspaceAgentBinding.class));
 
         // The two model columns are interchangeable in shape but not in meaning — an entry that filed
@@ -137,13 +136,6 @@ class AgentBindingServiceTest extends BaseUnitTest {
         );
     }
 
-    /**
-     * The audit row is the only durable trace a delete leaves — the binding itself is gone — so the
-     * assertion is on its payload, not on the fact that a call happened. Two things must hold: the
-     * action reads {@code DELETED} (not {@code UPDATED} with an emptied-out "after", which would file a
-     * removal alongside genuine edits), and the {@code before} snapshot carries the model the workspace
-     * actually lost, captured before {@code delete()} rather than after.
-     */
     @Test
     void deleteRemovesTheBindingAndFilesADeletedAuditRowNamingTheLostModel() {
         Workspace w = workspace();

@@ -22,11 +22,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 
-/**
- * The one rule every terminal accounting path shares: prefer what the runner reported, fall back to
- * what the proxy actually watched go upstream, and only claim "unknown spend" when neither record has
- * tokens. Getting the fallback wrong understates a workspace's month and lets it spend past its cap.
- */
 class TerminalUsageTest extends BaseUnitTest {
 
     private static LlmUsage runner(int input, int output, int calls) {
@@ -99,19 +94,13 @@ class TerminalUsageTest extends BaseUnitTest {
 
     @Test
     @DisplayName("both records absent is unverifiable, not a crash")
-    void bothRecordsAbsent() {
+    void bothRecordsAbsentIsUnverifiableNotACrash() {
         TerminalUsage usage = TerminalUsage.resolve(null, null);
 
         assertThat(usage.verifiable()).isFalse();
         assertThat(usage.totalCalls()).isZero();
     }
 
-    /**
-     * Every terminal path — clean finish, cancellation, worker drain, infra-retry, the zombie sweeper's
-     * reaper, and the API cancel — appends through {@link TerminalUsage#appendTo}, so the choice between
-     * the ledger's two append paths is made once, here. Both inputs must matter: real observed tokens
-     * that cannot be priced are as unbillable as a price with no trustworthy tokens behind it.
-     */
     @Nested
     @DisplayName("appendTo picks the append path from the evidence, not from the call site")
     class AppendPath {
@@ -141,7 +130,7 @@ class TerminalUsageTest extends BaseUnitTest {
 
         @Test
         @DisplayName("the row is keyed by the job's own id and attempt, so a retry bills separately")
-        void theRowIsKeyedByJobAndAttempt() {
+        void theRowIsKeyedByJobAndAttemptSoARetryBillsSeparately() {
             UUID jobId = UUID.randomUUID();
 
             TerminalUsage.resolve(runner(10, 20, 1), null).appendTo(
@@ -160,10 +149,6 @@ class TerminalUsageTest extends BaseUnitTest {
             assertThat(sample.getValue().sourceAttempt()).isEqualTo(3);
         }
 
-        /**
-         * An unpriced row costs nothing either way, so discarding the counts would throw away the only
-         * surviving evidence of how much work the provider was actually asked to do.
-         */
         @Test
         @DisplayName("token counts survive onto an unpriced row")
         void unpricedRowKeepsItsTokenCounts() {

@@ -38,7 +38,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
-/** Unified LLM ledger persistence and budget enforcement against the real database. */
 @Tag("integration")
 class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
@@ -140,9 +139,8 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     /**
-     * The individual rows one workspace owns. Production never reads the ledger row by row — every
-     * caller goes through one of the aggregates — so the filter lives here rather than as a finder
-     * on the repository.
+     * Production never reads the ledger row by row — every caller goes through one of the aggregates
+     * — so this filter lives here rather than as a finder on the repository.
      */
     private List<LlmUsageEvent> eventsOf(Workspace workspace) {
         return usageRepository
@@ -165,7 +163,6 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         );
     }
 
-    /** The own-provider mirror of {@link #pricedInstance}: the workspace's own money. */
     private LlmPriceSnapshot workspacePriced(String perMInput, String perMOutput) {
         return new LlmPriceSnapshot(
             FundingSource.WORKSPACE,
@@ -204,7 +201,6 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         return llmModelRepository.save(LlmCatalogTestFixtures.model(connection, slug + "-model", "gpt-ledger"));
     }
 
-    /** A QUEUED job whose availability was pushed out, with the given hold reason. */
     private AgentJob queuedJob(Workspace workspace, Instant availableAt, @Nullable String holdReason) {
         AgentJob job = new AgentJob();
         job.setWorkspace(workspace);
@@ -377,9 +373,8 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     /**
-     * an exhausted shared-model budget is the host's problem, not the workspace's. Detection
-     * bound to the workspace's own provider is a different purse and keeps running — it is refused
-     * only later, for lack of a resolvable model in this fixture, never by the host's cap.
+     * Detection bound to the workspace's own provider is a different purse and keeps running — it is
+     * refused only later, for lack of a resolvable model in this fixture, never by the host's cap.
      */
     @Test
     void submitIsNotBlockedByTheInstanceCapWhenDetectionRunsOnTheWorkspacesOwnProvider() {
@@ -405,7 +400,6 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(blockedCount("byo")).isEqualTo(byoBlockedBefore);
     }
 
-    /** The mirror: the workspace's own cap pauses its own-provider detection. */
     @Test
     void submitIsBlockedByTheWorkspacesOwnCapForOwnProviderDetection() {
         Workspace workspace = setupWorkspace("ledger-block-byo");
@@ -477,10 +471,9 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     /**
-     * raising or clearing either cap releases exactly the jobs the claim loop parked on that
-     * cap, so the flagship self-serve action ("I raised my cap") takes effect on the next poll rather
-     * than up to an hour later. Its precision is the point — it must not fast-forward a crash-retry
-     * backoff, which is a different kind of future {@code available_at} entirely.
+     * Raising a cap takes effect on the next poll rather than up to an hour later. Its precision is
+     * the point — it must not fast-forward a crash-retry backoff, which is a different kind of future
+     * {@code available_at} entirely.
      */
     @Nested
     @DisplayName("Raising a cap releases the jobs it held")
@@ -517,7 +510,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         @Test
         @DisplayName("a crash-retry backoff is never fast-forwarded by a cap change")
-        void aRetryBackoffIsLeftAlone() {
+        void aCrashRetryBackoffIsNeverFastForwardedByACapChange() {
             // A QUEUED job with a future available_at and NO hold reason is backing off from a failed
             // attempt. Releasing it would send a crash-looping job straight back at a failing upstream.
             Workspace workspace = setupWorkspace("hold-retry-backoff");

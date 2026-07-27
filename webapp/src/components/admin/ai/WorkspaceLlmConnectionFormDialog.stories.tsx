@@ -34,10 +34,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Connect your own AI provider. The description is the copy the cost vocabulary pins verbatim. */
 export const Connect: Story = {};
 
-/** Editing an already-connected provider; the key field shows the masked placeholder. */
 export const Edit: Story = {
 	args: { editing: mockConnection },
 };
@@ -47,11 +45,8 @@ export const Submitting: Story = {
 };
 
 /**
- * Reviewed at the WCAG 2.2 SC 1.4.10 reflow width (320 px). The create form is the taller of the two
- * variants — preset, protocol checkbox, base URL, auth mode, key, and the active switch — and a
- * `position: fixed` popup that outgrows the viewport hangs off both ends at once with no way to
- * scroll it back. `AdminLlmModelFormDialog`, the tallest of these dialogs, carries the full proof
- * that `DialogBody` scrolls the middle rather than the whole popup.
+ * WCAG 2.2 SC 1.4.10 at 320 px on the taller create variant: a `position: fixed` popup that outgrows
+ * the viewport hangs off both ends at once with no way to scroll it back.
  */
 export const MobileReflow: Story = {
 	parameters: {
@@ -64,7 +59,6 @@ export const MobileReflow: Story = {
 	},
 };
 
-/** Submitting without a display name surfaces validation. */
 export const ValidationError: Story = {
 	play: async () => {
 		await userEvent.click(await screen.findByRole("button", { name: /^connect provider$/i }));

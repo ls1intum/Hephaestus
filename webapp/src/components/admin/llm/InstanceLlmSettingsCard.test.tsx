@@ -77,7 +77,6 @@ describe("InstanceLlmSettingsCard", () => {
 
 		fireEvent.change(hostsField(), { target: { value: "llm.example.com" } });
 
-		// A background refetch: a second admin has since changed the toggle.
 		rerender(
 			<InstanceLlmSettingsCard
 				settings={{ allowedEgressHosts: "api.openai.com", allowWorkspaceConnections: false }}

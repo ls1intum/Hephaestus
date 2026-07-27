@@ -13,8 +13,7 @@ function mockPage(connections: LlmConnection[] = [], models: LlmModel[] = []) {
 		http.get("*/admin/llm/connections", () => HttpResponse.json(connections)),
 		http.get("*/admin/llm/models", () => HttpResponse.json(models)),
 		http.get("*/admin/workspaces", () => HttpResponse.json([])),
-		// Unmocked this falls through to a real fetch, and the policy card's switch flips from
-		// controlled to uncontrolled mid-test.
+		// Unmocked, the policy card's switch flips from controlled to uncontrolled mid-test.
 		http.get("*/admin/llm/settings", () =>
 			HttpResponse.json({ allowWorkspaceConnections: true, allowedEgressHosts: "" }),
 		),
@@ -66,8 +65,6 @@ describe("instance AI models route", () => {
 	});
 
 	it("keeps each connection's toggle pending independently when two run at once", async () => {
-		// The confirm closes on click and the PATCH runs on in the background, so nothing holds the
-		// admin still between two rows.
 		let releaseSlowToggle: (() => void) | undefined;
 		const slowToggle = new Promise<void>((resolve) => {
 			releaseSlowToggle = resolve;
@@ -120,8 +117,8 @@ describe("instance AI models route", () => {
 	});
 
 	it("lets the access dialog be dismissed while its save is still in flight", async () => {
-		// We set no request timeout, so against a provider that never answers, a dialog that refuses to
-		// close while `isPending` traps focus with nothing left to release it.
+		// There is no request timeout, so a dialog that refuses to close while `isPending` traps focus
+		// with nothing left to release it.
 		let releaseSlowSharing: (() => void) | undefined;
 		const slowSharing = new Promise<void>((resolve) => {
 			releaseSlowSharing = resolve;
@@ -150,7 +147,7 @@ describe("instance AI models route", () => {
 		fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
 
 		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-		// The request was not cancelled, so the row stays disabled: no second save behind the dismissal.
+		// The request was not cancelled, so the row stays disabled: no second save behind a dismissal.
 		expect(
 			(screen.getByRole("button", { name: "Manage access for GPT Test" }) as HTMLButtonElement)
 				.disabled,

@@ -26,45 +26,27 @@ import { MonthNavigator } from "./MonthNavigator";
 import { budgetUsedPercent, formatMonthLabel, projectBudget } from "./usage-utils";
 
 export interface AdminLlmUsagePageProps {
-	/** ISO `yyyy-MM` month currently shown. */
+	/** ISO `yyyy-MM`. */
 	month: string;
-	/** Whether `month` is the current calendar month (UTC) — gates every pause/pace banner. */
 	isCurrentMonth: boolean;
-	/**
-	 * Whether the stepper may move forward. Separate from {@link isCurrentMonth} rather than its
-	 * negation: both are false on a month later than this one, and only the route knows the difference.
-	 */
+	/** Not `!isCurrentMonth`: both are false on a month later than this one. */
 	canGoNext: boolean;
-	/** Slug of the workspace being viewed; used for the in-product links to its AI models page. */
 	workspaceSlug: string;
 	report?: WorkspaceLlmUsageReport;
 	isLoading: boolean;
-	/** The thrown request error, if the report failed to load. */
 	error: unknown;
-	/** Retry the failed report load. */
 	onRetry?: () => void;
 	onPrevMonth: () => void;
 	onNextMonth: () => void;
-	/**
-	 * Open the provider-cap editor. The dialog itself lives in the route container.
-	 *
-	 * Reachable on the current month only — see {@link CapIsNotMonthScoped}.
-	 */
 	onEditOwnProviderCap: () => void;
-	/** Injected so burn-rate projections are deterministic in tests and stories. */
 	now?: Date;
 }
 
 /**
- * Workspace-admin cost control for one month.
- *
- * The workspace lives under two independent caps that are different people's money and are never
- * summed (`docs/contributor/llm-cost-vocabulary.md`, rule 2): the *shared-model budget* its host sets and funds, and the
- * *provider cap* the workspace sets on its own provider. They pause independently, so every banner
- * here names whose cap tripped and routes to whoever can lift it — the workspace admin can act on
- * their own cap, and on the host's they can only move a purpose across.
- *
- * Pure/presentational — the route container owns the query, the selected month, and the dialog.
+ * Workspace-admin cost control for one month, under two independent caps that are different
+ * people's money and are never summed (`docs/contributor/llm-cost-vocabulary.md`): the
+ * *shared-model budget* the host sets and funds, and the *provider cap* the workspace sets on its
+ * own provider. Every banner names whose cap tripped, because only one of them is theirs to lift.
  */
 export function AdminLlmUsagePage({
 	month,
@@ -80,9 +62,7 @@ export function AdminLlmUsagePage({
 	onEditOwnProviderCap,
 	now = new Date(),
 }: AdminLlmUsagePageProps) {
-	// The confirmed (priced) spend on each side — the figures the two caps compare against. When
-	// some usage this month has no price on record, each is a floor, not the full total (see
-	// `unpricedEventCount` below).
+	// Priced spend only, so each is a floor when `unpricedEventCount` is non-zero.
 	const sharedSpend = report?.instanceTotalCostUsd ?? 0;
 	const providerSpend = report?.ownProviderTotalCostUsd ?? 0;
 	const sharedBudget = report?.instanceMonthlyBudgetUsd;
@@ -92,9 +72,6 @@ export function AdminLlmUsagePage({
 	const unpricedEventCount = report?.unpricedEventCount ?? 0;
 	const providerPaused = isCurrentMonth && (report?.ownProviderPaused ?? false);
 	const sharedPaused = isCurrentMonth && (report?.instancePaused ?? false);
-	// A cap that is already at the wall is reported by its pause banner; warning "you've used 100%"
-	// underneath it would just say the same thing more quietly. `capState` is the one place that
-	// decides this, shared with the instance console.
 	const providerWarning =
 		capState(providerPercent, providerPaused, isCurrentMonth) === "near" ? providerPercent : null;
 	const sharedWarning =
@@ -105,15 +82,9 @@ export function AdminLlmUsagePage({
 			report.byDay.length > 0 ||
 			sharedSpend > 0 ||
 			providerSpend > 0);
-	// A cap with no visible meter is a trap, so the provider card shows whenever either exists.
-	const hasProviderSide = providerCap != null || providerSpend > 0;
+	const hasProviderCapOrSpend = providerCap != null || providerSpend > 0;
 
-	// Display-only conversion, absent unless the instance opted into a display currency. USD is the
-	// number this page is really about — the estimates are secondary everywhere they appear, and the
-	// caption below the cards is the one place they are explained.
 	const fx: Fx = report?.fx;
-	// The exact conversion each card headline will render, resolved here so the caption appears if
-	// and only if something on the page actually converted — never as a footnote to nothing.
 	const sharedTitleFx =
 		sharedBudget != null
 			? spendOfCapConversion(sharedSpend, sharedBudget, fx)
@@ -122,10 +93,7 @@ export function AdminLlmUsagePage({
 		providerCap != null
 			? spendOfCapConversion(providerSpend, providerCap, fx)
 			: spendConversion(providerSpend, fx);
-	// Every converted figure on the page, not just the cards: the breakdown tables convert their own
-	// footer totals, and a card can convert nothing (a $0 budget, say — the supported "pause now"
-	// state). Only figures that actually render count, so the "EUR amounts are estimates…" footnote
-	// never appears under a page with no estimates on it.
+	// Only figures that actually render, so the estimate footnote never trails a page with no estimate on it.
 	const hasConversion =
 		sharedTitleFx != null ||
 		providerTitleFx != null ||
@@ -152,8 +120,6 @@ export function AdminLlmUsagePage({
 			{error != null ? (
 				<QueryErrorAlert error={error} title="Couldn't load AI usage" onRetry={onRetry} />
 			) : isLoading || report == null ? (
-				// Skeleton the real card grid and table shell rather than blanking the page, so nothing
-				// jumps when the report lands.
 				<>
 					<div className="grid gap-4 md:grid-cols-2">
 						{["shared", "provider"].map((slot) => (
@@ -224,8 +190,6 @@ export function AdminLlmUsagePage({
 					)}
 
 					{unpricedEventCount > 0 && (
-						// The direction of the error is the point: totals under-count, never over-count, so
-						// the copy says what is missing and who can add it rather than naming a status.
 						<Alert variant="warning" role="status">
 							<CircleAlert aria-hidden />
 							<AlertTitle>
@@ -252,7 +216,7 @@ export function AdminLlmUsagePage({
 							paused={sharedPaused}
 							titleFx={sharedTitleFx}
 						/>
-						{hasProviderSide ? (
+						{hasProviderCapOrSpend ? (
 							<ProviderCapCard
 								isCurrentMonth={isCurrentMonth}
 								spendUsd={providerSpend}
@@ -322,9 +286,6 @@ export function AdminLlmUsagePage({
 						</>
 					)}
 
-					{/* Disclosed once, after every figure it qualifies — never beside each number, where it
-					    would bury the numbers it exists to explain, and never above them, where a footnote
-					    reads as a preamble to something else. */}
 					{hasConversion && <FxDisclosure fx={fx} isCurrentMonth={isCurrentMonth} />}
 				</>
 			)}
@@ -332,7 +293,6 @@ export function AdminLlmUsagePage({
 	);
 }
 
-/** One name for the AI config page, and one link to it, wherever this page sends someone there. */
 function AiModelsLink({ workspaceSlug }: { workspaceSlug: string }) {
 	return (
 		<Link
@@ -345,13 +305,33 @@ function AiModelsLink({ workspaceSlug }: { workspaceSlug: string }) {
 	);
 }
 
+interface CapHeadlineProps {
+	spendUsd: number;
+	capUsd: number | undefined;
+	titleFx: FxConversion | null;
+}
+
+/** Spend, the cap it runs against, and the display-currency estimate — one voice on both cards. */
+function CapHeadline({ spendUsd, capUsd, titleFx }: CapHeadlineProps) {
+	return (
+		<CardTitle className="text-2xl tabular-nums">
+			{formatCostUsd(spendUsd)}
+			{(capUsd != null || titleFx != null) && (
+				<span className="text-base font-normal text-muted-foreground">
+					{capUsd != null && <> of {formatCapUsd(capUsd)}</>}
+					<FxAmount conversion={titleFx} />
+				</span>
+			)}
+		</CardTitle>
+	);
+}
+
 interface SharedBudgetCardProps {
 	isCurrentMonth: boolean;
 	spendUsd: number;
 	capUsd: number | undefined;
 	percent: number | undefined;
 	paused: boolean;
-	/** The estimate that trails the headline, or `null` when there is nothing to convert. */
 	titleFx: FxConversion | null;
 }
 
@@ -366,31 +346,13 @@ function SharedBudgetCard({
 }: SharedBudgetCardProps) {
 	const labelId = useId();
 	return (
-		// A named region, so the card is reachable in the accessible tree — "which purse is this
-		// figure in" is the whole question this page answers, and the answer is the card's own label.
+		// A landmark, so "which purse is this figure in" is answerable from the accessible tree alone.
 		<Card role="region" aria-labelledby={labelId}>
 			<CardHeader>
 				<CardDescription id={labelId}>
 					{isCurrentMonth ? "Shared-model spend so far" : "Shared-model spend"}
 				</CardDescription>
-				<CardTitle className="text-2xl tabular-nums">
-					{formatCostUsd(spendUsd)}
-					{capUsd != null ? (
-						<span className="text-base font-normal text-muted-foreground">
-							{" "}
-							of {formatCapUsd(capUsd)}
-							<FxAmount conversion={titleFx} />
-						</span>
-					) : (
-						// Without a cap there is no muted "of …" tail to hang the estimate on, so the wrapper
-						// only exists when there is actually an estimate to put in it.
-						titleFx != null && (
-							<span className="text-base font-normal text-muted-foreground">
-								<FxAmount conversion={titleFx} />
-							</span>
-						)
-					)}
-				</CardTitle>
+				<CapHeadline spendUsd={spendUsd} capUsd={capUsd} titleFx={titleFx} />
 				<CardDescription>
 					{capUsd != null
 						? "Shared-model budget · set by your host"
@@ -398,7 +360,6 @@ function SharedBudgetCard({
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-3">
-				{/* Whose budget this is has already been said once, in the description above. */}
 				{percent != null && capUsd != null && (
 					<CapMeterWithCaption
 						percent={percent}
@@ -421,7 +382,6 @@ interface ProviderCapCardProps {
 	percent: number | undefined;
 	paused: boolean;
 	onEditOwnProviderCap: () => void;
-	/** The estimate that trails the headline, or `null` when there is nothing to convert. */
 	titleFx: FxConversion | null;
 }
 
@@ -442,24 +402,7 @@ function ProviderCapCard({
 				<CardDescription id={labelId}>
 					{isCurrentMonth ? "Your provider spend so far" : "Your provider spend"}
 				</CardDescription>
-				<CardTitle className="text-2xl tabular-nums">
-					{formatCostUsd(spendUsd)}
-					{capUsd != null ? (
-						<span className="text-base font-normal text-muted-foreground">
-							{" "}
-							of {formatCapUsd(capUsd)}
-							<FxAmount conversion={titleFx} />
-						</span>
-					) : (
-						titleFx != null && (
-							<span className="text-base font-normal text-muted-foreground">
-								<FxAmount conversion={titleFx} />
-							</span>
-						)
-					)}
-				</CardTitle>
-				{/* Says which cap bounds the figure above and who owns it, in the same shape as the
-				    shared-model card's line — the two purses are only told apart by these two sentences. */}
+				<CapHeadline spendUsd={spendUsd} capUsd={capUsd} titleFx={titleFx} />
 				<CardDescription>
 					{capUsd != null
 						? "Provider cap · set by you, billed by your provider"
@@ -495,7 +438,6 @@ interface NoProviderCardProps {
 	onEditOwnProviderCap: () => void;
 }
 
-/** Quiet call-to-action: no provider cap and nothing has run on a provider of their own. */
 function NoProviderCard({
 	isCurrentMonth,
 	workspaceSlug,
@@ -506,8 +448,6 @@ function NoProviderCard({
 		<Card role="region" aria-labelledby={labelId}>
 			<CardHeader>
 				<CardDescription id={labelId}>Your provider spend</CardDescription>
-				{/* Zero money is `$0` on every card on this page — a second vocabulary for it would read
-				    as a different kind of number. */}
 				<CardTitle className="text-2xl tabular-nums">{formatCostUsd(0)}</CardTitle>
 				<CardDescription>
 					No provider cap set · nothing has run on a provider of your own
@@ -539,11 +479,6 @@ interface CapMeterWithCaptionProps {
 	label: string;
 }
 
-/**
- * The shared meter plus this page's caption. The card has the width for a percentage in prose, so
- * the amounts stay in the headline above and are not repeated here; the state word comes from
- * {@link CAP_STATE_LABELS} so it cannot drift from the instance console's cell.
- */
 function CapMeterWithCaption({
 	percent,
 	paused,

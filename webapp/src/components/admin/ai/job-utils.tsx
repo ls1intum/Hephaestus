@@ -62,16 +62,10 @@ export function formatTokens(value: number | undefined): string {
 }
 
 /**
- * A money figure in a right-aligned column, padded so its decimal point lands where every other
- * row's does.
- *
- * `tabular-nums` equalises glyph *width*; it does nothing about a missing `.00`, so `$0`, `<$0.01`
- * and `$4.50` right-align with their decimal points three different distances from the edge. The
- * copy for `$0` and `<$0.01` is fixed (`docs/contributor/llm-cost-vocabulary.md`, rule 5), so the
- * fix is layout: reserve the width of the cents that string doesn't have. `visibility: hidden`
- * keeps the space (unlike `display: none`) and `aria-hidden` keeps it out of the accessible name.
- *
- * Headlines are not columns — don't wrap them.
+ * A money figure in a right-aligned column, padded so its decimal point lands where every other row's
+ * does. `tabular-nums` equalises glyph *width* but not a missing `.00`, and the copy for `$0` and
+ * `<$0.01` is fixed, so the fix is layout: `visibility: hidden` keeps the space that `display: none`
+ * would collapse, and `aria-hidden` keeps it out of the accessible name. Not for headlines.
  */
 export function MoneyCell({ children }: { children: string }) {
 	return (
@@ -86,10 +80,7 @@ export function MoneyCell({ children }: { children: string }) {
 	);
 }
 
-/**
- * The model a job ran on, read from its frozen submit-time snapshot. Populated from submission
- * onward, unlike the runner-reported `llmModel`, which only exists once the job has actually run.
- */
+/** The submit-time snapshot, not the runner-reported `llmModel`, which exists only once it has run. */
 export function modelLabel(job: Pick<AgentJob, "model">): string {
 	return job.model ?? "—";
 }

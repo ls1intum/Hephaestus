@@ -138,13 +138,6 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
             verify(connectionRepository, never()).save(any());
         }
 
-        /**
-         * The SSRF guard has to fail the create closed, and has to run before the row is written —
-         * a policy consulted after {@code save()} would leave a persisted connection pointing at an
-         * internal address. Both are asserted through the outcome: only the exact requested base URL is
-         * rejected, so a run that normalised the URL first, skipped the policy, or called it too late
-         * would end with a saved row and no exception.
-         */
         @Test
         void doesNotCreateAConnectionWhoseBaseUrlTheEgressPolicyRejects() {
             byoEnabled(true);
@@ -275,8 +268,6 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
 
         @Test
         void throwsNotFoundForAConnectionOwnedByAnotherWorkspace() {
-            // Never trust a client-supplied id: the tenancy-scoped lookup must miss, not fall through to
-            // a bare findById that could return a foreign workspace's connection.
             when(connectionRepository.findByIdAndWorkspaceId(5L, 1L)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> connectionService.get(workspaceContext, 5L)).isInstanceOf(
@@ -324,10 +315,8 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
         }
 
         /**
-         * A stored connection is re-checked on every probe, not trusted because it passed on the day it
-         * was created: the instance allowlist can tighten afterwards, and DNS for a host that was public
-         * then can point inside the network now. The probe service is told it must have been validated
-         * by this caller, so if this call is skipped nothing else stops the dial.
+         * A stored connection is re-checked on every probe: the instance allowlist can tighten after it
+         * was created, and DNS for a host that was public then can point inside the network now.
          */
         @Test
         void doesNotProbeAStoredConnectionWhoseBaseUrlTheEgressPolicyNowRejects() {

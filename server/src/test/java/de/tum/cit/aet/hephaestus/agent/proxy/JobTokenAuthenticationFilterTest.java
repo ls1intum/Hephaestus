@@ -446,11 +446,6 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
     }
 
-    /**
-     * What the budget gate and the usage accumulator are handed about the caller. Both answers come
-     * from the row this filter already loads, so neither costs an extra query — and both are read in
-     * the same instant, so they cannot describe different attempts.
-     */
     @Nested
     @DisplayName("the billed attempt resolved from the row")
     class BilledAttempt {
@@ -468,11 +463,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             assertThat(routing.attempt().sourceId()).isEqualTo(job.getId());
         }
 
-        /**
-         * The number the budget gate bounds a run with. Kills the mutation "report zero in-flight
-         * spend": 1M input at $10/1M plus 100k output at $30/1M is $13, and a run that has spent $13
-         * against a $10 cap must not be allowed to make call fourteen.
-         */
+        /** 1M input at $10/1M plus 100k output at $30/1M is the $13 asserted below. */
         @Test
         @DisplayName("prices the calls the attempt has already made with the rates frozen at admission")
         void theRoutingPricesWhatTheAttemptHasAlreadySpent() throws Exception {
@@ -496,10 +487,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             assertThat(routing.inFlightSpendUsd()).isEqualByComparingTo("13");
         }
 
-        /**
-         * Only reachable for a job that never went through {@code LlmAdmissionService}, which refuses
-         * to start an unpriced model. Reported as zero rather than guessed at.
-         */
+        /** Only reachable for a job that never went through {@code LlmAdmissionService}, which refuses one. */
         @Test
         @DisplayName("a snapshot with no frozen price contributes no in-flight spend")
         void aSnapshotWithoutAPriceContributesNothing() throws Exception {

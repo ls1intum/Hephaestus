@@ -23,11 +23,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-/**
- * Instance-admin LLM cost governance: {@code GET /admin/llm/usage} (cross-workspace month
- * rollup) and {@code PUT /admin/workspaces/{workspaceSlug}/llm/budget} (the cap). Verifies the
- * app_admin authority gate, the rollup values, budget set/clear, and request validation.
- */
 @Tag("integration")
 // See LlmUsageControllerIntegrationTest: the unset display currency is stated, not inherited from
 // whatever the developer's optional .env happens to hold.
@@ -88,8 +83,6 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
             .getResponseBody();
 
         assertThat(report).isNotNull();
-        // Rows are addressed by slug — the same handle the cap endpoint takes, so an admin never has
-        // to translate between two identifiers to act on what the rollup shows them.
         return report
             .workspaces()
             .stream()
@@ -118,11 +111,6 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         assertThat(idleRow.instancePaused()).isFalse();
     }
 
-    /**
-     * the admin rollup reports the workspace's OWN cap and its own-provider verdict as a
-     * separate column. Read-only here — it governs the workspace's money — and it must not bleed
-     * into the instance verdict the admin acts on.
-     */
     @Test
     void adminSeesTheWorkspacesOwnCapAndVerdictWithoutItAffectingTheInstanceVerdict() {
         Workspace workspace = setupWorkspace("adm-byo");
@@ -192,9 +180,8 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     /**
-     * The cap is now addressed by slug, so an unknown slug has to answer 404 rather than silently
-     * writing nothing: a typo'd slug that returned 204 would tell an operator their cap is in place
-     * when no workspace is capped at all.
+     * A typo'd slug that returned 204 would tell an operator their cap is in place when no workspace
+     * is capped at all.
      */
     @Test
     void settingTheCapOnAnUnknownWorkspaceSlugIs404() {
@@ -225,9 +212,8 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     /**
-     * Zero-regression guard, mirroring the workspace-scoped one: with no display currency configured
-     * the response carries no {@code fx} key at all — neither on the envelope nor on a row — even
-     * though a fresh rate is stored.
+     * The fixture stores a perfectly fresh rate first, so the only thing that can be suppressing
+     * {@code fx} is the unset property.
      */
     @Test
     void rollupOmitsFxEntirelyWhenNoDisplayCurrencyConfigured() {
@@ -270,9 +256,6 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
 
     @Test
     void anonymousIsUnauthorized() {
-        // Stands for every instance-admin route: SecurityConfig's anyRequest().authenticated() answers
-        // all of /admin/**, so one route proves the posture for the whole namespace.
-        //
         // 401, not 403: an unauthenticated caller must be told to authenticate. The two are answered
         // by different layers (the entry point vs. @PreAuthorize), so passing the 403 case above says
         // nothing about this one.
@@ -280,9 +263,7 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     @Test
-    void settingAWorkspacesBudgetIsForbiddenForANonAdminAndUnauthorizedForAnonymous() {
-        // The mutation is the endpoint an operator's backstop is worth attacking; nonAdminIsForbidden
-        // only ever covered the read.
+    void settingAWorkspacesBudgetIsRefusedForBothANonAdminAndAnAnonymousCaller() {
         webTestClient
             .put()
             .uri("/admin/workspaces/{slug}/llm/budget", "any-workspace")

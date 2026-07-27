@@ -9,10 +9,10 @@ import { renderRouteAt, TRANSFORM_WAIT } from "@/test/router-harness";
 // Mounting the real route pulls in the whole admin layout and its lazy modules.
 vi.setConfig({ testTimeout: 20_000 });
 
-/** Both surfaces under test are current-month-only: no "Set budget" and no cap state on a closed month. */
+/** The real current month: the editor and the cap state are withdrawn on a closed one. */
 const MONTH = currentMonthUtc();
 
-/** 86% of the $50 budget below — over `BUDGET_WARN_PERCENT`, so the pace warning is on screen to read. */
+/** 86% of the $50 budget below, so the pace warning is on screen to read. */
 const SPENT_USD = 43;
 
 function row(budgetUsd: number | undefined): AdminWorkspaceLlmUsage {
@@ -48,7 +48,6 @@ function detail(budgetUsd: number | undefined): WorkspaceLlmUsageReport {
 
 const requestedMonths: string[] = [];
 
-/** One `budget`, read by both reports — the row and the expanded panel are two views of one number. */
 function mockUsageRoutes(options: {
 	budgetUsd?: number;
 	onPutBudget?: (budgetUsd: number | undefined) => Promise<Response> | Response;
@@ -87,10 +86,7 @@ async function saveBudget(amount: string) {
 }
 
 describe("instance AI usage route", () => {
-	/**
-	 * `?month=` is route state, so the clamp in `usageSearchSchema` lives in the router and only a
-	 * mounted router exercises it: a link must not reach a month the stepper itself refuses to walk to.
-	 */
+	// `?month=` is route state, so only a mounted router exercises `usageSearchSchema`'s clamp.
 	it("clamps a future ?month= back to this month", async () => {
 		mockUsageRoutes({ budgetUsd: 50 });
 		await renderUsageRoute("/admin/usage?month=2999-01");
@@ -99,17 +95,12 @@ describe("instance AI usage route", () => {
 		expect(requestedMonths).toEqual([MONTH]);
 	});
 
-	/**
-	 * The row and the expanded panel are fed by two different endpoints — the admin rollup and the
-	 * workspace's own report — and both print the budget. The panel stays mounted across the write, so
-	 * invalidating only the rollup leaves two contradictory caps for one workspace on one screen.
-	 */
+	// The row and the panel are fed by two endpoints, and the panel stays mounted across the write.
 	it("refreshes the expanded panel's budget, not just the row's", async () => {
 		mockUsageRoutes({ budgetUsd: 50 });
 		await renderUsageRoute();
 
 		fireEvent.click(screen.getByRole("button", { name: /View usage details for Acme/ }));
-		// The panel's warning is the budget as the *workspace-scoped* report states it.
 		await screen.findByText("Acme has used 86% of its shared-model budget");
 
 		fireEvent.click(screen.getByRole("button", { name: /Set budget for Acme/ }));

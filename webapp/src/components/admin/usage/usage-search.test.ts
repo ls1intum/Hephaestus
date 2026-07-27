@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { monthOf, usageSearchSchema } from "./usage-search";
 
-/** Any date inside the month; only the yyyy-MM part is ever read. */
 function atMonth(iso: string) {
 	vi.useFakeTimers();
 	vi.setSystemTime(new Date(iso));
@@ -32,7 +31,6 @@ describe("usageSearchSchema", () => {
 
 	it("clamps a future month to now, because there is no such thing as future spend", () => {
 		atMonth("2026-07-15T00:00:00.000Z");
-		// A link must not reach a state the stepper refuses to walk to.
 		expect(usageSearchSchema.parse({ month: "2027-01" })).toEqual({ month: "2026-07" });
 	});
 
@@ -48,7 +46,7 @@ describe("monthOf", () => {
 	});
 
 	it("falls back to the current UTC month when the URL says nothing", () => {
-		// Late UTC on the last day of the month: a local-time fallback would report August here.
+		// A local-time fallback would report August here.
 		atMonth("2026-07-31T23:30:00.000Z");
 		expect(monthOf({})).toBe("2026-07");
 	});

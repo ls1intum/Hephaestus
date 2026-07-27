@@ -48,8 +48,7 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
         workspace.setWorkspaceSlug("ws");
         context = new WorkspaceContext(1L, "ws", "Ws", AccountType.ORG, null, false, false, Set.of());
         // lenient: the read-only getter resolves through findById, the audited writes through the
-        // locking variant (which serializes the before-snapshot with the mutation), so each test uses
-        // exactly one of the two.
+        // locking variant, so each test uses exactly one of the two.
         lenient().when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
         lenient().when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(workspace));
     }
@@ -70,8 +69,6 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
 
     @Test
     void effectiveValueUsesOverrideOverPropertyWhenOverrideIsFalse() {
-        // Property skipDrafts=true, workspace override=false → effective must be false (override wins,
-        // not an OR). Guards the resolution precedence in both directions.
         workspace.getReviewSettings().setSkipDrafts(false);
 
         PracticeReviewSettingsDTO view = service.getSettings(context);
@@ -80,7 +77,7 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
     }
 
     @Test
-    void updatePracticeReviewAppliesPatch() {
+    void updatePracticeReviewAppliesThePatchAndReturnsTheUpdatedView() {
         when(workspaceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         PracticeReviewSettingsDTO view = service.updatePracticeReview(
@@ -91,7 +88,6 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
         assertThat(workspace.getReviewSettings().getSkipDrafts()).isFalse();
         assertThat(workspace.getReviewSettings().getCooldownMinutes()).isEqualTo(30);
         assertThat(workspace.getReviewSettings().getRunForAllUsers()).isNull(); // untouched
-        // The returned view is what the UI consumes; assert it reflects the patch too.
         assertThat(view.skipDrafts()).isFalse();
         assertThat(view.cooldownMinutes()).isEqualTo(30);
     }

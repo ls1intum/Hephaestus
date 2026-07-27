@@ -88,7 +88,6 @@ describe("AdminLlmModelAccessDialog", () => {
 			"false",
 		);
 
-		// A background refetch: same model, fresh object, granted more broadly since.
 		rerender(
 			<AdminLlmModelAccessDialog
 				{...props}

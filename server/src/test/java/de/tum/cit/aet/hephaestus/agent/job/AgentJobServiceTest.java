@@ -108,7 +108,6 @@ class AgentJobServiceTest extends BaseUnitTest {
         workspace.setId(1L);
         workspace.setWorkspaceSlug("test-ws");
 
-        // Detection runs exactly the workspace's PRACTICE_DETECTION binding — one job, no fan-out.
         enabledBinding = new WorkspaceAgentBinding();
         enabledBinding.setId(10L);
         enabledBinding.setWorkspace(workspace);
@@ -124,8 +123,6 @@ class AgentJobServiceTest extends BaseUnitTest {
             .when(agentBindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_DETECTION))
             .thenReturn(Optional.of(enabledBinding));
 
-        // Default resolver stub — submitForBinding freezes ConfigSnapshot.from(binding, resolver);
-        // individual tests override where the resolved shape matters.
         lenient()
             .when(llmModelResolver.resolve(any()))
             .thenReturn(
@@ -200,15 +197,8 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         /**
-         * The binding is resolved BEFORE the budget check so the cap that applies is the one
-         * belonging to whoever pays for that binding — the host for a shared instance model, the
-         * workspace for its own connected provider. Getting this order wrong would let an exhausted
-         * host budget pause work the workspace pays for itself.
-         *
-         * <p>Asserted through the outcome, not through a {@code verify}: only the payer named here is
-         * given an exhausted cap, so the job survives if and only if the service consulted the OTHER
-         * purse. A run that reaches the right purse returns empty and writes no row; a run that reaches
-         * the wrong one sails past a cap that is not exhausted and persists a job.
+         * Asserted through the outcome rather than a {@code verify}: only the payer named here is given
+         * an exhausted cap, so the job survives if and only if the service consulted the OTHER purse.
          */
         @ParameterizedTest(name = "a binding on {1}''s model is paused by {1}''s exhausted cap, and only by it")
         @CsvSource({ "true, INSTANCE, WORKSPACE", "false, WORKSPACE, INSTANCE" })
@@ -274,8 +264,6 @@ class AgentJobServiceTest extends BaseUnitTest {
 
         @Test
         void shouldSubmitNothingWhenBoundModelIsRevoked() {
-            // The binding resolves to a since-revoked model: ConfigSnapshot.from throws, so no job is
-            // created (detection is paused for this workspace until the model is restored).
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
             when(llmModelResolver.resolve(enabledBinding)).thenThrow(new IllegalStateException("model unavailable"));
 
@@ -326,7 +314,7 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldCreateJobQueued() {
+        void shouldCreateAQueuedJobWithItsPurposeIdempotencyKeyAndFrozenSnapshot() {
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             JobTypeHandler handler = mock(JobTypeHandler.class);
@@ -356,8 +344,6 @@ class AgentJobServiceTest extends BaseUnitTest {
             assertThat(job.getJobType()).isEqualTo(AgentJobType.PULL_REQUEST_REVIEW);
             assertThat(job.getIdempotencyKey()).isEqualTo("pr_review:owner/repo:42:authoring:abc123:detection");
             assertThat(job.getConfigSnapshot()).isNotNull();
-            // The QUEUED insert IS the enqueue: AgentJobExecutor's poll loop discovers it directly
-            // from the agent_job table, so there is no publish event to verify.
             assertThat(job.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
         }
 
@@ -365,10 +351,8 @@ class AgentJobServiceTest extends BaseUnitTest {
         @DisplayName("the credential is NEVER frozen onto the job — one path, resolved live by the proxy")
         void neverCopiesTheCredentialOntoTheJob() {
             // Asserted on the entity's shape rather than on one submitted job's field being null: the
-            // job now has nowhere to put a provider credential at all, which is the stronger guarantee
-            // and the one a future write path cannot undo by forgetting to leave a field unset. The
-            // proxy resolves the provider key live from the frozen snapshot's connection reference; a
-            // SECOND encrypted column here would mean a second place that key comes to rest.
+            // job has nowhere to put a provider credential at all, which a future write path cannot
+            // undo by forgetting to leave a field unset.
             assertThat(AgentJob.class.getDeclaredFields())
                 .filteredOn(
                     field ->
@@ -561,7 +545,7 @@ class AgentJobServiceTest extends BaseUnitTest {
 
         @Test
         @SuppressWarnings("unchecked")
-        void submitPreparedRendersAnActionableMessageWhenNothingWasSubmitted() {
+        void submitPreparedNamesTheUnboundAndBudgetCausesWhenNothingWasSubmitted() {
             // submitPrepared is invoked by the controller AFTER the prep transaction commits, so submit() runs
             // outside any outer transaction. With no enabled config it renders the no-job message.
             lenient()
@@ -581,8 +565,6 @@ class AgentJobServiceTest extends BaseUnitTest {
                 mock(JobSubmissionRequest.class)
             );
 
-            // The message must name the two real causes an operator can act on — an unbound/disabled
-            // purpose or an exhausted budget — not a config concept that no longer exists.
             assertThat(result).contains("No job created").contains("unbound or disabled").contains("budget");
         }
     }

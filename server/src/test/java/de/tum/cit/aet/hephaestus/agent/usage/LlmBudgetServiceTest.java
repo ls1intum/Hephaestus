@@ -46,7 +46,6 @@ class LlmBudgetServiceTest extends BaseUnitTest {
         budgetService = new LlmBudgetService(usageRepository, workspaceRepository, meterRegistry);
     }
 
-    /** A workspace carrying both caps: the instance admin's purse and the workspace admin's own. */
     private Workspace workspaceWithBudgets(@Nullable BigDecimal instanceBudget, @Nullable BigDecimal byoBudget) {
         Workspace workspace = new Workspace();
         workspace.setId(WORKSPACE_ID);
@@ -55,7 +54,6 @@ class LlmBudgetServiceTest extends BaseUnitTest {
         return workspace;
     }
 
-    /** The verdict for a workspace carrying these two caps, resolved the way every gate resolves it. */
     private LlmBudgetDecision decideWithBudgets(@Nullable BigDecimal instanceBudget, @Nullable BigDecimal byoBudget) {
         when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(
             java.util.Optional.of(workspaceWithBudgets(instanceBudget, byoBudget))
@@ -87,11 +85,6 @@ class LlmBudgetServiceTest extends BaseUnitTest {
         return value == null || value.isEmpty() ? null : new BigDecimal(value);
     }
 
-    /**
-     * Each purse is blocked by EXHAUSTED and by an unverifiable month (a cap whose true spend cannot be
-     * confirmed is not a cap), and never blocked when uncapped. The two tables are deliberate mirrors:
-     * they must stay identical in rule while reading different ledger columns.
-     */
     @Nested
     @DisplayName("decide() — one purse's verdict")
     class PurseVerdict {
@@ -106,7 +99,12 @@ class LlmBudgetServiceTest extends BaseUnitTest {
                 "0, 0, false, EXHAUSTED",
             }
         )
-        void instancePurse(String capUsd, String spend, boolean unpriced, LlmBudgetBlockReason expected) {
+        void theInstancePurseIsBlockedOnlyWhenExhaustedOrUnverifiable(
+            String capUsd,
+            String spend,
+            boolean unpriced,
+            LlmBudgetBlockReason expected
+        ) {
             stubLedger(spend, unpriced, "0.00", false);
 
             assertThat(decideWithBudgets(cap(capUsd), null).instanceFunded()).isEqualTo(expected);
@@ -122,7 +120,12 @@ class LlmBudgetServiceTest extends BaseUnitTest {
                 "0, 0, false, EXHAUSTED",
             }
         )
-        void workspaceFundedPurse(String capUsd, String spend, boolean unpriced, LlmBudgetBlockReason expected) {
+        void theWorkspaceFundedPurseIsBlockedOnlyWhenExhaustedOrUnverifiable(
+            String capUsd,
+            String spend,
+            boolean unpriced,
+            LlmBudgetBlockReason expected
+        ) {
             stubLedger("0.00", false, spend, unpriced);
 
             assertThat(decideWithBudgets(null, cap(capUsd)).workspaceFunded()).isEqualTo(expected);
@@ -162,7 +165,6 @@ class LlmBudgetServiceTest extends BaseUnitTest {
     @DisplayName("decide() — the two purses never contaminate each other")
     class PurseIsolation {
 
-        /** One month as both purses see it: each cap, its confirmed spend, and its unpriced blind spot. */
         record Month(
             String instanceCap,
             String instanceSpend,
@@ -173,11 +175,9 @@ class LlmBudgetServiceTest extends BaseUnitTest {
         ) {}
 
         /**
-         * Every row states a verdict for BOTH purses, which is what makes it a test of isolation rather
-         * than of one purse: the purse-at-a-time tables above hold the other side fixed and never look
-         * at it. The last two rows are the invariant at its extremes — nothing a workspace admin can
-         * write (a zero cap, a million dollars of own-provider spend, an unpriceable own-provider model)
-         * is an input to the host's verdict, and vice versa.
+         * The last two rows are the invariant at its extremes — nothing a workspace admin can write (a
+         * zero cap, a million dollars of own-provider spend, an unpriceable own-provider model) is an
+         * input to the host's verdict, and vice versa.
          *
          * <p>The ledger here is mocked, so what these rows pin is the DECISION logic. The
          * {@code funding_source} SQL predicate that feeds it is proved against a real database by
@@ -243,8 +243,7 @@ class LlmBudgetServiceTest extends BaseUnitTest {
 
     /**
      * An unattributable call (null funding source) is judged against BOTH purses — fail-safe, never a
-     * way around a cap. The non-null routing is covered by {@link BlockSubmission} below, which drives
-     * {@code forFunding} through the real gate.
+     * way around a cap.
      */
     @Nested
     @DisplayName("LlmBudgetDecision.forFunding with no funding source")
@@ -269,10 +268,6 @@ class LlmBudgetServiceTest extends BaseUnitTest {
         }
     }
 
-    /**
-     * The submission-side gate is funding-scoped: it asks only the purse that pays for the work, and
-     * tags its metric with which cap refused it.
-     */
     @Nested
     @DisplayName("blockSubmission is scoped to whoever pays")
     class BlockSubmission {
@@ -341,7 +336,12 @@ class LlmBudgetServiceTest extends BaseUnitTest {
                 "999999.00, true, , UNVERIFIABLE",
             }
         )
-        void verdictFor(String pricedCost, boolean hasUnpriced, String capUsd, LlmBudgetVerdict expected) {
+        void theVerdictCombinesSpendUnpricedUsageAndCap(
+            String pricedCost,
+            boolean hasUnpriced,
+            String capUsd,
+            LlmBudgetVerdict expected
+        ) {
             assertThat(LlmBudgetService.verdictFor(new BigDecimal(pricedCost), hasUnpriced, cap(capUsd))).isEqualTo(
                 expected
             );

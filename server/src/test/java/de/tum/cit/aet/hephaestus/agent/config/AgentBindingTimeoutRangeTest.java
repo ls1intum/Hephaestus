@@ -15,12 +15,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * The per-run timeout is bounded at both ends; the ceiling is the load-bearing one.
- * {@code MentorInFlightReaper} reaps a turn older than {@link AgentBindingLimits#MAX_TIMEOUT_SECONDS} as
- * abandoned — without this ceiling an administrator could configure a binding past that window and have
- * live turns reaped mid-answer. {@code MentorPiAdapter} clamps rows that never came through this API;
- * this covers the rows that do, refusing an out-of-range value with a 400 instead of silently running
- * something else.
+ * The ceiling is the load-bearing end: {@code MentorInFlightReaper} reaps a turn older than
+ * {@link AgentBindingLimits#MAX_TIMEOUT_SECONDS} as abandoned, so a binding configured past that window
+ * would have live turns reaped mid-answer.
  */
 class AgentBindingTimeoutRangeTest extends BaseUnitTest {
 

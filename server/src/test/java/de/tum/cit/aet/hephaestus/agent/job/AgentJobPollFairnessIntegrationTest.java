@@ -28,16 +28,10 @@ import org.springframework.test.context.DynamicPropertySource;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Head-of-line starvation fix for the poll candidate query: {@code findQueuedIdsOldestFirst}
- * is not a plain {@code WHERE status='QUEUED' ORDER BY created_at LIMIT n}, which has no awareness of
- * per-bucket concurrency caps. If the oldest {@code n} QUEUED rows all belonged to a {@code
- * (workspace, purpose)} already saturated on RUNNING jobs, every claim attempt in that batch
- * correctly skipped them (the concurrency-full outcome), but a younger, immediately-runnable job
- * belonging to a DIFFERENT workspace/purpose never even entered the candidate batch — it would
- * starve behind an unclaimable backlog for as many poll cycles as the saturated bucket stays
- * saturated. The query now excludes candidates whose {@code (workspace, purpose)} binding is already
- * at its RUNNING cap (the cap lives on {@code workspace_agent_binding} since the per-purpose binding
- * redesign; a job whose binding row is gone is treated as uncapped and stays a candidate).
+ * Head-of-line starvation fix for the poll candidate query. A plain {@code WHERE status='QUEUED' ORDER
+ * BY created_at LIMIT n} has no awareness of per-bucket concurrency caps: if the oldest {@code n}
+ * QUEUED rows all belong to a {@code (workspace, purpose)} already saturated on RUNNING jobs, a
+ * younger, immediately-runnable job in a different bucket never enters the candidate batch at all.
  */
 @DisplayName("Poll candidate fairness")
 class AgentJobPollFairnessIntegrationTest extends BaseIntegrationTest {
@@ -92,10 +86,8 @@ class AgentJobPollFairnessIntegrationTest extends BaseIntegrationTest {
         binding(cappedWs, 1);
         binding(openWs, 3);
 
-        // The capped workspace already has one RUNNING job at its max-concurrent-jobs=1 cap.
         runningJob(cappedWs);
 
-        // Older QUEUED backlog, all on the capped (unclaimable) workspace.
         Instant base = Instant.now().minus(1, ChronoUnit.HOURS);
         for (int i = 0; i < 5; i++) {
             queuedJob(cappedWs, base.plusSeconds(i));
@@ -139,8 +131,6 @@ class AgentJobPollFairnessIntegrationTest extends BaseIntegrationTest {
 
         assertThat(jobRepository.findQueuedIdsOldestFirst(10)).contains(jobId);
     }
-
-    // ── helpers ──
 
     private Workspace activeWorkspace(String slug) {
         return workspaceRepository.save(TestEntities.activeWorkspace(slug));

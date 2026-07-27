@@ -1,8 +1,7 @@
 import { expect } from "storybook/test";
 
 /**
- * SC 4.1.2: dimming a control with `pointer-events-none` blocks the mouse and nothing else — it
- * stays in the tab order and is still announced as available, so the real contract is the native
+ * SC 4.1.2: `pointer-events-none` blocks the mouse and nothing else, so the contract is the native
  * `disabled` attribute. The focus check is what an `aria-disabled` look-alike would fail.
  */
 export async function expectGenuinelyDisabled(control: HTMLElement) {
@@ -13,10 +12,8 @@ export async function expectGenuinelyDisabled(control: HTMLElement) {
 }
 
 /**
- * The same claim for a non-form control: Base UI draws a switch as a `<span role="switch">`, which
- * has no native `disabled`, so `aria-disabled` plus removal from the tab order is the whole
- * contract. `data-disabled` is only the kit's styling hook and asserts nothing. Neither attribute
- * says the press is ignored, so callers assert that separately.
+ * The same, for a Base UI `<span role="switch">`: no native `disabled`, so `aria-disabled` plus
+ * removal from the tab order is the whole contract. Neither says the press is ignored.
  */
 export async function expectUnavailable(control: HTMLElement) {
 	await expect(control).toHaveAttribute("aria-disabled", "true");

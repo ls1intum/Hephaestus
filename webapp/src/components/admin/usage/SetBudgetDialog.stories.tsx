@@ -3,10 +3,7 @@ import { fn } from "storybook/test";
 import { expectAmountRejected } from "@/test/budget-amount-field";
 import { SetBudgetDialog } from "./SetBudgetDialog";
 
-/**
- * Instance-admin dialog to set or remove a workspace's monthly shared-model budget.
- * Open whenever a workspace is passed; `null` keeps it closed.
- */
+/** Instance-admin dialog to set or remove a workspace's monthly shared-model budget. */
 const meta = {
 	component: SetBudgetDialog,
 	parameters: { layout: "centered" },
@@ -33,10 +30,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Editing an existing budget — the "Remove budget" action is offered. */
 export const WithExistingCap: Story = {};
 
-/** Workspace with no budget — no "Remove budget" action, input starts empty. */
 export const Uncapped: Story = {
 	args: {
 		workspace: {
@@ -57,14 +52,8 @@ export const Pending: Story = {
 	args: { isPending: true },
 };
 
-/**
- * One illustration, not three: every amount rule lives on `BudgetAmountDialog`, which this wrapper
- * supplies nothing but copy to. What is worth proving *here* is that the copy arrives — that the
- * rejection is raised against a field labelled "Monthly budget" and a button reading "Save budget",
- * not against this component's own defaults. The dialog is portalled, so
- * {@link expectAmountRejected} queries the document rather than the story canvas.
- */
-export const InvalidEmptyValue: Story = {
+/** The dialog is portalled, so {@link expectAmountRejected} queries the document, not the canvas. */
+export const PassesItsFieldAndButtonCopyThrough: Story = {
 	play: async ({ args }) =>
 		await expectAmountRejected({
 			fieldLabel: /monthly budget/i,

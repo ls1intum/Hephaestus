@@ -11,7 +11,7 @@ type BudgetVerdict = WorkspaceLlmUsageReport["ownProviderBudgetVerdict"];
 type CapScope = "shared" | "own";
 type PauseReason = "CAP_REACHED" | "NO_PRICE";
 
-/** The four pause banners. The two caps pause independently and are never merged into one. */
+/** The two caps pause independently and are never merged into one banner. */
 const PAUSE_COPY: Record<
 	CapScope,
 	Record<PauseReason, { title: string; body: (parts: PauseCopyParts) => string }>
@@ -59,7 +59,6 @@ interface BudgetExhaustedAlertProps {
 	onEditOwnProviderCap?: () => void;
 }
 
-/** Rendered by both the AI usage page and the AI models page, once per paused cap. */
 export function BudgetExhaustedAlert({
 	scope,
 	verdict,

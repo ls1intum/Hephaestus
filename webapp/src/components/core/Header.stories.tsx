@@ -3,10 +3,7 @@ import { fn } from "storybook/test";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import Header from "./Header";
 
-/**
- * Header component - fully presentational, receives all data via props.
- * Version badge links to GitHub releases for production versions.
- */
+/** Fully presentational. The version badge links to GitHub releases in production only. */
 const meta = {
 	component: Header,
 	parameters: {
@@ -65,9 +62,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Production header with clickable version linking to release notes.
- */
 export const Default: Story = {
 	args: {
 		isAuthenticated: true,
@@ -75,7 +69,6 @@ export const Default: Story = {
 	},
 };
 
-/** Outside production the header shows the environment, not a version. */
 export const Staging: Story = {
 	args: {
 		isAuthenticated: true,
@@ -104,9 +97,6 @@ export const Development: Story = {
 	},
 };
 
-/**
- * Header for unauthenticated visitors with sign-in button.
- */
 export const LoggedOut: Story = {
 	args: {
 		isAuthenticated: false,
@@ -114,9 +104,6 @@ export const LoggedOut: Story = {
 	},
 };
 
-/**
- * Header in loading state while authentication is being verified.
- */
 export const Loading: Story = {
 	args: {
 		isAuthenticated: false,
@@ -124,9 +111,7 @@ export const Loading: Story = {
 	},
 };
 
-/**
- * Header without active workspace - logo links to landing page.
- */
+/** With no active workspace the logo links to the landing page. */
 export const NoWorkspace: Story = {
 	args: {
 		isAuthenticated: true,
@@ -135,9 +120,6 @@ export const NoWorkspace: Story = {
 	},
 };
 
-/**
- * Mobile view with compact layout.
- */
 export const Mobile: Story = {
 	args: {
 		isAuthenticated: true,

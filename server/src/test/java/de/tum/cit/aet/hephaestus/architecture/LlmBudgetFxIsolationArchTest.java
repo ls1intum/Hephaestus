@@ -13,23 +13,18 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
- * <b>No budget-enforcement class may depend on the fx package.</b>
- *
- * <p>USD is the sole unit of record, pricing and enforcement; the display currency is an estimate
+ * USD is the sole unit of record, pricing and enforcement; the display currency is an estimate
  * computed at read time from a rate that can be stale, missing, or resolved to a date other than
  * today. Letting any of that near a budget comparison would mean an FX move — or a failed fetch —
- * could pause or unpause a workspace's work. So the classes that decide whether spend is allowed stay
- * FX-free structurally rather than by convention.
+ * could pause or unpause a workspace's work.
  *
  * <p>The read-side rollup services ({@code LlmUsageService}, {@code LlmUsageAdminService}) are
  * deliberately NOT in this set: attaching the rate to a response is exactly their job.
  *
- * <p><b>What this test cannot see.</b> The rules below are structural — they catch an import, not a
- * multiplication. A rollup service that IS allowed to hold a rate could still convert a total before
- * passing it to {@code verdictFor}, and every rule here would stay green. That value-level property
- * has its own guard, and it must be a runtime one:
- * {@code LlmUsageFxDisplayIntegrationTest#budgetVerdictIsJudgedInUsdEvenWhenADisplayRateWouldUndercutIt}
- * fixes a cap and a spend that disagree once converted, and pins the USD answer.
+ * <p>These rules catch an import, not a multiplication: a rollup service that IS allowed to hold a
+ * rate could still convert a total before passing it to {@code verdictFor} and leave every rule here
+ * green. That value-level property is pinned at runtime instead, by
+ * {@code LlmUsageFxDisplayIntegrationTest#budgetVerdictIsJudgedInUsdEvenWhenADisplayRateWouldUndercutIt}.
  */
 @Tag("architecture")
 class LlmBudgetFxIsolationArchTest extends HephaestusArchitectureTest {
@@ -38,8 +33,6 @@ class LlmBudgetFxIsolationArchTest extends HephaestusArchitectureTest {
 
     private static final Set<String> ENFORCEMENT_CLASSES = Set.of(
         "de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService",
-        // Holds the caps and the spend and performs the comparison the proxy pauses work on — the
-        // most literal "decides whether spend is allowed" class there is.
         "de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetHeadroom",
         "de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService",
         "de.tum.cit.aet.hephaestus.agent.proxy.ProxyBudgetGate",
@@ -52,13 +45,9 @@ class LlmBudgetFxIsolationArchTest extends HephaestusArchitectureTest {
         javaClass -> ENFORCEMENT_CLASSES.contains(javaClass.getFullName())
     );
 
-    /**
-     * Both rules below match on name, so a rename would empty them and leave them passing while
-     * guarding nothing. This is what keeps them non-vacuous.
-     */
     @Test
     @DisplayName("the enforcement set the rules name still exists")
-    void enforcementClassesArePresent() {
+    void enforcementClassesStillExistSoTheRulesAreNotVacuous() {
         List<String> present = classes
             .stream()
             .map(JavaClass::getFullName)

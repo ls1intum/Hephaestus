@@ -88,7 +88,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
 
-        /** Factory methods like {@code fromEntity} are fine; this only checks immutability. */
         @Test
         void dtosAreImmutableRecords() {
             ArchRule rule = classes()
@@ -394,10 +393,8 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
     class TestArchitectureTests {
 
         /**
-         * Tests that drive Liquibase themselves and therefore must NOT have a Spring context: the
-         * context would build the schema (either via its own Liquibase run or {@code ddl-auto}) before
-         * the test could seed the pre-migration rows it exists to migrate. The rule below is about
-         * consistent setup and cleanup, which a test owning its whole database lifecycle already has.
+         * Tests that drive Liquibase themselves and therefore must NOT have a Spring context: the context
+         * would build the schema before the test could seed the pre-migration rows it exists to migrate.
          */
         private static final Set<String> SCHEMA_OWNING_TESTS = Set.of("LegacyAgentConfigMigrationIntegrationTest");
 

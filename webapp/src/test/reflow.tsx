@@ -2,9 +2,8 @@ import { expect } from "storybook/test";
 
 /**
  * Assertions for WCAG 2.2 SC 1.4.10 (Reflow) and SC 2.5.8 (Target Size), for the Storybook browser
- * tier. Callers must set `parameters.viewport.defaultViewport = "reflow"`; every helper that reads
- * the viewport asserts that first, because measuring a dialog against a 1280 px window passes
- * vacuously.
+ * tier. Callers must set `parameters.viewport.defaultViewport = "reflow"` — measuring against a
+ * 1280 px window passes vacuously, so every viewport-reading helper asserts it first.
  */
 
 const LAYOUT_SLACK_PX = 1;
@@ -77,10 +76,7 @@ export async function expectTargetSize(control: HTMLElement) {
 	await expect(rect.height).toBeGreaterThanOrEqual(MIN_TARGET_PX);
 }
 
-/**
- * SC 2.5.8's *Spacing* exception, which is what makes the kit's switches and checkboxes conformant:
- * an undersized target passes when a 24 px circle centred on it intersects no other target's.
- */
+/** SC 2.5.8's *Spacing* exception: an undersized target passes when its 24 px circle hits no other. */
 export async function expectTargetSpacing(controls: HTMLElement[]) {
 	await expect(controls.length).toBeGreaterThan(0);
 	const centres = controls.map((control) => {
@@ -121,10 +117,7 @@ export function openDialogPopup(): HTMLElement {
 	return popup;
 }
 
-/**
- * A `position: fixed` popup centred with `-translate-y-1/2` hangs off *both* edges once it outgrows
- * the viewport, and the page cannot scroll a fixed element back into view.
- */
+/** A centred `fixed` popup hangs off *both* edges once it outgrows the viewport, and cannot be scrolled back. */
 export async function expectDialogFitsViewport(popup: HTMLElement = openDialogPopup()) {
 	await expectReflowViewport();
 	// The layout box, not `getBoundingClientRect`: the `zoom-in-95` enter animation may still be

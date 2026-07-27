@@ -21,12 +21,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
-/**
- * Parses a verbatim copy of the ECB's {@code eurofxref-daily.xml} and pins the client's central
- * promise: <b>it never throws</b>. Every failure the ECB can hand it — a refused or unreachable
- * request, an empty body, a document that carries no usable USD quote — comes back as an empty
- * Optional, because the caller is a scheduled tick that must survive the ECB having a bad day.
- */
 class EcbFxRateClientTest extends BaseUnitTest {
 
     private MockWebServer ecb;
@@ -46,7 +40,6 @@ class EcbFxRateClientTest extends BaseUnitTest {
         return clientForUrl(ecb.url(path).toString());
     }
 
-    /** The one knob {@code hephaestus.llm.fx.daily-url} exists for: aim the client at a fixture. */
     private static EcbFxRateClient clientForUrl(String dailyUrl) {
         return new EcbFxRateClient(
             new LlmProperties("", new LlmProperties.Egress(false), new LlmProperties.Fx(dailyUrl))
@@ -66,8 +59,6 @@ class EcbFxRateClientTest extends BaseUnitTest {
         );
     }
 
-    // PARSING
-
     @Test
     @DisplayName("should read the dated USD rate out of a real ECB document")
     void shouldParseUsdRateWhenGivenRealEcbDocument() throws IOException {
@@ -82,11 +73,6 @@ class EcbFxRateClientTest extends BaseUnitTest {
         });
     }
 
-    /**
-     * Four documents, four separate reasons the parser must hand back nothing rather than a number.
-     * Each row is its own guard: drop any one of them and exactly one row goes green with a rate the
-     * ledger would then quote money in.
-     */
     static Stream<Arguments> unusableDocuments() {
         return Stream.of(
             Arguments.of(
@@ -120,8 +106,6 @@ class EcbFxRateClientTest extends BaseUnitTest {
         assertThat(EcbFxRateClient.parseUsdRate(xml)).as(why).isEmpty();
     }
 
-    // FETCHING
-
     @Test
     @DisplayName("should fetch and parse the daily document over HTTP")
     void shouldReturnRateWhenEcbAnswers() throws Exception {
@@ -140,16 +124,15 @@ class EcbFxRateClientTest extends BaseUnitTest {
      */
     @Test
     @DisplayName("should return empty without throwing when the ECB answers 500")
-    void shouldReturnEmptyWhenEcbReturnsServerError() {
+    void shouldReturnEmptyRatherThanThrowWhenEcbReturnsServerError() {
         ecb.enqueue(new MockResponse.Builder().code(500).body("upstream boom").build());
 
         assertThat(clientFor("/daily.xml").fetchLatestUsdRate()).isEmpty();
     }
 
-    /** A separate guard from the catch above: a 200 with nothing in it never reaches the parser. */
     @Test
     @DisplayName("should return empty without throwing when the body is empty")
-    void shouldReturnEmptyWhenEcbReturnsEmptyBody() {
+    void shouldReturnEmptyRatherThanThrowWhenTheBodyIsEmpty() {
         ecb.enqueue(new MockResponse.Builder().code(200).body("").build());
 
         assertThat(clientFor("/daily.xml").fetchLatestUsdRate()).isEmpty();

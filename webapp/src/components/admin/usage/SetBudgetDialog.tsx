@@ -5,17 +5,12 @@ import type { Fx } from "./fx";
 export interface SetBudgetDialogProps {
 	/** `null` keeps the dialog closed. */
 	workspace: AdminWorkspaceLlmUsage | null;
-	/**
-	 * From the report envelope rather than the row, so the estimate under the field uses the same
-	 * rate as the table behind the dialog.
-	 */
+	/** From the report envelope, so the field's estimate uses the table's rate. */
 	fx?: Fx;
-	/** Passed straight through to the shared editor; see its `isCurrentMonth`. */
 	isCurrentMonth?: boolean;
 	isPending: boolean;
 	serverError?: string | null;
 	onOpenChange: (open: boolean) => void;
-	/** `null` removes the cap; a number (USD, >= 0, 2 decimals) sets it. */
 	onSubmit: (monthlyLlmBudgetUsd: number | null) => void;
 }
 

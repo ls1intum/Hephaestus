@@ -50,14 +50,9 @@ export const FreeModel: Story = {
 };
 
 /**
- * The tallest dialog on the workspace surface, reviewed at the WCAG 2.2 SC 1.4.10 reflow width
- * (320 px).
- *
- * Six fields plus the whole price editor come to roughly 950 px. `DialogBody` is what bounds the
- * height and scrolls the middle: an unbounded `position: fixed` popup this tall hangs off the top and
- * the bottom of every phone at once, leaving neither the title nor "Add inactive model" reachable.
- * `DialogBody` is shared, so the full proof of that behaviour lives on the tallest dialog in the app
- * (`AdminLlmModelFormDialog`, past 1000 px); here the claim is that this form stays inside its bound.
+ * WCAG 2.2 SC 1.4.10 at 320 px: this form outgrows the viewport, and `DialogBody` bounding the
+ * height is all that keeps a `position: fixed` popup from hanging off both ends with its title and
+ * submit out of reach.
  */
 export const MobileReflow: Story = {
 	args: { editing: mockModel },
@@ -71,7 +66,6 @@ export const MobileReflow: Story = {
 	},
 };
 
-/** Submitting without a display name or upstream id surfaces validation. */
 export const ValidationError: Story = {
 	play: async () => {
 		await userEvent.click(await screen.findByRole("button", { name: /add inactive model/i }));

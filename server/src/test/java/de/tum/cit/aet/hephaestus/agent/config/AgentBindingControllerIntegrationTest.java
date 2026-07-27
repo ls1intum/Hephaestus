@@ -21,13 +21,10 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
- * The per-purpose binding endpoints over the real stack.
- *
- * <p>Exists mainly for the listing: readiness is judged outside the loading transaction on purpose —
- * resolve() signals a revoked model by throwing, and catching that inside a shared transaction would
- * still mark it rollback-only. A plain finder returns rows whose LAZY model blows up on first touch
- * outside a session, so the endpoint 500s instead of answering; unit tests mock the repository and never
- * cross that boundary.
+ * Exists mainly for the listing: readiness is judged outside the loading transaction because resolve()
+ * signals a revoked model by throwing, and catching that inside a shared transaction would still mark it
+ * rollback-only. A plain finder returns rows whose LAZY model blows up on first touch outside a session,
+ * a boundary mocked repositories never cross.
  */
 class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
@@ -162,12 +159,9 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
     @Test
     @DisplayName("the endpoints require authentication")
     void anonymousIsRejected() {
-        // The listing's own gate: SecurityConfig permits anonymous GET under a workspace slug, and the
-        // member cases below only exercise PUT and DELETE — so @RequireAtLeastWorkspaceAdmin on
-        // listAgents is pinned here and nowhere else.
-        //
-        // Against a REAL workspace: an unknown slug 404s during resolution, which would pass this
-        // assertion without ever reaching the authentication check.
+        // SecurityConfig permits anonymous GET under a workspace slug, so @RequireAtLeastWorkspaceAdmin
+        // on listAgents is pinned here and nowhere else. Against a REAL workspace: an unknown slug 404s
+        // during resolution, which would pass this assertion without reaching the authentication check.
         User owner = persistUser("binding-anon-owner");
         Workspace workspace = createWorkspace(
             "binding-anon",
@@ -249,7 +243,6 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
             .expectStatus()
             .isForbidden();
 
-        // Sanity: the same principal IS admitted in the workspace it actually administers.
         webTestClient
             .get()
             .uri("/workspaces/{slug}/agents", own.getWorkspaceSlug())

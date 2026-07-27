@@ -65,7 +65,6 @@ class LlmUsageInsertContractTest extends BaseUnitTest {
 
     private static final String TABLE = "llm_usage_event";
 
-    /** Where the committed changelogs live, as they sit on the classpath from {@code src/main/resources}. */
     private static final String CHANGELOGS = "classpath*:db/changelog/*.xml";
 
     /** Column list and VALUES list of {@code INSERT INTO … (cols) VALUES (vals)}. */
@@ -138,8 +137,6 @@ class LlmUsageInsertContractTest extends BaseUnitTest {
             .as("an unused component is a value the recorder computes and the ledger throws away")
             .containsExactlyInAnyOrderElementsOf(components);
     }
-
-    // ─── The table, as the committed changelogs define it ──────────────────────────────────────
 
     /**
      * Replays every committed changelog's {@code createTable}/{@code addColumn}/{@code dropColumn}/
@@ -237,9 +234,6 @@ class LlmUsageInsertContractTest extends BaseUnitTest {
         }
     }
 
-    // ─── The entity and the SQL ────────────────────────────────────────────────────────────────
-
-    /** Every column name {@code LlmUsageEvent} maps. */
     private static Set<String> mappedColumnsOf(Class<?> entity) {
         Set<String> columns = new LinkedHashSet<>();
         for (Field field : entity.getDeclaredFields()) {

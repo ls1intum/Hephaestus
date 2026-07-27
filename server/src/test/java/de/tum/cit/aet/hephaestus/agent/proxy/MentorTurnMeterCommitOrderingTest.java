@@ -22,10 +22,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.transaction.support.TransactionSynchronizationUtils;
 
 /**
- * {@link MentorTurnMeter} states an invariant: the meter can lag the row but must never claim spend
- * the durable record does not have. Advancing it inline, inside the still-open {@code REQUIRES_NEW}
- * transaction, breaks that — a commit that then fails would leave the meter holding tokens the row
- * never got. So the ordering is the behaviour: nothing reaches the meter until {@code afterCommit} fires.
+ * {@link MentorTurnMeter} may lag the row but must never claim spend the durable record does not have:
+ * advancing it inline, inside the still-open {@code REQUIRES_NEW} transaction, would leave a failed
+ * commit holding tokens the row never got.
  */
 class MentorTurnMeterCommitOrderingTest extends BaseUnitTest {
 
@@ -56,8 +55,6 @@ class MentorTurnMeterCommitOrderingTest extends BaseUnitTest {
 
         accumulator.accumulate(attempt(turnId), usage);
 
-        // Inline mirroring passes the "was it called" check but fails HERE: while the transaction is
-        // still open the meter must know nothing, or a failed commit strands spend in it forever.
         verify(credentialRegistry, never()).accumulate(any(), any());
 
         TransactionSynchronizationUtils.triggerAfterCommit();

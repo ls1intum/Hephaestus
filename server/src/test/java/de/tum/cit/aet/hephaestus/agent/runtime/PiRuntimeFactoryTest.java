@@ -96,8 +96,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         )
         void stagesRunnerSidecars() {
             var inputs = factory.build(spec("openai-completions", "m", false)).inputFiles();
-            // pi-runner.mjs imports both sidecars relatively; without staging them the sandbox exits 1
-            // with ERR_MODULE_NOT_FOUND and no detection runs.
+            // pi-runner.mjs imports both relatively; unstaged, the sandbox exits 1 with ERR_MODULE_NOT_FOUND.
             for (String sidecar : PRACTICE.sidecarScripts()) {
                 assertThat(inputs).containsKey(sidecar);
                 assertThat(inputs.get(sidecar)).isNotEmpty();
@@ -107,9 +106,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
 
         @Test
         void promptDigest_isStableAcrossBuilds_andIndependentOfModel() {
-            // Same scaffolding must yield the same digest regardless of model/workspace, since an
-            // evaluation groups runs by this value. settings.json and pi-provider.json are
-            // deliberately excluded from the digested scaffolding.
+            // An evaluation groups runs by this digest; settings.json and pi-provider.json are excluded from it.
             String first = factory.build(spec("openai-completions", "model-a", false)).promptDigest();
             String second = factory.build(spec("openai-completions", "model-b", false)).promptDigest();
 
@@ -180,7 +177,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
     class ProviderConfigJson {
 
         @Test
-        void capturesResolvedBehaviour() throws Exception {
+        void capturesResolvedBehaviourButNeverTheCredential() throws Exception {
             PiPlanSpec spec = new PiPlanSpec(
                 "openai-completions",
                 "gpt-oss-120b",
@@ -203,7 +200,6 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             assertThat(root.path("maxOutputTokens").asInt()).isEqualTo(4096);
             assertThat(root.path("supportsReasoning").asBoolean()).isTrue();
             assertThat(root.has("cacheControlFormat")).isFalse();
-            // The credential NEVER lands here — only non-secret behaviour.
             assertThat(new String(json, StandardCharsets.UTF_8)).doesNotContain("job-token-123");
         }
 

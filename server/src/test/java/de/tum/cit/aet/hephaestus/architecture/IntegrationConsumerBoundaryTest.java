@@ -69,12 +69,11 @@ class IntegrationConsumerBoundaryTest extends HephaestusArchitectureTest {
     }
 
     /**
-     * Stronger than {@link #agentDoesNotDependOnIntegrationConsumer()}: the agent role must not link
-     * against jnats at all, not even its own connection. A jnats import anywhere under {@code agent/}
-     * would mean a NATS-based feature crept back in without going through the {@code agent_job} queue.
+     * Not even its own connection: a jnats import anywhere under {@code agent/} would mean a NATS-based
+     * feature crept back in without going through the {@code agent_job} queue.
      */
     @Test
-    void agentDoesNotDependOnJnats() {
+    void agentDoesNotLinkAgainstJnatsAtAll() {
         noClasses()
             .that()
             .resideInAPackage("de.tum.cit.aet.hephaestus.agent..")

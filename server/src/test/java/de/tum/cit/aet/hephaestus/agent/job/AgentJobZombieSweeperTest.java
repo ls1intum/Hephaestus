@@ -122,7 +122,6 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
         );
     }
 
-    /** Real entity (owned JPA types must not be mocked) for the absolute-timeout reaper tests. */
     private AgentJob runningJob(UUID id, Instant startedAt, int timeoutSeconds) {
         AgentJob job = new AgentJob();
         job.setId(id);
@@ -149,10 +148,6 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
         return workspace;
     }
 
-    /**
-     * A snapshot whose {@code schemaVersion} is one past this server's — exactly what a reverted
-     * canary rollout leaves behind, and what {@link ConfigSnapshot#fromJson} refuses to read.
-     */
     private tools.jackson.databind.JsonNode snapshotFromTheFuture() {
         tools.jackson.databind.node.ObjectNode node = (tools.jackson.databind.node.ObjectNode) admittedSnapshot(
             600
@@ -160,7 +155,6 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
         return node.put("schemaVersion", ConfigSnapshot.SCHEMA_VERSION + 1);
     }
 
-    /** The single ledger event appended through the priced path. */
     private LlmUsageRecorder.LlmUsageSample capturePriced() {
         ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample = ArgumentCaptor.forClass(
             LlmUsageRecorder.LlmUsageSample.class
@@ -170,7 +164,6 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
         return sample.getValue();
     }
 
-    /** The single ledger event appended through the UNPRICED path. */
     private LlmUsageRecorder.LlmUsageSample captureUnverifiable() {
         ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample = ArgumentCaptor.forClass(
             LlmUsageRecorder.LlmUsageSample.class
@@ -253,9 +246,6 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
             assertThat(sample.getValue().sourceAttempt()).isZero();
         }
 
-        // A job that never began executing carries no attributable spend — both sweeps reach that
-        // through the same guard in recordUnverifiableUsage.
-
         @Test
         @DisplayName("legacy jobs without an admission snapshot are recovered as explicitly unpriced")
         void recoversLegacyJobWithoutPriceSnapshot() {
@@ -331,7 +321,6 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
                 any(),
                 any()
             );
-            // No further status write beyond the attempted requeue itself, and no requeue credited.
             verify(jobRepository, never()).transitionStatus(any(), any(), any(), any(), any());
             verify(usageRecorder, never()).recordUnverifiable(any(), any());
             assertThat(meterRegistry.counter("agent.job.orphan.requeued").count()).isZero();
@@ -436,15 +425,13 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
         @DisplayName(
             "attempts already at the cap: marks FAILED directly, without claiming another attempt or calling the lifecycle service"
         )
-        void exhaustedAttemptsMarksFailedDirectly() {
+        void exhaustedAttemptsMarksFailedDirectlyKeepingTheCommentId() {
             AgentJob job = stuckJob((short) AgentJobZombieSweeper.MAX_DELIVERY_RECOVERY_ATTEMPTS);
             job.setDeliveryCommentId("comment-1");
             when(jobRepository.findStuckPendingDeliveries(any(), any())).thenReturn(List.of(job));
 
             sweeper.recoverStuckDeliveries();
 
-            // The terminal write is what matters: FAILED, carrying the comment id forward so the row
-            // still points at whatever was posted before the crash.
             ArgumentCaptor<DeliveryStatus> status = ArgumentCaptor.forClass(DeliveryStatus.class);
             verify(jobRepository).updateDeliveryStatus(eq(job.getId()), status.capture(), eq("comment-1"));
             assertThat(status.getValue()).isEqualTo(DeliveryStatus.FAILED);
@@ -462,7 +449,7 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
 
         @Test
         @DisplayName("bills the reaped attempt's proxy-recorded tokens at its frozen price")
-        void shouldReapStaleRunningJobs() {
+        void billsTheReapedAttemptsProxyRecordedTokensAtItsFrozenPrice() {
             UUID jobId = UUID.randomUUID();
             // Started 20 minutes ago with 600s (10min) timeout + 5min buffer = 15min
             // 20 min > 15 min → stale
@@ -473,8 +460,6 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
             when(jobRepository.findStaleRunningJobs(any())).thenReturn(List.of(job));
             when(jobRepository.findByIdWithWorkspaceForUpdate(jobId)).thenReturn(java.util.Optional.of(job));
             when(jobRepository.transitionStatus(any(), any(), any(), any(), any())).thenReturn(1);
-            // The proxy watched real calls go out before the worker died — that is the only surviving
-            // record of this attempt's spend.
             when(jobRepository.findLlmUsageById(jobId)).thenReturn(
                 java.util.Optional.of(new AgentJobLlmUsage(3, 900, 400, 50, 120, 0))
             );
@@ -489,8 +474,6 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
                 any(),
                 eq(Set.of(AgentJobStatus.RUNNING))
             );
-            // Observed tokens + a resolved price ⇒ the PRICED path, and the payload must carry the
-            // proxy's numbers rather than zeros.
             LlmUsageRecorder.LlmUsageSample sample = capturePriced();
             assertThat(sample.sourceId()).isEqualTo(jobId);
             assertThat(sample.sourceAttempt()).isEqualTo(2);
@@ -574,7 +557,6 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
 
             sweeper.reapStaleRunningJobs();
 
-            // 1. The state transition happens — an unreadable price must not cost the job its exit.
             verify(jobRepository).transitionStatus(
                 eq(jobId),
                 eq(AgentJobStatus.TIMED_OUT),
@@ -583,18 +565,13 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
                 eq(Set.of(AgentJobStatus.RUNNING))
             );
             assertThat(meterRegistry.counter("agent.job.zombie.reaped").count()).isEqualTo(1.0);
-            // 2. The ledger event is still appended, and explicitly instance-funded UNPRICED so the
-            //    month reads unverifiable rather than cheap.
             LlmUsageRecorder.LlmUsageSample sample = captureUnverifiable();
             assertThat(sample.price().pricingState()).isEqualTo(PricingState.UNPRICED);
             assertThat(sample.price().fundingSource()).isEqualTo(FundingSource.INSTANCE);
             assertThat(sample.price().per1mInputUsd()).isNull();
-            // 3. The model name came out of the snapshot we could not read, so it is honestly absent
-            //    rather than guessed — but the observed tokens survive as the record of the work done.
             assertThat(sample.model()).isNull();
             assertThat(sample.inputTokens()).isEqualTo(500L);
             assertThat(sample.totalCalls()).isEqualTo(2);
-            // 4. Degrading silently is the other failure mode; an operator gets a counter.
             assertThat(meterRegistry.counter("agent.job.snapshot.unreadable").count()).isEqualTo(1.0);
         }
 
@@ -602,8 +579,6 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
         @DisplayName("an unreadable snapshot falls back to the default timeout rather than skipping the job")
         void unreadableSnapshotFallsBackToTheDefaultTimeout() {
             UUID jobId = UUID.randomUUID();
-            // 700s ago: past the 600s default + 5min buffer only if the default is applied. A job
-            // whose timeout could not be read must not become immortal by defaulting to "not stale".
             AgentJob job = runningJob(jobId, Instant.now().minusSeconds(1200), 600);
             job.setConfigSnapshot(snapshotFromTheFuture());
 

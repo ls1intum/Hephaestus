@@ -3,7 +3,6 @@ import { expect, fn, within } from "storybook/test";
 import { expectGenuinelyDisabled } from "@/test/controls";
 import { TablePagination } from "./TablePagination";
 
-/** Pager for a table that changes pages by calling back rather than navigating. */
 const meta = {
 	component: TablePagination,
 	parameters: { layout: "centered" },
@@ -14,10 +13,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Reads the pager back off the accessible tree in document order: numbered tokens, `▸` for the one
- * carrying `aria-current="page"`, `…` for a gap. Says nothing about how the pager is marked up.
- */
+/** Reads the pager off the accessible tree: `▸` marks `aria-current="page"`, `…` marks a gap. */
 async function expectTokens(canvasElement: HTMLElement, expected: string) {
 	const canvas = within(canvasElement);
 	const nav = canvas.getByRole("navigation");

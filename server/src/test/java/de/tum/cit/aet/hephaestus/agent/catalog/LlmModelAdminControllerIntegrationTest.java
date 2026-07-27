@@ -17,11 +17,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-/**
- * Instance-admin CRUD, pricing, and sharing for the LLM model catalog ({@code /admin/llm/models}):
- * app_admin gate, price-supersede history, selected-workspace sharing roundtrip, and the
- * delete-in-use guard.
- */
 class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final String ADMIN_TOKEN = "mock-jwt-token-for-admin-user";

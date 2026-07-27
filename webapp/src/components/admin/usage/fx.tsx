@@ -2,10 +2,9 @@ import type { FxRateInfo } from "@/api/types.gen";
 import { asDate } from "@/lib/dates";
 
 /**
- * Display-only currency conversion for the AI-usage surfaces. USD stays authoritative — spend is
- * metered, capped and enforced in USD — so a converted figure is only ever a secondary estimate
- * beside it: `$4.50 (≈ €3.96)`. Absent `fx` is the norm, not an error: everything here degrades to
- * the plain USD string or `null`.
+ * Display-only conversion for the AI-usage surfaces. USD stays authoritative — spend is metered,
+ * capped and enforced in USD — so a converted figure is only ever an estimate beside it:
+ * `$4.50 (≈ €3.96)`. Absent `fx` is the norm, not an error.
  */
 
 /** Below this, `formatCostUsd` renders the bound `<$0.01`, which is not a figure to convert. */
@@ -23,10 +22,7 @@ type CurrencyDisplay = "symbol" | "code" | "name";
 /** A cached `null` is a currency code the platform rejected, so `undefined` means "not tried yet". */
 const formatters = new Map<string, Intl.NumberFormat | null>();
 
-/**
- * `en-US` deliberately, not the viewer's locale: `de-DE` renders `3,96 €`, and a comma decimal in a
- * parenthetical hanging off `$4.50` puts two number grammars on one line.
- */
+/** `en-US`, not the viewer's locale: `de-DE`'s `3,96 €` beside `$4.50` is two number grammars. */
 function formatter(
 	currencyCode: string,
 	digits: number,
@@ -47,7 +43,7 @@ function formatter(
 			maximumFractionDigits: digits,
 		});
 	} catch {
-		// An unknown ISO code throws. This is presentation, not accounting — fall back to USD alone.
+		// An unknown ISO code throws. Presentation, not accounting — fall back to USD alone.
 		built = null;
 	}
 	formatters.set(key, built);
@@ -56,10 +52,7 @@ function formatter(
 
 const usesIsoCode = new Map<string, boolean>();
 
-/**
- * A dollar-like symbol beside the primary USD figure would read as dollars, so any currency whose
- * symbol contains `$` (CAD, AUD) shows its ISO code instead: `$50 (≈ CAD 44)`.
- */
+/** A `$`-bearing symbol beside the USD figure would read as dollars: `$50 (≈ CAD 44)` instead. */
 function displayFor(currencyCode: string): CurrencyDisplay {
 	let ambiguous = usesIsoCode.get(currencyCode);
 	if (ambiguous === undefined) {
@@ -75,8 +68,7 @@ function displayFor(currencyCode: string): CurrencyDisplay {
 
 /**
  * Below one unit of the requested precision there is no figure rather than a misleading one: at
- * {@link CAP_DIGITS} a $0.40 cap would render `≈ €0` (free, which it is not) and $0.60 as `≈ €1`,
- * nearly double.
+ * {@link CAP_DIGITS} a $0.40 cap would render `≈ €0`, which is free, and $0.60 as `≈ €1`.
  */
 function amountIn(
 	usd: number | null | undefined,
@@ -111,7 +103,6 @@ function conversionOf(amount: { written: string; spoken: string } | null): FxCon
 		: { text: `≈ ${amount.written}`, label: `approximately ${amount.spoken}` };
 }
 
-/** `$0` and the `<$0.01` bound stay USD-only: a converted bound would be false precision. */
 export function spendConversion(usd: number | null | undefined, fx: Fx): FxConversion | null {
 	return conversionOf(amountIn(usd, fx, SPEND_DIGITS));
 }
@@ -148,15 +139,11 @@ function formatRateDate(value: FxRateInfo["rateDate"]): string {
 	});
 }
 
-/** Total, so adding a source to the spec fails the build until it is named here. */
 const SOURCE_NAMES: Record<FxRateInfo["source"], string> = {
 	ECB: "European Central Bank",
 };
 
-/**
- * A newer server can send a source this client's spec does not know, so an unnamed publisher falls
- * back to the unattributed wording rather than naming the wrong bank.
- */
+/** A newer server can send a source this spec does not know; unattributed beats the wrong bank. */
 function publisherOf(source: FxRateInfo["source"]): string | undefined {
 	return (SOURCE_NAMES as Record<string, string | undefined>)[source];
 }
@@ -200,12 +187,7 @@ export interface FxCapHint {
 	tail: string;
 }
 
-/**
- * The live hint under a cap field. Only the current month resolves to the latest published rate, so
- * `isCurrentMonth` is what makes "at today's rate" true — and it is re-checked here rather than
- * trusted of the caller, because an open dialog survives the month stepping behind it (browser Back,
- * or a UTC month rollover).
- */
+/** Re-checks `isCurrentMonth` rather than trusting the caller: an open dialog outlives a month step. */
 export function fxCapHint(
 	valueUsd: number | null | undefined,
 	fx: Fx,
@@ -226,8 +208,8 @@ export interface FxApproxProps {
 }
 
 /**
- * `role="img"` is load-bearing: `aria-label` on a bare `<span>` has no role to attach to and is
- * dropped, and "≈" read literally is announced as "tilde operator" or skipped.
+ * `role="img"` is load-bearing: a bare `<span>`'s `aria-label` is dropped, and `≈` read literally is
+ * announced as "tilde operator".
  */
 export function FxApprox({ conversion }: FxApproxProps) {
 	return (
@@ -261,10 +243,7 @@ export interface FxSpendProps {
 	fx: Fx;
 }
 
-/**
- * `≈ €3.96` on a second line under a spend figure, never as an inline suffix: a variable-width
- * suffix shifts each row's USD figure differently and breaks a money column's right-edge alignment.
- */
+/** Its own line, never an inline suffix: a variable-width suffix breaks the money column's right edge. */
 export function FxSpendLine({ usd, fx }: FxSpendProps) {
 	const conversion = spendConversion(usd, fx);
 	if (conversion == null) {
@@ -279,11 +258,9 @@ export function FxSpendLine({ usd, fx }: FxSpendProps) {
 
 export interface FxDisclosureProps {
 	fx: Fx;
-	/** A closed month's rate is frozen inside it, which changes what the caption promises. */
 	isCurrentMonth: boolean;
 }
 
-/** Once per page, under the figures it covers. */
 export function FxDisclosure({ fx, isCurrentMonth }: FxDisclosureProps) {
 	const parts = disclosureParts(fx, isCurrentMonth);
 	if (parts == null) {

@@ -269,8 +269,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             verify(commentPoster).postFormattedBody(eq(agentJob), any(String.class));
             verify(diffNotePoster).reconcileInlineNotes(eq(agentJob), any());
 
-            // DeliveryStatus persistence happens in AgentJobExecutor, not handler.deliver(), so the
-            // in-memory status stays null even though commentId is set.
+            // AgentJobExecutor persists deliveryStatus, not handler.deliver(), so it stays null here.
             assertThat(agentJob.getDeliveryCommentId()).isEqualTo("comment-123");
             assertThat(agentJob.getDeliveryStatus()).isNull();
         }
@@ -305,8 +304,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
             assertThat(observationRepository.findAll()).hasSize(2);
 
-            // Both a findings summary and an approval reach this same call; only the body text
-            // distinguishes them, so assert on it rather than just the call count.
+            // A findings summary reaches this same call, so only the body text tells an approval apart.
             var body = ArgumentCaptor.forClass(String.class);
             verify(commentPoster).postFormattedBody(eq(agentJob), body.capture());
             assertThat(body.getValue()).contains("nothing to change here");
@@ -449,7 +447,6 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             handler.deliver(agentJob);
             assertThat(observationRepository.findAll()).hasSize(2);
 
-            // An event is published on every deliver() call, even when everything discards as a duplicate.
             List<PracticeDetectionCompletedEvent> events = applicationEvents
                 .stream(PracticeDetectionCompletedEvent.class)
                 .toList();

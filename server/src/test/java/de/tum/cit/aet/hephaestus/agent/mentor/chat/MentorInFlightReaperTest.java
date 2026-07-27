@@ -26,17 +26,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.OptimisticLockingFailureException;
 
 /**
- * The reaper's SWEEP contract: what one bad row is allowed to do to the rest of the batch.
- *
- * <p>Deliberately not about what a single turn is billed — {@code MentorTurnPersistenceIntegrationTest}
- * owns that against a real database. What is asserted here is the blast radius, which is a property of
- * the loop rather than of any row: a single {@code @Transactional} spanning every row would let one
- * optimistic-lock collision discard the ledger writes of every turn already billed in that pass and
- * leave all of them stuck {@code in_flight} behind the partial unique index, so the boundary has to sit
- * around one turn.
- *
- * <p>{@code self} is injected, so the per-turn transactional boundary is a seam a unit test can push
- * on: making it throw is exactly the collision the production proxy would surface.
+ * A single {@code @Transactional} spanning every row would let one optimistic-lock collision discard the
+ * ledger writes of every turn already billed in that pass and leave all of them stuck {@code in_flight}
+ * behind the partial unique index, so the boundary has to sit around one turn. {@code self} is injected,
+ * which makes that per-turn boundary a seam a unit test can make throw.
  */
 class MentorInFlightReaperTest extends BaseUnitTest {
 
@@ -61,8 +54,6 @@ class MentorInFlightReaperTest extends BaseUnitTest {
         MentorInFlightReaper reaper = reaperWith(self);
 
         assertThatCode(reaper::reap).doesNotThrowAnyException();
-        // The point: the row AFTER the failure is still reached. Delete the per-row try/catch and this
-        // is where the test fails — third is never attempted and the exception escapes the scheduler.
         verify(self).accountOne(third);
         assertThat(meterRegistry.counter("mentor.in_flight.reaper.failure").count())
             .as("a lost write must be counted, not swallowed — it means a turn is staying stuck")
@@ -79,8 +70,6 @@ class MentorInFlightReaperTest extends BaseUnitTest {
         MentorInFlightReaper reaper = reaperWith(mock(MentorInFlightReaper.class));
 
         assertThat(reaper.accountOne(finished.getId())).isFalse();
-        // Its own completion path already billed it. Drop the status re-check and the reaper bills a
-        // second ledger event for the same turn.
         verify(usageRecorder, never()).record(anyLong(), any());
         verify(usageRecorder, never()).recordUnverifiable(anyLong(), any());
     }
@@ -97,11 +86,7 @@ class MentorInFlightReaperTest extends BaseUnitTest {
         verify(usageRecorder, never()).record(anyLong(), any());
     }
 
-    /**
-     * The sweep writes money, so two replicas must not both run it. Asserted on the annotation because
-     * that IS the mechanism — there is no observable behaviour to assert without a second JVM, and
-     * every other ledger-writing sweep in the tree carries the same one.
-     */
+    /** Asserted on the annotation because there is no observable behaviour to assert without a second JVM. */
     @Test
     @DisplayName("the sweep is single-flighted across replicas")
     void shouldBeSchedulerLocked() throws NoSuchMethodException {
@@ -120,15 +105,9 @@ class MentorInFlightReaperTest extends BaseUnitTest {
     }
 
     /**
-     * The sweep's one assumption about the outside world: a turn older than the window cannot still be
-     * running. That is only true because a binding's per-run timeout has an enforced ceiling
-     * ({@link AgentBindingLimits#MAX_TIMEOUT_SECONDS}, refused above by the binding API and clamped to
-     * by {@code MentorPiAdapter}) and this window is sized from it. Reaping a live turn bills it as
-     * abandoned and closes a conversation someone is talking to, so the two must be checked against
-     * each other rather than each against a literal.
-     *
-     * <p>Fails if the derivation is replaced by a constant and the ceiling is later raised, or if the
-     * floor stops being applied to a configured window that is too small.
+     * The window is sized from {@link AgentBindingLimits#MAX_TIMEOUT_SECONDS}, so the two are checked
+     * against each other rather than each against a literal: reaping a live turn bills it as abandoned
+     * and closes a conversation someone is talking to.
      */
     @Test
     @DisplayName("the window always outlasts the longest turn a binding can be configured to produce")
@@ -136,8 +115,7 @@ class MentorInFlightReaperTest extends BaseUnitTest {
         Duration longestPossibleTurn = Duration.ofSeconds(AgentBindingLimits.MAX_TIMEOUT_SECONDS);
 
         MentorInFlightReaper defaultWindow = reaperWith(mock(MentorInFlightReaper.class));
-        // An operator lowering the property below the safe floor gets the floor, not their value:
-        // hephaestus.mentor.in-flight-reaper.window is a knob for sweeping LATER, never sooner.
+        // The window property is a knob for sweeping LATER, never sooner: below the floor you get the floor.
         MentorInFlightReaper misconfigured = new MentorInFlightReaper(
             chatMessageRepository,
             usageRecorder,

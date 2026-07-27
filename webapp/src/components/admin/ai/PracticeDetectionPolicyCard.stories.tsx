@@ -13,9 +13,8 @@ const readyBinding: AgentBinding = {
 };
 
 /**
- * Policy editor for practice-detection reviews: which model detection runs on (read-only —
- * the binding is owned by the AI models page), automatic/manual triggers, and review policy
- * (drafts, cooldown, coverage). Saves field-by-field.
+ * Policy editor for practice-detection reviews: the bound model (read-only — the AI models page
+ * owns it), the triggers, and the review policy. Saves field by field.
  */
 const meta = {
 	component: PracticeDetectionPolicyCard,
@@ -48,24 +47,20 @@ type Story = StoryObj<typeof meta>;
 
 export const RuntimeBound: Story = {};
 
-/** Practice detection has no model — nothing runs until one is chosen on the AI models page. */
 export const Unbound: Story = {
 	args: { detectionBinding: undefined },
 };
 
-/** The bound model was disabled or revoked elsewhere — detection is paused (destructive warning). */
 export const BoundModelUnavailable: Story = {
 	args: { detectionBinding: { ...readyBinding, ready: false } },
 };
 
-/** Coverage scoped to the opt-in role. */
 export const RoleScopedCoverage: Story = {
 	args: {
 		settings: { ...mockPracticeReviewSettings, runForAllUsers: false },
 	},
 };
 
-/** All policy fields inherit the fleet default — every control shows "Inherited from default". */
 export const AllInherited: Story = {
 	args: {
 		settings: {
@@ -78,12 +73,10 @@ export const AllInherited: Story = {
 	},
 };
 
-/** Both triggers disabled — reviews never start automatically or on demand. */
 export const TriggersOff: Story = {
 	args: { autoTriggerEnabled: false, manualTriggerEnabled: false },
 };
 
-/** A save is in flight — controls disabled. */
 export const Saving: Story = {
 	args: { isSaving: true },
 };
@@ -92,10 +85,6 @@ export const Loading: Story = {
 	args: { isLoading: true, settings: undefined },
 };
 
-/**
- * The policy could not be loaded because the account lacks the permission — the alert repeats the
- * server's explanation and withholds a Retry that would be refused identically.
- */
 export const LoadForbidden: Story = {
 	args: {
 		isError: true,
@@ -106,18 +95,10 @@ export const LoadForbidden: Story = {
 };
 
 /**
- * The policy editor at the WCAG 2.2 SC 1.4.10 reflow width (320 CSS px).
+ * WCAG 2.2 SC 1.4.10 at 320 px: nothing here is tabular, so nothing may scroll sideways.
  *
- * Nothing here is tabular, so it must reflow to one column with no horizontal scrolling at all —
- * each `Field` keeps its switch beside a description that wraps, and the numeric input stays inside
- * the card.
- *
- * The switches are drawn at 32 x 18 px, the size shadcn (and the platform convention behind it) uses.
- * The vendored `ui/switch.tsx` enlarges the hit area past the SC 2.5.8 floor on its own, with
- * `after:-inset-x-3 after:-inset-y-2`, so the criterion is met without leaning on the *Spacing*
- * exception. The spacing is asserted anyway, because it is the second line of defence and the thing
- * a denser layout would break first — and because `getBoundingClientRect` measures the drawn switch,
- * not the pseudo-element that extends it.
+ * The switches meet SC 2.5.8 through a pseudo-element `getBoundingClientRect` cannot see, so the
+ * Spacing exception is what this can actually measure — and what a denser layout breaks first.
  */
 export const MobileReflow: Story = {
 	parameters: {

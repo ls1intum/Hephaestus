@@ -34,8 +34,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  *
  * <p>The fix is a pessimistic read that serialises the snapshot with the write, and this is the only
  * place it can be shown working: the interleaving needs two real connections against real Postgres
- * row locks. The staging below is what makes the race deterministic rather than lucky — the first
- * writer takes the row and holds it, and the second is released only by the first's commit.
+ * row locks.
  */
 @Tag("integration")
 class LlmBudgetCapConcurrencyIntegrationTest extends AbstractWorkspaceIntegrationTest {
@@ -78,7 +77,7 @@ class LlmBudgetCapConcurrencyIntegrationTest extends AbstractWorkspaceIntegratio
     @ParameterizedTest(name = "{0}")
     @MethodSource("writeOrder")
     @DisplayName("neither cap write reverts the other when both land on the same row at once")
-    void concurrentCapWritesBothSurvive(String scenario) throws Exception {
+    void neitherCapWriteRevertsTheOtherWhenBothLandOnTheSameRowAtOnce(String scenario) throws Exception {
         boolean instanceAdminHoldsTheRow = scenario.startsWith("the instance admin");
         User owner = persistUser("cap-race-owner-" + (instanceAdminHoldsTheRow ? "instance" : "workspace"));
         Workspace workspace = createWorkspace(

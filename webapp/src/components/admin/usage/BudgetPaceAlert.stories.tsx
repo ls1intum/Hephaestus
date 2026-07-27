@@ -11,11 +11,8 @@ const eur: FxRateInfo = {
 };
 
 /**
- * Warn before the wall: how much of a cap is gone, and when this month's pace would reach it.
- *
- * Both consoles render it — the workspace admin watching their own cap and the instance admin
- * watching a workspace's — so the only thing that changes between them is the subject of the
- * sentence, never the figures or their order.
+ * Warn before the wall: how much of a cap is gone, and when this month's pace would reach it. Both
+ * consoles render it, so only the subject of the sentence changes — never the figures or their order.
  */
 const meta = {
 	component: BudgetPaceAlert,
@@ -37,7 +34,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The workspace's own page: the cap is theirs, so the sentence is in the second person. */
 export const OwnProviderCap: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
@@ -45,7 +41,6 @@ export const OwnProviderCap: Story = {
 	},
 };
 
-/** The instance console: the same alert about someone else's cap, named. */
 export const NamedSubject: Story = {
 	args: { subjectName: "Acme" },
 	play: async ({ canvasElement }) => {
@@ -54,7 +49,6 @@ export const NamedSubject: Story = {
 	},
 };
 
-/** The shared-model budget rather than the workspace's own provider — a different purse, so named. */
 export const SharedModelBudget: Story = {
 	args: { scope: "shared", subjectName: "Acme" },
 	play: async ({ canvasElement }) => {
@@ -63,11 +57,7 @@ export const SharedModelBudget: Story = {
 	},
 };
 
-/**
- * Too early in the month, or too little spend, for a pace to mean anything: the alert still reports
- * the share consumed and says nothing at all about when the cap would be reached. A projection is
- * withheld rather than guessed.
- */
+/** A projection is withheld rather than guessed; the share consumed is still reported. */
 export const NoProjection: Story = {
 	args: { projection: null },
 };
@@ -76,7 +66,6 @@ export const PaceStaysUnderCap: Story = {
 	args: { projection: { projectedMonthEndUsd: 47.5, reachedOn: null } },
 };
 
-/** No display currency configured — every figure is USD only, with no parentheticals. */
 export const UsdOnly: Story = {
 	args: { fx: null },
 };

@@ -30,19 +30,16 @@ import org.junit.jupiter.api.Test;
  * it asserts nothing while looking like coverage. This actually happened to three tests, including
  * two security guards, before this rule was added.
  *
- * <p><b>Scope: the whole inheritance chain, not just direct subclasses.</b> The first version of this
- * rule inspected only classes that literally wrote {@code extends BaseIntegrationTest}, which left the
- * intermediate bases uncovered — {@code AbstractWorkspaceIntegrationTest} above all, which 40-odd
- * controller tests extend. Two tests were dead through exactly that hole
- * ({@code AgentsPathDispatchTest}, and {@code WorkspaceScopedControllerComplianceTest}, dead since the
- * module was created). The scan therefore resolves {@code extends} transitively: a class is in scope
- * if <em>any</em> ancestor is {@code BaseIntegrationTest}, however many abstract bases sit between.
+ * <p>The scan resolves {@code extends} transitively. The first version inspected only classes that
+ * literally wrote {@code extends BaseIntegrationTest}, leaving the intermediate bases uncovered —
+ * {@code AbstractWorkspaceIntegrationTest} above all, which 40-odd controller tests extend.
+ * {@code AgentsPathDispatchTest} and {@code WorkspaceScopedControllerComplianceTest} were dead through
+ * exactly that hole, the latter since the module was created.
  *
- * <p><b>Method.</b> A source scan (mirroring {@link NoMockingOwnedEntitiesTest}) rather than an
- * ArchUnit class scan, because the defect is about <em>file names</em> — all Failsafe looks at — and a
- * compiled class graph cannot see them. Only top-level declarations (column 0) count: Failsafe matches
- * a file, so a nested {@code @Nested} class is never independently discoverable and never
- * independently dead. Abstract bases are exempt; they are never executed directly.
+ * <p>It is a source scan (mirroring {@link NoMockingOwnedEntitiesTest}) rather than an ArchUnit class
+ * scan, because the defect is about <em>file names</em> — all Failsafe looks at — and a compiled class
+ * graph cannot see them. Only top-level declarations count: Failsafe matches a file, so a nested
+ * {@code @Nested} class is never independently discoverable and never independently dead.
  */
 @Tag("architecture")
 class IntegrationTestNamingConventionTest {
@@ -50,9 +47,8 @@ class IntegrationTestNamingConventionTest {
     private static final String INTEGRATION_BASE = "BaseIntegrationTest";
 
     /**
-     * A top-level {@code class} declaration and everything up to its body. Anchored at column 0 so
-     * nested classes (always indented by the formatter) are skipped, and so javadoc/comment lines —
-     * which start with {@code *} or {@code /} — can never match.
+     * Anchored at column 0 so nested classes (always indented by the formatter) are skipped, and so
+     * javadoc/comment lines — which start with {@code *} or {@code /} — can never match.
      */
     private static final Pattern TOP_LEVEL_CLASS_DECL = Pattern.compile(
         "(?m)^(\\w[\\w\\s-]*?\\s)?class\\s+(\\w+)([^\\n{]*)"
@@ -60,7 +56,6 @@ class IntegrationTestNamingConventionTest {
 
     private static final Pattern EXTENDS_CLAUSE = Pattern.compile("\\bextends\\s+(\\w+)");
 
-    /** One top-level class declaration found in the test sources. */
     private record TestClass(String name, boolean isAbstract, String superName, Path file) {}
 
     @Test
@@ -99,9 +94,9 @@ class IntegrationTestNamingConventionTest {
     }
 
     /**
-     * @return the {@code SomeBase -> BaseIntegrationTest} chain when {@code decl} transitively extends
-     *     the integration base, or {@code null} when it does not. Cycles (impossible in valid Java, but
-     *     reachable in a half-edited source tree) terminate instead of hanging.
+     * @return the {@code SomeBase -> BaseIntegrationTest} chain, or {@code null} when {@code decl} does
+     *     not transitively extend the integration base. Cycles (impossible in valid Java, but reachable
+     *     in a half-edited source tree) terminate instead of hanging.
      */
     private static String integrationBaseChain(TestClass decl, Map<String, TestClass> declarations) {
         Set<String> chain = new LinkedHashSet<>();

@@ -28,12 +28,8 @@ class FxRateInfoDTOTest extends BaseUnitTest {
         assertThat(info.ratePerUsd().scale()).isEqualTo(6);
     }
 
-    /**
-     * The UI names the publisher in its disclosure, so the payload has to be the thing that says who it
-     * is. Stamped by the factory rather than by callers — see {@link FxRateInfoDTO#ECB_SOURCE}.
-     */
     @Test
-    void shouldAttributeTheQuoteToTheEcb() {
+    void shouldStampEcbAsTheSourceSoTheUiCanNameThePublisher() {
         FxRateInfoDTO info = FxRateInfoDTO.fromEcbRate("EUR", new BigDecimal("1.1377"), DATE);
 
         assertThat(info.source()).isEqualTo("ECB");

@@ -10,14 +10,10 @@ import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Proves the backwards half of {@code PageInfo} survives decoding into the generated model.
- *
- * <p>{@code GithubFeedbackChannel.findExistingSummary} decides whether an older page exists from
- * {@code GHPageInfo.getHasPreviousPage()} and continues from {@code getStartCursor()}. Every other test of
- * that method stubs {@code ClientResponseField.toEntity} and hands back an already-built connection, so it
- * decodes no JSON: were those two properties dropped on the way in, {@code hasPreviousPage} would read
- * {@code false} and the scan would report a confirmed {@code ABSENT} after one page — licensing a duplicate
- * summary on any thread longer than the page size. That is the seam this test covers.
+ * Every other test of {@code GithubFeedbackChannel.findExistingSummary} stubs
+ * {@code ClientResponseField.toEntity} and hands back an already-built connection, so no JSON is decoded:
+ * were {@code hasPreviousPage}/{@code startCursor} dropped on the way in, the scan would report a confirmed
+ * {@code ABSENT} after one page and license a duplicate summary on any thread longer than the page size.
  *
  * <p>The payload is a verbatim page from api.github.com (issue comments, {@code last: 1}), cursors included.
  */

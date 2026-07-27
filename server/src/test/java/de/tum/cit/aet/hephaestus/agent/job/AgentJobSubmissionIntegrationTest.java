@@ -36,11 +36,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Integration test for {@link AgentJobService#submit} exercising real PostgreSQL idempotency (partial
- * unique index) and config snapshot capture. The QUEUED insert IS the enqueue, so the row itself is
- * the whole observable outcome — there is no separate publish event to assert on.
- */
 class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -91,7 +86,6 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             LlmCatalogTestFixtures.model(connection, "submit-model", "gpt-submit-test")
         );
 
-        // The workspace's PRACTICE_DETECTION binding — what submit() discovers and freezes.
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
         binding.setWorkspace(workspace);
         binding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
@@ -200,12 +194,7 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             AgentJob job = result.get();
             assertThat(job.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
             assertThat(job.getJobType()).isEqualTo(AgentJobType.PULL_REQUEST_REVIEW);
-            assertThat(job.getIdempotencyKey()).isEqualTo(
-                // per-phase key: a manual/dev submission carries the "manual" phase segment, and the
-                // trailing segment is now the purpose — one PRACTICE_DETECTION job per workspace,
-                // no per-config fan-out
-                "pr_review:org/submit-repo:10:manual:abc123:detection"
-            );
+            assertThat(job.getIdempotencyKey()).isEqualTo("pr_review:org/submit-repo:10:manual:abc123:detection");
             assertThat(job.getPurpose()).isEqualTo(AgentPurpose.PRACTICE_DETECTION);
             assertThat(job.getConfigSnapshot()).isNotNull();
             assertThat(job.getMetadata().get("pull_request_id").asLong()).isEqualTo(prId);

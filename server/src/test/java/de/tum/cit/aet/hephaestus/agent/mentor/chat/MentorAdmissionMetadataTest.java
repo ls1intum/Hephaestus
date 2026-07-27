@@ -14,12 +14,9 @@ import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * The one place the mentor turn's admission block is written and read, so the round trip is the
- * contract: whatever a turn was admitted with is what the reaper bills it at months later.
- *
- * <p>The rest is about what an admission block that is NOT what the writer produced does. That block
- * is read inside the reaper's per-turn transaction, and anything thrown there fails the same row on
- * every later tick too — the turn is never billed and its thread never takes another turn.
+ * A malformed admission block is read inside the reaper's per-turn transaction, so anything thrown
+ * there fails the same row on every later tick too — the turn is never billed and its thread never
+ * takes another turn.
  */
 class MentorAdmissionMetadataTest extends BaseUnitTest {
 

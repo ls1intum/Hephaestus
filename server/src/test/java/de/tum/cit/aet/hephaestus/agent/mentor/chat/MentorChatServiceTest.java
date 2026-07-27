@@ -161,7 +161,6 @@ class MentorChatServiceTest extends BaseUnitTest {
         turnExec = directExecutor();
         sandbox = new FakeSandbox();
         proxyCredentialRegistry = new MentorProxyCredentialRegistry();
-        // Real sandboxes always get a minted proxy credential; without one here every turn would fail to bind.
         sessionToken = proxyCredentialRegistry.mint(
             sandbox.identity().sessionId(),
             new MentorProxyCredentialRegistry.Route(
@@ -203,8 +202,6 @@ class MentorChatServiceTest extends BaseUnitTest {
             proxyCredentialRegistry
         );
 
-        // Both purses open by default; the turn-level gate dereferences this, so an unstubbed null
-        // would NPE every unrelated test rather than reading as "not blocked".
         when(llmBudgetService.decide(WORKSPACE_ID)).thenReturn(LlmBudgetDecision.ALLOWED);
 
         when(llmModelResolver.resolve(any())).thenReturn(
@@ -255,8 +252,6 @@ class MentorChatServiceTest extends BaseUnitTest {
         when(workspaceContextBuilder.build(any())).thenReturn(new LinkedHashMap<>());
         when(interactiveSandboxService.attach(any())).thenReturn(sandbox);
         when(mentorPiAdapter.buildSandboxSpec(any(), any(), any(), any())).thenReturn(stubSpec());
-        // Without this stub, Mockito's default null return would replace the Finish chunk in the
-        // happy-path stream, and `turnComplete` would never resolve.
         when(persistence.augmentFinishWithCost(any(UIMessageChunk.Finish.class), any())).thenAnswer(inv ->
             inv.getArgument(0, UIMessageChunk.Finish.class)
         );
@@ -354,7 +349,6 @@ class MentorChatServiceTest extends BaseUnitTest {
 
     @Test
     void runTurn_webPromptIsVerbatimUserMessage_noSurfaceDirective() {
-        // Counterpart of the two SLACK_DM tests above: WEB gets no [Surface: ...] wrapper or history block.
         scheduleHappyPathResponses(sandbox).run();
 
         runTurnSync("What should I do next based on recent work?", ThreadSurface.WEB);
@@ -406,9 +400,6 @@ class MentorChatServiceTest extends BaseUnitTest {
         );
     }
 
-    // 1b. Mentor runtime resolution — a bound + enabled config is preferred and the workspace-scoped
-    // finder (the only real cross-tenant guard) is used; the fan-out fallback is NOT consulted.
-
     @Test
     void runTurn_prefersBoundEnabledMentorConfig_overFallback() throws Exception {
         Workspace boundWs = new Workspace();
@@ -431,9 +422,6 @@ class MentorChatServiceTest extends BaseUnitTest {
         assertThat(admitted.getValue().getId()).isEqualTo(4242L);
     }
 
-    // 1c. A bound-but-disabled mentor config fails closed. Silently choosing another config could
-    // change provider, model, and price in the middle of a conversation.
-
     @Test
     void runTurn_disabledBoundConfig_failsClosedBeforeSandboxAttach() throws Exception {
         Workspace boundWs = new Workspace();
@@ -452,10 +440,6 @@ class MentorChatServiceTest extends BaseUnitTest {
         );
         verify(interactiveSandboxService, never()).attach(any());
     }
-
-    // 1d. No enabled MENTOR agent binding for the workspace → resolveLlmConfig.orElseThrow. This is the only
-    // un-covered exit of the documented cross-tenant guard, and it fires BEFORE the sandbox attaches —
-    // a distinct early-failure ordering (no runner, lock still released, ERROR outcome).
 
     @Test
     void runTurn_noEnabledConfig_recordsErrorAndNeverAttaches() throws Exception {
@@ -481,16 +465,10 @@ class MentorChatServiceTest extends BaseUnitTest {
         assertOutcomeRecorded(MentorChatMetrics.Outcome.ERROR);
     }
 
-    // 1e. Monthly LLM budget gate: both blocking reasons must refuse the turn BEFORE
-    // anything persists, with their own user-facing message. The gate is scoped to whoever funds the
-    // resolved mentor model — the default fixture admits an INSTANCE-funded (shared) model.
-
-    /** A decision that blocks only the host's purse — the fixture's mentor model is INSTANCE-funded. */
     private static LlmBudgetDecision instanceBlocked(LlmBudgetBlockReason reason) {
         return new LlmBudgetDecision(reason, LlmBudgetBlockReason.NONE);
     }
 
-    /** Re-admit the fixture's mentor binding as a WORKSPACE-funded (own-provider) model. */
     private void admitWorkspaceFundedMentorModel() {
         when(llmAdmissionService.admit(any(WorkspaceAgentBinding.class))).thenReturn(
             new AdmittedLlmModel(
@@ -543,10 +521,6 @@ class MentorChatServiceTest extends BaseUnitTest {
         assertThat(meterRegistry.find("llm.budget.blocked").tag("surface", "mentor").counter().count()).isEqualTo(1d);
     }
 
-    /**
-     * the host's exhausted budget must not pause a mentor running on the workspace's OWN
-     * provider — that is the workspace's money, governed by the workspace's own cap.
-     */
     @Test
     void runTurn_instanceBudgetExhaustedButMentorRunsOnOwnProvider_proceedsNormally() throws Exception {
         admitWorkspaceFundedMentorModel();
@@ -559,7 +533,6 @@ class MentorChatServiceTest extends BaseUnitTest {
         assertOutcomeRecorded(MentorChatMetrics.Outcome.SUCCESS);
     }
 
-    /** The mirror: an exhausted BYO cap pauses own-provider mentoring, and says who can lift it. */
     @Test
     void runTurn_byoBudgetExhaustedAndMentorRunsOnOwnProvider_blocksWithWorkspaceAdminCopy() throws Exception {
         admitWorkspaceFundedMentorModel();
@@ -577,7 +550,6 @@ class MentorChatServiceTest extends BaseUnitTest {
         assertOutcomeRecorded(MentorChatMetrics.Outcome.ERROR);
     }
 
-    /** And the reverse asymmetry: an exhausted BYO cap never pauses a shared-model mentor turn. */
     @Test
     void runTurn_byoBudgetExhaustedButMentorRunsOnASharedModel_proceedsNormally() throws Exception {
         when(llmBudgetService.decide(WORKSPACE_ID)).thenReturn(
@@ -678,7 +650,6 @@ class MentorChatServiceTest extends BaseUnitTest {
     @Test
     void runTurn_clientDisconnect_completesNormallyAndAbortsRunner() throws Exception {
         scheduleHappyPathResponses(sandbox).run();
-        // Disconnect after the preamble sends, once the runner client is live, so the abort hook fires.
         emitter.disconnectAfterCalls = PREAMBLE_SEND_COUNT;
 
         runTurnSync();
@@ -712,9 +683,6 @@ class MentorChatServiceTest extends BaseUnitTest {
 
     @Test
     void runTurn_clientDisconnectOnSyncSend_recordsClientDisconnect() throws Exception {
-        // The orchestrator's two synchronous sends happen before sandbox.attach; if either throws
-        // ClientDisconnectedException, outcome=CLIENT_DISCONNECT and the sandbox is never attached.
-        // This is the only path that records that outcome — without this test it's dead-on-write.
         emitter.disconnectAfterCalls = 1; // call #2 (DataMentorStatus) throws
 
         runTurnSync();
@@ -746,14 +714,6 @@ class MentorChatServiceTest extends BaseUnitTest {
         assertOutcomeRecorded(MentorChatMetrics.Outcome.POISONED);
     }
 
-    // 3b. Per-turn proxy metering: the window in which a turn's calls are billable
-
-    /**
-     * At the moment the prompt goes out, mimics what a real sandbox call does at the proxy: authenticate
-     * the session token, post one call's tokens against the turn it names, then re-check the gate.
-     * {@code accumulate} stands in for {@code MentorTurnUsageAccumulator} (no DB in this tier) — the
-     * orchestrator behaviour under test is the binding, not the write.
-     */
     private void probeProxyDuringPrompt(String token, AtomicReference<ProxyRouting.BilledAttempt> seen) {
         Consumer<JsonNode> scripted = sandbox.onSend;
         sandbox.onSend = frame -> {
@@ -769,7 +729,6 @@ class MentorChatServiceTest extends BaseUnitTest {
         };
     }
 
-    /** The default fixture admits a NO_CHARGE model; the spend assertion needs real rates. */
     private void admitAtTenDollarsPerMillionInputTokens() {
         when(llmAdmissionService.admit(any(WorkspaceAgentBinding.class))).thenReturn(
             new AdmittedLlmModel(
@@ -789,14 +748,6 @@ class MentorChatServiceTest extends BaseUnitTest {
         );
     }
 
-    /**
-     * Mid-turn, the credential the sandbox holds reports THIS turn and what it has already spent —
-     * which is what lets the budget gate refuse a turn before it finishes.
-     *
-     * <p>Kills "never call bindTurn" (probe sees no billing target, letting a turn spend unlimited
-     * against an exhausted cap) and "never call unbindTurn" (session stays billable to a finished
-     * turn, so the next turn's calls land on the dead one).
-     */
     @Test
     @DisplayName("mid-turn, the sandbox credential reports this turn and what it has already spent")
     void aTurnIsBoundToItsSandboxCredentialOnlyWhileItRuns() {
@@ -817,12 +768,6 @@ class MentorChatServiceTest extends BaseUnitTest {
             .isNull();
     }
 
-    /**
-     * A turn the runner kills mid-flight releases its binding on the way out, so the sandbox's next
-     * turn starts from a clean slate rather than inheriting a dead turn's billing target.
-     *
-     * <p>Kills "unbind only on the success path".
-     */
     @Test
     @DisplayName("a turn that dies mid-way still releases its binding")
     void aTurnThatDiesStillReleasesItsBinding() {
@@ -842,8 +787,6 @@ class MentorChatServiceTest extends BaseUnitTest {
     @Test
     @DisplayName("in-flight conflict: persistence throws; conflict chunk sent; sandbox never attached")
     void runTurn_inFlightConflict_returns409() {
-        // doThrow, not when(...).thenThrow: the latter would call the stub registered in setUp with
-        // null arguments just to record the intent.
         doThrow(new TurnAlreadyInFlightException(THREAD_ID, new RuntimeException("dup")))
             .when(persistence)
             .persistInFlight(any(), any(), any(), any(), any());
@@ -858,16 +801,9 @@ class MentorChatServiceTest extends BaseUnitTest {
             throw new AssertionError(e);
         }
         assertThat(turnLock.activeKeys()).isZero();
-        // The JVM lock was acquired here, so this persistence-throws path is the DB-backstop outcome,
-        // distinct from the LOCAL lock-conflict outcome below.
         assertOutcomeRecorded(MentorChatMetrics.Outcome.IN_FLIGHT_CONFLICT_DB);
     }
 
-    /**
-     * Asserts exactly one increment each on {@code mentor.turn.started} and the expected
-     * {@code mentor.turn.completed} outcome tag — keeps them in lockstep so a future refactor that
-     * lands one without the other doesn't drift SLO dashboards silently.
-     */
     private void assertOutcomeRecorded(MentorChatMetrics.Outcome expected) {
         assertThat(meterRegistry.find("mentor.turn.started").counter().count()).as("mentor.turn.started").isEqualTo(1d);
         assertThat(meterRegistry.find("mentor.turn.completed").tag("outcome", expected.tag()).counter().count())
@@ -914,8 +850,6 @@ class MentorChatServiceTest extends BaseUnitTest {
         }
 
         verify(persistence, never()).persistInFlight(any(), any(), any(), any(), any());
-        // Distinct from IN_FLIGHT_CONFLICT_DB above: that one signals a JVM-lock leak across replicas,
-        // this one is a normal same-JVM double-submit.
         assertOutcomeRecorded(MentorChatMetrics.Outcome.IN_FLIGHT_CONFLICT_LOCAL);
     }
 

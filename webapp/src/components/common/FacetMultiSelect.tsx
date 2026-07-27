@@ -28,10 +28,7 @@ export interface FacetMultiSelectProps<TValue extends string | number> {
 	options: FacetOption<TValue>[];
 	selected: readonly TValue[];
 	onChange: (values: TValue[]) => void;
-	/**
-	 * `toolbar` — the dashed filter chip that sits in a table toolbar beside other facets.
-	 * `field` — a full-width form control that matches the `Select` next to it in a form.
-	 */
+	/** `toolbar` is the dashed filter chip; `field` is a full-width form control. */
 	variant?: "toolbar" | "field";
 	/** Set when a `FieldLabel` names this control, so `htmlFor` reaches the trigger button. */
 	id?: string;
@@ -42,11 +39,7 @@ export interface FacetMultiSelectProps<TValue extends string | number> {
 
 const MAX_INLINE_CHIPS = 2;
 
-/**
- * One facet of a filter or a form: a trigger opening a searchable multi-select list that summarises
- * the selection back onto itself. Matching goes through `Intl.Collator`, so accents and case behave
- * the way a reader expects rather than the way `toLowerCase()` does.
- */
+/** Matching goes through `Intl.Collator`, so accents and case behave better than `toLowerCase()`. */
 export function FacetMultiSelect<TValue extends string | number>({
 	title,
 	options,

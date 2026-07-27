@@ -10,13 +10,8 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * What a streamed call contributes to billing, read off the bytes as they pass.
- *
- * <p>A streamed response reports its usage totals inside the SSE body rather than in a header, so a
- * streamed call is billed only if something reads the bytes on their way through. Each test below names
- * the one-token mutation it kills, because reading the stream is only worth having if it survives the
- * ways a real stream is shaped — usage in the last frame, frames split across TCP-sized buffers, and
- * streams that stop early.
+ * A streamed response reports its usage totals inside the SSE body rather than in a header, so a
+ * streamed call is billed only if something reads the bytes on their way through.
  */
 class ProxyStreamUsageTapTest extends BaseUnitTest {
 
@@ -36,9 +31,6 @@ class ProxyStreamUsageTapTest extends BaseUnitTest {
         /**
          * The shape a chat-completions stream actually has with {@code stream_options.include_usage}:
          * many delta frames carrying {@code "usage": null}, then one final frame carrying the totals.
-         *
-         * <p>Kills "drop the {@code observed = parsed} assignment in handleLine": the tap then reports
-         * nothing and every streamed call is billed as zero, which is the bug this class fixes.
          */
         @Test
         @DisplayName("reads the totals off the final frame, ignoring the null-usage deltas before it")
@@ -64,13 +56,6 @@ class ProxyStreamUsageTapTest extends BaseUnitTest {
             assertThat(observed.reasoningTokens()).isEqualTo(10);
         }
 
-        /**
-         * A DataBuffer boundary falls wherever the network puts it, including the middle of the one
-         * frame that carries the money.
-         *
-         * <p>Kills "parse each chunk on its own instead of reassembling lines": the usage frame is
-         * then two unparseable halves and the call is billed as zero.
-         */
         @Test
         @DisplayName("reassembles a usage frame split across chunk boundaries")
         void reassemblesAFrameSplitAcrossChunks() {
@@ -85,13 +70,7 @@ class ProxyStreamUsageTapTest extends BaseUnitTest {
             assertThat(tap.observed().outputTokens()).isEqualTo(3);
         }
 
-        /**
-         * The reported figure is cumulative for the whole response, so a provider that repeats it must
-         * not be billed twice.
-         *
-         * <p>Kills "sum successive usage frames instead of replacing": the totals below would read 12
-         * input tokens rather than 9.
-         */
+        /** The reported figure is cumulative for the whole response, so a repeat must not be billed twice. */
         @Test
         @DisplayName("a repeated usage block replaces the earlier one rather than adding to it")
         void laterUsageReplacesEarlier() {
@@ -104,10 +83,6 @@ class ProxyStreamUsageTapTest extends BaseUnitTest {
             assertThat(tap.observed().outputTokens()).isEqualTo(4);
         }
 
-        /**
-         * A stream that dies mid-flight bills what it observed — and before the terminal frame it has
-         * observed nothing. Deltas are text, not token counts; estimating from them would be a guess.
-         */
         @Test
         @DisplayName("a stream cut off before the usage frame reports nothing rather than a guess")
         void aTruncatedStreamReportsNothing() {
@@ -118,7 +93,6 @@ class ProxyStreamUsageTapTest extends BaseUnitTest {
             assertThat(tap.observed()).isNull();
         }
 
-        /** Only SSE payload lines are read; the comment keep-alives and field lines around them are not. */
         @Test
         @DisplayName("non-data lines are not parsed as frames")
         void ignoresNonDataLines() {
@@ -130,10 +104,6 @@ class ProxyStreamUsageTapTest extends BaseUnitTest {
             assertThat(tap.observed()).isNull();
         }
 
-        /**
-         * A provider that never terminates a line must cost bounded memory. After the cap trips the tap
-         * resynchronises on the next newline rather than staying wedged for the rest of the stream.
-         */
         @Test
         @DisplayName("an unterminated frame is abandoned, and the next frame is still read")
         void abandonsAnOversizedFrameAndResynchronises() {
@@ -156,9 +126,6 @@ class ProxyStreamUsageTapTest extends BaseUnitTest {
         /**
          * The responses API nests usage under the terminal event's {@code response} envelope, which is
          * why the tap tries both placements.
-         *
-         * <p>Kills "drop the {@code event.get(\"response\")} fallback in handleLine": every streamed
-         * call on the responses protocol — the mentor's default — is then billed as zero.
          */
         @Test
         @DisplayName("reads usage from the response.completed envelope")
@@ -181,10 +148,6 @@ class ProxyStreamUsageTapTest extends BaseUnitTest {
             assertThat(observed.reasoningTokens()).isEqualTo(25);
         }
 
-        /**
-         * A response the provider gave up on still burned tokens, and it reports them on the same
-         * envelope — so a truncated answer is billed for what it cost, not written off.
-         */
         @Test
         @DisplayName("an incomplete response is billed for the tokens it did burn")
         void billsAnIncompleteResponse() {

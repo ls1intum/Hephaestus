@@ -28,15 +28,8 @@ function renderDialog(overrides: Partial<BudgetAmountDialogProps> = {}) {
 	);
 }
 
-/**
- * The hint's shape on an open current-month dialog — the rounding, the wording, and the way it
- * tracks what is being typed — belongs to `fx.test.tsx` (`fxCapHint`) and to this component's
- * `WithLiveCurrencyHint` story. What is left here is the one thing neither can reach: the dialog
- * outliving the month it was opened over.
- */
 describe("the cap editor's currency hint", () => {
 	it("withdraws the estimate when the month behind the open dialog closes", () => {
-		// See `fxCapHint`: the dialog outlives the check that opened it.
 		const { rerender } = renderDialog();
 		expect(screen.getByText(/at today's rate/i)).toBeTruthy();
 
@@ -60,8 +53,6 @@ describe("the cap editor's currency hint", () => {
 	});
 
 	it("says nothing about a rate a caller never claimed a month for", () => {
-		// The prop defaults to `false`, so a surface that has not thought about which month it is
-		// showing gets no estimate rather than a possibly frozen one.
 		renderDialog({ isCurrentMonth: undefined });
 
 		expect(screen.queryByText(/at today's rate/i)).toBeNull();

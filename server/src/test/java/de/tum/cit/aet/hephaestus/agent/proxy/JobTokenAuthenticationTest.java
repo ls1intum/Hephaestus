@@ -5,13 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.Test;
 
-/**
- * The one thing this token decides for itself: it never hands the bearer secret back out.
- *
- * <p>Everything else about it — the principal it carries, that it is authenticated, that it holds no
- * authorities — is Spring's own contract, and {@code JobTokenAuthenticationFilterTest} asserts the
- * assembled token where it actually lands, on the {@code SecurityContext}.
- */
 class JobTokenAuthenticationTest extends BaseUnitTest {
 
     private static final ProxyRouting ROUTING = new ProxyRouting(

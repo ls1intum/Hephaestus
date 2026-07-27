@@ -25,11 +25,10 @@ import org.junit.jupiter.api.Test;
  * typed it as a different one: {@code 9999999999.99999999} comes back as {@code 10000000000}. The
  * admin's own screen would disagree with the price the ledger bills at.
  *
- * <p>{@code MoneyWirePrecisionTest} measures where the cliff is; this asserts the input can't reach it.
- * Two independent guards, deliberately: {@code @Digits} rejects the request before any service runs and
- * names the offending field, while {@link LlmPriceValidation} holds the same line for all four entry
- * points that can set a rate — instance create and reprice, workspace BYO create and update — so the
- * bound cannot be widened by adding a fifth DTO that forgets the annotation.
+ * <p>Two independent guards, deliberately: {@code @Digits} rejects the request before any service runs
+ * and names the offending field, while {@link LlmPriceValidation} holds the same line for all four
+ * entry points that can set a rate — instance create and reprice, workspace BYO create and update — so
+ * the bound cannot be widened by adding a fifth DTO that forgets the annotation.
  */
 class LlmPriceWidthTest extends BaseUnitTest {
 
@@ -37,19 +36,14 @@ class LlmPriceWidthTest extends BaseUnitTest {
     private static final int RATE_SCALE = 8;
 
     /**
-     * The smallest rate the shared validator refuses, stated once by production and read from there.
-     * Both fixtures derive from it, so the two guards are measured against each other rather than
-     * against a literal this file chose: widen {@link LlmPriceValidation#MAX_RATE_EXCLUSIVE} past
-     * {@code @Digits(integer = 7)} and the accept case below fails, narrow it inside and the reject
-     * case fails.
+     * Both fixtures derive from the production constant, so the two guards are measured against each
+     * other rather than against a literal this file chose: widen
+     * {@link LlmPriceValidation#MAX_RATE_EXCLUSIVE} past {@code @Digits(integer = 7)} and the accept
+     * case below fails, narrow it inside and the reject case fails.
      */
     private static final BigDecimal FIRST_UNSAFE_RATE = LlmPriceValidation.MAX_RATE_EXCLUSIVE.setScale(RATE_SCALE);
 
-    /**
-     * One unit in the last place below it: the widest rate an admin can actually set, and the value
-     * {@code MoneyWirePrecisionTest.aFrozenRateIsTheSameNumberInTheCatalogAndTheLedger} proves survives
-     * the wire.
-     */
+    /** One unit in the last place below it: the widest rate an admin can actually set. */
     private static final BigDecimal WIDEST_SAFE_RATE = FIRST_UNSAFE_RATE.subtract(
         BigDecimal.ONE.movePointLeft(RATE_SCALE)
     );
@@ -86,8 +80,6 @@ class LlmPriceWidthTest extends BaseUnitTest {
             priceRequest(FIRST_UNSAFE_RATE)
         );
 
-        // Drop @Digits from per1mInputUsd and this is empty: the rate is stored, then displayed as a
-        // different number.
         assertThat(violations).as("@Digits is what stops a rate the API cannot quote back accurately").isNotEmpty();
         assertThat(violations).allSatisfy(violation ->
             assertThat(violation.getPropertyPath().toString()).isEqualTo("per1mInputUsd")
@@ -97,8 +89,6 @@ class LlmPriceWidthTest extends BaseUnitTest {
     @Test
     @DisplayName("the shared validator holds the same bound for every entry point")
     void shouldRejectAnOversizedRateInTheSharedValidator() {
-        // The DTO annotation only guards ITS endpoint. Workspace BYO models reach the same rates through
-        // their own request records, so the magnitude check has to live where all four paths meet.
         assertThatThrownBy(() -> validate(FIRST_UNSAFE_RATE))
             .isInstanceOf(IllegalArgumentException.class)
             // The admin has to be told which ceiling they hit, so the bound itself is in the message.

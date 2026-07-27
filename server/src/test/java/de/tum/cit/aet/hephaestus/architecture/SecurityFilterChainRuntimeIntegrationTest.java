@@ -51,8 +51,7 @@ class SecurityFilterChainRuntimeIntegrationTest extends BaseIntegrationTest {
             .anyMatch(chain -> chain.getFilters().stream().anyMatch(AuthRateLimitFilter.class::isInstance));
     }
 
-    // The LLM proxy chain's filter-order assertion moved to
-    // LlmProxyIntegrationTest.CrossChainSecurity#llmProxyChainHasJobTokenFilterBeforeUpaf: the proxy
-    // beans are gated on the job-execution capability (worker role + hephaestus.agent.enabled), which
-    // the default integration context deliberately leaves off, so the chain does not exist here.
+    // The proxy beans are gated on the job-execution capability (worker role + hephaestus.agent.enabled),
+    // which this context leaves off, so the LLM proxy chain's filter order is asserted in
+    // LlmProxyIntegrationTest.CrossChainSecurity#llmProxyChainHasJobTokenFilterBeforeUpaf instead.
 }

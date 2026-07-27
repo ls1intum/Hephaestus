@@ -43,7 +43,6 @@ function optionLabel(model: AvailableLlmModel): string {
 	return `${model.displayName} · ${model.connectionDisplayName} · ${priceLabel(model, "workspace")}`;
 }
 
-/** The options of one funding group — identical rows, so both groups share this. */
 function ModelOptions({ models }: { models: AvailableLlmModel[] }) {
 	return models.map((model) => (
 		<SelectItem
@@ -65,9 +64,8 @@ function ModelOptions({ models }: { models: AvailableLlmModel[] }) {
 }
 
 /**
- * Model picker for an agent config binding. Groups by funding source: instance-shared models
- * and models billed through the workspace's own provider accounts. Never shows the upstream model id
- * or the owning connection's endpoint, only the display name and price framing.
+ * Grouped by funding source. Never shows the upstream model id or the connection's endpoint — only
+ * the display name and price framing.
  */
 export function ModelPicker({
 	id,

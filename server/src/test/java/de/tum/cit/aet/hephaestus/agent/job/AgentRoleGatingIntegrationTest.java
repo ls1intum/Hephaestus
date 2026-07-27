@@ -11,23 +11,11 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 /**
- * Property-driven boot-matrix proof for a split-pod, worker-only deployment — no Docker, no real
- * WSS hub: this is entirely about which
- * BEANS wire under {@code hephaestus.runtime.server.enabled=false, hephaestus.runtime.worker.enabled
- * =true, hephaestus.agent.enabled=true}, mirroring the {@code prod,worker} production profile
- * (application-worker.yml) plus {@code AGENT_ENABLED=true}.
- *
- * <p>Beans only. The values in {@code application-worker.yml} — which this test sets by hand rather
- * than loads — are read by
+ * Boot-matrix proof for a split-pod, worker-only deployment: which BEANS wire under
+ * {@code runtime.server.enabled=false, runtime.worker.enabled=true, agent.enabled=true}, mirroring the
+ * {@code prod,worker} production profile (application-worker.yml) plus {@code AGENT_ENABLED=true}. The
+ * values in {@code application-worker.yml} itself are read by
  * {@code de.tum.cit.aet.hephaestus.core.runtime.WorkerProfileOverlayTest}.
- *
- * <p><b>Split-role gating.</b> The job-submission listeners gate on {@code hephaestus.agent.enabled}
- * alone — NOT on the worker role — so they wire here even with {@code runtime.server.enabled=false}.
- * This is what makes "set AGENT_ENABLED on every role that needs it" (MIGRATION.md) actually correct:
- * for submission the flag alone, independent of which runtime role(s) are on, is what the beans key
- * on. Orphan recovery is the exception and is gated the other way — {@code AgentJobZombieSweeper} is
- * {@code @ConditionalOnServerRole} and so is absent here; see
- * {@link #recoverySweeperIsAbsentWithoutServerRole} for why.
  */
 @DisplayName("Worker-only role gating")
 class AgentRoleGatingIntegrationTest extends BaseIntegrationTest {
@@ -78,11 +66,6 @@ class AgentRoleGatingIntegrationTest extends BaseIntegrationTest {
         assertThat(context.getBeansOfType(BotCommandProcessor.class)).isNotEmpty();
     }
 
-    /**
-     * The counterpart to the test above, and the line between them is the point: <b>submitting</b> a
-     * job is an event-driven capability that follows {@code AGENT_ENABLED}, while <b>sweeping</b> for
-     * dead ones is a scheduled duty that follows the server role.
-     */
     @Test
     @DisplayName("the zombie sweeper does NOT wire on a worker-only pod — sweeping is a server-role duty")
     void recoverySweeperIsAbsentWithoutServerRole() {

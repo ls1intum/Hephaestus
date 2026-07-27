@@ -37,7 +37,6 @@ class SandboxReconcilerTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        // No SandboxProperties: DockerSandboxConfiguration is worker-role-gated, not property-disabled.
         meterRegistry = new SimpleMeterRegistry();
         reconciler = new SandboxReconciler(jobRepository, containerManager, networkManager, meterRegistry);
     }
@@ -259,7 +258,7 @@ class SandboxReconcilerTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldCleanupAllWhenDbQueryFails() {
+        void shouldRemoveEvenRunningContainersWhenTheDbQueryFails() {
             UUID orphanedJobId = UUID.randomUUID();
 
             when(jobRepository.findByStatusIn(any())).thenThrow(new RuntimeException("DB unreachable"));
@@ -279,8 +278,6 @@ class SandboxReconcilerTest extends BaseUnitTest {
                 List.of(new DockerOperations.NetworkInfo("net-1", "agent-net-" + orphanedJobId))
             );
 
-            // DB failure treats all resources as orphaned (fail-safe), so even the "running"
-            // container above gets removed.
             reconciler.periodicReconciliation();
 
             verify(containerManager).forceRemove("ctr-1");

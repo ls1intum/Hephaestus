@@ -1,10 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, within } from "storybook/test";
+import { expect, fn } from "storybook/test";
 import type { FxRateInfo, WorkspaceLlmUsageReport } from "@/api/types.gen";
 import { expectPageReflows, expectTablesScrollInPlace } from "@/test/reflow";
 import { AdminLlmUsagePage } from "./AdminLlmUsagePage";
 
-/** Fixed "today" so the burn-rate projections render the same shot every time. */
+const FX_DISCLOSURE = /reference rate published on/;
+const ESTIMATE_LABEL = /^approximately /;
+
 const NOW = new Date("2026-07-10T12:00:00.000Z");
 
 const baseReport: WorkspaceLlmUsageReport = {
@@ -88,7 +90,6 @@ const baseReport: WorkspaceLlmUsageReport = {
 	],
 };
 
-/** The same month with the workspace running part of its work on a provider of its own. */
 const withOwnProvider: WorkspaceLlmUsageReport = {
 	...baseReport,
 	ownProviderMonthlyBudgetUsd: 10,
@@ -101,10 +102,6 @@ const withOwnProvider: WorkspaceLlmUsageReport = {
 	),
 };
 
-/**
- * The rate an instance with a EUR display currency reports for the running month. Already
- * inverted: multiply a USD amount by it to get the estimate.
- */
 const eurToday: FxRateInfo = {
 	currencyCode: "EUR",
 	ratePerUsd: 0.878966,
@@ -113,9 +110,8 @@ const eurToday: FxRateInfo = {
 };
 
 /**
- * The workspace admin's cost-control page. Two independently owned caps — the shared-model budget
- * the host sets, and the provider cap the workspace sets for itself — each with its own meter, its
- * own pause banner, and its own pre-wall warning.
+ * The workspace admin's cost-control page: two independently owned caps — the shared-model budget
+ * the host sets and the provider cap the workspace sets for itself — never merged into one number.
  */
 const meta = {
 	component: AdminLlmUsagePage,
@@ -140,43 +136,24 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Comfortably inside the shared-model budget, with no provider of the workspace's own yet.
- *
- * Also the default currency state: no instance has a display currency until someone configures
- * one, so every figure here is USD and nothing explains itself.
- */
-export const WithinBudget: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.queryByText(/reference rate published on/)).toBeNull();
-		await expect(canvasElement.querySelectorAll('[role="img"]')).toHaveLength(0);
+export const WithinBudgetInUsd: Story = {
+	play: async ({ canvas }) => {
+		await expect(canvas.queryByText(FX_DISCLOSURE)).toBeNull();
+		await expect(canvas.queryAllByLabelText(ESTIMATE_LABEL)).toHaveLength(0);
 	},
 };
 
-/**
- * The same month on an instance that displays EUR. USD stays the headline figure and the estimate
- * trails it, marked `≈` at every occurrence; the caption underneath explains all of them at once
- * and names the rate.
- */
 export const DisplayCurrencyThisMonth: Story = {
 	args: {
 		report: { ...withOwnProvider, fx: eurToday },
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		// Presence, not wording: `fx.test.tsx` owns the sentence, this owns "the page shows it".
-		await expect(canvas.getByText(/reference rate published on/)).toBeVisible();
-		// Symbols would be announced as "tilde operator" or dropped — every estimate says words.
-		await expect(canvas.getAllByLabelText(/^approximately /).length).toBeGreaterThan(0);
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText(FX_DISCLOSURE)).toBeVisible();
+		// `≈` announces as "tilde operator" or is dropped, so every estimate carries a spoken label.
+		await expect(canvas.getAllByLabelText(ESTIMATE_LABEL).length).toBeGreaterThan(0);
 	},
 };
 
-/**
- * A closed month. Its rate is the last one published inside that month, so the figures are frozen
- * — the caption says so instead of quoting a live rate that would drift under a past total. The
- * frozen wording itself is asserted on `FxDisclosure` in `fx.test.tsx`; this is the picture of it.
- */
 export const DisplayCurrencyClosedMonth: Story = {
 	args: {
 		month: "2026-06",
@@ -195,10 +172,7 @@ export const DisplayCurrencyClosedMonth: Story = {
 	},
 };
 
-/**
- * A currency whose symbol would read as dollars beside the USD figure it estimates — CAD, AUD and
- * friends — falls back to the ISO code rather than putting two `$` in one line.
- */
+/** A second `$` beside the USD figure would read as dollars, so the ISO code stands in. */
 export const DisplayCurrencyWithAmbiguousSymbol: Story = {
 	args: {
 		report: {
@@ -213,29 +187,23 @@ export const DisplayCurrencyWithAmbiguousSymbol: Story = {
 	},
 };
 
-/** Both sides live and under their caps — the two meters never merge into one number. */
 export const BothCapsHealthy: Story = {
 	args: { report: withOwnProvider },
 };
 
-/** 84% of the provider cap is gone — warned as a status, with the date the pace reaches it. */
 export const ApproachingProviderCap: Story = {
 	args: {
 		report: { ...withOwnProvider, ownProviderTotalCostUsd: 8.4 },
 	},
 };
 
-/** 88% of the shared-model budget is gone. Same shape, different owner — and a different remedy. */
 export const ApproachingSharedBudget: Story = {
 	args: {
 		report: { ...withOwnProvider, instanceTotalCostUsd: 22 },
 	},
 };
 
-/**
- * Day 2 of the month: the same warning without a projection. One busy afternoon is not a pace, so
- * the page says nothing rather than guessing.
- */
+/** Two days in, one busy afternoon is not a pace, so the warning arrives without a date. */
 export const ApproachingWithoutProjection: Story = {
 	args: {
 		now: new Date("2026-07-02T12:00:00.000Z"),
@@ -243,7 +211,6 @@ export const ApproachingWithoutProjection: Story = {
 	},
 };
 
-/** The workspace spent its provider cap — the one pause its admin can lift themselves. */
 export const ProviderCapReached: Story = {
 	args: {
 		report: {
@@ -255,7 +222,6 @@ export const ProviderCapReached: Story = {
 	},
 };
 
-/** Calls on the workspace's own models with no price set: the cap can't be checked, so work stops. */
 export const ProviderCapUnenforceable: Story = {
 	args: {
 		report: {
@@ -267,7 +233,6 @@ export const ProviderCapUnenforceable: Story = {
 	},
 };
 
-/** The shared-model budget is spent. A warning, not a catastrophe — their provider runs on. */
 export const SharedBudgetReached: Story = {
 	args: {
 		report: {
@@ -279,7 +244,6 @@ export const SharedBudgetReached: Story = {
 	},
 };
 
-/** Shared-model calls with no price set — only the host can fix this, and the copy says so. */
 export const SharedBudgetUnverifiable: Story = {
 	args: {
 		report: {
@@ -292,11 +256,8 @@ export const SharedBudgetUnverifiable: Story = {
 };
 
 /**
- * Both caps spent: the actionable one leads.
- *
- * "Leads" is about where the two banners land on the page, so it is measured here rather than by
- * sibling order in a jsdom test — `flex-col-reverse` would satisfy that and still put the banner
- * they can act on underneath the one they cannot.
+ * The banner the admin can act on leads, measured by geometry: `flex-col-reverse` satisfies a
+ * DOM-order assertion while rendering the two the other way up.
  */
 export const BothPaused: Story = {
 	args: {
@@ -317,19 +278,17 @@ export const BothPaused: Story = {
 	},
 };
 
-/** No provider of their own — a quiet offer rather than an empty meter. */
 export const NoProviderConnected: Story = {
 	args: { report: baseReport },
 };
 
-/** Provider spend with no cap on it yet: the meter is absent, the offer to cap it is not. */
 export const ProviderUncapped: Story = {
 	args: {
 		report: { ...withOwnProvider, ownProviderMonthlyBudgetUsd: undefined },
 	},
 };
 
-/** A $0 provider cap pauses immediately — it reads 100% used, not "—". */
+/** A $0 cap is a cap: 100% used and paused, not "no cap". */
 export const ZeroProviderCap: Story = {
 	args: {
 		report: {
@@ -342,18 +301,12 @@ export const ZeroProviderCap: Story = {
 	},
 };
 
-/** The host set no budget at all — spend is still reported, there is simply nothing to fill. */
 export const NoSharedBudget: Story = {
 	args: {
 		report: { ...withOwnProvider, instanceMonthlyBudgetUsd: undefined },
 	},
 };
 
-/**
- * A past month that ended over budget — nothing is paused in a month that has already closed, and
- * the cap editor is not offered: a cap applies from the moment it is saved, so changing one from a
- * closed month would move what runs today while the reader is looking at history.
- */
 export const PastMonth: Story = {
 	args: {
 		month: "2026-06",
@@ -388,24 +341,20 @@ export const Empty: Story = {
 	},
 };
 
-/**
- * Some runs used a model with no price set, so both reported totals — and the caps that read
- * them — under-count. A secondary callout explains the gap and who can close it.
- */
+/** Unpriced runs make both totals — and the caps reading them — a floor, which the callout says. */
 export const CallsWithNoPriceSet: Story = {
 	args: {
 		report: { ...withOwnProvider, unpricedEventCount: 42 },
 	},
 };
 
-/** A single run with no price set — the callout reads "1 run", not "1 runs". */
+/** The callout reads "1 run", not "1 runs". */
 export const SingleCallWithNoPriceSet: Story = {
 	args: {
 		report: { ...withOwnProvider, unpricedEventCount: 1 },
 	},
 };
 
-/** Report still loading — both cap cards and the by-job-type table shell are skeletoned in place. */
 export const Loading: Story = {
 	args: {
 		report: undefined,
@@ -413,15 +362,14 @@ export const Loading: Story = {
 	},
 };
 
-/** Report failed to load — a 5xx is retryable, so the alert offers a Retry. */
-export const ErrorState: Story = {
+/** A 5xx is retryable, so the alert offers a Retry; the 403 story is the contrast. */
+export const RetryableServerError: Story = {
 	args: {
 		report: undefined,
 		error: { status: 500, detail: "Couldn't build the usage report." },
 	},
 };
 
-/** A 403 is not retryable, so the alert explains the block without offering a Retry. */
 export const ForbiddenError: Story = {
 	args: {
 		report: undefined,
@@ -430,14 +378,10 @@ export const ForbiddenError: Story = {
 };
 
 /**
- * The whole page at the WCAG 2.2 SC 1.4.10 reflow width (320 CSS px ≙ 1280 px at 400 % zoom).
- *
- * The page must reflow to a single column with no horizontal scrolling of its own. The two
- * breakdown tables are the documented data-table exception: they may scroll sideways, but only
- * inside their own container — which is what `expectTablesScrollInPlace` pins down.
+ * WCAG 2.2 SC 1.4.10 at 320 px: the page itself may not scroll sideways; the breakdown tables take
+ * the data-table exception and scroll only inside their own container.
  */
 export const MobileReflow: Story = {
-	// The densest state the page has: two pause banners, both cap cards, and both breakdown tables.
 	args: {
 		report: {
 			...withOwnProvider,

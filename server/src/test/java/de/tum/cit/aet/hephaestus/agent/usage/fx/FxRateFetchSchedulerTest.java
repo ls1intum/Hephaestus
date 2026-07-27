@@ -34,10 +34,8 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.dao.DataAccessResourceFailureException;
 
 /**
- * The fetch side: what lands in {@code fx_rate}, what deliberately does not, and — the load-bearing
- * one — that this bean simply does not exist off the server role. The worker and webhook tiers must
- * not acquire an outbound dependency on ecb.europa.eu; an ungated bean in this area has crash-looped
- * them before.
+ * The worker and webhook tiers must not acquire an outbound dependency on ecb.europa.eu; an ungated
+ * bean in this area has crash-looped them before.
  */
 class FxRateFetchSchedulerTest extends BaseUnitTest {
 
@@ -52,8 +50,7 @@ class FxRateFetchSchedulerTest extends BaseUnitTest {
     private FxRateLookup lookup;
 
     /**
-     * Stands in for the {@code fx_rate} table. These tests are about what ends up stored, so the rows
-     * are kept here and asserted directly — "no row was written" and "the old row is still the old
+     * Stands in for the {@code fx_rate} table: "no row was written" and "the old row is still the old
      * row" are different facts, and a {@code verify(never()).save(any())} cannot tell them apart.
      */
     private final List<FxRate> table = new ArrayList<>();
@@ -82,7 +79,6 @@ class FxRateFetchSchedulerTest extends BaseUnitTest {
         }
     });
 
-    /** Seed a row that is already on file before the scheduler runs. */
     private FxRate storedRate(LocalDate date, String usdPerEur) {
         FxRate rate = new FxRate();
         rate.setRateDate(date);
@@ -96,10 +92,6 @@ class FxRateFetchSchedulerTest extends BaseUnitTest {
         return new FxRateFetchScheduler(client, repository, lookup, CLOCK);
     }
 
-    /**
-     * Both ways a fetch is triggered store the same row: the daily tick, and the boot catch-up that
-     * covers the first start after an operator sets a display currency.
-     */
     @ParameterizedTest(name = "{0} stores a freshly published rate")
     @MethodSource("everyFetchEntryPoint")
     void shouldStoreRateWhenFetchSucceeds(String entryPoint, Consumer<FxRateFetchScheduler> fetch) {
@@ -120,14 +112,13 @@ class FxRateFetchSchedulerTest extends BaseUnitTest {
 
     @Test
     @DisplayName("should overwrite the same day's row when the rate is republished")
-    void shouldUpdateExistingRowWhenSameDayFetchedAgain() {
+    void shouldOverwriteTheSameDaysRowWhenTheRateIsRepublished() {
         FxRate existing = storedRate(TODAY, "1.1000");
         when(lookup.isEnabled()).thenReturn(true);
         when(client.fetchLatestUsdRate()).thenReturn(Optional.of(FETCHED));
 
         scheduler().fetchDaily();
 
-        // Updated in place, not appended: one row per rate_date, carrying the republished number.
         assertThat(table).containsExactly(existing);
         assertThat(existing.getUsdPerEur()).isEqualByComparingTo("1.1377");
         assertThat(existing.getFetchedAt()).isEqualTo(Instant.now(CLOCK));
@@ -135,15 +126,13 @@ class FxRateFetchSchedulerTest extends BaseUnitTest {
 
     @Test
     @DisplayName("should leave the stored rate untouched when the fetch fails")
-    void shouldNotWriteWhenFetchFails() {
-        // A rate published yesterday is already on file; today's fetch fails.
+    void shouldLeaveTheStoredRateUntouchedWhenTheFetchFails() {
         FxRate yesterday = storedRate(TODAY.minusDays(1), "1.1000");
         when(lookup.isEnabled()).thenReturn(true);
         when(client.fetchLatestUsdRate()).thenReturn(Optional.empty());
 
         scheduler().fetchDaily();
 
-        // Staleness — not a wrong number — is the failure mode: the old row survives byte-for-byte.
         assertThat(table).containsExactly(yesterday);
         assertThat(yesterday.getUsdPerEur()).isEqualByComparingTo("1.1000");
         assertThat(yesterday.getFetchedAt()).isEqualTo(Instant.EPOCH);
@@ -168,7 +157,7 @@ class FxRateFetchSchedulerTest extends BaseUnitTest {
 
     @Test
     @DisplayName("should not fetch at startup when a usable rate is already stored")
-    void shouldNotFetchOnStartupWhenRateAlreadyStored() {
+    void shouldMakeNoOutboundRequestOnStartupWhenAUsableRateIsAlreadyStored() {
         FxRate existing = storedRate(TODAY, "1.1377");
         when(lookup.isEnabled()).thenReturn(true);
         when(lookup.latest()).thenReturn(
@@ -177,8 +166,6 @@ class FxRateFetchSchedulerTest extends BaseUnitTest {
 
         scheduler().fetchOnStartupIfMissing();
 
-        // No egress at all — the point of the guard is that boot does not hit ecb.europa.eu when it
-        // has nothing to learn.
         verifyNoInteractions(client);
         assertThat(table).containsExactly(existing);
     }
@@ -198,7 +185,6 @@ class FxRateFetchSchedulerTest extends BaseUnitTest {
 
         assertThatCode(() -> scheduler().fetchOnStartupIfMissing()).doesNotThrowAnyException();
 
-        // Boot survives, and the catch-up leaves the table exactly as it found it.
         assertThat(table).containsExactly(untouched);
         assertThat(untouched.getUsdPerEur()).isEqualByComparingTo("1.1000");
     }
@@ -214,11 +200,7 @@ class FxRateFetchSchedulerTest extends BaseUnitTest {
     }
 
     /**
-     * The default configuration ships no display currency, and under it this feature must be inert:
-     * no request to ecb.europa.eu, no row read, no row written. Every operator who never sets
-     * {@code hephaestus.llm.display-currency} is on this path.
-     *
-     * <p>Both entry points run against the REAL {@link FxRateLookup} built from the real default
+     * Both entry points run against the REAL {@link FxRateLookup} built from the real default
      * {@link LlmProperties}, so what is asserted is the production predicate — an unset property
      * resolves to "off" — and not a stubbed boolean. A {@code isEnabled()} that started returning
      * true, or a {@code freshLatest()} that read the table before checking the currency, fails here.
@@ -263,7 +245,7 @@ class FxRateFetchSchedulerTest extends BaseUnitTest {
 
     @ParameterizedTest(name = "{2}")
     @MethodSource("roleGating")
-    void registersTheSchedulerOnlyOnTheServerRole(String[] properties, boolean expectBean, String why) {
+    void shouldRegisterTheSchedulerOnlyOnTheServerRole(String[] properties, boolean expectBean, String why) {
         contextRunner()
             .withPropertyValues(properties)
             .run(context -> {

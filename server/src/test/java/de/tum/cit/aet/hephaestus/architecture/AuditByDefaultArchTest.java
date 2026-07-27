@@ -55,13 +55,9 @@ class AuditByDefaultArchTest extends HephaestusArchitectureTest {
     }
 
     /**
-     * The one part of an {@code @Audited} declaration the compiler cannot check: {@link Audited#type()}
-     * is a token, because no annotation member can have a type that depends on another member's value.
-     * So the ledger is an enum and this rule covers only what that leaves open — that the token names a
-     * real constant of the ledger it was declared under.
-     *
-     * <p>A typo would otherwise be read as "some row type we don't know", which silently opts the
-     * endpoint out of {@link #auditDeclarationsMatchTheCallGraph()}.
+     * {@link Audited#type()} is a bare token, because no annotation member can have a type that depends
+     * on another member's value — so the compiler cannot check it. A typo would be read as "some row type
+     * we don't know", silently opting the endpoint out of {@link #auditDeclarationsMatchTheCallGraph()}.
      */
     @Test
     void everyAuditedTypeIsAConstantOfItsLedgersVocabulary() {
@@ -95,7 +91,6 @@ class AuditByDefaultArchTest extends HephaestusArchitectureTest {
     private static Optional<String> malformedReason(AuditLedger ledger, String type) {
         Set<String> vocabulary = ledger.vocabulary();
         if (type.isEmpty()) {
-            // A bare ledger is only legal where that ledger has no fixed vocabulary to name.
             return vocabulary.isEmpty()
                 ? Optional.empty()
                 : Optional.of(ledger + " rows are typed — name the constant, e.g. type = \"X\"");

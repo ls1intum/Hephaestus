@@ -9,10 +9,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-/**
- * Instance-admin CRUD for the LLM connection catalog ({@code /admin/llm/connections}): app_admin access gate, write-only API key redaction, and the delete-in-use guard. {@code LlmConnectionServiceTest}
- * covers business-rule detail; this stays scoped to the HTTP contract.
- */
 class LlmConnectionAdminControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final String ADMIN_TOKEN = "mock-jwt-token-for-admin-user";

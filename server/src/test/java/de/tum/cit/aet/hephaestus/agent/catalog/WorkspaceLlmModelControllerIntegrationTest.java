@@ -20,12 +20,6 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-/**
- * Workspace-admin CRUD for models on "your AI provider" plus the available-models union projection
- * ({@code /workspaces/{slug}/llm/**}): tenancy isolation, and — the sharpest edge of this
- * endpoint — that a shared-catalog entry in the available-models response never leaks the instance's
- * upstream model id, base URL, or credential shape.
- */
 class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
@@ -254,7 +248,6 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
     void availableModelsHidesAGrantedInstanceModelNotGrantedToThisWorkspace() {
         Workspace workspace = setupWorkspace("avail-grant-ws");
         LlmModel grantedElsewhere = seedInstanceModel("gpt-5-granted-upstream", ModelVisibility.GRANTED, true);
-        // Grant it to a DIFFERENT workspace only.
         User otherOwner = persistUser("avail-grant-other-owner");
         Workspace otherWorkspace = createWorkspace(
             "avail-grant-other-ws",
@@ -310,8 +303,6 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
         seedInstanceModel("gpt-5-disabled-upstream", ModelVisibility.PUBLIC, false);
         WorkspaceLlmConnectionDTO connection = createWorkspaceConnection(workspace, "conn-1");
         WorkspaceLlmModelDTO ownModel = createWorkspaceModel(workspace, connection.id(), "own-model");
-        // Disable the just-created workspace model through the real update endpoint (also exercises
-        // the enabled toggle, not just seeding).
         webTestClient
             .patch()
             .uri("/workspaces/{slug}/llm/models/{id}", workspace.getWorkspaceSlug(), ownModel.id())
@@ -368,7 +359,6 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
     }
 
     // ─── Access control ────────────────────────────────────────────────────────────────────────
-    // Every endpoint on this controller is @RequireAtLeastWorkspaceAdmin.
 
     @Test
     @WithMentorUser
@@ -396,7 +386,6 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
             .expectStatus()
             .isForbidden();
 
-        // The read gate is the interesting one, but a member must not be able to write either.
         webTestClient
             .post()
             .uri("/workspaces/{slug}/llm/connections/{connectionId}/models", slug, 1)
@@ -420,7 +409,7 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
 
     @Test
     @WithMentorUser
-    void aWorkspaceAdminWithNoMembershipInAnotherWorkspaceIsForbiddenThere() {
+    void aWorkspaceAdminIsForbiddenInAnotherWorkspaceButStillAdmittedInTheirOwn() {
         // A genuine (non-superadmin) workspace ADMIN — @WithAdminUser carries the instance-wide
         // app_admin elevation, which would let this call through for the wrong reason.
         User admin = persistUser("mentor");
@@ -443,7 +432,6 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
             .expectStatus()
             .isForbidden();
 
-        // Sanity: the same principal IS admitted in the workspace it actually administers.
         webTestClient
             .get()
             .uri("/workspaces/{slug}/llm/models", own.getWorkspaceSlug())

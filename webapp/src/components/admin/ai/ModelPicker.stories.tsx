@@ -67,10 +67,7 @@ export const NoModelsYet: Story = {
 	args: { availableModels: [] },
 };
 
-/**
- * Nothing is selected and the owning field has flagged it: the trigger carries `aria-invalid` and
- * points at the explanation, which the field renders — `Field` wires no ids on its own.
- */
+/** `Field` wires no ids on its own, so the trigger has to point at the explanation itself. */
 export const Invalid: Story = {
 	args: { invalid: true, "aria-describedby": "model-picker-error" },
 	render: (args) => (

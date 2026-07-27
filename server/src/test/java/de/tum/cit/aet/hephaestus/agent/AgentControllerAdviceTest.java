@@ -39,9 +39,8 @@ class AgentControllerAdviceTest extends BaseUnitTest {
     }
 
     /**
-     * All six conflicts are 409s. Without a {@code type}, RFC 7807 makes them all {@code about:blank},
-     * so a client can only tell them apart by string-matching an English title — which changes with
-     * copy edits. Each URI is API surface: pinning them here means a rename is a deliberate act.
+     * Without a {@code type} RFC 7807 collapses all six 409s to {@code about:blank}, leaving clients to
+     * string-match English titles. The URIs are API surface, so a rename must be a deliberate act.
      */
     @Test
     void everyConflictCarriesItsOwnStableTypeUri() {

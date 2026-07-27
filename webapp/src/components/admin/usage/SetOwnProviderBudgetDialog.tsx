@@ -6,12 +6,10 @@ export interface SetOwnProviderBudgetDialogProps {
 	/** The cap in force today, in USD; `null`/`undefined` means the workspace is uncapped. */
 	currentCapUsd?: number | null;
 	fx?: Fx;
-	/** Passed straight through to the shared editor; see its `isCurrentMonth`. */
 	isCurrentMonth?: boolean;
 	isPending: boolean;
 	serverError?: string | null;
 	onOpenChange: (open: boolean) => void;
-	/** `null` removes the cap; a number (USD, >= 0, 2 decimals) sets it. */
 	onSubmit: (monthlyBudgetUsd: number | null) => void;
 }
 
@@ -41,8 +39,7 @@ export function SetOwnProviderBudgetDialog({
 			isCurrentMonth={isCurrentMonth}
 			isPending={isPending}
 			serverError={serverError}
-			// No `submitLabel`/`removeLabel`: "Save cap" / "Remove cap" are the shared editor's own
-			// defaults. Only the budget wrapper, which calls the number a budget, has to override them.
+			// No `submitLabel`/`removeLabel`: "Save cap" / "Remove cap" are the shared editor's defaults.
 			onOpenChange={onOpenChange}
 			onSubmit={onSubmit}
 		/>

@@ -116,8 +116,6 @@ class ConfigSnapshotTest extends BaseUnitTest {
 
         @Test
         void shouldNotContainCredentialMaterialInJson() {
-            // The binding itself never carries a key, and the snapshot must never grow a field that
-            // copies one out of the resolved connection — the proxy re-resolves it live instead.
             WorkspaceAgentBinding binding = createBinding();
             stubResolver(binding);
 
@@ -234,10 +232,8 @@ class ConfigSnapshotTest extends BaseUnitTest {
 
         @Test
         void shouldDeserializeLegacyV3Snapshot() {
-            // Pre-v4 snapshot shape: llmProvider/credentialMode/llmBaseUrl/modelName, no
-            // apiProtocol/connectionScope/connectionId. fromJson must translate it rather than
-            // default-null the new fields — an in-flight job dispatched before the v4 deploy still
-            // needs a usable apiProtocol/baseUrl/upstreamModelId.
+            // An in-flight job dispatched before the v4 deploy still needs a usable
+            // apiProtocol/baseUrl/upstreamModelId, so fromJson must translate rather than default-null.
             String legacy =
                 "{\"schemaVersion\":3,\"configId\":42,\"configName\":\"legacy\"," +
                 "\"llmProvider\":\"ANTHROPIC\",\"credentialMode\":\"PROXY\"," +
@@ -288,15 +284,9 @@ class ConfigSnapshotTest extends BaseUnitTest {
         }
     }
 
-    /**
-     * A snapshot is the only routing a running job has: the proxy sends its calls wherever this record
-     * says, for as long as the job lives. A snapshot missing either half of that address, or carrying a
-     * timeout no job could run under, must never come into existence to be frozen onto a row.
-     */
     @Nested
     class Validation {
 
-        /** The valid shape every row below breaks in exactly one place. */
         private ConfigSnapshot snapshot(String apiProtocol, String baseUrl, int timeoutSeconds) {
             return new ConfigSnapshot(
                 ConfigSnapshot.SCHEMA_VERSION,

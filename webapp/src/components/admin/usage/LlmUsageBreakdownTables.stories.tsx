@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, within } from "storybook/test";
+import { expect } from "storybook/test";
 import type {
 	FxRateInfo,
 	LlmUsageByDay,
@@ -66,11 +66,7 @@ const dayRows: LlmUsageByDay[] = [
 	},
 ];
 
-/**
- * A month's report as the server sends it. The tables read their footer money straight off these two
- * fields rather than re-adding the rows — the client does no money arithmetic — so the fixture keeps
- * them consistent with the rows the same way the server does.
- */
+/** The footers read money off the envelope rather than re-adding rows, so the fixture adds up. */
 function report(overrides: Partial<WorkspaceLlmUsageReport> = {}): WorkspaceLlmUsageReport {
 	const byJobType = overrides.byJobType ?? jobTypeRows;
 	const byDay = overrides.byDay ?? dayRows;
@@ -91,9 +87,8 @@ function report(overrides: Partial<WorkspaceLlmUsageReport> = {}): WorkspaceLlmU
 }
 
 /**
- * Where a month's AI spend went, broken down by the kind of work that caused it. Spend is split by
- * *who pays* — shared instance models against the workspace's own connected provider — because those
- * are two separate purses with two separate caps, and a single merged number could not be acted on.
+ * Where a month's AI spend went, split by *who pays*: two purses with two separate caps, so a single
+ * merged number could not be acted on.
  */
 const meta = {
 	component: LlmUsageByJobTypeTable,
@@ -105,24 +100,17 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Two job types, so a totals footer is worth showing. */
 export const ByJobType: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(await canvas.findByText("PR review")).toBeVisible();
 		await expect(await canvas.findByText("Mentor turn")).toBeVisible();
 	},
 };
 
-/**
- * One row needs no footer: a "total" there would restate the line directly above it. The table
- * deliberately drops it rather than printing the same number twice.
- */
 export const SingleRowHasNoTotals: Story = {
 	args: { report: report({ byJobType: [jobTypeRows[0]] }) },
 };
 
-/** Loading — the table shell stays put so the page doesn't jump when the rows land. */
 export const Loading: Story = {
 	args: { report: undefined },
 };
@@ -131,12 +119,10 @@ export const Empty: Story = {
 	args: { report: report({ byJobType: [] }) },
 };
 
-/** No display currency configured: USD only, and no estimate line under any figure. */
 export const UsdOnly: Story = {
 	args: { fx: null },
 };
 
-/** The per-day view of the same month — the shape of the spend over time. */
 export const ByDay: StoryObj<typeof LlmUsageByDayTable> = {
 	render: (args) => <LlmUsageByDayTable {...args} />,
 	args: { report: report(), fx: eur },

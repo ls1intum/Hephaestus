@@ -28,7 +28,6 @@ class ConfigAuditDiffTest {
             Arguments.of("{\"a\":1,\"b\":2}", "{\"a\":1,\"b\":3}", List.of("b"), "only the keys that differ"),
             // Drives no-op suppression: an idempotent PATCH must leave no row.
             Arguments.of("{\"a\":1}", "{\"a\":1}", List.of(), "identical snapshots yield no keys"),
-            // A cleared override is a real change, not an absent key.
             Arguments.of(
                 "{\"cooldownMinutes\":30}",
                 "{\"cooldownMinutes\":null}",
@@ -50,7 +49,6 @@ class ConfigAuditDiffTest {
                 List.of("slugs"),
                 "arrays compare whole rather than by index"
             ),
-            // Snapshot shapes evolve; a field that appeared or vanished is what a reader needs.
             Arguments.of("{\"a\":1}", "{\"a\":1,\"b\":2}", List.of("b"), "a key on one side only is a change"),
             // Returning empty on create would let the recorder suppress it as a no-op, losing the event.
             Arguments.of(

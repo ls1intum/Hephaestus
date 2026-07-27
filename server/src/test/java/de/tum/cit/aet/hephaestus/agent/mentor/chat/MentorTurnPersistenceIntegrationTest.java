@@ -245,9 +245,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void persistInFlight_concurrentRace_exactlyOneWins() throws Exception {
-        // Proves the DB half of the dual-lock defence (Java MentorTurnLock + DB partial unique
-        // index): even if the Java lock were stripped, exactly one writer wins at the row level.
+    void persistInFlight_concurrentRace_theDbUniqueIndexAloneLetsExactlyOneWriterWin() throws Exception {
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
 
         ExecutorService pool = Executors.newFixedThreadPool(2);
@@ -584,11 +582,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void optimisticLocking_staleSnapshotSaveFails() throws Exception {
-        // Protects against reaper-vs-late-finalise corruption: a writer that loaded the entity at
-        // version=N can no longer overwrite a row the reaper bumped to N+1 — Hibernate's
-        // version-checked UPDATE throws, the persistence service catches it, and the reaper's
-        // observation survives.
+    void optimisticLocking_aLateFinaliseCannotOverwriteWhatTheReaperWrote() throws Exception {
         UUID assistantId = persistInFlightTurn("hello");
 
         // Simulate the in-flight runner: load a managed snapshot at the current version.
@@ -641,15 +635,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
             .hasSize(1);
     }
 
-    /**
-     * A worker dies mid-turn leaving no runner report — only what the LLM proxy wrote to the row per
-     * call. The reaper must bill from that.
-     *
-     * <p>Kills "reaper falls back to {@code recordUnverifiable} with zeros", which would silently
-     * lose a crashed turn's spend. The read-only column mapping that actually protects the
-     * concurrent case is pinned separately by
-     * {@code MentorTurnUsageAccumulatorIntegrationTest#aStaleEntityFlushDoesNotClobberTheCounters}.
-     */
     @Test
     @DisplayName("a turn abandoned by a crashed worker is billed for the calls the proxy recorded")
     void accountingReaper_billsACrashedTurnFromItsProxyRecordedUsage() throws Exception {
@@ -675,15 +660,10 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         assertThat(event.getCacheReadTokens()).isEqualTo(10_000);
         assertThat(event.getReasoningTokens()).isEqualTo(500);
         assertThat(event.getTotalCalls()).isEqualTo(2);
-        // Priced, not UNVERIFIABLE: we know what this turn burned, so the month's verdict is real.
         assertThat(event.getPricingState()).isEqualTo(PricingState.PRICED);
         assertThat(event.getCostUsd()).isEqualByComparingTo("1.000000");
     }
 
-    /**
-     * The narrowed claim, from the other side: a turn that genuinely made no recorded call is still
-     * UNVERIFIABLE. Pricing it as $0 would let a crashed turn read as free rather than unknown.
-     */
     @Test
     @DisplayName("a turn with no recorded call stays unverifiable rather than being priced as free")
     void accountingReaper_keepsATurnWithNoRecordedCallUnverifiable() throws Exception {
@@ -703,7 +683,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         assertThat(event.getCostUsd()).isNull();
     }
 
-    /** One served proxy call, written the way the proxy writes it: fenced on the turn still running. */
     private void accumulateProxyCall(UUID turnId, long input, long output, long reasoning, long cacheRead) {
         new TransactionTemplate(transactionManager).executeWithoutResult(ignored ->
             assertThat(chatMessageRepository.accumulateLlmUsage(turnId, input, output, reasoning, cacheRead)).isEqualTo(
@@ -720,12 +699,10 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     /**
-     * A reaper configured with a window below the safe floor, so the clamp — not the requested ten
-     * minutes — decides which rows are stale, matching what an operator who sets the property too low gets.
-     *
-     * <p>Hand-built because the injected bean's {@code @SchedulerLock} needs a {@code shedlock} table
-     * that {@code ddl-auto=create} doesn't produce; the injected bean is still passed as self-reference
-     * so each turn runs in the {@code REQUIRES_NEW} transaction the batch semantics depend on.
+     * A window below the safe floor, so the clamp — not the requested ten minutes — decides which rows
+     * are stale. Hand-built because the injected bean's {@code @SchedulerLock} needs a {@code shedlock}
+     * table that {@code ddl-auto=create} doesn't produce; the injected bean is still passed as
+     * self-reference so each turn runs in the {@code REQUIRES_NEW} transaction the batch semantics need.
      */
     private MentorInFlightReaper reaperWithAnUnsafeWindow() {
         return new MentorInFlightReaper(
@@ -751,10 +728,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("chk_chat_message_status rejects values outside (in_flight,completed,interrupted)")
     void statusColumnCheckConstraintFires() throws Exception {
-        // Pins the production DB-level guard: the CHECK constraint is the backstop that catches a
-        // future writer typo'ing `"in_flite"` or inventing a status without an app-side state
-        // machine update. @BeforeEach recreates the constraint so this exercises the real predicate,
-        // not just JPA validation.
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "constraint test");
         Assertions.assertThatThrownBy(() -> {
             try (
@@ -773,10 +746,8 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
             }
         })
             .isInstanceOf(java.sql.SQLException.class)
-            // The constraint name varies by environment: production ships the explicit
-            // `chk_chat_message_status` via Liquibase; ddl-auto=create also generates a
-            // Hibernate-implicit `chat_message_status_check`. Either can fire first, so the
-            // assertion accepts both.
+            // Production ships the explicit `chk_chat_message_status` via Liquibase; ddl-auto=create
+            // also generates a Hibernate-implicit `chat_message_status_check`. Either can fire first.
             .satisfies(t ->
                 Assertions.assertThat(t.getMessage()).containsAnyOf(
                     "chk_chat_message_status",

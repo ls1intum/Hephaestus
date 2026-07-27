@@ -80,10 +80,14 @@ version first and keep its startup log to hand.
 
 1. Remove `HEPHAESTUS_WORKER_LLM_BASE_URL`, `HEPHAESTUS_WORKER_LLM_API_KEY`,
    `HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED`, and every `AGENT_DEFAULT_CONFIG_*` variable from your
-   deployment. None of them is read any more and none of them is an error. The first three are not
-   ignored quietly, though: every boot names each one it still finds (`… is set but no longer read`),
-   so a clean startup log is how you confirm they are gone. The `AGENT_DEFAULT_CONFIG_*` variables
-   pass unmentioned — delete them while you are in the file, or nothing will remind you.
+   deployment. None of them is read any more and none of them is an error, so nothing breaks if you
+   leave one behind — but nothing reliably reminds you either. Do this by grepping your own
+   configuration; do not wait for the startup log to tell you. The boot-time "`… is set but no longer
+   read`" warning only fires for a variable that reaches the JVM's own environment under its
+   `HEPHAESTUS_`-prefixed name, and the shipped Compose files no longer pass any of these into the
+   container — a stale line in `docker/.env` is therefore invisible to the application and draws no
+   warning. On a deployment that sets container environment directly (Kubernetes, systemd), the first
+   three do warn; `AGENT_DEFAULT_CONFIG_*` never does.
 2. Register your OpenAI-compatible endpoint(s) under Instance admin → AI models (or have a workspace admin connect their own under the workspace's Administration → AI models). Each page tests the connection before you save it, so you learn the endpoint answers without waiting for a review to fail.
 3. **Review and re-enable each workspace's carried-over AI configuration.** The upgrade copies every
    agent configuration that was in use — endpoint, model name, encrypted API key, timeout,
@@ -136,7 +140,7 @@ version first and keep its startup log to hand.
 
 1. Set `AGENT_ENABLED=true` (replacing `AGENT_NATS_ENABLED=true`) on **every** role that needs to submit, execute, or recover jobs — not just the role that claims and runs them. In a split-pod deployment that means **both** `application-server` (submits jobs from PR/issue events and runs the orphan-recovery sweep — both gate on this same flag, independent of the worker role) **and** `application-worker` (claims and executes them, additionally gated on the worker role); `docker/compose.app.yaml` already sets the same `AGENT_ENABLED` value on both services. In the monolith, set it once. No profile turns it on for you: a pod you do not set it on claims nothing — including a `worker`-profile pod you start outside the shipped Compose files, which in earlier releases turned itself on.
 2. Confirm the flag actually took, on each side. Once the upgraded server is up, the `agent.queue.depth`, `agent.queue.oldest_age_seconds` and `agent.queue.running` metrics exist; if `AGENT_ENABLED` never reached that pod they are absent altogether rather than reading zero — which is the difference between "the queue is idle" and "the queue was never switched on". For the worker side, open a pull request and watch `agent.queue.oldest_age_seconds`: it should rise and fall. An age that only ever climbs means the server is submitting and no worker is claiming.
-3. Remove `AGENT_NATS_ENABLED`, `HEPHAESTUS_AGENT_NATS_SERVER`, `AGENT_NATS_MAX_ACK_PENDING`, and `AGENT_NATS_FETCH_BATCH_SIZE` from your deployment. None is read any more and none is an error, but each one still set is named in every boot log (`… is set but no longer read`) until you delete it.
+3. Remove `AGENT_NATS_ENABLED`, `HEPHAESTUS_AGENT_NATS_SERVER`, `AGENT_NATS_MAX_ACK_PENDING`, and `AGENT_NATS_FETCH_BATCH_SIZE` from your deployment. None is read any more and none is an error. Grep your configuration for them rather than trusting the boot log: of these four only `HEPHAESTUS_AGENT_NATS_SERVER` is named by the "`… is set but no longer read`" warning, and only on a deployment that sets container environment directly. The other three never carried the `HEPHAESTUS_` prefix the warning matches on, and under the shipped Compose files none of the four reaches the container at all, so a stale `docker/.env` stays silent.
 4. Optional cleanup, after the upgraded instance has run long enough that you are not rolling back: the `AGENT` JetStream stream is no longer read from or written to. Delete it with `nats stream rm AGENT` if you want to reclaim its storage; leaving it in place is harmless.
 5. Do not remove NATS itself or `NATS_ENABLED` — webhook ingest and SCM/Slack sync still require it.
 
@@ -276,11 +280,41 @@ and review the release notes for endpoint changes.
 
 ### Database Schema Changed
 
-Liquibase handles this automatically. If you see errors:
+Liquibase applies changelogs automatically, in order, on server startup. A failure is not silent: the
+application context fails to start, so the container exits and your orchestrator restarts it — a
+crash-loop whose first useful line is in the *first* startup attempt's log, not the latest. Capture
+that before doing anything else:
 
-1. Check Liquibase changelog for the migration
-2. Ensure database user has ALTER permissions
-3. Check for data that violates new constraints
+```bash
+docker compose logs application-server | grep -i -m5 liquibase
+```
+
+Liquibase runs each changeset in its own transaction, so a failure leaves earlier changesets applied
+and the failing one rolled back. The database is therefore consistent but *partially migrated*, and
+the old application version may no longer match it — do not assume rolling back the image is safe.
+
+| Symptom in the log | What it means | What to do |
+| --- | --- | --- |
+| `Could not acquire change log lock` | A previous run was killed (OOM, `docker kill`, node eviction) mid-migration and left its row in `DATABASECHANGELOGLOCK`. | Confirm no server is actually running, then clear it: `UPDATE databasechangeloglock SET locked = FALSE, lockgranted = NULL, lockedby = NULL WHERE id = 1;` and restart. Never clear it while another replica may still be migrating. |
+| `Validation Failed: … checksums do not match` | A changelog file that already ran was edited. Released changelogs are immutable for exactly this reason. | Restore the file to its released content and fix forward with a *new* changelog. Do not `clearCheckSums` on production to make the error go away — it tells Liquibase to trust a file whose applied effect you no longer know. |
+| A constraint or `NOT NULL` addition fails | Existing rows violate the new rule. CI replays migrations against an empty database, so a data-incompatible migration passes CI and fails only on real data. | Do not hand-edit the schema. Report it with the failing changeset id; the fix ships as a new changelog that cleans the data first. |
+| `permission denied` / `must be owner of` | The database user lacks DDL rights on an existing object. | Grant ownership or `ALTER` on the named object and restart. |
+
+**Fix forward, do not roll back.** Changelogs carry `<rollback>` blocks, but they are never exercised
+in CI and are not a supported recovery path. The supported recoveries, in order of preference:
+
+1. **Wait for a patch release** that fixes the changeset forward. A partially migrated database keeps
+   serving on the previous image only if no applied changeset broke it — check the log for which
+   changesets succeeded before deciding.
+2. **Restore from backup** if the instance must come back now and forward-fixing will take longer than
+   the outage budget. Follow
+   [Backup & restore](https://ls1intum.github.io/Hephaestus/admin/backup-restore); restore the
+   database dump *and* the `.env` holding `HEPHAESTUS_SECURITY_ENCRYPTION_KEY`, or every encrypted
+   credential in the restored database is unreadable. Then pin `IMAGE_TAG` to the version the dump
+   was taken under so it is not immediately re-migrated by the release that failed.
+
+Take a database dump before every upgrade that ships a migration. The release notes flag which ones
+do.
 
 ---
 

@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.sync;
 
+import static de.tum.cit.aet.hephaestus.integration.scm.GraphQlResponseStubValidator.Vendor.GITLAB;
+import static de.tum.cit.aet.hephaestus.integration.scm.GraphQlResponseStubValidator.assertVendorCouldReturn;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
@@ -60,6 +62,14 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
     private static final Long SCOPE_ID = 100L;
     private static final Long REPO_ID = 7L;
     private static final String FULL_PATH = "acme/widgets";
+
+    /** The committed operation document each connection prefix is listed by. */
+    private static final Map<String, String> LISTING_DOCUMENTS = Map.of(
+        "project.issues",
+        "GetProjectIssueNumbers",
+        "project.mergeRequests",
+        "GetProjectMergeRequestNumbers"
+    );
 
     @Mock
     private IssueRepository issueRepository;
@@ -152,6 +162,7 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
             .stream()
             .map(iid -> Map.<String, Object>of("iid", String.valueOf(iid)))
             .toList();
+        assertVendorCouldReturn(GITLAB, LISTING_DOCUMENTS.get(prefix), prefix + ".nodes", nodes);
         // doReturn to sidestep the generic signature of toEntityList(Class<T>).
         lenient().doReturn(nodes).when(nodesField).toEntityList(Map.class);
         lenient().when(response.field(prefix + ".nodes")).thenReturn(nodesField);

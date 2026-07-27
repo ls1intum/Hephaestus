@@ -1,5 +1,5 @@
 import { ChevronDown } from "lucide-react";
-import { type FormEvent, useId, useState } from "react";
+import { type FormEvent, type ReactNode, useId, useState } from "react";
 import type {
 	AgentBinding,
 	AgentBindingRequest,
@@ -25,7 +25,6 @@ import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { BudgetExhaustedAlert } from "./BudgetExhaustedAlert";
 import { ModelPicker, type ModelSelection } from "./ModelPicker";
-import { WorkspaceLlmProviderPanel } from "./WorkspaceLlmProviderPanel";
 
 type Purpose = AgentBinding["purpose"];
 
@@ -104,23 +103,17 @@ export interface AgentBindingsPageProps {
 	availableModels: AvailableLlmModel[];
 	practicesEnabled: boolean;
 	mentorEnabled: boolean;
-	/** Whether the instance lets this workspace register providers of its own. */
-	ownProviderAllowed: boolean;
-	/** This month's spend, for the paused-budget banners. Absent while it loads. */
+	/** The workspace's own AI providers, mounted by the route because this section fetches its own data. */
+	providerPanel?: ReactNode;
 	usage?: WorkspaceLlmUsageReport;
 	isLoading: boolean;
 	isError: boolean;
 	loadError: unknown;
-	/**
-	 * Every purpose with a save/turn-off in flight — a set, not one purpose: both cards submit
-	 * independently and an admin does not wait for the first to settle before saving the second.
-	 */
 	pendingPurposes: ReadonlySet<Purpose>;
 	/**
-	 * How many writes *this admin* has completed against each purpose. A card is keyed on its purpose
-	 * plus this counter, so it reseeds from the server binding exactly when they save or turn it off —
-	 * and never when someone else's change arrives on a background refetch, which would silently
-	 * discard the timeout, concurrency and internet-access edits they have open.
+	 * How many writes *this admin* has completed against each purpose. A card reseeds from the server
+	 * binding exactly when they save or turn it off, and never on a background refetch — which would
+	 * discard the edits they have open.
 	 */
 	saveRevisions?: Partial<Record<Purpose, number>>;
 	onRetry: () => void;
@@ -128,19 +121,14 @@ export interface AgentBindingsPageProps {
 	onTurnOff: (purpose: Purpose) => void;
 }
 
-/**
- * What each AI task runs on, one card per purpose. The route owns every query and mutation for the
- * task cards, so their data dependencies are readable from the route file and their stories need no
- * request mocking. The one exception is {@link WorkspaceLlmProviderPanel} below, which still fetches
- * and mutates on its own — the remaining nested data layer on this surface.
- */
+/** What each AI task runs on, one card per purpose. Presentational: the route owns every query. */
 export function AgentBindingsPage({
 	workspaceSlug,
 	bindings,
 	availableModels,
 	practicesEnabled,
 	mentorEnabled,
-	ownProviderAllowed,
+	providerPanel,
 	usage,
 	isLoading,
 	isError,
@@ -161,8 +149,7 @@ export function AgentBindingsPage({
 				<h1 className="text-3xl font-bold tracking-tight">AI models</h1>
 			</div>
 
-			{/* The two caps pause independently, so each paused side gets its own banner — the one the
-			    workspace can act on first. */}
+			{/* Each paused cap gets its own banner, the one the workspace can act on first. */}
 			{(usage?.ownProviderPaused || usage?.instancePaused) && (
 				<div className="mb-6 space-y-3">
 					{usage.ownProviderPaused && (
@@ -198,9 +185,8 @@ export function AgentBindingsPage({
 						<h2 className="text-lg font-semibold">Tasks</h2>
 						{PURPOSES.map((meta) => (
 							<AgentPurposeCard
-								// The purpose is the card's identity; the revision is this admin's own writes. A
-								// key over the bound model id instead would remount — discarding whatever they have
-								// typed — the moment *another* admin repointed the purpose.
+								// Keyed on this admin's own writes, not on the bound model id: that would remount
+								// over whatever they have typed the moment *another* admin repointed the purpose.
 								key={`${meta.purpose}:${saveRevisions?.[meta.purpose] ?? 0}`}
 								meta={meta}
 								binding={bindingFor(meta.purpose)}
@@ -213,20 +199,8 @@ export function AgentBindingsPage({
 						))}
 					</section>
 
-					{ownProviderAllowed && (
-						<section className="space-y-4">
-							{/* The panel owns this section's heading, because it sits in a row with "Add
-							    provider". The real setting is handed down rather than hard-coded, so the panel's
-							    "new providers are disabled" banner reflects the instance rather than a constant.
-							    Known gap: while the section is gated on the same flag, a workspace that *loses*
-							    the permission also loses sight of the providers it already has, which the banner
-							    promises it keeps — closing that means mounting the panel unconditionally. */}
-							<WorkspaceLlmProviderPanel
-								workspaceSlug={workspaceSlug}
-								ownProviderAllowed={ownProviderAllowed}
-							/>
-						</section>
-					)}
+					{/* The panel owns this section's heading, because it sits in a row with "Add provider". */}
+					{providerPanel && <section className="space-y-4">{providerPanel}</section>}
 				</div>
 			)}
 		</div>
@@ -283,8 +257,8 @@ function AgentPurposeCard({
 	const handleSubmit = (event: FormEvent) => {
 		event.preventDefault();
 		if (!selection || timeout.value == null || concurrency.value == null) {
-			// Save stays enabled precisely so this reveals *why* the binding can't be saved — and the
-			// disclosure opens, because the offending field may be inside it.
+			// Save stays enabled precisely so this reveals *why*; the disclosure opens because the
+			// offending field may be inside it.
 			setShowErrors(true);
 			if (timeout.value == null || concurrency.value == null) setShowAdvanced(true);
 			return;
@@ -313,12 +287,9 @@ function AgentPurposeCard({
 	}
 
 	return (
-		// A named region, so each purpose's card is reachable in the accessible tree — every card's
-		// Save, Turn off and model picker otherwise read identically.
+		// A landmark: every card's Save, Turn off and model picker otherwise read identically.
 		<Card role="region" aria-labelledby={cardLabelId}>
 			<CardHeader>
-				{/* `min-w-0` lets the description wrap instead of forcing the row wider than the card;
-				    `flex-wrap` drops the badge onto its own line once there is no room for both. */}
 				<div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
 					<div className="min-w-0 flex-1">
 						<CardTitle id={cardLabelId}>{meta.title}</CardTitle>
@@ -332,8 +303,7 @@ function AgentPurposeCard({
 						))}
 				</div>
 			</CardHeader>
-			{/* noValidate: this form validates itself so every rejection surfaces through `FieldError`.
-			    Left to the browser, `min` would block submit with a native bubble the field can't explain. */}
+			{/* noValidate: left to the browser, `min` blocks submit with a bubble `FieldError` can't explain. */}
 			<form onSubmit={handleSubmit} noValidate>
 				<CardContent className="space-y-4">
 					<FieldGroup>

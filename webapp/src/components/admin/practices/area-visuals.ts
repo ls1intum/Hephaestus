@@ -101,15 +101,11 @@ import {
 } from "lucide-react";
 
 /**
- * Visual identity for a practice area. Colour is a redundant cue only — the icon and the area name
- * carry the meaning, so a chip never relies on hue alone.
- *
- * Pill classes are full literal strings so Tailwind keeps them; free-form hex is not offered because
- * only these curated families are contrast-checked in both themes.
+ * Visual identity for a practice area. Colour is a redundant cue only, never the meaning. Pill
+ * classes are full literal strings so Tailwind keeps them; free-form hex is not contrast-checked.
  */
 export type AreaVisual = { Icon: LucideIcon; pill: string };
 
-/** Palette family → chip classes, contrast-checked in light and dark. */
 export const PILL: Record<string, string> = {
 	red: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-200",
 	orange: "bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-200",

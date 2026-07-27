@@ -61,6 +61,7 @@ function mockModelsRoute(bindings: () => AgentBinding[]) {
 		http.get("*/workspaces/:workspaceSlug/llm/settings", () =>
 			HttpResponse.json({ ownProviderAllowed: false }),
 		),
+		http.get("*/workspaces/:workspaceSlug/llm/connections", () => HttpResponse.json([])),
 		http.get("*/workspaces/:workspaceSlug/llm/usage", () =>
 			HttpResponse.json({
 				month: "2026-07",
@@ -76,16 +77,12 @@ function mockModelsRoute(bindings: () => AgentBinding[]) {
 			}),
 		),
 		http.get("*/workspaces/:workspaceSlug", () => HttpResponse.json(WORKSPACE)),
-		// The shell's switcher matches the URL slug against this list; unmocked it answers empty and
-		// the app navigates off the workspace, taking the page under test with it.
+		// The shell's switcher navigates off the workspace when this list does not contain the slug.
 		http.get("*/workspaces", () => HttpResponse.json([WORKSPACE_LIST_ITEM])),
 	);
 }
 
-/**
- * The refetch has to cost a round trip. Answered inside a microtask it lands before React flushes
- * the remount, so the card reseeds from a cache that is already fresh and the defect hides.
- */
+/** The refetch has to cost a round trip: answered in a microtask it lands before the remount. */
 function slowBindingsRefetch(bindings: () => AgentBinding[]) {
 	return http.get("*/workspaces/:workspaceSlug/agents", async () => {
 		await delay(50);
@@ -113,7 +110,6 @@ const saveButton = (purposeLabel: string) =>
 
 describe("workspace AI models route", () => {
 	it("keeps each purpose's card pending independently when two saves run at once", async () => {
-		// Both cards submit into one `useMutation` pair, whose `variables` name only the latest call.
 		let releaseSlowSave: (() => void) | undefined;
 		const slowSave = new Promise<void>((resolve) => {
 			releaseSlowSave = resolve;
@@ -145,8 +141,6 @@ describe("workspace AI models route", () => {
 	});
 
 	it("keeps unsaved run limits when another admin repoints the same purpose", async () => {
-		// The card remounts by key on its own save, so the key must hold nothing another admin can
-		// change — keying on the bound model would discard this admin's typed timeout.
 		let bindings = [binding("PRACTICE_DETECTION", 20)];
 		const queryClient = await renderModelsRoute(() => bindings);
 
@@ -156,8 +150,7 @@ describe("workspace AI models route", () => {
 		fireEvent.change(timeout, { target: { value: "900" } });
 		expect(timeout.value).toBe("900");
 
-		// The readiness badge renders straight off the refetched binding, so it is the signal that the
-		// other admin's write landed — the picker deliberately does not move.
+		// The badge is the signal the other admin's write landed; the picker deliberately does not move.
 		bindings = [{ ...binding("PRACTICE_DETECTION", 21), ready: false }];
 		await queryClient.invalidateQueries({
 			queryKey: listAgentsQueryKey({ path: { workspaceSlug: "acme" } }),
@@ -176,16 +169,12 @@ describe("workspace AI models route", () => {
 	});
 
 	it("reads back what was just saved, not what the card was showing before", async () => {
-		// The reseed must be driven by the write's own response: `invalidateQueries` only schedules a
-		// refetch, it does not touch `data`, so the card would remount against the pre-save array.
 		let bindings = [binding("PRACTICE_DETECTION", 20)];
 		await renderModelsRoute(() => bindings);
 		server.use(
 			slowBindingsRefetch(() => bindings),
 			http.put("*/workspaces/:workspaceSlug/agents/PRACTICE_DETECTION", async ({ request }) => {
 				const body = (await request.json()) as { instanceModelId: number; timeoutSeconds: number };
-				// `ready` is the one field the card cannot be holding locally, so it proves the saved
-				// binding reached the card.
 				const saved: AgentBinding = {
 					...binding("PRACTICE_DETECTION", body.instanceModelId),
 					timeoutSeconds: body.timeoutSeconds,

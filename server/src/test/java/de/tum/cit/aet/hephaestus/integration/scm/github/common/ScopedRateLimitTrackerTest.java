@@ -78,7 +78,7 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         void shouldUpdateStateFromValidResponse() {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
-            ClientGraphQlResponse response = mockResponseWithRateLimit(4500, 5000, 500, 2, resetTime);
+            ClientGraphQlResponse response = mockResponseWithRateLimit(4500, 5000, 2, resetTime);
 
             GHRateLimit result = tracker.updateFromResponse(scopeId, response);
 
@@ -122,8 +122,8 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
             Long scope2 = 2L;
 
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
-            tracker.updateFromResponse(scope1, mockResponseWithRateLimit(4000, 5000, 1000, 3, resetTime));
-            tracker.updateFromResponse(scope2, mockResponseWithRateLimit(3000, 5000, 2000, 5, resetTime));
+            tracker.updateFromResponse(scope1, mockResponseWithRateLimit(4000, 5000, 3, resetTime));
+            tracker.updateFromResponse(scope2, mockResponseWithRateLimit(3000, 5000, 5, resetTime));
 
             assertThat(tracker.getRemaining(scope1)).isEqualTo(4000);
             assertThat(tracker.getRemaining(scope2)).isEqualTo(3000);
@@ -135,10 +135,10 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
 
-            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4500, 5000, 500, 2, resetTime));
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4500, 5000, 2, resetTime));
             assertThat(tracker.getRemaining(scopeId)).isEqualTo(4500);
 
-            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4000, 5000, 1000, 3, resetTime));
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4000, 5000, 3, resetTime));
             assertThat(tracker.getRemaining(scopeId)).isEqualTo(4000);
             assertThat(tracker.getTrackedScopeCount()).isEqualTo(1);
         }
@@ -151,7 +151,7 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         void shouldReturnTrueWhenBelowCriticalThreshold() {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
-            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(50, 5000, 4950, 10, resetTime));
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(50, 5000, 10, resetTime));
 
             assertThat(tracker.isCritical(scopeId)).isTrue();
         }
@@ -160,7 +160,7 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         void shouldReturnFalseWhenAtCriticalThreshold() {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
-            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(100, 5000, 4900, 10, resetTime));
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(100, 5000, 10, resetTime));
 
             assertThat(tracker.isCritical(scopeId)).isFalse();
         }
@@ -169,7 +169,7 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         void shouldReturnFalseWhenAboveCriticalThreshold() {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
-            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4000, 5000, 1000, 5, resetTime));
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4000, 5000, 5, resetTime));
 
             assertThat(tracker.isCritical(scopeId)).isFalse();
         }
@@ -187,7 +187,7 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         void shouldReturnTrueWhenBelowLowThreshold() {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
-            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(300, 5000, 4700, 10, resetTime));
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(300, 5000, 10, resetTime));
 
             assertThat(tracker.isLow(scopeId)).isTrue();
         }
@@ -196,7 +196,7 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         void shouldReturnFalseWhenAtLowThreshold() {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
-            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(500, 5000, 4500, 10, resetTime));
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(500, 5000, 10, resetTime));
 
             assertThat(tracker.isLow(scopeId)).isFalse();
         }
@@ -205,7 +205,7 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         void shouldReturnFalseWhenAboveLowThreshold() {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
-            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4000, 5000, 1000, 5, resetTime));
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4000, 5000, 5, resetTime));
 
             assertThat(tracker.isLow(scopeId)).isFalse();
         }
@@ -223,7 +223,7 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         void shouldNotWaitWhenAboveLowThreshold() throws InterruptedException {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
-            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4000, 5000, 1000, 5, resetTime));
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4000, 5000, 5, resetTime));
 
             boolean waited = tracker.waitIfNeeded(scopeId);
 
@@ -234,7 +234,7 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         void shouldNotWaitWhenBetweenCriticalAndLow() throws InterruptedException {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
-            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(200, 5000, 4800, 10, resetTime));
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(200, 5000, 10, resetTime));
 
             boolean waited = tracker.waitIfNeeded(scopeId);
 
@@ -245,7 +245,7 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         void shouldNotWaitWhenResetTimeHasPassed() throws InterruptedException {
             Long scopeId = 1L;
             OffsetDateTime pastResetTime = OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(5);
-            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(50, 5000, 4950, 10, pastResetTime));
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(50, 5000, 10, pastResetTime));
 
             boolean waited = tracker.waitIfNeeded(scopeId);
 
@@ -260,7 +260,7 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         void shouldReturnZeroWhenAboveLowThreshold() {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
-            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4000, 5000, 1000, 5, resetTime));
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4000, 5000, 5, resetTime));
 
             Duration delay = tracker.getRecommendedDelay(scopeId);
 
@@ -271,7 +271,7 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         void shouldReturnZeroWhenResetTimeInPast() {
             Long scopeId = 1L;
             OffsetDateTime pastResetTime = OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(5);
-            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(300, 5000, 4700, 10, pastResetTime));
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(300, 5000, 10, pastResetTime));
 
             Duration delay = tracker.getRecommendedDelay(scopeId);
 
@@ -282,7 +282,7 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         void shouldReturnPositiveDelayWhenLow() {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(30);
-            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(300, 5000, 4700, 10, resetTime));
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(300, 5000, 10, resetTime));
 
             Duration delay = tracker.getRecommendedDelay(scopeId);
 
@@ -314,7 +314,7 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         void shouldReturnSnapshotAfterObservedResponse() {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
-            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4200, 5000, 800, 3, resetTime));
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4200, 5000, 3, resetTime));
 
             var snapshot = tracker.snapshot(scopeId);
 
@@ -333,7 +333,7 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         void shouldNotFabricateResetAtWhenPayloadOmitsIt() {
             Long scopeId = 1L;
 
-            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4200, 5000, 800, 3, null));
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4200, 5000, 3, null));
 
             var snapshot = tracker.snapshot(scopeId);
             assertThat(snapshot).isNotNull();
@@ -350,7 +350,7 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         void shouldNotLetOptimisticResetLeakIntoSnapshot() {
             Long scopeId = 1L;
             OffsetDateTime pastReset = OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(5);
-            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(7, 5000, 4993, 10, pastReset));
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(7, 5000, 10, pastReset));
 
             // Decision API assumes a full budget because the window has rolled over...
             assertThat(tracker.getRemaining(scopeId)).isEqualTo(5000);
@@ -367,7 +367,7 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         void shouldKeepObservedRemainingWhileWindowIsOpen() {
             Long scopeId = 1L;
             OffsetDateTime futureReset = OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(20);
-            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(7, 5000, 4993, 10, futureReset));
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(7, 5000, 10, futureReset));
 
             var snapshot = tracker.snapshot(scopeId);
             assertThat(snapshot).isNotNull();
@@ -379,7 +379,7 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         void shouldNeverReportThrottledUntilFromGraphQlObservations() {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
-            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4200, 5000, 800, 3, resetTime));
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4200, 5000, 3, resetTime));
 
             assertThat(tracker.snapshot(scopeId).throttledUntil()).isNull();
         }
@@ -423,7 +423,7 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         void shouldNotOverwriteAFresherObservationWithAStalerSeed() {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
-            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4200, 5000, 800, 3, resetTime));
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4200, 5000, 3, resetTime));
 
             // A probe that was in flight before the GraphQL response landed.
             tracker.updateFromRestRateLimit(scopeId, 5000, 4999, resetTime.toInstant(), Instant.now().minusSeconds(30));
@@ -448,7 +448,7 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         void shouldRegisterMetricsGaugeOnFirstUpdate() {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
-            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4500, 5000, 500, 2, resetTime));
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4500, 5000, 2, resetTime));
 
             assertThat(
                 meterRegistry.find("github.graphql.ratelimit.points.remaining").tag("scope_id", "1").gauge()
@@ -476,7 +476,7 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         void throttleDecisionMustNotWriteBackIntoObservedState() {
             Long scopeId = 1L;
             OffsetDateTime pastReset = OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(5);
-            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(7, 5000, 4993, 10, pastReset));
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(7, 5000, 10, pastReset));
 
             // Exercise every decision API that could mutate state back up.
             tracker.getRemaining(scopeId);
@@ -494,7 +494,7 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         void shouldReflectUpdatedValuesInGauges() {
             Long scopeId = 1L;
             OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
-            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4500, 5000, 500, 2, resetTime));
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4500, 5000, 2, resetTime));
 
             assertThat(
                 meterRegistry.find("github.graphql.ratelimit.points.remaining").tag("scope_id", "1").gauge().value()
@@ -507,14 +507,19 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
 
     // Helper Methods
 
+    /**
+     * No committed operation document selects {@code rateLimit.used} or {@code rateLimit.nodeCount} — every one
+     * asks for {@code cost limit remaining resetAt}. GitHub therefore never sends them, and the generated DTO's
+     * primitive fields decode to 0. Stubbing a non-zero {@code used} would assert against a reply that cannot
+     * arrive.
+     */
     private ClientGraphQlResponse mockResponseWithRateLimit(
         int remaining,
         int limit,
-        int used,
         int cost,
         OffsetDateTime resetAt
     ) {
-        GHRateLimit rateLimit = new GHRateLimit(cost, limit, 0, remaining, resetAt, used);
+        GHRateLimit rateLimit = new GHRateLimit(cost, limit, 0, remaining, resetAt, 0);
 
         ClientResponseField field = mock(ClientResponseField.class);
         when(field.toEntity(GHRateLimit.class)).thenReturn(rateLimit);

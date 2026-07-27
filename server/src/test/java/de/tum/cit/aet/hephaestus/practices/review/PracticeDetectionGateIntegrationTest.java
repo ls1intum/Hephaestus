@@ -43,11 +43,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Integration test for {@link PracticeReviewDetectionGate} against real PostgreSQL: workspace
- * resolution, binding existence checks, and JSONB containment queries ({@code triggerEvents @> ?}).
- *
- * <p>Mocks only the role-check SPI ({@link UserRoleChecker}); label/draft/assignee checks run
- * against the in-memory PR object, matching production where the PR is loaded once by the caller.
+ * Mocks only the role-check SPI ({@link UserRoleChecker}); label/draft/assignee checks run against the
+ * in-memory PR object, matching production where the PR is loaded once by the caller.
  */
 class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
 

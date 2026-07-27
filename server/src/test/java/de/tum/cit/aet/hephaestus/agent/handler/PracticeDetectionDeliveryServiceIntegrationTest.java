@@ -245,8 +245,6 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
 
             var result = deliveryService.deliver(agentJob, findings);
 
-            // The returned map is what the delivery layer keys feedback supersession on; it must match
-            // observation.recurrence_key exactly, or supersession breaks.
             assertThat(result.observationKeys().values().stream().map(ObservationKeys::recurrenceKey).toList())
                 .as("one stable key returned per delivered finding")
                 .hasSize(2)
@@ -303,8 +301,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         @Test
         @DisplayName("persisted finding pins the practice's current criteria revision (SCD-2)")
         void findingPinsCurrentRevision() {
-            // The seeded practice was saved straight through the repository, so it has no revision yet;
-            // append one here the way PracticeService.createPractice would.
+            // Seeded straight through the repository, so no revision exists yet; append one as createPractice would.
             Practice practice = practiceRepository
                 .findByWorkspaceIdAndSlug(workspace.getId(), "pr-description-quality")
                 .orElseThrow();
@@ -331,8 +328,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
 
         @Test
         void persistsEveryDistinctBadFinding() {
-            // Each finding's idempotency key includes its index, so all 7 are distinct; there is no
-            // per-practice cap on BAD findings.
+            // Each idempotency key includes the index, so all 7 are distinct: there is no per-practice cap.
             var findings = new ArrayList<ValidatedFinding>();
             for (int i = 0; i < 7; i++) {
                 findings.add(

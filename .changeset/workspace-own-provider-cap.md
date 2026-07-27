@@ -3,7 +3,7 @@
 ---
 
 Workspace administrators can now cap what their own connected AI provider spends each month, under
-Administration → "Usage". It is their own money, so it is theirs to set, change, or remove — and it
+Administration → "AI usage". It is their own money, so it is theirs to set, change, or remove — and it
 is separate from the budget the instance administrator funds and sets for shared models. The two
 never add up and never pause each other: if the shared-model budget runs out, work on the
 workspace's own provider keeps running, and vice versa.

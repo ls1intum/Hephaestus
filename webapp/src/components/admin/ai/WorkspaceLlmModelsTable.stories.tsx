@@ -4,6 +4,11 @@ import type { WorkspaceLlmModel } from "@/api/types.gen";
 import { expectControlOnScreen, expectDialogFitsViewport, openDialogPopup } from "@/test/reflow";
 import { WorkspaceLlmModelsTable } from "./WorkspaceLlmModelsTable";
 
+async function openDeleteConfirm(canvas: ReturnType<typeof within>, name: RegExp) {
+	await userEvent.click(canvas.getByRole("button", { name }));
+	return await screen.findByRole("alertdialog");
+}
+
 const mockModels: WorkspaceLlmModel[] = [
 	{
 		id: 1,
@@ -57,34 +62,26 @@ export const Empty: Story = {
 };
 
 export const DeleteConfirm: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await userEvent.click(canvas.getByRole("button", { name: /delete gpt-5 mini/i }));
-		const dialog = await screen.findByRole("alertdialog");
+	play: async ({ canvas }) => {
+		const dialog = await openDeleteConfirm(canvas, /delete gpt-5 mini/i);
 		await expect(within(dialog).getByText(/stop working/i)).toBeInTheDocument();
 	},
 };
 
 /**
- * The delete confirmation at the WCAG 2.2 SC 1.4.10 reflow width (320 CSS px).
- *
- * `AlertDialogContent`'s `max-w-xs` is 20rem — exactly a 320 px viewport — so a width bound alone
- * would let the popup run edge to edge here, and past the edge as soon as the root font size grew.
- * A `calc(100% - 2rem)` clamp is what keeps a 1rem gutter at any width.
+ * WCAG 2.2 SC 1.4.10 at 320 px, where `AlertDialogContent`'s `max-w-xs` is exactly the viewport — so
+ * only its `calc(100% - 2rem)` clamp keeps a gutter, and this asserts the gutter rather than the max.
  */
 export const DeleteConfirmMobileReflow: Story = {
 	parameters: {
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320, 375] },
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await userEvent.click(canvas.getByRole("button", { name: /delete gpt-5 mini/i }));
-		await screen.findByRole("alertdialog");
+	play: async ({ canvas }) => {
+		await openDeleteConfirm(canvas, /delete gpt-5 mini/i);
 
 		await expectDialogFitsViewport();
-		// A real 1rem gutter on each side, not merely "no wider than the screen". Layout width, so the
-		// `zoom-in-95` enter animation cannot flatter the measurement.
+		// Layout width, so the `zoom-in-95` enter animation cannot flatter the measurement.
 		await expect(openDialogPopup().offsetWidth).toBeLessThanOrEqual(window.innerWidth - 32);
 		await expectControlOnScreen(screen.getByRole("button", { name: /^cancel$/i }));
 		await expectControlOnScreen(screen.getByRole("button", { name: /^delete$/i }));
@@ -92,14 +89,9 @@ export const DeleteConfirmMobileReflow: Story = {
 };
 
 /**
- * The same confirmation with a display name long enough to outgrow the screen, still at 320 px.
- *
- * `AlertDialogContent` has no `DialogBody` equivalent — the whole popup is the scroller — so its
- * height bound is the only thing standing between tall content and a `position: fixed` popup that
- * hangs off both edges with its buttons out of reach. No model name in the product is anywhere near
- * this long; the fixture is deliberately absurd so the bound is exercised as behaviour (does the
- * popup stay on screen, does it scroll, is Delete still reachable) rather than read back off the
- * emitted CSS, which would pass just as well over a popup nobody could use.
+ * `AlertDialogContent` is its own scroller, so only its height bound keeps a `position: fixed` popup
+ * from hanging off the screen with Delete out of reach. The absurd name exercises that bound as
+ * behaviour — stays on screen, scrolls, Delete reachable — rather than as emitted CSS.
  */
 export const DeleteConfirmLongNameReflow: Story = {
 	args: {
@@ -109,16 +101,12 @@ export const DeleteConfirmLongNameReflow: Story = {
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320] },
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await userEvent.click(canvas.getByRole("button", { name: /^delete gpt-5 /i }));
-		const popup = await screen.findByRole("alertdialog");
+	play: async ({ canvas }) => {
+		const popup = await openDeleteConfirm(canvas, /^delete gpt-5 /i);
 
-		// It stays inside the viewport…
 		await expectDialogFitsViewport();
-		// …because it is bounded, not because the content happened to fit: this title does not.
+		// Bounded, not merely fitting: this title overflows, and the overflow scrolls rather than clips.
 		await expect(popup.scrollHeight).toBeGreaterThan(popup.clientHeight);
-		// …and the overflow scrolls rather than clips, so the footer can be reached at all.
 		popup.scrollTop = popup.scrollHeight;
 		await expect(popup.scrollTop).toBeGreaterThan(0);
 

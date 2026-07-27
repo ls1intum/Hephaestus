@@ -20,11 +20,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
-/**
- * Month → rate resolution, the crux of the display-currency feature. Two properties matter more than
- * the arithmetic: a closed month's figure must be frozen (a later rate can never restate it), and a
- * table that has gone stale must produce no conversion at all rather than a drifting one.
- */
 class FxRateLookupTest extends BaseUnitTest {
 
     /** A Saturday — the ECB publishes nothing on weekends, so "today" has no rate of its own. */
@@ -102,9 +97,8 @@ class FxRateLookupTest extends BaseUnitTest {
     }
 
     /**
-     * A closed month resolves to the last rate dated inside it, AND stays there once newer rates
-     * arrive. Both halves in one test because the second is only meaningful given the first: asserting
-     * the freeze without asserting what it froze to would pass on a lookup that returned nothing.
+     * Both halves in one test because the second is only meaningful given the first: asserting the
+     * freeze without asserting what it froze to would pass on a lookup that returned nothing.
      */
     @Test
     @DisplayName("should resolve a closed month to its last in-month rate and keep it after newer rates arrive")
@@ -120,7 +114,6 @@ class FxRateLookupTest extends BaseUnitTest {
         assertThat(before.rateDate()).isEqualTo(LocalDate.of(2026, 6, 30));
         assertThat(before.ratePerUsd()).isEqualByComparingTo("0.892857"); // 1 / 1.1200, inverted once
 
-        // A new day is published: the newest rate moves, but nothing on or before 30 June changes.
         when(repository.findTopByOrderByRateDateDesc()).thenReturn(Optional.of(rate(SATURDAY, "1.4000")));
         FxRateInfoDTO after = fx.forMonth(CLOSED_MONTH).orElseThrow();
 

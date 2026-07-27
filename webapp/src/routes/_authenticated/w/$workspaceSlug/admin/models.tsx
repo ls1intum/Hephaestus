@@ -14,6 +14,7 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import type { AgentBinding } from "@/api/types.gen";
 import { AgentBindingsPage, PURPOSE_TITLES } from "@/components/admin/ai/AgentBindingsPage";
+import { WorkspaceLlmProviderPanel } from "@/components/admin/ai/WorkspaceLlmProviderPanel";
 import { currentMonthUtc } from "@/components/admin/usage/usage-utils";
 import { filedUnder, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import { workspaceAdminHead } from "@/lib/page-title";
@@ -47,19 +48,16 @@ function ModelsContainer() {
 		staleTime: 60_000,
 	});
 
-	// In precedence order: the first to fail supplies the ProblemDetail and the status the alert
-	// classifies on, and the bindings are the one that answers the page's own question. Usage is not
-	// among them — the page is readable without it.
+	// In precedence order: the first to fail supplies the ProblemDetail the alert classifies on. Usage
+	// is not among them — the page is readable without it.
 	const pageQueries = [bindingsQuery, workspaceQuery, llmSettingsQuery, availableModelsQuery];
 
 	const bindingsKey = listAgentsQueryKey({ path: { workspaceSlug } });
 	const invalidateBindings = () => queryClient.invalidateQueries({ queryKey: bindingsKey });
 
 	/**
-	 * Synchronously, because the reseed key changes on the very next render and whatever the cache
-	 * holds at that moment is what the admin reads back. `invalidateQueries` only schedules a refetch,
-	 * so on its own it would remount the card against the pre-save array. The invalidation still
-	 * follows, to supersede a refetch that was already in flight when the write landed.
+	 * Synchronously: the reseed key changes on the very next render, and `invalidateQueries` only
+	 * schedules a refetch, so on its own it would remount the card against the pre-save array.
 	 */
 	const cacheSavedBinding = (saved: AgentBinding) =>
 		queryClient.setQueryData<AgentBinding[]>(bindingsKey, (current) => {
@@ -74,8 +72,7 @@ function ModelsContainer() {
 			(current ?? []).filter((b) => b.purpose !== purpose),
 		);
 
-	// Bumped only by this admin's own completed write, and only for the purpose they wrote: anything
-	// else would remount a card over an edit in progress.
+	// Bumped only by this admin's own completed write: anything else remounts a card over an open edit.
 	const [saveRevisions, setSaveRevisions] = useState<Partial<Record<Purpose, number>>>({});
 	const bumpSaveRevision = (purpose: Purpose) =>
 		setSaveRevisions((current) => ({ ...current, [purpose]: (current[purpose] ?? 0) + 1 }));
@@ -122,7 +119,12 @@ function ModelsContainer() {
 			availableModels={availableModelsQuery.data ?? []}
 			practicesEnabled={workspaceQuery.data?.practicesEnabled ?? false}
 			mentorEnabled={workspaceQuery.data?.mentorEnabled ?? false}
-			ownProviderAllowed={llmSettingsQuery.data?.ownProviderAllowed ?? false}
+			providerPanel={
+				<WorkspaceLlmProviderPanel
+					workspaceSlug={workspaceSlug}
+					ownProviderAllowed={llmSettingsQuery.data?.ownProviderAllowed ?? false}
+				/>
+			}
 			usage={usageQuery.data}
 			isLoading={pageQueries.some((query) => query.isLoading)}
 			isError={pageQueries.some((query) => query.isError)}

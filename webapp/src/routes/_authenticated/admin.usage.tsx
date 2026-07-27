@@ -81,7 +81,6 @@ function AdminInstanceUsagePage() {
 					path: { workspaceSlug: variables.path.workspaceSlug },
 				}),
 			});
-			// The proxy caches its answer for about 30s, so "resumes now" would be a small lie.
 			toast.success(
 				variables.body.monthlyBudgetUsd == null
 					? "Budget removed. New calls resume within a minute."
@@ -150,7 +149,7 @@ function AdminInstanceUsagePage() {
 						current?.workspaceSlug === workspace.workspaceSlug ? null : workspace,
 					)
 				}
-				onEditBudget={editBudgetFor}
+				onEditSharedModelBudget={editBudgetFor}
 			/>
 
 			<SetBudgetDialog

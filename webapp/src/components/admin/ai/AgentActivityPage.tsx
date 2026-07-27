@@ -18,10 +18,8 @@ import type { JobStatus } from "./job-utils";
 const PAGE_SIZE = 20;
 
 /**
- * Filed per job, not observed per hook. A `useMutation`'s own `isPending` belongs to the hook, not to
- * the job it was called with: cancel one run, close the panel and open another, and the second run's
- * Cancel is disabled by the first run's request. One key per operation, so a retry never disables a
- * cancel either.
+ * Filed per job, not observed per hook: a `useMutation`'s `isPending` belongs to the hook, so the
+ * second run's Cancel would be disabled by the first run's request.
  */
 const CANCEL_MUTATION_KEY = ["cancelAgentJob"];
 const RETRY_DELIVERY_MUTATION_KEY = ["retryAgentJobDelivery"];
@@ -49,9 +47,8 @@ export function AgentActivityPage({ workspaceSlug }: AgentActivityPageProps) {
 		enabled: Boolean(workspaceSlug),
 	});
 
-	// A key without the `query` part, which the generated helper then omits from the key entirely.
-	// Invalidation matches keys partially, so this reaches every page and status filter of *this*
-	// workspace's job list — and nothing outside it.
+	// A prefix key, omitting `query`: invalidation matches partially, so this reaches every page and
+	// status filter of *this* workspace's job list, and nothing outside it.
 	const invalidateJobs = () => {
 		queryClient.invalidateQueries({
 			queryKey: listAgentJobsQueryKey({ path: { workspaceSlug } }),

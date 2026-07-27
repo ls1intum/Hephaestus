@@ -61,7 +61,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        // budgetGate mock defaults isBlocked() to false, so existing tests see an open gate.
         controller = new LlmProxyController(
             WebClient.create(),
             resolver,
@@ -85,12 +84,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
     @Nested
     class BudgetGate {
 
-        /**
-         * The 429 body names WHICH purse stopped the call — the two have different remedies and
-         * different people behind them. Which purse the gate consults is
-         * {@code ProxyBudgetGateTest}'s subject; here the routing's funding source is what the body
-         * must be worded from.
-         */
         @Test
         void the429BodyNamesTheSharedPurseForASharedModelCall() {
             var routing = routing("openai-completions");
@@ -129,13 +122,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
                 .contains("raises the cap");
         }
 
-        /**
-         * A call the gate allows is never turned into a 429 further down: it proceeds to credential
-         * resolution (which here returns nothing, hence 502 — anything but 429 proves it went
-         * through). The asymmetry that produces the allow — an exhausted host budget must not stop a
-         * call the workspace pays for — is decided inside the gate, and pinned by
-         * {@code ProxyBudgetGateTest}.
-         */
+        /** 502, not 429: the credential resolves to nothing, so anything but 429 proves the call got through. */
         @Test
         void doesNotRejectACallTheGateAllows() {
             var routing = workspaceFundedRouting();
@@ -174,13 +161,11 @@ class LlmProxyControllerTest extends BaseUnitTest {
             );
 
             assertThat(result.getStatusCode().value()).isEqualTo(403);
-            // Refused before the money, not after it — no credential resolved, no provider reached.
             verifyNoInteractions(resolver);
             verifyNoInteractions(mentorTurnUsageAccumulator);
             verifyNoInteractions(usageAccumulator);
         }
 
-        /** The budget gate has nothing to judge without an attempt, and must not be reached first. */
         @Test
         void refusesBeforeConsultingTheBudgetGate() {
             authenticate(unboundMentorSessionRouting());
@@ -336,11 +321,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
             assertThat(OBJECT_MAPPER.readTree(prepared.withoutUsageRequest()).has("stream_options")).isFalse();
         }
 
-        /**
-         * The surface a runner may ask the provider for. A rejected body is answered before any
-         * upstream call, so each {@code false} row is a capability the sandbox cannot buy on the
-         * host's key, and each {@code true} row is one it must keep.
-         */
         static Stream<Arguments> requestedCapabilities() {
             return Stream.of(
                 Arguments.of("{\"tools\":[{\"type\":\"function\"},{\"type\":\"custom\"}]}", true, "caller-run tools"),
@@ -365,11 +345,8 @@ class LlmProxyControllerTest extends BaseUnitTest {
     }
 
     /**
-     * A streamed call, end to end against a real upstream: what the client receives, and what the
-     * ledger is told, from the same bytes.
-     *
-     * <p>These tests drive an actual HTTP stream because the failure they guard against is invisible to
-     * any mock: a controller that returns the instant it sees an SSE body serves a perfect response and
+     * These tests drive an actual HTTP stream because the failure they guard against is invisible to any
+     * mock: a controller that returns the instant it sees an SSE body serves a perfect response and
      * reaches no accounting at all, so only the ledger tells the two apart.
      */
     @Nested
@@ -461,11 +438,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
             );
         }
 
-        /**
-         * Kills "return before recording usage on the SSE branch" — i.e. the original bug. The client's
-         * bytes are asserted alongside the accounting so a fix that buffered the stream to read it would
-         * not pass either.
-         */
         @Test
         @DisplayName("a streamed call is billed for the usage its final frame reports")
         void aStreamedCallIsBilled() throws Exception {
@@ -515,13 +487,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
             ).isTrue();
         }
 
-        /**
-         * Asking for usage is the proxy's own addition to the caller's payload, so a provider that
-         * refuses the field must cost the caller nothing more than our blindness to that call's tokens.
-         *
-         * <p>Kills "drop the retry-without-stream_options fallback": every streaming call against such a
-         * provider then fails with a 400 the runner never asked for.
-         */
         @Test
         @DisplayName("a provider that rejects stream_options degrades to an unmetered call, not a failure")
         void aProviderThatRejectsTheUsageRequestDegrades() throws Exception {
@@ -639,7 +604,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         return headers;
     }
 
-    /** One running attempt of one job, with nothing spent yet — the gate is stubbed in these tests. */
     private static final ProxyRouting.BilledAttempt ATTEMPT = new ProxyRouting.BilledAttempt(
         de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType.AGENT_JOB,
         java.util.UUID.fromString("00000000-0000-0000-0000-0000000000aa"),
@@ -660,7 +624,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         );
     }
 
-    /** The same route, but billed to the workspace's own provider rather than a shared model. */
     private static ProxyRouting workspaceFundedRouting() {
         return new ProxyRouting(
             "job:test",
@@ -674,7 +637,6 @@ class LlmProxyControllerTest extends BaseUnitTest {
         );
     }
 
-    /** A live mentor sandbox credential with no turn bound to it — the one routing with no attempt. */
     private static ProxyRouting unboundMentorSessionRouting() {
         return new ProxyRouting(
             "mentor-session",

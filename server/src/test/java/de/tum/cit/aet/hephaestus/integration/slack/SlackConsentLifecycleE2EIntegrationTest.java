@@ -73,11 +73,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * The one end-to-end composition proof for the Slack consent redesign: it asserts real DB state at every hop of
- * the lifecycle (see the test's {@code @DisplayName}), catching cross-slice wiring breaks where each unit stays
- * green but the pipeline is severed.
- *
- * <p><b>Scope split.</b> The pipeline is driven at the service layer (the outbound {@link SlackMessageService} and
+ * <b>Scope split.</b> The pipeline is driven at the service layer (the outbound {@link SlackMessageService} and
  * {@link AgentJobService} are the only mocks) rather than over HTTP — REST authorization is covered by
  * {@code SlackChannelAdminControllerIntegrationTest}. It runs on the fast entity-derived schema (with the raw-JDBC
  * {@code slack_thread} columns added via {@link SlackConversationTestSupport}); the companion

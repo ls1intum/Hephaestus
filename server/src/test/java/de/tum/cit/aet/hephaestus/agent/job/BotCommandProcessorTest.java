@@ -65,10 +65,8 @@ class BotCommandProcessorTest extends BaseUnitTest {
     class CommandMatching {
 
         /**
-         * The three accepted spellings: exact, trailing arguments ("/hephaestus review please" means
-         * the same thing), and any casing. Each must produce the same submission — for the MR the
-         * command was written on, and with a null trigger event, which is what makes a manually
-         * requested review run the full focus-active practice set rather than one trigger's subset.
+         * A null trigger event is what makes a manually requested review run the full focus-active
+         * practice set rather than one trigger's subset.
          */
         @ParameterizedTest(name = "{0} triggers a review")
         @ValueSource(strings = { "/hephaestus review", "/hephaestus review please", "/Hephaestus Review" })
@@ -88,11 +86,6 @@ class BotCommandProcessorTest extends BaseUnitTest {
             assertThat(request.triggerEvent()).isNull();
         }
 
-        /**
-         * "review" must be a whole word: a command that merely STARTS with it is a different command,
-         * and running an expensive review on it would be worse than ignoring it. Nothing is looked up
-         * and nothing is submitted — an unknown command touches no repository at all.
-         */
         @ParameterizedTest(name = "{0} is ignored")
         @ValueSource(strings = { "/hephaestus review-all", "/hephaestus reviewcode", "/hephaestus deploy" })
         void aCommandThatIsNotReview_isSilentlyIgnored(String command) {

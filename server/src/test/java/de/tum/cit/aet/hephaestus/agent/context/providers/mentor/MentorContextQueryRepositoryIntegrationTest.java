@@ -117,7 +117,6 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
         ChatThread foreign = persistence.ensureThread(other.getId(), UUID.randomUUID(), user, "foreign prompt");
         persistence.persistInFlight(foreign, "foreign prompt", UUID.randomUUID(), null, admittedMentorConfig());
 
-        // Both ids are passed; the foreign one must still be filtered out by the workspace_id join.
         List<Object[]> rows = queryRepository.findFirstUserMessagePartsByThreadIds(
             workspace.getId(),
             List.of(mine.getId(), foreign.getId())

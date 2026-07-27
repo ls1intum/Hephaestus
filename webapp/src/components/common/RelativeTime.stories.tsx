@@ -4,10 +4,7 @@ import { RelativeTime } from "./RelativeTime";
 
 const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000);
 
-/**
- * A timestamp as "4 minutes ago", against a clock shared by every relative time on the page, with the
- * absolute instant one hover away.
- */
+/** A timestamp as "4 minutes ago", with the absolute instant one hover away. */
 const meta = {
 	component: RelativeTime,
 	parameters: { layout: "centered" },
@@ -18,7 +15,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** No cadence to judge against, so the time is printed and left uncoloured. */
 export const Default: Story = {};
 
 export const HoverRevealsAbsoluteTime: Story = {
@@ -31,7 +27,7 @@ export const HoverRevealsAbsoluteTime: Story = {
 	},
 };
 
-/** A fresh reading earns no colour, because only an adverse judgement is worth tinting. */
+/** Uncoloured on purpose: only an adverse judgement is worth tinting. */
 export const Fresh: Story = { args: { value: minutesAgo(4), tone: "fresh" } };
 
 export const Stale: Story = {
@@ -50,10 +46,8 @@ export const VeryStale: Story = {
 	},
 };
 
-/** A timestamp with no known cadence: no judgement is possible, and none is implied. */
 export const UnknownCadence: Story = { args: { value: minutesAgo(600), tone: "unknown" } };
 
-/** A missing timestamp renders the fallback dash — never "now", which would read as fresh. */
 export const Never: Story = {
 	args: { value: undefined },
 	play: async ({ canvasElement }) => {
@@ -67,9 +61,8 @@ export const CustomFallback: Story = {
 };
 
 /**
- * The wire types say `Date`, but timestamps arrive as ISO **strings** at runtime — the generated
- * client does not revive them. A component that trusted the type here would render "Invalid Date"
- * in production and pass in Storybook.
+ * The generated client does not revive dates: the wire type says `Date`, runtime hands you an ISO
+ * string. Trusting the type renders "Invalid Date" in production and passes in Storybook.
  */
 export const WireString: Story = {
 	args: { value: "2026-07-14T09:30:12Z" },

@@ -17,11 +17,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-/**
- * {@link MentorProxyCredentialRegistry#revoke(UUID)} is the dispose-path hook
- * {@code DockerInteractiveSandboxAdapter} calls when a mentor sandbox's container is torn down (any
- * reason). This pins the revoke contract in isolation from the sandbox/docker machinery.
- */
 class MentorProxyCredentialRegistryTest extends BaseUnitTest {
 
     private final MentorProxyCredentialRegistry registry = new MentorProxyCredentialRegistry();
@@ -35,18 +30,13 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
         );
 
         registry.revoke(sessionId);
-        // A second close callback (or a race between idle-reap and manual close) must not throw.
         registry.revoke(sessionId);
 
         assertThat(registry.validate(token)).isEmpty();
     }
 
     @Test
-    void revokingAnUnknownSessionIsANoOp() {
-        // A sandbox that lost the concurrent-attach race never minted a token that got embedded into a
-        // container; its dispose path still calls revoke() with that sessionId. "No-op" has to mean the
-        // registry is untouched, not merely that nothing was thrown — a revoke that cleared the map
-        // would take every live mentor session's credential down with it.
+    void revokingAnUnknownSessionLeavesEveryLiveSessionUntouched() {
         UUID liveSession = UUID.randomUUID();
         String liveToken = registry.mint(
             liveSession,
@@ -122,7 +112,6 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
             );
         }
 
-        /** Between turns a session's credential names no execution, so there is nothing to bill or gate on. */
         @Test
         void aSessionWithNoTurnRunningCarriesNoBillingTarget() {
             String token = mint(UUID.randomUUID());
@@ -130,10 +119,6 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
             assertThat(registry.validate(token).orElseThrow().attempt()).isNull();
         }
 
-        /**
-         * The core of M1. Kills "return {@code null} instead of the BilledAttempt in validate": the
-         * turn's spend-so-far is then always zero, which is exactly the blindness the fix removes.
-         */
         @Test
         @DisplayName("a bound turn's completed calls are reported as this call's in-flight spend")
         void aBoundTurnReportsWhatItHasAlreadySpent() {
@@ -156,14 +141,6 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
             assertThat(registry.validate(token).orElseThrow().inFlightSpendUsd()).isEqualByComparingTo("2.00");
         }
 
-        /**
-         * Guarantee (c), and the reason the fence is keyed on the turn id rather than on "whatever is
-         * bound now".
-         *
-         * <p>Kills "have accumulate add to the currently bound turn instead of looking the turn up by
-         * id": turn A's straggling call is then charged to turn B, at turn B's frozen price and
-         * possibly from the other purse.
-         */
         @Test
         @DisplayName("a call that outlives its turn is dropped, not billed to the next turn")
         void aLateCallDoesNotLandOnTheFollowingTurn() {
@@ -182,10 +159,6 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
             assertThat(turnB.observed().isEmpty()).as("turn B is untouched").isTrue();
         }
 
-        /**
-         * Unbinding stops NEW usage; it must not erase what the turn already burned, because the
-         * terminal ledger write happens after the turn stops owning its sandbox.
-         */
         @Test
         void unbindingStopsFurtherUsageButKeepsWhatWasObserved() {
             UUID sessionId = UUID.randomUUID();
@@ -201,7 +174,6 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
             assertThat(registry.boundTurns()).isZero();
         }
 
-        /** Idempotent, and value-matching. */
         @Test
         void aStaleUnbindDoesNotDetachTheTurnRunningNow() {
             UUID sessionId = UUID.randomUUID();
@@ -218,10 +190,6 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
             assertThat(attempt.sourceId()).isEqualTo(turnB.turnId());
         }
 
-        /**
-         * A displaced turn stops collecting immediately rather than quietly accruing under a turn that
-         * has moved on — the same fence read from the bind side.
-         */
         @Test
         void bindingANewTurnDetachesTheOneItReplaces() {
             UUID sessionId = UUID.randomUUID();
@@ -235,7 +203,6 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
             assertThat(registry.boundTurns()).isEqualTo(1);
         }
 
-        /** No credential means no billing target, and the proxy refuses those — so the caller is told. */
         @Test
         void bindingToASessionWithNoLiveCredentialFails() {
             UUID sessionId = UUID.randomUUID();
@@ -251,7 +218,6 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
             assertThat(registry.boundTurns()).isZero();
         }
 
-        /** Tearing the sandbox down mid-turn must not leave the turn index holding a meter forever. */
         @Test
         void revokingASessionMidTurnReleasesTheBoundTurn() {
             UUID sessionId = UUID.randomUUID();
@@ -265,10 +231,6 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
             assertThat(registry.accumulate(meter.turnId(), new ProxyTokenUsage(10, 0, 0, 0))).isFalse();
         }
 
-        /**
-         * An unpriced turn is still identified and still metered in tokens; it just contributes no
-         * dollars to the in-flight term, matching how the job path treats a snapshot with no rates.
-         */
         @Test
         void anUnpricedTurnReportsZeroSpendRatherThanFailing() {
             UUID sessionId = UUID.randomUUID();
@@ -328,7 +290,6 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
 
         @Test
         void reMintingForOneSessionRetiresTheTokenItReplaces() {
-            // A rebuild for the same session must not leave two live credentials for one sandbox.
             UUID sessionId = UUID.randomUUID();
             String first = registry.mint(
                 sessionId,
@@ -349,7 +310,6 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
         }
     }
 
-    /** Manual clock so TTL behaviour is asserted without sleeping. */
     private static final class FakeTicker implements Ticker {
 
         private final AtomicLong nanos = new AtomicLong();

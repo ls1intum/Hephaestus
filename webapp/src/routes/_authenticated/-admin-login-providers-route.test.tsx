@@ -28,8 +28,6 @@ function renderLoginProvidersRoute() {
 
 describe("instance login providers route", () => {
 	it("keeps each provider's toggle pending independently when two run at once", async () => {
-		// Nothing gates this switch — no confirm, no modal — so a second row can be toggled while the
-		// first PATCH is still open.
 		let releaseSlowToggle: (() => void) | undefined;
 		const slowToggle = new Promise<void>((resolve) => {
 			releaseSlowToggle = resolve;

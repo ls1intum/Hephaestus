@@ -10,7 +10,7 @@ interface Row {
 
 const row: Row = { id: 7, displayName: "GPT-5" };
 
-/** Holds `subject` in caller state, as every real surface does, so the dialog can actually close. */
+/** Holds `subject` in caller state, as every real surface does, so the dialog can close. */
 function ConfirmHarness(props: ConfirmDialogProps<Row>) {
 	const [subject, setSubject] = useState<Row | null>(props.subject);
 	const [deleted, setDeleted] = useState<Row | null>(null);
@@ -33,10 +33,7 @@ function ConfirmHarness(props: ConfirmDialogProps<Row>) {
 	);
 }
 
-/**
- * The confirm for a destructive row action. It names the row in its title, because a modal that
- * says only "Are you sure?" is a modal nobody can answer, and it closes the moment it is confirmed.
- */
+/** The confirm for a destructive row action: it names the row, because "Are you sure?" cannot be answered. */
 const meta = {
 	component: ConfirmDialog as (props: ConfirmDialogProps<Row>) => ReactNode,
 	parameters: { layout: "centered" },
@@ -57,7 +54,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-/** "Cancel" is not the opposite of every verb: turning a connection off is refused by keeping it active. */
+/** "Cancel" is not the opposite of every verb — turning a connection off is refused by keeping it. */
 export const CustomVerbs: Story = {
 	args: {
 		title: (subject: Row) => `Turn off “${subject.displayName}”?`,
@@ -68,14 +65,12 @@ export const CustomVerbs: Story = {
 	},
 };
 
-/** A name long enough to wrap still has to leave both actions reachable. */
 export const LongName: Story = {
 	args: {
 		subject: { id: 8, displayName: "gpt-5-turbo-preview-2026-07-01-eu-central-fallback" },
 	},
 };
 
-/** Confirming hands the row back and closes in the same gesture. */
 export const Confirming: Story = {
 	render: (args) => <ConfirmHarness {...args} />,
 	play: async ({ canvas }) => {

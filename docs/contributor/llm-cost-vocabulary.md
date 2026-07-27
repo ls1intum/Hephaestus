@@ -20,11 +20,15 @@ call site.
 
 ## Rule 1 — Price, cost, and spend are three different numbers
 
-| Word | What it is | Wire field | Formatter |
+| Word | What it is | Where it appears | Formatter |
 | --- | --- | --- | --- |
-| **price** (or **rate**) | A published per-1M-token rate, as the provider lists it | `per1mInputUsd`, `per1mOutputUsd` | `formatRateUsd` |
-| **cost** | What one recorded thing cost — a call, a `llm_usage_event`, a job, a turn | `costUsd`, `totalCostUsd` | `formatCostUsd` |
-| **spend** | Cost summed over a window, usually a month, usually a workspace | `spentUsd`, and the totals in a usage report | `formatCostUsd` |
+| **price** (or **rate**) | A published per-1M-token rate, as the provider lists it | `per1mInputUsd`, `per1mOutputUsd`, `per1mCacheReadUsd`, `per1mCacheWriteUsd` | `formatRateUsd` |
+| **cost** | What one recorded thing cost — a call, an `llm_usage_event`, a job, a turn | `llm_usage_event.cost_usd` (`NUMERIC(18,6)`). No single item's cost is published on its own; the API exposes cost only as a total | `formatCostUsd` |
+| **spend** | Cost summed over a window, usually a month, usually a workspace | `instanceTotalCostUsd`, `ownProviderTotalCostUsd` | `formatCostUsd` |
+
+There is deliberately no `totalCostUsd` and no `spentUsd` on the wire: spend is always published
+already split by purse, because merging the two is exactly what rule 2 forbids. `spentUsd` exists only
+as a Java-internal accessor and must not be reintroduced as a field name.
 
 A price is what you would be charged; cost and spend are what you *were* charged. Never use one word
 for another number — in copy, in a field name, or in a test name. "Spend" is the word for the summed
@@ -57,24 +61,33 @@ provider cap comes first, because that is the one the reader can act on.
 "Shared-model budget" and "provider cap" are the words that reach the screen — including the
 accessible names of the meters ("Shared-model budget used", "Provider cap used by Acme").
 
-The wire is not consistent with this and does not need to be: both are `…BudgetUsd`
-(`monthlyBudgetUsd`, `ownProviderMonthlyBudgetUsd`). **The UI words are the contract; the field names
-are history.** Do not rename copy to match a field.
+The wire is not consistent with this and does not need to be. Both caps are *written* through the same
+field, `monthlyBudgetUsd` — which purse a request governs is carried by the path it is sent to, so the
+field name does not encode it a second time — and *read back* as `instanceMonthlyBudgetUsd` and
+`ownProviderMonthlyBudgetUsd`. **The UI words are the contract; the field names are history.** Do not
+rename copy to match a field.
 
 ## Rule 4 — Never render a pricing or budget enum
 
 `PRICED` / `NO_CHARGE` / `UNPRICED` and `WITHIN` / `EXHAUSTED` / `UNVERIFIABLE` are internal states.
 None of those words appears on screen.
 
-For price, `webapp/src/lib/llm-pricing.ts#priceLabel` is the **only** place the word choice lives, and
-it varies by audience:
+For price, `webapp/src/lib/llm-pricing.ts#priceLabel` owns the word choice, and it varies by audience:
 
 - `PRICED` → the number itself, never the word ("$0.075 input · $0.30 output / 1M tokens")
 - `NO_CHARGE` → "No metered API cost"
 - `UNPRICED` → "No price set" to an instance admin, "Price not set" to a workspace admin
 
-The price radio (`PriceModeEditor`) labels its options through the same function, so the option a
-price was chosen on and the label the tables print for it cannot drift.
+The price radio (`PriceModeEditor`) takes its `NO_CHARGE` and `UNPRICED` option labels from that same
+function, so the option a price was chosen on and the label the tables print for it cannot drift. Its
+`PRICED` option is worded separately ("Price per 1M tokens"), necessarily — `priceLabel` renders a
+priced model as its numbers, which is not a thing a radio can be labelled with.
+
+Two other surfaces answer a *different* question and legitimately use different words: the instance
+model table's readiness column says "Price missing" because it is ranking one blocker against others
+("Connection off", "Model off", "No workspace access"), not naming a pricing mode. If you are adding a
+third phrasing for the same question `priceLabel` already answers, route it through `priceLabel`
+instead.
 
 For budget state, the copy says what happens ("paused", "resumes"), not which enum constant produced
 it. `UNVERIFIABLE` pauses a **capped** purse exactly like `EXHAUSTED` — a cap you cannot verify is not
@@ -84,9 +97,12 @@ a cap — and is a data-quality note on an uncapped one.
 
 `webapp/src/lib/money.ts` owns USD rendering, and the choice is not cosmetic:
 
-- **`formatRateUsd`** — prices and per-unit rates. Up to four decimals, never floored: `$0.075 / 1M`
-  is a real price, and this is the one number an admin checks against their provider's price list.
-  Rendering it with the spend formatter would print `$0.08`, and `$0.003` would become `<$0.01`.
+- **`formatRateUsd`** — prices and per-unit rates. Up to four decimals: `$0.075 / 1M` is a real price,
+  and this is the one number an admin checks against their provider's price list. Rendering it with
+  the spend formatter would print `$0.08`, and `$0.003` would become `<$0.01`. Note the one place this
+  is lossy: the API accepts and the database stores eight decimals (`NUMERIC(18,8)`), so a rate below
+  `$0.0001 / 1M` renders rounded. Widening the formatter is the fix if such a rate is ever priced —
+  do not route it through a different formatter.
 - **`formatCostUsd`** — anything actually spent. `$0` for nothing (not `$0.00`, which buries the
   difference between "none" and "almost none"), `<$0.01` for a nonzero amount too small for cents,
   plain cents otherwise.
@@ -94,12 +110,25 @@ a cap — and is a data-quality note on an uncapped one.
 
 `—` is the rendering for absent in all three.
 
-## Rule 6 — The client formats money; it does not do arithmetic on it
+## Rule 6 — Client-side money arithmetic is display-only, and may never decide anything
 
 Amounts are exact decimals on the server (`NUMERIC`, `BigDecimal`) and land in JavaScript as binary64.
-Totals, remaining budget, pace projections and cap verdicts are all computed exactly on the server and
-shipped as their own fields. Re-deriving one by adding up rendered rows trades an exact number for an
-approximate one, and can only ever disagree with the figure printed above it.
+
+**Money totals and cap verdicts are computed on the server and shipped as their own fields; read them,
+never re-derive them.** Adding up rendered rows to produce a total trades an exact number for an
+approximate one and can only ever disagree with the figure printed above it. The same goes for whether
+a purse is paused: `paused` is authoritative because it mirrors the live gate, and is not derivable
+from the verdict alone.
+
+The client does do some arithmetic on money, and that is fine as long as nothing depends on the
+result: the euro display estimate multiplies by the FX rate, the meters compute a percentage, the
+breakdown tables divide a total by a run count, and the burn-rate projection extrapolates this month's
+pace in the browser. All four are rendering. A meter that read 99.9997% while the gate was shut would
+be a wart; a meter that *decided* would be a bug. FX in particular is never an input to a budget, a
+price or the ledger.
+
+Note what this means for anyone reading the API: there is no `remaining` field. Meters print "X of Y"
+and derive the difference for display only.
 
 ## Rule 7 — Say what the bound is, not how it feels
 

@@ -47,32 +47,17 @@ export interface WorkspaceLlmProviderPanelProps {
 	workspaceSlug: string;
 	/**
 	 * Whether the instance still lets this workspace register *new* providers and models. False does
-	 * not hide the panel: providers already connected stay listed and stay editable, which is exactly
-	 * what the banner promises, so hiding the section would make it a lie.
+	 * not hide the panel — providers already connected stay listed and editable, as the banner says.
 	 */
 	ownProviderAllowed: boolean;
 }
 
 type TestResult = { ok: boolean; message: string };
 
-/**
- * Filed under a key of its own so the panel can ask the cache which connections are being probed.
- * Probes are slow network round-trips with no confirmation step, and testing two providers one after
- * the other without waiting is the normal way to use this screen.
- */
+// Each write is filed under a shared prefix so one cache lookup answers "is this row busy" — a row
+// stays disabled until *its own* write settles, not until whichever write settles first.
 const PROBE_MUTATION_KEY = ["workspaceProbeLlmConnection"];
-/**
- * Update and delete of a model share one prefix, so one lookup answers "is this row busy" for both.
- * A row's controls must stay disabled until *its own* write settles, not until whichever write
- * settles first.
- */
 const MODEL_WRITE_MUTATION_KEY = ["workspaceWriteLlmModel"];
-/**
- * Same reason, for connections: a write against one provider must not disable the others' buttons.
- * Update and delete share the prefix, so one lookup answers "is this card busy" for both — the
- * instance twin files both writes the same way, and filing only the delete left Edit/Test/Disconnect
- * clickable while a PATCH was still out.
- */
 const CONNECTION_WRITE_MUTATION_KEY = ["workspaceWriteLlmConnection"];
 
 /** Workspace-owned OpenAI-compatible connections and the models grouped under each connection. */
@@ -81,11 +66,9 @@ export function WorkspaceLlmProviderPanel({
 	ownProviderAllowed,
 }: WorkspaceLlmProviderPanelProps) {
 	const queryClient = useQueryClient();
-	// Prefixes the per-card heading ids each provider card's `aria-labelledby` points at.
 	const cardLabelPrefix = useId();
-	// Hoisted once. Spread inline at each site, a `filedUnder` key and the `usePendingMutationIds` key
-	// that reads it can drift apart, and the lookup then silently returns an empty set — every row
-	// re-enables mid-flight with no test failing.
+	// Hoisted, so a `filedUnder` key and the `usePendingMutationIds` key reading it cannot drift apart:
+	// the lookup would silently return an empty set and re-enable every row mid-flight.
 	const modelWriteKey = [...MODEL_WRITE_MUTATION_KEY, workspaceSlug];
 	const connectionWriteKey = [...CONNECTION_WRITE_MUTATION_KEY, workspaceSlug];
 	const probeKey = [...PROBE_MUTATION_KEY, workspaceSlug];
@@ -289,8 +272,6 @@ export function WorkspaceLlmProviderPanel({
 				</Empty>
 			) : (
 				<>
-					{/* Wraps rather than squeezing "Add provider" to a few pixels once the heading and
-					    the button no longer fit side by side. */}
 					<div className="flex flex-wrap items-center justify-between gap-3">
 						<div className="min-w-0 flex-1">
 							<h2 className="text-lg font-semibold">Your AI providers</h2>
@@ -308,8 +289,7 @@ export function WorkspaceLlmProviderPanel({
 						return (
 							<Card
 								key={connection.id}
-								// A named region, so a screen-reader user can reach one provider's card directly;
-								// without it the card's name lives in a `<div>` with no relationship to anything.
+								// A landmark, so a screen-reader user can reach one provider's card directly.
 								role="region"
 								aria-labelledby={`${cardLabelPrefix}-${connection.id}`}
 							>
@@ -331,11 +311,9 @@ export function WorkspaceLlmProviderPanel({
 									</div>
 								</CardHeader>
 								<CardContent className="space-y-4">
-									{/* Each control names its own provider: three cards deep, "Edit" / "Test connection" /
-									    "Disconnect" are otherwise the same three names repeated, and nothing ties a
-									    button to the card title above it (WCAG SC 2.4.6). Each name opens with the
-									    button's own visible text — including the "Testing…" the probe swaps in — so
-									    speech control still matches what the reader can see (SC 2.5.3). */}
+									{/* Three cards deep, "Edit" / "Test connection" / "Disconnect" are otherwise the same
+									    three names repeated with nothing tying them to a card (SC 2.4.6). Each name opens
+									    with the button's own visible text, so speech control still matches (SC 2.5.3). */}
 									<div className="flex flex-wrap gap-2">
 										<Button
 											variant="outline"
@@ -384,9 +362,8 @@ export function WorkspaceLlmProviderPanel({
 										</Button>
 									</div>
 									{testResult && (
-										// The outcome of a button the reader just pressed. Assertive `alert` on the
-										// success branch would cut across whatever is being read (SC 4.1.3); a failure
-										// still earns it.
+										// An assertive `alert` on success would cut across whatever is being read
+										// (SC 4.1.3); a failure still earns it.
 										<Alert
 											variant={testResult.ok ? "success" : "destructive"}
 											role={testResult.ok ? "status" : "alert"}
@@ -396,8 +373,7 @@ export function WorkspaceLlmProviderPanel({
 									)}
 									<div className="space-y-3">
 										<div className="flex items-center justify-between">
-											{/* One level below the section heading above; `CardTitle` is a `<div>`, so an
-											    `h4` here would skip a level (WCAG SC 1.3.1). */}
+											{/* `CardTitle` is a `<div>`, so an `h4` here would skip a level (SC 1.3.1). */}
 											<h3 className="text-sm font-medium">Models</h3>
 											{!registrationBlocked && (
 												<Button

@@ -8,11 +8,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-/**
- * Instance-admin governance settings ({@code /admin/llm/settings}): app_admin gate, partial
- * update semantics, and the defaults returned before the singleton row is ever written (ddl-auto test
- * schema has no Liquibase-seeded row — {@link InstanceLlmSettingsService#get} must fall back cleanly).
- */
 class InstanceLlmSettingsControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final String ADMIN_TOKEN = "mock-jwt-token-for-admin-user";
@@ -90,7 +85,6 @@ class InstanceLlmSettingsControllerIntegrationTest extends AbstractWorkspaceInte
             .uri("/admin/llm/settings")
             .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
             .contentType(MediaType.APPLICATION_JSON)
-            // Only touch the egress hosts this time — allowWorkspaceConnections=false must survive.
             .bodyValue(new UpdateInstanceLlmSettingsRequestDTO("api.openai.com\napi.anthropic.com", null))
             .exchange()
             .expectStatus()

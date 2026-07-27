@@ -19,13 +19,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 
-/**
- * What creating, updating and deleting an instance LLM connection does — and what it records.
- *
- * <p>Every successful mutation lands on {@code auth_event} through the {@link LlmConnectionAudit} SPI
- * port, and every rejected one lands nowhere: this catalog holds provider credentials, so an audit
- * row for a change that did not happen is as misleading as a missing row for one that did.
- */
 class LlmConnectionServiceTest extends BaseUnitTest {
 
     @Mock
@@ -85,12 +78,6 @@ class LlmConnectionServiceTest extends BaseUnitTest {
             verifyNoInteractions(llmConnectionAudit);
         }
 
-        /**
-         * The SSRF guard has to fail the create closed, and has to run before the row is written: a
-         * policy consulted after {@code save()} would leave a persisted instance connection pointing at
-         * an internal address, reachable by every workspace on the server. The workspace-owned twin
-         * carries the same assertion; this is the instance-owned half of the same guarantee.
-         */
         @Test
         void doesNotCreateAConnectionWhoseBaseUrlTheEgressPolicyRejects() {
             when(connectionRepository.findBySlug("openai-prod")).thenReturn(Optional.empty());
@@ -131,7 +118,7 @@ class LlmConnectionServiceTest extends BaseUnitTest {
     class Delete {
 
         @Test
-        void deletingAnUnreferencedConnectionAuditsTheDeletion() {
+        void deletingAnUnreferencedConnectionAuditsTheSameRowItRemoved() {
             LlmConnection connection = new LlmConnection();
             connection.setId(5L);
             connection.setSlug("openai-prod");
@@ -140,10 +127,6 @@ class LlmConnectionServiceTest extends BaseUnitTest {
 
             connectionService.delete(5L);
 
-            // The row that was deleted must be the one that was looked up, and the audit must name
-            // that same row — an audit entry naming a different connection than the one removed is
-            // worse than none, because the trail then reads as complete while pointing at the wrong
-            // provider.
             ArgumentCaptor<LlmConnection> deleted = ArgumentCaptor.forClass(LlmConnection.class);
             verify(connectionRepository).delete(deleted.capture());
             assertThat(deleted.getValue().getId()).isEqualTo(5L);
@@ -203,7 +186,6 @@ class LlmConnectionServiceTest extends BaseUnitTest {
             verify(llmConnectionAudit).connectionUpdated(5L, "openai-prod");
         }
 
-        /** An absent field is "leave it alone", not "set it to null" — the whole point of a PATCH shape. */
         @Test
         void leavesOmittedFieldsUntouched() {
             LlmConnection connection = stored();
@@ -215,11 +197,6 @@ class LlmConnectionServiceTest extends BaseUnitTest {
             assertThat(connection.isEnabled()).isTrue();
         }
 
-        /**
-         * Clearing wins over supplying. An admin who ticks "remove the stored key" while the form still
-         * carries a value must end up with no credential — the ambiguous request may never leave one
-         * behind, and this is the only place that rule is decided.
-         */
         @Test
         void clearingTheApiKeyBeatsASuppliedOne() {
             LlmConnection connection = stored();

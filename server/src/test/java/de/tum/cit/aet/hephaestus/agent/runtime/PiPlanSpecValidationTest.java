@@ -55,8 +55,6 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
 
     @Test
     void jobTokenIsAlwaysRequired() {
-        // ONE credential path — every sandbox talks to the LLM proxy, so a blank/null
-        // jobToken is always rejected, not just in some "mode".
         assertThatThrownBy(() ->
             new PiPlanSpec(
                 "openai-completions",

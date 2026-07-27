@@ -37,7 +37,6 @@ const mockUseActiveWorkspaceSlug = useActiveWorkspaceSlug as Mock;
 
 type ChatStatus = UseChatHelpers<ChatMessage>["status"];
 
-/** What the mocked `uuid.v4` returns, i.e. the id the hook picks when it is handed no `threadId`. */
 const SELF_GENERATED_THREAD_ID = "mock-uuid-123";
 
 function createMockMessage(role: "user" | "assistant", text: string, id?: string): ChatMessage {
@@ -67,10 +66,7 @@ interface FakeChat {
 	finishTurn: () => void;
 }
 
-/**
- * A stateful stand-in for `useChat`. The hook under test does not own its transcript, so a stub
- * returning a frozen `messages: []` would leave every claim below with nothing to check but a spy.
- */
+/** Stateful, because the hook does not own its transcript: a frozen `messages: []` proves nothing. */
 function installFakeChat(initialStatus: ChatStatus = "ready"): FakeChat {
 	const fake = {
 		lastOptions: undefined,
@@ -348,8 +344,7 @@ describe("useMentorChat", () => {
 	});
 
 	describe("thread hydration", () => {
-		// UUIDs, because `parseThreadMessages` drops a thread with any other id shape and hydration
-		// is then skipped silently — a non-UUID fixture would go green over a dead effect.
+		// UUIDs, because `parseThreadMessages` silently drops a thread whose ids are any other shape.
 		const threadMessages = [
 			createMockMessage("user", "Previous message", "f47ac10b-58cc-4372-a567-0e02b2c3d479"),
 			createMockMessage("assistant", "Previous response", "c9bf9e57-1685-4c89-bafb-ff5af830be8a"),
@@ -447,7 +442,6 @@ describe("useMentorChat", () => {
 				messages: [{ id: "m1", role: "user", parts: [{ type: "text", text: "first" }] }, latest],
 			});
 
-			// Only the newest turn goes over the wire — the server rebuilds context from the thread id.
 			expect(prepared.body).toEqual({ id: "thread-1", message: latest });
 			expect(prepared.credentials).toBe("include");
 			expect(prepared.headers["X-XSRF-TOKEN"]).toBe("mock-csrf");

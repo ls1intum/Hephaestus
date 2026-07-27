@@ -24,15 +24,9 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 
 /**
- * The bound the gate promises: <b>an attempt is refused as soon as its OWN completed calls have
- * consumed the headroom the ledger last showed.</b>
- *
- * <p>Every test below fixes a ledger that says the workspace has spent nothing — because that is what
- * the ledger DOES say for the whole length of a run, no matter how much that run has spent. A ledger
- * row is only appended when an agent job or mentor turn ends, so a gate that consults the ledger alone
- * is blind to the one execution most worth stopping. The mutation these tests kill is exactly that
- * blindness: pass {@code BigDecimal.ZERO} instead of {@code routing.inFlightSpendUsd()} and the
- * runaway cases below all go green with a forwarded call.
+ * A ledger row is only appended when an agent job or mentor turn ends, so for the whole length of a run
+ * the ledger says the workspace has spent nothing. Every fixture below therefore fixes a zero-spend
+ * ledger, and what refuses a call is the attempt's own completed spend counted on top of it.
  */
 class ProxyBudgetGateTest extends BaseUnitTest {
 
@@ -49,7 +43,6 @@ class ProxyBudgetGateTest extends BaseUnitTest {
         gate = new ProxyBudgetGate(budgetService);
     }
 
-    /** A $1 instance cap with nothing recorded against it — a run in progress always looks like this. */
     private static LlmBudgetHeadroom instanceCapOfOneDollar() {
         return new LlmBudgetHeadroom(BigDecimal.ZERO, ONE_DOLLAR, false, null, null, false);
     }
@@ -82,12 +75,6 @@ class ProxyBudgetGateTest extends BaseUnitTest {
     @DisplayName("the bound: one attempt cannot outspend the cap by more than a call")
     class TheBound {
 
-        /**
-         * The ledger on its own says ALLOWED for this workspace at both spends below; what refuses the
-         * dollar call is the attempt's own spend counted on top of it. Both halves are asserted
-         * together, so a gate that consulted only the ledger fails here. The cent of headroom is the
-         * other edge of the same boundary: the gate stops AT the cap, not before it.
-         */
         @ParameterizedTest(name = "an attempt that has spent ${0} of a $1.00 cap is blocked={1}")
         @CsvSource({ "0.99, false", "1.00, true" })
         void anAttemptIsJudgedOnItsOwnUnrecordedSpend(String ownSpendUsd, boolean blocked) {
@@ -100,11 +87,6 @@ class ProxyBudgetGateTest extends BaseUnitTest {
             assertThat(gate.isBlocked(routing(FundingSource.INSTANCE, ownSpendUsd))).isEqualTo(blocked);
         }
 
-        /**
-         * What makes the bound hold call after call rather than once per TTL: the expensive ledger read
-         * is cached per workspace, but the attempt's spend is re-read on every request. A gate that
-         * cached the finished verdict instead would forward the second call here.
-         */
         @Test
         @DisplayName("a second call is judged on fresh attempt spend even though the ledger read is cached")
         void theAttemptSpendIsFreshEvenWhenTheLedgerVerdictIsCached() {
@@ -139,10 +121,6 @@ class ProxyBudgetGateTest extends BaseUnitTest {
             assertThat(gate.isBlocked(routing(FundingSource.WORKSPACE, "1.00"))).isTrue();
         }
 
-        /**
-         * Fail-safe, not fail-open: a legacy snapshot that cannot say who paid has its spend charged to
-         * both caps, exactly as {@code LlmBudgetDecision} judges such a call against both.
-         */
         @Test
         @DisplayName("an attempt with no known funding source is charged to both purses")
         void anUnattributableAttemptIsChargedToBothPurses() {
@@ -153,10 +131,9 @@ class ProxyBudgetGateTest extends BaseUnitTest {
     }
 
     /**
-     * The same bound, reached the way a mentor turn reaches it: through the credential its sandbox
-     * presents. A mentor turn has no {@code agent_job} row, so until it was given a meter of its own it
-     * could spend without limit inside one turn — the gate saw a route with nothing to charge and let
-     * every call through.
+     * A mentor turn has no {@code agent_job} row, so until it was given a meter of its own it could spend
+     * without limit inside one turn — the gate saw a route with nothing to charge and let every call
+     * through.
      */
     @Nested
     @DisplayName("a mentor turn is bounded by its own completed calls, exactly like a job attempt")
@@ -175,7 +152,6 @@ class ProxyBudgetGateTest extends BaseUnitTest {
             BigDecimal.ZERO
         );
 
-        /** Mint a session credential, start a turn on it, and burn {@code inputTokens} across one call. */
         private ProxyRouting turnThatHasSpent(int inputTokens) {
             UUID sessionId = UUID.randomUUID();
             String token = credentials.mint(
@@ -197,14 +173,7 @@ class ProxyBudgetGateTest extends BaseUnitTest {
             return credentials.validate(token).orElseThrow();
         }
 
-        /**
-         * At $10 per million input tokens, 100k tokens is $1.00 — the whole cap, none of it in the
-         * ledger yet; 90k is still under it. The ledger says ALLOWED for this workspace at both, so
-         * only the turn's own completed calls can stop the refused one.
-         *
-         * <p>Kills "give the mentor route a null attempt again": the turn would then spend the whole
-         * cap inside one turn and still be waved through for as long as it kept calling.
-         */
+        /** At $10 per million input tokens, 100k tokens is $1.00 — the whole cap; 90k is still under it. */
         @ParameterizedTest(name = "a turn that has burned {0} input tokens of a $1.00 cap is blocked={1}")
         @CsvSource({ "90000, false", "100000, true" })
         void aTurnIsJudgedOnItsOwnCompletedCalls(int inputTokens, boolean blocked) {
@@ -222,10 +191,6 @@ class ProxyBudgetGateTest extends BaseUnitTest {
     @DisplayName("routes with nothing to charge")
     class NothingToCharge {
 
-        /**
-         * A mentor session between turns names no execution, so there is no in-flight term to add —
-         * the residual the registry documents. The ledger still decides.
-         */
         @Test
         @DisplayName("a route with no live execution contributes no in-flight spend")
         void aRouteWithNoLiveExecutionIsJudgedOnTheLedgerAlone() {

@@ -10,26 +10,17 @@ export const JOB_TYPE_LABELS: Record<LlmJobType, string> = {
 	MENTOR_TURN: "Mentor turn",
 };
 
-/** Current calendar month in UTC as ISO `yyyy-MM` — matches the server's month bucketing. */
+/** Current calendar month in UTC as ISO `yyyy-MM`. */
 export function currentMonthUtc(): string {
 	return new Date().toISOString().slice(0, 7);
 }
 
-/**
- * Whether `month` *is* this month — the question the cap editors and the "at today's rate" hint turn
- * on. Equality, never `>=`: those two ask different things and only one of them is about now.
- * A month past this one is not the current month by any reading, and treating it as one would put a
- * live cap editor and a live rate over a report that cannot exist.
- */
+/** Equality, never `>=`: a month past this one would otherwise get a live cap editor and rate. */
 export function isCurrentMonthUtc(month: string): boolean {
 	return month === currentMonthUtc();
 }
 
-/**
- * Whether the stepper may move forward from `month`. ISO `yyyy-MM` compares lexicographically, so
- * this is a real "earlier than now" — and it stays false past it, which {@link isCurrentMonthUtc}
- * negated would not.
- */
+/** ISO `yyyy-MM` compares lexicographically. Stays false *past* this month, unlike `!isCurrentMonthUtc`. */
 export function canStepForwardFrom(month: string): boolean {
 	return month < currentMonthUtc();
 }
@@ -70,10 +61,7 @@ export function formatDayLabel(date: Date): string {
 	});
 }
 
-/**
- * The day a pause lifts by itself: the first of the month after `month`, in UTC. Budgets are
- * scoped to a UTC calendar month, so this is the honest "until when" in every pause banner.
- */
+/** The day a pause lifts by itself: the first of the month after `month`, in UTC. */
 export function budgetResetDayLabel(month: string): string {
 	const next = addMonths(month, 1);
 	const [yearStr, monthStr] = next.split("-");
@@ -81,15 +69,10 @@ export function budgetResetDayLabel(month: string): string {
 }
 
 /**
- * Share of a cap consumed, in percent, or `undefined` when there is no cap to compare against.
- * A $0 cap is a supported state ("paused immediately") and reads as 100% used — only an absent
- * cap has no percentage to show.
+ * Share of a cap consumed. A $0 cap is a supported state ("paused immediately") and reads as 100%.
  *
- * Display only, and that is a rule rather than a description. Money is exact decimal on the server
- * and a binary64 `number` here (see the API description's "Money and exact decimals"), so nothing
- * this returns may decide anything: whether work is actually held back is `paused` on the payload,
- * and whether spend is within its cap is the server's verdict. A meter that read 99.9997% while the
- * gate was shut would be a rendering wart; a meter that *decided* would be a bug.
+ * Display only, and that is a rule: money is exact decimal on the server and binary64 here, so
+ * nothing this returns may decide anything. Whether work is held back is `paused` on the payload.
  */
 export function budgetUsedPercent(
 	spendUsd: number,
@@ -101,31 +84,26 @@ export function budgetUsedPercent(
 	return capUsd > 0 ? (spendUsd / capUsd) * 100 : 100;
 }
 
-/** At or above this share of a cap the page warns before the wall instead of only reporting it. */
 export const BUDGET_WARN_PERCENT = 80;
 
 export interface BudgetProjection {
-	/** Spend at month end if the month's average daily pace holds, in USD. */
+	/** Spend at month end if the month's average daily pace holds. */
 	projectedMonthEndUsd: number;
-	/** UTC date the cap is projected to be reached, or `null` when the pace doesn't reach it. */
+	/** `null` when the projected pace never reaches the cap. */
 	reachedOn: Date | null;
 }
 
+/** One busy afternoon would project a wildly wrong month, so a projection needs some month behind it. */
+const MIN_DAYS_ELAPSED_TO_PROJECT = 3;
+
 /**
  * Straight-line burn-rate projection for a capped month: `spend / daysElapsed * daysInMonth`.
- *
- * Returns `null` — meaning "say nothing" — whenever the denominator is garbage rather than
- * guessing anyway: a month other than the one `now` falls in, the first two days of the month
- * (one busy afternoon would project a wildly wrong month), zero spend, or no positive cap.
+ * `null` means "say nothing" — the denominator is garbage, not a guess worth showing.
  */
 export function projectBudget(
 	spendUsd: number,
 	capUsd: number | undefined,
 	month: string,
-	// Injected, where {@link isCurrentMonthUtc} reads the real clock. Both are called only by the two
-	// usage routes, which pass the same real `new Date()` into this one and hand `isCurrentMonth` down
-	// as a prop — so the two clocks are the same clock in production, and a story that injects a
-	// different `now` also passes its own `isCurrentMonth` rather than deriving one.
 	now: Date,
 ): BudgetProjection | null {
 	if (capUsd == null || capUsd <= 0 || spendUsd <= 0) {
@@ -135,7 +113,7 @@ export function projectBudget(
 		return null;
 	}
 	const daysElapsed = now.getUTCDate();
-	if (daysElapsed < 3) {
+	if (daysElapsed < MIN_DAYS_ELAPSED_TO_PROJECT) {
 		return null;
 	}
 	const [yearStr, monthStr] = month.split("-");

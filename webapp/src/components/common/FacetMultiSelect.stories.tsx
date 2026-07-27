@@ -9,10 +9,7 @@ const eventTypes = [
 	{ value: "FEATURE_FLAG_CHANGED", label: "Feature flag changed" },
 ];
 
-/**
- * One facet of a filter or a form. Two presentations of the same control: the audit toolbar's dashed
- * chip, and a full-width form field.
- */
+/** One facet of a filter or a form: the toolbar's dashed chip, or a full-width form field. */
 const meta = {
 	component: FacetMultiSelect,
 	parameters: { layout: "centered" },
@@ -37,17 +34,15 @@ type Story = StoryObj<typeof meta>;
 
 export const Empty: Story = {};
 
-/** Up to two selections ride on the trigger as chips, so the filter reads without being opened. */
 export const TwoSelected: Story = {
 	args: { selected: ["LOGIN_SUCCESS", "ROLE_CHANGED"] },
 };
 
-/** Past two, the chips would wrap the toolbar, so the trigger collapses to a count. */
+/** Past two, chips would wrap the toolbar, so the trigger collapses to a count. */
 export const ManySelected: Story = {
 	args: { selected: ["LOGIN_SUCCESS", "LOGIN_FAILURE", "ROLE_CHANGED"] },
 };
 
-/** The form presentation, matching the `Select` beside it. */
 export const FieldVariant: Story = {
 	args: {
 		variant: "field",
@@ -60,12 +55,12 @@ export const FieldVariant: Story = {
 	},
 };
 
-/** Nothing to choose from: the caller names the void rather than showing "No matches". */
+/** The caller names the void; the generic "No matches" would be wrong here. */
 export const NoOptions: Story = {
 	args: { variant: "field", title: "Workspaces", options: [], emptyLabel: "No workspaces yet" },
 };
 
-/** "arzt" finds "Ärztliche", which a `toLowerCase().includes()` filter never would. */
+/** "arztliche" finds "Ärztliche", which a `toLowerCase().includes()` filter never would. */
 export const AccentInsensitiveSearch: Story = {
 	args: {
 		variant: "field",

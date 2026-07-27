@@ -49,10 +49,6 @@ async function renderUsageRoute(onPutBudget?: () => Promise<Response> | Response
 const capField = () => screen.getByLabelText(/Monthly cap/i);
 
 describe("workspace AI usage route", () => {
-	/**
-	 * The dialog body remounts on every open with a blank `dismissedServerError`, so a rejection left
-	 * on the mutation would reappear attached to an amount that is no longer on screen.
-	 */
 	it("does not re-show a dismissed rejection when the cap dialog is reopened", async () => {
 		const changeCap = await renderUsageRoute();
 

@@ -21,11 +21,6 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * {@link AgentJobRetentionService}'s batch-loop logic — a single pass must keep
- * calling the batched UPDATE/DELETE until a batch returns fewer rows than the batch size (the
- * "backlog drained" signal), and must count every batch into the retention metrics.
- */
 class AgentJobRetentionServiceTest extends BaseUnitTest {
 
     private static final int BATCH_SIZE = 500;

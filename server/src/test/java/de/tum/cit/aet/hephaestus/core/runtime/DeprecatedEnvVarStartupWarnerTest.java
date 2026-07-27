@@ -27,10 +27,6 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.mock.env.MockEnvironment;
 
-/**
- * Retired env vars are silently ignored (see MIGRATION.md). This warner is the operator-visible
- * signal that a deployment is still setting one of them.
- */
 class DeprecatedEnvVarStartupWarnerTest extends BaseUnitTest {
 
     private ListAppender<ILoggingEvent> appender;
@@ -86,10 +82,6 @@ class DeprecatedEnvVarStartupWarnerTest extends BaseUnitTest {
             );
     }
 
-    /**
-     * One retired property set on its own draws exactly one warning, naming that property and the
-     * replacement the operator has to move to — never a second warning for a key nobody set.
-     */
     @ParameterizedTest(name = "{0}")
     @CsvSource(
         {
@@ -97,7 +89,7 @@ class DeprecatedEnvVarStartupWarnerTest extends BaseUnitTest {
             "hephaestus.agent.nats.enabled, false, PostgreSQL",
         }
     )
-    void warnsOnlyForThePropertyThatIsSet(String property, String value, String guidance) {
+    void warnsExactlyOnceNamingOnlyThePropertyThatIsSet(String property, String value, String guidance) {
         MockEnvironment environment = new MockEnvironment();
         environment.setProperty(property, value);
 
@@ -118,10 +110,9 @@ class DeprecatedEnvVarStartupWarnerTest extends BaseUnitTest {
     }
 
     /**
-     * A shipped profile that still defines a retired key makes this warner fire on every boot of that
-     * profile, blaming the operator for a line they never wrote. Spring's YAML source binds the key
-     * whatever the value is — a {@code ${VAR:}} placeholder with an empty default resolves to
-     * {@code ""}, not "absent" — so the value cannot rescue it; the line has to be gone.
+     * Spring's YAML source binds the key whatever the value is — a {@code ${VAR:}} placeholder with an
+     * empty default resolves to {@code ""}, not "absent" — so the value cannot rescue a retired key;
+     * the line has to be gone.
      *
      * <p>Static content, deliberately: booting each profile to check would need every one of them to
      * have a satisfiable environment, and would not fail until it did.
@@ -158,13 +149,9 @@ class DeprecatedEnvVarStartupWarnerTest extends BaseUnitTest {
     }
 
     /**
-     * {@code server.port: -1} disables the HTTP connector entirely. {@code LlmProxyController} /
-     * {@code LlmProxySecurityConfig} wire on the worker profile whenever
-     * {@code hephaestus.agent.enabled=true} (the job-execution capability gate, ADR 0006), so that
-     * sentinel makes the proxy unreachable on every worker pod that actually executes jobs.
-     *
-     * <p>Reads the shipped YAML rather than booting a context: {@code webEnvironment=RANDOM_PORT} test
-     * infra forces a real port regardless of the YAML default, which would mask the regression.
+     * {@code server.port: -1} disables the HTTP connector entirely, which makes the LLM proxy unreachable
+     * on every worker pod that executes jobs (ADR 0006). Reads the shipped YAML rather than booting a
+     * context: {@code webEnvironment=RANDOM_PORT} forces a real port and would mask the regression.
      */
     @Test
     void workerProfileServerPortIsNotTheDisabledConnectorSentinel() throws Exception {

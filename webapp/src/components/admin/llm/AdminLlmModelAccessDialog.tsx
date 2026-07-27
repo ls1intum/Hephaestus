@@ -30,11 +30,9 @@ export interface AdminLlmModelAccessDialogProps {
 }
 
 /**
- * Dedicated access editor for an instance model. Access changes take effect at request time.
- *
- * The form is mounted only while the dialog is open and keyed by the model, so its selection seeds
- * once, at open. An effect copying the model into state would re-run on a background refetch and
- * discard an unsaved edit.
+ * Access editor for an instance model; changes take effect at request time. Keyed by the model and
+ * mounted only while open, so the selection seeds once — an effect would discard an unsaved edit on
+ * a background refetch.
  */
 export function AdminLlmModelAccessDialog({
 	open,
@@ -100,8 +98,7 @@ function AdminLlmModelAccessDialogContent({
 				</DialogDescription>
 			</DialogHeader>
 
-			{/* Two option cards, the workspace picker and up to one consequence alert — enough to
-			    overflow a phone in landscape. Only the body scrolls. */}
+			{/* Enough content to overflow a phone in landscape, so only the body scrolls. */}
 			<DialogBody className="space-y-4 py-1">
 				<ModelAccessScopeChoice
 					idPrefix="llm-model-access"
@@ -142,9 +139,8 @@ function AdminLlmModelAccessDialogContent({
 					</div>
 				)}
 
-				{/* Advisory, and re-derived on every radio press and every workspace ticked. `role="alert"`
-				    is assertive and would interrupt the combobox's own announcement each time (SC 4.1.3);
-				    only a *failure* earns that. */}
+				{/* Re-derived on every press: an assertive `role="alert"` would interrupt the combobox's
+				    own announcement each time (SC 4.1.3). */}
 				{noWorkspaceHasAccess && !isWorkspaceError && (
 					<Alert role="status">
 						<AlertTitle>No workspace will be able to use this model</AlertTitle>

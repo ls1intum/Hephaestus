@@ -15,21 +15,11 @@ import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 
-/**
- * Table-driven behavioral coverage for {@link EgressPolicy}, the SSRF/credential-leak guard for
- * instance-owned LLM provider connections.
- *
- * <p>The invariants asserted here: a provider base URL must be HTTPS to a public address; loopback is
- * reachable only when {@code hephaestus.llm.egress.allow-loopback} is on and only over http; userinfo,
- * query and fragment are always refused; and a non-blank instance allowlist is the final word on the
- * host. {@code validate} returns void, so "does not throw" is the whole of its success contract.
- */
 class EgressPolicyTest extends BaseUnitTest {
 
     @Mock
     private InstanceLlmSettingsRepository settingsRepository;
 
-    /** Defaults except for the one knob under test — the shape an unset {@code hephaestus.llm} binds to. */
     private static LlmProperties properties(boolean allowLoopback) {
         return new LlmProperties(
             "",
@@ -132,12 +122,7 @@ class EgressPolicyTest extends BaseUnitTest {
             );
         }
 
-        /**
-         * Both spellings reach the same refusal, by different routes: {@code 127.0.0.1} is parsed as a
-         * literal, {@code localhost} is resolved through {@code InetAddress.getAllByName} (satisfied from
-         * /etc/hosts, so this stays offline-safe). With the flag off the LOCAL_DEV_HOSTS short-circuit is
-         * disabled outright, so both fall through to the resolved-address check.
-         */
+        // localhost resolves through InetAddress.getAllByName, satisfied from /etc/hosts — offline-safe.
         @ParameterizedTest
         @ValueSource(strings = { "127.0.0.1", "localhost" })
         @DisplayName("https to loopback is ALSO blocked by default — the flag gates loopback outright, not just http")
@@ -174,16 +159,10 @@ class EgressPolicyTest extends BaseUnitTest {
                 .hasMessage("Provider host must be a public HTTPS URL");
         }
 
-        /**
-         * Every input that never yields a usable host — null, blank, host-less, unparsable — is refused
-         * with the same operator-facing message, so an admin cannot tell a typo from an attack and the
-         * guard cannot leak which one it was. Null is a case in its own right: it must be an
-         * IllegalArgumentException, not the NullPointerException a missing null check would produce.
-         */
         @ParameterizedTest(name = "[{index}] {0}")
         @NullSource
         @ValueSource(strings = { "   ", "https:///v1", "not a url at all" })
-        void rejectsAnyBaseUrlWithoutAUsableHost(String baseUrl) {
+        void rejectsEveryBaseUrlWithoutAUsableHostWithTheSameMessage(String baseUrl) {
             assertThatThrownBy(() -> loopbackBlocked().validate(baseUrl))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Provider host must be a public HTTPS URL");
@@ -225,10 +204,6 @@ class EgressPolicyTest extends BaseUnitTest {
         // DNS round-trip, so these stay deterministic/offline-safe (assertPublicAddress runs — and must
         // succeed — before assertAllowlisted is ever reached).
 
-        /**
-         * These three are also the suite's positive control: a public address with a path must survive
-         * the private-range check and the credential/query guard untouched.
-         */
         @Test
         @DisplayName("an empty/blank allowlist permits any public host")
         void emptyAllowlistPermitsAnyPublicHost() {
@@ -247,7 +222,7 @@ class EgressPolicyTest extends BaseUnitTest {
 
         @Test
         @DisplayName("a host present in the allowlist (case-insensitive) is permitted")
-        void allowlistHit() {
+        void permitsAHostListedInTheAllowlistIgnoringCase() {
             // example.com is IANA-reserved and guaranteed globally resolvable — used here (instead of an
             // IP literal) specifically to exercise the allowlist's case-insensitive host match.
             stubAllowlist("api.openai.com,EXAMPLE.COM\napi.anthropic.com");
@@ -257,7 +232,7 @@ class EgressPolicyTest extends BaseUnitTest {
 
         @Test
         @DisplayName("a host absent from a non-blank allowlist is rejected")
-        void allowlistMiss() {
+        void rejectsAHostAbsentFromANonBlankAllowlist() {
             stubAllowlist("1.1.1.1,9.9.9.9");
 
             assertThatThrownBy(() -> loopbackBlocked().validate("https://8.8.8.8/v1"))
@@ -282,7 +257,6 @@ class EgressPolicyTest extends BaseUnitTest {
         }
     }
 
-    /** Wraps a bare IPv6 literal in brackets for use as a URI host; leaves IPv4/hostnames untouched. */
     private static String wrapIfIpv6(String host) {
         return host.contains(":") ? "[" + host + "]" : host;
     }

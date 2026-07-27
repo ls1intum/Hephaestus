@@ -32,19 +32,14 @@ import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 
 /**
- * Validates every committed GitHub and GitLab operation document against that vendor's checked-in schema.
- *
- * <p>A malformed document fails at the vendor's API with a GraphQL error — the same outcome every caller here
- * treats as an unknown/skip result — so a typo can ship silently and never surface as a test failure. This runs
- * the real graphql-java validator over the exact document text {@link FragmentMergingDocumentSource} (the
- * production document source) assembles, so fragment resolution is checked too, not bypassed.
+ * A malformed operation document fails at the vendor's API with a GraphQL error — the same outcome every caller
+ * here treats as an unknown/skip result — so a typo can ship silently and never surface as a test failure.
  *
  * <p>This only proves each document is valid against the checked-in schema; a schema refresh is what catches
  * vendor-side deprecation.
  */
 class GraphQlOperationDocumentValidationTest extends BaseUnitTest {
 
-    /** Vendor directory layout under {@code src/main/resources/graphql/}. */
     private record Vendor(String name, String schema, String operations, String fragments) {}
 
     private static final List<Vendor> VENDORS = List.of(
@@ -123,12 +118,8 @@ class GraphQlOperationDocumentValidationTest extends BaseUnitTest {
         );
     }
 
-    /**
-     * Guards the guard: if the operations directory ever stops being discovered, the parameterised test above
-     * would pass vacuously with zero cases. Both vendors must contribute documents.
-     */
     @Test
-    void everyVendorContributesDocuments() {
+    void everyVendorContributesDocumentsSoTheScanIsNotVacuous() {
         for (Vendor vendor : VENDORS) {
             assertThat(operationNames(vendor.operations()))
                 .as("no operation documents found for %s", vendor.name())
@@ -142,7 +133,7 @@ class GraphQlOperationDocumentValidationTest extends BaseUnitTest {
 
     private static GraphQLSchema loadSchema(String schemaLocation) {
         // An unexecutable schema needs no data fetchers or scalar implementations — validation only reads the
-        // type system, which is exactly what a client-side document check should depend on.
+        // type system.
         TypeDefinitionRegistry registry = new SchemaParser().parse(read(new ClassPathResource(schemaLocation)));
         return UnExecutableSchemaGenerator.makeUnExecutableSchema(registry);
     }

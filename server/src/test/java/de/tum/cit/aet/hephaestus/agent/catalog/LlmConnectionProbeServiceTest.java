@@ -87,9 +87,8 @@ class LlmConnectionProbeServiceTest extends BaseUnitTest {
 
     @Test
     void shouldProbeAStoredConnectionFromAProjectionRatherThanTheEntity() {
-        // The probe blocks for up to its full network timeout. Loading a projection instead of the
-        // entity is what lets probeStored() run with no transaction and no JDBC connection held — a
-        // handful of admins testing one stalled provider must not be able to starve the pool.
+        // The probe blocks for up to its full network timeout, so it runs with no transaction and no
+        // JDBC connection held — a few admins testing one stalled provider must not starve the pool.
         when(connectionRepository.findProbeTargetById(5L)).thenReturn(
             Optional.of(new LlmProbeTarget(upstream.url("/v1").toString(), LlmAuthMode.BEARER, "sk-abc"))
         );
@@ -110,13 +109,8 @@ class LlmConnectionProbeServiceTest extends BaseUnitTest {
     }
 
     /**
-     * Both probe entry points dial a URL on the admin's behalf, so both are SSRF surfaces and both must
-     * clear the egress guard BEFORE the socket is opened. {@code probeDraft} is the sharper of the two:
-     * its URL is whatever the admin just typed into the form and was never stored, so nothing else in
-     * the system has ever looked at it.
-     *
-     * <p>Asserted on the upstream's request count rather than on the mock: "the guard was consulted" is
-     * not the invariant — "no packet left the process" is.
+     * Asserted on the upstream's request count rather than on the mock: "the guard was consulted" is not
+     * the invariant — "no packet left the process" is.
      */
     @Test
     void aDraftProbeRefusesAForbiddenUrlWithoutDiallingIt() {

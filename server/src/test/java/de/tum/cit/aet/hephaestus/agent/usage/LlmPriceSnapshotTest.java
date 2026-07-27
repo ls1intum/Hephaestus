@@ -10,11 +10,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-/**
- * The arithmetic that turns tokens into the number a workspace is billed. Every case here is about
- * one property: the stored amount either equals what the frozen rates produced, or it says which way
- * it was moved and why.
- */
 class LlmPriceSnapshotTest extends BaseUnitTest {
 
     private static LlmPriceSnapshot priced(@Nullable String inputRate) {
@@ -45,7 +40,7 @@ class LlmPriceSnapshotTest extends BaseUnitTest {
 
         @Test
         @DisplayName("an unpriced model yields no cost at all, not a zero")
-        void unpricedYieldsNull() {
+        void anUnpricedModelYieldsNoCostAtAllRatherThanAZero() {
             LlmPriceSnapshot unpriced = new LlmPriceSnapshot(
                 FundingSource.INSTANCE,
                 PricingState.UNPRICED,
@@ -158,8 +153,6 @@ class LlmPriceSnapshotTest extends BaseUnitTest {
 
             assertThat(cost.usd()).isEqualByComparingTo("999999999.999999");
             assertThat(cost.clamp()).isNull();
-            // That this amount also survives the JSON->binary64 trip is asserted once, on the clamp
-            // constants themselves, by MoneyWirePrecisionTest#everyCostTheLedgerWillStoreSurvivesTheWire.
         }
     }
 }

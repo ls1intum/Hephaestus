@@ -14,15 +14,10 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
- * Pins the one ambiguity the {@code /agents} namespace creates: {@code GET /agents/jobs} (a literal
- * segment) and {@code GET /agents/{purpose}} (a template) are both two-segment patterns under the same
- * parent. Spring's {@code PathPattern} comparator ranks the literal above the variable, so {@code jobs}
- * can never be swallowed as a purpose — if that ordering ever flipped, the job-history screen would
- * start failing enum conversion with a 400, while both controllers kept passing their own suites in
- * isolation.
- *
- * <p>Both assertions matter: the first proves the literal wins, the second proves the template is still
- * reachable and still rejects a non-purpose.
+ * {@code GET /agents/jobs} (literal) and {@code GET /agents/{purpose}} (template) are both two-segment
+ * patterns under the same parent. Spring's {@code PathPattern} comparator ranks the literal higher; if
+ * that ordering ever flipped, the job-history screen would start failing enum conversion with a 400
+ * while both controllers kept passing their own suites in isolation.
  */
 class AgentsPathDispatchIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
@@ -49,7 +44,7 @@ class AgentsPathDispatchIntegrationTest extends AbstractWorkspaceIntegrationTest
         Workspace workspace = setupWorkspace();
 
         // A paginated envelope can only have come from AgentJobController; the binding controller
-        // returns a bare array, and an attempt to bind "jobs" to AgentPurpose would have been a 400.
+        // returns a bare array.
         webTestClient
             .get()
             .uri("/workspaces/{slug}/agents/jobs", workspace.getWorkspaceSlug())
@@ -70,8 +65,7 @@ class AgentsPathDispatchIntegrationTest extends AbstractWorkspaceIntegrationTest
     void agentsCollectionIsNotShadowedByTheJobsRoute() {
         Workspace workspace = setupWorkspace();
 
-        // A bare array is the binding controller's shape. If /agents/jobs had claimed the parent, or the
-        // two mappings had collided at startup, this would not be reachable at all.
+        // A bare array is the binding controller's shape.
         webTestClient
             .get()
             .uri("/workspaces/{slug}/agents", workspace.getWorkspaceSlug())
@@ -87,7 +81,7 @@ class AgentsPathDispatchIntegrationTest extends AbstractWorkspaceIntegrationTest
     @Test
     @WithAdminUser
     @DisplayName("PUT /agents/{purpose} rejects a value that is not a purpose")
-    void purposeTemplateStillValidatesItsEnum() {
+    void aNonPurposeIsRefusedWith400RatherThanFallingThroughTo404() {
         Workspace workspace = setupWorkspace();
 
         webTestClient
@@ -98,8 +92,6 @@ class AgentsPathDispatchIntegrationTest extends AbstractWorkspaceIntegrationTest
             .bodyValue(Map.of("instanceModelId", 1))
             .exchange()
             .expectStatus()
-            // 400 exactly: a 404 would mean the handler is gone rather than reached-and-refusing,
-            // which is the ambiguity this class exists to remove.
             .isBadRequest();
     }
 }

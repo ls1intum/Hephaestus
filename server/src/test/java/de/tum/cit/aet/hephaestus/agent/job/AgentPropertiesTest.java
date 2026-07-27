@@ -14,11 +14,6 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
- * A too-small {@code poll-interval} spins {@code AgentJobExecutor}'s poll loop into a tight
- * DB-hammering busy-loop, and a zero or negative one is nonsensical (immediate re-poll, or a
- * {@link Thread#sleep} that throws). A sub-second {@code heartbeat-interval} floods
- * {@code worker_registry} with writes. Both fail startup instead of booting into either failure mode.
- *
  * <p>Exercised through direct construction because {@code @Validated}'s method-level validation only
  * fires through a Spring-managed proxy, not plain {@code new AgentProperties(...)}.
  */

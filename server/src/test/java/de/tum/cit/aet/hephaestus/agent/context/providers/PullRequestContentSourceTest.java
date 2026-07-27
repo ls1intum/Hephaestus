@@ -338,7 +338,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
 
         @Test
         void computeAndStoreDiffSummary_parsesPerFileChunks() throws Exception {
-            // Feeds an annotated diff.patch straight into the parser; no git stubbing needed.
             String annotated =
                 "[L1] diff --git a/src/A.java b/src/A.java\n" +
                 "[L1] +line a1\n" +

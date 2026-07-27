@@ -15,11 +15,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-/**
- * HTTP-boundary coverage for a workspace's practice-review policy: the read, and the PATCH
- * (override / reset-to-inherit, 400 on an out-of-range cooldown). Model selection lives on the
- * per-purpose agents ({@code /agents}) and is covered there.
- */
 class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
@@ -49,8 +44,7 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
             .doesNotExist()
             .jsonPath("$.skipDrafts")
             .isEqualTo(true)
-            // Feature flags aren't review policy and already live on the workspace itself; assert
-            // this response carries the policy alone rather than assuming it.
+            // Feature flags aren't review policy and already live on the workspace itself.
             .jsonPath("$.practicesEnabled")
             .doesNotExist()
             .jsonPath("$.mentorEnabled")
@@ -80,7 +74,6 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
     void overridesAndResetsPracticeReviewPolicy() {
         Workspace workspace = setupWorkspace("ai-reset");
 
-        // Override skipDrafts to false (fleet default is true).
         webTestClient
             .patch()
             .uri("/workspaces/{slug}/practices/review-settings", workspace.getWorkspaceSlug())
@@ -96,7 +89,7 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
             .jsonPath("$.skipDrafts")
             .isEqualTo(false);
 
-        // Reset it back to inherit → override null, effective falls back to the fleet default (true).
+        // Reset to inherit — the fleet default for skipDrafts is true.
         webTestClient
             .patch()
             .uri("/workspaces/{slug}/practices/review-settings", workspace.getWorkspaceSlug())
@@ -112,8 +105,6 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
             .jsonPath("$.skipDrafts")
             .isEqualTo(true);
     }
-
-    // ─── Access control ────────────────────────────────────────────────────────────────────────
 
     @Test
     @WithMentorUser
@@ -171,7 +162,6 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
             .expectStatus()
             .isForbidden();
 
-        // Sanity: the same principal IS admitted in the workspace it actually administers.
         webTestClient
             .get()
             .uri("/workspaces/{slug}/practices/review-settings", own.getWorkspaceSlug())

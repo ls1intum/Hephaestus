@@ -4,10 +4,9 @@ import { expectAmountRejected } from "@/test/budget-amount-field";
 import { expectControlOnScreen, expectDialogFitsViewport } from "@/test/reflow";
 import { SetOwnProviderBudgetDialog } from "./SetOwnProviderBudgetDialog";
 
-/**
- * The workspace admin's cap on spend through their own provider — their money, so unlike the
- * shared-model budget this one is theirs to set, change, and remove.
- */
+const capDialog = async () => within(await screen.findByRole("dialog"));
+
+/** The workspace's cap on spend through its own provider — their money, so theirs to change. */
 const meta = {
 	component: SetOwnProviderBudgetDialog,
 	parameters: { layout: "centered" },
@@ -25,10 +24,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Changing an existing cap — "Remove cap" is offered alongside it. */
 export const WithExistingCap: Story = {};
 
-/** No cap yet — nothing to remove. */
 export const Uncapped: Story = {
 	args: { currentCapUsd: null },
 };
@@ -37,24 +34,16 @@ export const Pending: Story = {
 	args: { isPending: true },
 };
 
-/**
- * The server rejected the amount. It lands next to the value that caused it, not in a toast that
- * evaporates before the two can be compared.
- */
-export const ServerRejection: Story = {
+/** The rejection lands beside the value that caused it, not in a toast that outlives it. */
+export const ServerRejectionSitsAtTheField: Story = {
 	args: { serverError: "Monthly cap must not exceed 99999999.99." },
 	play: async () => {
-		const dialog = within(await screen.findByRole("dialog"));
+		const dialog = await capDialog();
 		await expect(dialog.getByRole("alert")).toHaveTextContent(/must not exceed/i);
 	},
 };
 
-/**
- * One illustration, not two: every amount rule lives on `BudgetAmountDialog`, which this wrapper
- * supplies nothing but copy to. What is worth proving here is that the copy arrives — the rejection
- * is raised against a field labelled "Monthly cap" and a button reading "Save cap".
- */
-export const InvalidEmptyValue: Story = {
+export const PassesItsFieldAndButtonCopyThrough: Story = {
 	play: async ({ args }) =>
 		await expectAmountRejected({
 			fieldLabel: /monthly cap/i,
@@ -66,9 +55,8 @@ export const InvalidEmptyValue: Story = {
 };
 
 /**
- * Reviewed at the WCAG 2.2 SC 1.4.10 reflow width (320 px). Short in portrait, but with a cap in
- * force the footer stacks three buttons, which together with the header already exceeds a phone
- * held in landscape — so the height bound and the reachable footer matter here too.
+ * WCAG 2.2 SC 1.4.10 at 320 px: with a cap in force the footer stacks three buttons, which already
+ * exceeds a phone held in landscape, so the height bound matters as much as the width.
  */
 export const MobileReflow: Story = {
 	parameters: {
@@ -76,7 +64,7 @@ export const MobileReflow: Story = {
 		chromatic: { viewports: [320, 375, 768] },
 	},
 	play: async () => {
-		const dialog = within(await screen.findByRole("dialog"));
+		const dialog = await capDialog();
 		await expectDialogFitsViewport();
 		for (const name of [/save cap/i, /remove cap/i, /^cancel$/i, /^close$/i]) {
 			await expectControlOnScreen(dialog.getByRole("button", { name }));
@@ -84,13 +72,11 @@ export const MobileReflow: Story = {
 	},
 };
 
-/** Removing the cap submits `null` — uncapped, not zero (which would pause everything). */
+/** Removing submits `null` — uncapped, not `0`, which would pause everything instead. */
 export const RemoveCap: Story = {
 	play: async ({ args }) => {
-		const dialog = within(await screen.findByRole("dialog"));
+		const dialog = await capDialog();
 
-		// The action exists only because a cap is in force, and the field is showing that cap — which
-		// is what makes `null` below "remove the $25 they can see" rather than "submit an empty form".
 		await expect(dialog.getByLabelText(/monthly cap/i)).toHaveValue(25);
 
 		await userEvent.click(dialog.getByRole("button", { name: /remove cap/i }));
@@ -99,11 +85,10 @@ export const RemoveCap: Story = {
 	},
 };
 
-/** With no cap in force there is nothing to remove, so the action is not offered at all. */
 export const UncappedOffersNoRemoval: Story = {
 	args: { currentCapUsd: null },
 	play: async () => {
-		const dialog = within(await screen.findByRole("dialog"));
+		const dialog = await capDialog();
 		await expect(dialog.getByLabelText(/monthly cap/i)).toHaveValue(null);
 		await expect(dialog.queryByRole("button", { name: /remove cap/i })).toBeNull();
 	},

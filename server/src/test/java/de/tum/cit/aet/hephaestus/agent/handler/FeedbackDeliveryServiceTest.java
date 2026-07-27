@@ -374,7 +374,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
         @Test
         void blankAfterSanitize_noInlineLanded_recordsEmptyAfterSanitize() {
-            // Nothing reached the developer, so this must ledger SUPPRESSED, never a phantom DELIVERED unit.
             AgentJob job = createJob();
             stubOpenPr();
 
@@ -398,8 +397,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
         @Test
         void blankAfterSanitize_inlineLanded_recordsDeliveredWithoutSummary() {
-            // Recorded as DELIVERED even though summary is blank: the recorder skips SUMMARY placement
-            // when there's no comment id, but the inline note landing still counts as delivery.
             AgentJob job = createJob();
             stubOpenPr();
             var note = new DiffNote("src/Foo.java", 10, null, "Fix this", "ck-foo");
@@ -417,7 +414,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             var delivery = new DeliveryContent("", List.of(note), List.of());
             service.deliverFeedback(job, delivery);
 
-            // Signal list asserted exactly (not any()) since it's the payload the ledger bills provenance against.
             verify(feedbackLedgerRecorder).record(
                 eq(job),
                 eq(delivery),
@@ -430,7 +426,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
         @Test
         void throwsWhenSummaryPostReturnsNoId() {
-            // No comment id back from the provider means the developer sees nothing, so fail loud.
             AgentJob job = createJob();
             stubOpenPr();
             when(commentPoster.postFormattedBody(any(), any())).thenReturn(null);
@@ -441,14 +436,12 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException.class
             );
             assertThat(job.getDeliveryCommentId()).isNull();
-            // Must persist as FAILED before the exception propagates, not get discarded with it.
             verify(feedbackLedgerRecorder).recordUndelivered(eq(job), eq(delivery));
         }
 
         @Test
         void summaryLandedThenInlineFailed_doesNotRecordFalseUndelivered() {
-            // Summary already posted when the inline-notes step throws; recordUndelivered must not run,
-            // or it would falsely mark the landed summary undelivered and double-raise its loci.
+            // A false undelivered here would double-raise the loci of a summary the developer already saw.
             AgentJob job = createJob();
             stubOpenPr();
             when(commentPoster.postFormattedBody(any(), any())).thenReturn("IC_summary_1");
@@ -516,7 +509,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
         @Test
         void emptyDiffNotesStillReconcilesToClearStaleNotesOnOpenPr() {
-            // Zero inline notes must still reconcile, or an earlier run's stale notes never get cleared.
             AgentJob job = createJob();
             stubOpenPr();
             when(commentPoster.postFormattedBody(any(), any())).thenReturn("IC_comment789");
@@ -527,8 +519,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void suppressedPrNeverReconciles_noDataLoss() {
-            // A suppressed CLOSED PR must never reach reconciliation, or a re-run would wipe the delivered review.
+        void suppressedClosedPrNeverReconcilesSoARerunCannotWipeTheDeliveredReview() {
             AgentJob job = createJob();
             var pr = createOpenPr();
             pr.setState(Issue.State.CLOSED);
@@ -681,8 +672,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
             String formatted = FeedbackDeliveryService.formatPracticeNote("Some review content", job);
 
-            // Mirrors GithubFeedbackChannel#findExistingSummary's own match check
-            // (node.getBody().contains(marker)); asserting the round trip catches format/lookup drift.
+            // Mirrors GithubFeedbackChannel#findExistingSummary's own match check: body.contains(marker).
             String lookupMarker = PullRequestCommentPoster.summaryMarkerFor(job);
             assertThat(formatted).contains(lookupMarker);
         }

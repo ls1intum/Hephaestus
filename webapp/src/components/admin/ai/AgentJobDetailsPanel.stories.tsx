@@ -10,8 +10,8 @@ import {
 } from "./story-mock-data";
 
 /**
- * Slide-over panel with a run's overview, usage, error, and config snapshot, plus
- * confirm dialogs for cancelling a running job or retrying a failed delivery.
+ * Slide-over panel with a run's overview, usage, error, and config snapshot, plus confirm dialogs
+ * for cancelling a running job or retrying a failed delivery.
  */
 const meta = {
 	component: AgentJobDetailsPanel,
@@ -35,8 +35,8 @@ export const Completed: Story = {};
 
 export const Running: Story = {
 	args: { job: mockJobRunning },
+	// The Sheet and its AlertDialog render in portals, so every query here goes through `screen`.
 	play: async () => {
-		// The Sheet + AlertDialog render in portals — query the whole document.
 		await userEvent.click(screen.getByRole("button", { name: /^cancel run$/i }));
 		const dialog = await screen.findByRole("alertdialog");
 		await expect(within(dialog).getByText(/the running container stops/i)).toBeInTheDocument();
@@ -52,13 +52,9 @@ export const FailedDelivery: Story = {
 };
 
 /**
- * The details panel at the WCAG 2.2 SC 1.4.10 reflow width (320 CSS px).
- *
- * `SheetContent` sets its widths as `data-[side=right]:w-3/4` / `data-[side=right]:sm:max-w-sm`,
- * which are attribute-qualified and outrank a plain `w-full` — so a width override here has to be
- * qualified too, or the panel renders at 75 % of a phone (about 240 px) for label/value rows that
- * need every pixel. This asserts the panel spans the viewport, and that the confirm dialog it opens
- * fits inside it.
+ * WCAG 2.2 SC 1.4.10 at 320 px. `SheetContent`'s `data-[side=right]:w-3/4` outranks a plain
+ * `w-full`, so a width override here has to be attribute-qualified too or the panel renders at 75 %
+ * of a phone.
  */
 export const MobileReflow: Story = {
 	args: { job: mockJobRunning },
@@ -71,7 +67,6 @@ export const MobileReflow: Story = {
 		const panel = await screen.findByRole("dialog");
 		await expect(panel.getBoundingClientRect().width).toBeGreaterThanOrEqual(window.innerWidth - 1);
 
-		// The confirm dialog nested inside the panel is subject to the same bound.
 		await userEvent.click(screen.getByRole("button", { name: /^cancel run$/i }));
 		await screen.findByRole("alertdialog");
 		await expectDialogFitsViewport();

@@ -30,11 +30,6 @@ class DefaultMentorReadinessQueryTest extends BaseUnitTest {
         query = new DefaultMentorReadinessQuery(agentBindingRepository, llmModelResolver);
     }
 
-    /**
-     * The positive leg. Without it every case in this class is a "false", and replacing the whole
-     * method body with {@code return false} passes — Slack App Home would then tell every workspace
-     * its mentor is unavailable while it is working.
-     */
     @Test
     void shouldReportReadyWhenAnEnabledBindingResolvesToAModel() {
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();

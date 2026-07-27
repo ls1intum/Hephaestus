@@ -41,17 +41,9 @@ import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * What a mentor turn is billed when the runner never reports its usage.
- *
- * <p>A turn that crashes, times out, or is killed mid-flight has still made real provider calls that
- * have already been paid for. Its end-of-turn report is exactly what it never got to produce, so the
- * only account of those calls is the running total the LLM proxy wrote to the turn's row as it served
- * each one — which is the whole reason that total is kept. Billing such a turn as a zero-token event
- * would understate the workspace's month by every crash it had.
- *
- * <p>The totals are read from the row by projection, which is what these tests stub. That the proxy's
- * per-call write actually reaches that row — and is fenced to a turn still in flight — needs a real
- * database and lives in {@code MentorTurnUsageAccumulatorIntegrationTest}.
+ * A turn that crashes, times out, or is killed mid-flight has still made real provider calls that were
+ * paid for, and its end-of-turn report is exactly what it never got to produce — so the only account of
+ * those calls is the running total the LLM proxy wrote to the turn's row as it served each one.
  */
 class MentorTurnCrashBillingTest extends BaseUnitTest {
 
@@ -100,7 +92,6 @@ class MentorTurnCrashBillingTest extends BaseUnitTest {
         when(chatMessageRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
     }
 
-    /** The template only needs to run its action; there is no database in this tier. */
     private static PlatformTransactionManager noOpTransactionManager() {
         return mock(PlatformTransactionManager.class);
     }
@@ -116,12 +107,10 @@ class MentorTurnCrashBillingTest extends BaseUnitTest {
         );
     }
 
-    /** What the proxy recorded on this turn's row, one row-read away from the accounting path. */
     private void proxyRecorded(MentorTurnLlmUsage usage) {
         when(chatMessageRepository.findLlmUsageById(assistantId)).thenReturn(Optional.of(usage));
     }
 
-    /** A turn that got as far as issuing its prompt, and no further. */
     private static TranslatorState startedTurnWithNoRunnerReport() {
         TranslatorState state = new TranslatorState(UUID.randomUUID());
         state.bindAdmission("gpt-x", PRICE);
@@ -129,13 +118,6 @@ class MentorTurnCrashBillingTest extends BaseUnitTest {
         return state;
     }
 
-    /**
-     * The point of the whole mechanism.
-     *
-     * <p>Kills "drop the proxy-meter fallback in billTurn": the turn below is then recorded as
-     * UNVERIFIABLE with zero tokens, over three provider calls that really went out and really cost
-     * money.
-     */
     @Test
     @DisplayName("a turn that dies before the runner reports anything is billed for the calls the proxy saw")
     void aCrashedTurnIsBilledForWhatTheProxyObserved() {
@@ -157,11 +139,6 @@ class MentorTurnCrashBillingTest extends BaseUnitTest {
         assertThat(sample.getValue().totalCalls()).isEqualTo(3);
     }
 
-    /**
-     * The runner's report is authoritative when there IS one — it is what the chat UI already showed.
-     * Kills "prefer the proxy's totals over the runner's report": the numbers persisted on the message
-     * and the numbers billed to the ledger would then disagree on every normal turn.
-     */
     @Test
     @DisplayName("a turn that reported its own usage is billed from that report, not from the proxy meter")
     void theRunnerReportWinsWhenThereIsOne() {
@@ -178,8 +155,7 @@ class MentorTurnCrashBillingTest extends BaseUnitTest {
         verify(usageRecorder).record(eq(WORKSPACE_ID), sample.capture());
         assertThat(sample.getValue().inputTokens()).isEqualTo(11);
         assertThat(sample.getValue().outputTokens()).isEqualTo(22);
-        // The row is not even consulted: with a report in hand there is nothing to fall back to, and
-        // reading it would open the door to someone later summing the two views of the same calls.
+        // Not even consulted: summing the two views of the same calls would double-bill them.
         verify(chatMessageRepository, never()).findLlmUsageById(any());
     }
 
@@ -197,15 +173,9 @@ class MentorTurnCrashBillingTest extends BaseUnitTest {
     }
 
     /**
-     * With no report from either side there is genuinely nothing to bill, and the event must stay
-     * UNVERIFIABLE rather than being silently priced as free — the distinction the budget verdict
-     * depends on. Both ways of observing nothing book the same event, and a vanished row must not NPE
-     * its way out of accounting.
-     *
-     * <p>What is booked matters as much as that something is: the turn's own identity, the admitted
-     * model and the frozen admission price (the pricing-state downgrade is the recorder's job, not
-     * this one's), no tokens, and one call. That call floor is what stops an unobserved turn from
-     * looking like a turn that never happened — the ledger row is the operator's only trace of it.
+     * The one-call, zero-token floor is deliberate: it stops an unobserved turn from looking like a turn
+     * that never happened, since the ledger row is the operator's only trace of it. The pricing-state
+     * downgrade is the recorder's job, not this one's.
      */
     @ParameterizedTest(name = "{0}")
     @MethodSource("nothingToBillFrom")

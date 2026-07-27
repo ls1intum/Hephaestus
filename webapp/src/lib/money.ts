@@ -26,7 +26,6 @@ const USD_RATE = new Intl.NumberFormat("en-US", {
 	maximumFractionDigits: 4,
 });
 
-/** An amount of money that was spent. */
 export function formatCostUsd(value: number | undefined): string {
 	if (value == null) return "—";
 	if (value === 0) return "$0";
@@ -42,10 +41,7 @@ export function formatCapUsd(value: number | undefined): string {
 	return Number.isInteger(value) ? USD_WHOLE.format(value) : USD.format(value);
 }
 
-/**
- * A published price, never an amount spent ({@link formatCostUsd}): a rate keeps all four decimals
- * because an admin checks it against their provider's price list digit for digit.
- */
+/** A published price: all four decimals, because an admin checks it against a price list. */
 export function formatRateUsd(value: number | undefined): string {
 	return value == null ? "—" : USD_RATE.format(value);
 }

@@ -24,12 +24,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 
 /**
- * What each cap write does to the row it touches: it sets its own column, records the transition
- * against its own purse, and frees the jobs that were parked on that cap. The hold release is only
- * asserted here — the controller integration tests cover the column and the audit row, not the
- * release — so both methods below are load-bearing.
- *
- * <p>That the two writers cannot revert each other — the reason both reads are pessimistic — is a
+ * That the two writers cannot revert each other — the reason both reads are pessimistic — is a
  * property of two transactions racing for one row, so it is asserted where it can actually happen, in
  * {@link LlmBudgetCapConcurrencyIntegrationTest}. Here the locking read is simply the one that is
  * stubbed: a writer that dropped it would find no workspace and 404.
@@ -85,7 +80,7 @@ class LlmBudgetCapWriteTest extends BaseUnitTest {
 
     @Test
     @DisplayName("the instance cap write sets the shared-model cap and frees the jobs held on it")
-    void instanceCapWriteAppliesAndReleases() {
+    void theInstanceCapWriteSetsTheSharedModelCapAndFreesTheJobsHeldOnIt() {
         when(workspaceRepository.findByWorkspaceSlugForUpdate(SLUG)).thenReturn(Optional.of(workspace));
 
         adminService.updateBudget(SLUG, new BigDecimal("250.00"));
@@ -112,7 +107,7 @@ class LlmBudgetCapWriteTest extends BaseUnitTest {
 
     @Test
     @DisplayName("the own-provider cap write sets the own-provider cap and frees the jobs held on it")
-    void ownProviderCapWriteAppliesAndReleases() {
+    void theOwnProviderCapWriteSetsTheOwnProviderCapAndFreesTheJobsHeldOnIt() {
         when(workspaceRepository.findByIdForUpdate(WORKSPACE_ID)).thenReturn(Optional.of(workspace));
 
         workspaceService.updateOwnProviderBudget(WORKSPACE_ID, new BigDecimal("40.00"));

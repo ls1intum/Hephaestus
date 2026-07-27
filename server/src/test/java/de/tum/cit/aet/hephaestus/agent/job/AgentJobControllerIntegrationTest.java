@@ -34,10 +34,6 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         return workspace;
     }
 
-    /**
-     * A token the fixture chooses rather than one {@code AgentJob}'s pre-persist hook mints, so
-     * {@link #jobTokenNeverExposedInResponse} can look for a value it knows is in the row.
-     */
     private static String seededJobToken() {
         return "job-token-must-not-leak-" + UUID.randomUUID();
     }
@@ -49,8 +45,6 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         job.setPurpose(AgentPurpose.PRACTICE_DETECTION);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         job.setStatus(status);
-        // Include upstreamModelId so the DTO's snapshotString extractor (AgentJobDTO.from) is exercised
-        // on its present-value branch end-to-end, not just the absent-field null path.
         job.setConfigSnapshot(
             OBJECT_MAPPER.valueToTree(
                 Map.of(
@@ -156,7 +150,6 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         assertThat(result.id()).isEqualTo(job.getId());
         assertThat(result.status()).isEqualTo(AgentJobStatus.COMPLETED);
         assertThat(result.jobType()).isEqualTo(AgentJobType.PULL_REQUEST_REVIEW);
-        // The model is projected out of the JSONB configSnapshot by AgentJobDTO.from.
         assertThat(result.model()).isEqualTo("gpt-5.4-mini");
     }
 
@@ -329,10 +322,9 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     }
 
     /**
-     * Stands for the whole workspace-admin posture: {@code SecurityConfig} permits anonymous GET under
-     * a workspace slug, so {@code @RequireAtLeastWorkspaceAdmin} on the handler is the only thing
-     * between the public internet and a workspace's job history — and this listing is the one endpoint
-     * here with no member-level sibling pinning that annotation.
+     * {@code SecurityConfig} permits anonymous GET under a workspace slug, so
+     * {@code @RequireAtLeastWorkspaceAdmin} on the handler is the only thing between the public internet
+     * and a workspace's job history.
      */
     @Test
     void listJobsRequiresAuthentication() {

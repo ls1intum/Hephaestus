@@ -29,12 +29,7 @@ export interface BudgetAmountDialogProps {
 	submitLabel?: string;
 	removeLabel?: string;
 	fx?: Fx;
-	/**
-	 * Whether the surface behind this dialog is showing the current month. A cap is not month-scoped,
-	 * so only the current month's rate can be quoted "at today's rate" under the amount — see
-	 * {@link fxCapHint}. Defaults to `false`: a caller that has not thought about it gets no estimate
-	 * rather than a possibly frozen one.
-	 */
+	/** Defaults to `false`: a caller that has not thought about it gets no estimate, not a frozen one. */
 	isCurrentMonth?: boolean;
 	onOpenChange: (open: boolean) => void;
 	/** `null` removes the cap; a number (USD, >= 0, at most 2 decimals) sets it. */
@@ -54,8 +49,7 @@ export function BudgetAmountDialog({
 }: BudgetAmountDialogProps) {
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			{/* Keyed on the value the form seeds from, so the input can never carry the previous
-			    subject's amount and a caller cannot forget to say so. */}
+			{/* Keyed on what the form seeds from, so the input cannot carry the previous subject's amount. */}
 			{open && (
 				<BudgetAmountDialogContent
 					key={contentProps.currentValueUsd ?? "none"}
@@ -88,8 +82,7 @@ function BudgetAmountDialogContent({
 	const [value, setValue] = useState(currentValueUsd != null ? String(currentValueUsd) : "");
 	// Withheld until the first submit so the field isn't red before anything was attempted.
 	const [showError, setShowError] = useState(false);
-	// The server error stays until the amount is edited, so it reads as "this value was rejected"
-	// rather than as ambient noise.
+	// The server error stays until the amount is edited, so it reads as "this value was rejected".
 	const [dismissedServerError, setDismissedServerError] = useState<string | null>(null);
 
 	const parsed = Number.parseFloat(value);
@@ -98,13 +91,10 @@ function BudgetAmountDialogContent({
 	const hasCentPrecision = /^\d*(\.\d{0,2})?$/.test(value.trim());
 	const isValid = !isEmpty && Number.isFinite(parsed) && parsed >= 0 && hasCentPrecision;
 	const canRemove = currentValueUsd != null;
+	// Names the remove button only when it is on screen; a subject with no cap yet has none.
+	const emptyError = canRemove ? `Enter an amount, or use ${removeLabel}.` : "Enter an amount.";
 	const localError = isEmpty
-		? // Names the button actually on screen — and only when it is on screen: the remove button is
-			// not rendered for a subject that has no cap yet, and an error pointing at a control that
-			// isn't there is worse than one that doesn't.
-			canRemove
-			? `Enter an amount, or use ${removeLabel}.`
-			: "Enter an amount."
+		? emptyError
 		: !Number.isFinite(parsed) || parsed < 0
 			? "Enter an amount of $0 or more."
 			: "Use at most two decimal places.";
@@ -131,8 +121,7 @@ function BudgetAmountDialogContent({
 					<DialogTitle>{title}</DialogTitle>
 					<DialogDescription>{description}</DialogDescription>
 				</DialogHeader>
-				{/* Short in portrait, but header plus three stacked footer buttons already exceed a phone in
-				    landscape (~320 px tall), where scrolling the field keeps "Save cap" on screen. */}
+				{/* Short in portrait, but header plus three stacked buttons exceed a phone in landscape. */}
 				<DialogBody className="py-1">
 					<FieldGroup>
 						<Field data-invalid={isInvalid}>
@@ -146,7 +135,6 @@ function BudgetAmountDialogContent({
 								placeholder="e.g. 25.00"
 								value={value}
 								aria-invalid={isInvalid}
-								// Both the estimate and the rejection reason.
 								aria-describedby={
 									[fxHint != null ? fxHintId : null, isInvalid ? errorId : null]
 										.filter(Boolean)

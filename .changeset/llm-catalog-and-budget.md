@@ -11,9 +11,10 @@ behind the LLM proxy, which is now the only path a sandbox has to a provider.
 Interactive mentor conversations reuse a healthy sandbox for faster follow-up turns and replace it
 when its binding changes or its lease expires.
 
-Monthly budget totals now count only verifiable priced usage. When a started attempt has no
-trustworthy usage counters or legacy price snapshot, the total is shown as "at least $X" instead of
-silently reporting a lower number — unverifiable usage is never folded in as if it cost nothing.
+Monthly budget totals now count only verifiable priced usage. A started attempt with no trustworthy
+usage counters is never folded in as if it cost nothing: it is counted separately and the total says
+how many runs it is missing ("2 runs aren't counted in these totals"), so an understated figure
+declares itself instead of reading as complete.
 
 **Operators:** remove `HEPHAESTUS_WORKER_LLM_BASE_URL`, `HEPHAESTUS_WORKER_LLM_API_KEY`,
 `HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED`, and every `AGENT_DEFAULT_CONFIG_*` variable from your

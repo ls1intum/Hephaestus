@@ -42,11 +42,7 @@ function useNow(): number {
 	return useSyncExternalStore(subscribe, getSnapshot);
 }
 
-/**
- * How a timestamp's freshness reads against the cadence expected of it. `unknown` is a timestamp
- * with no known cadence, as opposed to `never`, which is no timestamp at all. Reaching the verdict
- * is the caller's job; this module only paints one.
- */
+/** `unknown` is a timestamp with no known cadence; `never` is no timestamp at all. */
 export type FreshnessTone = "never" | "unknown" | "fresh" | "stale" | "veryStale";
 
 /** `fresh` and `unknown` stay muted: only an adverse judgement earns a colour. */
@@ -69,11 +65,8 @@ export interface RelativeTimeProps {
 }
 
 /**
- * A timestamp as "4 minutes ago", against a clock shared by every relative time on the page, with
- * the absolute instant one hover away.
- *
- * Both halves matter: the phrase re-renders so a "2 minutes ago" cannot sit on screen for an hour,
- * and the absolute instant stays reachable for correlating a row against a server log.
+ * A timestamp as "4 minutes ago", against a clock shared by every relative time on the page, with the
+ * absolute instant one hover away for correlating a row against a server log.
  */
 export function RelativeTime({
 	value,

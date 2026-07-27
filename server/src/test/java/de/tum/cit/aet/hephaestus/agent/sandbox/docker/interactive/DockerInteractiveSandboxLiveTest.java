@@ -676,8 +676,7 @@ class DockerInteractiveSandboxLiveTest {
                     AGENT_PI_IMAGE +
                     " docker/agents/pi/"
             );
-            // If any step of the real bootstrap chain fails, the runner never starts, the pump
-            // sees EOF with a non-zero exit, and attach() throws.
+            // A failed bootstrap step means the pump sees EOF with a non-zero exit and attach() throws.
             AttachedSandbox sb = adapter.attach(buildMentorSpec("u_boot", "w_boot"));
             CopyOnWriteArrayList<JsonNode> frames = new CopyOnWriteArrayList<>();
             sb.subscribe(frames::add);

@@ -29,6 +29,7 @@ Budget enforcement is more accurate and more honest:
 **Operators:** two changes may need action. (1) The instance-wide "usage without a known price"
 Warn/Block setting has been removed; a workspace that has a cap set and unverifiable spend is now
 always paused (a cap you cannot verify is not a cap), while an uncapped workspace is never paused —
-no configuration is needed. (2) Practice detection no longer runs on every configuration by default:
-if any workspace relied on that implicit behaviour, assign it a detection model under Administration
-→ AI models for its reviews to resume.
+no configuration is needed. (2) Practice detection no longer runs on every configuration by default,
+so a workspace that relied on that implicit behaviour needs a detection model assigned before its
+reviews resume. This is part of the one post-upgrade pass over each workspace's AI models page that
+`MIGRATION.md` describes — do it once, there, rather than as a separate step.

@@ -37,12 +37,9 @@ function useLastNonNull<T>(subject: T | null): T | null {
 /**
  * The shared confirm for destructive row actions.
  *
- * **Confirming closes the dialog, before the request it starts has settled** — the row that owns
- * the request reports the outcome instead. ADR 0027 has the derivation:
+ * **Confirming closes the dialog, before the request it starts has settled** — the row that owns the
+ * request reports the outcome instead. ADR 0027 has the derivation:
  * {@link https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0027-dialog-lifetime-and-where-a-write-outcome-lands.md}
- *
- * {@link AlertDialogAction} is a plain `Button`, not the primitive's `Close`, so closing is this
- * component's job rather than something every caller has to remember.
  */
 export function ConfirmDialog<T>({
 	subject,

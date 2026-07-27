@@ -578,8 +578,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 .isInstanceOf(SandboxException.class)
                 .hasMessageContaining("Docker daemon lost");
 
-            // Logs must be read before cleanup removes the container, with the full tail
-            // (mirrors DockerSandboxAdapter.LOG_TAIL_LINES) — a truncated tail is no diagnostics at all.
+            // 500 mirrors DockerSandboxAdapter.LOG_TAIL_LINES; a truncated tail is no diagnostics at all.
             InOrder inOrder = inOrder(containerManager);
             inOrder.verify(containerManager).getLogs(CONTAINER_ID, 500);
             inOrder.verify(containerManager).forceRemove(CONTAINER_ID);
@@ -624,8 +623,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
     class Cancellation {
 
         @Test
-        void shouldThrowOnCancellation() {
-            // Calling cancel() from inside the stub simulates cancellation racing with network creation.
+        void shouldThrowWhenCancelRacesNetworkCreation() {
             when(networkManager.createJobNetwork(eq(JOB_ID), eq(false))).thenAnswer(invocation -> {
                 sandboxAdapter.cancel(JOB_ID);
                 return NETWORK_ID;
@@ -678,7 +676,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         @Test
         void shouldNoOpForUnknownJob() {
             assertThatCode(() -> sandboxAdapter.cancel(UUID.randomUUID())).doesNotThrowAnyException();
-            // "Did not throw" alone would still pass if cancel() stopped the wrong container.
             verify(containerManager, never()).stopContainer(anyString());
         }
     }
@@ -1017,8 +1014,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         void shouldOverwriteSecurityEnvVarsViaOrdering() {
             setupHappyPath();
 
-            // Defense-in-depth: even if GIT_TERMINAL_PROMPT/GIT_ATTR_NOSYSTEM leaked past the
-            // blocklist, the security injection at the end of buildEnvironment() must still win.
+            // Even if these leaked past the blocklist, the injection at the end of buildEnvironment() wins.
             sandboxAdapter.execute(createSpec());
 
             ArgumentCaptor<DockerOperations.ContainerSpec> captor = ArgumentCaptor.forClass(

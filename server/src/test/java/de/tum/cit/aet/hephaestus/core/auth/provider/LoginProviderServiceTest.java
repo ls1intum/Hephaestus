@@ -39,12 +39,7 @@ class LoginProviderServiceTest extends BaseUnitTest {
         LoginProviderClientRegistrationRepository.class
     );
 
-    /**
-     * The real {@link AuthEventLogger} over a mocked writer, not a mocked logger: the fluent
-     * {@code event(...).actingAccount(...).details(...).record()} chain is the thing under test in
-     * {@link #adminMutationsLandOnTheAuthEventTrail()}, and a mocked logger would assert nothing
-     * about what actually reaches the ledger.
-     */
+    /** The real logger over a mocked writer: a mocked logger would assert nothing about what reaches the ledger. */
     private final AuthEventWriter authEventWriter = mock(AuthEventWriter.class);
     private final AuthEventLogger authEventLogger = new AuthEventLogger(authEventWriter);
 
@@ -518,11 +513,6 @@ class LoginProviderServiceTest extends BaseUnitTest {
         return provider;
     }
 
-    /**
-     * Changing how people sign in to the instance is the event an audit trail exists for. All three
-     * admin mutations must land on {@code auth_event} — the ledger an instance admin reads at
-     * {@code /admin/audit}, alongside {@code APP_ROLE_CHANGED} and the impersonation pair.
-     */
     @Test
     void adminMutationsLandOnTheAuthEventTrail() {
         when(repository.existsByRegistrationId("gitlab-acme")).thenReturn(false);
@@ -553,11 +543,6 @@ class LoginProviderServiceTest extends BaseUnitTest {
             .allSatisfy(details -> assertThat(details).contains("\"registrationId\":\"gitlab-acme\""));
     }
 
-    /**
-     * The PATCH audit names the fields that changed so an admin reading the trail can tell a display-name
-     * tweak from a credential rotation — but it must never carry the credential itself. {@code clientSecret}
-     * appearing as a CHANGED KEY is the whole point; the secret's value appearing anywhere is the bug.
-     */
     @Test
     void updateAuditNamesTheRotatedSecretWithoutRecordingIt() {
         LoginProvider existing = gitlabProvider("gitlab-acme", "old-secret");

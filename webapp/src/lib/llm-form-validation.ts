@@ -2,13 +2,11 @@ import { z } from "zod";
 import type { PricingMode } from "@/lib/llm-pricing";
 
 /**
- * Client-side validation for the LLM connection and model forms, which set `noValidate` so their
- * messages render in `FieldError` rather than an unstylable browser bubble — leaving `required`,
- * `min`, `step` and `type="url"` inert and this the only thing enforcing them.
+ * Validation for the LLM forms, which set `noValidate` — so `required`, `min`, `step` and
+ * `type="url"` are inert and this is the only thing enforcing them.
  *
- * Deliberately not mirrored from the server: anything depending on instance state (does the host
- * resolve, is it on the egress allowlist, is loopback permitted). Guessing at those here would
- * reject setups an operator has legitimately enabled.
+ * Deliberately does not mirror the server's instance-state rules (host resolution, egress allowlist,
+ * loopback): guessing at those here would reject setups an operator has legitimately enabled.
  */
 
 export type FieldErrors<TField extends string> = Partial<Record<TField, string>>;
@@ -30,10 +28,7 @@ const displayNameSchema = z
 	.min(1, "A display name is required.")
 	.max(128, "Use 128 characters or fewer.");
 
-/**
- * Credentials, query string and fragment are rejected because that is how a gateway URL smuggles an
- * API key into logs and snapshots. The server refuses them too.
- */
+/** Credentials, query and fragment are rejected: that is how a gateway URL smuggles a key into logs. */
 const baseUrlSchema = z
 	.string()
 	.trim()

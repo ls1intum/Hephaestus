@@ -484,7 +484,6 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
             metadata.put("pr_number", 42);
             job.setMetadata(metadata);
 
-            // Mimics GithubFeedbackChannel rejecting the malformed input; the poster wraps it as JobDeliveryException.
             when(githubChannel.formatPullRequestSubjectId("repo-without-owner", 42)).thenThrow(
                 new IllegalArgumentException("GitHub repoFullName must be 'owner/repo': repo-without-owner")
             );

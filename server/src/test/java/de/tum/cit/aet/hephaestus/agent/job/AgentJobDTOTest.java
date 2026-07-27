@@ -14,11 +14,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * A workspace admin must never see the full path/query of a base URL they do not own end-to-end. A
- * legacy (pre-catalog, {@code connectionScope=null}) config is exactly as operator-sensitive as an
- * INSTANCE one, so it redacts too.
- */
 class AgentJobDTOTest extends BaseUnitTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();

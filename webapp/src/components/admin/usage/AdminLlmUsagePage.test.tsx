@@ -45,10 +45,7 @@ const baseReport: WorkspaceLlmUsageReport = {
 	],
 };
 
-/**
- * The page links to the workspace's models page, so it needs a router in scope. The router mounts
- * asynchronously, hence the await before any assertion.
- */
+/** The page links to the workspace's models page, so it needs a router in scope. */
 async function renderPage(
 	report: WorkspaceLlmUsageReport = baseReport,
 	props: Partial<React.ComponentProps<typeof AdminLlmUsagePage>> = {},
@@ -120,13 +117,11 @@ describe("AdminLlmUsagePage", () => {
 		).toBeTruthy();
 	});
 
-	it("shows the per-run average alongside the untouched funding columns", async () => {
+	it("averages each purse over the run count on its own, never the two summed", async () => {
 		await renderPage();
 
 		const byJobType = screen.getByRole("table", { name: "AI spend by run type" });
 		expect(within(byJobType).getByRole("columnheader", { name: "Avg per run" })).toBeTruthy();
-		// 5 events: $4.25 shared and $1.75 own, each averaged on its own — never summed. No "≈": on
-		// this page that glyph means "converted currency", and the column header already says "Avg".
 		expect(within(byJobType).getByText("$0.85")).toBeTruthy();
 		expect(within(byJobType).getByText("shared models")).toBeTruthy();
 		expect(within(byJobType).getByText("$0.35")).toBeTruthy();
@@ -134,10 +129,6 @@ describe("AdminLlmUsagePage", () => {
 	});
 
 	describe("pause banners", () => {
-		/**
-		 * Whose money it is decides who is asked to act: the workspace can lift its own cap and price
-		 * its own models, but a shared-model budget is the host's to raise and the host's to price.
-		 */
 		it.each<[string, Partial<WorkspaceLlmUsageReport>, string, string, string | null]>([
 			[
 				"a reached provider cap",
@@ -148,8 +139,6 @@ describe("AdminLlmUsagePage", () => {
 				},
 				"Your provider cap is reached",
 				"Paused until August 1 (UTC), or until you raise or remove the cap.",
-				// Their own cap, and this page owns the editor — the banner offers the lever itself
-				// rather than sending them somewhere.
 				null,
 			],
 			[
@@ -171,26 +160,21 @@ describe("AdminLlmUsagePage", () => {
 				{ instancePaused: true, instanceBudgetVerdict: "UNVERIFIABLE" },
 				"Shared-model spend can't be verified",
 				"2 shared-model runs have no price, so the budget can't be checked and shared models are paused. Only your host can price them.",
-				// Only the host can price a shared model, so there is nothing here to link them to.
 				null,
 			],
-		])("explains %s and who can clear it", async (_name, patch, title, body, href) => {
+		])("explains %s, and links to the fix only where the reader can apply it", async (_name, patch, title, body, href) => {
 			await renderPage({ ...baseReport, ...patch });
 
 			const banner = screen.getByText(title).closest("[role='alert']") as HTMLElement;
 			expect(banner).toBeTruthy();
 			expect(within(banner).getByText(body)).toBeTruthy();
-			// Stated for every row, absence included: a link offered where the reader can do nothing
-			// with it is as wrong as a missing one, and only asserting the positives hides that.
 			expect(
 				within(banner).queryByRole("link", { name: "Open AI models" })?.getAttribute("href") ??
 					null,
 			).toBe(href);
 		});
 
-		it("puts the cap editor inside the banner about the cap that stopped the work", async () => {
-			// The lever has to be in the banner that names the pause; on this page the only other
-			// route to it is the provider card further down, past the fold on a phone.
+		it("puts the cap editor in the banner as a button, not a link away to another owner", async () => {
 			const onEditOwnProviderCap = vi.fn();
 			await renderPage(
 				{
@@ -208,15 +192,9 @@ describe("AdminLlmUsagePage", () => {
 
 			fireEvent.click(adjust);
 
-			// A workspace admin can lift their own cap, so the control is a button they press here —
-			// not a link away to whoever owns the other purse.
 			expect(onEditOwnProviderCap).toHaveBeenCalledTimes(1);
 			expect(adjust.tagName).toBe("BUTTON");
 		});
-
-		// Which of the two paused banners the reader meets first is a claim about the rendered page,
-		// not about sibling order in the DOM — `flex-col-reverse` satisfies one and fails the other.
-		// It is measured in `AdminLlmUsagePage.stories.tsx` (`BothPaused`), where there is layout.
 
 		it("shows no pause banner for a past month", async () => {
 			await renderPage(
@@ -229,14 +207,6 @@ describe("AdminLlmUsagePage", () => {
 	});
 
 	describe("approaching a cap", () => {
-		/**
-		 * The warning is a status, not an alert: nothing has happened yet, and nothing is blocked. Each
-		 * row states the whole region a reader would hear, or `null` for "there is no such region" — so
-		 * the silent cases are asserted as firmly as the loud ones, in one unconditional expectation.
-		 *
-		 * `unpricedEventCount: 0` on every row: that callout is a second `role="status"` on this page
-		 * and has nothing to do with pace.
-		 */
 		it.each<[string, Partial<WorkspaceLlmUsageReport>, Date, string | null]>([
 			[
 				"warns at 80% with the date the pace reaches the cap",
@@ -291,18 +261,13 @@ describe("AdminLlmUsagePage", () => {
 		it.each<[string, Partial<WorkspaceLlmUsageReport>, string]>([
 			["a cap in force", {}, "Change cap"],
 			["no cap yet", { ownProviderMonthlyBudgetUsd: undefined }, "Set cap"],
-		])("withdraws the editor on a closed month, with %s", async (_name, patch, label) => {
+		])("withdraws the editor on a closed month and says where to change it, with %s", async (_name, patch, label) => {
 			await renderPage(
 				{ ...baseReport, month: "2026-06", ...patch },
 				{ month: "2026-06", isCurrentMonth: false },
 			);
 
-			// A cap is not month-scoped: saved from June's view it changes what runs today. Offering it
-			// here would also put "≈ €44 at today's rate" under the amount field while the caption below
-			// says the month's rate is frozen — two sentences on one screen contradicting each other.
 			expect(screen.queryByRole("button", { name: label })).toBeNull();
-			// And the sentence that replaces the button has to point at the way back: the reader wanted
-			// to change a cap, and "not here" alone leaves them looking for where.
 			expect(
 				screen.getByText(
 					"A cap applies from the moment it is saved, not to the month you are reading. Step forward to this month to change it.",
@@ -319,8 +284,7 @@ describe("AdminLlmUsagePage", () => {
 			source: "ECB",
 		};
 
-		/** Two days, so the breakdown table earns a footer — and the footer converts its total. */
-		const twoDays: WorkspaceLlmUsageReport["byDay"] = [
+		const twoDaysWithATotalRow: WorkspaceLlmUsageReport["byDay"] = [
 			{
 				day: new Date("2026-07-05T00:00:00.000Z"),
 				instanceTotalCostUsd: 6.2,
@@ -337,13 +301,8 @@ describe("AdminLlmUsagePage", () => {
 			},
 		];
 
-		/**
-		 * A $0 shared budget — the supported "pause now" state — converts to nothing, and with no
-		 * provider side no card converts at all. The table footers convert independently, so the
-		 * caption must follow *them* too: otherwise "≈ €10.90" sits on screen with no rate behind it.
-		 */
 		it.each<[string, WorkspaceLlmUsageReport["byDay"], number, string | null]>([
-			["only the table footers convert", twoDays, 12.4, "≈ €10.90"],
+			["only the table footers convert", twoDaysWithATotalRow, 12.4, "≈ €10.90"],
 			["nothing on the page converted", [], 0, null],
 		])("discloses the rate when %s", async (_name, byDay, instanceTotalCostUsd, footerText) => {
 			await renderPage({
@@ -364,15 +323,10 @@ describe("AdminLlmUsagePage", () => {
 			}
 			const table = screen.getByRole("table", { name: "AI spend by day" });
 			expect(within(table).getByRole("row", { name: /^Total/ }).textContent).toContain(footerText);
-			// Presence, not wording: the sentence itself is `fx.test.tsx`'s to state in full.
 			expect(screen.getByText(/reference rate published on/)).toBeTruthy();
 		});
 
 		it("stays silent under a cap that is set but converted nowhere on the page", async () => {
-			// The first days of a month: a provider cap exists, and no spend has reached the whole unit
-			// the estimates round to, so nothing on screen is in euros. The caption follows what is
-			// *rendered*, not what could be computed — a conversion prepared for the cap and shown
-			// nowhere must not put "EUR amounts are estimates…" under a page with no estimates on it.
 			await renderPage({
 				...baseReport,
 				instanceMonthlyBudgetUsd: undefined,
@@ -399,15 +353,11 @@ describe("AdminLlmUsagePage", () => {
 					ownProviderTotalCostUsd: 0,
 					unpricedEventCount: 0,
 					fx: eur,
-					// Late enough in the month that the pace lands under the cap, which is the branch that
-					// quotes a month-end figure instead of a date.
 				},
 				{ now: new Date("2026-07-28T12:00:00.000Z") },
 			);
 
 			const alert = screen.getByText(/At this pace/);
-			// Half a converted sentence reads as a mistake: "$43.90 of $50 (≈ €38.59 of €44) … the month
-			// finishes around $61.20" would make the reader switch currencies mid-breath.
 			expect(alert.textContent).toContain("≈ €38.59 of €44");
 			expect(alert.textContent).toMatch(/the month finishes around \$[\d.]+ \(≈ €[\d.]+\)\./);
 		});

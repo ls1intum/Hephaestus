@@ -30,15 +30,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * The proxy's running usage totals, asserted on the {@code agent_job} row they are written to.
- *
- * <p>Against the real database rather than a mocked repository, because the behaviour under test is
- * the ADD: a job makes many calls, and each must land on top of the previous ones. A verify-only test
- * would pin the arguments and still pass if {@code accumulateLlmUsage} overwrote instead of summing —
- * which would silently discard everything but the last call of a crashed run.
- *
- * <p>The bean itself is absent from the test context ({@code hephaestus.runtime.worker.enabled=false}),
- * so the accumulator is constructed directly and its {@code REQUIRES_NEW} boundary supplied by
+ * The accumulator bean is absent from the test context ({@code hephaestus.runtime.worker.enabled=false}),
+ * so it is constructed directly here and its {@code REQUIRES_NEW} boundary supplied by
  * {@link TransactionTemplate}.
  */
 @Tag("integration")
@@ -103,11 +96,6 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
         return jobRepository.findLlmUsageById(job.getId()).orElseThrow();
     }
 
-    // Reading the usage block itself — both protocols, every bucket — belongs to the single parser both
-    // transports share, and ProxyStreamUsageTapTest tables it against that parser directly. What this
-    // class owns is what the parsed numbers do to the row, so every test below asserts an ADD or a fence.
-
-    /** The reason the class exists: a crashed run is billed for every call it made, not the last one. */
     @Test
     @DisplayName("successive calls add onto the row rather than replacing it")
     void repeatedCallsAccumulateOntoTheSameRow() {
@@ -152,16 +140,10 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
     }
 
     /**
-     * The orphan-recovery race, end to end on the real row.
-     *
-     * <p>Attempt 0 dispatches a provider call. While it waits, its worker's heartbeat goes stale and
-     * orphan recovery requeues the job — bumping {@code retry_count} and zeroing these counters — after
-     * which a sibling claims it as attempt 1. The original worker was never dead: its response arrives
-     * and it accumulates. Without the attempt fence those tokens land on attempt 1's freshly-zeroed
-     * counters and are billed at attempt 1's price and funding source.
-     *
-     * <p>Kills the mutation "drop {@code AND j.retryCount = :attempt} from {@code accumulateLlmUsage}":
-     * without it the row reads 25 input tokens and one call belonging to nobody.
+     * Attempt 0 dispatches a provider call. While it waits, its worker's heartbeat goes stale and orphan
+     * recovery requeues the job — bumping {@code retry_count} and zeroing these counters — after which a
+     * sibling claims it as attempt 1. The original worker was never dead: its response arrives and it
+     * accumulates, onto counters that now belong to attempt 1 and its price and funding source.
      */
     @Test
     @DisplayName("a late call from a superseded attempt is dropped, not billed to the attempt that now owns the row")
@@ -176,7 +158,6 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         ProxyUsageAccumulator accumulator = new ProxyUsageAccumulator(jobRepository, registry);
 
-        // The requeue: retry_count bumped, per-attempt counters zeroed, row reclaimed as attempt 1.
         requeueTo(job, 1);
 
         accumulateAs(
@@ -193,7 +174,6 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
         assertThat(registry.counter("llm.proxy.usage.accumulate.superseded").count()).isEqualTo(1.0);
     }
 
-    /** The same fence read the other way: the attempt that still owns the row is billed normally. */
     @Test
     @DisplayName("the attempt that still owns the row is accumulated onto as before")
     void theOwningAttemptStillAccumulates() {
@@ -212,10 +192,6 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
         assertThat(usage.outputTokens()).isEqualTo(9);
     }
 
-    /**
-     * The terminal half of the same fence: after a clean finish the row's totals are the runner's
-     * authoritative report, and a straggling proxy call must not add onto them.
-     */
     @Test
     @DisplayName("a call that lands after the job went terminal does not corrupt the final totals")
     void lateWriteAfterTerminalIsDropped() {
@@ -245,11 +221,7 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
         jobRepository.saveAndFlush(job);
     }
 
-    /**
-     * Only reachable with a stubbed repository: a real one has no way to fail on demand. The
-     * behaviour under test is not the swallow — it is that the swallow is COUNTED, because these
-     * tokens are the only record of a call that already cost money.
-     */
+    /** Only reachable with a stubbed repository: a real one has no way to fail on demand. */
     @Test
     @DisplayName("a failed write is swallowed, but counted so the under-billing is visible")
     void failedAccumulationIsCountedNotSilent() {

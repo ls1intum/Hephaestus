@@ -72,19 +72,16 @@ class LlmModelServiceTest extends BaseUnitTest {
         connection.setId(3L);
         model.setConnection(connection);
         // Not every test looks up model 7 (e.g. the unknown-id 404 case) — lenient so those aren't
-        // flagged as unnecessary stubbing. Both finders are stubbed: updatePrice() still uses the plain
-        // findById, get() uses the eager-fetch variant, and activation/repricing/sharing use the
-        // write-locked variant.
+        // flagged as unnecessary stubbing. All three finders are stubbed because the service picks a
+        // different one per operation.
         lenient().when(modelRepository.findById(7L)).thenReturn(Optional.of(model));
         lenient().when(modelRepository.findByIdWithConnection(7L)).thenReturn(Optional.of(model));
         lenient().when(modelRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(model));
     }
 
     private void stubModelSavePassthrough() {
-        // Stubs both: create()/update() now flush synchronously (saveAndFlush, so a
-        // concurrent unique-constraint violation surfaces inside their try/catch instead of escaping as
-        // an uncaught 500 at the transaction's implicit end-of-method flush), while updateSharing()
-        // (untouched — it never changes upstream_model_id) still calls plain save().
+        // create()/update() flush synchronously; updateSharing() never touches upstream_model_id and
+        // still calls plain save().
         lenient()
             .when(modelRepository.save(any(LlmModel.class)))
             .thenAnswer(invocation -> invocation.getArgument(0));
@@ -93,7 +90,6 @@ class LlmModelServiceTest extends BaseUnitTest {
             .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
-    /** A rate column from the table below; an absent rate is a {@code null} rate, not zero. */
     private static @org.jspecify.annotations.Nullable BigDecimal rate(@org.jspecify.annotations.Nullable String value) {
         return value == null ? null : new BigDecimal(value);
     }
@@ -165,15 +161,6 @@ class LlmModelServiceTest extends BaseUnitTest {
             assertThat(inserted.getValue().getPer1mInputUsd()).isEqualByComparingTo("3.00");
         }
 
-        /**
-         * The shared {@code LlmPriceValidation} rule table, driven through the endpoint that reprices
-         * an instance model. One row per rule, so deleting any single branch of the validator leaves
-         * exactly one row red. The message fragment is asserted and not merely the exception type:
-         * it is what the admin who typed the rates reads back.
-         *
-         * <p>Workspace BYO models reach the same validator through their own create path;
-         * {@code WorkspaceLlmModelServiceTest} pins that wiring rather than repeating this table.
-         */
         @ParameterizedTest(name = "{5}")
         @CsvSource(
             nullValues = "NULL",
@@ -213,7 +200,6 @@ class LlmModelServiceTest extends BaseUnitTest {
         void pricedModeAcceptsOneZeroRateAsLongAsAnotherIsPositive() {
             when(priceRepository.findByModelIdAndEffectiveToIsNull(7L)).thenReturn(Optional.empty());
             when(priceRepository.save(any(LlmModelPrice.class))).thenAnswer(invocation -> invocation.getArgument(0));
-            // Free-input, priced-output is a legitimate PRICED model — only the all-zero case is rejected.
             UpdateLlmModelPriceRequestDTO request = new UpdateLlmModelPriceRequestDTO(
                 PricingMode.PRICED,
                 BigDecimal.ZERO,
@@ -281,17 +267,13 @@ class LlmModelServiceTest extends BaseUnitTest {
 
         /**
          * Replace-all grant updates must read the row through the write-locked finder, or two admins
-         * editing the same model's grant set at once silently overwrite each other. Asserted on the
-         * instance that actually gets mutated rather than on which finder was called: the two finders
-         * hand back different objects here, so a read that skipped the lock would write its visibility
-         * onto the unlocked copy and return that one instead.
+         * editing the same model's grant set at once silently overwrite each other.
          */
         @Test
         void locksTheModelWhileReplacingItsGrantSet() {
             stubModelSavePassthrough();
-            // A decoy behind the NON-locking finder. lenient() because it must stay unused while the
-            // code is correct — that is the assertion. If updateSharing ever reads through
-            // findByIdWithConnection instead, it picks this object up and the assertions below fail.
+            // A decoy behind the NON-locking finder, lenient because it must stay unused while the code
+            // is correct — if updateSharing ever reads through it, the assertions below fail.
             LlmModel unlockedCopy = new LlmModel();
             unlockedCopy.setId(7L);
             unlockedCopy.setVisibility(ModelVisibility.PUBLIC);
@@ -348,7 +330,6 @@ class LlmModelServiceTest extends BaseUnitTest {
         @Test
         void grantedVisibilityReplacesGrantSetWithExactlyTheRequestedWorkspaces() {
             stubModelSavePassthrough();
-            // Existing grants: workspace 1 (kept) and workspace 2 (to be removed).
             LlmModelWorkspaceGrant keep = new LlmModelWorkspaceGrant(7L, 1L);
             LlmModelWorkspaceGrant remove = new LlmModelWorkspaceGrant(7L, 2L);
             when(grantRepository.findByIdModelId(7L)).thenReturn(List.of(keep, remove));
@@ -433,25 +414,17 @@ class LlmModelServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void updateKeepsImmutableUpstreamModelId() {
+        void updateKeepsImmutableUpstreamModelIdAndAuditsTheModelAndConnectionItChanged() {
             stubModelSavePassthrough();
             UpdateLlmModelRequestDTO request = new UpdateLlmModelRequestDTO("Renamed", null, null, null, null);
 
             LlmModel result = modelService.update(7L, request);
 
             assertThat(result.getUpstreamModelId()).isEqualTo("gpt-5");
-            // An edit to a model every workspace can bind has to leave a trail naming which model on
-            // which connection changed — a CREATED row here, or a row naming a different model, reads
-            // as a complete audit trail while pointing at the wrong provider.
             verify(llmModelAudit).modelUpdated(7L, 3L, "gpt-5");
             verify(llmModelAudit, never()).modelCreated(any(), any(), any());
         }
 
-        /**
-         * A model is created switched off, always. Activation requires a price, and the price is set on
-         * a separate call that needs the model's id — so a model that arrived live could only ever be a
-         * live model with no price, which admission then refuses with nothing on screen to explain it.
-         */
         @Test
         void refusesToCreateAModelThatIsAlreadyActive() {
             CreateLlmModelRequestDTO active = new CreateLlmModelRequestDTO(
@@ -468,21 +441,17 @@ class LlmModelServiceTest extends BaseUnitTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Create the model disabled, set its price, then activate it.");
 
-            // Refused before anything is looked up, let alone written or audited.
             verify(connectionRepository, never()).findById(any());
             verify(modelRepository, never()).saveAndFlush(any());
             verifyNoInteractions(llmModelAudit);
         }
 
         /**
-         * the fast-path {@code existsByConnectionIdAndUpstreamModelId} check above is
-         * racy — two concurrent creates/updates can both pass it. The unique constraint
-         * {@code ux_llm_model_connection_upstream} is the real backstop, but it only fires when the
-         * INSERT/UPDATE is actually flushed to the DB. {@code save()} alone doesn't guarantee that (a
-         * generated-id entity's write can be deferred to the transaction's implicit end-of-method flush,
-         * OUTSIDE the try/catch) — {@code saveAndFlush()} forces it synchronously, so the violation lands
-         * inside the catch and becomes a 409 instead of an uncaught 500. Simulated here via a mocked
-         * {@link DataIntegrityViolationException} thrown directly from {@code saveAndFlush}.
+         * The fast-path {@code existsByConnectionIdAndUpstreamModelId} check is racy, so the unique
+         * constraint {@code ux_llm_model_connection_upstream} is the real backstop — but it only fires
+         * on an actual flush. {@code save()} alone can defer a generated-id entity's write to the
+         * transaction's implicit end-of-method flush, OUTSIDE the try/catch; {@code saveAndFlush()}
+         * forces it inside, so the violation becomes a 409 instead of an uncaught 500.
          */
         @Test
         void createTranslatesAFlushTimeConstraintViolationInto409() {

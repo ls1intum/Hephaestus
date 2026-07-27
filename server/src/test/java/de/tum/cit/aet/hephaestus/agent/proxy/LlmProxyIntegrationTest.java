@@ -37,7 +37,6 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/** Real HTTP proof of the proxy's narrow OpenAI-compatible trust boundary. */
 class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -214,7 +213,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     private AgentJob runningJob(String protocol, LlmAuthMode authMode, String upstreamModelId, boolean modelEnabled) {
-        // The three fields this test is actually about — the fixture supplies the rest.
         LlmConnection connection = LlmCatalogTestFixtures.connection("connection-" + System.nanoTime());
         connection.setBaseUrl(upstream.url("/v1").toString().replaceAll("/$", ""));
         connection.setApiProtocol(protocol);
@@ -232,7 +230,6 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
             )
         );
 
-        // The per-purpose binding IS the config pointer now: one row per (workspace, purpose).
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
         binding.setWorkspace(workspace);
         binding.setPurpose(AgentPurpose.PRACTICE_DETECTION);

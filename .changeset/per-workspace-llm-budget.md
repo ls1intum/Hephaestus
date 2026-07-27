@@ -10,7 +10,7 @@ administrator raises the cap. Changes to a cap are recorded in the audit log alo
 administrative changes.
 
 Workspace administrators get a matching view for their own workspace under Administration →
-"Usage": total spend for the month, a breakdown by day and by kind of work (pull-request reviews,
+"AI usage": total spend for the month, a breakdown by day and by kind of work (pull-request reviews,
 issue reviews, conversation reviews, and mentor conversations), and their current cap, which they can
 see but not raise. Mentor conversations are included in these totals for the first time. Where a
 started attempt has no trustworthy usage counters or legacy price snapshot, it is counted separately

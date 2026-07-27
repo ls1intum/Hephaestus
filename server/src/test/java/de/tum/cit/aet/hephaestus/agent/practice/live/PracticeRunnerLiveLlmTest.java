@@ -300,9 +300,7 @@ class PracticeRunnerLiveLlmTest {
             StandardCopyOption.REPLACE_EXISTING
         );
 
-        // Pi-side settings + the same pi-provider.json contract production uses. The runner registers
-        // this provider directly before createAgentSession(), so the live test must not maintain a
-        // parallel models.json shape that can drift from production.
+        // The same pi-provider.json contract production uses, not a parallel models.json that could drift.
         Path piHome = WORKSPACE.resolve(".pi-home");
         Files.createDirectories(piHome);
         Files.write(piHome.resolve("settings.json"), buildSettingsJson(creds.model()));
@@ -357,8 +355,7 @@ class PracticeRunnerLiveLlmTest {
     }
 
     private static byte[] buildSettingsJson(String modelId) throws IOException {
-        // Same shape as PiRuntimeFactory.buildPiSettingsJson. Kept local because this live harness
-        // stages files directly rather than building a full server-side PiPlan.
+        // Duplicates PiRuntimeFactory.buildPiSettingsJson: this harness stages files without a PiPlan.
         Map<String, Object> settings = new LinkedHashMap<>();
         settings.put("defaultProvider", "hephaestus");
         settings.put("defaultModel", modelId);

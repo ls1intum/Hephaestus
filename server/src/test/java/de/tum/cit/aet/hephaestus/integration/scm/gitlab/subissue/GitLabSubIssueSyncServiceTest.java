@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.subissue;
 
+import static de.tum.cit.aet.hephaestus.integration.scm.GraphQlResponseStubValidator.Vendor.GITLAB;
+import static de.tum.cit.aet.hephaestus.integration.scm.GraphQlResponseStubValidator.assertVendorCouldReturn;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -119,15 +121,27 @@ class GitLabSubIssueSyncServiceTest extends BaseUnitTest {
         return issue;
     }
 
-    /** A GraphQL WorkItem node for {@code iid} whose HIERARCHY widget points at {@code parentIid}. */
+    /**
+     * A GraphQL WorkItem node for {@code iid} whose HIERARCHY widget points at {@code parentIid}.
+     *
+     * <p>{@code WorkItem.iid} is {@code String!} in the checked-in schema, so GitLab sends {@code "42"} and never
+     * {@code 42}. Stubbing it as a number would exercise only the {@code Number} branch of the production
+     * extractor — the branch GitLab can never trigger.
+     */
     private static Map<String, Object> workItemNode(int iid, int parentIid, String parentNamespace) {
-        Map<String, Object> parent = Map.of("iid", parentIid, "namespace", Map.of("fullPath", parentNamespace));
+        Map<String, Object> parent = Map.of(
+            "iid",
+            String.valueOf(parentIid),
+            "namespace",
+            Map.of("fullPath", parentNamespace)
+        );
         Map<String, Object> hierarchyWidget = Map.of("type", "HIERARCHY", "parent", parent);
-        return Map.of("iid", iid, "widgets", List.of(hierarchyWidget));
+        return Map.of("iid", String.valueOf(iid), "widgets", List.of(hierarchyWidget));
     }
 
     @SafeVarargs
     private void mockWorkItemResponse(Map<String, Object>... nodes) {
+        assertVendorCouldReturn(GITLAB, "GetProjectWorkItemHierarchy", "project.workItems.nodes", List.of(nodes));
         HttpGraphQlClient client = mock(HttpGraphQlClient.class);
         when(graphQlClientProvider.forScope(anyLong())).thenReturn(client);
 

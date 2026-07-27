@@ -10,8 +10,8 @@ import { cn } from "@/lib/utils";
  * ⚠️ Diverges from the shadcn registry — `shadcn add dialog` drops the following; re-apply them.
  *
  * 1. `DialogContent` is height-bound and scrollable. Upstream's popup is `fixed` with no
- *    `max-height`, and a fixed element taller than the viewport cannot be scrolled back into view,
- *    so its title and submit button are unreachable on a phone (WCAG 2.2 SC 1.4.10).
+ *    `max-height`, and a fixed element taller than the viewport cannot be scrolled back into view
+ *    (WCAG 2.2 SC 1.4.10).
  * 2. `DialogBody` — an opt-in scrollable middle, with header and footer pinned around it.
  * 3. `DialogForm` — a `display: contents` form wrapper, so a submitting footer costs no layout box.
  */
@@ -109,12 +109,10 @@ function DialogBody({ className, ...props }: React.ComponentProps<"div">) {
 }
 
 /**
- * A `<form>` wrapping a dialog's header, body and footer so a footer button submits it.
- * `display: contents` keeps the three as {@link DialogContent}'s own flex children; a form with a
- * box of its own would defeat the pinned-header/scrolling-body column.
+ * `display: contents` keeps header, body and footer as {@link DialogContent}'s own flex children; a
+ * form with a box of its own would defeat the pinned-header/scrolling-body column.
  *
- * `noValidate` because these forms report their own errors: the browser's bubble announces nothing
- * to a screen reader and stops at the first offending field.
+ * `noValidate` because these forms report their own errors: the browser's bubble announces nothing.
  */
 function DialogForm({ className, ...props }: React.ComponentProps<"form">) {
 	return <form className={cn("contents", className)} noValidate {...props} />;
