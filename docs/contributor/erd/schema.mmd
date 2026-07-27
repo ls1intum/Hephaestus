@@ -396,7 +396,6 @@ erDiagram
         SMALLINT id PK
         TEXT allowed_egress_hosts
         BOOLEAN allow_workspace_connections "NOT NULL"
-        VARCHAR(16) default_unpriced_policy "NOT NULL"
         TIMESTAMPTZ updated_at
         VARCHAR(255) updated_by
     }
@@ -523,11 +522,11 @@ erDiagram
         VARCHAR(128) display_name "NOT NULL"
         VARCHAR(2048) base_url "NOT NULL"
         VARCHAR(40) api_protocol "NOT NULL"
+        VARCHAR(16) auth_mode "NOT NULL"
         TEXT api_key
         BOOLEAN enabled "NOT NULL"
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at
-        VARCHAR(16) auth_mode "NOT NULL"
     }
 
     LlmModel {
@@ -535,7 +534,7 @@ erDiagram
         BIGINT connection_id FK,UK "NOT NULL"
         VARCHAR(64) slug UK "NOT NULL"
         VARCHAR(128) display_name "NOT NULL"
-        VARCHAR(256) upstream_model_id "NOT NULL"
+        VARCHAR(256) upstream_model_id UK "NOT NULL"
         INTEGER context_window
         INTEGER max_output_tokens
         BOOLEAN supports_reasoning "NOT NULL"
@@ -572,17 +571,18 @@ erDiagram
         UUID id PK
         BIGINT workspace_id FK "NOT NULL"
         VARCHAR(40) job_type "NOT NULL"
+        VARCHAR(20) source_type UK "NOT NULL"
         UUID source_id UK "NOT NULL"
+        INTEGER source_attempt UK "NOT NULL"
         VARCHAR(128) model
         BIGINT input_tokens "NOT NULL"
         BIGINT output_tokens "NOT NULL"
         BIGINT cache_read_tokens "NOT NULL"
         BIGINT cache_write_tokens "NOT NULL"
+        BIGINT reasoning_tokens "NOT NULL"
         INTEGER total_calls "NOT NULL"
         NUMERIC(18,6) cost_usd
-        TIMESTAMPTZ occurred_at "NOT NULL"
         VARCHAR(16) pricing_state "NOT NULL"
-        BIGINT reasoning_tokens "NOT NULL"
         VARCHAR(16) funding_source "NOT NULL"
         BIGINT applied_price_id
         BIGINT applied_workspace_model_id
@@ -590,8 +590,7 @@ erDiagram
         NUMERIC(18,8) applied_per_1m_output_usd
         NUMERIC(18,8) applied_per_1m_cache_read_usd
         NUMERIC(18,8) applied_per_1m_cache_write_usd
-        VARCHAR(20) source_type UK "NOT NULL"
-        INTEGER source_attempt UK "NOT NULL"
+        TIMESTAMPTZ occurred_at "NOT NULL"
     }
 
     LoginProvider {
@@ -1217,20 +1216,20 @@ erDiagram
         VARCHAR(128) display_name "NOT NULL"
         VARCHAR(2048) base_url "NOT NULL"
         VARCHAR(40) api_protocol "NOT NULL"
+        VARCHAR(16) auth_mode "NOT NULL"
         TEXT api_key
         BOOLEAN enabled "NOT NULL"
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at
-        VARCHAR(16) auth_mode "NOT NULL"
     }
 
     WorkspaceLlmModel {
         BIGINT id PK,UK
         BIGINT workspace_id FK,UK "NOT NULL"
-        BIGINT connection_id FK "NOT NULL"
+        BIGINT connection_id FK,UK "NOT NULL"
         VARCHAR(64) slug UK "NOT NULL"
         VARCHAR(128) display_name "NOT NULL"
-        VARCHAR(256) upstream_model_id "NOT NULL"
+        VARCHAR(256) upstream_model_id UK "NOT NULL"
         INTEGER context_window
         INTEGER max_output_tokens
         BOOLEAN supports_reasoning "NOT NULL"
@@ -1339,7 +1338,9 @@ erDiagram
     WorkspaceLlmModel ||--|| WorkspaceAgentBinding : has
     Workspace ||--|| WorkspaceLlmConnection : has
     Workspace ||--|| WorkspaceLlmModel : has
-    WorkspaceLlmConnection ||--|| WorkspaceLlmModel : has
+    WorkspaceLlmConnection ||--|| WorkspaceLlmModel : workspace_id
+    WorkspaceLlmConnection ||--|| WorkspaceLlmModel : connection_id
+    WorkspaceLlmConnection ||--|| WorkspaceLlmModel : connection_id
     User ||--|| WorkspaceMembership : belongs_to
     Workspace ||--|| WorkspaceMembership : belongs_to
 
@@ -1426,8 +1427,6 @@ erDiagram
     LlmModel ||--o{ WorkspaceAgentBinding : references
     WorkspaceLlmModel ||--o{ WorkspaceAgentBinding : workspace_model_id
     WorkspaceLlmModel ||--o{ WorkspaceAgentBinding : workspace_model_id
-    WorkspaceLlmConnection ||--o{ WorkspaceLlmModel : connection_id
-    WorkspaceLlmConnection ||--o{ WorkspaceLlmModel : connection_id
     Workspace ||--o{ WorkspaceSlugHistory : has
 
     %% Many-to-Many relationships
