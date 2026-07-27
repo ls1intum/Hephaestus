@@ -62,7 +62,7 @@ pnpm run generate:api:application-server:client
 
 ### Always
 
-- Run `./mvnw test` before committing
+- Run `./mvnw test -P'!quick'` before committing. The `quick` profile is active by default and skips surefire entirely, so a bare `./mvnw test` prints BUILD SUCCESS having run **zero** tests — see the root `AGENTS.md` for the four test tiers.
 - Use constructor injection (via `@RequiredArgsConstructor`)
 - Return `ResponseEntity` with proper status codes
 - Tag tests appropriately (`@Tag("unit")`, etc.)
@@ -86,7 +86,16 @@ pnpm run generate:api:application-server:client
 src/main/java/de/tum/cit/aet/hephaestus/
 ├── Application.java              # Entry point (@SpringBootApplication)
 ├── config/                       # @Configuration beans
+├── core/                         # Cross-cutting substrate (security, tenancy, runtime roles, auth)
 ├── workspace/                    # Multi-tenant workspace management
+├── agent/                        # Agent jobs, LLM catalog + proxy, usage ledger, sandboxes
+│   ├── catalog/                  # Instance + workspace LLM connections, models, pricing
+│   ├── config/                   # Per-purpose agent bindings (workspace × purpose → model)
+│   ├── job/                      # agent_job queue: submit, poll/claim, execute, sweep, retain
+│   ├── proxy/                    # In-app LLM proxy — the only credential path a sandbox has
+│   ├── sandbox/                  # Docker sandbox runtime + SPI
+│   └── usage/                    # llm_usage_event ledger, budget caps, admission, FX
+├── practices/                    # Practice catalogue, detection settings, feedback
 ├── integration/                  # Unified integration framework
 │   ├── core/                     # Vendor-agnostic substrate (webhook, consumer, oauth, …)
 │   │   └── webhook/              # Shared inbound webhook substrate (all kinds)

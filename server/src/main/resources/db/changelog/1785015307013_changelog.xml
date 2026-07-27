@@ -818,11 +818,23 @@
     </changeSet>
 
     <changeSet id="1785015307013-21" author="hephaestus" runInTransaction="false">
-        <preConditions onFail="MARK_RAN" onFailMessage="ix_agent_job_queued_available already present">
-            <not><indexExists indexName="ix_agent_job_queued_available"/></not>
+        <preConditions onFail="MARK_RAN" onFailMessage="ix_agent_job_queued_available already present and valid">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
+                WHERE c.relname = 'ix_agent_job_queued_available' AND i.indisvalid
+            </sqlCheck>
         </preConditions>
-        <comment>Index queued jobs by their claim-eligibility time without blocking queue traffic.</comment>
+        <comment>
+            Index queued jobs by their claim-eligibility time without blocking queue traffic.
+
+            The guard is on pg_index.indisvalid, not on the index merely existing: a CREATE INDEX
+            CONCURRENTLY that fails partway leaves an index the planner will never use, and JDBC index
+            metadata cannot tell it apart from a good one. An existence-only precondition would record
+            this changeSet as applied and leave the queue's poll query unindexed for the life of the
+            install. The leading DROP clears exactly that leftover and is a no-op otherwise.
+        </comment>
         <sql>
+            DROP INDEX CONCURRENTLY IF EXISTS ix_agent_job_queued_available;
             CREATE INDEX CONCURRENTLY ix_agent_job_queued_available
                 ON agent_job (available_at, id)
                 WHERE status = 'QUEUED';
@@ -867,7 +879,18 @@
         <preConditions onFail="MARK_RAN" onFailMessage="agent_job table is absent">
             <tableExists tableName="agent_job"/>
         </preConditions>
-        <comment>Oban's autovacuum recommendation, adapted: a high-churn queue table needs vacuum triggered by absolute row-change count, not the default 20% scale factor.</comment>
+        <comment>
+            Oban's autovacuum recommendation, adapted: a high-churn queue table needs vacuum triggered
+            by absolute row-change count, not the default 20% scale factor.
+
+            The precondition checks only that the table is there, and deliberately does not try to
+            detect the storage parameters themselves. A precondition can see WHETHER a reloption is
+            set but not whether it holds the intended value, so matching on presence would let a stale
+            or half-applied setting silently skip the change. ALTER TABLE ... SET (...) is idempotent,
+            so this reasserts the intended values outright. Consequence, stated rather than hidden:
+            a re-run overwrites operator-tuned values for these two parameters on this table. Tune
+            them by changing this changelog, not the live table.
+        </comment>
         <sql>
             ALTER TABLE agent_job SET (autovacuum_vacuum_scale_factor = 0, autovacuum_vacuum_threshold = 500);
         </sql>
@@ -880,7 +903,7 @@
         <preConditions onFail="MARK_RAN" onFailMessage="worker_registry table is absent">
             <tableExists tableName="worker_registry"/>
         </preConditions>
-        <comment>Same autovacuum tuning for worker_registry — a small table taking heartbeat-rate UPDATEs.</comment>
+        <comment>Same autovacuum tuning for worker_registry — a small table taking heartbeat-rate UPDATEs. Reasserted unconditionally on re-run for the reason given in changeSet -24.</comment>
         <sql>
             ALTER TABLE worker_registry SET (autovacuum_vacuum_scale_factor = 0, autovacuum_vacuum_threshold = 100);
         </sql>
@@ -890,11 +913,15 @@
     </changeSet>
 
     <changeSet id="1785015307013-26" author="hephaestus" runInTransaction="false">
-        <preConditions onFail="MARK_RAN" onFailMessage="ix_agent_job_delivery_pending already present">
-            <not><indexExists indexName="ix_agent_job_delivery_pending"/></not>
+        <preConditions onFail="MARK_RAN" onFailMessage="ix_agent_job_delivery_pending already present and valid">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
+                WHERE c.relname = 'ix_agent_job_delivery_pending' AND i.indisvalid
+            </sqlCheck>
         </preConditions>
-        <comment>Support the zombie sweeper's stuck-PENDING-delivery scan.</comment>
+        <comment>Support the zombie sweeper's stuck-PENDING-delivery scan. Guarded on index validity, not existence — see changeSet -21.</comment>
         <sql>
+            DROP INDEX CONCURRENTLY IF EXISTS ix_agent_job_delivery_pending;
             CREATE INDEX CONCURRENTLY ix_agent_job_delivery_pending
                 ON agent_job (completed_at)
                 WHERE status = 'COMPLETED' AND delivery_status = 'PENDING';
@@ -903,11 +930,15 @@
     </changeSet>
 
     <changeSet id="1785015307013-27" author="hephaestus" runInTransaction="false">
-        <preConditions onFail="MARK_RAN" onFailMessage="ix_agent_job_retention already present">
-            <not><indexExists indexName="ix_agent_job_retention"/></not>
+        <preConditions onFail="MARK_RAN" onFailMessage="ix_agent_job_retention already present and valid">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
+                WHERE c.relname = 'ix_agent_job_retention' AND i.indisvalid
+            </sqlCheck>
         </preConditions>
-        <comment>Support the retention service's terminal-row batch scans (strip, then delete).</comment>
+        <comment>Support the retention service's terminal-row batch scans (strip, then delete). Guarded on index validity, not existence — see changeSet -21.</comment>
         <sql>
+            DROP INDEX CONCURRENTLY IF EXISTS ix_agent_job_retention;
             CREATE INDEX CONCURRENTLY ix_agent_job_retention
                 ON agent_job (completed_at)
                 WHERE status IN ('COMPLETED','FAILED','TIMED_OUT','CANCELLED');
@@ -1080,6 +1111,7 @@
                 <tableExists tableName="agent_config"/>
                 <sqlCheck expectedResult="0">SELECT count(*) FROM workspace_agent_binding</sqlCheck>
                 <sqlCheck expectedResult="0">SELECT count(*) FROM workspace_llm_connection</sqlCheck>
+                <sqlCheck expectedResult="0">SELECT count(*) FROM workspace_llm_model</sqlCheck>
             </and>
         </preConditions>
         <comment>
@@ -1294,7 +1326,7 @@
     </changeSet>
 
     <changeSet id="1785015307013-34" author="hephaestus">
-        <preConditions onFail="WARN" onFailMessage="MIGRATION NOTICE (#1368): at least one workspace AI configuration needs a human before it will run again — a provider that is not OpenAI-compatible, no endpoint URL ever recorded, no model name ever recorded, detection that ran across several configurations at once (only one binding survives), or a configuration that was both disabled and unreferenced and is therefore dropped with the old table. Every other carried-over value — endpoint, model, API key, limits — was preserved. Everything arrives disabled; open each workspace's AI settings, fix what the server log names, and re-enable. See MIGRATION.md. (Re-running migrations against an already-upgraded database also prints this notice, because the legacy table it inspects is gone by then — expected, and safe to ignore.)">
+        <preConditions onFail="WARN" onFailMessage="MIGRATION NOTICE (#1368): at least one workspace AI configuration needs a human before it will run again — a provider that is not OpenAI-compatible, no endpoint URL ever recorded, no model name ever recorded, detection that ran across several configurations at once (only one binding survives), or a configuration that was both disabled and unreferenced and is therefore dropped with the old table. Every other carried-over value — endpoint, model, API key, limits — was preserved. Everything arrives disabled; open each workspace's AI settings, fix what the server log names, and re-enable. See MIGRATION.md. (Re-applying this changelog against an already-upgraded database — after Liquibase's tracking table has been cleared or rebuilt — also prints this notice, because the legacy table it inspects is gone by then; expected, and safe to ignore. An ordinary re-run skips this changeSet entirely, and a fresh install never prints it: the legacy table is created empty by an earlier changelog and has nothing to report.)">
             <and>
                 <tableExists tableName="agent_config"/>
                 <sqlCheck expectedResult="0">
@@ -1408,11 +1440,15 @@
     </changeSet>
 
     <changeSet id="1785015307013-36" author="hephaestus" runInTransaction="false">
-        <preConditions onFail="MARK_RAN" onFailMessage="ix_agent_job_running_purpose already present">
-            <not><indexExists indexName="ix_agent_job_running_purpose"/></not>
+        <preConditions onFail="MARK_RAN" onFailMessage="ix_agent_job_running_purpose already present and valid">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
+                WHERE c.relname = 'ix_agent_job_running_purpose' AND i.indisvalid
+            </sqlCheck>
         </preConditions>
-        <comment>Per-(workspace, purpose) RUNNING count for the poll query's concurrency-cap fairness predicate. Must follow changeSet -35: an index cannot precede the column it references.</comment>
+        <comment>Per-(workspace, purpose) RUNNING count for the poll query's concurrency-cap fairness predicate. Must follow changeSet -35: an index cannot precede the column it references. Guarded on index validity, not existence — see changeSet -21.</comment>
         <sql>
+            DROP INDEX CONCURRENTLY IF EXISTS ix_agent_job_running_purpose;
             CREATE INDEX CONCURRENTLY ix_agent_job_running_purpose
                 ON agent_job (workspace_id, purpose)
                 WHERE status = 'RUNNING';

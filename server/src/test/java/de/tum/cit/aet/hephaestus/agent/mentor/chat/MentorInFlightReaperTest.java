@@ -29,10 +29,10 @@ import org.springframework.dao.OptimisticLockingFailureException;
  *
  * <p>Deliberately not about what a single turn is billed — {@code MentorTurnPersistenceIntegrationTest}
  * owns that against a real database. What is asserted here is the blast radius, which is a property of
- * the loop rather than of any row, and which the previous shape got wrong: one {@code @Transactional}
- * spanning every row meant one optimistic-lock collision discarded the ledger writes of every turn
- * already billed in that pass, and left all of them stuck {@code in_flight} behind the partial unique
- * index.
+ * the loop rather than of any row: a single {@code @Transactional} spanning every row would let one
+ * optimistic-lock collision discard the ledger writes of every turn already billed in that pass and
+ * leave all of them stuck {@code in_flight} behind the partial unique index, so the boundary has to sit
+ * around one turn.
  *
  * <p>{@code self} is injected, so the per-turn transactional boundary is a seam a unit test can push
  * on: making it throw is exactly the collision the production proxy would surface.
@@ -110,7 +110,12 @@ class MentorInFlightReaperTest extends BaseUnitTest {
 
         assertThat(lock).as("an unlocked money-writing sweep double-runs on every multi-replica deploy").isNotNull();
         assertThat(lock.name()).isEqualTo("mentor-in-flight-reaper");
-        assertThat(lock.lockAtMostFor()).as("an unbounded lock survives a crashed pod").isNotBlank();
+        assertThat(lock.lockAtMostFor())
+            .as(
+                "without its own bound the sweep falls back to ShedLockConfig's 30-minute default, so a crashed pod " +
+                    "holds the lock across far more of this two-minute sweep's ticks than its own runtime warrants"
+            )
+            .isNotBlank();
     }
 
     private MentorInFlightReaper reaperWith(MentorInFlightReaper self) {

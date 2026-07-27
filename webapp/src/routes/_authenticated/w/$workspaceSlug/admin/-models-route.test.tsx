@@ -169,9 +169,10 @@ describe("workspace AI models route", () => {
 	});
 
 	it("keeps unsaved run limits when another admin repoints the same purpose", async () => {
-		// The card used to be keyed on the model it was bound to, so a *different* admin changing the
-		// model remounted this admin's open form and discarded the timeout they had typed — fields that
-		// have nothing to do with the model, lost because the model was in the key.
+		// The card is remounted by key when its own save lands, so the key must not contain anything a
+		// *different* admin can change: keying on the bound model means someone else repointing the
+		// purpose remounts this admin's open form and discards the timeout they had typed — fields
+		// that have nothing to do with the model, lost because the model was in the key.
 		let bindings = [binding("PRACTICE_DETECTION", 20)];
 		const queryClient = await renderModelsRoute(() => bindings);
 
@@ -202,11 +203,12 @@ describe("workspace AI models route", () => {
 	});
 
 	it("reads back what was just saved, not what the card was showing before", async () => {
-		// The card reseeds from the cached binding when this admin's own save completes. Bumping that
-		// counter off `invalidateQueries` reseeded it from the *pre-save* array — `invalidateQueries`
-		// schedules a refetch, it does not touch `data` — so the picker snapped back to the model that
-		// had just been replaced, under a "saved" toast, and stayed there once the refetch landed,
-		// because the key never changes again. Saving from that screen wrote the old model back.
+		// The card reseeds from the cached binding when this admin's own save completes, so the reseed
+		// has to be driven by the response and not by `invalidateQueries`: invalidation schedules a
+		// refetch, it does not touch `data`. Driven off the invalidation, the picker reseeds from the
+		// *pre-save* array — snapping back to the model that was just replaced, under a "saved" toast,
+		// and staying there once the refetch lands because the key never changes again. Saving from
+		// that screen writes the old model back.
 		let bindings = [binding("PRACTICE_DETECTION", 20)];
 		await renderModelsRoute(() => bindings);
 		server.use(

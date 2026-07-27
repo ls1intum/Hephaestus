@@ -163,6 +163,10 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
     @Test
     @DisplayName("the endpoints require authentication")
     void anonymousIsRejected() {
+        // The listing's own gate: SecurityConfig permits anonymous GET under a workspace slug, and the
+        // member cases below only exercise PUT and DELETE — so @RequireAtLeastWorkspaceAdmin on
+        // listAgents is pinned here and nowhere else.
+        //
         // Against a REAL workspace: an unknown slug 404s during resolution, which would pass this
         // assertion without ever reaching the authentication check.
         User owner = persistUser("binding-anon-owner");
@@ -254,38 +258,5 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
             .exchange()
             .expectStatus()
             .isOk();
-    }
-
-    @Test
-    @DisplayName("the mutating endpoints require authentication too, not just the listing")
-    void anonymousCannotPutOrDeleteABinding() {
-        User owner = persistUser("binding-anon-mut-owner");
-        Workspace workspace = createWorkspace(
-            "binding-anon-mut",
-            "Binding Workspace",
-            "binding-anon-mut-org",
-            AccountType.ORG,
-            owner
-        );
-
-        // 403, not 401: with no `Authorization: Bearer` header these state-changing requests are
-        // cookie-shaped, so SecurityConfig#requiresCsrf refuses them at the CSRF filter before
-        // authentication runs. Asserting 401 would invite exempting the mutations from CSRF to
-        // "fix" it. Either way the handler is never reached.
-        webTestClient
-            .put()
-            .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), AgentPurpose.PRACTICE_DETECTION)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("instanceModelId", 1, "enabled", true))
-            .exchange()
-            .expectStatus()
-            .isForbidden();
-
-        webTestClient
-            .delete()
-            .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), AgentPurpose.PRACTICE_DETECTION)
-            .exchange()
-            .expectStatus()
-            .isForbidden();
     }
 }

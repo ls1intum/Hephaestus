@@ -50,23 +50,21 @@ export const ServerRejection: Story = {
 	},
 };
 
-/** The amounts this form must refuse, and the reason each one is given. */
-const rejects =
-	(typed: string, reason: RegExp): Story["play"] =>
-	async ({ args }) =>
+/**
+ * One illustration, not two: every amount rule lives on `BudgetAmountDialog`, which this wrapper
+ * supplies nothing but copy to. What is worth proving here is that the copy arrives — the rejection
+ * is raised against a field labelled "Monthly cap" and a button reading "Save cap".
+ */
+export const InvalidEmptyValue: Story = {
+	play: async ({ args }) =>
 		await expectAmountRejected({
 			fieldLabel: /monthly cap/i,
 			submitLabel: /save cap/i,
-			typed,
-			reason,
+			typed: "",
+			reason: /enter an amount/i,
 			onSubmit: args.onSubmit,
-		});
-
-/** Submitting a cleared field surfaces *why* it was rejected instead of silently doing nothing. */
-export const InvalidEmptyValue: Story = { play: rejects("", /enter an amount/i) };
-
-/** Sub-cent precision is rejected in the field rather than by a native browser bubble. */
-export const InvalidSubCentValue: Story = { play: rejects("25.005", /two decimal places/i) };
+		}),
+};
 
 /**
  * Reviewed at the WCAG 2.2 SC 1.4.10 reflow width (320 px). Short in portrait, but with a cap in

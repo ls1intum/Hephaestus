@@ -11,7 +11,9 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
+import de.tum.cit.aet.hephaestus.agent.catalog.ResolvedLlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditAction;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
@@ -20,7 +22,6 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
-import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -87,7 +88,22 @@ class AgentBindingServiceTest extends BaseUnitTest {
         assertThat(saved.isEnabled()).isTrue();
         // Availability is checked by the resolver, not re-implemented here.
         verify(llmModelResolver).resolve(any(WorkspaceAgentBinding.class));
-        verify(configAudit).record(any(ConfigAuditEntry.class));
+
+        // Mirrors the delete-path assertion below: the audit row must name the purpose that was bound
+        // and the model it was now bound to, with a `before` that shows nothing was bound. The two
+        // model columns are interchangeable in shape but not in meaning — an entry that filed the id
+        // under workspaceModelId would claim the workspace pays for a model the instance owns.
+        ArgumentCaptor<ConfigAuditEntry> entry = ArgumentCaptor.forClass(ConfigAuditEntry.class);
+        verify(configAudit).record(entry.capture());
+        assertThat(entry.getValue().entityType()).isEqualTo(ConfigAuditEntityType.AGENT_BINDING);
+        assertThat(entry.getValue().entityId()).isEqualTo(AgentPurpose.PRACTICE_DETECTION.name());
+        assertThat(entry.getValue().workspaceId()).isEqualTo(1L);
+        assertThat(entry.getValue().action()).isEqualTo(ConfigAuditAction.UPDATED);
+        assertThat(entry.getValue().before()).hasFieldOrPropertyWithValue("instanceModelId", null);
+        assertThat(entry.getValue().after())
+            .hasFieldOrPropertyWithValue("instanceModelId", 99L)
+            .hasFieldOrPropertyWithValue("workspaceModelId", null)
+            .hasFieldOrPropertyWithValue("enabled", true);
     }
 
     @Test
@@ -161,13 +177,27 @@ class AgentBindingServiceTest extends BaseUnitTest {
             .hasFieldOrPropertyWithValue("enabled", true);
     }
 
+    /**
+     * The positive leg. Without it every {@code isReady} assertion in this class survives replacing the
+     * method body with {@code return false}, and the UI would report every workspace unable to run.
+     */
     @Test
-    void getBindingsReturnsEveryPurposeConfiguredForTheWorkspace() {
+    void isReadyIsTrueWhenAnEnabledBindingStillResolves() {
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
-        binding.setPurpose(AgentPurpose.MENTOR);
-        when(bindingRepository.findByWorkspaceIdWithModels(1L)).thenReturn(List.of(binding));
+        binding.setEnabled(true);
+        when(llmModelResolver.resolve(binding)).thenReturn(
+            new ResolvedLlmModel(
+                "https://api.openai.com",
+                "openai-completions",
+                "gpt-test",
+                null,
+                null,
+                false,
+                FundingSource.INSTANCE
+            )
+        );
 
-        assertThat(service.getBindings(context())).containsExactly(binding);
+        assertThat(service.isReady(binding)).isTrue();
     }
 
     @Test

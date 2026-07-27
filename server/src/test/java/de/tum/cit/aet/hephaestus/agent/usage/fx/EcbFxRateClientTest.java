@@ -10,18 +10,22 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.Optional;
+import java.util.stream.Stream;
 import mockwebserver3.MockResponse;
 import mockwebserver3.MockWebServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Parses a verbatim copy of the ECB's {@code eurofxref-daily.xml} and pins the client's central
- * promise: <b>it never throws</b>. Every failure mode — transport, status, body, structure — has to
- * come back as an empty Optional, because the caller is a scheduled tick that must survive the ECB
- * having a bad day.
+ * promise: <b>it never throws</b>. Every failure the ECB can hand it — a refused or unreachable
+ * request, an empty body, a document that carries no usable USD quote — comes back as an empty
+ * Optional, because the caller is a scheduled tick that must survive the ECB having a bad day.
  */
 class EcbFxRateClientTest extends BaseUnitTest {
 
@@ -78,45 +82,42 @@ class EcbFxRateClientTest extends BaseUnitTest {
         });
     }
 
-    @Test
-    @DisplayName("should return empty when the document has no USD entry")
-    void shouldReturnEmptyWhenNoUsdEntryPresent() {
-        String xml = """
-            <gesmes:Envelope xmlns:gesmes="http://www.gesmes.org/xml/2002-08-01"
-                             xmlns="http://www.ecb.int/vocabulary/2002-08-01/eurofxref">
-              <Cube><Cube time='2026-07-24'><Cube currency='GBP' rate='0.86545'/></Cube></Cube>
-            </gesmes:Envelope>
-            """;
-
-        assertThat(EcbFxRateClient.parseUsdRate(xml)).isEmpty();
+    /**
+     * Four documents, four separate reasons the parser must hand back nothing rather than a number.
+     * Each row is its own guard: drop any one of them and exactly one row goes green with a rate the
+     * ledger would then quote money in.
+     */
+    static Stream<Arguments> unusableDocuments() {
+        return Stream.of(
+            Arguments.of(
+                """
+                <gesmes:Envelope xmlns:gesmes="http://www.gesmes.org/xml/2002-08-01"
+                                 xmlns="http://www.ecb.int/vocabulary/2002-08-01/eurofxref">
+                  <Cube><Cube time='2026-07-24'><Cube currency='GBP' rate='0.86545'/></Cube></Cube>
+                </gesmes:Envelope>
+                """,
+                "a well-formed document that quotes every currency except USD"
+            ),
+            Arguments.of("<html><body>503 Service Unavailable", "an error page served where XML was expected"),
+            Arguments.of(
+                """
+                <?xml version="1.0"?>
+                <!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+                <Cube><Cube time='2026-07-24'><Cube currency='USD' rate='1.1377'/></Cube></Cube>
+                """,
+                "a DOCTYPE, refused outright so no external entity can be expanded"
+            ),
+            Arguments.of(
+                "<Cube><Cube time='2026-07-24'><Cube currency='USD' rate='0'/></Cube></Cube>",
+                "a zero quote, which the read-time inversion would divide by"
+            )
+        );
     }
 
-    @Test
-    @DisplayName("should return empty when the body is not well-formed XML")
-    void shouldReturnEmptyWhenBodyIsNotXml() {
-        assertThat(EcbFxRateClient.parseUsdRate("<html><body>503 Service Unavailable")).isEmpty();
-    }
-
-    @Test
-    @DisplayName("should return empty rather than resolve an external entity")
-    void shouldReturnEmptyWhenDocumentDeclaresDoctype() {
-        // Remote XML: a DOCTYPE is refused outright rather than parsed, so no entity can be expanded.
-        String xxe = """
-            <?xml version="1.0"?>
-            <!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
-            <Cube><Cube time='2026-07-24'><Cube currency='USD' rate='1.1377'/></Cube></Cube>
-            """;
-
-        assertThat(EcbFxRateClient.parseUsdRate(xxe)).isEmpty();
-    }
-
-    @Test
-    @DisplayName("should return empty when the quoted rate is zero")
-    void shouldReturnEmptyWhenRateIsZero() {
-        // A zero quote would make the read-time inversion divide by zero.
-        String xml = "<Cube><Cube time='2026-07-24'><Cube currency='USD' rate='0'/></Cube></Cube>";
-
-        assertThat(EcbFxRateClient.parseUsdRate(xml)).isEmpty();
+    @ParameterizedTest(name = "{1}")
+    @MethodSource("unusableDocuments")
+    void shouldReturnEmptyForAnUnusableDocument(String xml, String why) {
+        assertThat(EcbFxRateClient.parseUsdRate(xml)).as(why).isEmpty();
     }
 
     // FETCHING
@@ -132,6 +133,11 @@ class EcbFxRateClientTest extends BaseUnitTest {
         assertThat(ecb.takeRequest().getTarget()).isEqualTo("/stats/eurofxref/eurofxref-daily.xml");
     }
 
+    /**
+     * A bad status and an unreachable host reach the caller identically — both leave the single
+     * {@code retrieve().body(...)} statement by exception, into the one catch that turns any transport
+     * failure into an empty Optional. One of the two is enough to pin that catch.
+     */
     @Test
     @DisplayName("should return empty without throwing when the ECB answers 500")
     void shouldReturnEmptyWhenEcbReturnsServerError() {
@@ -140,20 +146,12 @@ class EcbFxRateClientTest extends BaseUnitTest {
         assertThat(clientFor("/daily.xml").fetchLatestUsdRate()).isEmpty();
     }
 
+    /** A separate guard from the catch above: a 200 with nothing in it never reaches the parser. */
     @Test
     @DisplayName("should return empty without throwing when the body is empty")
     void shouldReturnEmptyWhenEcbReturnsEmptyBody() {
         ecb.enqueue(new MockResponse.Builder().code(200).body("").build());
 
         assertThat(clientFor("/daily.xml").fetchLatestUsdRate()).isEmpty();
-    }
-
-    @Test
-    @DisplayName("should return empty without throwing when the host is unreachable")
-    void shouldReturnEmptyWhenHostIsUnreachable() throws IOException {
-        String deadUrl = ecb.url("/daily.xml").toString();
-        ecb.close();
-
-        assertThat(clientForUrl(deadUrl).fetchLatestUsdRate()).isEmpty();
     }
 }

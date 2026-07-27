@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { AvailableLlmModel } from "@/api/types.gen";
+import { priceLabel } from "@/lib/llm-pricing";
 import { ModelPicker } from "./ModelPicker";
 
 const models: AvailableLlmModel[] = [
@@ -45,14 +46,15 @@ describe("ModelPicker", () => {
 		render(<ModelPicker availableModels={models} value={null} onChange={vi.fn()} />);
 		fireEvent.click(screen.getByRole("combobox"));
 
-		expect(
-			screen.getByRole("option", {
-				name: "GPT-5 · Organization endpoint · $1.00 input · $2.00 output / 1M tokens",
-			}),
-		).toBeTruthy();
-		expect(
-			screen.getByRole("option", { name: "GPT-5 · Workspace endpoint · No metered API cost" }),
-		).toBeTruthy();
+		// The price wording is `priceLabel`'s and is stated in `llm-pricing.test.ts`; what the picker
+		// is answerable for is that it ends up in the *name*, not only in sighted text beside it.
+		for (const model of models) {
+			expect(
+				screen.getByRole("option", {
+					name: `${model.displayName} · ${model.connectionDisplayName} · ${priceLabel(model, "workspace")}`,
+				}),
+			).toBeTruthy();
+		}
 	});
 
 	it("marks the trigger invalid and links its description when asked to", () => {

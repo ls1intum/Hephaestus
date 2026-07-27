@@ -111,34 +111,38 @@ export const SaveInFlight: Story = {
 	},
 };
 
-/** The advanced settings are a disclosure: the trigger reports its own state to assistive tech. */
+/**
+ * The card with its advanced settings open — the state the run limits are actually reviewed in.
+ *
+ * That the trigger reports its own state, and that the panel it claims to control is the one holding
+ * the fields, is asserted in `AgentBindingsPage.test.tsx`; this story exists for the picture.
+ */
 export const AdvancedDisclosure: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		const trigger = (await canvas.findAllByRole("button", { name: /Advanced/ }))[0];
-
-		await expect(trigger).toHaveAttribute("aria-expanded", "false");
-		await userEvent.click(trigger);
-		await expect(trigger).toHaveAttribute("aria-expanded", "true");
+		await userEvent.click((await canvas.findAllByRole("button", { name: /Advanced/ }))[0]);
 		await expect(await canvas.findByLabelText("Timeout (seconds)")).toBeInTheDocument();
 	},
 };
 
-/** Clearing a run limit blocks the save and explains itself in place — never as a toast. */
+/**
+ * Clearing a run limit blocks the save and explains itself in place — never as a toast.
+ *
+ * That the field is marked invalid and that nothing is sent is asserted in
+ * `AgentBindingsPage.test.tsx`. What only a real browser can say is the other half: no toast region
+ * appears anywhere on the page, so the reader's attention is not pulled away from the field they
+ * have to fix.
+ */
 export const InvalidRunLimit: Story = {
-	play: async ({ canvasElement, args }) => {
+	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await userEvent.click((await canvas.findAllByRole("button", { name: /Advanced/ }))[0]);
 
-		const timeout = await canvas.findByLabelText("Timeout (seconds)");
-		await userEvent.clear(timeout);
+		await userEvent.clear(await canvas.findByLabelText("Timeout (seconds)"));
 		await userEvent.click(canvas.getAllByRole("button", { name: "Save" })[0]);
 
 		await expect(await canvas.findByText("Enter a number of seconds.")).toBeInTheDocument();
-		await expect(timeout).toHaveAttribute("aria-invalid", "true");
-		// Field-level validation stays in the field: no toast is raised, and nothing is sent.
 		await expect(screen.queryByRole("status")).toBeNull();
-		await expect(args.onSave).not.toHaveBeenCalled();
 	},
 };
 

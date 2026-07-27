@@ -85,13 +85,6 @@ class AgentRoleGatingIntegrationTest extends BaseIntegrationTest {
      * The counterpart to the test above, and the line between them is the point: <b>submitting</b> a
      * job is an event-driven capability that follows {@code AGENT_ENABLED}, while <b>sweeping</b> for
      * dead ones is a scheduled duty that follows the server role.
-     *
-     * <p>This assertion was previously inverted — it demanded the sweeper on a worker-only pod, on the
-     * reasoning that a pod running only {@code AGENT_ENABLED} must still recover dead workers' jobs.
-     * That reasoning does not hold: {@code @EnableScheduling} lives on the SERVER-gated
-     * {@code ServerSchedulingConfig}, so on this pod the sweeper's {@code @Scheduled} methods could
-     * never fire even when the bean exists. Keeping it here bought nothing and cost the meters it
-     * registers, which would sit at a permanent zero on a pod that never sweeps.
      */
     @Test
     @DisplayName("the zombie sweeper does NOT wire on a worker-only pod — sweeping is a server-role duty")

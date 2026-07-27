@@ -41,9 +41,9 @@ describe("AdminLlmModelsSection", () => {
 	});
 
 	it("closes the delete confirm on confirming, while the DELETE is still in flight", async () => {
-		// The row disappears the moment the list refetches, but the confirm naming it used to stay up
-		// with Delete offered again — a second DELETE for a model that no longer exists, answered 404
-		// and toasted "Could not delete the model" for a delete that had worked.
+		// The row disappears the moment the list refetches. A confirm that stayed up would still be
+		// naming it, with Delete offered again — a second DELETE for a model that no longer exists,
+		// answered 404 and toasted "Could not delete the model" for a delete that had worked.
 		const onDelete = vi.fn();
 		const props = {
 			connectionDisplayName: "OpenAI",

@@ -95,12 +95,19 @@ files set the env var the base default leaves off:
   to **both** services — so under the shipped compose a worker stays off until the operator sets the var,
   and outside compose (Kubernetes, systemd) it comes up **on**. See the next section.
 
-`hephaestus.agent.enabled` (`AGENT_ENABLED`) gates two independent things that must agree, or a
-split deployment silently does half its job: **submission** (`AgentJobEventListener` /
-`IssueAgentJobEventListener` / `BotCommandProcessor`, which turn PR/issue/bot events into `agent_job`
-rows) and **orphan recovery** (`AgentJobZombieSweeper`, which reclaims a dead worker's stuck jobs) run
-wherever this flag is `true` — the server role, independent of the worker role. **Execution**
-(`AgentJobExecutor`, the poll loop that claims and runs jobs) additionally requires the worker role.
+`hephaestus.agent.enabled` (`AGENT_ENABLED`) gates three things that must agree, or a split
+deployment silently does half its job. They do **not** share a gate:
+
+- **Submission** (`AgentJobEventListener` / `IssueAgentJobEventListener` / `BotCommandProcessor`,
+  which turn PR/issue/bot events into `agent_job` rows) needs only this flag. It wires on *any* pod
+  where the flag is `true`, including a `prod,worker` pod — `application-worker.yml` defaults
+  `AGENT_ENABLED` to `true`, so a worker pod does submit as well as execute.
+- **Orphan recovery** (`AgentJobZombieSweeper`, which reclaims a dead worker's stuck jobs) needs this
+  flag **and** the server role (`@ConditionalOnServerRole`), so it does not double-run on a
+  dedicated worker pod.
+- **Execution** (`AgentJobExecutor`, the poll loop that claims and runs jobs) needs this flag **and**
+  the worker role.
+
 Set `AGENT_ENABLED=true` on **every** pod that needs any of these — in the split-pod topology that
 is both `application-server` (submission + recovery) and `application-worker` (execution). The
 `application-worker` profile defaults it to `true` on its own, but `application-server` does not, so
@@ -144,7 +151,8 @@ list boots a pod that claims and executes jobs. Add `AGENT_ENABLED=false` if you
 No LLM env vars are needed: the LLM proxy runs in-process on this pod (it follows the worker/sandbox
 capability, not `AGENT_ENABLED`) and reads providers
 from the same instance/workspace catalog as the app pod. Register providers at runtime under
-Instance admin → AI models, or per-workspace under "bring your own AI provider" — never via env var.
+Instance admin → AI models, or per-workspace under that workspace's own AI models page — never via
+env var.
 
 Capacity defaults to `auto` and auto-sizes from `Runtime.availableProcessors()`. Override only if the
 host is noisy — and mind the name: the JVM binds

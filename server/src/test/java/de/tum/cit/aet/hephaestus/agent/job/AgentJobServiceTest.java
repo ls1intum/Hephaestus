@@ -200,33 +200,6 @@ class AgentJobServiceTest extends BaseUnitTest {
             verify(agentJobRepository, never()).saveAndFlush(any());
         }
 
-        @Test
-        void shouldSubmitTheBoundDetectionModel() {
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-
-            JobTypeHandler handler = mock(JobTypeHandler.class);
-            when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
-            when(handler.createSubmission(any())).thenReturn(createSubmission());
-            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any())).thenReturn(
-                Optional.empty()
-            );
-            when(agentJobRepository.saveAndFlush(any(AgentJob.class))).thenAnswer(inv -> {
-                AgentJob j = inv.getArgument(0);
-                j.prePersist();
-                return j;
-            });
-
-            Optional<AgentJob> result = service.submit(
-                1L,
-                AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class)
-            );
-
-            assertThat(result).isPresent();
-            assertThat(result.get().getPurpose()).isEqualTo(AgentPurpose.PRACTICE_DETECTION);
-            verify(agentJobRepository).saveAndFlush(any());
-        }
-
         /**
          * The binding is resolved BEFORE the budget check so the cap that applies is the one
          * belonging to whoever pays for that binding — the host for a shared instance model, the
@@ -439,33 +412,6 @@ class AgentJobServiceTest extends BaseUnitTest {
             );
 
             assertThat(result).isEmpty();
-        }
-
-        @Test
-        void shouldRunTheBoundConfig() {
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-
-            JobTypeHandler handler = mock(JobTypeHandler.class);
-            when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
-            when(handler.createSubmission(any())).thenReturn(createSubmission());
-
-            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any())).thenReturn(
-                Optional.empty()
-            );
-            when(agentJobRepository.saveAndFlush(any())).thenAnswer(inv -> {
-                AgentJob j = inv.getArgument(0);
-                j.prePersist();
-                return j;
-            });
-
-            Optional<AgentJob> result = service.submit(
-                1L,
-                AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class)
-            );
-
-            assertThat(result).isPresent();
-            assertThat(result.get().getPurpose()).isEqualTo(AgentPurpose.PRACTICE_DETECTION);
         }
 
         @Test

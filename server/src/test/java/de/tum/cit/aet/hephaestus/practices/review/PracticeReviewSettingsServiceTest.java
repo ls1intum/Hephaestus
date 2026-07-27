@@ -11,7 +11,6 @@ import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
-import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewField;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
@@ -98,19 +97,7 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
         assertThat(view.cooldownMinutes()).isEqualTo(30);
     }
 
-    @Test
-    void updatePracticeReviewResetsFieldToInherit() {
-        workspace.getReviewSettings().setSkipDrafts(false); // explicit override
-        when(workspaceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        PracticeReviewSettingsDTO view = service.updatePracticeReview(
-            context,
-            new UpdatePracticeReviewSettingsRequestDTO(null, null, null, null, Set.of(PracticeReviewField.SKIP_DRAFTS))
-        );
-
-        // Override cleared → inheriting again; effective falls back to the fleet default (true).
-        assertThat(workspace.getReviewSettings().getSkipDrafts()).isNull();
-        assertThat(view.skipDraftsOverride()).isNull();
-        assertThat(view.skipDrafts()).isTrue();
-    }
+    // Resetting a field back to inherit — override cleared, effective value falling back to the fleet
+    // default — is asserted through the endpoint an admin uses by
+    // PracticeReviewSettingsControllerIntegrationTest#overridesAndResetsPracticeReviewPolicy.
 }

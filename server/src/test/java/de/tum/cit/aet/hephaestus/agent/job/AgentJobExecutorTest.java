@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -50,6 +51,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 import org.assertj.core.api.Assertions;
@@ -783,11 +786,12 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             executor.processJob(jobId);
 
+            // The reason the operator reads must name the exit code that produced it.
             verify(jobRepository).transitionStatus(
-                any(),
+                eq(jobId),
                 eq(AgentJobStatus.FAILED),
                 any(),
-                any(),
+                eq("Container exited with code 1"),
                 eq(Set.of(AgentJobStatus.RUNNING))
             );
         }
@@ -825,10 +829,10 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             assertThat(meterRegistry.counter("agent.pi.envelope.mismatch").count()).isEqualTo(1d);
             verify(jobRepository).transitionStatus(
-                any(),
+                eq(jobId),
                 eq(AgentJobStatus.FAILED),
                 any(),
-                any(),
+                eq("Container exited with code 42"),
                 eq(Set.of(AgentJobStatus.RUNNING))
             );
         }
@@ -859,10 +863,10 @@ class AgentJobExecutorTest extends BaseUnitTest {
             executor.processJob(jobId);
 
             verify(jobRepository).transitionStatus(
-                any(),
+                eq(jobId),
                 eq(AgentJobStatus.TIMED_OUT),
                 any(),
-                any(),
+                eq("Container timed out"),
                 eq(Set.of(AgentJobStatus.RUNNING))
             );
         }
@@ -891,10 +895,10 @@ class AgentJobExecutorTest extends BaseUnitTest {
             executor.processJob(jobId);
 
             verify(jobRepository).transitionStatus(
-                any(),
+                eq(jobId),
                 eq(AgentJobStatus.CANCELLED),
                 any(),
-                any(),
+                eq("Cancelled during execution"),
                 eq(Set.of(AgentJobStatus.RUNNING))
             );
         }
@@ -918,11 +922,14 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             executor.processJob(jobId);
 
+            // The thrown message must survive onto the row — an operator debugging a FAILED job has
+            // nothing else. transitionTerminal takes the POLL jobId (not job.getId()); see the ledger
+            // sourceId note in AgentJobExecutor.
             verify(jobRepository).transitionStatus(
-                any(),
+                eq(jobId),
                 eq(AgentJobStatus.FAILED),
                 any(),
-                any(),
+                eq("Docker daemon unreachable"),
                 eq(Set.of(AgentJobStatus.RUNNING))
             );
         }
@@ -1012,14 +1019,24 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             executor.processJob(jobId);
 
+            var availableAt = ArgumentCaptor.forClass(Instant.class);
+            var newToken = ArgumentCaptor.forClass(String.class);
+            var newTokenHash = ArgumentCaptor.forClass(String.class);
             verify(jobRepository).requeueOrphan(
                 eq(jobId),
                 eq("infra-retry-worker"),
                 eq(AGENT_PROPS.maxRetries()),
-                any(),
-                any(),
-                any()
+                availableAt.capture(),
+                newToken.capture(),
+                newTokenHash.capture()
             );
+            // Backoff: the retry must not be immediately eligible again, or an infra blip becomes a
+            // hot loop. Asserted as a range, since the exact instant is clock-dependent.
+            assertThat(availableAt.getValue()).isAfter(Instant.now());
+            // Rotation: the retry must NOT reuse the token the failed attempt handed the sandbox —
+            // that token may still be held by a stuck container.
+            assertThat(newToken.getValue()).isNotEqualTo("test-token").isNotBlank();
+            assertThat(newTokenHash.getValue()).isEqualTo(AgentJob.computeTokenHash(newToken.getValue()));
             // Never falls through to a terminal FAILED write when the requeue CAS won.
             verify(jobRepository, never()).transitionStatus(any(), eq(AgentJobStatus.FAILED), any(), any(), any());
             verify(jobRepository, never()).transitionStatusOwnedBy(
@@ -1738,12 +1755,23 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         @Test
         @DisplayName("empty candidate list means no claim is even attempted")
-        void emptyPollAttemptsNoClaims() {
-            when(jobRepository.findQueuedIdsOldestFirst(anyInt())).thenReturn(List.of());
+        void emptyPollAttemptsNoClaims() throws Exception {
+            // Drive the real poll thread: the latch fires from inside the executor's own query, so the
+            // assertion below observes the production loop rather than the stub.
+            var polled = new CountDownLatch(1);
+            when(jobRepository.findQueuedIdsOldestFirst(anyInt())).thenAnswer(invocation -> {
+                polled.countDown();
+                return List.of();
+            });
 
-            List<UUID> candidates = jobRepository.findQueuedIdsOldestFirst(5);
+            executor.start();
+            try {
+                assertThat(polled.await(5, TimeUnit.SECONDS)).isTrue();
+            } finally {
+                executor.stopAcceptingNewJobs();
+            }
 
-            assertThat(candidates).isEmpty();
+            verify(jobRepository, atLeastOnce()).findQueuedIdsOldestFirst(anyInt());
             verify(jobRepository, never()).findByIdQueuedForUpdateSkipLocked(any(), any());
         }
 

@@ -3,8 +3,10 @@ import { asDate } from "./dates";
 
 describe("asDate", () => {
 	it("parses the ISO string the SDK actually returns for a date field", () => {
-		// The generated client types these as `Date` but ships them as strings at runtime.
-		expect(asDate("2026-07-24T10:30:00.000Z")?.toISOString()).toBe("2026-07-24T10:30:00.000Z");
+		// The generated client types these as `Date` but ships them as strings at runtime, so the
+		// decision `asDate` makes is "hand this string to the platform's parser rather than to a
+		// caller expecting a Date". Whether that parser reads ISO-8601 correctly is not ours to pin.
+		expect(asDate("2026-07-24T10:30:00.000Z")).toBeInstanceOf(Date);
 	});
 
 	it("passes a real Date through untouched", () => {

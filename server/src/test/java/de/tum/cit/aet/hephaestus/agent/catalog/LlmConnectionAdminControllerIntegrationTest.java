@@ -179,9 +179,4 @@ class LlmConnectionAdminControllerIntegrationTest extends AbstractWorkspaceInteg
             .expectStatus()
             .isForbidden();
     }
-
-    @Test
-    void anonymousIsUnauthorized() {
-        webTestClient.get().uri("/admin/llm/connections").exchange().expectStatus().isUnauthorized();
-    }
 }

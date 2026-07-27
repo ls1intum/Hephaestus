@@ -322,5 +322,28 @@ class WorkspaceLlmConnectionServiceTest extends BaseUnitTest {
             assertThat(result.modelCount()).isEqualTo(0);
             assertThat(result.message()).isEqualTo("Provider returned HTTP 503");
         }
+
+        /**
+         * A stored connection is re-checked on every probe, not trusted because it passed on the day it
+         * was created: the instance allowlist can tighten afterwards, and DNS for a host that was public
+         * then can point inside the network now. The probe service is told it must have been validated
+         * by this caller, so if this call is skipped nothing else stops the dial.
+         */
+        @Test
+        void doesNotProbeAStoredConnectionWhoseBaseUrlTheEgressPolicyNowRejects() {
+            byoEnabled(true);
+            when(connectionRepository.findProbeTargetByIdAndWorkspaceId(5L, 1L)).thenReturn(
+                Optional.of(new LlmProbeTarget("https://api.openai.com", LlmAuthMode.BEARER, "sk-abc"))
+            );
+            doThrow(new IllegalArgumentException("Base URL must be a public https:// address"))
+                .when(egressPolicy)
+                .validate("https://api.openai.com");
+
+            assertThatThrownBy(() -> connectionService.probe(workspaceContext, 5L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("public https");
+
+            verifyNoInteractions(probeService);
+        }
     }
 }

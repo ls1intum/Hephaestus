@@ -18,23 +18,27 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Reads the pager back as a reader sees it: the numbered tokens in order, with `▸` marking the one
+ * Reads the pager back as a reader meets it: the numbered tokens in order, with `▸` marking the one
  * carrying `aria-current="page"` and `…` standing for a gap. The window, the gaps and which page is
  * current are the whole of this component's logic, and this is the only place it is stated.
+ *
+ * Assembled from the accessible tree — page buttons by name, gaps by their own text — and put back
+ * in reading order by document position, so it says nothing about how the pager is marked up. A
+ * pager rebuilt as a flex row of buttons instead of a list reads exactly the same here.
  */
 async function expectTokens(canvasElement: HTMLElement, expected: string) {
 	const canvas = within(canvasElement);
 	const nav = canvas.getByRole("navigation");
-	const tokens = [...nav.querySelectorAll("li")]
-		.map((item) => {
-			const button = item.querySelector("button");
-			if (button == null) return "…";
-			const label = button.getAttribute("aria-label") ?? "";
-			// The two boundary controls are not part of the window.
-			if (label.startsWith("Go to previous") || label.startsWith("Go to next")) return null;
-			return `${button.getAttribute("aria-current") === "page" ? "▸" : ""}${button.textContent}`;
-		})
-		.filter((token) => token != null);
+	// The two boundary controls are named "Go to previous/next page", so this excludes them.
+	const pages = within(nav).getAllByRole("button", { name: /^Go to page \d+$/ });
+	const gaps = within(nav).queryAllByText("More pages");
+	const tokens = [...pages, ...gaps]
+		.sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1))
+		.map((node) =>
+			gaps.includes(node)
+				? "…"
+				: `${node.getAttribute("aria-current") === "page" ? "▸" : ""}${node.textContent}`,
+		);
 	await expect(tokens.join(" ")).toBe(expected);
 }
 

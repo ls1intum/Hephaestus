@@ -68,10 +68,42 @@ class LlmModelResolverTest extends BaseUnitTest {
         return binding;
     }
 
+    /**
+     * The file's one positive case, and it has to assert the payload field by field: this credential is
+     * what the proxy dials with, and every field is the same shape as its neighbour. Swapping
+     * {@code baseUrl} for {@code apiProtocol}, or handing back the connection's id where the model's
+     * upstream id belongs, produces a perfectly non-null credential that talks to the wrong provider.
+     */
     @Test
     void shouldResolveActivePublicInstanceModelForWorkspace() {
         var ref = new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 10L, 20L, 30L);
-        assertThat(resolver.resolveProxyCredential(ref)).isNotNull();
+
+        LlmModelResolver.ProxyCredential credential = resolver.resolveProxyCredential(ref);
+
+        assertThat(credential).isNotNull();
+        assertThat(credential.baseUrl()).isEqualTo("https://api.example.test/v1");
+        assertThat(credential.apiProtocol()).isEqualTo("openai-responses");
+        assertThat(credential.authMode()).isEqualTo(LlmAuthMode.BEARER);
+        // The model's upstream id, not the catalog's own — the provider has never heard of our ids.
+        assertThat(credential.upstreamModelId()).isEqualTo("gpt-test");
+        assertThat(credential.apiKey()).isEqualTo("secret");
+    }
+
+    /**
+     * A connection saved with an empty key is not a connection with an empty key: an empty
+     * {@code Authorization: Bearer} header is a request the provider rejects with a confusing 401,
+     * whereas no key at all lets the proxy fall through to whatever unauthenticated access the
+     * provider offers, which is the honest representation of "no credential configured".
+     */
+    @Test
+    void shouldReportABlankApiKeyAsNoCredentialAtAll() {
+        connection.setApiKey("   ");
+        var ref = new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 10L, 20L, 30L);
+
+        LlmModelResolver.ProxyCredential credential = resolver.resolveProxyCredential(ref);
+
+        assertThat(credential).isNotNull();
+        assertThat(credential.apiKey()).isNull();
     }
 
     @Test

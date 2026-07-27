@@ -134,6 +134,17 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
         return issue;
     }
 
+    /**
+     * Captures the one submission request the listener handed to the job service for
+     * {@code workspaceId}. The job type and workspace id are identical across every issue trigger,
+     * so only the payload distinguishes them.
+     */
+    private IssueReviewSubmissionRequest captureSubmission(Long workspaceId) {
+        var captor = ArgumentCaptor.forClass(IssueReviewSubmissionRequest.class);
+        verify(agentJobService).submit(eq(workspaceId), eq(AgentJobType.ISSUE_REVIEW), captor.capture());
+        return captor.getValue();
+    }
+
     // Test Groups
 
     @Nested
@@ -219,11 +230,7 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onIssueCreated(event);
 
-            verify(agentJobService).submit(
-                eq(WORKSPACE_ID),
-                eq(AgentJobType.ISSUE_REVIEW),
-                any(IssueReviewSubmissionRequest.class)
-            );
+            assertThat(captureSubmission(WORKSPACE_ID).triggerEvent()).isEqualTo(TriggerEventNames.ISSUE_CREATED);
         }
 
         @Test
@@ -245,7 +252,13 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onIssueCreated(event);
 
-            verify(agentJobService).submit(eq(42L), eq(AgentJobType.ISSUE_REVIEW), any());
+            var workspaceIdCaptor = ArgumentCaptor.forClass(Long.class);
+            verify(agentJobService).submit(
+                workspaceIdCaptor.capture(),
+                eq(AgentJobType.ISSUE_REVIEW),
+                any(IssueReviewSubmissionRequest.class)
+            );
+            assertThat(workspaceIdCaptor.getValue()).isEqualTo(42L).isNotEqualTo(99L);
         }
 
         @Test
@@ -381,11 +394,8 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
             listener.onIssueClosed(new ScmDomainEvent.IssueClosed(issueData, "completed", webhookContext(1L)));
 
             verify(practiceReviewDetectionGate).evaluateIssue(issue, TriggerEventNames.ISSUE_CLOSED, TriggerMode.AUTO);
-            verify(agentJobService).submit(
-                eq(WORKSPACE_ID),
-                eq(AgentJobType.ISSUE_REVIEW),
-                any(IssueReviewSubmissionRequest.class)
-            );
+            // The trigger the gate saw must be the trigger the job carries.
+            assertThat(captureSubmission(WORKSPACE_ID).triggerEvent()).isEqualTo(TriggerEventNames.ISSUE_CLOSED);
         }
 
         @Test
@@ -413,11 +423,9 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onIssueLabeled(event);
 
-            verify(agentJobService).submit(
-                eq(WORKSPACE_ID),
-                eq(AgentJobType.ISSUE_REVIEW),
-                any(IssueReviewSubmissionRequest.class)
-            );
+            var request = captureSubmission(WORKSPACE_ID);
+            assertThat(request.triggerEvent()).isEqualTo(TriggerEventNames.ISSUE_LABELED);
+            assertThat(request.issueId()).isEqualTo(ISSUE_ID);
         }
 
         @Test

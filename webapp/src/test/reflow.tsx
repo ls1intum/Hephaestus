@@ -8,7 +8,8 @@ import { expect } from "storybook/test";
  * {@link expectReflowViewport}. That guard belongs in the helpers rather than in each story: a story
  * that measures a dialog against a 1280 px window is not checking reflow at all, it is passing
  * vacuously, and "remember to also call `expectPageReflows`" is exactly the kind of instruction a
- * caller drops. Drop `defaultViewport: "reflow"` from any story below and its play function fails.
+ * caller drops. Drop `defaultViewport: "reflow"` from a story that calls these helpers and its play
+ * function fails.
  */
 
 /** Half a device pixel of slack, so a fractional layout position never flakes the suite. */
@@ -35,7 +36,12 @@ export async function expectPageReflows() {
 	);
 }
 
-function scrollParentOf(element: HTMLElement): HTMLElement {
+/**
+ * The nearest ancestor that scrolls `element` sideways. Found by behaviour rather than by a kit
+ * class or `data-slot`, so a renamed container in the UI kit cannot silently turn the assertions
+ * that use it into no-ops.
+ */
+export function horizontalScrollParentOf(element: HTMLElement): HTMLElement {
 	for (let node = element.parentElement; node != null; node = node.parentElement) {
 		if (["auto", "scroll"].includes(getComputedStyle(node).overflowX)) {
 			return node;
@@ -49,17 +55,32 @@ function scrollParentOf(element: HTMLElement): HTMLElement {
 /**
  * A wide table is SC 1.4.10's own listed exception; a wide table that drags the page sideways is
  * not, and one whose overflow is clipped is worse — the columns become unreachable.
+ *
+ * `expectOverflow` states which of the two situations the caller is in. Without it a table that
+ * happens to fit passes the "and it really does scroll" half by never reaching it, which is the
+ * vacuous pass this argument exists to make impossible: a story that means to prove the exception
+ * says so, and fails if its table ever stops overflowing.
  */
-export async function expectTablesScrollInPlace(root: HTMLElement | Document = document) {
+export async function expectTablesScrollInPlace(
+	root: HTMLElement | Document = document,
+	{ expectOverflow = false }: { expectOverflow?: boolean } = {},
+) {
 	await expectReflowViewport();
 	const tables = root.querySelectorAll<HTMLElement>("table");
 	await expect(tables.length).toBeGreaterThan(0);
 	for (const table of tables) {
-		const scroller = scrollParentOf(table);
+		const scroller = horizontalScrollParentOf(table);
 		await expect(scroller.getBoundingClientRect().width).toBeLessThanOrEqual(
 			window.innerWidth + EPSILON,
 		);
-		if (table.scrollWidth > scroller.clientWidth + EPSILON) {
+		const overflows = table.scrollWidth > scroller.clientWidth + EPSILON;
+		if (expectOverflow) {
+			await expect(
+				overflows,
+				"Expected this table to be wider than its scroller, so that the scrolling assertion below means something.",
+			).toBe(true);
+		}
+		if (overflows) {
 			scroller.scrollLeft = scroller.scrollWidth;
 			await expect(scroller.scrollLeft).toBeGreaterThan(0);
 		}
@@ -153,8 +174,9 @@ export async function expectDialogFitsViewport(popup: HTMLElement = openDialogPo
 export async function expectDialogBodyScrolls(popup: HTMLElement = openDialogPopup()) {
 	await expectReflowViewport();
 	const heading = popup.querySelector<HTMLElement>('h2, [role="heading"]');
-	await expect(heading).not.toBeNull();
-	if (heading == null) return;
+	if (heading == null) {
+		throw new Error("A dialog with no heading has nothing to keep pinned while its body scrolls.");
+	}
 
 	const scrollers = [popup, ...popup.querySelectorAll<HTMLElement>("*")].filter(
 		(node) =>

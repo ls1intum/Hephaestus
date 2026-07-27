@@ -205,11 +205,6 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
          * ObservationController (contributor findings API), ReactionController (contributor reactions),
          * and PracticeReviewSettingsController (per-workspace review policy) are allowed as REST entry
          * points in the practices module.
-         *
-         * <p>PracticeReviewSettingsController joined the list in #1368, when the policy it serves moved
-         * off {@code /ai-settings} — a container in the {@code agent} module named for something it no
-         * longer held. The policy is a property of practice review, and hosting it here let its service
-         * drop its last {@code agent} dependency.
          */
         @Test
         void practicesHasDedicatedController() {

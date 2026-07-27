@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
@@ -93,6 +94,25 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
         return createRequest(null, null, null);
     }
 
+    /** Live on arrival with no price — the shape the activation guard has to refuse. */
+    private CreateWorkspaceLlmModelRequestDTO enabledUnpricedCreateRequest() {
+        return new CreateWorkspaceLlmModelRequestDTO(
+            "gpt-5",
+            "GPT-5",
+            "gpt-5",
+            null,
+            null,
+            null,
+            true,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+        );
+    }
+
     /** slug/displayName/upstreamModelId fixed to "gpt-5"/"GPT-5"/"gpt-5"; only pricing varies per test. */
     private CreateWorkspaceLlmModelRequestDTO createRequest(
         PricingMode pricingMode,
@@ -139,7 +159,10 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
 
         @Test
         void availableModelsRemainsAvailableWhenWorkspaceConnectionsAreDisabled() {
-            // Read-only: existing bindings must stay explicable even if BYO was later turned off.
+            // Read-only: the gate guards writes only, so a workspace whose BYO switch is off can still
+            // read the catalogue and existing bindings stay explicable. Adding requireByoEnabled() to
+            // availableModels throws AccessForbiddenException here.
+            byoEnabled(false);
             when(instanceModelRepository.findVisibleEnabledModels(1L)).thenReturn(List.of());
             when(modelRepository.findEnabledWithEnabledConnection(1L)).thenReturn(List.of());
 
@@ -194,6 +217,14 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             assertThat(entry.getValue().action()).isEqualTo(ConfigAuditAction.CREATED);
         }
 
+        /**
+         * The one thing this class owes the shared validator: that BYO create routes a workspace
+         * admin's rates through it at all. The rules themselves — required rates, all-zero, the Free
+         * note, rates on an unpriced model — are tabled once, against the same
+         * {@code LlmPriceValidation}, in {@code LlmModelServiceTest.PriceSupersede}. Deleting the
+         * {@code LlmPriceValidation.validate(...)} call from {@code WorkspaceLlmModelService#create}
+         * fails only here.
+         */
         @Test
         void pricedModeReusesTheSharedPriceValidationAndRejectsAMissingOutputRate() {
             byoEnabled(true);
@@ -202,42 +233,68 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
 
             CreateWorkspaceLlmModelRequestDTO request = createRequest(PricingMode.PRICED, new BigDecimal("3.00"), null);
 
-            assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, request)).isInstanceOf(
-                IllegalArgumentException.class
-            );
+            assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("an input rate and an output rate");
             verify(modelRepository, never()).saveAndFlush(any());
         }
 
+        /**
+         * The BYO activation guard, mirroring the instance-side one. An unpriced model that is live is
+         * a model the ledger cannot cost: admission refuses it, so the work never runs, and the
+         * workspace admin sees jobs that never start with no explanation. Refusing at activation is what
+         * turns that into an error message they can act on.
+         */
         @Test
-        void freeModeReusesTheSharedPriceValidationAndRequiresANote() {
+        void refusesToCreateAnActiveModelWithNoPrice() {
             byoEnabled(true);
-            when(connectionRepository.findByIdAndWorkspaceId(50L, 1L)).thenReturn(Optional.of(connection()));
+            // Connection deliberately enabled: only the missing price may be the reason for the refusal,
+            // otherwise this test would pass on the other conjunct of the same guard.
+            WorkspaceLlmConnection live = connection();
+            live.setEnabled(true);
+            when(connectionRepository.findByIdAndWorkspaceId(50L, 1L)).thenReturn(Optional.of(live));
             when(modelRepository.findByWorkspaceIdAndSlug(1L, "gpt-5")).thenReturn(Optional.empty());
 
-            CreateWorkspaceLlmModelRequestDTO request = createRequest(PricingMode.NO_CHARGE, null, null);
-
-            assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, request))
+            assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, enabledUnpricedCreateRequest()))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("note");
+                .hasMessageContaining("configure a price before activating the model");
+            verify(modelRepository, never()).saveAndFlush(any());
+            verifyNoInteractions(configAudit);
         }
 
+        /**
+         * The other half of the same guard: a model whose own price is fine but whose connection is
+         * switched off cannot reach the provider, so activating it would produce the same silent
+         * non-start.
+         */
         @Test
-        void pricedModeReusesTheSharedPriceValidationAndRejectsAllZeroRates() {
-            // an all-zero-rate PRICED model would otherwise pass validation and
-            // count as verified $0 spend forever — that's what Free is for.
+        void refusesToCreateAnActiveModelOnADisabledConnection() {
             byoEnabled(true);
-            when(connectionRepository.findByIdAndWorkspaceId(50L, 1L)).thenReturn(Optional.of(connection()));
+            // Priced, so only the switched-off connection may be the reason for the refusal.
+            WorkspaceLlmConnection disabled = connection();
+            disabled.setEnabled(false);
+            when(connectionRepository.findByIdAndWorkspaceId(50L, 1L)).thenReturn(Optional.of(disabled));
             when(modelRepository.findByWorkspaceIdAndSlug(1L, "gpt-5")).thenReturn(Optional.empty());
 
-            CreateWorkspaceLlmModelRequestDTO request = createRequest(
+            CreateWorkspaceLlmModelRequestDTO pricedButOffline = new CreateWorkspaceLlmModelRequestDTO(
+                "gpt-5",
+                "GPT-5",
+                "gpt-5",
+                null,
+                null,
+                null,
+                true,
                 PricingMode.PRICED,
-                BigDecimal.ZERO,
-                BigDecimal.ZERO
+                new BigDecimal("3.00"),
+                new BigDecimal("6.00"),
+                null,
+                null,
+                null
             );
 
-            assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, request))
+            assertThatThrownBy(() -> modelService.create(workspaceContext, 50L, pricedButOffline))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("choose Free instead");
+                .hasMessageContaining("Activate the connection");
             verify(modelRepository, never()).saveAndFlush(any());
         }
     }
@@ -469,19 +526,6 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
                 .orElseThrow();
             assertThat(own.id()).isEqualTo(9L);
             assertThat(own.connectionDisplayName()).isEqualTo("My Provider");
-        }
-
-        @Test
-        void anInstanceModelInvisibleToThisWorkspaceIsAlreadyFilteredByTheRepositoryQuery() {
-            // The visibility/grant filter lives in LlmModelRepository#findVisibleEnabledModels (a JPQL
-            // query), so the service-level contract is simply: whatever the query returns is included
-            // verbatim, and an empty result yields an empty projection.
-            when(instanceModelRepository.findVisibleEnabledModels(1L)).thenReturn(List.of());
-            when(modelRepository.findEnabledWithEnabledConnection(1L)).thenReturn(List.of());
-
-            List<AvailableLlmModelDTO> result = modelService.availableModels(workspaceContext);
-
-            assertThat(result).isEmpty();
         }
     }
 }

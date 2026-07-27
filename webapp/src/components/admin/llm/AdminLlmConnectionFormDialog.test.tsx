@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { LlmConnection } from "@/api/types.gen";
+import { validateLlmConnectionForm } from "@/lib/llm-form-validation";
 import { AdminLlmConnectionFormDialog } from "./AdminLlmConnectionFormDialog";
 
 const connection: LlmConnection = {
@@ -94,9 +95,14 @@ describe("AdminLlmConnectionFormDialog", () => {
 
 		fireEvent.click(screen.getByRole("button", { name: "Save inactive connection" }));
 
-		expect(
-			screen.getByText("Remove any credentials, query string or fragment from the URL."),
-		).toBeTruthy();
+		// The wording is `llm-form-validation`'s and is stated there; what this dialog is answerable
+		// for is that the shared rule runs on this field and that its words reach the reader unaltered.
+		const rejection = validateLlmConnectionForm({
+			displayName: "Gateway",
+			baseUrl: "https://gw.example.com/v1?api-key=SECRET",
+		}).baseUrl;
+		expect(rejection).toBeTruthy();
+		expect(screen.getByText(rejection as string)).toBeTruthy();
 		expect(onCreate).not.toHaveBeenCalled();
 	});
 

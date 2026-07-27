@@ -4,7 +4,6 @@ import {
 	expectDialogFitsViewport,
 	expectPageReflows,
 	expectTablesScrollInPlace,
-	expectTargetSize,
 	expectWithinViewport,
 	REFLOW_WIDTH,
 } from "./reflow";
@@ -41,10 +40,7 @@ describe("reflow assertions refuse to run at desktop width", () => {
 		await expect(run()).rejects.toThrow(/reflow viewport/);
 	});
 
-	it("expectTargetSize still holds at any width, so it carries no viewport guard", async () => {
-		desktop();
-		const control = tinyElement();
-		control.getBoundingClientRect = () => new DOMRect(0, 0, 32, 32);
-		await expect(expectTargetSize(control)).resolves.toBeUndefined();
-	});
+	// `expectTargetSize` is deliberately absent from the table: 24 px is 24 px at any width, so it
+	// carries no viewport guard and has nothing to fail here. Its own assertion is exercised by every
+	// story that calls it (`AgentJobsTable`, `AdminInstanceLlmUsageTable`, `AgentActivityPage`).
 });

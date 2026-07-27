@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import type { SyncJob } from "@/api/types.gen";
-import { expectGenuinelyDisabled } from "@/test/controls";
 import { SyncJobsTable } from "./SyncJobsTable";
 
 const jobs: SyncJob[] = [
@@ -207,19 +206,15 @@ export const Paged: Story = {
 };
 
 /**
- * The job history pages through the shared `TablePagination`, so its boundary controls are real
- * `<button disabled>`s rather than dimmed anchors (WCAG 2.2 SC 4.1.2) — and the current page is
- * carried by `aria-current`, which is what replaced the hand-written "Page N of M" line.
+ * The job history pages through the shared `TablePagination`. The pager carries where the reader is
+ * in `aria-current`, so this table needs no "Page N of M" line of its own — and the window, the gaps
+ * and the boundary behaviour are stated once, in `TablePagination.stories.tsx`.
  */
-export const FirstPageBoundaryIsDisabled: Story = {
+export const FirstPage: Story = {
 	args: { jobs, page: 0, totalPages: 4, onPageChange: fn() },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expectGenuinelyDisabled(canvas.getByRole("button", { name: "Go to previous page" }));
-		await expect(canvas.getByRole("button", { name: "Go to next page" })).toBeEnabled();
-		await expect(canvas.getByRole("button", { name: "Go to page 1" })).toHaveAttribute(
-			"aria-current",
-			"page",
-		);
+		await expect(canvas.getByRole("navigation", { name: "pagination" })).toBeInTheDocument();
+		await expect(canvas.queryByText(/Page \d+ of \d+/)).toBeNull();
 	},
 };

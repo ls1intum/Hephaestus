@@ -59,9 +59,10 @@ export const FailedDelivery: Story = {
  * The details panel at the WCAG 2.2 SC 1.4.10 reflow width (320 CSS px).
  *
  * `SheetContent` sets its widths as `data-[side=right]:w-3/4` / `data-[side=right]:sm:max-w-sm`,
- * which are attribute-qualified and outrank a plain `w-full` — so the panel was rendering at 75 %
- * of a phone, about 240 px, for label/value rows that need every pixel. This asserts it now really
- * does span the viewport, and that the confirm dialog it opens fits inside it.
+ * which are attribute-qualified and outrank a plain `w-full` — so a width override here has to be
+ * qualified too, or the panel renders at 75 % of a phone (about 240 px) for label/value rows that
+ * need every pixel. This asserts the panel spans the viewport, and that the confirm dialog it opens
+ * fits inside it.
  */
 export const MobileReflow: Story = {
 	args: { job: mockJobRunning },

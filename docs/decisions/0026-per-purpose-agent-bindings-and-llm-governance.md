@@ -61,7 +61,10 @@ detection and mentor; the `llm_usage_event` ledger freezes the applied per-1M ra
 authoritative price history. The legacy per-1k `model_pricing` table is retired.
 
 **A budget cap that is honest.** The monthly cap holds queued detection jobs (re-eligible via
-`available_at`) instead of cancelling them, the proxy refuses new calls once a workspace is over cap,
+`available_at`) instead of cancelling them on the spot; the hold is bounded — `AgentJobExecutor`'s
+`BUDGET_HOLD_MAX_AGE` cancels a job that is still over cap seven days after it was queued, because a
+month-old review is noise and an unbounded hold loops forever. The proxy refuses new calls once a
+workspace is over cap,
 a crashed job bills the calls it made from proxy-accumulated counters, and enforcement is structural:
 a capped workspace with an unverifiable month is paused (a cap you cannot verify is not a cap) while
 an uncapped workspace is never paused — the `WARN`/`BLOCK` knob is removed.
@@ -70,10 +73,11 @@ an uncapped workspace is never paused — the `WARN`/`BLOCK` knob is removed.
 
 - The runtime resolves a model only from a binding. `agent_config` and the scalar pointers were
   demoted to a transitional write-through mirror and have **since been deleted** (see the amendment
-  note below); `WorkspaceAgentBinding` is now the sole `ModelBindingSource`.
+  note at the top of this ADR); `WorkspaceAgentBinding` is now the sole `ModelBindingSource`.
 - **Operators:** a workspace that relied on the implicit fan-out must explicitly assign a detection
-  model; the instance `WARN`/`BLOCK` "usage without a known price" setting is gone (its column is
-  dropped automatically).
+  model; the instance `WARN`/`BLOCK` "usage without a known price" setting is gone. Nothing to
+  migrate — the setting was never persisted, so no column is created or dropped for it; enforcement
+  is structural instead.
 - Credential isolation is structural, not a WHERE-clause promise: a workspace-scoped query can never
   select an instance key, and the proxy resolves the URL and key together from the live row so a
   repointed host can never be paired with a rotated key.

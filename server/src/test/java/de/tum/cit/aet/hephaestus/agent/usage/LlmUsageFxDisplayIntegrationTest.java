@@ -146,14 +146,12 @@ class LlmUsageFxDisplayIntegrationTest extends AbstractWorkspaceIntegrationTest 
             .isEqualTo("ECB")
             .jsonPath("$.fx.ratePerUsd")
             .value(rate -> assertThat(new BigDecimal(rate.toString())).isEqualByComparingTo("0.878966"))
-            .jsonPath("$.workspaces[0].fx")
-            .doesNotExist()
-            .jsonPath("$.workspaces[1].fx")
-            .doesNotExist()
             .returnResult()
             .getResponseBody();
 
         // Once for the whole response, not once per row: the key occurs a single time on the wire.
+        // This is what makes the block above an ENVELOPE fact — copy the rate onto each of the two
+        // workspace rows and there are three occurrences, not one.
         assertThat(new String(body, StandardCharsets.UTF_8).split("\"fx\"", -1)).hasSize(2);
     }
 

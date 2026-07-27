@@ -12,6 +12,9 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
@@ -84,16 +87,14 @@ class ConfigSnapshotTest extends BaseUnitTest {
             assertThat(snapshot.allowInternet()).isFalse();
         }
 
-        @Test
-        void shouldRejectNullSource() {
-            assertThatThrownBy(() -> ConfigSnapshot.from(null, resolver)).isInstanceOf(NullPointerException.class);
-        }
+        @ParameterizedTest(name = "from() rejects a null {0}")
+        @ValueSource(strings = { "binding", "resolver" })
+        void shouldRejectANullArgument(String missingArgument) {
+            boolean bindingIsMissing = "binding".equals(missingArgument);
 
-        @Test
-        void shouldRejectNullResolver() {
-            assertThatThrownBy(() -> ConfigSnapshot.from(createBinding(), null)).isInstanceOf(
-                NullPointerException.class
-            );
+            assertThatThrownBy(() ->
+                ConfigSnapshot.from(bindingIsMissing ? null : createBinding(), bindingIsMissing ? resolver : null)
+            ).isInstanceOf(NullPointerException.class);
         }
     }
 
@@ -293,98 +294,51 @@ class ConfigSnapshotTest extends BaseUnitTest {
         }
     }
 
+    /**
+     * A snapshot is the only routing a running job has: the proxy sends its calls wherever this record
+     * says, for as long as the job lives. A snapshot missing either half of that address, or carrying a
+     * timeout no job could run under, must never come into existence to be frozen onto a row.
+     */
     @Nested
     class Validation {
 
-        @Test
-        void shouldRejectNullApiProtocol() {
-            assertThatThrownBy(() ->
-                new ConfigSnapshot(
-                    ConfigSnapshot.SCHEMA_VERSION,
-                    null,
-                    "https://api.openai.com",
-                    "gpt",
-                    null,
-                    null,
-                    null,
-                    false,
-                    null,
-                    null,
-                    null,
-                    null,
-                    600,
-                    false,
-                    null
-                )
-            ).isInstanceOf(NullPointerException.class);
+        /** The valid shape every row below breaks in exactly one place. */
+        private ConfigSnapshot snapshot(String apiProtocol, String baseUrl, int timeoutSeconds) {
+            return new ConfigSnapshot(
+                ConfigSnapshot.SCHEMA_VERSION,
+                apiProtocol,
+                baseUrl,
+                "gpt",
+                null,
+                null,
+                null,
+                false,
+                null,
+                null,
+                null,
+                null,
+                timeoutSeconds,
+                false,
+                null
+            );
         }
 
-        @Test
-        void shouldRejectNullBaseUrl() {
-            assertThatThrownBy(() ->
-                new ConfigSnapshot(
-                    ConfigSnapshot.SCHEMA_VERSION,
-                    "openai-completions",
-                    null,
-                    "gpt",
-                    null,
-                    null,
-                    null,
-                    false,
-                    null,
-                    null,
-                    null,
-                    null,
-                    600,
-                    false,
-                    null
-                )
-            ).isInstanceOf(NullPointerException.class);
+        @ParameterizedTest(name = "a snapshot with no {2} cannot be built")
+        @CsvSource(
+            nullValues = "NULL",
+            value = { "NULL, https://api.openai.com, apiProtocol", "openai-completions, NULL, baseUrl" }
+        )
+        void shouldRejectAMissingRoutingField(String apiProtocol, String baseUrl, String missingField) {
+            assertThatThrownBy(() -> snapshot(apiProtocol, baseUrl, 600))
+                .as(missingField)
+                .isInstanceOf(NullPointerException.class);
         }
 
-        @Test
-        void shouldRejectZeroTimeout() {
+        @ParameterizedTest(name = "a timeout of {0}s cannot be built")
+        @ValueSource(ints = { 0, -1 })
+        void shouldRejectANonPositiveTimeout(int timeoutSeconds) {
             assertThatThrownBy(() ->
-                new ConfigSnapshot(
-                    ConfigSnapshot.SCHEMA_VERSION,
-                    "openai-completions",
-                    "https://api.openai.com",
-                    "gpt",
-                    null,
-                    null,
-                    null,
-                    false,
-                    null,
-                    null,
-                    null,
-                    null,
-                    0,
-                    false,
-                    null
-                )
-            ).isInstanceOf(IllegalArgumentException.class);
-        }
-
-        @Test
-        void shouldRejectNegativeTimeout() {
-            assertThatThrownBy(() ->
-                new ConfigSnapshot(
-                    ConfigSnapshot.SCHEMA_VERSION,
-                    "openai-completions",
-                    "https://api.openai.com",
-                    "gpt",
-                    null,
-                    null,
-                    null,
-                    false,
-                    null,
-                    null,
-                    null,
-                    null,
-                    -1,
-                    false,
-                    null
-                )
+                snapshot("openai-completions", "https://api.openai.com", timeoutSeconds)
             ).isInstanceOf(IllegalArgumentException.class);
         }
     }

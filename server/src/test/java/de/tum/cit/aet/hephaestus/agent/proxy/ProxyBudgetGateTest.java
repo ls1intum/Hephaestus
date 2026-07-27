@@ -19,6 +19,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 
 /**
@@ -80,35 +82,22 @@ class ProxyBudgetGateTest extends BaseUnitTest {
     @DisplayName("the bound: one attempt cannot outspend the cap by more than a call")
     class TheBound {
 
-        @Test
-        @DisplayName("an attempt whose own unrecorded spend reaches the cap is refused")
-        void anAttemptIsRefusedOnceItsOwnSpendReachesTheCap() {
-            when(budgetService.headroom(WORKSPACE_ID)).thenReturn(instanceCapOfOneDollar());
-
-            assertThat(gate.isBlocked(routing(FundingSource.INSTANCE, "1.00"))).isTrue();
-        }
-
-        @Test
-        @DisplayName("one cent of headroom left still forwards — the gate stops at the cap, not before it")
-        void anAttemptStillUnderTheCapIsForwarded() {
-            when(budgetService.headroom(WORKSPACE_ID)).thenReturn(instanceCapOfOneDollar());
-
-            assertThat(gate.isBlocked(routing(FundingSource.INSTANCE, "0.99"))).isFalse();
-        }
-
         /**
-         * The finding, stated as a test: the ledger the old gate read says ALLOWED for the very same
-         * workspace at the very same instant. Everything that stops the runaway comes from the
-         * attempt's own spend.
+         * The ledger on its own says ALLOWED for this workspace at both spends below; what refuses the
+         * dollar call is the attempt's own spend counted on top of it. Both halves are asserted
+         * together, so a gate that consulted only the ledger fails here. The cent of headroom is the
+         * other edge of the same boundary: the gate stops AT the cap, not before it.
          */
-        @Test
-        @DisplayName("the ledger alone would have allowed the call that is being refused")
-        void theLedgerAloneWouldHaveAllowedIt() {
+        @ParameterizedTest(name = "an attempt that has spent ${0} of a $1.00 cap is blocked={1}")
+        @CsvSource({ "0.99, false", "1.00, true" })
+        void anAttemptIsJudgedOnItsOwnUnrecordedSpend(String ownSpendUsd, boolean blocked) {
             LlmBudgetHeadroom headroom = instanceCapOfOneDollar();
             when(budgetService.headroom(WORKSPACE_ID)).thenReturn(headroom);
 
-            assertThat(headroom.decide().blocks(FundingSource.INSTANCE)).isFalse();
-            assertThat(gate.isBlocked(routing(FundingSource.INSTANCE, "1.00"))).isTrue();
+            assertThat(headroom.decide().blocks(FundingSource.INSTANCE))
+                .as("the ledger alone allows both of these calls")
+                .isFalse();
+            assertThat(gate.isBlocked(routing(FundingSource.INSTANCE, ownSpendUsd))).isEqualTo(blocked);
         }
 
         /**
@@ -209,35 +198,23 @@ class ProxyBudgetGateTest extends BaseUnitTest {
         }
 
         /**
-         * Kills "give the mentor route a null attempt again": the turn below spends $1.00 of a $1.00
-         * cap inside one turn and is still waved through for as long as it keeps calling.
+         * At $10 per million input tokens, 100k tokens is $1.00 — the whole cap, none of it in the
+         * ledger yet; 90k is still under it. The ledger says ALLOWED for this workspace at both, so
+         * only the turn's own completed calls can stop the refused one.
+         *
+         * <p>Kills "give the mentor route a null attempt again": the turn would then spend the whole
+         * cap inside one turn and still be waved through for as long as it kept calling.
          */
-        @Test
-        @DisplayName("a turn whose own completed calls have consumed the cap is refused mid-turn")
-        void aTurnIsRefusedOnceItsOwnCallsConsumeTheCap() {
-            when(budgetService.headroom(WORKSPACE_ID)).thenReturn(instanceCapOfOneDollar());
-
-            // 100k input tokens at $10/M = $1.00, the whole cap, none of it in the ledger yet.
-            assertThat(gate.isBlocked(turnThatHasSpent(100_000))).isTrue();
-        }
-
-        @Test
-        @DisplayName("a turn still under the cap keeps calling")
-        void aTurnUnderTheCapIsForwarded() {
-            when(budgetService.headroom(WORKSPACE_ID)).thenReturn(instanceCapOfOneDollar());
-
-            assertThat(gate.isBlocked(turnThatHasSpent(90_000))).isFalse();
-        }
-
-        /** The ledger says ALLOWED for this workspace at this instant; only the turn's own spend stops it. */
-        @Test
-        @DisplayName("the ledger alone would have allowed the mentor call that is being refused")
-        void theLedgerAloneWouldHaveAllowedIt() {
+        @ParameterizedTest(name = "a turn that has burned {0} input tokens of a $1.00 cap is blocked={1}")
+        @CsvSource({ "90000, false", "100000, true" })
+        void aTurnIsJudgedOnItsOwnCompletedCalls(int inputTokens, boolean blocked) {
             LlmBudgetHeadroom headroom = instanceCapOfOneDollar();
             when(budgetService.headroom(WORKSPACE_ID)).thenReturn(headroom);
 
-            assertThat(headroom.decide().blocks(FundingSource.INSTANCE)).isFalse();
-            assertThat(gate.isBlocked(turnThatHasSpent(100_000))).isTrue();
+            assertThat(headroom.decide().blocks(FundingSource.INSTANCE))
+                .as("the ledger alone allows both of these turns")
+                .isFalse();
+            assertThat(gate.isBlocked(turnThatHasSpent(inputTokens))).isEqualTo(blocked);
         }
     }
 

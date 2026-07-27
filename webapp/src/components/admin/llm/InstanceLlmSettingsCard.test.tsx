@@ -81,8 +81,9 @@ describe("InstanceLlmSettingsCard", () => {
 		fireEvent.change(hostsField(), { target: { value: "llm.example.com" } });
 
 		// A background refetch lands — this tab regaining focus past the query's `staleTime` is enough
-		// — and a second admin has since changed the toggle. Copying props into state through an effect
-		// threw the typed host away and reset `dirty`, greying out Save on a form mid-edit.
+		// — and a second admin has since changed the toggle. The form is seeded once, on mount:
+		// anything that copies props into state afterwards throws the typed host away and greys out
+		// Save on a form the admin is still in the middle of.
 		rerender(
 			<InstanceLlmSettingsCard
 				settings={{ allowedEgressHosts: "api.openai.com", allowWorkspaceConnections: false }}

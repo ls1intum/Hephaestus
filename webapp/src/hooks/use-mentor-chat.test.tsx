@@ -1,15 +1,14 @@
 /**
- * Comprehensive tests for useMentorChat hook.
+ * Tests for useMentorChat.
  *
  * This hook orchestrates AI SDK's useChat with Hephaestus-specific features:
  * - Thread management (loading, hydration, grouped threads)
- * - Greeting functionality
  * - Vote management
  * - Query invalidation on message completion
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 // Mock external dependencies before importing the hook
@@ -36,8 +35,9 @@ vi.mock("uuid", () => ({
 }));
 
 // Import after mocks are set up
+import type { UseChatHelpers } from "@ai-sdk/react";
 import { useChat } from "@ai-sdk/react";
-import { getThreadQueryKey } from "@/api/@tanstack/react-query.gen";
+import { getThreadQueryKey, listThreadsQueryKey } from "@/api/@tanstack/react-query.gen";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import type { ChatMessage } from "@/lib/types";
 import { useMentorChat } from "./use-mentor-chat";
@@ -46,6 +46,8 @@ import { useMentorChat } from "./use-mentor-chat";
 const mockUseChat = useChat as Mock;
 const mockUseActiveWorkspaceSlug = useActiveWorkspaceSlug as Mock;
 
+type ChatStatus = UseChatHelpers<ChatMessage>["status"];
+
 // Test utilities
 function createMockMessage(role: "user" | "assistant", text: string, id?: string): ChatMessage {
 	return {
@@ -53,6 +55,86 @@ function createMockMessage(role: "user" | "assistant", text: string, id?: string
 		role,
 		parts: [{ type: "text", text, state: role === "assistant" ? "done" : undefined }],
 	} as ChatMessage;
+}
+
+/** The visible text of a message, the way the transcript renders it. */
+function textOf(message: ChatMessage): string {
+	return message.parts
+		.map((part) => (part.type === "text" ? part.text : ""))
+		.join("")
+		.trim();
+}
+
+interface FakeChat {
+	/** What the hook handed to `useChat` on the last render — the transport lives here. */
+	options: {
+		id: string;
+		messages: ChatMessage[];
+		transport: unknown;
+		onFinish?: (event: { message: ChatMessage }) => void;
+		onError?: (error: Error) => void;
+	};
+	/** A stream that fails the way a dropped connection does. */
+	raiseError: (error: Error) => void;
+	/** A turn that completes, which is what triggers the hook's cache invalidation. */
+	finishTurn: () => void;
+}
+
+/**
+ * A stateful stand-in for AI SDK's `useChat`.
+ *
+ * The hook under test does not own its transcript — `useChat` does — so a stub that returns a frozen
+ * `messages: []` leaves every behavioural claim here ("sends", "refuses to send", "hydrates",
+ * "does not overwrite a stream") with nothing to check but a spy. This fake keeps the list the way
+ * the real hook does, so the tests read `result.current.messages` and `result.current.status` — the
+ * two values the mentor transcript is rendered from.
+ */
+function installFakeChat(initialStatus: ChatStatus = "ready"): FakeChat {
+	const fake = {
+		options: undefined,
+		raiseError: () => {},
+		finishTurn: () => {},
+	} as unknown as FakeChat;
+
+	mockUseChat.mockImplementation((options: FakeChat["options"] & { generateId?: () => string }) => {
+		fake.options = options;
+		const [messages, setMessages] = useState<ChatMessage[]>(options.messages ?? []);
+		const [status, setStatus] = useState<ChatStatus>(initialStatus);
+		const [error, setError] = useState<Error | undefined>(undefined);
+
+		fake.raiseError = (raised: Error) => {
+			setStatus("error");
+			setError(raised);
+			options.onError?.(raised);
+		};
+		fake.finishTurn = () => {
+			options.onFinish?.({ message: createMockMessage("assistant", "Done") });
+		};
+
+		return {
+			id: options.id,
+			messages,
+			status,
+			error,
+			sendMessage: ({ text }: { text: string }) => {
+				setMessages((current) => [
+					...current,
+					createMockMessage("user", text, options.generateId?.()),
+				]);
+				setStatus("submitted");
+			},
+			setMessages,
+			stop: vi.fn(),
+			regenerate: vi.fn(),
+			clearError: vi.fn(),
+			resumeStream: vi.fn(),
+			addToolResult: vi.fn(),
+			addToolOutput: vi.fn(),
+			addToolApprovalResponse: vi.fn(),
+		};
+	});
+
+	return fake;
 }
 
 function createQueryClient() {
@@ -77,44 +159,19 @@ function createWrapper(queryClient: QueryClient) {
 
 describe("useMentorChat", () => {
 	let queryClient: QueryClient;
-	let mockSendMessage: Mock;
-	let mockSetMessages: Mock;
-	let mockStop: Mock;
-	let mockRegenerate: Mock;
-	let mockClearError: Mock;
+	let chat: FakeChat;
 
 	beforeEach(() => {
 		vi.clearAllMocks();
 
 		queryClient = createQueryClient();
 
-		// Setup default mocks
-		mockSendMessage = vi.fn();
-		mockSetMessages = vi.fn();
-		mockStop = vi.fn();
-		mockRegenerate = vi.fn();
-		mockClearError = vi.fn();
-
 		mockUseActiveWorkspaceSlug.mockReturnValue({
 			workspaceSlug: "test-workspace",
 			isLoading: false,
 		});
 
-		mockUseChat.mockReturnValue({
-			id: "mock-uuid-123",
-			messages: [],
-			status: "ready",
-			error: undefined,
-			sendMessage: mockSendMessage,
-			setMessages: mockSetMessages,
-			stop: mockStop,
-			regenerate: mockRegenerate,
-			clearError: mockClearError,
-			resumeStream: vi.fn(),
-			addToolResult: vi.fn(),
-			addToolOutput: vi.fn(),
-			addToolApprovalResponse: vi.fn(),
-		});
+		chat = installFakeChat();
 
 		// Reset fetch mock
 		global.fetch = vi.fn();
@@ -144,22 +201,17 @@ describe("useMentorChat", () => {
 			expect(result.current.currentThreadId).toBe("existing-thread-123");
 		});
 
-		it("should initialize with provided initial messages", () => {
+		it("opens on the messages it was handed, so a resumed thread renders straight away", () => {
 			const initialMessages = [
 				createMockMessage("user", "Hello"),
 				createMockMessage("assistant", "Hi there!"),
 			];
 
-			renderHook(() => useMentorChat({ initialMessages }), {
+			const { result } = renderHook(() => useMentorChat({ initialMessages }), {
 				wrapper: createWrapper(queryClient),
 			});
 
-			// Verify useChat was called with initial messages
-			expect(mockUseChat).toHaveBeenCalledWith(
-				expect.objectContaining({
-					messages: initialMessages,
-				}),
-			);
+			expect(result.current.messages).toEqual(initialMessages);
 		});
 
 		it("should not enable thread query when workspace is loading", () => {
@@ -177,7 +229,7 @@ describe("useMentorChat", () => {
 	});
 
 	describe("message sending", () => {
-		it("should call sendMessage with text when sendMessage is invoked", () => {
+		it("puts what the user typed into the transcript", () => {
 			const { result } = renderHook(() => useMentorChat({}), {
 				wrapper: createWrapper(queryClient),
 			});
@@ -186,34 +238,29 @@ describe("useMentorChat", () => {
 				result.current.sendMessage("Hello AI!");
 			});
 
-			expect(mockSendMessage).toHaveBeenCalledWith({ text: "Hello AI!" });
+			expect(result.current.messages).toHaveLength(1);
+			expect(result.current.messages[0].role).toBe("user");
+			expect(textOf(result.current.messages[0])).toBe("Hello AI!");
+			expect(result.current.status).toBe("submitted");
 		});
 
-		it("should not send empty messages", () => {
+		it.each<[string, string]>([
+			["an empty message", ""],
+			["a message that is only whitespace", "   "],
+		])("leaves the transcript untouched for %s", (_name, text) => {
 			const { result } = renderHook(() => useMentorChat({}), {
 				wrapper: createWrapper(queryClient),
 			});
 
 			act(() => {
-				result.current.sendMessage("");
+				result.current.sendMessage(text);
 			});
 
-			expect(mockSendMessage).not.toHaveBeenCalled();
+			expect(result.current.messages).toEqual([]);
+			expect(result.current.status).toBe("ready");
 		});
 
-		it("should not send whitespace-only messages", () => {
-			const { result } = renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			act(() => {
-				result.current.sendMessage("   ");
-			});
-
-			expect(mockSendMessage).not.toHaveBeenCalled();
-		});
-
-		it("should not send messages when workspace is not available", () => {
+		it("sends nothing while no workspace is active, because there is no endpoint to send to", () => {
 			mockUseActiveWorkspaceSlug.mockReturnValue({
 				workspaceSlug: null,
 				isLoading: false,
@@ -227,7 +274,8 @@ describe("useMentorChat", () => {
 				result.current.sendMessage("Hello");
 			});
 
-			expect(mockSendMessage).not.toHaveBeenCalled();
+			expect(result.current.messages).toEqual([]);
+			expect(result.current.status).toBe("ready");
 		});
 	});
 
@@ -236,65 +284,22 @@ describe("useMentorChat", () => {
 	// live-LLM tests where the real status transitions matter.
 
 	describe("error handling", () => {
-		it("should expose error from useChat", () => {
-			const testError = new Error("Test error");
-			mockUseChat.mockReturnValue({
-				id: "mock-uuid-123",
-				messages: [],
-				status: "error",
-				error: testError,
-				sendMessage: mockSendMessage,
-				setMessages: mockSetMessages,
-				stop: mockStop,
-				regenerate: mockRegenerate,
-				clearError: mockClearError,
-				resumeStream: vi.fn(),
-				addToolResult: vi.fn(),
-				addToolOutput: vi.fn(),
-				addToolApprovalResponse: vi.fn(),
-			});
-
-			const { result } = renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			expect(result.current.error).toBe(testError);
-		});
-
-		it("should call onError callback when provided and error occurs", async () => {
+		it("surfaces a failed stream as state and tells the caller about it once", async () => {
 			const onError = vi.fn();
-
-			// Capture the onError callback passed to useChat
-			mockUseChat.mockImplementation((options) => {
-				// Simulate an error occurring
-				setTimeout(() => {
-					options.onError?.(new Error("Streaming error"));
-				}, 0);
-
-				return {
-					id: "mock-uuid-123",
-					messages: [],
-					status: "ready",
-					error: undefined,
-					sendMessage: mockSendMessage,
-					setMessages: mockSetMessages,
-					stop: mockStop,
-					regenerate: mockRegenerate,
-					clearError: mockClearError,
-					resumeStream: vi.fn(),
-					addToolResult: vi.fn(),
-					addToolOutput: vi.fn(),
-					addToolApprovalResponse: vi.fn(),
-				};
-			});
-
-			renderHook(() => useMentorChat({ onError }), {
+			const streamingError = new Error("Streaming error");
+			const { result } = renderHook(() => useMentorChat({ onError }), {
 				wrapper: createWrapper(queryClient),
 			});
 
-			// The hook forwards useChat's error to the caller's onError — assert that pass-through actually
-			// fires end-to-end (the setTimeout above simulates useChat raising a streaming error).
-			await waitFor(() => expect(onError).toHaveBeenCalledWith(expect.any(Error)));
+			act(() => {
+				chat.raiseError(streamingError);
+			});
+
+			// Both halves matter: the transcript has to be able to render the failure, and the route
+			// that opened the chat has to be told so it can toast.
+			expect(result.current.error).toBe(streamingError);
+			expect(result.current.status).toBe("error");
+			await waitFor(() => expect(onError).toHaveBeenCalledExactlyOnceWith(streamingError));
 		});
 	});
 
@@ -367,48 +372,15 @@ describe("useMentorChat", () => {
 	});
 
 	describe("thread hydration", () => {
-		it("should hydrate messages from thread detail when data is available", async () => {
-			// IDs must be UUIDs — parseThreadMessages (chat-validation) rejects non-UUID ids, which would
-			// silently skip hydration. (The previous "msg-1"/"msg-2" ids never validated, masking the bug.)
-			const threadMessages = [
-				createMockMessage("user", "Previous message", "f47ac10b-58cc-4372-a567-0e02b2c3d479"),
-				createMockMessage("assistant", "Previous response", "c9bf9e57-1685-4c89-bafb-ff5af830be8a"),
-			];
+		// IDs must be UUIDs — parseThreadMessages (chat-validation) rejects non-UUID ids and hydration
+		// is skipped silently, so a non-UUID fixture would make this suite green over a dead effect.
+		const threadMessages = [
+			createMockMessage("user", "Previous message", "f47ac10b-58cc-4372-a567-0e02b2c3d479"),
+			createMockMessage("assistant", "Previous response", "c9bf9e57-1685-4c89-bafb-ff5af830be8a"),
+		];
 
-			// Mock useChat to simulate the hook with thread detail available
-			// The hook hydrates messages when threadDetail is available
-
-			mockUseChat.mockImplementation((options) => {
-				return {
-					id: options.id ?? "mock-uuid-123",
-					messages: [],
-					status: "ready",
-					error: undefined,
-					sendMessage: mockSendMessage,
-					setMessages: mockSetMessages,
-					stop: mockStop,
-					regenerate: mockRegenerate,
-					clearError: mockClearError,
-					resumeStream: vi.fn(),
-					addToolResult: vi.fn(),
-					addToolOutput: vi.fn(),
-					addToolApprovalResponse: vi.fn(),
-				};
-			});
-
-			// Create a mock fetch for the thread API
-			const mockFetch = vi.fn().mockResolvedValue({
-				ok: true,
-				json: vi.fn().mockResolvedValue({
-					id: "thread-123",
-					title: "Test Thread",
-					messages: threadMessages,
-				}),
-			});
-			global.fetch = mockFetch;
-
-			// Pre-populate the query cache under the hook's REAL query key (hey-api createQueryKey),
-			// so threadQuery resolves and the hydration effect runs.
+		/** The cache entry `threadQuery` resolves from, under the hook's real hey-api query key. */
+		function seedThread() {
 			queryClient.setQueryData(
 				getThreadQueryKey({ path: { workspaceSlug: "test-workspace", threadId: "thread-123" } }),
 				{
@@ -417,124 +389,96 @@ describe("useMentorChat", () => {
 					messages: threadMessages,
 				},
 			);
+		}
+
+		it("renders the stored thread once its detail resolves", async () => {
+			seedThread();
 
 			const { result } = renderHook(() => useMentorChat({ threadId: "thread-123" }), {
 				wrapper: createWrapper(queryClient),
 			});
 
-			// The hook should set the threadId as currentThreadId
 			expect(result.current.currentThreadId).toBe("thread-123");
-
-			// Once the thread detail resolves (and we're not streaming), the hydration effect pushes the
-			// parsed thread messages into the chat exactly once — assert the effect actually ran, not just
-			// that setMessages is re-exposed.
-			await waitFor(() => expect(mockSetMessages).toHaveBeenCalledTimes(1));
-			expect(mockSetMessages.mock.calls[0][0]).toHaveLength(threadMessages.length);
+			await waitFor(() =>
+				expect(result.current.messages.map((message) => message.id)).toEqual(
+					threadMessages.map((message) => message.id),
+				),
+			);
+			expect(result.current.messages.map(textOf)).toEqual([
+				"Previous message",
+				"Previous response",
+			]);
 		});
 
-		it("should not hydrate when streaming is in progress", async () => {
-			mockUseChat.mockReturnValue({
-				id: "mock-uuid-123",
-				messages: [],
-				status: "streaming",
-				error: undefined,
-				sendMessage: mockSendMessage,
-				setMessages: mockSetMessages,
-				stop: mockStop,
-				regenerate: mockRegenerate,
-				clearError: mockClearError,
-				resumeStream: vi.fn(),
-				addToolResult: vi.fn(),
-				addToolOutput: vi.fn(),
-				addToolApprovalResponse: vi.fn(),
-			});
+		it("does not overwrite an answer that is still streaming", async () => {
+			chat = installFakeChat("streaming");
+			seedThread();
 
-			queryClient.setQueryData(
-				["getThread", { path: { workspaceSlug: "test-workspace", threadId: "thread-123" } }],
-				{
-					id: "thread-123",
-					messages: [createMockMessage("user", "Test")],
-				},
-			);
-
-			renderHook(() => useMentorChat({ threadId: "thread-123" }), {
+			const { result } = renderHook(() => useMentorChat({ threadId: "thread-123" }), {
 				wrapper: createWrapper(queryClient),
 			});
 
-			// setMessages should not be called during streaming
+			// Long enough for the hydration effect to have run had it been going to.
 			await new Promise((resolve) => setTimeout(resolve, 50));
-			expect(mockSetMessages).not.toHaveBeenCalled();
+			expect(result.current.messages).toEqual([]);
+			expect(result.current.status).toBe("streaming");
 		});
 	});
 
 	describe("callback invocation", () => {
-		it("should invalidate queries when message finishes", async () => {
-			const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+		it("marks the thread and the thread list stale when a turn finishes", async () => {
+			const threadsKey = listThreadsQueryKey({ path: { workspaceSlug: "test-workspace" } });
+			// No `threadId` was passed, so the hook files the turn under the id it generated itself.
+			const threadKey = getThreadQueryKey({
+				path: { workspaceSlug: "test-workspace", threadId: "mock-uuid-123" },
+			});
+			queryClient.setQueryData(threadsKey, []);
+			queryClient.setQueryData(threadKey, { id: "mock-uuid-123", messages: [] });
 
-			// Capture and invoke the onFinish callback
-			mockUseChat.mockImplementation((options) => {
-				// Immediately call onFinish to simulate completion
-				setTimeout(() => {
-					options.onFinish?.({
-						message: createMockMessage("assistant", "Done"),
-					});
-				}, 0);
+			renderHook(() => useMentorChat({}), { wrapper: createWrapper(queryClient) });
+			expect(queryClient.getQueryState(threadsKey)?.isInvalidated).toBe(false);
 
-				return {
-					id: "mock-uuid-123",
-					messages: [],
-					status: "ready",
-					error: undefined,
-					sendMessage: mockSendMessage,
-					setMessages: mockSetMessages,
-					stop: mockStop,
-					regenerate: mockRegenerate,
-					clearError: mockClearError,
-					resumeStream: vi.fn(),
-					addToolResult: vi.fn(),
-					addToolOutput: vi.fn(),
-					addToolApprovalResponse: vi.fn(),
-				};
+			act(() => {
+				chat.finishTurn();
 			});
 
-			renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
-
-			await waitFor(() => {
-				expect(invalidateSpy).toHaveBeenCalled();
-			});
+			// The sidebar's thread list and the open thread both changed on the server; leaving either
+			// fresh leaves the answer that just arrived missing from the next navigation.
+			expect(queryClient.getQueryState(threadsKey)?.isInvalidated).toBe(true);
+			expect(queryClient.getQueryState(threadKey)?.isInvalidated).toBe(true);
 		});
 	});
 
 	describe("transport configuration", () => {
-		it("should configure transport with correct API endpoint", () => {
+		it("posts the latest message to the active workspace's mentor endpoint, cookie + CSRF", () => {
 			renderHook(() => useMentorChat({}), {
 				wrapper: createWrapper(queryClient),
 			});
 
-			expect(mockUseChat).toHaveBeenCalledWith(
-				expect.objectContaining({
-					transport: expect.objectContaining({
-						api: "http://localhost:8080/workspaces/test-workspace/mentor/chat",
-					}),
-				}),
-			);
-		});
+			const transport = chat.options.transport as {
+				api: string;
+				prepareSendMessagesRequest: (input: {
+					id: string;
+					messages: { id: string; role: string; parts: { type: string; text: string }[] }[];
+				}) => {
+					body: unknown;
+					credentials: string;
+					headers: Record<string, string>;
+				};
+			};
 
-		it("rides the session cookie + CSRF double-submit header (ADR 0017 auth migration)", () => {
-			renderHook(() => useMentorChat({}), {
-				wrapper: createWrapper(queryClient),
-			});
+			expect(transport.api).toBe("http://localhost:8080/workspaces/test-workspace/mentor/chat");
 
-			// biome-ignore lint/suspicious/noExplicitAny: transport comes from the mocked useChat call args
-			const transport = (mockUseChat.mock.calls.at(-1)?.[0] as any).transport;
+			const latest = { id: "m2", role: "user", parts: [{ type: "text", text: "second" }] };
 			const prepared = transport.prepareSendMessagesRequest({
 				id: "thread-1",
-				messages: [{ id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] }],
+				messages: [{ id: "m1", role: "user", parts: [{ type: "text", text: "first" }] }, latest],
 			});
 
-			// The Keycloak Bearer header is gone; the request now carries the session cookie + CSRF token.
+			// Only the newest turn goes over the wire — the server rebuilds context from the thread id.
+			expect(prepared.body).toEqual({ id: "thread-1", message: latest });
+			// Cookie-session auth (ADR 0017): the session rides `credentials: include` and the
+			// state-changing POST carries the CSRF double-submit header. No Keycloak Bearer.
 			expect(prepared.credentials).toBe("include");
 			expect(prepared.headers["X-XSRF-TOKEN"]).toBe("mock-csrf");
 		});

@@ -114,9 +114,4 @@ class InstanceLlmSettingsControllerIntegrationTest extends AbstractWorkspaceInte
             .expectStatus()
             .isForbidden();
     }
-
-    @Test
-    void anonymousIsUnauthorized() {
-        webTestClient.get().uri("/admin/llm/settings").exchange().expectStatus().isUnauthorized();
-    }
 }

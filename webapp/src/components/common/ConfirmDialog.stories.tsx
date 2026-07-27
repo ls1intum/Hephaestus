@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import type { ReactNode } from "react";
-import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { type ReactNode, useState } from "react";
+import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
 import { ConfirmDialog, type ConfirmDialogProps } from "./ConfirmDialog";
 
 interface Row {
@@ -11,12 +11,41 @@ interface Row {
 const row: Row = { id: 7, displayName: "GPT-5" };
 
 /**
- * The one confirm for a destructive row action, wherever a table offers one.
+ * The caller's half of the contract, for the stories that need the dialog to actually close: the row
+ * awaiting confirmation lives in the caller's state, exactly as it does on every real surface.
+ */
+function ConfirmHarness(props: ConfirmDialogProps<Row>) {
+	const [subject, setSubject] = useState<Row | null>(props.subject);
+	const [deleted, setDeleted] = useState<Row | null>(null);
+	return (
+		<>
+			<ConfirmDialog
+				{...props}
+				subject={subject}
+				onConfirm={(confirmed) => {
+					props.onConfirm(confirmed);
+					setDeleted(confirmed);
+				}}
+				onClose={() => {
+					props.onClose();
+					setSubject(null);
+				}}
+			/>
+			{deleted != null && <p>Deleted “{deleted.displayName}”</p>}
+		</>
+	);
+}
+
+/**
+ * The confirm for a destructive row action on the AI/LLM surfaces.
  *
  * It names the row in its title, because a modal that says only "Are you sure?" is a modal nobody
  * can answer. It closes the moment it is confirmed — the request it starts is the row's business,
  * not the popup's — which is what keeps a second click from re-sending a delete, and what keeps a
  * pending request from ever holding a popup open with both of its buttons disabled.
+ *
+ * Dismissal (Escape, Cancel) is covered by `ConfirmDialog.test.tsx`, which asserts the same three
+ * things this file could only restate: both footer buttons enabled, the popup gone, nothing acted on.
  */
 const meta = {
 	// The component is generic; the stories pin it to one row type so the render props are typed.
@@ -61,27 +90,24 @@ export const LongName: Story = {
 	},
 };
 
-/** Confirming hands the row back and closes in the same gesture. */
+/**
+ * Confirming hands the row back and closes in the same gesture.
+ *
+ * Rendered against caller state, because that is the only way the claim can be checked: `subject` is
+ * the caller's, so "closes" happens when the caller clears it from `onClose` — a story holding
+ * `subject` fixed would leave the popup on screen no matter what the component did.
+ */
 export const Confirming: Story = {
-	play: async ({ args }) => {
+	render: (args) => <ConfirmHarness {...args} />,
+	play: async ({ canvas }) => {
 		const dialog = within(await screen.findByRole("alertdialog"));
 		await userEvent.click(dialog.getByRole("button", { name: "Delete" }));
-		await expect(args.onConfirm).toHaveBeenCalledWith(row);
-		await expect(args.onClose).toHaveBeenCalled();
-	},
-};
 
-/**
- * Escape always gets out. Nothing in this popup is ever disabled, so it can never be the modal with
- * no operable control and no exit that WCAG 2.2 SC 2.1.2 is about.
- */
-export const EscapeDismisses: Story = {
-	play: async ({ args }) => {
-		const dialog = within(await screen.findByRole("alertdialog"));
-		await expect(dialog.getByRole("button", { name: "Cancel" })).toBeEnabled();
-		await expect(dialog.getByRole("button", { name: "Delete" })).toBeEnabled();
-		await userEvent.keyboard("{Escape}");
-		await expect(args.onClose).toHaveBeenCalled();
-		await expect(args.onConfirm).not.toHaveBeenCalled();
+		// The popup outlives its own close by an exit animation, so "gone" is waited for.
+		await waitFor(async () => await expect(screen.queryByRole("alertdialog")).toBeNull());
+		// …and the row it handed back is the one it was opened on, read off the page rather than
+		// off the callback: `onConfirm(shown)` instead of `onConfirm(subject)` would act on the row
+		// the caller has already let go of.
+		await expect(canvas.getByText("Deleted “GPT-5”")).toBeInTheDocument();
 	},
 };

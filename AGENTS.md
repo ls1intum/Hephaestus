@@ -111,7 +111,7 @@ Regeneration is destructive; stash local edits before running these commands. Ch
 - Use Lombok consistently (`@Getter`, `@Setter`, etc.) but prefer explicit builders or records when immutability helps.
 - Group new tests under the proper JUnit tag so CI picks them up (`@Tag("unit")`, `@Tag("integration")`, or `@Tag("live")`). Follow AAA structure, single assertion focus, deterministic data. See `server/AGENTS.md` for testing patterns.
 - Reuse existing DTO converters/mappers instead of duplicating mapping logic. Look at `integration.scm.domain.team` for established patterns.
-- Security: new endpoints must enforce permissions using the existing security utilities (`EnsureAdminUser`, etc.).
+- Security: new endpoints must declare their permission, not assume one. Instance-admin routes use `@PreAuthorize("hasAuthority('app_admin')")`; workspace routes use `@RequireAtLeastWorkspaceAdmin` (and the other `core.security` annotations); anything reachable while impersonating goes through `ImpersonationGuard`.
 - Give each new changelog a fresh millisecond-timestamp ID greater than the previous one and append its `<include>` to the end of `master.xml` (append-only; the historical list is not globally sorted). Align entity annotations with the generated change sets.
 - Annotate record components in DTOs with `org.jspecify.annotations.NonNull` when the API requires a value; leave optional fields bare so the OpenAPI spec stays minimal without extra schema annotations.
 - Prefer resource-oriented workspace endpoints: express lifecycle transitions via HTTP methods (for example `PATCH /workspaces/{workspaceSlug}/status`) instead of RPC-style verbs and return consistent `ProblemDetail` payloads for errors.

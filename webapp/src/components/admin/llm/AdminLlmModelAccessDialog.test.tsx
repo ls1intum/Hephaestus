@@ -93,8 +93,8 @@ describe("AdminLlmModelAccessDialog", () => {
 		);
 
 		// A background refetch lands — same model, a fresh object, and another admin has since granted
-		// it more broadly. Mirroring props into state through an effect silently reinstated Beta here,
-		// so Save went on to revoke nothing.
+		// it more broadly. The open dialog is seeded once, on mount: anything that mirrors props into
+		// state on every render reinstates Beta here, and Save goes on to revoke nothing.
 		rerender(
 			<AdminLlmModelAccessDialog
 				{...props}

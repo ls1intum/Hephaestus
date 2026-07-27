@@ -41,6 +41,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.event.ApplicationEvents;
@@ -304,10 +305,15 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
             assertThat(observationRepository.findAll()).hasSize(2);
 
-            // Approval comment posted (no negatives → approval summary). Inline notes are reconciled
-            // unconditionally on an OPEN PR with an EMPTY list — clearing any prior run's stale
-            // line-numbered notes while posting no new ones.
-            verify(commentPoster).postFormattedBody(any(), any());
+            // Approval comment posted (no negatives → approval summary). Assert the BODY: a findings
+            // summary and an approval reach this same call, so only the text separates "we found
+            // nothing" from "we found things" — posting the wrong one to a clean PR is the defect.
+            var body = ArgumentCaptor.forClass(String.class);
+            verify(commentPoster).postFormattedBody(eq(agentJob), body.capture());
+            assertThat(body.getValue()).contains("nothing to change here");
+
+            // Inline notes are reconciled unconditionally on an OPEN PR with an EMPTY list — clearing
+            // any prior run's stale line-numbered notes while posting no new ones.
             verify(diffNotePoster).reconcileInlineNotes(eq(agentJob), eq(List.of()));
         }
     }

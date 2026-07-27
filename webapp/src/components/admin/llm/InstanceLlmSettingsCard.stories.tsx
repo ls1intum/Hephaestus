@@ -43,15 +43,19 @@ export const Loading: Story = {
 	args: { settings: undefined, isLoading: true },
 };
 
-/** The Save button is disabled until a field actually changes. */
-export const EditsEnableSave: Story = {
+/**
+ * The card mid-edit, with the workspace-provider policy flipped and not yet saved.
+ *
+ * That Save is offered only once something differs from the settings on record — including typing a
+ * value back to what the server holds — is asserted in `InstanceLlmSettingsCard.test.tsx`.
+ */
+export const EditedButUnsaved: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		const saveButton = canvas.getByRole("button", { name: /save settings/i });
-		await expect(saveButton).toBeDisabled();
-		await userEvent.click(
-			canvas.getByRole("switch", { name: /let workspaces add providers and models/i }),
-		);
-		await expect(saveButton).toBeEnabled();
+		const ownProvider = canvas.getByRole("switch", {
+			name: /let workspaces add providers and models/i,
+		});
+		await userEvent.click(ownProvider);
+		await expect(ownProvider).toHaveAttribute("aria-checked", "false");
 	},
 };

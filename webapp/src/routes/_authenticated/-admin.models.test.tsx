@@ -82,9 +82,9 @@ describe("AdminLlmPage", () => {
 	});
 
 	it("keeps each connection's toggle pending independently when two run at once", async () => {
-		// Turning a connection off is the one write on this page with no modal holding the user still:
-		// the confirm closes on click and the PATCH runs in the background, so a second row can be
-		// toggled immediately. Connection 1's PATCH hangs, connection 2's answers at once. A single
+		// The confirm closes on click and the PATCH runs in the background, so a second row can be
+		// toggled while the first request is still out — nothing on this page holds the admin still
+		// between the two. Connection 1's PATCH hangs, connection 2's answers at once. A single
 		// "which connection is mutating" id is cleared by 2 settling, which re-enables row 1's switch
 		// while its request is in flight — a second PATCH for a connection that is already off.
 		let releaseSlowToggle: (() => void) | undefined;

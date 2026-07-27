@@ -102,8 +102,14 @@ class MentorChatControllerTest extends BaseUnitTest {
     @DisplayName("user message exactly MAX_PROMPT_CHARS is accepted and dispatched")
     void boundarySizedUserMessage_dispatches() {
         String exactlyAtCap = "x".repeat(TEST_PROPERTIES.maxPromptChars());
-        controller.chat(stubContext(), body(UUID.randomUUID(), null, exactlyAtCap), response);
-        verify(mentorChatService).start(any(), any());
+        UUID threadId = UUID.randomUUID();
+        controller.chat(stubContext(), body(threadId, null, exactlyAtCap), response);
+        ArgumentCaptor<MentorTurnRequest> req = ArgumentCaptor.forClass(MentorTurnRequest.class);
+        verify(mentorChatService).start(req.capture(), any());
+        // The message must arrive whole — a cap that truncated instead of rejecting would still dispatch.
+        assertThat(req.getValue().userMessage()).hasSize(TEST_PROPERTIES.maxPromptChars());
+        assertThat(req.getValue().threadId()).isEqualTo(threadId);
+        assertThat(response.getHeader(UIMessageChunk.RESPONSE_HEADER)).isEqualTo(UIMessageChunk.PROTOCOL_VERSION);
     }
 
     @Test

@@ -48,7 +48,9 @@ export const DetailsButtonIsTheOnlyAffordance: Story = {
 		await expect(controls[0]).toHaveAccessibleName(/^View details for/);
 
 		await userEvent.click(controls[0]);
-		await expect(args.onSelectJob).toHaveBeenCalledWith(mockJobs[0]);
+		// The run this story rendered into that row, not a fixture read out of the shared module by
+		// index — three story files draw on `mockJobs`, and reordering it is not a defect here.
+		await expect(args.onSelectJob).toHaveBeenCalledWith(args.jobs[0]);
 	},
 };
 
@@ -103,11 +105,9 @@ export const MobileReflow: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		await expectPageReflows();
-		await expectTablesScrollInPlace(canvasElement);
-		// The table really is wider than the viewport — otherwise the assertion above proves nothing.
-		await expect(within(canvasElement).getByRole("table").scrollWidth).toBeGreaterThan(
-			window.innerWidth,
-		);
+		// `expectOverflow`: this table really must be wider than its scroller, or "and it scrolls
+		// sideways in place" would be a claim about something that never happened.
+		await expectTablesScrollInPlace(canvasElement, { expectOverflow: true });
 
 		// Size only, not position: this action legitimately sits off to the right until the table is
 		// scrolled to it. That is the sanctioned data-table exception, not an unreachable control.

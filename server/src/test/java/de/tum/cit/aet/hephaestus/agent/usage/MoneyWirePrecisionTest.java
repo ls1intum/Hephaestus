@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.usage;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelPrice;
+import de.tum.cit.aet.hephaestus.agent.catalog.UpdateLlmModelPriceRequestDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
@@ -79,7 +80,10 @@ class MoneyWirePrecisionTest extends BaseUnitTest {
         assertThat(accepted.fraction()).isLessThanOrEqualTo(stored.scale());
         assertThat(accepted.integer() + accepted.fraction()).isLessThanOrEqualTo(stored.precision());
 
-        assertRoundTrips(largestAt(accepted.integer() + accepted.fraction(), accepted.fraction()));
+        // Only the column's own width is put through the trip: the request's width is already bounded
+        // by SIGNIFICANT_DIGITS two lines above, so round-tripping it would restate DBL_DIG rather than
+        // anything this system declares. Nothing bounds the COLUMN, so widening it to NUMERIC(20,6)
+        // fails here and nowhere else.
         assertRoundTrips(largestAt(stored.precision(), stored.scale()));
     }
 
@@ -94,16 +98,25 @@ class MoneyWirePrecisionTest extends BaseUnitTest {
      * states — the tighter of the two cases, since each decimal place costs an integer digit.
      */
     @Test
-    void aFrozenRateIsTheSameNumberInTheCatalogAndTheLedger() throws NoSuchFieldException {
+    void aFrozenRateIsTheSameNumberInTheCatalogAndTheLedger() throws NoSuchFieldException, NoSuchMethodException {
         Column catalog = LlmModelPrice.class.getDeclaredField("per1mInputUsd").getAnnotation(Column.class);
         Column ledger = LlmUsageEvent.class.getDeclaredField("appliedPer1mInputUsd").getAnnotation(Column.class);
 
         assertThat(ledger.scale()).isEqualTo(catalog.scale());
         assertThat(ledger.precision()).isGreaterThanOrEqualTo(catalog.precision());
 
-        assertRoundTrips(largestAt(SIGNIFICANT_DIGITS, catalog.scale())); // 9999999.99999999
-        assertRoundTrips(BigDecimal.ONE.movePointLeft(catalog.scale())); // the smallest rate settable
-        assertRoundTrips(new BigDecimal("75.00000001")); // a frontier model's output rate, plus one unit
+        // The column is NUMERIC(18,8), wider than the wire; what actually bounds a rate is the request
+        // validator. Taking the width from that annotation rather than from a literal is what makes the
+        // round-trip a statement about this system: widening it to @Digits(integer = 8) fails here.
+        Digits acceptedRate = UpdateLlmModelPriceRequestDTO.class.getMethod("per1mInputUsd").getAnnotation(
+            Digits.class
+        );
+        assertThat(acceptedRate).as("a rate's width must stay declared, or nothing bounds it").isNotNull();
+        assertThat(acceptedRate.fraction())
+            .as("the accepted decimals and the stored decimals must be the same number of places")
+            .isEqualTo(catalog.scale());
+        assertThat(acceptedRate.integer() + acceptedRate.fraction()).isLessThanOrEqualTo(SIGNIFICANT_DIGITS);
+        assertRoundTrips(largestAt(acceptedRate.integer() + acceptedRate.fraction(), acceptedRate.fraction()));
     }
 
     /** The amount {@link LlmPriceSnapshot#calculateCost} substitutes for what {@code rate} really produced. */

@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.integration.slack.preferences;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -167,7 +169,9 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
         service.updateChannelMessagesAllowed(1L, ACCOUNT_ID, true);
 
         verify(participantConsentService).recordChannelMessageOptIn(1L, "U1");
-        verify(erasureService, never()).erasePerson(1L, 123L, "U1");
+        // Deliberately unconstrained: pinning the arguments would let an erasure of SOMEONE ELSE'S data
+        // pass, which is the exact accident this forbids.
+        verify(erasureService, never()).erasePerson(anyLong(), anyLong(), anyString());
     }
 
     @Test

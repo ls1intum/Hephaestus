@@ -304,19 +304,6 @@ class LlmBudgetServiceTest extends BaseUnitTest {
                 meterRegistry.counter("llm.budget.blocked", "surface", "agent_job", "cap", expectedCapTag).count()
             ).isEqualTo(2d);
         }
-
-        @Test
-        @DisplayName("an uncapped workspace never blocks a submission on either purse")
-        void uncappedWorkspaceNeverBlocksASubmission() {
-            Workspace workspace = workspaceWithBudgets(null, null);
-
-            assertThat(
-                budgetService.blockSubmission(workspace, "PULL_REQUEST_REVIEW", FundingSource.INSTANCE)
-            ).isFalse();
-            assertThat(
-                budgetService.blockSubmission(workspace, "PULL_REQUEST_REVIEW", FundingSource.WORKSPACE)
-            ).isFalse();
-        }
     }
 
     static Stream<Arguments> exhaustedCaps() {

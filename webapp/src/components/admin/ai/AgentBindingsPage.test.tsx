@@ -23,8 +23,12 @@ const detectionBinding: AgentBinding = {
 };
 
 /**
- * The page takes everything it renders as a prop, so a test states the situation directly instead of
- * standing up a QueryClient and five request mocks to arrive at the same screen.
+ * The binding cards take everything they render as a prop, so a test states the situation directly
+ * instead of standing up a QueryClient and five request mocks to arrive at the same screen.
+ *
+ * `ownProviderAllowed: false` is not incidental: the provider panel this page also renders still
+ * fetches and mutates on its own, so it is the one part of this screen a test cannot reach without a
+ * QueryClient. Everything asserted here is above that line.
  */
 function renderPage(overrides: Partial<AgentBindingsPageProps> = {}) {
 	const onSave = vi.fn();

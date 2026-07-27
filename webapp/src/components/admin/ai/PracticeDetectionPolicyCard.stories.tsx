@@ -113,11 +113,12 @@ export const LoadForbidden: Story = {
  * each `Field` keeps its switch beside a description that wraps, and the numeric input stays inside
  * the card.
  *
- * The switches are the smallest targets on the page at 32 x 18 px, which is the size shadcn (and the
- * platform convention behind it) draws a switch. That is under SC 2.5.8's 24 px floor, so what makes
- * them conformant is the criterion's *Spacing* exception — the rows are far enough apart that the
- * 24 px circles never meet. This asserts that spacing, which is the thing a denser layout would
- * actually break.
+ * The switches are drawn at 32 x 18 px, the size shadcn (and the platform convention behind it) uses.
+ * The vendored `ui/switch.tsx` enlarges the hit area past the SC 2.5.8 floor on its own, with
+ * `after:-inset-x-3 after:-inset-y-2`, so the criterion is met without leaning on the *Spacing*
+ * exception. The spacing is asserted anyway, because it is the second line of defence and the thing
+ * a denser layout would break first — and because `getBoundingClientRect` measures the drawn switch,
+ * not the pseudo-element that extends it.
  */
 export const MobileReflow: Story = {
 	parameters: {

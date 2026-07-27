@@ -155,6 +155,17 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         return pr;
     }
 
+    /**
+     * Captures the one submission request the listener handed to the job service for
+     * {@code workspaceId}. Every submitting path must assert on the payload, not on the fact that
+     * a call happened — the job type and workspace id are identical across all six triggers.
+     */
+    private PullRequestReviewSubmissionRequest captureSubmission(Long workspaceId) {
+        var captor = ArgumentCaptor.forClass(PullRequestReviewSubmissionRequest.class);
+        verify(agentJobService).submit(eq(workspaceId), eq(AgentJobType.PULL_REQUEST_REVIEW), captor.capture());
+        return captor.getValue();
+    }
+
     // Test Groups
 
     @Nested
@@ -283,14 +294,12 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             var prData = createPrData(Issue.State.OPEN, false, false);
             var event = new ScmDomainEvent.PullRequestCreated(prData, webhookContext(99L));
 
-            PullRequest pr = setupHappyPath();
+            setupHappyPath();
 
             listener.onPullRequestCreated(event);
 
-            verify(agentJobService).submit(
-                eq(WORKSPACE_ID),
-                eq(AgentJobType.PULL_REQUEST_REVIEW),
-                any(PullRequestReviewSubmissionRequest.class)
+            assertThat(captureSubmission(WORKSPACE_ID).triggerEvent()).isEqualTo(
+                TriggerEventNames.PULL_REQUEST_CREATED
             );
         }
 
@@ -313,7 +322,13 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onPullRequestCreated(event);
 
-            verify(agentJobService).submit(eq(42L), eq(AgentJobType.PULL_REQUEST_REVIEW), any());
+            var workspaceIdCaptor = ArgumentCaptor.forClass(Long.class);
+            verify(agentJobService).submit(
+                workspaceIdCaptor.capture(),
+                eq(AgentJobType.PULL_REQUEST_REVIEW),
+                any(PullRequestReviewSubmissionRequest.class)
+            );
+            assertThat(workspaceIdCaptor.getValue()).isEqualTo(42L).isNotEqualTo(99L);
         }
 
         @Test
@@ -444,10 +459,8 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onPullRequestSynchronized(event);
 
-            verify(agentJobService).submit(
-                eq(WORKSPACE_ID),
-                eq(AgentJobType.PULL_REQUEST_REVIEW),
-                any(PullRequestReviewSubmissionRequest.class)
+            assertThat(captureSubmission(WORKSPACE_ID).triggerEvent()).isEqualTo(
+                TriggerEventNames.PULL_REQUEST_SYNCHRONIZED
             );
         }
 
@@ -493,11 +506,13 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onReviewSubmitted(event);
 
-            verify(agentJobService).submit(
-                eq(WORKSPACE_ID),
-                eq(AgentJobType.PULL_REQUEST_REVIEW),
-                any(PullRequestReviewSubmissionRequest.class)
-            );
+            // A ReviewSubmitted event carries no PullRequestData, so the request is rebuilt from the
+            // entity via PullRequestData.from(pr). Assert the rebuilt payload, not just the call.
+            var request = captureSubmission(WORKSPACE_ID);
+            assertThat(request.triggerEvent()).isEqualTo(TriggerEventNames.REVIEW_SUBMITTED);
+            assertThat(request.pullRequest().number()).isEqualTo(PR_NUMBER);
+            assertThat(request.pullRequest().repository().nameWithOwner()).isEqualTo("owner/repo");
+            assertThat(request.headRefOid()).isEqualTo("abc123");
         }
 
         @Test
@@ -671,11 +686,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             listener.onPullRequestMerged(new ScmDomainEvent.PullRequestMerged(prData, webhookContext(1L)));
 
             verify(practiceReviewDetectionGate).evaluate(pr, TriggerEventNames.PULL_REQUEST_MERGED, TriggerMode.AUTO);
-            verify(agentJobService).submit(
-                eq(WORKSPACE_ID),
-                eq(AgentJobType.PULL_REQUEST_REVIEW),
-                any(PullRequestReviewSubmissionRequest.class)
-            );
+            // The trigger the gate saw must be the trigger the job carries, or the runner selects
+            // the wrong practice set for a retrospective review.
+            assertThat(captureSubmission(WORKSPACE_ID).triggerEvent()).isEqualTo(TriggerEventNames.PULL_REQUEST_MERGED);
         }
 
         @Test
@@ -705,11 +718,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             listener.onPullRequestClosed(new ScmDomainEvent.PullRequestClosed(prData, false, webhookContext(1L)));
 
             verify(practiceReviewDetectionGate).evaluate(pr, TriggerEventNames.PULL_REQUEST_CLOSED, TriggerMode.AUTO);
-            verify(agentJobService).submit(
-                eq(WORKSPACE_ID),
-                eq(AgentJobType.PULL_REQUEST_REVIEW),
-                any(PullRequestReviewSubmissionRequest.class)
-            );
+            assertThat(captureSubmission(WORKSPACE_ID).triggerEvent()).isEqualTo(TriggerEventNames.PULL_REQUEST_CLOSED);
         }
 
         @Test
@@ -823,11 +832,11 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             var event = new ScmDomainEvent.PullRequestCreated(prData, webhookContext(1L));
             fixture.listener().onPullRequestCreated(event);
 
-            verify(agentJobService).submit(
-                eq(WORKSPACE_ID),
-                eq(AgentJobType.PULL_REQUEST_REVIEW),
-                any(PullRequestReviewSubmissionRequest.class)
-            );
+            // The practice this fixture registers triggers on PULL_REQUEST_CREATED only, so the
+            // real gate's Detect must carry that trigger through to the submitted job.
+            var request = captureSubmission(WORKSPACE_ID);
+            assertThat(request.triggerEvent()).isEqualTo(TriggerEventNames.PULL_REQUEST_CREATED);
+            assertThat(request.pullRequest().repository().nameWithOwner()).isEqualTo("owner/repo");
         }
 
         @Test

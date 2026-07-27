@@ -41,7 +41,8 @@ epic; a third role is anticipated but deferred.
 Option 1. `core.runtime.RuntimeRole` defines the property keys:
 
 - `hephaestus.runtime.worker.enabled` (default true; **wired**) — gates the worker chain
-  via `DockerSandboxConfiguration` and `AgentNatsConsumerConfig`
+  via `DockerSandboxConfiguration` and the agent NATS pull consumer (both as of this ADR; see the
+  2026-07-21 and 2026-07-22 updates for what carries the gate today)
 - `hephaestus.runtime.server.enabled` (default true; **reserved**) — placeholder constant
   for the future server-only role. Not wired in this epic: the server-side bean chain
   (HTTP API, sync NATS, mentor SSE, scheduled tasks, agent dispatch) still loads
@@ -58,7 +59,8 @@ this epic; the third role lands when restart independence becomes a hard require
 - Zero env vars → full monolith boots.
 - Worker-only deploy is feasible today by setting `hephaestus.runtime.worker.enabled=false`
   on the server pod — the Docker sandbox + agent NATS pull consumer drop out. The
-  server JAR remains bit-identical.
+  server JAR remains bit-identical. **This consequence no longer holds as written — see the
+  2026-07-22 update below before setting that flag on an application-server pod.**
 - True server-only mode (HTTP API + sync NATS only) requires the reserved
   `server.enabled` flag to be wired in a follow-up; this epic establishes the
   property-key contract but defers the implementation.
@@ -110,3 +112,22 @@ they are worker/sandbox capability, but not queued agent jobs. The LLM proxy the
 `hephaestus.agent.enabled AND hephaestus.runtime.worker.enabled` gate. This lets operators disable
 practice reviews without disabling mentor and makes the split topology explicit: application-server
 keeps local Docker capability for mentor; dedicated workers claim queued practice jobs.
+
+**This supersedes the Decision and Consequences sections above on two points.**
+
+1. What `hephaestus.runtime.worker.enabled` gates is now `DockerSandboxConfiguration`,
+   `AgentJobExecutor` and `LlmProxyController`. `AgentNatsConsumerConfig`, named in the Decision
+   section, no longer exists — the agent queue is PostgreSQL (ADR 0025).
+2. **Do not set `hephaestus.runtime.worker.enabled=false` on an application-server pod.** The
+   Consequences section offers that as the way to reach a worker-only deploy; it is no longer safe.
+   Because `LlmProxyController` gates on this property alone, turning it off also removes the
+   in-process LLM proxy and the local Docker capability the interactive mentor sandbox needs — and
+   the proxy is the only path a sandbox has to a provider key (ADR 0006). Mentor chat then fails at
+   the first turn, with nothing in the application-server's own configuration naming the cause.
+
+   To run application-server without executing queued practice jobs, set `hephaestus.agent.enabled=false`
+   and leave `hephaestus.runtime.worker.enabled` at its default. `AgentJobExecutor` needs both, so it
+   drops out; the proxy and mentor sandbox keep running. Note that `hephaestus.agent.enabled=false`
+   also stops job *submission* and orphan recovery on that pod — see `docs/admin/runtime-roles.mdx`.
+   A pod that must have no Docker capability at all is a different deployment shape than this ADR
+   describes and needs a real server-only role, still unbuilt.

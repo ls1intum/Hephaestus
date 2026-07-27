@@ -229,7 +229,7 @@ supersession chain.
 | Field | Type | Column | Nullable | Description | Justification |
 | --- | --- | --- | --- | --- | --- |
 | id | UUID | `id` | no | PK; `@PrePersist` if null. | Immutable identifier. |
-| agentJobId | UUID | `agent_job_id` | no | Producing job (FK `fk_feedback_agent_job`, Liquibase). Raw UUID. Unique with `position`. | Avoids a cycle into `agent`; cascade-delete. `(agent_job_id, position)` is the dedup key — a re-emitted job cannot double-insert a unit. |
+| agentJobId | UUID | `agent_job_id` | no | Producing job (scalar FK `sfk_feedback_agent_job`, Liquibase). Raw UUID. Unique with `position`. | Avoids a cycle into `agent`; `ON DELETE RESTRICT` — a job referenced by feedback cannot be deleted, so no agent_job delete can cascade away append-only feedback. `(agent_job_id, position)` is the dedup key — a re-emitted job cannot double-insert a unit. |
 | workspaceId | Long | `workspace_id` | no | Owning workspace (FK `fk_feedback_workspace`, Liquibase). Raw Long. | Avoids a cycle into `workspace`; purge removes feedback explicitly. |
 | artifactType | WorkArtifact | `artifact_type` | yes | Kind of artifact this is about. | Nullable: reflection-dashboard feedback is not anchored to one artifact. |
 | artifactId | Long | `artifact_id` | yes | External id of the target. | Nullable in lockstep with `artifactType`. |

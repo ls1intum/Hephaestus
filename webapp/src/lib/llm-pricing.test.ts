@@ -1,32 +1,32 @@
 import { describe, expect, it } from "vitest";
+import { formatRateUsd } from "@/components/admin/ai/job-utils";
 import { priceLabel } from "./llm-pricing";
 
 describe("priceLabel", () => {
 	/**
-	 * A price is a *rate*, and these strings are what an admin compares against their provider's
-	 * published price list. Rendered through the spend formatter they were quietly wrong: a real
-	 * $0.075 / 1M rate rounded up to "$0.08" (a 6.7% misstatement) and $0.003 collapsed to the
-	 * literal string "<$0.01", which is not a number at all.
+	 * A price is a *rate*, and the label an admin compares against their provider's published price
+	 * list has to carry the digits that provider printed. The spend formatter clamps to cents, which
+	 * is right for money spent and wrong for a rate: it would turn $0.075 into "$0.08" and $0.003 into
+	 * the literal "<$0.01", which is not a number at all. What the digits look like is
+	 * `formatRateUsd`'s to decide and `job-utils.test.tsx`'s to state; the claim here is that the
+	 * label is composed from *that* formatter rather than the other one.
 	 */
 	it("renders a sub-cent rate as the number the provider publishes", () => {
 		expect(priceLabel({ pricingMode: "PRICED", per1mInputUsd: 0.075 }, "instance")).toBe(
-			"$0.075 / 1M input tokens",
+			`${formatRateUsd(0.075)} / 1M input tokens`,
 		);
 		expect(priceLabel({ pricingMode: "PRICED", per1mInputUsd: 0.003 }, "workspace")).toBe(
-			"$0.003 / 1M input tokens",
+			`${formatRateUsd(0.003)} / 1M input tokens`,
 		);
 	});
 
-	it("keeps cents on a whole-dollar rate so a price column stays a price column", () => {
+	it("names both halves of a two-sided price, each at the rate precision", () => {
 		expect(
 			priceLabel({ pricingMode: "PRICED", per1mInputUsd: 3, per1mOutputUsd: 15 }, "instance"),
-		).toBe("$3.00 input · $15.00 output / 1M tokens");
-	});
-
-	it("names both halves of a two-sided price", () => {
+		).toBe(`${formatRateUsd(3)} input · ${formatRateUsd(15)} output / 1M tokens`);
 		expect(
 			priceLabel({ pricingMode: "PRICED", per1mInputUsd: 0.15, per1mOutputUsd: 0.6 }, "workspace"),
-		).toBe("$0.15 input · $0.60 output / 1M tokens");
+		).toBe(`${formatRateUsd(0.15)} input · ${formatRateUsd(0.6)} output / 1M tokens`);
 	});
 
 	it("says who can fix a missing price", () => {

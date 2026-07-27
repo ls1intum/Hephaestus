@@ -57,25 +57,29 @@ class AgentJobBackoffTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("grows monotonically with attempt number before the cap")
-    void growsMonotonicallyBeforeCap() {
-        Duration attempt1 = AgentJobBackoff.compute(1, NO_JITTER);
-        Duration attempt2 = AgentJobBackoff.compute(2, NO_JITTER);
-        Duration attempt3 = AgentJobBackoff.compute(3, NO_JITTER);
-
-        assertThat(attempt2).isGreaterThan(attempt1);
-        assertThat(attempt3).isGreaterThan(attempt2);
-    }
-
-    @Test
     @DisplayName("caps at 15 minutes regardless of how high the attempt number climbs")
     void capsAtFifteenMinutes() {
-        assertThat(AgentJobBackoff.compute(100, NO_JITTER)).isEqualTo(AgentJobBackoff.CAP);
-        assertThat(AgentJobBackoff.compute(1000, NO_JITTER)).isEqualTo(AgentJobBackoff.CAP);
+        // The literal, not AgentJobBackoff.CAP: the number in this test's name is the operator-visible
+        // promise, and reading the cap back from production would let any value satisfy it.
+        assertThat(AgentJobBackoff.compute(100, NO_JITTER)).isEqualTo(Duration.ofMinutes(15));
+        assertThat(AgentJobBackoff.compute(1000, NO_JITTER)).isEqualTo(Duration.ofMinutes(15));
+    }
+
+    /**
+     * Jitter multiplies the UNCAPPED base and the cap clamps the jittered value — that order, and not
+     * the other. Capping first would leave the +10% leg free to carry a maxed-out 900s wait to 990s,
+     * which is a wait longer than the cap this class promises.
+     */
+    @Test
+    @DisplayName("the cap is applied after jitter, so even maximum positive jitter cannot exceed 15 minutes")
+    void maximumPositiveJitterNeverExceedsTheCap() {
+        assertThat(AgentJobBackoff.compute(100, MAX_POSITIVE_JITTER))
+            .as("no wait may exceed the cap, whichever way the jitter goes")
+            .isLessThanOrEqualTo(Duration.ofMinutes(15));
     }
 
     @Test
-    @DisplayName("jitter is bounded to +/-10% of the (possibly capped) base")
+    @DisplayName("jitter is bounded to +/-10% of the uncapped base")
     void jitterIsBoundedToTenPercent() {
         Duration base = AgentJobBackoff.compute(3, NO_JITTER); // 96s
         Duration maxUp = AgentJobBackoff.compute(3, MAX_POSITIVE_JITTER);
@@ -91,6 +95,12 @@ class AgentJobBackoffTest extends BaseUnitTest {
         );
     }
 
+    /**
+     * The smallest wait any input can produce is {@code round((0^4 + 15) * 0.9) = 14s}: {@code
+     * nextDouble()} is bounded to {@code [0, 1)}, so the jitter multiplier never falls below 0.9. The
+     * {@code Math.max(1, …)} floor in {@code compute} therefore sits below every reachable value and no
+     * legal input exercises it; what this pins is the reachable minimum.
+     */
     @Test
     @DisplayName("never returns zero or negative, even at the smallest attempt with max negative jitter")
     void neverReturnsZeroOrNegative() {

@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { expectAmountRejected } from "@/test/budget-amount-field";
 import { BudgetAmountDialog } from "./BudgetAmountDialog";
 import type { Fx } from "./fx";
 
@@ -54,19 +55,30 @@ export const ServerRejection: Story = {
 	args: { serverError: "Monthly cap must not exceed 99999999.99." },
 };
 
-/** A local rejection wins over a stale server one, and nothing is submitted. */
-export const InvalidNegativeValue: Story = {
-	play: async ({ args }) => {
-		const dialog = within(await screen.findByRole("dialog"));
-		const input = dialog.getByLabelText(/monthly cap/i);
-		await userEvent.clear(input);
-		await userEvent.type(input, "-5");
-		await userEvent.click(dialog.getByRole("button", { name: /save cap/i }));
+/**
+ * Every amount this form refuses, and the reason it gives for each. The rules live here, on the
+ * component that owns them — the two wrappers each keep one illustration to prove they pass their
+ * own field and button labels through, and nothing more.
+ */
+const rejects =
+	(typed: string, reason: RegExp): Story["play"] =>
+	async ({ args }) =>
+		await expectAmountRejected({
+			fieldLabel: /monthly cap/i,
+			submitLabel: /save cap/i,
+			typed,
+			reason,
+			onSubmit: args.onSubmit,
+		});
 
-		await expect(dialog.getByRole("alert")).toHaveTextContent(/\$0 or more/i);
-		await expect(args.onSubmit).not.toHaveBeenCalled();
-	},
-};
+/** Submitting a cleared field surfaces *why* it was rejected instead of silently doing nothing. */
+export const InvalidEmptyValue: Story = { play: rejects("", /enter an amount/i) };
+
+/** Sub-cent precision is rejected in the field rather than by a native browser bubble. */
+export const InvalidSubCentValue: Story = { play: rejects("25.005", /two decimal places/i) };
+
+/** A local rejection wins over a stale server one, and nothing is submitted. */
+export const InvalidNegativeValue: Story = { play: rejects("-5", /\$0 or more/i) };
 
 /**
  * On an instance that displays EUR the field says what the amount being typed is worth, live and
@@ -105,14 +117,13 @@ export const WithLiveCurrencyHint: Story = {
  * this dialog says no longer changes. The editors are withheld on a closed month — this covers the
  * dialog outliving that check: `open` is plain React state, so browser Back steps the month behind
  * an already-open dialog, and a UTC month can roll over while it sits there.
+ *
+ * The withdrawal itself is asserted twice already — on `fxCapHint` in `fx.test.tsx`, and across a
+ * rerender in `BudgetAmountDialog.test.tsx`, which is the only form that reaches the flip. This is
+ * the picture of the result.
  */
 export const OnAClosedMonthTheHintIsWithdrawn: Story = {
 	args: { currentValueUsd: 50, fx: EUR, isCurrentMonth: false },
-	play: async () => {
-		const dialog = within(await screen.findByRole("dialog"));
-		await expect(dialog.queryByText(/at today's rate/)).toBeNull();
-		await expect(dialog.queryByLabelText(/approximately 44 euros/)).toBeNull();
-	},
 };
 
 /** Without a display currency configured — the default — the field carries no estimate at all. */

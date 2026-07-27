@@ -64,12 +64,11 @@ class AuditByDefaultArchTest extends HephaestusArchitectureTest {
     /**
      * Every {@code @Audited} value parses as {@code "<ledger>[ <TOKEN>]"} — see {@link Audited}.
      *
-     * <p>This is what keeps the grammar from splitting again. It shipped three ways at once
-     * ({@code "WORKSPACE_LLM_CONNECTION"}, {@code "connection_audit"},
-     * {@code "auth_event LLM_CONNECTION_CREATED"}), which meant a reader could not tell from the
-     * annotation which trail to go read. It also makes the entity-type spelling load-bearing: a typo'd
-     * token used to be indistinguishable from "names some other ledger", which silently opted the
-     * endpoint out of {@link #auditDeclarationsMatchTheCallGraph()}.
+     * <p>One grammar is what lets a reader tell from the annotation alone which trail to go read: the
+     * value must name a real ledger first, so a bare entity type or a lone token does not pass. It also
+     * makes the token's spelling load-bearing — a typo is rejected here rather than read as "names some
+     * other ledger", which would silently opt the endpoint out of
+     * {@link #auditDeclarationsMatchTheCallGraph()}.
      */
     @Test
     void everyAuditedValueNamesAKnownLedgerAndRecord() {

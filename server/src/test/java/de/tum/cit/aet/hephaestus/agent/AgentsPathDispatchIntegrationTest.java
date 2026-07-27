@@ -102,6 +102,8 @@ class AgentsPathDispatchIntegrationTest extends AbstractWorkspaceIntegrationTest
             .bodyValue(Map.of("instanceModelId", 1))
             .exchange()
             .expectStatus()
-            .is4xxClientError();
+            // 400 exactly: a 404 would mean the handler is gone rather than reached-and-refusing,
+            // which is the ambiguity this class exists to remove.
+            .isBadRequest();
     }
 }

@@ -103,51 +103,9 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
         return jobRepository.findLlmUsageById(job.getId()).orElseThrow();
     }
 
-    @Test
-    @DisplayName("chat-completions: the input bucket is prompt tokens MINUS the cached ones")
-    void completionsUsageBillsNonCachedInputSeparatelyFromCacheReads() {
-        AgentJob job = persistedJob("proxy-usage-completions");
-
-        // prompt_tokens is inclusive of cached; billing both buckets in full would charge twice.
-        accumulate(
-            job.getId(),
-            json(
-                "{\"usage\":{\"prompt_tokens\":100,\"completion_tokens\":50," +
-                    "\"prompt_tokens_details\":{\"cached_tokens\":20}," +
-                    "\"completion_tokens_details\":{\"reasoning_tokens\":10}}}"
-            ),
-            false
-        );
-
-        AgentJobLlmUsage usage = usageOf(job);
-        assertThat(usage.inputTokens()).isEqualTo(80);
-        assertThat(usage.cacheReadTokens()).isEqualTo(20);
-        assertThat(usage.outputTokens()).isEqualTo(50);
-        assertThat(usage.reasoningTokens()).isEqualTo(10);
-        assertThat(usage.totalCalls()).isEqualTo(1);
-    }
-
-    @Test
-    @DisplayName("responses protocol: the same totals from the input_tokens/output_tokens shape")
-    void responsesUsageReadsInputAndOutputTokenShape() {
-        AgentJob job = persistedJob("proxy-usage-responses");
-
-        accumulate(
-            job.getId(),
-            json(
-                "{\"usage\":{\"input_tokens\":200,\"output_tokens\":70," +
-                    "\"input_tokens_details\":{\"cached_tokens\":50}," +
-                    "\"output_tokens_details\":{\"reasoning_tokens\":25}}}"
-            ),
-            true
-        );
-
-        AgentJobLlmUsage usage = usageOf(job);
-        assertThat(usage.inputTokens()).isEqualTo(150);
-        assertThat(usage.cacheReadTokens()).isEqualTo(50);
-        assertThat(usage.outputTokens()).isEqualTo(70);
-        assertThat(usage.reasoningTokens()).isEqualTo(25);
-    }
+    // Reading the usage block itself — both protocols, every bucket — belongs to the single parser both
+    // transports share, and ProxyStreamUsageTapTest tables it against that parser directly. What this
+    // class owns is what the parsed numbers do to the row, so every test below asserts an ADD or a fence.
 
     /** The reason the class exists: a crashed run is billed for every call it made, not the last one. */
     @Test

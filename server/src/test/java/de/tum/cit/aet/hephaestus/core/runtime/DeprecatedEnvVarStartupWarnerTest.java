@@ -11,6 +11,8 @@ import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.env.YamlPropertySourceLoader;
 import org.springframework.core.env.PropertySource;
@@ -80,16 +82,26 @@ class DeprecatedEnvVarStartupWarnerTest extends BaseUnitTest {
             );
     }
 
-    @Test
-    void warnsOnlyForThePropertyThatIsSet() {
+    /**
+     * One retired property set on its own draws exactly one warning, naming that property and the
+     * replacement the operator has to move to — never a second warning for a key nobody set.
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(
+        {
+            "hephaestus.worker.llm.base-url, https://api.anthropic.com, AI models",
+            "hephaestus.agent.nats.enabled, false, PostgreSQL",
+        }
+    )
+    void warnsOnlyForThePropertyThatIsSet(String property, String value, String guidance) {
         MockEnvironment environment = new MockEnvironment();
-        environment.setProperty("hephaestus.worker.llm.base-url", "https://api.anthropic.com");
+        environment.setProperty(property, value);
 
         new DeprecatedEnvVarStartupWarner(environment).warnOnRetiredProperties();
 
         List<String> messages = warnMessages();
         assertThat(messages).hasSize(1);
-        assertThat(messages.get(0)).contains("hephaestus.worker.llm.base-url");
+        assertThat(messages.get(0)).contains(property).contains(guidance);
     }
 
     @Test
@@ -99,18 +111,6 @@ class DeprecatedEnvVarStartupWarnerTest extends BaseUnitTest {
         new DeprecatedEnvVarStartupWarner(environment).warnOnRetiredProperties();
 
         assertThat(warnMessages()).isEmpty();
-    }
-
-    @Test
-    void warnsWhenAgentNatsEnabledIsStillSet() {
-        MockEnvironment environment = new MockEnvironment();
-        environment.setProperty("hephaestus.agent.nats.enabled", "false");
-
-        new DeprecatedEnvVarStartupWarner(environment).warnOnRetiredProperties();
-
-        List<String> messages = warnMessages();
-        assertThat(messages).hasSize(1);
-        assertThat(messages.get(0)).contains("hephaestus.agent.nats.enabled").contains("PostgreSQL");
     }
 
     /**

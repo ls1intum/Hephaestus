@@ -367,19 +367,6 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
         assertThat(body).doesNotContain("sk-workspace-secret");
     }
 
-    @Test
-    void anonymousIsUnauthorized() {
-        User owner = persistUser("wsmodel-anon-owner");
-        Workspace workspace = createWorkspace("wsmodel-anon-ws", "Anon", "wsmodel-anon-org", AccountType.ORG, owner);
-
-        webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/available-models", workspace.getWorkspaceSlug())
-            .exchange()
-            .expectStatus()
-            .isUnauthorized();
-    }
-
     // ─── Access control ────────────────────────────────────────────────────────────────────────
     // Every endpoint on this controller is @RequireAtLeastWorkspaceAdmin. The matrix mirrors
     // WorkspaceLlmConnectionControllerIntegrationTest, its sibling under the same /llm prefix.

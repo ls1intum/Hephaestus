@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
 import de.tum.cit.aet.hephaestus.agent.catalog.PricingMode;
 import de.tum.cit.aet.hephaestus.agent.catalog.ResolvedLlmModel;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
@@ -62,6 +63,19 @@ class LlmAdmissionServiceTest extends BaseUnitTest {
         return binding;
     }
 
+    /** A binding onto the workspace's own (BYO) catalog: the other funding source entirely. */
+    private static WorkspaceAgentBinding byoBinding() {
+        WorkspaceAgentBinding binding = binding(AgentPurpose.PRACTICE_DETECTION);
+        binding.setInstanceModel(null);
+        WorkspaceLlmModel model = new WorkspaceLlmModel();
+        model.setId(21L);
+        model.setPricingMode(PricingMode.PRICED);
+        model.setPer1mInputUsd(new BigDecimal("0.50"));
+        model.setPer1mOutputUsd(new BigDecimal("2.00"));
+        binding.setWorkspaceModel(model);
+        return binding;
+    }
+
     @Test
     void freezesAuthoritativeInstancePriceAtAdmission() {
         WorkspaceAgentBinding binding = binding(AgentPurpose.PRACTICE_DETECTION);
@@ -96,6 +110,91 @@ class LlmAdmissionServiceTest extends BaseUnitTest {
         assertThat(admitted.price().pricingState()).isEqualTo(PricingState.PRICED);
         assertThat(admitted.price().appliedPriceId()).isEqualTo(40L);
         assertThat(admitted.price().per1mInputUsd()).isEqualByComparingTo("1.25");
+    }
+
+    /**
+     * The BYO admission arm — the branch that decides which purse pays. A workspace-owned model must
+     * be priced from the workspace's own catalog row (never from the instance price table) and the
+     * snapshot must be stamped WORKSPACE, or the workspace's provider spend would be charged against
+     * the host's shared-model cap.
+     */
+    @Test
+    void freezesTheWorkspacesOwnPriceAndFundingSourceForABoundByoModel() {
+        WorkspaceAgentBinding binding = byoBinding();
+        when(bindingRepository.findByWorkspaceIdAndPurposeForUpdate(30L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            Optional.of(binding)
+        );
+        // The row lock the instance arm takes on llm_model is taken on workspace_llm_model here, and
+        // it is scoped to the owning workspace: a model id alone must not be admissible cross-tenant.
+        when(workspaceModelRepository.findByIdAndWorkspaceIdForUpdate(21L, 30L)).thenReturn(
+            Optional.of(binding.getWorkspaceModel())
+        );
+        when(resolver.resolve(binding)).thenReturn(
+            new ResolvedLlmModel(
+                "https://byo.example/v1",
+                "openai-responses",
+                "byo-model",
+                null,
+                null,
+                false,
+                FundingSource.WORKSPACE
+            )
+        );
+        when(resolver.connectionRef(binding)).thenReturn(
+            new LlmModelResolver.ConnectionRef(FundingSource.WORKSPACE, 11L, 21L, 30L)
+        );
+        when(workspaceModelRepository.findByIdAndWorkspaceId(21L, 30L)).thenReturn(
+            Optional.of(binding.getWorkspaceModel())
+        );
+
+        AdmittedLlmModel admitted = service.admit(binding);
+
+        assertThat(admitted.price().fundingSource()).isEqualTo(FundingSource.WORKSPACE);
+        assertThat(admitted.price().pricingState()).isEqualTo(PricingState.PRICED);
+        assertThat(admitted.price().appliedWorkspaceModelId()).isEqualTo(21L);
+        assertThat(admitted.price().appliedPriceId()).isNull();
+        assertThat(admitted.price().per1mInputUsd()).isEqualByComparingTo("0.50");
+        assertThat(admitted.price().per1mOutputUsd()).isEqualByComparingTo("2.00");
+        // The instance price table is not the source of truth for a BYO model and must not be read.
+        verifyNoInteractions(priceRepository);
+    }
+
+    /**
+     * A model whose price nobody has filled in cannot be metered, so it must not run at all. The
+     * structural block on unverifiable spend: admitting it would produce usage rows the ledger cannot
+     * cost, and neither cap could ever refuse the work.
+     */
+    @Test
+    void refusesToAdmitAModelWhosePriceIsUnknown() {
+        WorkspaceAgentBinding binding = byoBinding();
+        binding.getWorkspaceModel().setPricingMode(PricingMode.UNPRICED);
+        when(bindingRepository.findByWorkspaceIdAndPurposeForUpdate(30L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            Optional.of(binding)
+        );
+        when(workspaceModelRepository.findByIdAndWorkspaceIdForUpdate(21L, 30L)).thenReturn(
+            Optional.of(binding.getWorkspaceModel())
+        );
+        when(resolver.resolve(binding)).thenReturn(
+            new ResolvedLlmModel(
+                "https://byo.example/v1",
+                "openai-responses",
+                "byo-model",
+                null,
+                null,
+                false,
+                FundingSource.WORKSPACE
+            )
+        );
+        when(resolver.connectionRef(binding)).thenReturn(
+            new LlmModelResolver.ConnectionRef(FundingSource.WORKSPACE, 11L, 21L, 30L)
+        );
+        when(workspaceModelRepository.findByIdAndWorkspaceId(21L, 30L)).thenReturn(
+            Optional.of(binding.getWorkspaceModel())
+        );
+
+        assertThatThrownBy(() -> service.admit(binding))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("no usable price");
     }
 
     @Test

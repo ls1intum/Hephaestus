@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { HttpResponse, http } from "msw";
 import { expect, within } from "storybook/test";
-import { expectPageReflows, expectTablesScrollInPlace, expectTargetSize } from "@/test/reflow";
+import { expectPageReflows, expectTargetSize } from "@/test/reflow";
 import { AgentActivityPage } from "./AgentActivityPage";
 import { mockJobs } from "./story-mock-data";
 
@@ -53,12 +53,9 @@ export const SinglePage: Story = {
 /**
  * The runs page at the WCAG 2.2 SC 1.4.10 reflow width (320 CSS px).
  *
- * The runs table keeps its own horizontal scroll — the standard's documented data-table exception —
- * without letting that overflow reach the page, and the pager stays inside the viewport.
- *
- * The second half also covers SC 1.4.4 Resize Text at 200 %. The pager's targets are `rem`-sized, so
- * text-only zoom grows them while the viewport does not; that, rather than the reflow width, is what
- * `flex-wrap` on the pager is for, and it is the case that actually fails without it.
+ * What this page adds over `AgentJobsTable`'s own reflow story — which is where the runs table's
+ * horizontal-scroll exception is stated — is the pager: it has to stay whole inside the viewport,
+ * with every target still meeting SC 2.5.8's 24 x 24 px minimum.
  */
 export const MobileReflow: Story = {
 	parameters: {
@@ -70,9 +67,7 @@ export const MobileReflow: Story = {
 		await canvas.findByRole("table");
 
 		await expectPageReflows();
-		await expectTablesScrollInPlace(canvasElement);
 
-		// Every pager target is inside the viewport and still meets SC 2.5.8's 24 x 24 px minimum.
 		// By role: the pager's controls change the page by calling back, so they are real buttons —
 		// including the boundary ones, which are `disabled` rather than dimmed anchors.
 		const pager = canvas.getByRole("navigation", { name: "pagination" });
@@ -82,10 +77,27 @@ export const MobileReflow: Story = {
 			await expect(target.getBoundingClientRect().right).toBeLessThanOrEqual(window.innerWidth + 1);
 			await expectTargetSize(target);
 		}
+	},
+};
 
-		// SC 1.4.4 Resize Text at 200 %: text-only zoom, which grows the `rem`-sized pager targets
-		// without giving the page any more room. The pager must wrap rather than push the document
-		// sideways. Restored in a `finally` so one failure cannot leave the runner's page zoomed.
+/**
+ * SC 1.4.4 Resize Text at 200 %: text-only zoom, which grows the `rem`-sized pager targets without
+ * giving the page any more room. The pager must wrap rather than push the document sideways — that,
+ * rather than the reflow width, is what `flex-wrap` on the pager is for, and it is the case that
+ * actually fails without it.
+ *
+ * Its own story because the only way to simulate text-only zoom is to set the root font size, which
+ * is a property of the runner's whole document rather than of this canvas. Keeping it alone means
+ * nothing else is being measured against a 32 px root; the `finally` puts it back even on failure,
+ * so a red run cannot leave every story after it zoomed.
+ */
+export const PagerAtDoubleTextSize: Story = {
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320] },
+	},
+	play: async ({ canvasElement }) => {
+		await within(canvasElement).findByRole("table");
 		const root = document.documentElement;
 		const originalFontSize = root.style.fontSize;
 		try {

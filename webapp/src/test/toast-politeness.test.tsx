@@ -21,12 +21,10 @@ describe("sonner toast politeness", () => {
 		const region = document.querySelector("section[aria-live]");
 		expect(region?.getAttribute("aria-live")).toBe("polite");
 
-		// The toast itself is not a live region and carries no role, so it inherits the container's
-		// politeness. Nothing about it says "error" to assistive tech beyond the message text.
-		const item = document.querySelector("li[data-sonner-toast]");
-		expect(item).not.toBeNull();
-		expect(item?.getAttribute("role")).toBeNull();
-		expect(item?.getAttribute("aria-live")).toBeNull();
+		// And nothing inside it announces itself either: an error toast enters the accessible tree as
+		// text in a polite region, never as an alert. The day sonner gives the toast a role of its own,
+		// this fails and the verdict above needs revisiting.
+		expect(screen.queryByRole("alert")).toBeNull();
 	});
 
 	it("drops an aria-live override rather than forwarding it to the container", async () => {

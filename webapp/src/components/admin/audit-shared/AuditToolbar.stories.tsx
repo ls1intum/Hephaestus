@@ -140,10 +140,10 @@ export const ClearsOneFacetOnly: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await userEvent.click(canvas.getByRole("combobox", { name: /^Setting/i }));
-		// Tabbed to, not clicked: Base UI's own Combobox.Clear carries tabIndex -1, so a mouse-only
-		// story passed while the control was unreachable for keyboard users. The popup moves focus to
-		// its search field asynchronously, so wait for that first — tabbing before it lands would
-		// measure the wrong starting point.
+		// Tabbed to, not clicked: Base UI's own Combobox.Clear carries tabIndex -1, so reaching it by
+		// mouse says nothing about whether a keyboard user can. The popup moves focus to its search
+		// field asynchronously, so wait for that first — tabbing before it lands measures from the
+		// wrong starting point.
 		const clear = await screen.findByRole("button", { name: /clear selection/i });
 		const search = await screen.findByPlaceholderText("Search…");
 		await waitFor(() => expect(search).toHaveFocus());
@@ -170,22 +170,26 @@ export const SelectionIsAnnounced: Story = {
 	},
 };
 
-/** A closed range and an open-ended one — the date trigger's two label shapes. */
+/**
+ * A date range counts as a filter: the toolbar offers Reset for it, exactly as it does for the facet
+ * pickers. How the range itself reads on the trigger is `AuditDateFacet.stories.tsx`'s to say, in
+ * both its closed and open-ended shapes.
+ */
 export const DateRangeSelected: Story = {
 	args: {
 		initialRange: { from: new Date("2026-07-01"), to: new Date("2026-07-08") },
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Jul 1 – Jul 8, 2026")).toBeInTheDocument();
 		await expect(canvas.getByRole("button", { name: /reset/i })).toBeInTheDocument();
 	},
 };
 
+/** A half-chosen range is still a filter, so Reset is still offered. */
 export const DateRangeOpenEnded: Story = {
 	args: { initialRange: { from: new Date("2026-07-01"), to: undefined } },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("From Jul 1, 2026")).toBeInTheDocument();
+		await expect(canvas.getByRole("button", { name: /reset/i })).toBeInTheDocument();
 	},
 };

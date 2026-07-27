@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.usage.fx;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -95,13 +96,19 @@ class FxRateFetchSchedulerTest extends BaseUnitTest {
         return new FxRateFetchScheduler(client, repository, lookup, CLOCK);
     }
 
-    @Test
-    @DisplayName("should store a freshly published rate")
-    void shouldStoreRateWhenFetchSucceeds() {
+    /**
+     * Both ways a fetch is triggered store the same row: the daily tick, and the boot catch-up that
+     * covers the first start after an operator sets a display currency.
+     */
+    @ParameterizedTest(name = "{0} stores a freshly published rate")
+    @MethodSource("everyFetchEntryPoint")
+    void shouldStoreRateWhenFetchSucceeds(String entryPoint, Consumer<FxRateFetchScheduler> fetch) {
         when(lookup.isEnabled()).thenReturn(true);
+        // Only the boot catch-up asks whether a usable rate is already stored.
+        lenient().when(lookup.latest()).thenReturn(Optional.empty());
         when(client.fetchLatestUsdRate()).thenReturn(Optional.of(FETCHED));
 
-        scheduler().fetchDaily();
+        fetch.accept(scheduler());
 
         assertThat(table).hasSize(1);
         FxRate stored = table.getFirst();
@@ -157,22 +164,6 @@ class FxRateFetchSchedulerTest extends BaseUnitTest {
         // between now and then.
         assertThat(table).containsExactly(yesterday);
         assertThat(yesterday.getUsdPerEur()).isEqualByComparingTo("1.1000");
-    }
-
-    @Test
-    @DisplayName("should fetch at startup when nothing usable is stored")
-    void shouldFetchOnStartupWhenNoRateStored() {
-        when(lookup.isEnabled()).thenReturn(true);
-        when(lookup.latest()).thenReturn(Optional.empty());
-        when(client.fetchLatestUsdRate()).thenReturn(Optional.of(FETCHED));
-
-        scheduler().fetchOnStartupIfMissing();
-
-        assertThat(table).hasSize(1);
-        FxRate stored = table.getFirst();
-        assertThat(stored.getRateDate()).isEqualTo(TODAY);
-        assertThat(stored.getUsdPerEur()).isEqualByComparingTo("1.1377");
-        assertThat(stored.getFetchedAt()).isEqualTo(Instant.now(CLOCK));
     }
 
     @Test

@@ -60,21 +60,28 @@ class LlmPriceSnapshotTest extends BaseUnitTest {
             assertThat(unpriced.calculateCost(1_000_000, 1_000_000, 0, 0).usd()).isNull();
         }
 
+        /**
+         * NO_CHARGE is a declaration by the operator, not an absence of rates: admission passes a
+         * declared-free model's real rates through untouched. The rates below are therefore the case
+         * that matters — with the short-circuit removed they produce $7.50 and bill a workspace for a
+         * model its administrator declared free. An all-null-rate fixture would reach zero either way
+         * and assert nothing.
+         */
         @Test
-        @DisplayName("a declared-free model is exactly zero, and that is not a clamp")
-        void noChargeIsZero() {
+        @DisplayName("a declared-free model is exactly zero even when it carries real rates, and that is not a clamp")
+        void noChargeIsZeroDespiteCarryingRates() {
             LlmPriceSnapshot free = new LlmPriceSnapshot(
-                FundingSource.INSTANCE,
+                FundingSource.WORKSPACE,
                 PricingState.NO_CHARGE,
                 null,
-                null,
-                null,
-                null,
-                null,
-                null
+                9L,
+                new BigDecimal("1"),
+                new BigDecimal("2"),
+                new BigDecimal("3"),
+                new BigDecimal("4")
             );
 
-            LlmPriceSnapshot.Cost cost = free.calculateCost(1_000_000, 1_000_000, 0, 0);
+            LlmPriceSnapshot.Cost cost = free.calculateCost(1_000_000, 2_000_000, 500_000, 250_000);
 
             assertThat(cost.usd()).isEqualByComparingTo("0");
             assertThat(cost.clamp()).isNull();
@@ -144,39 +151,15 @@ class LlmPriceSnapshotTest extends BaseUnitTest {
             assertThat(cost.clamp()).isEqualTo(LlmPriceSnapshot.CostClamp.CAPPED_AT_MAXIMUM);
         }
 
-        /**
-         * The clamped amount must itself round-trip, or clamping would swap one unstatable number for
-         * another. This is the same assertion {@link MoneyWirePrecisionTest} makes about the bound,
-         * made here about the constant that is supposed to sit on it.
-         */
         @Test
-        @DisplayName("the largest cost that is stored as computed is the largest the wire carries exactly")
-        void justBelowTheCeilingIsNotAClampAndSurvivesTheWire() {
+        @DisplayName("the largest cost below the ceiling is stored exactly as computed")
+        void justBelowTheCeilingIsNotAClamp() {
             LlmPriceSnapshot.Cost cost = priced("999999999.999999").calculateCost(1_000_000, 0, 0, 0);
 
             assertThat(cost.usd()).isEqualByComparingTo("999999999.999999");
             assertThat(cost.clamp()).isNull();
-            assertThat(new BigDecimal(Double.toString(Double.parseDouble(cost.usd().toString()))))
-                .as("the ceiling the clamp uses must be a value JSON's binary64 reproduces exactly")
-                .isEqualByComparingTo(cost.usd());
+            // That this amount also survives the JSON->binary64 trip is asserted once, on the clamp
+            // constants themselves, by MoneyWirePrecisionTest#everyCostTheLedgerWillStoreSurvivesTheWire.
         }
-    }
-
-    @Test
-    @DisplayName("reasoning tokens are already inside the output bucket and are not charged twice")
-    void reasoningIsNotASeparateCharge() {
-        LlmPriceSnapshot snapshot = new LlmPriceSnapshot(
-            FundingSource.WORKSPACE,
-            PricingState.PRICED,
-            null,
-            9L,
-            new BigDecimal("1"),
-            new BigDecimal("2"),
-            new BigDecimal("3"),
-            new BigDecimal("4")
-        );
-
-        // calculateCost takes no reasoning argument at all — 1*1 + 2*2 + 0.5*3 + 0.25*4 = 7.5.
-        assertThat(snapshot.calculateCost(1_000_000, 2_000_000, 500_000, 250_000).usd()).isEqualByComparingTo("7.5");
     }
 }

@@ -90,16 +90,8 @@ class AgentJobRetentionServiceTest extends BaseUnitTest {
             );
         }
 
-        @Test
-        @DisplayName("nothing to strip: zero rows, zero counter increments, exactly one attempt")
-        void nothingToStripIsANoOp() {
-            when(jobRepository.stripTerminalPayloads(any(), anyInt())).thenReturn(0);
-
-            service.runRetention();
-
-            verify(jobRepository, times(1)).stripTerminalPayloads(any(), anyInt());
-            assertThat(meterRegistry.counter("agent.job.retention.stripped").count()).isZero();
-        }
+        // An empty backlog takes the same loop exit as the partial batch above, and a counter
+        // incremented by zero is indistinguishable from one that is not incremented at all.
     }
 
     @Nested

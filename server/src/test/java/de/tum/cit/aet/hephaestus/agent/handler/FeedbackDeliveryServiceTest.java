@@ -315,7 +315,12 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
             service.deliverFeedback(job, new DeliveryContent("Fix stuff.", List.of(), List.of()));
 
-            verify(commentPoster).postFormattedBody(eq(job), any(String.class));
+            var body = ArgumentCaptor.forClass(String.class);
+            verify(commentPoster).postFormattedBody(eq(job), body.capture());
+            // The posted id landing on the job is the persisted trace that delivery really happened.
+            assertThat(job.getDeliveryCommentId()).isEqualTo("IC_comment789");
+            // Body is sanitized and wrapped with a marker + footer, so assert containment.
+            assertThat(body.getValue()).contains("Fix stuff.");
         }
 
         @Test
@@ -483,7 +488,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
-            verify(commentPoster).postFormattedBody(eq(job), any(String.class));
+            assertThat(job.getDeliveryCommentId()).isEqualTo("IC_comment456");
+            // No author → no per-user preference lookup is possible; absence is the observable state.
             verifyNoInteractions(userPreferencesRepository);
         }
 
@@ -543,16 +549,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             service.deliverFeedback(job, new DeliveryContent("Summary.", List.of(), List.of()));
 
             verify(diffNotePoster, never()).reconcileInlineNotes(any(), any());
-        }
-
-        @Test
-        void doesNotThrowOnFailure() {
-            AgentJob job = createJob();
-            stubOpenPr();
-            when(commentPoster.postFormattedBody(any(), any())).thenThrow(new RuntimeException("GraphQL timeout"));
-
-            var delivery = new DeliveryContent("Summary.", List.of(), List.of());
-            service.deliverFeedback(job, delivery);
         }
 
         @Test

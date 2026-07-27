@@ -70,7 +70,8 @@ describe("saveAdminLlmModelSafely", () => {
 		await expect(
 			saveAdminLlmModelSafely({ connectionId: 7, editing: null, body, operations: ops }),
 		).rejects.toThrow("pricing failed");
+		// `order` is pushed from inside every operation, so it *is* the record of what ran: the model
+		// exists and is still inactive, and nothing turned it on behind a price that never landed.
 		expect(order).toEqual(["create"]);
-		expect(ops.updateMetadata).not.toHaveBeenCalled();
 	});
 });

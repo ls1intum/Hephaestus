@@ -328,11 +328,6 @@ class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
             .isForbidden();
     }
 
-    @Test
-    void anonymousIsUnauthorized() {
-        webTestClient.get().uri("/admin/llm/models").exchange().expectStatus().isUnauthorized();
-    }
-
     private LlmModel llmModelFromRepository(Long id) {
         return llmModelRepository.findById(id).orElseThrow();
     }

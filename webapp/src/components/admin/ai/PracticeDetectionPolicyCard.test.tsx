@@ -4,9 +4,10 @@ import {
 	createRouter,
 	RouterProvider,
 } from "@tanstack/react-router";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { AgentBinding, AvailableLlmModel, PracticeReviewSettings } from "@/api/types.gen";
+import { expectUnavailable } from "@/test/controls";
 import { PracticeDetectionPolicyCard } from "./PracticeDetectionPolicyCard";
 
 const availableModel: AvailableLlmModel = {
@@ -102,19 +103,24 @@ describe("PracticeDetectionPolicyCard model binding", () => {
 	});
 
 	it("does not let an admin switch triggers on while nothing can run", async () => {
+		const onUpdateFeatures = vi.fn();
 		renderCard({
 			detectionBinding: undefined,
 			autoTriggerEnabled: false,
 			manualTriggerEnabled: false,
+			onUpdateFeatures,
 		});
 
-		expect(
-			(await screen.findByRole("switch", { name: "Automatic reviews" })).hasAttribute(
-				"data-disabled",
-			),
-		).toBe(true);
-		expect(
-			screen.getByRole("switch", { name: "Manual reviews" }).hasAttribute("data-disabled"),
-		).toBe(true);
+		const auto = await screen.findByRole("switch", { name: "Automatic reviews" });
+		const manual = screen.getByRole("switch", { name: "Manual reviews" });
+
+		// Announced as unavailable and out of the tab order, not merely greyed…
+		await expectUnavailable(auto);
+		await expectUnavailable(manual);
+
+		// …and pressing one anyway turns nothing on and asks the server for nothing.
+		fireEvent.click(auto);
+		expect(auto.getAttribute("aria-checked")).toBe("false");
+		expect(onUpdateFeatures).not.toHaveBeenCalled();
 	});
 });

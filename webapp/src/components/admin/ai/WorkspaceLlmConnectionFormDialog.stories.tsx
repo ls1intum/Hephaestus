@@ -1,11 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent } from "storybook/test";
 import type { WorkspaceLlmConnection } from "@/api/types.gen";
-import {
-	expectControlOnScreen,
-	expectDialogBodyScrolls,
-	expectDialogFitsViewport,
-} from "@/test/reflow";
+import { expectDialogFitsViewport } from "@/test/reflow";
 import { WorkspaceLlmConnectionFormDialog } from "./WorkspaceLlmConnectionFormDialog";
 
 const mockConnection: WorkspaceLlmConnection = {
@@ -51,9 +47,11 @@ export const Submitting: Story = {
 };
 
 /**
- * Reviewed at the WCAG 2.2 SC 1.4.10 reflow width (320 px). The create form is the taller of the
- * two variants — preset, protocol checkbox, base URL, auth mode, key, and the active switch — and
- * used to run off both ends of a phone viewport with no way to scroll it back.
+ * Reviewed at the WCAG 2.2 SC 1.4.10 reflow width (320 px). The create form is the taller of the two
+ * variants — preset, protocol checkbox, base URL, auth mode, key, and the active switch — and a
+ * `position: fixed` popup that outgrows the viewport hangs off both ends at once with no way to
+ * scroll it back. `AdminLlmModelFormDialog`, the tallest of these dialogs, carries the full proof
+ * that `DialogBody` scrolls the middle rather than the whole popup.
  */
 export const MobileReflow: Story = {
 	parameters: {
@@ -61,12 +59,8 @@ export const MobileReflow: Story = {
 		chromatic: { viewports: [320, 375, 768] },
 	},
 	play: async () => {
-		const submit = await screen.findByRole("button", { name: /^connect provider$/i });
+		await screen.findByRole("button", { name: /^connect provider$/i });
 		await expectDialogFitsViewport();
-		await expectDialogBodyScrolls();
-		await expectControlOnScreen(submit);
-		await expectControlOnScreen(screen.getByRole("button", { name: /^cancel$/i }));
-		await expectControlOnScreen(screen.getByRole("button", { name: /^close$/i }));
 	},
 };
 

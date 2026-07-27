@@ -1,12 +1,14 @@
 package de.tum.cit.aet.hephaestus.agent.sandbox.docker;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -36,6 +38,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 
 class DockerSandboxAdapterTest extends BaseUnitTest {
@@ -579,12 +582,17 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             );
             when(containerManager.getLogs(eq(CONTAINER_ID), anyInt())).thenReturn("error logs here");
 
-            try {
-                sandboxAdapter.execute(createSpec());
-            } catch (SandboxException ignored) {}
+            // The failure must still reach the caller — capturing diagnostics may not swallow it.
+            assertThatThrownBy(() -> sandboxAdapter.execute(createSpec()))
+                .isInstanceOf(SandboxException.class)
+                .hasMessageContaining("Docker daemon lost");
 
-            // captureLogsOnError should call getLogs before cleanup removes the container
-            verify(containerManager).getLogs(eq(CONTAINER_ID), anyInt());
+            // Logs must be read while the container still exists, i.e. strictly before cleanup removes it,
+            // and with the full tail (mirrors DockerSandboxAdapter.LOG_TAIL_LINES) — a truncated tail is
+            // the same as no diagnostics for the operator.
+            InOrder inOrder = inOrder(containerManager);
+            inOrder.verify(containerManager).getLogs(CONTAINER_ID, 500);
+            inOrder.verify(containerManager).forceRemove(CONTAINER_ID);
         }
 
         @Test
@@ -684,8 +692,10 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
 
         @Test
         void shouldNoOpForUnknownJob() {
-            // Should not throw
-            sandboxAdapter.cancel(UUID.randomUUID());
+            assertThatCode(() -> sandboxAdapter.cancel(UUID.randomUUID())).doesNotThrowAnyException();
+            // The real invariant of the else-branch: an unknown job id must not stop anyone else's
+            // container. "Did not throw" alone would still pass if cancel() stopped the wrong one.
+            verify(containerManager, never()).stopContainer(anyString());
         }
     }
 

@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, within } from "storybook/test";
 import type { TeamInfo } from "@/api/types.gen";
-import { expectGenuinelyDisabled } from "@/test/controls";
 import type { ExtendedUserTeams } from "./types";
 import { UsersTable } from "./UsersTable";
 
@@ -199,9 +198,8 @@ export const UsersWithoutTeams: Story = {
 };
 
 /**
- * Fifty users at ten a page, so the pager is on screen. Its boundary control is a real
- * `<button disabled>`, not an anchor dimmed with `pointer-events-none` — the dimmed anchor stays in
- * the tab order and is announced as an available control (WCAG 2.2 SC 4.1.2).
+ * Fifty users at ten a page, so the pager is on screen — the shared `TablePagination`, whose window,
+ * gaps and boundary behaviour are stated once in its own stories rather than re-checked here.
  */
 export const ManyUsers: Story = {
 	args: {
@@ -224,7 +222,6 @@ export const ManyUsers: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expectGenuinelyDisabled(canvas.getByRole("button", { name: "Go to previous page" }));
-		await expect(canvas.getByRole("button", { name: "Go to next page" })).toBeEnabled();
+		await expect(canvas.getByRole("navigation", { name: "pagination" })).toBeInTheDocument();
 	},
 };

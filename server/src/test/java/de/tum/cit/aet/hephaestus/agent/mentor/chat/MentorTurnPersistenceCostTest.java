@@ -33,7 +33,14 @@ class MentorTurnPersistenceCostTest extends BaseUnitTest {
         );
     }
 
-    private static TranslatorState state(long input, long output, long cacheRead, long cacheWrite, PricingState mode) {
+    private static TranslatorState state(
+        long input,
+        long output,
+        long cacheRead,
+        long cacheWrite,
+        long reasoning,
+        PricingState mode
+    ) {
         TranslatorState state = new TranslatorState(UUID.randomUUID());
         state.bindAdmission(
             "authoritative-model",
@@ -49,7 +56,12 @@ class MentorTurnPersistenceCostTest extends BaseUnitTest {
             )
         );
         var usage = JsonNodeFactory.instance.objectNode();
-        usage.put("input", input).put("output", output).put("cacheRead", cacheRead).put("cacheWrite", cacheWrite);
+        usage
+            .put("input", input)
+            .put("output", output)
+            .put("cacheRead", cacheRead)
+            .put("cacheWrite", cacheWrite)
+            .put("reasoning", reasoning);
         state.observeUsage(usage);
         return state;
     }
@@ -62,7 +74,7 @@ class MentorTurnPersistenceCostTest extends BaseUnitTest {
     void streamedCostUsesTheSameFrozenCatalogPriceAsTheLedger() {
         UIMessageChunk.Finish out = persistence().augmentFinishWithCost(
             finish(),
-            state(1000, 200, 0, 0, PricingState.PRICED)
+            state(1000, 200, 0, 0, 0, PricingState.PRICED)
         );
 
         assertThat(out.messageMetadata().model()).isEqualTo("authoritative-model");
@@ -71,17 +83,24 @@ class MentorTurnPersistenceCostTest extends BaseUnitTest {
 
     @Test
     void cacheBucketsAreAdditiveAndReasoningIsNotDoubleCharged() {
+        // The provider counts reasoning tokens INSIDE its output total, so the output bucket has
+        // already paid for these 150: $0.0023 for 200 output at $11.50/1M either way. Billing the
+        // reasoning tokens as a fifth bucket at the output rate would read $0.017025.
         UIMessageChunk.Finish out = persistence().augmentFinishWithCost(
             finish(),
-            state(0, 0, 500, 100, PricingState.PRICED)
+            state(0, 200, 500, 100, 150, PricingState.PRICED)
         );
 
-        assertThat(out.messageMetadata().costUsd()).isEqualTo(0.013);
+        assertThat(out.messageMetadata().costUsd())
+            .as("output $0.0023 + cacheRead $0.0100 + cacheWrite $0.0030, reasoning charged once")
+            .isEqualTo(0.0153);
     }
 
     @Test
     void unpricedAdmissionLeavesFinishUnchanged() {
         UIMessageChunk.Finish in = finish();
-        assertThat(persistence().augmentFinishWithCost(in, state(1000, 200, 0, 0, PricingState.UNPRICED))).isSameAs(in);
+        assertThat(persistence().augmentFinishWithCost(in, state(1000, 200, 0, 0, 0, PricingState.UNPRICED))).isSameAs(
+            in
+        );
     }
 }

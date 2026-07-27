@@ -253,26 +253,9 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
             assertThat(sample.getValue().sourceAttempt()).isZero();
         }
 
-        @Test
-        @DisplayName("requeues a worker-lost job still in preparation without attributing usage")
-        void requeuesPreparingOrphanWithoutUsage() {
-            UUID jobId = UUID.randomUUID();
-            when(jobRepository.findOrphanedRunningJobs(any(), ArgumentMatchers.anyLong())).thenReturn(
-                List.of(orphan(jobId, 7L, 0))
-            );
-            when(jobRepository.requeueOrphan(eq(jobId), eq(DEAD_WORKER_ID), anyInt(), any(), any(), any())).thenReturn(
-                1
-            );
-            AgentJob persistedJob = orphanedJob(jobId, 7L, 0);
-            persistedJob.setExecutionStartedAt(null);
-            when(jobRepository.findByIdWithWorkspaceForUpdate(jobId)).thenReturn(java.util.Optional.of(persistedJob));
-            org.mockito.Mockito.clearInvocations(usageRecorder);
-
-            sweeper.recoverOrphanedJobs();
-
-            verify(usageRecorder, never()).recordUnverifiable(any(), any());
-            assertThat(meterRegistry.counter("agent.job.orphan.requeued").count()).isEqualTo(1d);
-        }
+        // A job that never began executing carries no attributable spend. Both sweeps reach that
+        // through the same guard in recordUnverifiableUsage, asserted by
+        // ReapStaleRunning#shouldReapAJobStillInPreparationWithoutAttributingUsage.
 
         @Test
         @DisplayName("legacy jobs without an admission snapshot are recovered as explicitly unpriced")
@@ -467,11 +450,11 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
             ArgumentCaptor<DeliveryStatus> status = ArgumentCaptor.forClass(DeliveryStatus.class);
             verify(jobRepository).updateDeliveryStatus(eq(job.getId()), status.capture(), eq("comment-1"));
             assertThat(status.getValue()).isEqualTo(DeliveryStatus.FAILED);
-            // Giving up must not also burn another attempt, or the counter would climb past the cap
-            // forever on a row nobody is retrying any more.
-            assertThat(job.getDeliveryAttempts()).isEqualTo(
-                (short) AgentJobZombieSweeper.MAX_DELIVERY_RECOVERY_ATTEMPTS
-            );
+            // Giving up must not also burn another attempt, or delivery_attempts would climb past the
+            // cap forever on a row nobody is retrying any more — and must not re-enter delivery, which
+            // is what the row was given up on.
+            verify(jobRepository, never()).claimDeliveryRecoveryAttempt(any(), org.mockito.ArgumentMatchers.anyShort());
+            verify(lifecycleService, never()).recoverStuckDelivery(any(), org.mockito.ArgumentMatchers.anyShort());
             assertThat(meterRegistry.counter("agent.job.delivery.recovered").count()).isZero();
         }
     }

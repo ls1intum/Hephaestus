@@ -63,7 +63,7 @@ Entries exist only for releases that need operator action. Everything else is in
 
 **Before**: the worker pod's LLM upstream/key were passed through env vars (`HEPHAESTUS_WORKER_LLM_BASE_URL` / `HEPHAESTUS_WORKER_LLM_API_KEY`), and the LLM proxy could be toggled per pod with `HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED` (`hephaestus.sandbox.llm-proxy.enabled`).
 
-**After**: OpenAI and other OpenAI-compatible endpoints are registered at runtime under **Instance admin → AI models**, with an explicit Chat Completions or Responses API contract, per-model pricing, and optional sharing with workspaces. Workspaces can also connect their own compatible endpoint. The LLM proxy — the only path a sandbox has to a provider key — now runs automatically wherever agent jobs execute; it has no standalone enable flag. The three env vars above are no longer read.
+**After**: OpenAI and other OpenAI-compatible endpoints are registered at runtime under **Instance admin → AI models**, with an explicit Chat Completions or Responses API contract, per-model pricing, and optional sharing with workspaces. Workspaces can also connect their own compatible endpoint. The LLM proxy — the only path a sandbox has to a provider key — now runs automatically wherever the worker/sandbox capability is on (`hephaestus.runtime.worker.enabled`, default true), which is both the worker pod and the application-server replica that serves interactive mentor sandboxes. It has no standalone enable flag. The three env vars above are no longer read.
 
 **Migration**:
 
@@ -113,7 +113,7 @@ Entries exist only for releases that need operator action. Everything else is in
 
 **Before**: the practice-review agent job queue was delivered over a NATS JetStream stream (`AGENT`); a worker pulled a job id off the stream, then loaded the job from PostgreSQL to execute it. Interactive mentor turns were and remain request-affine; they do not use `agent_job`.
 
-**After**: workers poll `agent_job` directly and claim a batch with `FOR UPDATE SKIP LOCKED` — PostgreSQL, already the source of truth for job state, is now also the delivery mechanism. `AGENT_NATS_ENABLED` is replaced by `AGENT_ENABLED` (default `false`). New optional tuning: `AGENT_POLL_INTERVAL` (default `1s`), `AGENT_CLAIM_BATCH_SIZE` (default `5`), `AGENT_MAX_RETRIES` (default `5`), `AGENT_PAYLOAD_RETENTION` (default `14d`), and `AGENT_ROW_RETENTION` (default `90d`). NATS itself is unaffected everywhere else — it remains required for webhook ingest and SCM/Slack sync. See [ADR 0025](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0025-agent-job-queue-on-postgresql.md).
+**After**: workers poll `agent_job` directly and claim a batch with `FOR UPDATE SKIP LOCKED` — PostgreSQL, already the source of truth for job state, is now also the delivery mechanism. `AGENT_NATS_ENABLED` is replaced by `AGENT_ENABLED` (default `false`). New optional tuning: `AGENT_POLL_INTERVAL` (default `1s`), `AGENT_CLAIM_BATCH_SIZE` (default `5`), `AGENT_MAX_RETRIES` (default `5`), `AGENT_PAYLOAD_RETENTION` (default `P14D`), and `AGENT_ROW_RETENTION` (default `P90D`). NATS itself is unaffected everywhere else — it remains required for webhook ingest and SCM/Slack sync. See [ADR 0025](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0025-agent-job-queue-on-postgresql.md).
 
 **Migration**:
 
@@ -127,44 +127,49 @@ Entries exist only for releases that need operator action. Everything else is in
 **Affected**: any script or integration calling the workspace AI, agent-job, or LLM spend endpoints. No
 action is needed for the web UI, which ships updated in the same release.
 
-**Before**: the AI area accumulated four vocabularies for one feature — `ai-settings`, `agent-bindings`,
-`agent-jobs`, `llm-usage`, `llm-budget`, `byo-budget` — and the two monthly spend caps had different
-path shapes, different path variable types (numeric id vs slug) and differently named request fields.
+**Before**: the AI area of the API was `agent-configs` (named execution profiles), `ai-settings` (an
+aggregate container that also held the practice-review policy and the two config pointers), and
+`agent-jobs`.
 
 **After**: every address is either `llm/…` (models and what they cost) or `agents/…` (the things that
-run them). Both caps are `…/llm/budget` with the body `{ "monthlyBudgetUsd": … }`, and both address a
-workspace by slug. `ai-settings` is gone: the practice-review policy it held moved next to the practice
-catalogue, and the one instance-policy flag it exposed became `GET /workspaces/{slug}/llm/settings`.
+run them). `agent-configs` and `ai-settings` are gone: a workspace's AI setup is a per-purpose binding
+under `agents/…`, and the practice-review policy moved next to the practice catalogue. Both monthly
+spend caps are `…/llm/budget` with the body `{ "monthlyBudgetUsd": … }`, addressing a workspace by
+slug.
 
 **There are no redirects or aliases.** An old address returns 404.
 
 | Was | Now |
 | --- | --- |
-| `GET /admin/llm-usage` | `GET /admin/llm/usage` |
-| `PUT /admin/workspaces/{workspaceId}/llm-budget` | `PUT /admin/workspaces/{workspaceSlug}/llm/budget` |
-| `GET /workspaces/{slug}/llm-usage` | `GET /workspaces/{slug}/llm/usage` |
-| `PUT /workspaces/{slug}/llm-usage/byo-budget` | `PUT /workspaces/{slug}/llm/budget` |
-| `GET|PUT|DELETE /workspaces/{slug}/agent-bindings[/{purpose}]` | `GET|PUT|DELETE /workspaces/{slug}/agents[/{purpose}]` |
 | `GET /workspaces/{slug}/agent-jobs[/{jobId}[/cancel\|/delivery/retry]]` | `GET /workspaces/{slug}/agents/jobs[/…]` |
 | `GET /workspaces/{slug}/ai-settings` | `GET /workspaces/{slug}/practices/review-settings` |
 | `PATCH /workspaces/{slug}/ai-settings/practice-review` | `PATCH /workspaces/{slug}/practices/review-settings` |
-| — (new) | `GET /workspaces/{slug}/llm/settings` |
+| `GET`/`POST` `/workspaces/{slug}/agent-configs`, `GET`/`PATCH`/`DELETE` `…/agent-configs/{configId}` | removed — see the AI-configuration section above |
+| `PUT /workspaces/{slug}/ai-settings/practice-config`, `PUT …/ai-settings/mentor-config` | removed — see the AI-configuration section above |
+
+Everything else in the AI area is **new** in this release, not a renamed address, so no existing call
+site points at it:
+
+| New | What it is |
+| --- | --- |
+| `GET /workspaces/{slug}/agents` | list a workspace's per-purpose bindings |
+| `PUT`/`DELETE /workspaces/{slug}/agents/{purpose}` | set or clear one binding (`{purpose}` has no `GET`) |
+| `GET /admin/llm/usage` | instance-wide LLM spend, `{ month, fx, workspaces: [...] }` |
+| `PUT /admin/workspaces/{slug}/llm/budget` | the instance admin's monthly cap on a workspace |
+| `GET /workspaces/{slug}/llm/usage` | that workspace's own spend view |
+| `PUT /workspaces/{slug}/llm/budget` | the workspace's cap on its own connected provider |
+| `GET /workspaces/{slug}/llm/settings` | the instance LLM policy as it applies to this workspace |
+| `GET`/`POST`/`PATCH`/`DELETE /admin/llm/connections`, `…/models` | the instance model catalogue |
 
 **Migration**:
 
-1. Update every call site to the addresses above. `server/openapi.yaml` is the authoritative list.
-2. Change both budget request bodies to `{ "monthlyBudgetUsd": … }` (was `monthlyLlmBudgetUsd` for the
-   instance cap and `monthlyByoLlmBudgetUsd` for the workspace's own).
-3. Address the instance cap by workspace **slug** instead of numeric id. `GET /admin/llm/usage` reports
-   `workspaceSlug` on each row; `workspaceId` was removed.
-4. Re-parse `GET /admin/llm/usage`: it now returns `{ month, fx, workspaces: [...] }` rather than a bare
-   array, with the exchange rate reported once instead of on every row.
-5. Rename the spend fields you read: `pricedTotalCostUsd` → `instanceTotalCostUsd`, `byoTotalCostUsd` →
-   `ownProviderTotalCostUsd`, `byoMonthlyBudgetUsd` → `ownProviderMonthlyBudgetUsd`, `byoBudgetVerdict`
-   → `ownProviderBudgetVerdict`, `byoPaused` → `ownProviderPaused`, `instanceFundedPaused` →
-   `instancePaused`. The same names apply inside `byJobType[]` and `byDay[]`.
-6. If you read `GET /ai-settings` for `practicesEnabled` / `mentorEnabled`, take them from the workspace
+1. Update every call site in the first table to its new address. `server/openapi.yaml` is the
+   authoritative list.
+2. If you read `GET /ai-settings` for `practicesEnabled` / `mentorEnabled`, take them from the workspace
    itself (`GET /workspaces/{slug}`); the review-settings response returns the review policy only.
+3. If you called `/agent-configs` or the two `ai-settings` config pointers, follow the AI-configuration
+   section above: a workspace now has exactly one binding per purpose, edited through
+   `PUT /workspaces/{slug}/agents/{purpose}`.
 
 No database action is required. The config-audit trail keeps its historical entity-type values as
 written — the table is append-only by database trigger, so past rows are never rewritten.

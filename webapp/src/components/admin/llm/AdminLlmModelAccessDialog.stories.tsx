@@ -1,11 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn, screen, userEvent } from "storybook/test";
 import type { LlmModel } from "@/api/types.gen";
-import {
-	expectControlOnScreen,
-	expectDialogBodyScrolls,
-	expectDialogFitsViewport,
-} from "@/test/reflow";
+import { expectDialogFitsViewport } from "@/test/reflow";
 import { AdminLlmModelAccessDialog } from "./AdminLlmModelAccessDialog";
 
 const model: LlmModel = {
@@ -63,8 +59,9 @@ export const WorkspaceListError: Story = {
 
 /**
  * A real instance's worth of workspaces at the WCAG 2.2 SC 1.4.10 reflow width (320 px). Two option
- * cards, the picker and the "access is reduced" alert overflow a phone; only the body scrolls, so
- * the title stays pinned and "Save access" stays reachable.
+ * cards, the picker and the "access is reduced" alert overflow a phone, so the popup has to stay
+ * inside the viewport. That only the body scrolls is `DialogBody`'s doing, proved once on the
+ * tallest dialog (`AdminLlmModelFormDialog`).
  */
 export const MobileReflow: Story = {
 	args: {
@@ -84,10 +81,7 @@ export const MobileReflow: Story = {
 		// Narrowing access is what makes this dialog tall: it adds the picker and the consequence
 		// alert. Reviewing the "All workspaces" state alone would review the short half of it.
 		await userEvent.click(await screen.findByRole("radio", { name: /^Selected workspaces/i }));
-		const submit = await screen.findByRole("button", { name: /save access/i });
+		await screen.findByRole("button", { name: /save access/i });
 		await expectDialogFitsViewport();
-		await expectDialogBodyScrolls();
-		await expectControlOnScreen(submit);
-		await expectControlOnScreen(screen.getByRole("button", { name: /^close$/i }));
 	},
 };

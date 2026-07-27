@@ -18,3 +18,18 @@ export async function expectGenuinelyDisabled(control: HTMLElement) {
 	control.focus();
 	await expect(document.activeElement).toBe(before);
 }
+
+/**
+ * The same claim for a control that is not a form element, where the platform's `disabled` attribute
+ * is not available at all: Base UI draws a switch as a `<span role="switch">`, so `aria-disabled`
+ * plus removal from the tab order is the whole of the contract.
+ *
+ * `data-disabled` is *not* that contract — it is the styling hook the kit uses to grey the control,
+ * and a switch carrying it while still announced as available and still reachable by Tab is the same
+ * SC 4.1.2 failure the dimmed anchor above is. Neither attribute says the press is ignored, so
+ * callers state that separately, against whatever operating it would have changed.
+ */
+export async function expectUnavailable(control: HTMLElement) {
+	await expect(control).toHaveAttribute("aria-disabled", "true");
+	await expect(control).toHaveAttribute("tabindex", "-1");
+}

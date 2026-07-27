@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -9,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
+import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.integration.core.events.BotCommandReceivedEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -28,6 +30,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 
 @Tag("unit")
@@ -61,45 +64,28 @@ class BotCommandProcessorTest extends BaseUnitTest {
     @Nested
     class CommandMatching {
 
-        @Test
-        void exactReviewCommand_triggersReview() {
-            PullRequest pr = createOpenPr();
-            mockPrLookup(pr);
-            mockGateDetect(pr);
-            when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.of(new AgentJob()));
-
-            processor.onBotCommandReceived(event("/hephaestus review"));
-
-            verify(agentJobService).submit(eq(1L), eq(AgentJobType.PULL_REQUEST_REVIEW), any());
-        }
-
         /**
-         * Trailing text after the command is accepted — the second matching leg. A reviewer typing
-         * "/hephaestus review please" means the same thing, and trailing whitespace alone is already
-         * covered by the exact case above (the body is stripped before matching).
+         * The three accepted spellings: exact, trailing arguments ("/hephaestus review please" means
+         * the same thing), and any casing. Each must produce the same submission — for the MR the
+         * command was written on, and with a null trigger event, which is what makes a manually
+         * requested review run the full focus-active practice set rather than one trigger's subset.
          */
-        @Test
-        void reviewCommandWithTrailingArguments_triggersReview() {
+        @ParameterizedTest(name = "{0} triggers a review")
+        @ValueSource(strings = { "/hephaestus review", "/hephaestus review please", "/Hephaestus Review" })
+        void anAcceptedReviewCommand_submitsAReviewForThatMergeRequest(String command) {
             PullRequest pr = createOpenPr();
             mockPrLookup(pr);
             mockGateDetect(pr);
             when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.of(new AgentJob()));
 
-            processor.onBotCommandReceived(event("/hephaestus review please"));
+            processor.onBotCommandReceived(event(command));
 
-            verify(agentJobService).submit(eq(1L), eq(AgentJobType.PULL_REQUEST_REVIEW), any());
-        }
-
-        @Test
-        void caseInsensitive_triggersReview() {
-            PullRequest pr = createOpenPr();
-            mockPrLookup(pr);
-            mockGateDetect(pr);
-            when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.of(new AgentJob()));
-
-            processor.onBotCommandReceived(event("/Hephaestus Review"));
-
-            verify(agentJobService).submit(eq(1L), eq(AgentJobType.PULL_REQUEST_REVIEW), any());
+            var captor = ArgumentCaptor.forClass(PullRequestReviewSubmissionRequest.class);
+            verify(agentJobService).submit(eq(1L), eq(AgentJobType.PULL_REQUEST_REVIEW), captor.capture());
+            PullRequestReviewSubmissionRequest request = captor.getValue();
+            assertThat(request.pullRequest().number()).isEqualTo(MR_NUMBER);
+            assertThat(request.headRefOid()).isEqualTo("abc123");
+            assertThat(request.triggerEvent()).isNull();
         }
 
         /**
@@ -178,18 +164,6 @@ class BotCommandProcessorTest extends BaseUnitTest {
             processor.onBotCommandReceived(event("/hephaestus review"));
 
             verify(agentJobService, never()).submit(any(), any(), any());
-        }
-
-        @Test
-        void gateDetect_submitsJob() {
-            PullRequest pr = createOpenPr();
-            mockPrLookup(pr);
-            mockGateDetect(pr);
-            when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.of(new AgentJob()));
-
-            processor.onBotCommandReceived(event("/hephaestus review"));
-
-            verify(agentJobService).submit(eq(1L), eq(AgentJobType.PULL_REQUEST_REVIEW), any());
         }
 
         @Test

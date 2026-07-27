@@ -50,9 +50,9 @@ async function land(url: string) {
 
 /**
  * Drives admin URLs through the real router as each role, which makes the gate structural rather
- * than a convention: a route mapping to an /admin URL without nesting under the layout (a sibling,
- * a dot-notation path, an `admin_` un-nesting suffix) skips the guard silently, and
- * `achievement-designer.tsx` shipped exactly that way.
+ * than a convention: a route that maps to an /admin URL without nesting under the layout — a
+ * sibling, a dot-notation path, an `admin_` un-nesting suffix — skips the guard silently, and
+ * nothing about the file it lives in says so.
  */
 describe("workspace-admin route gate", () => {
 	it("enumerates the admin routes rather than trusting a hand-written list", () => {

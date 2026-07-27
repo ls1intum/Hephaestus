@@ -270,6 +270,9 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
 
     @Test
     void anonymousIsUnauthorized() {
+        // Stands for every instance-admin route: SecurityConfig's anyRequest().authenticated() answers
+        // all of /admin/**, so one route proves the posture for the whole namespace.
+        //
         // 401, not 403: an unauthenticated caller must be told to authenticate. The two are answered
         // by different layers (the entry point vs. @PreAuthorize), so passing the 403 case above says
         // nothing about this one.

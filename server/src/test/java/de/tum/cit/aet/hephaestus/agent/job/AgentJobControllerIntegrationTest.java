@@ -34,8 +34,17 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         return workspace;
     }
 
+    /**
+     * A token the fixture chooses rather than one {@code AgentJob}'s pre-persist hook mints, so
+     * {@link #jobTokenNeverExposedInResponse} can look for a value it knows is in the row.
+     */
+    private static String seededJobToken() {
+        return "job-token-must-not-leak-" + UUID.randomUUID();
+    }
+
     private AgentJob createJob(Workspace workspace, AgentJobStatus status) {
         AgentJob job = new AgentJob();
+        job.setJobToken(seededJobToken());
         job.setWorkspace(workspace);
         job.setPurpose(AgentPurpose.PRACTICE_DETECTION);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
@@ -203,14 +212,12 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             .returnResult()
             .getResponseBody();
 
-        assertThat(responseBody).isNotNull();
-        assertThat(responseBody).doesNotContain("jobToken");
-        assertThat(responseBody).doesNotContain("job_token");
-        // Also check the actual token value isn't leaked
+        // The token the row actually holds, read back through the at-rest converter: the DTO carries no
+        // jobToken component, so what has to be pinned is the VALUE, which could still ride out inside
+        // the passthrough JSONB fields (metadata / output / configSnapshot).
         AgentJob freshJob = agentJobRepository.findById(job.getId()).orElseThrow();
-        if (freshJob.getJobToken() != null) {
-            assertThat(responseBody).doesNotContain(freshJob.getJobToken());
-        }
+        assertThat(freshJob.getJobToken()).as("the fixture must carry a token, or this asserts nothing").isNotBlank();
+        assertThat(responseBody).isNotNull().doesNotContain(freshJob.getJobToken());
     }
 
     @Test
@@ -323,24 +330,12 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         assertThat(result.status()).isEqualTo(AgentJobStatus.CANCELLED);
     }
 
-    @Test
-    void cancelJobRequiresAuthentication() {
-        User owner = persistUser("unauth-cancel-owner");
-        Workspace workspace = createWorkspace("unauth-cancel-ws", "Unauth", "unauth-cancel", AccountType.ORG, owner);
-
-        // Pass CSRF (cookie-style write) but send no authentication, so the auth layer — not the CSRF
-        // filter — answers: an unauthenticated caller gets 401 (ADR 0017; see CsrfProtectionIntegrationTest
-        // for the tokenless-write 403 case).
-        String csrf = TestAuthUtils.fetchCsrfToken(webTestClient);
-        webTestClient
-            .post()
-            .uri("/workspaces/{slug}/agents/jobs/{id}/cancel", workspace.getWorkspaceSlug(), UUID.randomUUID())
-            .headers(TestAuthUtils.withCsrf(csrf))
-            .exchange()
-            .expectStatus()
-            .isUnauthorized();
-    }
-
+    /**
+     * Stands for the whole workspace-admin posture: {@code SecurityConfig} permits anonymous GET under
+     * a workspace slug, so {@code @RequireAtLeastWorkspaceAdmin} on the handler is the only thing
+     * between the public internet and a workspace's job history — and this listing is the one endpoint
+     * here with no member-level sibling pinning that annotation.
+     */
     @Test
     void listJobsRequiresAuthentication() {
         User owner = persistUser("unauth-job-owner");

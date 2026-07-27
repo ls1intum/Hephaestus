@@ -110,17 +110,23 @@ describe("handlePossibleSessionExpiry", () => {
 
 	it("collapses concurrent 401s into a single refresh", async () => {
 		refreshMock.mockResolvedValue(true);
-		stubLocation("/w/acme/overview");
+		const { assigned } = stubLocation("/w/acme/overview");
 		const qc = makeQueryClient();
 		const url = "http://localhost:8080/workspaces/acme/practices";
 
 		// Three requests 401 at once during a cookie rotation.
-		handlePossibleSessionExpiry(res(401, url), qc);
-		handlePossibleSessionExpiry(res(401, url), qc);
-		handlePossibleSessionExpiry(res(401, url), qc);
+		const handled = [
+			handlePossibleSessionExpiry(res(401, url), qc),
+			handlePossibleSessionExpiry(res(401, url), qc),
+			handlePossibleSessionExpiry(res(401, url), qc),
+		];
 		await flush();
 
+		// All three are taken over by the recovery — none falls through to its caller as an
+		// unhandled 401 — and the one refresh that runs heals them in place, without a logout.
+		expect(handled).toEqual([true, true, true]);
 		expect(refreshMock).toHaveBeenCalledOnce();
+		expect(assigned).toHaveLength(0);
 	});
 
 	it("does NOT handle (or refresh) a 401 from the GET /user probe", () => {

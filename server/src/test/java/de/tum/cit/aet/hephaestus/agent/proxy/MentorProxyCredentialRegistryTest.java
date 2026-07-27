@@ -27,30 +27,6 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
     private final MentorProxyCredentialRegistry registry = new MentorProxyCredentialRegistry();
 
     @Test
-    void mintedTokenAuthenticatesBeforeRevoke() {
-        UUID sessionId = UUID.randomUUID();
-        String token = registry.mint(
-            sessionId,
-            new Route("openai-completions", "https://api.openai.com", null, null, null, null)
-        );
-
-        assertThat(registry.validate(token)).isPresent();
-    }
-
-    @Test
-    void revokedTokenNoLongerAuthenticates() {
-        UUID sessionId = UUID.randomUUID();
-        String token = registry.mint(
-            sessionId,
-            new Route("openai-completions", "https://api.openai.com", null, null, null, null)
-        );
-
-        registry.revoke(sessionId);
-
-        assertThat(registry.validate(token)).isEmpty();
-    }
-
-    @Test
     void revokeIsIdempotent() {
         UUID sessionId = UUID.randomUUID();
         String token = registry.mint(
@@ -68,9 +44,19 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
     @Test
     void revokingAnUnknownSessionIsANoOp() {
         // A sandbox that lost the concurrent-attach race never minted a token that got embedded into a
-        // container; its dispose path still calls revoke() with that sessionId.
+        // container; its dispose path still calls revoke() with that sessionId. "No-op" has to mean the
+        // registry is untouched, not merely that nothing was thrown — a revoke that cleared the map
+        // would take every live mentor session's credential down with it.
+        UUID liveSession = UUID.randomUUID();
+        String liveToken = registry.mint(
+            liveSession,
+            new Route("openai-completions", "https://api.openai.com", null, null, null, null)
+        );
+
         registry.revoke(UUID.randomUUID());
-        // No exception — nothing to assert beyond "didn't throw".
+
+        assertThat(registry.validate(liveToken)).isPresent();
+        assertThat(registry.trackedSessions()).isEqualTo(1);
     }
 
     @Test

@@ -48,9 +48,9 @@ function openConfirm(onConfirm = vi.fn()) {
 describe("ConfirmDialog", () => {
 	it("closes as it confirms, so the request cannot be sent a second time", async () => {
 		// `AlertDialogAction` is a plain Button, not the primitive's Close, so nothing closes this
-		// unless the dialog does. Four hand-rolled copies of this block had to remember that and two
-		// forgot: the row vanished behind a modal that still offered an enabled Delete, and a second
-		// click sent a second DELETE that came back 404 — an error toast for a delete that worked.
+		// unless the dialog does. Miss that and the row vanishes behind a modal still offering an
+		// enabled Delete: a second click sends a second DELETE, which comes back 404 — an error toast
+		// for a delete that worked.
 		const onConfirm = openConfirm();
 
 		fireEvent.click(screen.getByRole("button", { name: "Delete" }));
@@ -60,11 +60,11 @@ describe("ConfirmDialog", () => {
 	});
 
 	it("lets Escape out while the confirmed request is still in flight", async () => {
-		// WCAG 2.2 SC 2.1.2. The copies this replaces refused dismissal while their mutation was
-		// pending *and* disabled both footer buttons, leaving a popup with no operable control and no
-		// exit — bounded by the request against a normal failure, unbounded against a connection that
-		// never answers, since `fetch` has no timeout of its own. Nothing here is disabled and nothing
-		// here reads the caller's pending state, so the trap has no state to live in.
+		// WCAG 2.2 SC 2.1.2. A confirm that refuses dismissal while its mutation is pending *and*
+		// disables both footer buttons is a popup with no operable control and no exit — bounded by
+		// the request against a normal failure, unbounded against a connection that never answers,
+		// since `fetch` has no timeout of its own. Nothing here is disabled and nothing here reads the
+		// caller's pending state, so the trap has no state to live in.
 		const onConfirm = vi.fn();
 		render(<Harness onConfirm={onConfirm} />);
 		fireEvent.click(screen.getByRole("button", { name: "Delete GPT-5" }));

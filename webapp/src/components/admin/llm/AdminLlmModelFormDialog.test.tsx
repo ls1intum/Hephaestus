@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { LlmModel } from "@/api/types.gen";
+import { validateLlmModelForm } from "@/lib/llm-form-validation";
+import { expectUnavailable } from "@/test/controls";
 import { AdminLlmModelFormDialog } from "./AdminLlmModelFormDialog";
 
 function renderDialog(onSave = vi.fn()) {
@@ -19,11 +21,15 @@ function renderDialog(onSave = vi.fn()) {
 }
 
 describe("AdminLlmModelFormDialog", () => {
-	it("creates a model inactive and shared with no workspace by default", () => {
+	it("creates a model inactive and shared with no workspace by default", async () => {
 		const onSave = renderDialog();
 		const active = screen.getByRole("switch", { name: "Active" }) as HTMLButtonElement;
 		expect(active.getAttribute("aria-checked")).toBe("false");
-		expect(active.hasAttribute("data-disabled")).toBe(true);
+		// And it cannot be flipped on the way in: announced as unavailable, out of the tab order, and
+		// unmoved by a press — a new model is created inactive and turned on afterwards or not at all.
+		await expectUnavailable(active);
+		fireEvent.click(active);
+		expect(active.getAttribute("aria-checked")).toBe("false");
 		expect(screen.queryByLabelText("Slug")).toBeNull();
 		fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "GPT-5" } });
 		fireEvent.change(screen.getByLabelText("Upstream model id"), { target: { value: "gpt-5" } });
@@ -80,11 +86,19 @@ describe("AdminLlmModelFormDialog", () => {
 
 		fireEvent.click(screen.getByRole("button", { name: "Add model" }));
 
-		expect(
-			screen.getByText(
-				"At least one rate must be above zero. For a free model, pick the free option.",
-			),
-		).toBeTruthy();
+		// The wording is `llm-form-validation`'s and is stated there; what this dialog is answerable
+		// for is that the shared rule runs at all and that its words reach the reader unaltered.
+		const rejection = validateLlmModelForm({
+			displayName: "GPT-5",
+			upstreamModelId: "gpt-5",
+			contextWindow: "",
+			maxOutputTokens: "",
+			pricingMode: "PRICED",
+			per1mInputUsd: 0,
+			per1mOutputUsd: 0,
+		}).per1mInputUsd;
+		expect(rejection).toBeTruthy();
+		expect(screen.getByText(rejection as string)).toBeTruthy();
 		expect(onSave).not.toHaveBeenCalled();
 	});
 

@@ -25,6 +25,8 @@ import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
@@ -89,6 +91,11 @@ class LlmModelServiceTest extends BaseUnitTest {
         lenient()
             .when(modelRepository.saveAndFlush(any(LlmModel.class)))
             .thenAnswer(invocation -> invocation.getArgument(0));
+    }
+
+    /** A rate column from the table below; an absent rate is a {@code null} rate, not zero. */
+    private static @org.jspecify.annotations.Nullable BigDecimal rate(@org.jspecify.annotations.Nullable String value) {
+        return value == null ? null : new BigDecimal(value);
     }
 
     private UpdateLlmModelPriceRequestDTO pricedRequest(String input, String output) {
@@ -159,59 +166,47 @@ class LlmModelServiceTest extends BaseUnitTest {
             assertThat(inserted.getValue().getPer1mInputUsd()).isEqualByComparingTo("3.00");
         }
 
-        @Test
-        void pricedModeRequiresBothInputAndOutputRates() {
+        /**
+         * The shared {@code LlmPriceValidation} rule table, driven through the endpoint that reprices
+         * an instance model. One row per rule, so deleting any single branch of the validator leaves
+         * exactly one row red. The message fragment is asserted and not merely the exception type:
+         * it is what the admin who typed the rates reads back.
+         *
+         * <p>Workspace BYO models reach the same validator through their own create path;
+         * {@code WorkspaceLlmModelServiceTest} pins that wiring rather than repeating this table.
+         */
+        @ParameterizedTest(name = "{5}")
+        @CsvSource(
+            nullValues = "NULL",
+            value = {
+                "PRICED, 3.00, NULL, NULL, an input rate and an output rate, a price missing its output rate",
+                "PRICED, -1.00, 2.00, NULL, zero or greater, a negative rate",
+                "PRICED, 0, 0, NULL, choose Free instead, an all-zero price that would bill as verified $0 forever",
+                "NO_CHARGE, NULL, NULL, NULL, note, a free model with no explanation",
+                "UNPRICED, 1.00, NULL, NULL, clear them or set a price, rates carried by a model with no price",
+            }
+        )
+        void updatePriceRejectsAnInvalidRateCombination(
+            PricingMode pricingMode,
+            String per1mInputUsd,
+            String per1mOutputUsd,
+            String priceNote,
+            String expectedMessage,
+            String why
+        ) {
             UpdateLlmModelPriceRequestDTO request = new UpdateLlmModelPriceRequestDTO(
-                PricingMode.PRICED,
-                new BigDecimal("3.00"),
+                pricingMode,
+                rate(per1mInputUsd),
+                rate(per1mOutputUsd),
                 null,
                 null,
-                null,
-                null,
-                null
-            );
-
-            assertThatThrownBy(() -> modelService.updatePrice(7L, request)).isInstanceOf(
-                IllegalArgumentException.class
-            );
-            verify(priceRepository, never()).save(any());
-        }
-
-        @Test
-        void pricedModeRejectsNegativeRates() {
-            UpdateLlmModelPriceRequestDTO request = new UpdateLlmModelPriceRequestDTO(
-                PricingMode.PRICED,
-                new BigDecimal("-1.00"),
-                new BigDecimal("2.00"),
-                null,
-                null,
-                null,
-                null
-            );
-
-            assertThatThrownBy(() -> modelService.updatePrice(7L, request)).isInstanceOf(
-                IllegalArgumentException.class
-            );
-            verify(priceRepository, never()).save(any());
-        }
-
-        @Test
-        void pricedModeRejectsAllZeroRates() {
-            // an all-zero-rate PRICED model would otherwise pass validation and
-            // count as verified $0 spend forever — that's what Free is for.
-            UpdateLlmModelPriceRequestDTO request = new UpdateLlmModelPriceRequestDTO(
-                PricingMode.PRICED,
-                BigDecimal.ZERO,
-                BigDecimal.ZERO,
-                null,
-                null,
-                null,
-                null
+                priceNote
             );
 
             assertThatThrownBy(() -> modelService.updatePrice(7L, request))
+                .as(why)
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("choose Free instead");
+                .hasMessageContaining(expectedMessage);
             verify(priceRepository, never()).save(any());
         }
 
@@ -236,24 +231,6 @@ class LlmModelServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void freeModeRequiresANote() {
-            UpdateLlmModelPriceRequestDTO request = new UpdateLlmModelPriceRequestDTO(
-                PricingMode.NO_CHARGE,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
-
-            assertThatThrownBy(() -> modelService.updatePrice(7L, request))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("note");
-            verify(priceRepository, never()).save(any());
-        }
-
-        @Test
         void freeModeWithNoteAndNoRatesSucceeds() {
             when(priceRepository.findByModelIdAndEffectiveToIsNull(7L)).thenReturn(Optional.empty());
             when(priceRepository.save(any(LlmModelPrice.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -271,24 +248,6 @@ class LlmModelServiceTest extends BaseUnitTest {
 
             assertThat(result.getPricingMode()).isEqualTo(PricingMode.NO_CHARGE);
             assertThat(result.getNote()).isEqualTo("Self-hosted, internally funded");
-        }
-
-        @Test
-        void unpricedModeRejectsRates() {
-            UpdateLlmModelPriceRequestDTO request = new UpdateLlmModelPriceRequestDTO(
-                PricingMode.UNPRICED,
-                new BigDecimal("1.00"),
-                null,
-                null,
-                null,
-                null,
-                null
-            );
-
-            assertThatThrownBy(() -> modelService.updatePrice(7L, request)).isInstanceOf(
-                IllegalArgumentException.class
-            );
-            verify(priceRepository, never()).save(any());
         }
 
         @Test
@@ -463,19 +422,9 @@ class LlmModelServiceTest extends BaseUnitTest {
             verify(modelRepository, never()).saveAndFlush(any());
         }
 
-        @Test
-        void createRejectsADuplicateUpstreamIdOnTheSameConnection() {
-            LlmConnection connection = new LlmConnection();
-            connection.setId(3L);
-            when(connectionRepository.findById(3L)).thenReturn(Optional.of(connection));
-            when(modelRepository.findByConnectionIdAndSlug(3L, "gpt-5-eu")).thenReturn(Optional.empty());
-            when(modelRepository.existsByConnectionIdAndUpstreamModelId(3L, "gpt-5")).thenReturn(true);
-
-            assertThatThrownBy(() -> modelService.create(3L, createRequest("gpt-5"))).isInstanceOf(
-                LlmModelUpstreamIdConflictException.class
-            );
-            verify(modelRepository, never()).saveAndFlush(any());
-        }
+        // The rejection half of this guard — a second model reusing an upstream id already taken on the
+        // connection — is asserted end to end, together with the 409 ProblemDetail it must produce, by
+        // LlmModelAdminControllerIntegrationTest#aDuplicateUpstreamModelIdOnTheSameConnectionIs409WithAProblemDetail.
 
         @Test
         void createSucceedsWhenTheUpstreamIdIsUniqueOnTheConnection() {
@@ -500,6 +449,38 @@ class LlmModelServiceTest extends BaseUnitTest {
 
             assertThat(result.getUpstreamModelId()).isEqualTo("gpt-5");
             verify(modelRepository, never()).existsByConnectionIdAndUpstreamModelIdAndIdNot(any(), any(), any());
+            // An edit to a model every workspace can bind has to leave a trail naming which model on
+            // which connection changed — a CREATED row here, or a row naming a different model, reads
+            // as a complete audit trail while pointing at the wrong provider.
+            verify(llmModelAudit).modelUpdated(7L, 3L, "gpt-5");
+            verify(llmModelAudit, never()).modelCreated(any(), any(), any());
+        }
+
+        /**
+         * A model is created switched off, always. Activation requires a price, and the price is set on
+         * a separate call that needs the model's id — so a model that arrived live could only ever be a
+         * live model with no price, which admission then refuses with nothing on screen to explain it.
+         */
+        @Test
+        void refusesToCreateAModelThatIsAlreadyActive() {
+            CreateLlmModelRequestDTO active = new CreateLlmModelRequestDTO(
+                "gpt-5-eu",
+                "GPT-5 EU",
+                "gpt-5",
+                null,
+                null,
+                null,
+                true
+            );
+
+            assertThatThrownBy(() -> modelService.create(3L, active))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Create the model disabled, set its price, then activate it.");
+
+            // Refused before anything is looked up, let alone written or audited.
+            verify(connectionRepository, never()).findById(any());
+            verify(modelRepository, never()).saveAndFlush(any());
+            verifyNoInteractions(llmModelAudit);
         }
 
         /**

@@ -68,9 +68,9 @@ export const DeleteConfirm: Story = {
 /**
  * The delete confirmation at the WCAG 2.2 SC 1.4.10 reflow width (320 CSS px).
  *
- * `AlertDialogContent`'s `max-w-xs` is 20rem — exactly a 320 px viewport — and it had no
- * `calc(100% - 2rem)` clamp of its own, so the popup ran edge to edge here and past the edge as
- * soon as the root font size was bumped. It now keeps a 1rem gutter at any width.
+ * `AlertDialogContent`'s `max-w-xs` is 20rem — exactly a 320 px viewport — so a width bound alone
+ * would let the popup run edge to edge here, and past the edge as soon as the root font size grew.
+ * A `calc(100% - 2rem)` clamp is what keeps a 1rem gutter at any width.
  */
 export const DeleteConfirmMobileReflow: Story = {
 	parameters: {
@@ -92,17 +92,18 @@ export const DeleteConfirmMobileReflow: Story = {
 };
 
 /**
- * The same confirmation with a long, wrapping display name, still at 320 px.
+ * The same confirmation with a display name long enough to outgrow the screen, still at 320 px.
  *
  * `AlertDialogContent` has no `DialogBody` equivalent — the whole popup is the scroller — so its
- * `max-h-[calc(100svh-2rem)]` is the only thing standing between tall content and a `position:
- * fixed` popup that hangs off both edges with its buttons out of reach. No confirm in the product
- * is tall enough to overflow a 568 px viewport, which is exactly why nothing measured the bound; so
- * this pins the bound itself rather than waiting for content that would trip it.
+ * height bound is the only thing standing between tall content and a `position: fixed` popup that
+ * hangs off both edges with its buttons out of reach. No model name in the product is anywhere near
+ * this long; the fixture is deliberately absurd so the bound is exercised as behaviour (does the
+ * popup stay on screen, does it scroll, is Delete still reachable) rather than read back off the
+ * emitted CSS, which would pass just as well over a popup nobody could use.
  */
 export const DeleteConfirmLongNameReflow: Story = {
 	args: {
-		models: [{ ...mockModels[0], displayName: `GPT-5 ${"extremely-long-model-name ".repeat(4)}` }],
+		models: [{ ...mockModels[0], displayName: `GPT-5 ${"extremely-long-model-name ".repeat(40)}` }],
 	},
 	parameters: {
 		viewport: { defaultViewport: "reflow" },
@@ -113,14 +114,13 @@ export const DeleteConfirmLongNameReflow: Story = {
 		await userEvent.click(canvas.getByRole("button", { name: /^delete gpt-5 /i }));
 		const popup = await screen.findByRole("alertdialog");
 
+		// It stays inside the viewport…
 		await expectDialogFitsViewport();
-
-		// A height bound at most the viewport less its 1rem gutters, and an overflow that scrolls
-		// rather than clips. Drop either and a confirm taller than the screen becomes unreachable.
-		const style = getComputedStyle(popup);
-		await expect(style.maxHeight).not.toBe("none");
-		await expect(Number.parseFloat(style.maxHeight)).toBeLessThanOrEqual(window.innerHeight - 32);
-		await expect(style.overflowY).toBe("auto");
+		// …because it is bounded, not because the content happened to fit: this title does not.
+		await expect(popup.scrollHeight).toBeGreaterThan(popup.clientHeight);
+		// …and the overflow scrolls rather than clips, so the footer can be reached at all.
+		popup.scrollTop = popup.scrollHeight;
+		await expect(popup.scrollTop).toBeGreaterThan(0);
 
 		await expectControlOnScreen(screen.getByRole("button", { name: /^delete$/i }));
 	},

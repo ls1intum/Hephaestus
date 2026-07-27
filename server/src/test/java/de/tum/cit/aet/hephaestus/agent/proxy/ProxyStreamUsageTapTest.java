@@ -12,11 +12,11 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * What a streamed call contributes to billing, read off the bytes as they pass.
  *
- * <p>The behaviour under test is the whole of half M2: before this tap existed the proxy returned the
- * moment it saw an SSE body, so every streamed call recorded nothing at all. Each test below names the
- * one-token mutation it kills, because "we now look at the stream" is only worth having if it survives
- * the ways a real stream is shaped — usage in the last frame, frames split across TCP-sized buffers,
- * and streams that stop early.
+ * <p>A streamed response reports its usage totals inside the SSE body rather than in a header, so a
+ * streamed call is billed only if something reads the bytes on their way through. Each test below names
+ * the one-token mutation it kills, because reading the stream is only worth having if it survives the
+ * ways a real stream is shaped — usage in the last frame, frames split across TCP-sized buffers, and
+ * streams that stop early.
  */
 class ProxyStreamUsageTapTest extends BaseUnitTest {
 

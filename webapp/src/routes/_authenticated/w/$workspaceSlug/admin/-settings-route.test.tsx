@@ -93,9 +93,15 @@ async function renderSettingsRoute() {
 describe("workspace settings route", () => {
 	/**
 	 * A reset re-derives every standing on the server, so the leaderboard and the league stats beside
-	 * it are stale the moment it returns. The route used to invalidate a hand-typed `["workspace"]`,
-	 * which is not the shape the generated helpers produce and therefore matched no query at all —
-	 * the button did its work on the server and the screen kept showing the old table.
+	 * it are stale the moment it returns. Invalidating a hand-typed `["workspace"]` is not the shape
+	 * the generated helpers produce and matches no query at all: the button does its work on the
+	 * server and the screen keeps showing the old table.
+	 *
+	 * A cache-contract assertion, deliberately. The honest form — count the requests the refetch makes
+	 * — is not available here: neither the leaderboard nor the league-stats surface is mounted on the
+	 * settings route, so an invalidation correctly fires no request at all. What can be checked is
+	 * that the two keys the mounted surfaces hold are the two keys this route marks stale, which is
+	 * exactly what the hand-typed key got wrong.
 	 */
 	it("marks the leaderboard and league stats stale after a reset", async () => {
 		const { queryClient, resetCalls } = await renderSettingsRoute();

@@ -138,50 +138,54 @@ describe("AdminLlmUsagePage", () => {
 		 * Whose money it is decides who is asked to act: the workspace can lift its own cap and price
 		 * its own models, but a shared-model budget is the host's to raise and the host's to price.
 		 */
-		it.each<[string, Partial<WorkspaceLlmUsageReport>, string, string, string | undefined]>([
+		it.each<[string, Partial<WorkspaceLlmUsageReport>, string, string, string | null]>([
 			[
 				"a reached provider cap",
-				{ ownProviderBudgetVerdict: "EXHAUSTED", ownProviderTotalCostUsd: 10 },
+				{
+					ownProviderPaused: true,
+					ownProviderBudgetVerdict: "EXHAUSTED",
+					ownProviderTotalCostUsd: 10,
+				},
 				"Your provider cap is reached",
 				"Paused until August 1 (UTC), or until you raise or remove the cap.",
-				undefined,
+				// Their own cap, and this page owns the editor — the banner offers the lever itself
+				// rather than sending them somewhere.
+				null,
 			],
 			[
 				"an unenforceable provider cap",
-				{ ownProviderBudgetVerdict: "UNVERIFIABLE" },
+				{ ownProviderPaused: true, ownProviderBudgetVerdict: "UNVERIFIABLE" },
 				"Your provider cap can't be enforced",
 				"2 runs on your models have no price, so the cap can't be checked and your provider is paused. Add a price to resume, or remove the cap.",
 				"/w/acme/admin/models",
 			],
 			[
 				"an exhausted shared budget",
-				{ instanceBudgetVerdict: "EXHAUSTED", instanceTotalCostUsd: 25 },
+				{ instancePaused: true, instanceBudgetVerdict: "EXHAUSTED", instanceTotalCostUsd: 25 },
 				"Shared-model budget reached",
 				"Paused until August 1 (UTC), or until your host raises the budget. Practice detection and Mentor can keep running on your own models.",
 				"/w/acme/admin/models",
 			],
 			[
 				"an unverifiable shared budget",
-				{ instanceBudgetVerdict: "UNVERIFIABLE" },
+				{ instancePaused: true, instanceBudgetVerdict: "UNVERIFIABLE" },
 				"Shared-model spend can't be verified",
 				"2 shared-model runs have no price, so the budget can't be checked and shared models are paused. Only your host can price them.",
-				undefined,
+				// Only the host can price a shared model, so there is nothing here to link them to.
+				null,
 			],
 		])("explains %s and who can clear it", async (_name, patch, title, body, href) => {
-			const paused =
-				patch.instanceBudgetVerdict != null
-					? { instancePaused: true }
-					: { ownProviderPaused: true };
-			await renderPage({ ...baseReport, ...paused, ...patch });
+			await renderPage({ ...baseReport, ...patch });
 
 			const banner = screen.getByText(title).closest("[role='alert']") as HTMLElement;
 			expect(banner).toBeTruthy();
 			expect(within(banner).getByText(body)).toBeTruthy();
-			if (href != null) {
-				expect(
-					within(banner).getByRole("link", { name: "Open AI models" }).getAttribute("href"),
-				).toBe(href);
-			}
+			// Stated for every row, absence included: a link offered where the reader can do nothing
+			// with it is as wrong as a missing one, and only asserting the positives hides that.
+			expect(
+				within(banner).queryByRole("link", { name: "Open AI models" })?.getAttribute("href") ??
+					null,
+			).toBe(href);
 		});
 
 		it("puts the cap editor inside the banner about the cap that stopped the work", async () => {
@@ -210,19 +214,9 @@ describe("AdminLlmUsagePage", () => {
 			expect(adjust.tagName).toBe("BUTTON");
 		});
 
-		it("puts the cap they can act on first when both are paused", async () => {
-			await renderPage({
-				...baseReport,
-				ownProviderPaused: true,
-				ownProviderBudgetVerdict: "EXHAUSTED",
-				instancePaused: true,
-				instanceBudgetVerdict: "EXHAUSTED",
-			});
-
-			const alerts = screen.getAllByRole("alert");
-			expect(alerts[0].textContent).toContain("Your provider cap is reached");
-			expect(alerts[1].textContent).toContain("Shared-model budget reached");
-		});
+		// Which of the two paused banners the reader meets first is a claim about the rendered page,
+		// not about sibling order in the DOM — `flex-col-reverse` satisfies one and fails the other.
+		// It is measured in `AdminLlmUsagePage.stories.tsx` (`BothPaused`), where there is layout.
 
 		it("shows no pause banner for a past month", async () => {
 			await renderPage(
@@ -235,25 +229,28 @@ describe("AdminLlmUsagePage", () => {
 	});
 
 	describe("approaching a cap", () => {
-		/** The warning is a status, not an alert: nothing has happened yet, and nothing is blocked. */
-		it.each<
-			[string, Partial<WorkspaceLlmUsageReport>, Date | undefined, string | null, RegExp | null]
-		>([
+		/**
+		 * The warning is a status, not an alert: nothing has happened yet, and nothing is blocked. Each
+		 * row states the whole region a reader would hear, or `null` for "there is no such region" — so
+		 * the silent cases are asserted as firmly as the loud ones, in one unconditional expectation.
+		 *
+		 * `unpricedEventCount: 0` on every row: that callout is a second `role="status"` on this page
+		 * and has nothing to do with pace.
+		 */
+		it.each<[string, Partial<WorkspaceLlmUsageReport>, Date, string | null]>([
 			[
 				"warns at 80% with the date the pace reaches the cap",
 				{ ownProviderTotalCostUsd: 8.4 },
-				undefined,
-				"You've used 84% of your provider cap",
-				/At this pace you'll hit it around July 12\./,
+				new Date("2026-07-10T12:00:00.000Z"),
+				"You've used 84% of your provider cap$8.40 of $10. At this pace you'll hit it around July 12.",
 			],
 			[
 				"keeps the warning but withholds a projection the month is too young to support",
 				{ ownProviderTotalCostUsd: 8.4 },
 				new Date("2026-07-02T12:00:00.000Z"),
-				"You've used 84% of your provider cap",
-				null,
+				"You've used 84% of your provider cap$8.40 of $10.",
 			],
-			["stays quiet below the threshold", {}, undefined, null, null],
+			["stays quiet below the threshold", {}, new Date("2026-07-10T12:00:00.000Z"), null],
 			[
 				"says nothing about a cap that is already paused, which the banner covers",
 				{
@@ -261,23 +258,13 @@ describe("AdminLlmUsagePage", () => {
 					ownProviderPaused: true,
 					ownProviderBudgetVerdict: "EXHAUSTED",
 				},
-				undefined,
-				null,
+				new Date("2026-07-10T12:00:00.000Z"),
 				null,
 			],
-		])("%s", async (_name, patch, now, warning, projection) => {
-			await renderPage({ ...baseReport, ...patch }, now != null ? { now } : {});
+		])("%s", async (_name, patch, now, pace) => {
+			await renderPage({ ...baseReport, unpricedEventCount: 0, ...patch }, { now });
 
-			if (warning == null) {
-				expect(screen.queryByText(/You've used/)).toBeNull();
-			} else {
-				expect(screen.getByText(warning).closest("[role='status']")).toBeTruthy();
-			}
-			if (projection == null) {
-				expect(screen.queryByText(/At this pace/)).toBeNull();
-			} else {
-				expect(screen.getByText(projection)).toBeTruthy();
-			}
+			expect(screen.queryByRole("status")?.textContent ?? null).toBe(pace);
 		});
 	});
 
@@ -377,18 +364,15 @@ describe("AdminLlmUsagePage", () => {
 			}
 			const table = screen.getByRole("table", { name: "AI spend by day" });
 			expect(within(table).getByRole("row", { name: /^Total/ }).textContent).toContain(footerText);
-			expect(
-				screen.getByText(
-					/EUR amounts are estimates at the European Central Bank reference rate published on Jul 24, 2026/,
-				),
-			).toBeTruthy();
+			// Presence, not wording: the sentence itself is `fx.test.tsx`'s to state in full.
+			expect(screen.getByText(/reference rate published on/)).toBeTruthy();
 		});
 
 		it("stays silent under a cap that is set but converted nowhere on the page", async () => {
 			// The first days of a month: a provider cap exists, and no spend has reached the whole unit
-			// the estimates round to, so nothing on screen is in euros. A conversion computed for the
-			// cap and rendered nowhere used to count towards the caption, putting "EUR amounts are
-			// estimates…" under a page with no estimates on it.
+			// the estimates round to, so nothing on screen is in euros. The caption follows what is
+			// *rendered*, not what could be computed — a conversion prepared for the cap and shown
+			// nowhere must not put "EUR amounts are estimates…" under a page with no estimates on it.
 			await renderPage({
 				...baseReport,
 				instanceMonthlyBudgetUsd: undefined,

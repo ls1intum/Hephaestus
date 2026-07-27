@@ -249,7 +249,13 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
         assertThat(currentChannel(C1).getConsentState()).isEqualTo(ConsentState.ACTIVE);
         Instant announcedAt = currentChannel(C1).getConsentAnnouncedAt();
         assertThat(announcedAt).isNotNull();
-        verify(slackMessageService).sendForWorkspace(eq(workspaceId), eq(C1), any(), any());
+        // The announcement text IS the consent: activating a channel silently, or posting some other
+        // notice, would start ingesting members' messages without telling them.
+        var fallbackText = ArgumentCaptor.forClass(String.class);
+        verify(slackMessageService).sendForWorkspace(eq(workspaceId), eq(C1), any(), fallbackText.capture());
+        assertThat(fallbackText.getValue())
+            .contains("Hephaestus is now active in this channel")
+            .contains("does not read earlier history");
         assertThat(auditToStates(C1)).containsExactly(ConsentState.ACTIVE);
 
         // Hop 3 — forward-only ingest: ts strictly after the announcement is stored, ts before it is not.

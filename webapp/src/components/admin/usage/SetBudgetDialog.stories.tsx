@@ -59,26 +59,19 @@ export const Pending: Story = {
 };
 
 /**
- * Each amount the form must refuse, and the reason it gives — separate stories because each is a
- * different thing on screen. The dialog is portalled, so {@link expectAmountRejected} queries the
- * document rather than the story canvas.
+ * One illustration, not three: every amount rule lives on `BudgetAmountDialog`, which this wrapper
+ * supplies nothing but copy to. What is worth proving *here* is that the copy arrives — that the
+ * rejection is raised against a field labelled "Monthly budget" and a button reading "Save budget",
+ * not against this component's own defaults. The dialog is portalled, so
+ * {@link expectAmountRejected} queries the document rather than the story canvas.
  */
-const rejects =
-	(typed: string, reason: RegExp): Story["play"] =>
-	async ({ args }) =>
+export const InvalidEmptyValue: Story = {
+	play: async ({ args }) =>
 		await expectAmountRejected({
 			fieldLabel: /monthly budget/i,
 			submitLabel: /save budget/i,
-			typed,
-			reason,
+			typed: "",
+			reason: /enter an amount/i,
 			onSubmit: args.onSubmit,
-		});
-
-/** Submitting a cleared field surfaces *why* it was rejected instead of silently doing nothing. */
-export const InvalidEmptyValue: Story = { play: rejects("", /enter an amount/i) };
-
-/** Sub-cent precision is rejected in the field rather than by a native browser bubble. */
-export const InvalidSubCentValue: Story = { play: rejects("25.005", /two decimal places/i) };
-
-/** A negative amount is rejected with its own reason, and nothing is submitted. */
-export const InvalidNegativeValue: Story = { play: rejects("-5", /\$0 or more/i) };
+		}),
+};

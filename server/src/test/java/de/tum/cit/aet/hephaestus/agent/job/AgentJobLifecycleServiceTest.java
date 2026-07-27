@@ -167,8 +167,12 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
                 .thenReturn(Optional.of(job))
                 .thenReturn(Optional.of(cancelledJob));
 
-            service.cancel(1L, jobId);
+            AgentJob result = service.cancel(1L, jobId);
 
+            // Both halves of the name: the row really transitions, AND the running container is told.
+            // Stopping the sandbox without persisting CANCELLED would leave a job the UI still calls
+            // running with nothing behind it.
+            assertThat(result.getStatus()).isEqualTo(AgentJobStatus.CANCELLED);
             verify(sandboxManager).cancel(jobId);
         }
 

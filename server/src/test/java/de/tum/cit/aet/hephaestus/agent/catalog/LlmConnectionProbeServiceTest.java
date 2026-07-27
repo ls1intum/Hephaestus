@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.catalog;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -25,6 +26,7 @@ class LlmConnectionProbeServiceTest extends BaseUnitTest {
 
     private MockWebServer upstream;
     private LlmConnectionRepository connectionRepository;
+    private EgressPolicy egressPolicy;
     private LlmConnectionProbeService service;
 
     @BeforeEach
@@ -32,9 +34,10 @@ class LlmConnectionProbeServiceTest extends BaseUnitTest {
         upstream = new MockWebServer();
         upstream.start();
         connectionRepository = mock(LlmConnectionRepository.class);
+        egressPolicy = mock(EgressPolicy.class);
         service = new LlmConnectionProbeService(
             connectionRepository,
-            mock(EgressPolicy.class),
+            egressPolicy,
             new ObjectMapper(),
             // Loopback allowed: the probe target is a MockWebServer on localhost.
             new LlmProperties("", new LlmProperties.Egress(true), new LlmProperties.Fx(LlmProperties.ECB_DAILY_URL))
@@ -104,6 +107,42 @@ class LlmConnectionProbeServiceTest extends BaseUnitTest {
         when(connectionRepository.findProbeTargetById(9L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.probeStored(9L)).isInstanceOf(EntityNotFoundException.class);
+    }
+
+    /**
+     * Both probe entry points dial a URL on the admin's behalf, so both are SSRF surfaces and both must
+     * clear the egress guard BEFORE the socket is opened. {@code probeDraft} is the sharper of the two:
+     * its URL is whatever the admin just typed into the form and was never stored, so nothing else in
+     * the system has ever looked at it.
+     *
+     * <p>Asserted on the upstream's request count rather than on the mock: "the guard was consulted" is
+     * not the invariant — "no packet left the process" is.
+     */
+    @Test
+    void aDraftProbeRefusesAForbiddenUrlWithoutDiallingIt() {
+        doThrow(new IllegalArgumentException("Provider host must be a public HTTPS URL"))
+            .when(egressPolicy)
+            .validate(any());
+
+        assertThatThrownBy(() -> service.probeDraft(request()))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("public HTTPS URL");
+        assertThat(upstream.getRequestCount()).as("the forbidden host must never be contacted").isZero();
+    }
+
+    @Test
+    void aStoredProbeRefusesAForbiddenUrlWithoutDiallingIt() {
+        // A connection stored before the allowlist tightened is re-checked on every probe, not trusted
+        // because it once passed.
+        when(connectionRepository.findProbeTargetById(5L)).thenReturn(
+            Optional.of(new LlmProbeTarget(upstream.url("/v1").toString(), LlmAuthMode.BEARER, "sk-abc"))
+        );
+        doThrow(new IllegalArgumentException("Provider host must be a public HTTPS URL"))
+            .when(egressPolicy)
+            .validate(any());
+
+        assertThatThrownBy(() -> service.probeStored(5L)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(upstream.getRequestCount()).isZero();
     }
 
     private ProbeLlmConnectionRequestDTO request() {

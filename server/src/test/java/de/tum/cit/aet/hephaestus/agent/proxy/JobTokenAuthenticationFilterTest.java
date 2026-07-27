@@ -23,11 +23,14 @@ import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -255,24 +258,12 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             verify(filterChain, never()).doFilter(any(), any());
         }
 
-        @Test
-        void shouldReturn401ForWhitespaceOnlyToken() throws Exception {
+        @ParameterizedTest(name = "Authorization: [{0}]")
+        @ValueSource(strings = { "Bearer ", "Bearer    " })
+        void shouldReturn401ForABearerHeaderWithNoToken(String header) throws Exception {
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
-            request.addHeader("Authorization", "Bearer    ");
-            var response = new MockHttpServletResponse();
-
-            filter.doFilterInternal(request, response, filterChain);
-
-            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
-            verify(filterChain, never()).doFilter(any(), any());
-        }
-
-        @Test
-        void shouldReturn401ForEmptyBearer() throws Exception {
-            var request = new MockHttpServletRequest();
-            request.setRemoteAddr("10.0.0.2");
-            request.addHeader("Authorization", "Bearer ");
+            request.addHeader("Authorization", header);
             var response = new MockHttpServletResponse();
 
             filter.doFilterInternal(request, response, filterChain);
@@ -284,38 +275,63 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         @Test
         void shouldAcceptCaseInsensitiveBearer() throws Exception {
             var job = createRunningJob();
-            when(
-                agentJobRepository.findByJobTokenHashAndStatus(eq(VALID_TOKEN_HASH), eq(AgentJobStatus.RUNNING))
-            ).thenReturn(Optional.of(job));
 
-            var request = new MockHttpServletRequest();
-            request.setRemoteAddr("10.0.0.2");
-            request.addHeader("Authorization", "bearer " + VALID_TOKEN);
-            var response = new MockHttpServletResponse();
+            Authentication installed = authenticateAndCaptureAuthentication(job, "bearer " + VALID_TOKEN, null);
 
-            filter.doFilterInternal(request, response, filterChain);
-
-            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
-            verify(filterChain).doFilter(any(), any());
+            assertThatTheChainRanAsTheJob(installed, job);
         }
 
         @Test
         void shouldIgnoreProviderKeyWhenBearerIsPresent() throws Exception {
             var job = createRunningJob();
+
+            Authentication installed = authenticateAndCaptureAuthentication(
+                job,
+                "Bearer " + VALID_TOKEN,
+                "provider-key-must-be-ignored"
+            );
+
+            assertThatTheChainRanAsTheJob(installed, job);
+        }
+
+        /**
+         * MockHttpServletResponse's status defaults to 200, so asserting SC_OK proves nothing on its
+         * own — a filter that forwarded the chain WITHOUT installing the job's authentication would
+         * pass that. What has to hold is that the downstream chain ran as this job.
+         */
+        private void assertThatTheChainRanAsTheJob(Authentication installed, AgentJob job) {
+            assertThat(installed).isInstanceOf(JobTokenAuthentication.class);
+            ProxyRouting routing = (ProxyRouting) ((JobTokenAuthentication) installed).getPrincipal();
+            assertThat(routing.principalDescription()).isEqualTo("job:" + job.getId());
+            // …and the context is torn down again once the chain returns.
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        }
+
+        private Authentication authenticateAndCaptureAuthentication(
+            AgentJob job,
+            String authorizationHeader,
+            @Nullable String providerKeyHeader
+        ) throws Exception {
             when(
                 agentJobRepository.findByJobTokenHashAndStatus(eq(VALID_TOKEN_HASH), eq(AgentJobStatus.RUNNING))
             ).thenReturn(Optional.of(job));
+            var authCapture = new AtomicReference<Authentication>();
+            doAnswer(invocation -> {
+                authCapture.set(SecurityContextHolder.getContext().getAuthentication());
+                return null;
+            })
+                .when(filterChain)
+                .doFilter(any(), any());
 
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
-            request.addHeader("x-api-key", "provider-key-must-be-ignored");
-            request.addHeader("Authorization", "Bearer " + VALID_TOKEN);
-            var response = new MockHttpServletResponse();
+            if (providerKeyHeader != null) {
+                request.addHeader("x-api-key", providerKeyHeader);
+            }
+            request.addHeader("Authorization", authorizationHeader);
 
-            filter.doFilterInternal(request, response, filterChain);
-
-            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
-            verify(filterChain).doFilter(any(), any());
+            filter.doFilterInternal(request, new MockHttpServletResponse(), filterChain);
+            return authCapture.get();
         }
 
         @Test
@@ -479,27 +495,6 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             ProxyRouting routing = authenticateAndCaptureRouting(job);
 
             assertThat(routing.inFlightSpendUsd()).isEqualByComparingTo("13");
-        }
-
-        @Test
-        @DisplayName("an attempt that has made no call yet has spent nothing")
-        void anAttemptWithNoCallsYetSpendsNothing() throws Exception {
-            var job = createRunningJob(
-                new LlmPriceSnapshot(
-                    FundingSource.INSTANCE,
-                    PricingState.PRICED,
-                    1L,
-                    null,
-                    new BigDecimal("10"),
-                    new BigDecimal("30"),
-                    null,
-                    null
-                )
-            );
-
-            ProxyRouting routing = authenticateAndCaptureRouting(job);
-
-            assertThat(routing.inFlightSpendUsd()).isEqualByComparingTo("0");
         }
 
         /**

@@ -80,6 +80,10 @@ export const ValidationError: Story = {
  * Seven fields, the price editor and the workspace picker — past 1000 px — at the WCAG 2.2
  * SC 1.4.10 reflow width (320 px). Only the body scrolls, so the title stays pinned and "Add model"
  * stays reachable.
+ *
+ * The tallest dialog in the app, which is why the full proof lives here: `DialogBody` is shared, so
+ * whatever bounds this one bounds every shorter dialog too. The other four only check they fit the
+ * viewport — the assertion that would fail first if one of them ever outgrew that shared bound.
  */
 export const MobileReflow: Story = {
 	parameters: {

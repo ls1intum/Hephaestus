@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { userEvent } from "storybook/test";
 import { describe, expect, it, vi } from "vitest";
 import type { LlmConnection } from "@/api/types.gen";
+import { expectUnavailable } from "@/test/controls";
 import { AdminLlmConnectionsTable } from "./AdminLlmConnectionsTable";
 
 const connection: LlmConnection = {
@@ -84,8 +85,8 @@ describe("AdminLlmConnectionsTable", () => {
 	});
 
 	it("counts one model as one", () => {
-		// Two was the one arity that reads correctly whatever the sentence does with the number, so it
-		// hid this: the same wording renders "all 1 models on this connection".
+		// The sentence special-cases one. Two is the arity that reads correctly however the number is
+		// interpolated, so a fixture of two alone would let "all 1 models on this connection" through.
 		renderTable({ 1: 1 });
 
 		fireEvent.click(screen.getByRole("switch", { name: "Turn off OpenAI production" }));
@@ -106,7 +107,7 @@ describe("AdminLlmConnectionsTable", () => {
 		expect(onToggleEnabled).toHaveBeenCalledWith(connection, false);
 	});
 
-	it("blocks turning off a connection until its affected models are known", () => {
+	it("blocks turning off a connection until its affected models are known", async () => {
 		render(
 			<AdminLlmConnectionsTable
 				connections={[connection]}
@@ -123,11 +124,14 @@ describe("AdminLlmConnectionsTable", () => {
 			/>,
 		);
 
-		expect(
-			screen
-				.getByRole("switch", { name: "Turn off OpenAI production" })
-				.hasAttribute("data-disabled"),
-		).toBe(true);
+		// Announced as unavailable and out of the tab order, not merely greyed (WCAG 2.2 SC 4.1.2)…
+		const toggle = screen.getByRole("switch", { name: "Turn off OpenAI production" });
+		await expectUnavailable(toggle);
 		expect(screen.getByRole("cell", { name: "—" })).toBeTruthy();
+
+		// …and pressing it anyway neither opens the confirm nor turns the connection off behind it.
+		fireEvent.click(toggle);
+		expect(screen.queryByRole("alertdialog")).toBeNull();
+		expect(toggle.getAttribute("aria-checked")).toBe("true");
 	});
 });

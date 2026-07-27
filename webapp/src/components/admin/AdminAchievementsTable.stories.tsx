@@ -1,6 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, within } from "storybook/test";
-import { expectGenuinelyDisabled } from "@/test/controls";
 import { AdminAchievementsTable } from "./AdminAchievementsTable";
 import type { ExtendedUserTeams } from "./types";
 
@@ -57,20 +56,14 @@ export const Recalculating: Story = {
 };
 
 /**
- * Thirty members at ten a page, so the pager is on screen. It is the shared `TablePagination`, whose
- * boundary control is a real `<button disabled>` rather than an anchor dimmed with
- * `pointer-events-none` — a dimmed anchor stays in the tab order and is announced as an available
- * control, which is the WCAG 2.2 SC 4.1.2 failure.
+ * Thirty members at ten a page, so the pager is on screen — the shared `TablePagination`, whose
+ * window, gaps, current-page marking and boundary behaviour are stated once in its own stories
+ * rather than re-checked on every table that mounts it.
  */
 export const ManyMembers: Story = {
 	args: { users: Array.from({ length: 30 }, (_, index) => member(index + 1)) },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expectGenuinelyDisabled(canvas.getByRole("button", { name: "Go to previous page" }));
-		await expect(canvas.getByRole("button", { name: "Go to next page" })).toBeEnabled();
-		await expect(canvas.getByRole("button", { name: "Go to page 1" })).toHaveAttribute(
-			"aria-current",
-			"page",
-		);
+		await expect(canvas.getByRole("navigation", { name: "pagination" })).toBeInTheDocument();
 	},
 };

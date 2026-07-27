@@ -20,13 +20,11 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * What happens to a served call whose 2xx body the proxy cannot read.
  *
- * <p>The tokens are gone either way — there is nothing to parse, so nothing can be billed. The
- * question this pins is whether that is OBSERVABLE. It used to be a {@code log.debug}, which in
- * production means invisible: a gateway that starts wrapping responses would silently stop the ledger
- * from seeing an entire connection's usage, and the first symptom would be a suspiciously cheap month.
- *
- * <p>Its three siblings ({@code ProxyUsageAccumulator}, and both failure paths in
- * {@code MentorTurnUsageAccumulator}) all WARN and count. This is the same contract.
+ * <p>The tokens are gone either way — there is nothing to parse, so nothing can be billed. What this
+ * pins is that the loss is OBSERVABLE: a gateway that starts wrapping responses stops the ledger from
+ * seeing an entire connection's usage, and without a counter the first symptom is a suspiciously cheap
+ * month. Its three siblings ({@code ProxyUsageAccumulator}, and both failure paths in
+ * {@code MentorTurnUsageAccumulator}) WARN and count for the same reason.
  */
 class ProxyAccountingUnparseableUsageTest extends BaseUnitTest {
 
@@ -75,13 +73,26 @@ class ProxyAccountingUnparseableUsageTest extends BaseUnitTest {
             1,
             BigDecimal.ZERO
         );
-        byte[] body = "{\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":5}}".getBytes(StandardCharsets.UTF_8);
+        // Every bucket distinct and non-zero: with cache-read and reasoning left at 0 the assertion
+        // below cannot tell the correct mapping from any permutation of it.
+        byte[] body = (
+            """
+            {"usage":{"prompt_tokens":10,"completion_tokens":5,\
+            "prompt_tokens_details":{"cached_tokens":4},\
+            "completion_tokens_details":{"reasoning_tokens":2}}}\
+            """
+        ).getBytes(StandardCharsets.UTF_8);
 
         accounting.recordUsage(attempt, body, false);
 
         assertThat(meterRegistry.counter("llm.proxy.usage.unparseable", "sourceType", "AGENT_JOB").count())
             .as("the counter must mean 'unbilled', not 'a call happened'")
             .isZero();
-        verify(usageAccumulator).accumulate(any(), any());
+        // The amount billed is the point of "still bills". Component order is
+        // (billableInput, output, reasoning, cacheRead) and the input bucket is the
+        // NON-cached remainder: 10 prompt tokens of which 4 were cache reads bills 6 at the input rate,
+        // not 10, or a cache read is charged at both rates. The intuitive
+        // (in, out, cacheRead, reasoning) reading mis-asserts and passes.
+        verify(usageAccumulator).accumulate(attempt, new ProxyTokenUsage(6, 5, 2, 4));
     }
 }

@@ -3,18 +3,19 @@
 **Status:** Accepted (amended 2026-07-21 — fairness + fencing fix wave)
 **Date:** 2026-07-21
 **Authors:** Felix T.J. Dietrich
-**Builds on:** [ADR 0005](0005-two-role-runtime-via-conditional-on-property.md) (two-role runtime, original agent NATS consumer), [ADR 0006](0006-llm-proxy-on-coordinator-trust-model.md) (LLM proxy job-execution capability gate), [ADR 0013](0013-no-jetstream-dlq-stream.md) (no JetStream DLQ stream)
+**Builds on:** [ADR 0005](0005-two-role-runtime-via-conditional-on-property.md) (two-role runtime, original agent NATS consumer), [ADR 0006](0006-llm-proxy-on-coordinator-trust-model.md) (in-app LLM proxy as the sole credential path), [ADR 0013](0013-no-jetstream-dlq-stream.md) (no JetStream DLQ stream)
 
 > **Amendment (2026-07-21, adversarial review fix wave):** Two gaps in the initial cutover, both
 > fixed without changing the decision above:
 >
 > - **Head-of-line starvation.** The poll candidate query (`findQueuedIdsOldestFirst`) was a plain
 >   `WHERE status='QUEUED' ORDER BY created_at LIMIT n`. If the oldest `n` QUEUED rows all belonged to
->   a config already at its `max_concurrent_jobs` cap, every claim attempt in that batch correctly
->   skipped them — but a younger, immediately-runnable job from a *different* config never even
->   entered the candidate batch, and could starve indefinitely behind an unclaimable backlog. The
->   query now excludes candidates whose config is already at its RUNNING cap (a correlated subquery,
->   supported by a new partial index `ix_agent_job_running_config`); the per-row `FOR UPDATE`
+>   one `(workspace, purpose)` already at its `max_concurrent_jobs` cap, every claim attempt in that
+>   batch correctly skipped them — but a younger, immediately-runnable job for a *different* purpose
+>   or workspace never even entered the candidate batch, and could starve indefinitely behind an
+>   unclaimable backlog. The query now excludes candidates whose `(workspace, purpose)` is already at
+>   the RUNNING cap on its `workspace_agent_binding` row (a correlated subquery, supported by a new
+>   partial index `ix_agent_job_running_purpose`); the per-row `FOR UPDATE`
 >   concurrency recheck inside the claim transaction remains the authoritative gate, so a stale read
 >   in this predicate costs nothing beyond an ordinary skipped candidate.
 > - **Unfenced orphan requeue.** `requeueOrphan` CAS'd on `status='RUNNING'` alone. If a job was
@@ -142,8 +143,8 @@ surfaced concrete gaps, closed here:
 
 - **Retention.** `agent_job` had no pruning — 10k jobs/day is ~3.65M rows/year, each carrying up to
   64KB of `container_logs`. `AgentJobRetentionService` now runs two batched passes (`AGENT_PAYLOAD_RETENTION`,
-  default 14 days: strip `container_logs`/`output` to `NULL`; `AGENT_ROW_RETENTION`, default 90
-  days: delete the row outright), plus autovacuum tuning on `agent_job` and `worker_registry`
+  default `P14D`: strip `container_logs`/`output` to `NULL`; `AGENT_ROW_RETENTION`, default `P90D`:
+  delete the row outright), plus autovacuum tuning on `agent_job` and `worker_registry`
   (`autovacuum_vacuum_scale_factor = 0`, an absolute threshold instead) — Oban's own documented
   recommendation for a high-churn queue table.
 - **Backoff + `available_at`.** A requeued job (orphan recovery, worker drain, or a classified
@@ -155,11 +156,14 @@ surfaced concrete gaps, closed here:
   and what the column actually enforced.
 - **Error classification.** Every execution failure used to become `FAILED` unconditionally,
   including sandbox-infrastructure blips (Docker daemon unreachable, image pull failure) that have
-  nothing to do with the job itself. `AgentJobExecutor#handleExecutionFailure` now classifies
-  provably-infra failures (`SandboxException`, `IOException`) as retryable — requeued with backoff,
-  bounded by the same `retry_count < max-retries` cap every other requeue path uses — while
-  everything else (a non-zero agent exit, a parse/envelope-mismatch failure, an unclassified
-  exception) still fails immediately, exactly as before.
+  nothing to do with the job itself. `AgentJobExecutor#handleExecutionFailure` classifies
+  provably-infra failures as retryable — requeued with backoff, bounded by the same `retry_count <
+  max-retries` cap every other requeue path uses — while everything else (a non-zero agent exit, a
+  parse/envelope-mismatch failure, an unclassified exception) still fails immediately, exactly as
+  before. This pass classified on `SandboxException` and `IOException`; the fix wave below narrowed
+  the first of those to `SandboxInfrastructureException`, which is what the code tests today. Throwing
+  a plain `SandboxException` for a transient Docker blip therefore yields a terminal `FAILED`, by
+  design.
 - **Token rotation on requeue.** `requeueOrphan` used to leave the job's `job_token` unchanged, so a
   zombie sandbox that was merely network-partitioned (not actually dead) could keep authenticating
   against the LLM proxy once a sibling worker re-claimed the same row — both could spend against
@@ -251,7 +255,9 @@ noted as a documented residual:
   ledger row was written before the retry bought another run — N retries of one job could
   under-count spend by up to N-1 runs. `handleExecutionFailure`'s successful-requeue branch now
   records an UNPRICED ledger row unconditionally before returning, mirroring the pattern already used
-  for cancellation and drain (the ledger's unique `source_id` makes a spurious duplicate safe).
+  for cancellation and drain. The ledger's `UNIQUE (source_type, source_id, source_attempt)` makes a
+  spurious duplicate safe; `source_id` alone is deliberately not unique, because a second attempt at
+  the same job is separately billable.
 - **Token rotation vs. in-flight proxy streams — residual window, documented rather than closed.**
   `requeueOrphan`'s token rotation already prevents a NEW proxy request from authenticating with the
   old token (the row's `job_token_hash` no longer matches once rotated, and the CAS also moves the
@@ -265,13 +271,16 @@ noted as a documented residual:
   design, not a quick fence). Chosen: document the window rather than build a partial fence; a
   worker-drain or infra-retry requeue during an active LLM call can still incur one extra concurrent
   call's cost until that call naturally completes or times out (`responseTimeout=300s`).
-- **Migration locks on the hot queue table.** The four `#1368` hardening indexes
-  (`ix_agent_job_running_config`, `ix_agent_job_queued_available`, `ix_agent_job_delivery_pending`,
+- **Migration locks on the hot queue table.** The four hardening indexes
+  (`ix_agent_job_running_purpose`, `ix_agent_job_queued_available`, `ix_agent_job_delivery_pending`,
   `ix_agent_job_retention`) are created with `CREATE INDEX CONCURRENTLY` (each in its own
   `runInTransaction="false"` changeset — required, since `CONCURRENTLY` cannot run inside a
-  transaction block). The status CHECK is added `NOT VALID` and validated separately (`VALIDATE
-  CONSTRAINT` takes `SHARE UPDATE EXCLUSIVE`, which blocks other schema changes but not ordinary
-  reads/writes).
+  transaction block). Each of those four changesets guards on `pg_index.indisvalid` rather than on the
+  index merely existing, and drops before it creates: a `CONCURRENTLY` build that fails partway leaves
+  an index the planner will never use, and an existence-only guard would record the changeset as
+  applied and leave the queue permanently unindexed. The status CHECK is added `NOT VALID` and
+  validated separately (`VALIDATE CONSTRAINT` takes `SHARE UPDATE EXCLUSIVE`, which blocks other
+  schema changes but not ordinary reads/writes).
 - **Retention runs on every replica, unbounded.** `AgentJobRetentionService#runRetention` now carries
   `@SchedulerLock` (ShedLock, already used elsewhere in this codebase for retention/cleanup jobs —
   see `ConfigAuditRetentionJob`), single-flighting the sweep across server-role replicas, and each

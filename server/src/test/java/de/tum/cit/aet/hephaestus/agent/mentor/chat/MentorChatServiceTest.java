@@ -78,6 +78,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -454,7 +455,9 @@ class MentorChatServiceTest extends BaseUnitTest {
         Workspace boundWs = new Workspace();
         when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(boundWs));
         WorkspaceAgentBinding boundBinding = new WorkspaceAgentBinding();
-        boundBinding.setId(99L);
+        // Deliberately NOT the id the default setUp binding carries: only an assertion on the
+        // identity can tell "the workspace-scoped finder's binding was used" from "some binding was".
+        boundBinding.setId(4242L);
         boundBinding.setPurpose(AgentPurpose.MENTOR);
         boundBinding.setEnabled(true);
         boundBinding.setTimeoutSeconds(600);
@@ -465,7 +468,9 @@ class MentorChatServiceTest extends BaseUnitTest {
         scheduleHappyPathResponses(sandbox).run();
         runTurnSync();
 
-        verify(agentBindingRepository).findByWorkspaceIdAndPurpose(WORKSPACE_ID, AgentPurpose.MENTOR);
+        var admitted = ArgumentCaptor.forClass(WorkspaceAgentBinding.class);
+        verify(llmAdmissionService).admit(admitted.capture());
+        assertThat(admitted.getValue().getId()).isEqualTo(4242L);
     }
 
     // 1c. A bound-but-disabled mentor config fails closed. Silently choosing another config could

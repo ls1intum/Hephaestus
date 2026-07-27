@@ -165,11 +165,8 @@ export const DisplayCurrencyThisMonth: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(
-			canvas.getByText(
-				/EUR amounts are estimates at the European Central Bank reference rate published on Jul 24, 2026/,
-			),
-		).toBeVisible();
+		// Presence, not wording: `fx.test.tsx` owns the sentence, this owns "the page shows it".
+		await expect(canvas.getByText(/reference rate published on/)).toBeVisible();
 		// Symbols would be announced as "tilde operator" or dropped — every estimate says words.
 		await expect(canvas.getAllByLabelText(/^approximately /).length).toBeGreaterThan(0);
 	},
@@ -177,7 +174,8 @@ export const DisplayCurrencyThisMonth: Story = {
 
 /**
  * A closed month. Its rate is the last one published inside that month, so the figures are frozen
- * — the caption says so instead of quoting a live rate that would drift under a past total.
+ * — the caption says so instead of quoting a live rate that would drift under a past total. The
+ * frozen wording itself is asserted on `FxDisclosure` in `fx.test.tsx`; this is the picture of it.
  */
 export const DisplayCurrencyClosedMonth: Story = {
 	args: {
@@ -194,12 +192,6 @@ export const DisplayCurrencyClosedMonth: Story = {
 				source: "ECB",
 			},
 		},
-	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(
-			canvas.getByText(/last rate published in the month shown, so these figures no longer change/),
-		).toBeVisible();
 	},
 };
 
@@ -299,7 +291,13 @@ export const SharedBudgetUnverifiable: Story = {
 	},
 };
 
-/** Both caps spent: the actionable one leads. */
+/**
+ * Both caps spent: the actionable one leads.
+ *
+ * "Leads" is about where the two banners land on the page, so it is measured here rather than by
+ * sibling order in a jsdom test — `flex-col-reverse` would satisfy that and still put the banner
+ * they can act on underneath the one they cannot.
+ */
 export const BothPaused: Story = {
 	args: {
 		report: {
@@ -311,6 +309,11 @@ export const BothPaused: Story = {
 			ownProviderBudgetVerdict: "EXHAUSTED",
 			ownProviderPaused: true,
 		},
+	},
+	play: async ({ canvas }) => {
+		const own = await canvas.findByText("Your provider cap is reached");
+		const shared = canvas.getByText("Shared-model budget reached");
+		await expect(own.getBoundingClientRect().top).toBeLessThan(shared.getBoundingClientRect().top);
 	},
 };
 
@@ -396,7 +399,7 @@ export const CallsWithNoPriceSet: Story = {
 	},
 };
 
-/** A single call with no price set — the callout reads "1 call", not "1 calls". */
+/** A single run with no price set — the callout reads "1 run", not "1 runs". */
 export const SingleCallWithNoPriceSet: Story = {
 	args: {
 		report: { ...withOwnProvider, unpricedEventCount: 1 },

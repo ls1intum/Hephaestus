@@ -9,4 +9,5 @@ sidebar tells you which console you are in. In a workspace, "Manage members" / "
 **Settings**, and "Usage" is **AI usage**. Every admin page also sets a browser tab title, so an
 instance tab and a workspace tab are finally distinguishable when both are open.
 
-The instance model catalogue moved from `/admin/llm` to `/admin/models`, matching the workspace page.
+The instance console's new model catalogue sits at `/admin/models`, the same address the workspace
+page has always used.

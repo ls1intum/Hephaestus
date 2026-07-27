@@ -1,84 +1,103 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, within } from "storybook/test";
 import type { AdminWorkspaceLlmUsage, WorkspaceLlmUsageReport } from "@/api/types.gen";
-import { expectTargetSize } from "@/test/reflow";
+import { expectTargetSize, horizontalScrollParentOf } from "@/test/reflow";
 import { AdminInstanceLlmUsageTable } from "./AdminInstanceLlmUsageTable";
 
 /**
- * Mixed cap ownership, in the container's sort order (shared-model spend desc): both caps set,
- * provider cap only, shared-model budget only, and neither.
+ * Both caps set; the shared-model budget is spent, so host-funded work is paused — the workspace's
+ * own provider keeps running, because that cap is nowhere near.
+ */
+const pausedOnSharedBudget: AdminWorkspaceLlmUsage = {
+	workspaceSlug: "example-workspace",
+	displayName: "Example Workspace",
+	instanceMonthlyBudgetUsd: 25,
+	instanceTotalCostUsd: 25.0142,
+	instanceBudgetVerdict: "EXHAUSTED",
+	instancePaused: true,
+	ownProviderMonthlyBudgetUsd: 40,
+	ownProviderTotalCostUsd: 6.5,
+	ownProviderBudgetVerdict: "WITHIN",
+	ownProviderPaused: false,
+	events: 118,
+};
+
+/**
+ * Both caps set; the workspace is closing in on its own cap (86%), which is its own admins' problem
+ * to solve — the instance admin can see it but cannot raise it.
+ */
+const nearingItsOwnProviderCap: AdminWorkspaceLlmUsage = {
+	workspaceSlug: "hephaestus-dev",
+	displayName: "Hephaestus Dev",
+	instanceMonthlyBudgetUsd: 100,
+	instanceTotalCostUsd: 13.4821,
+	instanceBudgetVerdict: "WITHIN",
+	instancePaused: false,
+	ownProviderMonthlyBudgetUsd: 25,
+	ownProviderTotalCostUsd: 21.4,
+	ownProviderBudgetVerdict: "WITHIN",
+	ownProviderPaused: false,
+	events: 74,
+};
+
+/**
+ * Shared-model budget only, three quarters spent, and some usage has no price on record — so the
+ * meter is a floor, which the warning line says out loud.
+ */
+const sharedBudgetOnlyUnverifiable: AdminWorkspaceLlmUsage = {
+	workspaceSlug: "launchpad",
+	displayName: "Launchpad",
+	instanceMonthlyBudgetUsd: 50,
+	instanceTotalCostUsd: 38.2,
+	instanceBudgetVerdict: "UNVERIFIABLE",
+	instancePaused: false,
+	ownProviderTotalCostUsd: 0,
+	events: 22,
+	ownProviderBudgetVerdict: "WITHIN",
+	ownProviderPaused: false,
+};
+
+/** Neither cap — nobody has taken responsibility for this workspace's spend yet. */
+const uncapped: AdminWorkspaceLlmUsage = {
+	workspaceSlug: "sandbox",
+	displayName: "Sandbox",
+	instanceTotalCostUsd: 0.42,
+	instanceBudgetVerdict: "WITHIN",
+	ownProviderTotalCostUsd: 0,
+	events: 3,
+	ownProviderBudgetVerdict: "WITHIN",
+	ownProviderPaused: false,
+	instancePaused: false,
+};
+
+/**
+ * Provider cap only, and spent: this workspace pauses itself without the instance admin ever setting
+ * a cap — the case that decides whether they bother setting one at all.
+ */
+const pausedOnItsOwnProviderCap: AdminWorkspaceLlmUsage = {
+	workspaceSlug: "atelier",
+	displayName: "Atelier",
+	instanceTotalCostUsd: 0,
+	instanceBudgetVerdict: "WITHIN",
+	ownProviderMonthlyBudgetUsd: 12,
+	ownProviderTotalCostUsd: 12.4,
+	ownProviderBudgetVerdict: "EXHAUSTED",
+	ownProviderPaused: true,
+	events: 40,
+	instancePaused: false,
+};
+
+/**
+ * Mixed cap ownership: both caps, both caps again, shared-model budget only, neither, and provider
+ * cap only. The container sorts by shared-model spend descending before it renders; this fixture is
+ * deliberately *not* in that order, so nothing here can quietly come to depend on it.
  */
 const rows: AdminWorkspaceLlmUsage[] = [
-	{
-		// Both caps set; the shared-model budget is spent, so host-funded work is paused — the
-		// workspace's own provider keeps running, because that cap is nowhere near.
-		workspaceSlug: "example-workspace",
-		displayName: "Example Workspace",
-		instanceMonthlyBudgetUsd: 25,
-		instanceTotalCostUsd: 25.0142,
-		instanceBudgetVerdict: "EXHAUSTED",
-		instancePaused: true,
-		ownProviderMonthlyBudgetUsd: 40,
-		ownProviderTotalCostUsd: 6.5,
-		ownProviderBudgetVerdict: "WITHIN",
-		ownProviderPaused: false,
-		events: 118,
-	},
-	{
-		// Both caps set; the workspace is closing in on its own cap (86%), which is its own admins'
-		// problem to solve — the instance admin can see it but cannot raise it.
-		workspaceSlug: "hephaestus-dev",
-		displayName: "Hephaestus Dev",
-		instanceMonthlyBudgetUsd: 100,
-		instanceTotalCostUsd: 13.4821,
-		instanceBudgetVerdict: "WITHIN",
-		instancePaused: false,
-		ownProviderMonthlyBudgetUsd: 25,
-		ownProviderTotalCostUsd: 21.4,
-		ownProviderBudgetVerdict: "WITHIN",
-		ownProviderPaused: false,
-		events: 74,
-	},
-	{
-		// Shared-model budget only, three quarters spent, and some usage has no price on record — so
-		// the meter is a floor, which the warning line says out loud.
-		workspaceSlug: "launchpad",
-		displayName: "Launchpad",
-		instanceMonthlyBudgetUsd: 50,
-		instanceTotalCostUsd: 38.2,
-		instanceBudgetVerdict: "UNVERIFIABLE",
-		instancePaused: false,
-		ownProviderTotalCostUsd: 0,
-		events: 22,
-		ownProviderBudgetVerdict: "WITHIN" as const,
-		ownProviderPaused: false,
-	},
-	{
-		// Neither cap — nobody has taken responsibility for this workspace's spend yet.
-		workspaceSlug: "sandbox",
-		displayName: "Sandbox",
-		instanceTotalCostUsd: 0.42,
-		instanceBudgetVerdict: "WITHIN",
-		ownProviderTotalCostUsd: 0,
-		events: 3,
-		ownProviderBudgetVerdict: "WITHIN" as const,
-		ownProviderPaused: false,
-		instancePaused: false,
-	},
-	{
-		// Provider cap only, and spent: this workspace pauses itself without the instance admin ever
-		// setting a cap — the case that decides whether they bother setting one at all.
-		workspaceSlug: "atelier",
-		displayName: "Atelier",
-		instanceTotalCostUsd: 0,
-		instanceBudgetVerdict: "WITHIN",
-		ownProviderMonthlyBudgetUsd: 12,
-		ownProviderTotalCostUsd: 12.4,
-		ownProviderBudgetVerdict: "EXHAUSTED",
-		ownProviderPaused: true,
-		events: 40,
-		instancePaused: false,
-	},
+	pausedOnSharedBudget,
+	nearingItsOwnProviderCap,
+	sharedBudgetOnlyUnverifiable,
+	uncapped,
+	pausedOnItsOwnProviderCap,
 ];
 
 const detailReport: WorkspaceLlmUsageReport = {
@@ -163,19 +182,22 @@ export const Default: Story = {
 /** One workspace expanded to show the existing by-run-type and daily usage rollups. */
 export const Expanded: Story = {
 	args: {
-		expandedWorkspaceSlug: rows[0].workspaceSlug,
+		expandedWorkspaceSlug: pausedOnSharedBudget.workspaceSlug,
 		detailReport,
 	},
 };
 
 /**
- * The projection the rollup row can't carry. A budget at 84% is only alarming once you know this
- * month's pace reaches it, which is exactly what the workspace's own console has always said and
- * this one used to stop short of.
+ * The projection the rollup row cannot carry. A budget at 84% is only alarming once you know this
+ * month's pace reaches it, so the expanded panel says so in the third person — the same sentence the
+ * workspace's own console writes in the second.
+ *
+ * Both halves of that sentence are asserted in `AdminInstanceLlmUsageTable.test.tsx`; this is the
+ * picture of them.
  */
 export const ExpandedNearCap: Story = {
 	args: {
-		expandedWorkspaceSlug: rows[1].workspaceSlug,
+		expandedWorkspaceSlug: nearingItsOwnProviderCap.workspaceSlug,
 		detailReport: {
 			...detailReport,
 			instanceMonthlyBudgetUsd: 50,
@@ -183,13 +205,6 @@ export const ExpandedNearCap: Story = {
 			instanceBudgetVerdict: "WITHIN",
 			instancePaused: false,
 		},
-	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(
-			canvas.getByText("Hephaestus Dev has used 84% of its shared-model budget"),
-		).toBeVisible();
-		await expect(canvas.getByText(/At this pace you'll hit it around July 12\./)).toBeVisible();
 	},
 };
 
@@ -209,16 +224,16 @@ export const DisplayCurrencyThisMonth: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(
-			canvas.getByText(
-				/EUR amounts are estimates at the European Central Bank reference rate published on Jul 24, 2026/,
-			),
-		).toBeVisible();
+		// Presence, not wording: `fx.test.tsx` owns the sentence, this owns "the table discloses it".
+		await expect(canvas.getByText(/reference rate published on/)).toBeVisible();
 		await expect(canvas.getByLabelText("approximately 21.99 euros")).toBeInTheDocument();
 	},
 };
 
-/** A closed month on a EUR instance: the rate is dated inside it, so the figures never move. */
+/**
+ * A closed month on a EUR instance: the rate is dated inside it, so the figures never move. The
+ * frozen wording is asserted on `FxDisclosure` in `fx.test.tsx`; this is the picture of it.
+ */
 export const DisplayCurrencyClosedMonth: Story = {
 	args: {
 		isCurrentMonth: false,
@@ -229,27 +244,20 @@ export const DisplayCurrencyClosedMonth: Story = {
 			source: "ECB",
 		},
 	},
-	play: async ({ canvasElement }) => {
-		await expect(
-			within(canvasElement).getByText(
-				/last rate published in the month shown, so these figures no longer change/,
-			),
-		).toBeVisible();
-	},
 };
 
 /**
  * The expanded breakdown at the WCAG 2.2 SC 1.4.10 reflow width (320 px).
  *
  * The eight-column rollup is the documented data-table exception: it may scroll horizontally inside
- * its own container. The breakdown that opens underneath it may not inherit that — nested in a
- * `colSpan` row it took the table's ~1100 px width and opened a second horizontal scroller inside
- * the first, which is two-dimensional scrolling to read a number. This asserts the panel is a
- * sibling of the scroll container rather than a descendant, and that it fits the page width.
+ * its own container. The breakdown that opens underneath it may not inherit that — a panel nested in
+ * a `colSpan` row takes the rollup's ~1100 px width and opens a second horizontal scroller inside
+ * the first, and two scrollers to read one number is two-dimensional scrolling. So the panel sits
+ * outside the rollup's scroller and reflows to the page.
  */
 export const ExpandedMobileReflow: Story = {
 	args: {
-		expandedWorkspaceSlug: rows[0].workspaceSlug,
+		expandedWorkspaceSlug: pausedOnSharedBudget.workspaceSlug,
 		detailReport,
 	},
 	parameters: {
@@ -257,27 +265,25 @@ export const ExpandedMobileReflow: Story = {
 		chromatic: { viewports: [320, 375, 1024] },
 	},
 	play: async ({ canvasElement }) => {
-		const scroller = canvasElement.querySelector<HTMLElement>('[data-slot="table-container"]');
-		const panel = canvasElement.querySelector<HTMLElement>(
-			`#workspace-usage-details-${rows[0].workspaceSlug}`,
-		);
-		await expect(scroller).not.toBeNull();
-		await expect(panel).not.toBeNull();
-		if (scroller == null || panel == null) return;
-
-		// The defect in one assertion: the breakdown must not live inside the table's scroller.
-		await expect(scroller.contains(panel)).toBe(false);
-		// And it reflows to the page rather than to the table's intrinsic width.
-		await expect(panel.scrollWidth).toBeLessThanOrEqual(canvasElement.clientWidth + 1);
-
-		// The toggle still owns the panel for assistive tech even though they are no longer adjacent.
+		// The toggle names the panel it owns, which is how assistive tech reaches it — and how this
+		// story reaches it, rather than by an id spelled out a second time here.
 		const toggle = await within(canvasElement).findByRole("button", {
 			name: /hide usage details for Example Workspace/i,
 		});
-		await expect(toggle).toHaveAttribute(
-			"aria-controls",
-			`workspace-usage-details-${rows[0].workspaceSlug}`,
-		);
+		const panelId = toggle.getAttribute("aria-controls");
+		const panel = panelId == null ? null : document.getElementById(panelId);
+		if (panel == null) {
+			throw new Error("The expanded toggle points at no panel, so there is nothing to measure.");
+		}
+
+		// Found by behaviour: whichever ancestor of the rollup actually scrolls it sideways.
+		const rollup = within(canvasElement).getByRole("table", { name: /Per-workspace AI spend/ });
+		const scroller = horizontalScrollParentOf(rollup);
+
+		// The defect in one assertion: the breakdown must not live inside the rollup's scroller.
+		await expect(scroller.contains(panel)).toBe(false);
+		// And it reflows to the page rather than to the rollup's intrinsic width.
+		await expect(panel.scrollWidth).toBeLessThanOrEqual(canvasElement.clientWidth + 1);
 	},
 };
 
@@ -294,9 +300,7 @@ export const HelpHeaderTargetSize: Story = {
 		const canvas = within(canvasElement);
 		for (const name of ["Shared-model budget", "Provider cap"]) {
 			const header = canvas.getByRole("columnheader", { name });
-			const trigger = header.querySelector<HTMLElement>("button");
-			await expect(trigger).not.toBeNull();
-			if (trigger != null) await expectTargetSize(trigger);
+			await expectTargetSize(within(header).getByRole("button"));
 		}
 	},
 };
@@ -327,12 +331,12 @@ export const NearCap: Story = {
 
 /** Paused on the host's money — the one cap this admin can actually raise. */
 export const PausedByInstanceCap: Story = {
-	args: { rows: [rows[0]] },
+	args: { rows: [pausedOnSharedBudget] },
 };
 
 /** Paused on the workspace's own money — raising the shared-model budget would change nothing. */
 export const PausedByProviderCap: Story = {
-	args: { rows: [rows[4]] },
+	args: { rows: [pausedOnItsOwnProviderCap] },
 };
 
 /** Both caps spent: two badges, because raising only one would leave the workspace stopped. */

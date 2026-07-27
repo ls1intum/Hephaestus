@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.catalog;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -79,6 +80,27 @@ class LlmConnectionServiceTest extends BaseUnitTest {
             assertThatThrownBy(() -> connectionService.create(createRequest())).isInstanceOf(
                 LlmConnectionSlugConflictException.class
             );
+
+            verify(connectionRepository, never()).save(any());
+            verifyNoInteractions(llmConnectionAudit);
+        }
+
+        /**
+         * The SSRF guard has to fail the create closed, and has to run before the row is written: a
+         * policy consulted after {@code save()} would leave a persisted instance connection pointing at
+         * an internal address, reachable by every workspace on the server. The workspace-owned twin
+         * carries the same assertion; this is the instance-owned half of the same guarantee.
+         */
+        @Test
+        void doesNotCreateAConnectionWhoseBaseUrlTheEgressPolicyRejects() {
+            when(connectionRepository.findBySlug("openai-prod")).thenReturn(Optional.empty());
+            doThrow(new IllegalArgumentException("Provider host must be a public HTTPS URL"))
+                .when(egressPolicy)
+                .validate("https://api.openai.com");
+
+            assertThatThrownBy(() -> connectionService.create(createRequest()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("public HTTPS URL");
 
             verify(connectionRepository, never()).save(any());
             verifyNoInteractions(llmConnectionAudit);

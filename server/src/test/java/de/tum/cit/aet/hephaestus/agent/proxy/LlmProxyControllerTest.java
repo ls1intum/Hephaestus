@@ -17,6 +17,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 import mockwebserver3.MockResponse;
 import mockwebserver3.MockWebServer;
 import mockwebserver3.RecordedRequest;
@@ -25,6 +26,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.springframework.http.HttpHeaders;
@@ -81,28 +85,15 @@ class LlmProxyControllerTest extends BaseUnitTest {
     @Nested
     class BudgetGate {
 
-        @Test
-        void rejectsWithoutResolvingCredentialWhenWorkspaceIsOverBudget() {
-            var routing = routing("openai-completions");
-            authenticate(routing);
-            when(budgetGate.isBlocked(routing)).thenReturn(true);
-
-            var result = controller.proxy(
-                request("POST", "/internal/llm/chat/completions"),
-                new MockHttpServletResponse(),
-                new HttpHeaders(),
-                jsonBody()
-            );
-
-            assertThat(result.getStatusCode().value()).isEqualTo(429);
-            verifyNoInteractions(resolver);
-        }
-
         /**
          * The 429 body names WHICH purse stopped the call — the two have different remedies and
          * different people behind them. Which purse the gate consults is
          * {@code ProxyBudgetGateTest}'s subject; here the routing's funding source is what the body
          * must be worded from.
+         *
+         * <p>The status alone proves the credential was never resolved: a call that reaches the
+         * resolver gets nothing back from it and returns 502, as {@link #doesNotRejectACallTheGateAllows}
+         * shows.
          */
         @Test
         void the429BodyNamesTheSharedPurseForASharedModelCall() {
@@ -307,41 +298,31 @@ class LlmProxyControllerTest extends BaseUnitTest {
             assertThat(OBJECT_MAPPER.readTree(prepared.withoutUsageRequest()).has("stream_options")).isFalse();
         }
 
-        @Test
-        void shouldAllowFunctionAndCustomTools() {
-            byte[] input = "{\"tools\":[{\"type\":\"function\"},{\"type\":\"custom\"}]}".getBytes(
-                StandardCharsets.UTF_8
+        /**
+         * The surface a runner may ask the provider for. A rejected body is answered before any
+         * upstream call, so each {@code false} row is a capability the sandbox cannot buy on the
+         * host's key, and each {@code true} row is one it must keep.
+         */
+        static Stream<Arguments> requestedCapabilities() {
+            return Stream.of(
+                Arguments.of("{\"tools\":[{\"type\":\"function\"},{\"type\":\"custom\"}]}", true, "caller-run tools"),
+                Arguments.of("{\"tools\":[{\"type\":\"web_search_preview\"}]}", false, "a provider-hosted tool"),
+                Arguments.of("{\"web_search_options\":{}}", false, "hosted search asked for outside tools"),
+                Arguments.of("{\"modalities\":[\"text\",\"audio\"],\"audio\":{}}", false, "audio output"),
+                Arguments.of("{\"modalities\":[\"text\"]}", true, "an explicit text-only modality")
             );
-
-            assertThat(controller.prepareBody(input, "model", false)).isNotNull();
         }
 
-        @Test
-        void shouldRejectProviderHostedTools() {
-            byte[] input = "{\"tools\":[{\"type\":\"web_search_preview\"}]}".getBytes(StandardCharsets.UTF_8);
+        @ParameterizedTest(name = "{2}")
+        @MethodSource("requestedCapabilities")
+        void locksTheRequestedCapabilitySurface(String body, boolean allowed, String what) {
+            var prepared = controller.prepareBody(body.getBytes(StandardCharsets.UTF_8), "model", false);
 
-            assertThat(controller.prepareBody(input, "model", false)).isNull();
-        }
-
-        @Test
-        void shouldRejectHostedSearchOutsideTools() {
-            byte[] input = "{\"web_search_options\":{}}".getBytes(StandardCharsets.UTF_8);
-
-            assertThat(controller.prepareBody(input, "model", false)).isNull();
-        }
-
-        @Test
-        void shouldRejectAudioOutput() {
-            byte[] input = "{\"modalities\":[\"text\",\"audio\"],\"audio\":{}}".getBytes(StandardCharsets.UTF_8);
-
-            assertThat(controller.prepareBody(input, "model", false)).isNull();
-        }
-
-        @Test
-        void shouldAllowExplicitTextOnlyModality() {
-            byte[] input = "{\"modalities\":[\"text\"]}".getBytes(StandardCharsets.UTF_8);
-
-            assertThat(controller.prepareBody(input, "model", false)).isNotNull();
+            if (allowed) {
+                assertThat(prepared).as(what).isNotNull();
+            } else {
+                assertThat(prepared).as(what).isNull();
+            }
         }
     }
 
@@ -349,10 +330,9 @@ class LlmProxyControllerTest extends BaseUnitTest {
      * A streamed call, end to end against a real upstream: what the client receives, and what the
      * ledger is told, from the same bytes.
      *
-     * <p>Before this, the controller returned the instant it saw an SSE body, so a streamed call
-     * reached no accounting at all. These tests drive an actual HTTP stream because the failure they
-     * guard against is invisible to any mock — the response is perfect either way, and only the
-     * accounting is missing.
+     * <p>These tests drive an actual HTTP stream because the failure they guard against is invisible to
+     * any mock: a controller that returns the instant it sees an SSE body serves a perfect response and
+     * reaches no accounting at all, so only the ledger tells the two apart.
      */
     @Nested
     class Streaming {

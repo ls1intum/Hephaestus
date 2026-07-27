@@ -88,6 +88,9 @@ describe("AdminInstanceLlmUsageTable", () => {
 			<AdminInstanceLlmUsageTable
 				rows={[workspace]}
 				month="2026-07"
+				// Pinned like every other render here: the fixture's month is July 2026, and falling back
+				// to the real clock would quietly turn this into a different test on 1 August.
+				now={new Date("2026-07-10T12:00:00.000Z")}
 				isCurrentMonth
 				isLoading={false}
 				error={null}
@@ -266,7 +269,8 @@ describe("AdminInstanceLlmUsageTable", () => {
 			/>,
 		);
 
-		// Third person here, first person on the workspace's own page — the only word that differs.
+		// Third person here, second person on the workspace's own page ("You've used …% of your …"):
+		// the instance admin is reading about someone else's budget, and the sentence says so.
 		expect(
 			screen.getByText("Example Workspace has used 84% of its shared-model budget"),
 		).toBeTruthy();
@@ -302,9 +306,9 @@ describe("AdminInstanceLlmUsageTable", () => {
 		});
 
 		it("survives a month with no workspaces in it", () => {
-			// The rate belongs to the month, so it is still known here — reading it off `rows[0]`, which
-			// an empty month does not have, is the regression this pins. Nothing converted, so nothing
-			// is disclosed, but that is now the deliberate outcome rather than missing data.
+			// The rate belongs to the month, not to any row, so it is still known on a month with no
+			// workspaces in it. Nothing on screen converted, so nothing is disclosed — a deliberate
+			// silence, not a missing rate.
 			renderTable([], { fx: eur });
 
 			expect(screen.getByText("No workspaces on this instance yet")).toBeTruthy();

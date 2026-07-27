@@ -51,9 +51,8 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
             .doesNotExist()
             .jsonPath("$.skipDrafts")
             .isEqualTo(true)
-            // The workspace's feature flags used to be copied onto this response. They are not the
-            // review policy and every client already holds them on the workspace itself, so their
-            // absence here is the point of the endpoint's rename — assert it rather than assume it.
+            // The workspace's feature flags are not review policy, and every client already holds them
+            // on the workspace itself, so this response carries the policy alone — asserted, not assumed.
             .jsonPath("$.practicesEnabled")
             .doesNotExist()
             .jsonPath("$.mentorEnabled")
@@ -185,33 +184,5 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
             .exchange()
             .expectStatus()
             .isOk();
-    }
-
-    @Test
-    void anonymousIsUnauthorized() {
-        // Against a REAL workspace: an unknown slug 404s during resolution, which would pass this
-        // assertion without ever reaching the authentication check.
-        User owner = persistUser("review-anon-owner");
-        Workspace workspace = createWorkspace("review-anon", "Anon", "review-anon-org", AccountType.ORG, owner);
-
-        webTestClient
-            .get()
-            .uri("/workspaces/{slug}/practices/review-settings", workspace.getWorkspaceSlug())
-            .exchange()
-            .expectStatus()
-            .isUnauthorized();
-
-        // The PATCH is 403 where the GET above is 401: with no `Authorization: Bearer` header a
-        // state-changing request is cookie-shaped, so SecurityConfig#requiresCsrf refuses it at the
-        // CSRF filter before authentication runs. Asserting 401 would invite exempting the mutation
-        // from CSRF to "fix" it. Either way the handler is never reached.
-        webTestClient
-            .patch()
-            .uri("/workspaces/{slug}/practices/review-settings", workspace.getWorkspaceSlug())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("skipDrafts", false))
-            .exchange()
-            .expectStatus()
-            .isForbidden();
     }
 }

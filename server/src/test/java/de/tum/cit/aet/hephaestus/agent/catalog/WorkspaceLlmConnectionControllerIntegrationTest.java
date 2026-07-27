@@ -272,17 +272,4 @@ class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceI
             .expectStatus()
             .isForbidden();
     }
-
-    @Test
-    void anonymousIsUnauthorized() {
-        User owner = persistUser("byo-anon-owner");
-        Workspace workspace = createWorkspace("byo-anon-ws", "Anon", "byo-anon-org", AccountType.ORG, owner);
-
-        webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/connections", workspace.getWorkspaceSlug())
-            .exchange()
-            .expectStatus()
-            .isUnauthorized();
-    }
 }

@@ -462,19 +462,9 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(decision.workspaceFunded()).isEqualTo(LlmBudgetBlockReason.NONE);
     }
 
-    @Test
-    void anUnpricedOwnProviderEventMakesOnlyTheWorkspacesOwnCapUnverifiable() {
-        Workspace workspace = setupWorkspace("ledger-byo-unpriced");
-        workspace.setMonthlyByoLlmBudgetUsd(new BigDecimal("100.00"));
-        workspace.setMonthlyLlmBudgetUsd(new BigDecimal("100.00"));
-        workspaceRepository.save(workspace);
-        recordUnverifiable(workspace.getId(), agentSample(UUID.randomUUID(), 0, 1000, workspacePriced("3.00", "9.00")));
-
-        LlmBudgetDecision decision = budgetService.decide(workspace.getId());
-
-        assertThat(decision.instanceFunded()).isEqualTo(LlmBudgetBlockReason.NONE);
-        assertThat(decision.workspaceFunded()).isEqualTo(LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED);
-    }
+    // The mirror of the case above — an unpriced OWN-PROVIDER event pausing only the workspace's own
+    // purse — is asserted through the report an admin actually reads by
+    // LlmUsageControllerIntegrationTest#anUnpricedOwnProviderEventPausesOnlyTheOwnProviderPurse.
 
     @Test
     void unverifiableUsageRetainsAdmissionProvenanceWithoutInventingACost() {
@@ -491,54 +481,12 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(meterRegistry.counter("llm.usage.uncosted").count()).isEqualTo(uncostedBefore + 1);
     }
 
-    @Test
-    void unverifiableInstanceUsageMakesTheBudgetVerdictUnverifiable() {
-        Workspace workspace = setupWorkspace("ledger-unverifiable");
-        workspace.setMonthlyLlmBudgetUsd(new BigDecimal("100.00"));
-        workspaceRepository.save(workspace);
-
-        recordUnverifiable(
-            workspace.getId(),
-            sample(
-                LlmUsageJobType.MENTOR_TURN,
-                LlmUsageSourceType.MENTOR_TURN,
-                UUID.randomUUID(),
-                0,
-                "gpt-5",
-                0,
-                0,
-                pricedInstance("3.00", "9.00")
-            )
-        );
-
-        boolean hasUnpriced = usageRepository.existsUnpricedInstanceFunded(
-            workspace.getId(),
-            Instant.now().minusSeconds(3600),
-            Instant.now().plusSeconds(3600)
-        );
-        assertThat(hasUnpriced).isTrue();
-        assertThat(
-            LlmBudgetService.verdictFor(
-                budgetService.headroom(workspace.getId()).instanceSpentUsd(),
-                hasUnpriced,
-                workspace.getMonthlyLlmBudgetUsd()
-            )
-        ).isEqualTo(LlmBudgetVerdict.UNVERIFIABLE);
-        // Blocked because the month cannot be verified, NOT because confirmed spend reached the cap.
-        assertThat(budgetService.decide(workspace.getId()).forFunding(FundingSource.INSTANCE)).isEqualTo(
-            LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED
-        );
-    }
-
-    @Test
-    void zeroBudgetPausesImmediatelyEvenWithNoSpend() {
-        Workspace workspace = setupWorkspace("ledger-zero");
-        workspace.setMonthlyLlmBudgetUsd(BigDecimal.ZERO);
-        workspaceRepository.save(workspace);
-        bindDetectionTo(workspace, FundingSource.INSTANCE);
-
-        assertThat(agentJobService.submit(workspace.getId(), AgentJobType.ISSUE_REVIEW, null)).isEmpty();
-    }
+    // An unpriced INSTANCE-funded month blocking the host's purse is asserted above, against the same
+    // SQL, by theWorkspacesOwnCapReadsOnlyOwnProviderLedgerRows; that the operator sees it as
+    // UNVERIFIABLE and paused is LlmUsageControllerIntegrationTest's
+    // usagePausedIsTrueOnAnUnverifiableMonthForACappedWorkspace. verdictFor's own table is
+    // LlmBudgetServiceTest.Verdict, and a zero cap pausing a submission with no spend at all is
+    // submitIsBlockedByTheWorkspacesOwnCapForOwnProviderDetection above.
 
     /**
      * raising or clearing either cap releases exactly the jobs the claim loop parked on that

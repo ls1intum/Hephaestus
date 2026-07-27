@@ -33,11 +33,26 @@ import org.junit.jupiter.api.Test;
  */
 class LlmPriceWidthTest extends BaseUnitTest {
 
-    /** {@code MoneyWirePrecisionTest.shouldRoundTripEveryPer1mRateBelowTenMillionDollars}'s ceiling. */
-    private static final BigDecimal WIDEST_SAFE_RATE = new BigDecimal("9999999.99999999");
+    /** The scale of the four rate columns, {@code NUMERIC(18,8)} — where the two guards are compared. */
+    private static final int RATE_SCALE = 8;
 
-    /** One unit past it — still legal in {@code NUMERIC(18,8)}, no longer exact as a double. */
-    private static final BigDecimal FIRST_UNSAFE_RATE = new BigDecimal("10000000.00000000");
+    /**
+     * The smallest rate the shared validator refuses, stated once by production and read from there.
+     * Both fixtures derive from it, so the two guards are measured against each other rather than
+     * against a literal this file chose: widen {@link LlmPriceValidation#MAX_RATE_EXCLUSIVE} past
+     * {@code @Digits(integer = 7)} and the accept case below fails, narrow it inside and the reject
+     * case fails.
+     */
+    private static final BigDecimal FIRST_UNSAFE_RATE = LlmPriceValidation.MAX_RATE_EXCLUSIVE.setScale(RATE_SCALE);
+
+    /**
+     * One unit in the last place below it: the widest rate an admin can actually set, and the value
+     * {@code MoneyWirePrecisionTest.aFrozenRateIsTheSameNumberInTheCatalogAndTheLedger} proves survives
+     * the wire.
+     */
+    private static final BigDecimal WIDEST_SAFE_RATE = FIRST_UNSAFE_RATE.subtract(
+        BigDecimal.ONE.movePointLeft(RATE_SCALE)
+    );
 
     private static ValidatorFactory factory;
     private static Validator validator;
@@ -86,7 +101,8 @@ class LlmPriceWidthTest extends BaseUnitTest {
         // their own request records, so the magnitude check has to live where all four paths meet.
         assertThatThrownBy(() -> validate(FIRST_UNSAFE_RATE))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("10000000");
+            // The admin has to be told which ceiling they hit, so the bound itself is in the message.
+            .hasMessageContaining(LlmPriceValidation.MAX_RATE_EXCLUSIVE.toPlainString());
     }
 
     @Test

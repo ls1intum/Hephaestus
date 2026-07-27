@@ -54,8 +54,8 @@ describe("problemDetailOf", () => {
 	});
 
 	it("still prefers the server's wording when the body carries both", () => {
-		// A ProblemDetail thrown as an Error subclass keeps its `detail`; dropping `message` must not
-		// have cost that.
+		// A ProblemDetail thrown as an Error subclass carries both fields. `message` is outside the
+		// precedence chain, but excluding it must not exclude the `detail` sitting beside it.
 		expect(problemDetailOf({ detail: "Model still bound to an agent", message: "boom" })).toBe(
 			"Model still bound to an agent",
 		);
