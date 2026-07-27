@@ -189,6 +189,9 @@ paths:
             - LLM_MODEL_PRICE_CHANGED
             - LLM_MODEL_SHARING_CHANGED
             - LLM_SETTINGS_CHANGED
+            - LOGIN_PROVIDER_CREATED
+            - LOGIN_PROVIDER_UPDATED
+            - LOGIN_PROVIDER_DELETED
       - in: query
         name: result
         required: false
@@ -267,6 +270,9 @@ paths:
             - LLM_MODEL_PRICE_CHANGED
             - LLM_MODEL_SHARING_CHANGED
             - LLM_SETTINGS_CHANGED
+            - LOGIN_PROVIDER_CREATED
+            - LOGIN_PROVIDER_UPDATED
+            - LOGIN_PROVIDER_DELETED
       - in: query
         name: result
         required: false

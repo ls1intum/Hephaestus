@@ -51,6 +51,9 @@ export const EVENT_TYPE_LABELS: Record<AuthEventType, string> = {
 	LLM_MODEL_PRICE_CHANGED: "Model price changed",
 	LLM_MODEL_SHARING_CHANGED: "Model sharing changed",
 	LLM_SETTINGS_CHANGED: "AI settings changed",
+	LOGIN_PROVIDER_CREATED: "Login provider added",
+	LOGIN_PROVIDER_UPDATED: "Login provider updated",
+	LOGIN_PROVIDER_DELETED: "Login provider removed",
 };
 
 /** Falls back to a humanized enum name so an event type added server-side still reads sensibly. */
