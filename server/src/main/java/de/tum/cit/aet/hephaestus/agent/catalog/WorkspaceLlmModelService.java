@@ -206,22 +206,12 @@ public class WorkspaceLlmModelService {
             requireActivatable(model);
         }
 
-        WorkspaceLlmModel saved;
-        try {
-            // saveAndFlush (not save) — see create()'s identical comment: an unflushed save() would let
-            // a concurrent-update race's constraint violation escape this catch as an uncaught 500.
-            saved = modelRepository.saveAndFlush(model);
-        } catch (DataIntegrityViolationException e) {
-            // The fast-path check above is racy; the unique constraint backstops the loser of a
-            // concurrent update.
-            if (isUpstreamIdConflict(e)) {
-                throw new LlmModelUpstreamIdConflictException(
-                    model.getConnection().getId(),
-                    model.getUpstreamModelId()
-                );
-            }
-            throw e;
-        }
+        // saveAndFlush (not save): flush inside this transaction so any constraint violation surfaces
+        // here rather than at the implicit end-of-transaction flush. No unique constraint can fire on
+        // this path — UpdateWorkspaceLlmModelRequestDTO carries neither connection nor upstream model
+        // id, the two columns of ux_ws_llm_model_connection_upstream — so there is nothing to translate
+        // into a 409.
+        WorkspaceLlmModel saved = modelRepository.saveAndFlush(model);
         configAudit.record(
             ConfigAuditEntry.updated(
                 ConfigAuditEntityType.WORKSPACE_LLM_MODEL,

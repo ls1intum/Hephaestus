@@ -56,8 +56,7 @@ class ConfigSnapshotTest extends BaseUnitTest {
                 "claude-sonnet-4-20250514",
                 200000,
                 8192,
-                false,
-                FundingSource.INSTANCE
+                false
             )
         );
         when(resolver.connectionRef(binding)).thenReturn(

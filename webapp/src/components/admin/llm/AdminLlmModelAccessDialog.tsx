@@ -14,7 +14,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { type ModelAccessScope, ModelAccessScopeChoice } from "./ModelAccessScopeChoice";
 import { type WorkspaceOption, workspaceFacetOptions } from "./workspace-options";
 
 export interface AdminLlmModelAccessDialogProps {
@@ -34,10 +34,9 @@ export interface AdminLlmModelAccessDialogProps {
  * Dedicated access editor for an instance model. Access changes take effect at request time.
  *
  * The form is mounted only while the dialog is open and keyed by the model, so its selection seeds
- * from that model exactly once — at open — rather than being copied in by an effect. An effect
- * re-ran on every background refetch: an admin who had deselected two workspaces and not yet saved
- * lost that edit, with no visual signal, the moment another admin touched the model or the tab
- * regained focus past the query's `staleTime`. Save then revoked nothing.
+ * from that model exactly once — at open — rather than being copied in by an effect. An effect would
+ * re-run on every background refetch and silently discard an unsaved edit the moment another admin
+ * touched the model, or the tab regained focus past the query's `staleTime`.
  */
 export function AdminLlmModelAccessDialog({
 	open,
@@ -79,7 +78,7 @@ function AdminLlmModelAccessDialogContent({
 	onSave,
 	onCancel,
 }: AdminLlmModelAccessDialogContentProps) {
-	const [scope, setScope] = useState<"ALL" | "SELECTED">(
+	const [scope, setScope] = useState<ModelAccessScope>(
 		model.visibility === "PUBLIC" ? "ALL" : "SELECTED",
 	);
 	const [workspaceIds, setWorkspaceIds] = useState<number[]>(model.grantedWorkspaceIds);
@@ -106,37 +105,12 @@ function AdminLlmModelAccessDialogContent({
 			{/* Two option cards, the workspace picker and up to one consequence alert — enough to
 			    overflow a phone in landscape. Only the body scrolls. */}
 			<DialogBody className="space-y-4 py-1">
-				<RadioGroup
+				<ModelAccessScopeChoice
+					idPrefix="llm-model-access"
+					label="Who can use this model"
 					value={scope}
-					onValueChange={(value) => setScope(value as "ALL" | "SELECTED")}
-					className="gap-3"
-					aria-label="Who can use this model"
-				>
-					<label
-						htmlFor="llm-model-access-all"
-						className="flex cursor-pointer items-start gap-3 rounded-lg border p-3"
-					>
-						<RadioGroupItem id="llm-model-access-all" value="ALL" />
-						<span>
-							<span className="block text-sm font-medium">All workspaces</span>
-							<span className="text-muted-foreground block text-xs">
-								Every current and future workspace can select the model.
-							</span>
-						</span>
-					</label>
-					<label
-						htmlFor="llm-model-access-selected"
-						className="flex cursor-pointer items-start gap-3 rounded-lg border p-3"
-					>
-						<RadioGroupItem id="llm-model-access-selected" value="SELECTED" />
-						<span className="min-w-0 flex-1">
-							<span className="block text-sm font-medium">Selected workspaces</span>
-							<span className="text-muted-foreground block text-xs">
-								Only explicitly selected workspaces can select the model.
-							</span>
-						</span>
-					</label>
-				</RadioGroup>
+					onChange={setScope}
+				/>
 
 				{scope === "SELECTED" && (
 					<div className="space-y-2">
@@ -170,8 +144,11 @@ function AdminLlmModelAccessDialogContent({
 					</div>
 				)}
 
+				{/* Advisory, and re-derived on every radio press and every workspace ticked. `role="alert"`
+				    is assertive and would interrupt the combobox's own announcement each time (SC 4.1.3);
+				    only a *failure* earns that. */}
 				{noWorkspaceHasAccess && !isWorkspaceError && (
-					<Alert>
+					<Alert role="status">
 						<AlertTitle>No workspace will be able to use this model</AlertTitle>
 						<AlertDescription>
 							This is useful while staging a model. Grant access when it is ready.
@@ -180,7 +157,7 @@ function AdminLlmModelAccessDialogContent({
 				)}
 
 				{removesCurrentWorkspace && (
-					<Alert variant="warning">
+					<Alert variant="warning" role="status">
 						<AlertTriangle aria-hidden />
 						<AlertTitle>Access is reduced immediately</AlertTitle>
 						<AlertDescription>
@@ -190,7 +167,7 @@ function AdminLlmModelAccessDialogContent({
 					</Alert>
 				)}
 				{restrictsFutureWorkspaces && !removesCurrentWorkspace && (
-					<Alert>
+					<Alert role="status">
 						<AlertTitle>Future workspaces will need an explicit grant</AlertTitle>
 						<AlertDescription>
 							Every workspace using it today keeps it, so nothing stops running.

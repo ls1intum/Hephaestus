@@ -12,10 +12,10 @@ import { cn } from "@/lib/utils";
  *
  * 1. `DialogContent` is height-bound and scrollable. Upstream's popup is `fixed` and centred with no
  *    `max-height`, so anything taller than the viewport hangs off both edges with no way to reach it
- *    — the page cannot scroll a fixed element back into view. That clipped the title and the submit
+ *    — the page cannot scroll a fixed element back into view, which clips the title and the submit
  *    button on every phone-sized viewport (WCAG 2.2 SC 1.4.10).
  * 2. `DialogBody` — an opt-in scrollable middle, with `DialogHeader`/`DialogFooter` pinned around it.
- *    Upstream's answer is an unnamed `div` with the same four utility classes copy-pasted into every
+ *    Upstream's answer is an unnamed `div` with the same five utility classes copy-pasted into every
  *    tall dialog (`examples/base/dialog-sticky-footer.tsx`); naming it means the next tall dialog
  *    cannot get it subtly wrong. The `has-data-[slot=…]` switch is this registry's own idiom for
  *    descendant-driven layout — see `AlertDialogHeader`, `CardHeader`, `Attachment`, `ComboboxChips`.

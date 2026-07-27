@@ -158,7 +158,7 @@ hephaestus:
     # ═══════════════════════════════════════════════════════════════════════════
     # AGENT SANDBOX & PRACTICE REVIEW (Production)
     # ═══════════════════════════════════════════════════════════════════════════
-    # Sandbox, the agent job queue (PostgreSQL-backed, #1368), git checkout, and LLM proxy are
+    # Sandbox, the agent job queue (PostgreSQL-backed), git checkout, and LLM proxy are
     # configured via env vars in compose.app.yaml. Defaults come from base application.yml.
     # The only prod-specific overrides go here (storage path for git repos).
     git:

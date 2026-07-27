@@ -50,6 +50,10 @@ public record ConfigSnapshot(
     String apiProtocol,
     String baseUrl,
     String upstreamModelId,
+    // Read-only carry-over: the model version/snapshot date the retired named agent config let an admin
+    // type. fromJson still reads it so a snapshot frozen before the model catalog existed keeps stating
+    // what it ran on; from() writes null, because the catalog identifies a model by its upstream id and
+    // has no version concept to source this from. Expect null on everything dispatched since.
     @Nullable String modelVersion,
     @Nullable Integer contextWindow,
     @Nullable Integer maxOutputTokens,

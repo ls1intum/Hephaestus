@@ -25,9 +25,9 @@ import org.springframework.stereotype.Component;
  * when that last forward was admitted — one call for a sequential runner or Pi's agent loop — never by
  * the whole run.</blockquote>
  *
- * <p>This is what the class did not do before: keyed on the ledger alone, every check during a run
- * saw zero of that run's spend, so one admitted job or turn could make unlimited calls against an
- * exhausted cap. {@code ProxyBudgetGateTest} pins the claim above.
+ * <p>The in-flight term is what makes that bound hold: keyed on the ledger alone, every check during
+ * a run would see zero of that run's spend, and one admitted job or turn could make unlimited calls
+ * against an exhausted cap. {@code ProxyBudgetGateTest} pins the claim above.
  *
  * <p>An execution's spend-so-far reaches this gate from wherever it accrues — an agent job's own row,
  * a mentor turn's {@code MentorTurnMeter} — and both buffered and streamed calls feed it

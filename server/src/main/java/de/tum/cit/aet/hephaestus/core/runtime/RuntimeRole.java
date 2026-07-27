@@ -50,8 +50,8 @@ public final class RuntimeRole {
      * Property key for the job-execution capability check (the PostgreSQL-backed agent job poller
      * enabled). The LLM proxy controller/security chain gates on this AND {@link #WORKER_PROPERTY} —
      * the same expression {@code AgentJobExecutor} wires on — so "jobs on, proxy off" is
-     * unexpressible (#1368 slice 5: the proxy is the ONLY LLM credential path, every job-executing
-     * host must run it).
+     * unexpressible: the proxy is the ONLY LLM credential path, so every job-executing host must run
+     * it.
      */
     public static final String AGENT_ENABLED_PROPERTY = "hephaestus.agent.enabled";
 }

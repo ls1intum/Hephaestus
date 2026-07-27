@@ -173,8 +173,7 @@ public class GithubFeedbackChannel implements FeedbackChannel {
     }
 
     /**
-     * Dedup lookup (#1368 hardening — delivery-recovery crash window; tri-state result and pagination
-     * added #1368 fix wave, finding #6): scans this PR/issue's comments, page by page up to {@link
+     * Dedup lookup for the delivery-recovery crash window: scans this PR/issue's comments, page by page up to {@link
      * #EXISTING_SUMMARY_SEARCH_PAGE_BUDGET} pages, for one whose body contains {@code marker}. Reuses the
      * same {@code GetPullRequestComments} / {@code GetIssueComments} queries {@code
      * GitHubIssueCommentSyncService} uses for sync — no new GraphQL surface.

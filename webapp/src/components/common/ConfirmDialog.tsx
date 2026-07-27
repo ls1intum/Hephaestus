@@ -27,15 +27,18 @@ export interface ConfirmDialogProps<T> {
 }
 
 /**
- * One confirm for every destructive row action, with one closing policy.
+ * The confirm for destructive row actions on the LLM surfaces, with one closing policy. Elsewhere in
+ * the app a handful of hand-rolled `AlertDialog`s survive — `LoginProvidersTable` (whose row stays
+ * on screen until the DELETE lands) and `AgentJobDetailsPanel` (whose confirms are triggered from
+ * inside the row they act on) — so this is not yet the only confirm in the codebase.
  *
  * **Confirming closes the dialog, before the request it starts has settled.** The alternative —
  * holding the popup open on a spinner until the mutation lands — needs its own disabled states, and
- * every hand-rolled copy of it in this codebase got at least one of them wrong: one never closed at
- * all (a second click re-sent the DELETE and toasted a 404 for a row that was already gone), and
- * three refused dismissal while pending with both footer buttons disabled, which is a popup with no
- * operable control and no exit — a keyboard trap (WCAG 2.2 SC 2.1.2), unbounded against a connection
- * that never answers, because `fetch` has no timeout of its own.
+ * two of them are easy to get wrong: a dialog that never closes (a second click re-sends the DELETE
+ * and toasts a 404 for a row that is already gone), and one that refuses dismissal while pending
+ * with both footer buttons disabled, which is a popup with no operable control and no exit — a
+ * keyboard trap (WCAG 2.2 SC 2.1.2), unbounded against a connection that never answers, because
+ * `fetch` has no timeout of its own.
  *
  * Closing on confirm removes both by construction: there is no in-flight state inside the dialog to
  * get wrong, and a second click cannot reach a dialog that is gone. Feedback does not disappear with
@@ -43,7 +46,7 @@ export interface ConfirmDialogProps<T> {
  * ids out of the mutation cache), and the outcome arrives as a toast.
  *
  * {@link AlertDialogAction} is a plain `Button`, not `AlertDialogPrimitive.Close`, so closing is the
- * consumer's job. That is exactly the detail four copies of this block had to remember; now one does.
+ * consumer's job — the one detail each caller would otherwise have to remember for itself.
  */
 export function ConfirmDialog<T>({
 	subject,

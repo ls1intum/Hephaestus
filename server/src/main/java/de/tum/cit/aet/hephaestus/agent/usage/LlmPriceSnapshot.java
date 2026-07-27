@@ -18,10 +18,20 @@ public record LlmPriceSnapshot(
 ) {
     private static final BigDecimal PER_1M = BigDecimal.valueOf(1_000_000L);
 
+    /** Decimal places the ledger keeps: {@code llm_usage_event.cost_usd} is {@code NUMERIC(18,6)}. */
+    static final int LEDGER_SCALE = 6;
+
+    /** How every amount reaches {@link #LEDGER_SCALE}. Banker's rounding, so a long run does not drift up. */
+    static final RoundingMode LEDGER_ROUNDING = RoundingMode.HALF_EVEN;
+
     /**
-     * The smallest amount the ledger column can hold: {@code NUMERIC(18,6)} keeps six decimal places.
+     * Working precision for the intermediate arithmetic — wide enough that the only rounding that
+     * decides a stored amount is the single {@link #LEDGER_SCALE} step at the end.
      */
-    private static final BigDecimal MIN_COST = new BigDecimal("0.000001");
+    private static final MathContext CALC = new MathContext(20, LEDGER_ROUNDING);
+
+    /** The smallest amount the ledger column can hold: one unit at {@link #LEDGER_SCALE}. */
+    private static final BigDecimal MIN_COST = BigDecimal.ONE.movePointLeft(LEDGER_SCALE);
 
     /**
      * The largest amount that survives the whole trip, which is NOT the column's own maximum.
@@ -40,7 +50,8 @@ public record LlmPriceSnapshot(
      */
     private static final BigDecimal EXACT_ON_WIRE_CEILING = BigDecimal.valueOf(1_000_000_000L);
 
-    private static final BigDecimal MAX_COST = new BigDecimal("999999999.999999");
+    /** The largest storable amount below the ceiling: one ledger unit under it. */
+    private static final BigDecimal MAX_COST = EXACT_ON_WIRE_CEILING.subtract(MIN_COST);
 
     /**
      * The price of an attempt whose real price cannot be recovered — a job frozen before admission
@@ -89,14 +100,13 @@ public record LlmPriceSnapshot(
     /** Computes the authoritative ledger/UI cost. Reasoning is already included in output tokens. */
     public Cost calculateCost(long inputTokens, long outputTokens, long cacheReadTokens, long cacheWriteTokens) {
         if (pricingState == PricingState.UNPRICED) return Cost.exact(null);
-        if (pricingState == PricingState.NO_CHARGE) return Cost.exact(BigDecimal.ZERO.setScale(6));
-        MathContext mc = new MathContext(20, RoundingMode.HALF_EVEN);
-        BigDecimal raw = bucket(inputTokens, per1mInputUsd, mc)
-            .add(bucket(outputTokens, per1mOutputUsd, mc), mc)
-            .add(bucket(cacheReadTokens, per1mCacheReadUsd, mc), mc)
-            .add(bucket(cacheWriteTokens, per1mCacheWriteUsd, mc), mc);
+        if (pricingState == PricingState.NO_CHARGE) return Cost.exact(BigDecimal.ZERO.setScale(LEDGER_SCALE));
+        BigDecimal raw = bucket(inputTokens, per1mInputUsd, CALC)
+            .add(bucket(outputTokens, per1mOutputUsd, CALC), CALC)
+            .add(bucket(cacheReadTokens, per1mCacheReadUsd, CALC), CALC)
+            .add(bucket(cacheWriteTokens, per1mCacheWriteUsd, CALC), CALC);
         if (raw.signum() < 0) throw new IllegalStateException("Frozen LLM price produced a negative cost");
-        BigDecimal rounded = raw.setScale(6, RoundingMode.HALF_EVEN);
+        BigDecimal rounded = raw.setScale(LEDGER_SCALE, LEDGER_ROUNDING);
         if (raw.signum() > 0 && rounded.signum() == 0) {
             return new Cost(MIN_COST, CostClamp.ROUNDED_UP_TO_MINIMUM);
         }

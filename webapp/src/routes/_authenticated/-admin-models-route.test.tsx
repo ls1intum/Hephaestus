@@ -1,45 +1,58 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { createMemoryHistory, createRouter, RouterProvider } from "@tanstack/react-router";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
-import {
-	adminGetLlmSettingsQueryKey,
-	adminListLlmConnectionsQueryKey,
-	adminListLlmModelsQueryKey,
-	adminListWorkspacesQueryKey,
-} from "@/api/@tanstack/react-query.gen";
-import type { LlmConnection } from "@/api/types.gen";
+import type { LlmConnection, LlmModel } from "@/api/types.gen";
+import { AuthProvider } from "@/integrations/auth/AuthContext";
 import { server } from "@/mocks/server";
-import { Route } from "./admin.models";
+import { routeTree } from "@/routeTree.gen";
 
-const AdminLlmPage = Route.options.component;
+// Mounting the real route pulls in the whole admin layout and its lazy modules; observed ~3s alone
+// and over the 5s default when the rest of the suite is competing for the box.
+vi.setConfig({ testTimeout: 20_000 });
 
-// `preload()` lazily transforms the whole (heavy) route module; observed ~3s alone and over the 5s
-// default when the rest of the suite is competing for the box.
-vi.setConfig({ testTimeout: 15_000 });
+/** The first mount in a file pays the lazy transform of the whole admin layout — seconds, not 1s. */
+const TRANSFORM_WAIT = { timeout: 10_000 };
 
-function seededClient() {
+/** The four queries the page opens with. Any test that needs different answers overrides them after. */
+function mockPage(connections: LlmConnection[] = [], models: LlmModel[] = []) {
+	server.use(
+		http.get("*/admin/llm/connections", () => HttpResponse.json(connections)),
+		http.get("*/admin/llm/models", () => HttpResponse.json(models)),
+		http.get("*/admin/workspaces", () => HttpResponse.json([])),
+		// Without this the settings query falls through to a real fetch, errors, and the policy card's
+		// switch flips from controlled to uncontrolled mid-test — noise, not a finding.
+		http.get("*/admin/llm/settings", () =>
+			HttpResponse.json({ allowWorkspaceConnections: true, allowedEgressHosts: "" }),
+		),
+	);
+}
+
+/**
+ * The real router, not `Route.options.component`: the gate in `admin.tsx`'s `beforeLoad`, the route's
+ * `head` and anything it reads off the URL only exist when the route is matched, and a test that
+ * calls the component directly cannot tell a working route from an unreachable one.
+ */
+async function renderModelsRoute() {
+	// One client for the guards and the provider, exactly as `main.tsx` wires it.
 	const queryClient = new QueryClient({
 		defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
 	});
-	queryClient.setQueryData(adminListLlmConnectionsQueryKey(), []);
-	queryClient.setQueryData(adminListLlmModelsQueryKey(), []);
-	queryClient.setQueryData(adminListWorkspacesQueryKey(), []);
-	queryClient.setQueryData(adminGetLlmSettingsQueryKey(), {
-		allowWorkspaceConnections: true,
-		allowedEgressHosts: "",
+	const router = createRouter({
+		routeTree,
+		history: createMemoryHistory({ initialEntries: ["/admin/models"] }),
+		context: { queryClient, auth: undefined },
 	});
-	return queryClient;
-}
-
-async function renderPage(queryClient: QueryClient) {
-	if (!AdminLlmPage) throw new Error("Admin LLM route must have a component");
-	await (AdminLlmPage as typeof AdminLlmPage & { preload: () => Promise<unknown> }).preload();
-	return render(
+	render(
 		<QueryClientProvider client={queryClient}>
-			<AdminLlmPage />
+			<AuthProvider>
+				{/* biome-ignore lint/suspicious/noExplicitAny: the app's router context is wider than this test needs. */}
+				<RouterProvider router={router as any} />
+			</AuthProvider>
 		</QueryClientProvider>,
 	);
+	return screen.findByRole("heading", { name: "AI models" }, TRANSFORM_WAIT);
 }
 
 /** A connection with no models on it turns off without a confirm, so every fixture here has one. */
@@ -74,11 +87,11 @@ function connection(id: number, displayName: string): LlmConnection {
 	};
 }
 
-describe("AdminLlmPage", () => {
+describe("instance AI models route", () => {
 	it("renders before a connection or provider probe has been selected", async () => {
-		await renderPage(seededClient());
+		mockPage();
 
-		expect(screen.getByRole("heading", { name: "AI models" })).toBeTruthy();
+		expect(await renderModelsRoute()).toBeTruthy();
 	});
 
 	it("keeps each connection's toggle pending independently when two run at once", async () => {
@@ -94,15 +107,8 @@ describe("AdminLlmPage", () => {
 		let slowToggleCalls = 0;
 		const connections = [connection(1, "Slow provider"), connection(2, "Fast provider")];
 		const models = [model(11, 1, "Slow model"), model(12, 2, "Fast model")];
+		mockPage(connections, models);
 		server.use(
-			http.get("*/admin/llm/connections", () => HttpResponse.json(connections)),
-			http.get("*/admin/llm/models", () => HttpResponse.json(models)),
-			http.get("*/admin/workspaces", () => HttpResponse.json([])),
-			// Without this the settings query falls through to a real fetch, errors, and the policy
-			// card's switch flips from controlled to uncontrolled mid-test — noise, not a finding.
-			http.get("*/admin/llm/settings", () =>
-				HttpResponse.json({ allowWorkspaceConnections: true, allowedEgressHosts: "" }),
-			),
 			http.patch("*/admin/llm/connections/1", async () => {
 				slowToggleCalls += 1;
 				await slowToggle;
@@ -113,13 +119,10 @@ describe("AdminLlmPage", () => {
 			),
 		);
 
-		const queryClient = seededClient();
-		queryClient.setQueryData(adminListLlmConnectionsQueryKey(), connections);
-		queryClient.setQueryData(adminListLlmModelsQueryKey(), models);
-		await renderPage(queryClient);
+		await renderModelsRoute();
 
 		const confirmTurnOff = async (name: string) => {
-			fireEvent.click(await screen.findByRole("switch", { name: `Turn off ${name}` }));
+			fireEvent.click(await screen.findByRole("switch", { name }, TRANSFORM_WAIT));
 			const dialog = await screen.findByRole("alertdialog");
 			fireEvent.click(within(dialog).getByRole("button", { name: "Turn off connection" }));
 			await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
@@ -130,15 +133,15 @@ describe("AdminLlmPage", () => {
 		await confirmTurnOff("Fast provider");
 		// The fast one settles and the list is refetched.
 		await waitFor(() =>
-			expect(
-				screen.getByRole("switch", { name: "Turn off Fast provider" }).getAttribute("aria-busy"),
-			).toBe("false"),
+			expect(screen.getByRole("switch", { name: "Fast provider" }).getAttribute("aria-busy")).toBe(
+				"false",
+			),
 		);
 
 		// The still-running row reads as busy and refuses input; the settled one is usable again.
-		expect(
-			screen.getByRole("switch", { name: "Turn off Slow provider" }).getAttribute("aria-busy"),
-		).toBe("true");
+		expect(screen.getByRole("switch", { name: "Slow provider" }).getAttribute("aria-busy")).toBe(
+			"true",
+		);
 		expect(
 			(screen.getByRole("button", { name: "Delete Slow provider" }) as HTMLButtonElement).disabled,
 		).toBe(true);
@@ -161,13 +164,8 @@ describe("AdminLlmPage", () => {
 		let sharingCalls = 0;
 		const connections = [connection(1, "Shared OpenAI")];
 		const sharedModel = model(7, 1, "GPT Test");
+		mockPage(connections, [sharedModel]);
 		server.use(
-			http.get("*/admin/llm/connections", () => HttpResponse.json(connections)),
-			http.get("*/admin/llm/models", () => HttpResponse.json([sharedModel])),
-			http.get("*/admin/workspaces", () => HttpResponse.json([])),
-			http.get("*/admin/llm/settings", () =>
-				HttpResponse.json({ allowWorkspaceConnections: true, allowedEgressHosts: "" }),
-			),
 			http.put("*/admin/llm/models/7/sharing", async () => {
 				sharingCalls += 1;
 				await slowSharing;
@@ -175,12 +173,11 @@ describe("AdminLlmPage", () => {
 			}),
 		);
 
-		const queryClient = seededClient();
-		queryClient.setQueryData(adminListLlmConnectionsQueryKey(), connections);
-		queryClient.setQueryData(adminListLlmModelsQueryKey(), [sharedModel]);
-		await renderPage(queryClient);
+		await renderModelsRoute();
 
-		fireEvent.click(await screen.findByRole("button", { name: "Manage access for GPT Test" }));
+		fireEvent.click(
+			await screen.findByRole("button", { name: "Manage access for GPT Test" }, TRANSFORM_WAIT),
+		);
 		const dialog = await screen.findByRole("dialog");
 		fireEvent.click(within(dialog).getByRole("button", { name: "Save access" }));
 		await waitFor(() => expect(sharingCalls).toBe(1));

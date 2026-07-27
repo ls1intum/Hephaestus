@@ -98,20 +98,19 @@ interface CapUsage {
 /**
  * Fold one stream's cap, spend and verdict into what the row renders.
  *
- * `paused` prefers the authoritative server flag when present and otherwise falls back to the
- * verdict, which is the only signal the admin rollup carries today. Either way a past month can
- * never be paused: the verdict compares the *current* cap against a finished month.
+ * `paused` is the server's own flag, which the rollup carries per stream. A past month can never be
+ * paused: the verdict compares the *current* cap against a finished month.
  */
 function capUsage(input: {
 	cap?: number;
 	spend: number;
 	verdict?: WorkspaceLlmUsageReport["instanceBudgetVerdict"];
-	paused?: boolean;
+	paused: boolean;
 	isCurrentMonth: boolean;
 }): CapUsage {
 	const { cap, spend, verdict, paused, isCurrentMonth } = input;
 	const percent = budgetUsedPercent(spend, cap);
-	const isPaused = isCurrentMonth && (paused ?? verdict === "EXHAUSTED");
+	const isPaused = isCurrentMonth && paused;
 	return {
 		cap,
 		spend,
@@ -287,8 +286,10 @@ export function AdminInstanceLlmUsageTable({
 											</Button>
 											{/* Only the shared-model budget gets an edit control — the provider cap is the
 											    workspace's own money and its own admins' call. The visible label stays
-											    short for the column; the accessible name says which workspace it edits,
-											    since every row's button reads the same otherwise.
+											    short for the column; the accessible name says which workspace it edits and
+											    which of the two purses, since every row's button reads the same otherwise
+											    — and it opens with the visible label, so speech control ("click Set
+											    budget") still matches it (WCAG 2.2 SC 2.5.3 Label in Name).
 											    Current month only: a budget is not month-scoped, so editing one from a
 											    closed month would quietly change what runs today while the reader is
 											    looking at history. Why it is gone is said once above the table. */}
@@ -296,7 +297,7 @@ export function AdminInstanceLlmUsageTable({
 												<Button
 													variant="outline"
 													size="sm"
-													aria-label={`Set shared-model budget for ${row.displayName}`}
+													aria-label={`Set budget for ${row.displayName} (shared models)`}
 													onClick={() => onEditBudget(row)}
 												>
 													Set budget
@@ -357,8 +358,8 @@ interface WorkspaceUsageDetailsProps {
  * the two together for assistive tech.
  *
  * The two breakdown tables stack until `xl`: side by side they would each be too narrow to avoid a
- * horizontal scroller of their own, and two scrollers on one screen is the thing that made this
- * unusable on a phone.
+ * horizontal scroller of their own, and two scrollers to read one number on one screen is
+ * two-dimensional scrolling (WCAG 2.2 SC 1.4.10).
  */
 function WorkspaceUsageDetails({
 	workspace,
@@ -406,9 +407,11 @@ function WorkspaceUsageDetails({
 			aria-labelledby={`${panelId}-heading`}
 			className="space-y-4 rounded-md border bg-muted/20 p-4"
 		>
-			<h3 id={`${panelId}-heading`} className="font-medium">
+			{/* One level below the page's own `h1`: `CardTitle` is a `<div>`, so nothing between them
+			    contributes to the outline and an `h3` here would skip a level (WCAG SC 1.3.1). */}
+			<h2 id={`${panelId}-heading`} className="font-medium">
 				Usage details · {workspace.displayName}
-			</h3>
+			</h2>
 			{error != null ? (
 				<QueryErrorAlert
 					error={error}
@@ -431,15 +434,15 @@ function WorkspaceUsageDetails({
 					))}
 					<div className="grid gap-4 xl:grid-cols-2">
 						<section aria-labelledby={`${panelId}-run-type`} className="min-w-0 space-y-2">
-							<h4 id={`${panelId}-run-type`} className="font-medium">
+							<h3 id={`${panelId}-run-type`} className="font-medium">
 								By run type
-							</h4>
+							</h3>
 							<LlmUsageByJobTypeTable report={isLoading ? undefined : report} fx={fx} />
 						</section>
 						<section aria-labelledby={`${panelId}-day`} className="min-w-0 space-y-2">
-							<h4 id={`${panelId}-day`} className="font-medium">
+							<h3 id={`${panelId}-day`} className="font-medium">
 								By day
-							</h4>
+							</h3>
 							<LlmUsageByDayTable report={isLoading ? undefined : report} fx={fx} />
 						</section>
 					</div>
@@ -546,18 +549,36 @@ function StatusCell({ shared, provider, isCurrentMonth }: StatusCellProps) {
 	// Both caps can be spent at once, and an admin who only sees "Paused" fields a ticket they
 	// cannot answer — so each cap contributes its own badge and they stack. Each names the money
 	// stream it belongs to, in the same words as the two spend columns.
+	// The state word comes from {@link CAP_STATE_LABELS}, the same constant the cap cells and the
+	// workspace's own console read, so the two consoles cannot drift into synonyms.
 	const badges: StatusBadge[] = [];
 	if (shared.state === "paused") {
-		badges.push({ key: "paused-shared", label: "Paused · shared models", variant: "destructive" });
+		badges.push({
+			key: "paused-shared",
+			label: `${CAP_STATE_LABELS.paused} · shared models`,
+			variant: "destructive",
+		});
 	}
 	if (provider.state === "paused") {
-		badges.push({ key: "paused-provider", label: "Paused · own provider", variant: "destructive" });
+		badges.push({
+			key: "paused-provider",
+			label: `${CAP_STATE_LABELS.paused} · own provider`,
+			variant: "destructive",
+		});
 	}
 	if (shared.state === "near") {
-		badges.push({ key: "near-shared", label: "Near cap · shared models", variant: "warning" });
+		badges.push({
+			key: "near-shared",
+			label: `${CAP_STATE_LABELS.near} · shared models`,
+			variant: "warning",
+		});
 	}
 	if (provider.state === "near") {
-		badges.push({ key: "near-provider", label: "Near cap · own provider", variant: "warning" });
+		badges.push({
+			key: "near-provider",
+			label: `${CAP_STATE_LABELS.near} · own provider`,
+			variant: "warning",
+		});
 	}
 	const noPriceSet = shared.unverifiable || provider.unverifiable;
 

@@ -1,7 +1,6 @@
 export interface CapIsNotMonthScopedProps {
 	/** What is being edited, as the reader's own word: `cap` on the workspace, `budget` on the host's. */
 	subject: "cap" | "budget";
-	className?: string;
 }
 
 /**
@@ -15,9 +14,9 @@ export interface CapIsNotMonthScopedProps {
  * One sentence for both consoles: the instance table's rows lose a button each and say it once above
  * them, the workspace card says it in the space its own button vacated.
  */
-export function CapIsNotMonthScoped({ subject, className }: CapIsNotMonthScopedProps) {
+export function CapIsNotMonthScoped({ subject }: CapIsNotMonthScopedProps) {
 	return (
-		<p className={className ?? "text-sm text-muted-foreground"}>
+		<p className="text-sm text-muted-foreground">
 			A {subject} applies from the moment it is saved, not to the month you are reading. Step
 			forward to this month to change it.
 		</p>

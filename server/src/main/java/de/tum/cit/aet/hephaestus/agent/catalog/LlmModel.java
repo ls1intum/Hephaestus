@@ -31,10 +31,15 @@ import org.jspecify.annotations.Nullable;
 @Entity
 @Table(
     name = "llm_model",
-    uniqueConstraints = @UniqueConstraint(
-        name = "ux_llm_model_connection_slug",
-        columnNames = { "connection_id", "slug" }
-    )
+    uniqueConstraints = {
+        @UniqueConstraint(name = "ux_llm_model_connection_slug", columnNames = { "connection_id", "slug" }),
+        // Both constraints are declared here so the ddl-auto test schema matches production, where the
+        // changelog creates them. LlmModelService#create catches the violation of this one by name.
+        @UniqueConstraint(
+            name = "ux_llm_model_connection_upstream",
+            columnNames = { "connection_id", "upstream_model_id" }
+        ),
+    }
 )
 @Getter
 @Setter

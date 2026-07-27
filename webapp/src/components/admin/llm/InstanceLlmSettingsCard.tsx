@@ -57,8 +57,8 @@ function InstanceLlmSettingsForm({ settings, isSubmitting, onSave }: InstanceLlm
 	);
 
 	// Derived, never stored: "is there anything to save" is a comparison against what the server holds
-	// right now, and the server's answer moves. Stored in a `dirty` flag it had to be reset by the same
-	// effect that clobbered the fields — which greyed out Save on a form the admin had typed into.
+	// right now, and the server's answer moves — a stored flag would have to be invalidated by whatever
+	// notices that, which is the same edge the seeding rule above exists to avoid.
 	// Trimmed on the host list because that is the form the payload below is sent in, so a lone
 	// trailing newline is not offered as a change.
 	const savedHosts = (settings.allowedEgressHosts ?? "").trim();

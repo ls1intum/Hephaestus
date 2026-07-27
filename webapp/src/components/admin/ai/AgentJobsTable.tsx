@@ -1,7 +1,7 @@
-import { formatDistanceToNow } from "date-fns";
 import { AlertCircle, Bot, ChevronRight } from "lucide-react";
 import { useId } from "react";
 import type { AgentJob } from "@/api/types.gen";
+import { RelativeTime } from "@/components/common/RelativeTime";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -76,9 +76,9 @@ export function AgentJobsTable({
 				{/* The visible "Status" text *is* the control's label, so the accessible name can never
 				    drift from what a speech-control user reads out loud (WCAG SC 2.5.3). */}
 				{/* `w-40` is 10rem, which under SC 1.4.4 text-only zoom at 200 % becomes 320 px — the
-				    entire reflow viewport — so the label beside it pushed the page sideways. `max-w-full`
-				    caps the control against the row and `flex-wrap` lets it drop below its label instead
-				    of overflowing once the two no longer fit side by side. */}
+				    entire reflow viewport, leaving no room for the label beside it. `max-w-full` caps the
+				    control against the row and `flex-wrap` lets it drop below its label instead of
+				    overflowing once the two no longer fit side by side. */}
 				<Field orientation="horizontal" className="w-auto max-w-full flex-wrap text-sm">
 					<FieldLabel htmlFor={statusFilterId} className="text-muted-foreground">
 						Status
@@ -153,7 +153,6 @@ export function AgentJobsTable({
 					</TableHeader>
 					<TableBody>
 						{jobs.map((job) => {
-							const created = formatDistanceToNow(new Date(job.createdAt), { addSuffix: true });
 							return (
 								<TableRow key={job.id}>
 									<TableCell>
@@ -165,7 +164,13 @@ export function AgentJobsTable({
 									<TableCell className="text-muted-foreground">
 										{job.llmModel ?? job.llmModelVersion ?? "—"}
 									</TableCell>
-									<TableCell className="text-muted-foreground">{created}</TableCell>
+									<TableCell className="text-muted-foreground">
+										{/* The shared ticking clock, like every other standalone timestamp: a queue is
+										    read while it is moving, so a "2 minutes ago" that froze on paint is worse
+										    than no reading. No tooltip: its trigger is a button, and one per row would
+										    put a tab stop between every row and its Details action. */}
+										<RelativeTime value={job.createdAt} tooltip={false} />
+									</TableCell>
 									<TableCell>
 										{job.deliveryStatus ? (
 											<Badge variant={deliveryBadgeVariant(job.deliveryStatus)}>
@@ -188,7 +193,10 @@ export function AgentJobsTable({
 											<Button
 												variant="ghost"
 												size="icon-sm"
-												aria-label={`View details for the ${modelLabel(job)} run ${created}`}
+												// Named by what the row *is*, not by when it happened: a relative phrase in an
+												// accessible name goes stale the moment the shared clock ticks past it, and
+												// the created cell beside this button already announces the instant.
+												aria-label={`View details for the ${STATUS_LABELS[job.status].toLowerCase()} ${modelLabel(job)} run`}
 												onClick={() => onSelectJob(job)}
 											>
 												<ChevronRight className="size-4" />

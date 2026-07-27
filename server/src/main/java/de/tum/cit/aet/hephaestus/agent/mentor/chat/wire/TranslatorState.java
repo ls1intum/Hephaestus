@@ -267,7 +267,8 @@ public final class TranslatorState {
         }
     }
 
-    public synchronized boolean hasObservedUsage() {
+    /** Callers hold this instance's monitor already — {@link #observedUsage()} is the only caller. */
+    private boolean hasObservedUsage() {
         return !completedUsage.isEmpty() || currentUsage != null;
     }
 

@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import {
 	getLlmUsageReportOptions,
@@ -39,6 +39,14 @@ function AdminUsageContainer() {
 	// and always forwardable. `replace` is deliberately not used: Back stepping months is the point.
 	const goToMonth = (next: string) => navigate({ search: (prev) => ({ ...prev, month: next }) });
 	const [isEditingOwnProviderCap, setIsEditingOwnProviderCap] = useState(false);
+	// Whether the cap dialog is on screen *right now*. React Query snapshots a mutation's options when
+	// `mutate` is called, so the state its callbacks close over is the state from that moment — the
+	// one value that cannot answer "is that field still on screen to report into".
+	const isEditingRef = useRef(false);
+	const editOwnProviderCap = (isEditing: boolean) => {
+		isEditingRef.current = isEditing;
+		setIsEditingOwnProviderCap(isEditing);
+	};
 
 	const {
 		data: report,
@@ -66,13 +74,26 @@ function AdminUsageContainer() {
 					? "Cap removed. New calls resume within a minute."
 					: "Cap saved. New calls resume within a minute.",
 			);
-			setIsEditingOwnProviderCap(false);
+			editOwnProviderCap(false);
 		},
-		// No toast: the dialog renders the server's reason next to the amount that caused it.
+		onError: (error) => {
+			// The server's reason belongs next to the amount that earned it, so while the dialog is open
+			// the field's own error is the whole report and a toast would only say it twice.
+			//
+			// The dialog stays dismissible during the write — `fetch` has no timeout, so refusing to
+			// close would be a trap — and dismissing it resets the mutation. A rejection arriving after
+			// that has no field left to land in: the page would keep showing the old cap and the admin
+			// would walk away believing the new one is in force. So it is said out loud instead.
+			if (!isEditingRef.current) {
+				toast.error("Couldn't save the cap", { description: problemDetailOf(error) });
+			}
+		},
 	});
 
-	// Two questions, not one: whether this is *the* current month (what the cap editor and the
-	// "at today's rate" hint turn on) and whether the stepper may move forward.
+	// Two questions the page asks separately: whether this is *the* current month (what the cap editor
+	// and the "at today's rate" hint turn on) and whether the stepper may move forward.
+	// `usageSearchSchema` clamps `month` to this month, so today each is the other's negation; they
+	// are asked apart because only that clamp makes it so, and the clamp is not this file's.
 	const isCurrentMonth = isCurrentMonthUtc(month);
 	const canGoNext = canStepForwardFrom(month);
 
@@ -91,7 +112,7 @@ function AdminUsageContainer() {
 				onNextMonth={() => {
 					if (canGoNext) goToMonth(addMonths(month, 1));
 				}}
-				onEditOwnProviderCap={() => setIsEditingOwnProviderCap(true)}
+				onEditOwnProviderCap={() => editOwnProviderCap(true)}
 			/>
 			<SetOwnProviderBudgetDialog
 				open={isEditingOwnProviderCap}
@@ -106,7 +127,7 @@ function AdminUsageContainer() {
 				}
 				onOpenChange={(open) => {
 					if (!open) {
-						setIsEditingOwnProviderCap(false);
+						editOwnProviderCap(false);
 						// Otherwise reopening the dialog shows the rejection of an amount the admin has since
 						// walked away from, against a field they have not typed in yet.
 						updateOwnProviderCap.reset();

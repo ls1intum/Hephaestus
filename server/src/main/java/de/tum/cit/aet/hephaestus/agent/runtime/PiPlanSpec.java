@@ -8,7 +8,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * Inputs for {@link PiRuntimeFactory#build(PiPlanSpec)}.
  *
- * <p>#1368 slice 5 — ONE credential path: every Pi sandbox talks to the in-app LLM proxy over
+ * <p><b>ONE credential path.</b> Every Pi sandbox talks to the in-app LLM proxy over
  * {@code $LLM_PROXY_URL}/{@code $LLM_PROXY_TOKEN} and NEVER holds a real provider API key.
  * {@code jobToken} is therefore always required — it is the job-scoped bearer credential the proxy
  * resolves server-side (see {@code LlmProxyController}), bounded by the job's timeout and revoked on

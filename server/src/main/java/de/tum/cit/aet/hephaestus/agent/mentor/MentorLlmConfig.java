@@ -13,10 +13,10 @@ import org.jspecify.annotations.Nullable;
  * Decouples the mentor module from the workspace's agent binding.
  *
  * <p>Routes through {@link LlmModelResolver} — the same resolved, non-secret behaviour shape
- * ({@code ResolvedLlmModel}) the practice-review path freezes into {@code ConfigSnapshot}. This
- * closes the capability drift the mentor runner previously hardcoded (context window, max output
- * tokens) and gives the mentor the SAME connection-scoped, live credential resolution the proxy
- * performs for one-shot jobs.
+ * ({@code ResolvedLlmModel}) the practice-review path freezes into {@code ConfigSnapshot}. It carries
+ * the resolved capabilities (context window, max output tokens) rather than having the mentor runner
+ * hardcode them, and gives the mentor the SAME connection-scoped, live credential resolution the
+ * proxy performs for one-shot jobs.
  */
 public record MentorLlmConfig(
     String apiProtocol,

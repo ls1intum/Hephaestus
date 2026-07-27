@@ -1,13 +1,14 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router";
 import { CircleDollarSign } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import {
 	adminGetLlmUsageReportOptions,
 	adminGetLlmUsageReportQueryKey,
 	adminUpdateWorkspaceLlmBudgetMutation,
 	getLlmUsageReportOptions,
+	getLlmUsageReportQueryKey,
 } from "@/api/@tanstack/react-query.gen";
 import type { AdminWorkspaceLlmUsage } from "@/api/types.gen";
 import { AdminInstanceLlmUsageTable } from "@/components/admin/usage/AdminInstanceLlmUsageTable";
@@ -41,6 +42,14 @@ function AdminInstanceUsagePage() {
 	// and always forwardable. `replace` is deliberately not used: Back stepping months is the point.
 	const goToMonth = (next: string) => navigate({ search: (prev) => ({ ...prev, month: next }) });
 	const [editing, setEditing] = useState<AdminWorkspaceLlmUsage | null>(null);
+	// Which workspace's budget dialog is on screen *right now*. React Query snapshots a mutation's
+	// options when `mutate` is called, so the `editing` its callbacks close over is the one from that
+	// moment — the single value that cannot answer "is that field still on screen to report into".
+	const editingRef = useRef<AdminWorkspaceLlmUsage | null>(null);
+	const editBudgetFor = (workspace: AdminWorkspaceLlmUsage | null) => {
+		editingRef.current = workspace;
+		setEditing(workspace);
+	};
 	const [expanded, setExpanded] = useState<AdminWorkspaceLlmUsage | null>(null);
 
 	const listQuery = useQuery({
@@ -70,6 +79,15 @@ function AdminInstanceUsagePage() {
 		onSuccess: (_data, variables) => {
 			// Prefix key (no options) invalidates every cached month.
 			queryClient.invalidateQueries({ queryKey: adminGetLlmUsageReportQueryKey() });
+			// The expanded Details panel is fed by the *workspace-scoped* report, a different key family
+			// that the prefix above does not reach. It stays mounted across the write, so without this it
+			// keeps quoting the budget that was just replaced — right under a row already showing the new
+			// one. Omitting `query` covers every cached month: a budget is not month-scoped.
+			queryClient.invalidateQueries({
+				queryKey: getLlmUsageReportQueryKey({
+					path: { workspaceSlug: variables.path.workspaceSlug },
+				}),
+			});
 			// The proxy caches its answer for about 30s, so "resumes now" would be a small lie. A bound
 			// ("within a minute") rather than a hedge ("about a minute") — it is one the gate keeps.
 			toast.success(
@@ -77,15 +95,26 @@ function AdminInstanceUsagePage() {
 					? "Budget removed. New calls resume within a minute."
 					: "Budget saved. New calls resume within a minute.",
 			);
-			setEditing(null);
+			editBudgetFor(null);
 		},
-		// No error toast: the dialog renders the server's reason as the amount field's error, where it
-		// sits next to the value that was rejected instead of evaporating above it.
+		onError: (error, variables) => {
+			// The server's reason belongs against the amount that earned it, so while that dialog is
+			// open the field's own error is the whole report and a toast would only say it twice.
+			//
+			// The dialog stays dismissible during the write — `fetch` has no timeout, so refusing to
+			// close would be a trap — and dismissing it resets the mutation. A rejection arriving after
+			// that has no field left to land in: the table would keep showing the old budget and the
+			// admin would walk away believing the new one is in force. So it is said out loud instead.
+			if (editingRef.current?.workspaceSlug !== variables.path.workspaceSlug) {
+				toast.error("Couldn't save the budget", { description: problemDetailOf(error) });
+			}
+		},
 	});
 
-	// Two questions, not one: whether the stepper may move forward, and whether this *is* the current
-	// month — which is what the budget editors and the "at today's rate" hint turn on. A month later
-	// than this one answers no to both, so neither may be the other's negation.
+	// Two questions the page asks separately: whether the stepper may move forward, and whether this
+	// *is* the current month — which is what the budget editors and the "at today's rate" hint turn
+	// on. `usageSearchSchema` clamps `month` to this month, so today each is the other's negation;
+	// they are asked apart because only that clamp makes it so, and the clamp is not this file's.
 	const canGoNext = canStepForwardFrom(month);
 	const isCurrentMonth = isCurrentMonthUtc(month);
 
@@ -137,7 +166,7 @@ function AdminInstanceUsagePage() {
 						current?.workspaceSlug === workspace.workspaceSlug ? null : workspace,
 					)
 				}
-				onEditBudget={setEditing}
+				onEditBudget={editBudgetFor}
 			/>
 
 			<SetBudgetDialog
@@ -152,7 +181,7 @@ function AdminInstanceUsagePage() {
 				}
 				onOpenChange={(open) => {
 					if (!open) {
-						setEditing(null);
+						editBudgetFor(null);
 						// Otherwise the next workspace's dialog opens showing this one's rejection.
 						updateBudget.reset();
 					}

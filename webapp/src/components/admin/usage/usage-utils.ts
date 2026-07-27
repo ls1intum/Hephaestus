@@ -122,6 +122,10 @@ export function projectBudget(
 	spendUsd: number,
 	capUsd: number | undefined,
 	month: string,
+	// Injected, where {@link isCurrentMonthUtc} reads the real clock. Both are called only by the two
+	// usage routes, which pass the same real `new Date()` into this one and hand `isCurrentMonth` down
+	// as a prop — so the two clocks are the same clock in production, and a story that injects a
+	// different `now` also passes its own `isCurrentMonth` rather than deriving one.
 	now: Date,
 ): BudgetProjection | null {
 	if (capUsd == null || capUsd <= 0 || spendUsd <= 0) {

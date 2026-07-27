@@ -53,17 +53,4 @@ public record UpdateLlmModelPriceRequestDTO(
     @Size(max = 500)
     @Schema(description = "Note; required when the model is free (e.g. self-hosted, no cost)")
     String note
-) {
-    /** Source-compatible constructor for tests/callers compiled against the removed overlapping reasoning rate. */
-    public UpdateLlmModelPriceRequestDTO(
-        PricingMode pricingMode,
-        BigDecimal input,
-        BigDecimal output,
-        BigDecimal cacheRead,
-        BigDecimal cacheWrite,
-        BigDecimal ignoredReasoning,
-        String note
-    ) {
-        this(pricingMode, input, output, cacheRead, cacheWrite, note);
-    }
-}
+) {}

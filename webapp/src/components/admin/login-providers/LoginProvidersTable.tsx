@@ -234,11 +234,11 @@ export function LoginProvidersTable({
 
 			<AlertDialog
 				open={deleting != null}
-				// Dismissal is always allowed, including while the DELETE is in flight. Refusing it left
-				// Escape and a disabled Cancel with no way out of a popup whose only other control was also
-				// disabled — a keyboard trap (WCAG 2.2 SC 2.1.2), unbounded against a connection that never
-				// answers. The request is not cancelled; the row it belongs to stays disabled until it
-				// settles, and a failure still toasts.
+				// Dismissal is always allowed, including while the DELETE is in flight. Refusing it would
+				// leave Escape and a disabled Cancel with no way out of a popup whose only other control is
+				// also disabled — a keyboard trap (WCAG 2.2 SC 2.1.2), unbounded against a connection that
+				// never answers. The request is not cancelled; the row it belongs to stays disabled until
+				// it settles, and a failure still toasts.
 				onOpenChange={(open) => {
 					if (!open) setDeleting(null);
 				}}

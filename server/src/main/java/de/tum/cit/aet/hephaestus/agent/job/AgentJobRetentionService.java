@@ -54,7 +54,7 @@ public class AgentJobRetentionService {
     private static final int BATCH_SIZE = 500;
 
     /**
-     * Wall-clock budget per pass (strip, then delete, finding #11): on a fresh backlog
+     * Wall-clock budget per pass (strip, then delete): on a fresh backlog
      * (e.g. retention just enabled against an already-large table) the batch loop could otherwise run for
      * a very long time in one {@link #runRetention()} invocation. Stopping early once the budget is spent
      * just means the remainder is worked off on the NEXT scheduled run (6h later) instead of blocking this

@@ -12,11 +12,10 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Reads a streamed call's token usage out of the SSE bytes on their way to the client.
  *
- * <p>A streaming call used to contribute nothing to either the ledger or the budget gate: the proxy
- * returned as soon as it saw an SSE body, so {@code accounting.recordUsage} was never reached. That
- * made any runner that streams — and the mentor streams by design — invisible to both. This tap
- * closes that half; {@code LlmProxyController#prepareBody} closes the other by asking the provider to
- * emit usage in the first place.
+ * <p>Without it a streaming call would reach neither the ledger nor the budget gate — the proxy
+ * returns as soon as it sees an SSE body, so {@code accounting.recordUsage} is never reached on that
+ * path, and the mentor streams by design. This tap is half of what makes a stream billable;
+ * {@code LlmProxyController#prepareBody} is the other half, asking the provider to emit usage at all.
  *
  * <h2>Where the usage is</h2>
  *

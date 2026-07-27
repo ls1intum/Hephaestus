@@ -15,6 +15,7 @@ import {
 import {
 	Table,
 	TableBody,
+	TableCaption,
 	TableCell,
 	TableHead,
 	TableHeader,
@@ -79,7 +80,10 @@ export function AdminLlmModelsSection({
 	return (
 		<div className="space-y-3">
 			<div className="flex items-center justify-between">
-				<h3 className="text-sm font-medium">Models on {connectionDisplayName}</h3>
+				{/* One level below the page's `h1`. `CardTitle` and this table's own caption are `<div>`
+				    and `<caption>`, so nothing between them contributes to the outline and an `h3` would
+				    skip a level (WCAG SC 1.3.1). Level is independent of the `text-sm` sizing. */}
+				<h2 className="text-sm font-medium">Models on {connectionDisplayName}</h2>
 				<Button size="sm" variant="outline" onClick={onAdd}>
 					<Plus className="size-4" aria-hidden />
 					Add model
@@ -104,13 +108,16 @@ export function AdminLlmModelsSection({
 				</Empty>
 			) : (
 				<Table containerClassName="rounded-md border">
+					<TableCaption className="sr-only">Models on {connectionDisplayName}</TableCaption>
 					<TableHeader>
 						<TableRow>
-							<TableHead>Model</TableHead>
-							<TableHead>Price</TableHead>
-							<TableHead>Workspace access</TableHead>
-							<TableHead>Status</TableHead>
-							<TableHead className="text-right">Actions</TableHead>
+							<TableHead scope="col">Model</TableHead>
+							<TableHead scope="col">Price</TableHead>
+							<TableHead scope="col">Workspace access</TableHead>
+							<TableHead scope="col">Status</TableHead>
+							<TableHead scope="col" className="text-right">
+								Actions
+							</TableHead>
 						</TableRow>
 					</TableHeader>
 					<TableBody>

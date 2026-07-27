@@ -66,8 +66,7 @@ public class AgentBindingService {
 
     /**
      * Create or replace the workspace's binding for one purpose from a direct write: bind exactly one
-     * available model and set the execution limits. Clears the legacy scalar pointer for the purpose so
-     * a subsequent config edit's {@link #sync} does not overwrite this direct write.
+     * available model and set the execution limits.
      */
     @Transactional
     public WorkspaceAgentBinding upsertBinding(

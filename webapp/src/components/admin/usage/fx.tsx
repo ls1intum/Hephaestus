@@ -1,6 +1,5 @@
 import type { FxRateInfo } from "@/api/types.gen";
 import { asDate } from "@/lib/dates";
-import { cn } from "@/lib/utils";
 
 /**
  * Display-only currency conversion for the AI-usage surfaces.
@@ -155,11 +154,16 @@ export function spendOfCapConversion(
 	};
 }
 
-/** UTC, like every other date on these pages, and `en-US` for the same reason the amounts are. */
+/**
+ * UTC, and in the viewer's own locale — the one date policy these pages have (`formatUsageDay`,
+ * `formatMonthLabel`, `formatDayLabel` in `usage-utils.ts` all read the same way). The `en-US` pin
+ * above is about *numbers*, where a comma decimal in a parenthetical hanging off `$4.50` puts two
+ * number grammars on one line; a date carries no separator that can be misread as another number.
+ */
 function formatRateDate(value: FxRateInfo["rateDate"]): string {
 	const date = asDate(value);
 	if (!date) return "–";
-	return date.toLocaleDateString("en-US", {
+	return date.toLocaleDateString(undefined, {
 		month: "short",
 		day: "numeric",
 		year: "numeric",
@@ -197,7 +201,12 @@ function disclosureParts(fx: Fx, isCurrentMonth: boolean): DisclosureParts | nul
 	if (written == null || spoken == null) {
 		return null;
 	}
-	const publisher = SOURCE_NAMES[fx.source] as string | undefined;
+	// `fx.source` is typed as the one value the *current* spec knows, but the payload can carry one a
+	// newer server added, so the lookup is widened rather than trusted. `SOURCE_NAMES` stays a total
+	// `Record` so adding a source to the spec fails the build until it is named here.
+	const publisher: string | undefined = (SOURCE_NAMES as Record<string, string | undefined>)[
+		fx.source
+	];
 	return {
 		lead: `${fx.currencyCode} amounts are estimates at the ${publisher == null ? "" : `${publisher} `}reference rate published on ${formatRateDate(fx.rateDate)}`,
 		rate: {
@@ -241,8 +250,10 @@ export function fxCapHint(
 	fx: Fx,
 	isCurrentMonth: boolean,
 ): FxCapHint | null {
+	// No `fx == null` check: `capConversion` already returns `null` without a rate, so this is the
+	// one question left to ask.
 	const conversion = capConversion(valueUsd, fx);
-	if (conversion == null || fx == null || !isCurrentMonth) {
+	if (conversion == null || !isCurrentMonth) {
 		return null;
 	}
 	return {
@@ -253,7 +264,6 @@ export function fxCapHint(
 
 export interface FxApproxProps {
 	conversion: FxConversion;
-	className?: string;
 }
 
 /**
@@ -261,9 +271,9 @@ export interface FxApproxProps {
  * dropped by conforming assistive tech, and read literally "≈" is announced as "tilde operator" or
  * skipped — either way the "estimate" the glyph carries is lost.
  */
-export function FxApprox({ conversion, className }: FxApproxProps) {
+export function FxApprox({ conversion }: FxApproxProps) {
 	return (
-		<span role="img" aria-label={conversion.label} className={cn("whitespace-nowrap", className)}>
+		<span role="img" aria-label={conversion.label} className="whitespace-nowrap">
 			{conversion.text}
 		</span>
 	);
@@ -271,18 +281,17 @@ export function FxApprox({ conversion, className }: FxApproxProps) {
 
 export interface FxAmountProps {
 	conversion: FxConversion | null;
-	className?: string;
 }
 
 /** The parenthetical that trails a USD figure: ` (≈ €3.96)`, separating space included. */
-export function FxAmount({ conversion, className }: FxAmountProps) {
+export function FxAmount({ conversion }: FxAmountProps) {
 	if (conversion == null) {
 		return null;
 	}
 	return (
 		<>
 			{" "}
-			<span role="img" aria-label={conversion.label} className={cn("whitespace-nowrap", className)}>
+			<span role="img" aria-label={conversion.label} className="whitespace-nowrap">
 				({conversion.text})
 			</span>
 		</>
@@ -292,20 +301,19 @@ export function FxAmount({ conversion, className }: FxAmountProps) {
 export interface FxSpendProps {
 	usd: number | null | undefined;
 	fx: Fx;
-	className?: string;
 }
 
 /**
  * `≈ €3.96` on its own line under a spend figure — the form every money cell uses. Renders nothing
  * when there is no conversion, so a column of `$0` rows keeps its single-line height.
  */
-export function FxSpendLine({ usd, fx, className }: FxSpendProps) {
+export function FxSpendLine({ usd, fx }: FxSpendProps) {
 	const conversion = spendConversion(usd, fx);
 	if (conversion == null) {
 		return null;
 	}
 	return (
-		<div className={cn("text-xs font-normal text-muted-foreground tabular-nums", className)}>
+		<div className="text-xs font-normal text-muted-foreground tabular-nums">
 			<FxApprox conversion={conversion} />
 		</div>
 	);
@@ -315,17 +323,16 @@ export interface FxDisclosureProps {
 	fx: Fx;
 	/** A closed month's rate is frozen inside it, which changes what the caption promises. */
 	isCurrentMonth: boolean;
-	className?: string;
 }
 
 /** Once per page, under the figures it covers — never per number, where it would drown them. */
-export function FxDisclosure({ fx, isCurrentMonth, className }: FxDisclosureProps) {
+export function FxDisclosure({ fx, isCurrentMonth }: FxDisclosureProps) {
 	const parts = disclosureParts(fx, isCurrentMonth);
 	if (parts == null) {
 		return null;
 	}
 	return (
-		<p className={cn("text-sm text-muted-foreground", className)}>
+		<p className="text-sm text-muted-foreground">
 			{parts.lead}
 			{" ("}
 			<FxApprox conversion={parts.rate} />

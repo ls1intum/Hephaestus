@@ -36,7 +36,6 @@ export function SetBudgetDialog({
 	return (
 		<BudgetAmountDialog
 			open={workspace !== null}
-			resetKey={workspace?.workspaceSlug}
 			title="Set shared-model budget"
 			description={
 				workspace !== null ? (

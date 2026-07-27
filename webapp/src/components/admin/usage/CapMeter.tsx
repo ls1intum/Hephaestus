@@ -53,9 +53,9 @@ export interface CapMeterProps {
 /**
  * One cap's consumption, everywhere a cap is shown.
  *
- * Three tones, because two hid the approach: normal, amber from {@link BUDGET_WARN_PERCENT} — the
- * same threshold that raises the pace warning — and destructive once the cap is reached or the
- * pause is live.
+ * Three tones, so the approach to a cap is legible before the cap is reached: normal, amber from
+ * {@link BUDGET_WARN_PERCENT} — the same threshold that raises the pace warning — and destructive
+ * once the cap is reached or the pause is live.
  *
  * The bar is all this owns. Layout and the caption underneath belong to the surface (a card has
  * room for "82% used · Near cap"; a table cell needs the amount in the same breath), but the tone

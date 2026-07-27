@@ -182,7 +182,11 @@ export function AgentJobDetailsPanel({
 												</AlertDialogDescription>
 											</AlertDialogHeader>
 											<AlertDialogFooter>
-												<AlertDialogCancel disabled={isCancelling}>Keep running</AlertDialogCancel>
+												{/* Never disabled: with both footer buttons out, this popup has no operable
+											    control at all, which is the shape `ConfirmDialog` exists to prevent. The
+											    request is not cancelled by dismissing; the trigger behind it stays
+											    disabled until it settles. */}
+												<AlertDialogCancel>Keep running</AlertDialogCancel>
 												<AlertDialogAction
 													variant="destructive"
 													disabled={isCancelling}
@@ -212,7 +216,7 @@ export function AgentJobDetailsPanel({
 												</AlertDialogDescription>
 											</AlertDialogHeader>
 											<AlertDialogFooter>
-												<AlertDialogCancel disabled={isRetrying}>Cancel</AlertDialogCancel>
+												<AlertDialogCancel>Cancel</AlertDialogCancel>
 												<AlertDialogAction
 													disabled={isRetrying}
 													onClick={() => onRetryDelivery(job)}

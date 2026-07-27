@@ -1,5 +1,5 @@
 import { ChevronDown } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useId, useState } from "react";
 import type {
 	AgentBinding,
 	AgentBindingRequest,
@@ -117,9 +117,10 @@ export interface AgentBindingsPageProps {
 }
 
 /**
- * What each AI task runs on, one card per purpose. Purely presentational: the route owns every
- * query and mutation, so this page's data dependencies are readable from the route file and its
- * stories need no request mocking.
+ * What each AI task runs on, one card per purpose. The route owns every query and mutation for the
+ * task cards, so their data dependencies are readable from the route file and their stories need no
+ * request mocking. The one exception is {@link WorkspaceLlmProviderPanel} below, which still fetches
+ * and mutates on its own — the remaining nested data layer on this surface.
  */
 export function AgentBindingsPage({
 	workspaceSlug,
@@ -202,10 +203,16 @@ export function AgentBindingsPage({
 
 					{ownProviderAllowed && (
 						<section className="space-y-4">
-							{/* The panel owns this section's heading: it sits in a row with "Add provider", and
-							    two headings two lines apart said the same thing twice. This panel still fetches
-							    and mutates on its own — the remaining nested data layer on this surface. */}
-							<WorkspaceLlmProviderPanel workspaceSlug={workspaceSlug} ownProviderAllowed />
+							{/* The panel owns this section's heading, because it sits in a row with "Add
+							    provider". The real setting is handed down rather than hard-coded, so the panel's
+							    "new providers are disabled" banner reflects the instance rather than a constant.
+							    Known gap: while the section is gated on the same flag, a workspace that *loses*
+							    the permission also loses sight of the providers it already has, which the banner
+							    promises it keeps — closing that means mounting the panel unconditionally. */}
+							<WorkspaceLlmProviderPanel
+								workspaceSlug={workspaceSlug}
+								ownProviderAllowed={ownProviderAllowed}
+							/>
 						</section>
 					)}
 				</div>
@@ -233,6 +240,7 @@ function AgentPurposeCard({
 	onSave,
 	onTurnOff,
 }: AgentPurposeCardProps) {
+	const cardLabelId = useId();
 	const [selection, setSelection] = useState<ModelSelection | null>(bindingToSelection(binding));
 	const [enabled, setEnabled] = useState(binding?.enabled ?? true);
 	const [timeoutSeconds, setTimeoutSeconds] = useState(String(binding?.timeoutSeconds ?? 600));
@@ -254,6 +262,8 @@ function AgentPurposeCard({
 
 	const modelHintId = `${meta.purpose}-model-hint`;
 	const modelErrorId = `${meta.purpose}-model-error`;
+	const timeoutErrorId = `${meta.purpose}-timeout-error`;
+	const concurrencyErrorId = `${meta.purpose}-concurrency-error`;
 	const modelDescribedBy =
 		[noModels ? modelHintId : null, modelError ? modelErrorId : null].filter(Boolean).join(" ") ||
 		undefined;
@@ -279,9 +289,9 @@ function AgentPurposeCard({
 
 	if (!featureEnabled) {
 		return (
-			<Card>
+			<Card role="region" aria-labelledby={cardLabelId}>
 				<CardHeader>
-					<CardTitle>{meta.title}</CardTitle>
+					<CardTitle id={cardLabelId}>{meta.title}</CardTitle>
 					<CardDescription>
 						Turned off for this workspace. Only your host can turn it on.
 					</CardDescription>
@@ -291,13 +301,15 @@ function AgentPurposeCard({
 	}
 
 	return (
-		<Card>
+		// A named region, so each purpose's card is reachable in the accessible tree — every card's
+		// Save, Turn off and model picker otherwise read identically.
+		<Card role="region" aria-labelledby={cardLabelId}>
 			<CardHeader>
 				{/* `min-w-0` lets the description wrap instead of forcing the row wider than the card;
 				    `flex-wrap` drops the badge onto its own line once there is no room for both. */}
 				<div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
 					<div className="min-w-0 flex-1">
-						<CardTitle>{meta.title}</CardTitle>
+						<CardTitle id={cardLabelId}>{meta.title}</CardTitle>
 						<CardDescription>{meta.description}</CardDescription>
 					</div>
 					{binding &&
@@ -372,13 +384,16 @@ function AgentPurposeCard({
 											min={MIN_TIMEOUT_SECONDS}
 											value={timeoutSeconds}
 											aria-invalid={Boolean(timeoutError)}
+											// The reason, not just the fact: `aria-invalid` alone announces "invalid"
+											// and nothing else on the way back to the field (WCAG SC 3.3.1).
+											aria-describedby={timeoutError ? timeoutErrorId : undefined}
 											onChange={(e) => {
 												setTimeoutSeconds(e.target.value);
 												setShowErrors(false);
 											}}
 											disabled={pending}
 										/>
-										{timeoutError && <FieldError>{timeoutError}</FieldError>}
+										{timeoutError && <FieldError id={timeoutErrorId}>{timeoutError}</FieldError>}
 									</Field>
 									<Field data-invalid={Boolean(concurrencyError)}>
 										<FieldLabel htmlFor={`${meta.purpose}-concurrency`}>
@@ -391,13 +406,16 @@ function AgentPurposeCard({
 											min={MIN_CONCURRENT_JOBS}
 											value={maxConcurrentJobs}
 											aria-invalid={Boolean(concurrencyError)}
+											aria-describedby={concurrencyError ? concurrencyErrorId : undefined}
 											onChange={(e) => {
 												setMaxConcurrentJobs(e.target.value);
 												setShowErrors(false);
 											}}
 											disabled={pending}
 										/>
-										{concurrencyError && <FieldError>{concurrencyError}</FieldError>}
+										{concurrencyError && (
+											<FieldError id={concurrencyErrorId}>{concurrencyError}</FieldError>
+										)}
 									</Field>
 									<Field orientation="horizontal">
 										<FieldLabel htmlFor={`${meta.purpose}-internet`}>Internet access</FieldLabel>

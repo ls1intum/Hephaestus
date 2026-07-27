@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.proxy;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
 
+import de.tum.cit.aet.hephaestus.agent.LlmProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.net.ConnectException;
 import java.net.UnknownHostException;
@@ -36,7 +37,16 @@ class LlmProxyWebClientConfigTest extends BaseUnitTest {
         ConnectionProvider provider = config.llmProxyConnectionProvider();
         LoopResources loop = config.llmProxyLoopResources();
         try {
-            WebClient client = config.llmProxyWebClient(provider, loop, false);
+            WebClient client = config.llmProxyWebClient(
+                provider,
+                loop,
+                // Loopback disallowed: this test asserts the resolver refuses a host that resolves to 127.0.0.1.
+                new LlmProperties(
+                    "",
+                    new LlmProperties.Egress(false),
+                    new LlmProperties.Fx(LlmProperties.ECB_DAILY_URL)
+                )
+            );
 
             Throwable thrown = catchThrowable(() ->
                 client.get().uri(LOOPBACK_URL).retrieve().bodyToMono(String.class).block(BLOCK)

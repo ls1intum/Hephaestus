@@ -101,10 +101,13 @@ public class AgentJobExecutor {
     private static final String MDC_JOB_TYPE = "agent.jobType";
     private static final int MAX_ERROR_MESSAGE_LENGTH = 4000;
     private static final int MAX_CONTAINER_LOGS_CHARS = 65536; // 64KB
-    // How long a claim-blocked job waits before the poll loop re-evaluates the cap, and the maximum
-    // total time it may stay held before it is cancelled as stale.
+    // How long a claim-blocked job waits before the poll loop re-evaluates the cap.
     private static final Duration BUDGET_HOLD_INTERVAL = Duration.ofHours(1);
-    private static final Duration BUDGET_HOLD_MAX_AGE = Duration.ofDays(7);
+    // Age — measured from submission, not from when the hold started — past which a still-blocked job is
+    // cancelled instead of held again. The work it would produce is what goes stale, so the job's own age
+    // is the thing worth bounding; measuring the hold instead would let an old job be held indefinitely
+    // as long as each individual hold was short.
+    private static final Duration BUDGET_HOLD_MAX_JOB_AGE = Duration.ofDays(7);
 
     private final AgentProperties agentProperties;
     private final AgentJobRepository jobRepository;
@@ -903,29 +906,31 @@ public class AgentJobExecutor {
             // HELD, not cancelled: exhaustion is temporary (the cap resets at the UTC month rollover,
             // or an admin raises it), so pushing available_at out and staying QUEUED lets the poll loop
             // resume the job automatically, which is what the paused-work copy promises the user.
-            // retry_count is untouched — this is not an execution failure. Only a hold older than
-            // BUDGET_HOLD_MAX_AGE is cancelled: month-old feedback is noise and an unbounded hold would
-            // loop forever. Scoped to who pays for this purpose, so the host's exhausted budget cannot
+            // retry_count is untouched — this is not an execution failure. A job still blocked once it is
+            // older than BUDGET_HOLD_MAX_JOB_AGE is cancelled instead: week-old feedback is noise, and a
+            // bound that never trips would hold forever. Scoped to who pays for this purpose, so the host's exhausted budget cannot
             // hold work the workspace funds through its own provider, or vice versa.
             LlmBudgetBlockReason blockReason = llmBudgetService
                 .decide(job.getWorkspace().getId())
                 .forFunding(claimedFundingSource(job));
             if (blockReason != LlmBudgetBlockReason.NONE) {
                 Instant now = Instant.now();
-                boolean expired =
+                boolean tooOldToHold =
                     job.getCreatedAt() != null &&
-                    Duration.between(job.getCreatedAt(), now).compareTo(BUDGET_HOLD_MAX_AGE) > 0;
-                if (expired) {
+                    Duration.between(job.getCreatedAt(), now).compareTo(BUDGET_HOLD_MAX_JOB_AGE) > 0;
+                if (tooOldToHold) {
                     String message =
-                        "Cancelled: still over budget after " + BUDGET_HOLD_MAX_AGE.toDays() + " days on hold.";
+                        "Cancelled: over the monthly AI budget, and this job is more than " +
+                        BUDGET_HOLD_MAX_JOB_AGE.toDays() +
+                        " days old.";
                     job.setStatus(AgentJobStatus.CANCELLED);
                     job.setCompletedAt(now);
                     job.setErrorMessage(message);
                     job.setCancellationReason(AgentJobCancellationReason.BUDGET_EXHAUSTED);
                     jobRepository.save(job);
                     log.info(
-                        "Cancelling claim — held past {} days on budget: jobId={}, workspaceId={}, blockReason={}",
-                        BUDGET_HOLD_MAX_AGE.toDays(),
+                        "Cancelling claim — over budget and older than {} days: jobId={}, workspaceId={}, blockReason={}",
+                        BUDGET_HOLD_MAX_JOB_AGE.toDays(),
                         jobId,
                         job.getWorkspace().getId(),
                         blockReason

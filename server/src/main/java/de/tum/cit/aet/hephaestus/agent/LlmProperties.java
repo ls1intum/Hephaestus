@@ -17,12 +17,10 @@ import org.springframework.validation.annotation.Validated;
  *   fx:     { daily-url: "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml" }
  * }</pre>
  *
- * <p>These three values were previously four separate {@code @Value} expressions spread across
- * {@code agent.catalog} and {@code agent.usage.fx}, each repeating its own default string. That is
- * how {@code EgressPolicy}'s SSRF validation and the probe client's connect-time resolver came to
- * hold two independent copies of the {@code allow-loopback} default — a pair that must agree
- * exactly, since one decides whether a URL may be saved and the other whether it may be dialled.
- * One binding, one default, one place an operator can read them.
+ * <p>One binding, one default, one place an operator can read them. {@code allow-loopback} in
+ * particular is read by two collaborators that must agree exactly — {@code EgressPolicy} decides
+ * whether a URL may be saved, the proxy's connect-time resolver whether it may be dialled — so it
+ * has to have a single owner rather than a default repeated at each reader.
  *
  * @param displayCurrency ISO 4217 code the USD spend figures are additionally shown in. Empty (the
  *                        default) turns the whole display-currency feature off and every response is

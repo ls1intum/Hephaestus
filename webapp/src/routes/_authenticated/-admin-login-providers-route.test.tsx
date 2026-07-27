@@ -1,16 +1,15 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { createMemoryHistory, createRouter, RouterProvider } from "@tanstack/react-router";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
-import { adminListLoginProvidersQueryKey } from "@/api/@tanstack/react-query.gen";
 import type { LoginProviderView } from "@/api/types.gen";
+import { AuthProvider } from "@/integrations/auth/AuthContext";
 import { server } from "@/mocks/server";
-import { Route } from "./admin.login-providers";
+import { routeTree } from "@/routeTree.gen";
 
-const AdminLoginProvidersPage = Route.options.component;
-
-// `preload()` lazily transforms the whole route module and its dialogs.
-vi.setConfig({ testTimeout: 15_000 });
+// Mounting the real route pulls in the whole admin layout and its lazy modules.
+vi.setConfig({ testTimeout: 20_000 });
 
 function provider(registrationId: string, displayName: string): LoginProviderView {
 	return {
@@ -26,7 +25,35 @@ function provider(registrationId: string, displayName: string): LoginProviderVie
 	};
 }
 
-describe("AdminLoginProvidersPage", () => {
+/** The first mount in a file pays the lazy transform of the whole admin layout — seconds, not 1s. */
+const TRANSFORM_WAIT = { timeout: 10_000 };
+
+/**
+ * The real router, not `Route.options.component`: the gate in `admin.tsx`'s `beforeLoad`, the route's
+ * `head` and anything it reads off the URL only exist when the route is matched, and a test that
+ * calls the component directly cannot tell a working route from an unreachable one.
+ */
+async function renderLoginProvidersRoute() {
+	// One client for the guards and the provider, exactly as `main.tsx` wires it.
+	const queryClient = new QueryClient({
+		defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+	});
+	const router = createRouter({
+		routeTree,
+		history: createMemoryHistory({ initialEntries: ["/admin/login-providers"] }),
+		context: { queryClient, auth: undefined },
+	});
+	render(
+		<QueryClientProvider client={queryClient}>
+			<AuthProvider>
+				{/* biome-ignore lint/suspicious/noExplicitAny: the app's router context is wider than this test needs. */}
+				<RouterProvider router={router as any} />
+			</AuthProvider>
+		</QueryClientProvider>,
+	);
+}
+
+describe("instance login providers route", () => {
 	it("keeps each provider's toggle pending independently when two run at once", async () => {
 		// Nothing gates this switch — no confirm, no modal — so a second row can be toggled while the
 		// first PATCH is still open. GitHub's hangs, GitLab's answers at once. A single "which provider
@@ -49,24 +76,9 @@ describe("AdminLoginProvidersPage", () => {
 			),
 		);
 
-		const queryClient = new QueryClient({
-			defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-		});
-		queryClient.setQueryData(adminListLoginProvidersQueryKey(), providers);
+		await renderLoginProvidersRoute();
 
-		if (!AdminLoginProvidersPage) throw new Error("Login providers route must have a component");
-		await (
-			AdminLoginProvidersPage as typeof AdminLoginProvidersPage & {
-				preload: () => Promise<unknown>;
-			}
-		).preload();
-		render(
-			<QueryClientProvider client={queryClient}>
-				<AdminLoginProvidersPage />
-			</QueryClientProvider>,
-		);
-
-		fireEvent.click(await screen.findByRole("switch", { name: "Disable GitHub" }));
+		fireEvent.click(await screen.findByRole("switch", { name: "Disable GitHub" }, TRANSFORM_WAIT));
 		await waitFor(() => expect(slowToggleCalls).toBe(1));
 		fireEvent.click(screen.getByRole("switch", { name: "Disable GitLab" }));
 		await waitFor(() =>

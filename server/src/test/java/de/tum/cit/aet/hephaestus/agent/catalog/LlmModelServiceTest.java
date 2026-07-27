@@ -105,7 +105,6 @@ class LlmModelServiceTest extends BaseUnitTest {
             new BigDecimal(output),
             null,
             null,
-            null,
             null
         );
     }
@@ -221,7 +220,6 @@ class LlmModelServiceTest extends BaseUnitTest {
                 new BigDecimal("9.00"),
                 null,
                 null,
-                null,
                 null
             );
 
@@ -240,7 +238,6 @@ class LlmModelServiceTest extends BaseUnitTest {
                 null,
                 null,
                 null,
-                null,
                 "Self-hosted, internally funded"
             );
 
@@ -255,7 +252,6 @@ class LlmModelServiceTest extends BaseUnitTest {
             model.setEnabled(true);
             UpdateLlmModelPriceRequestDTO request = new UpdateLlmModelPriceRequestDTO(
                 PricingMode.UNPRICED,
-                null,
                 null,
                 null,
                 null,
@@ -448,7 +444,6 @@ class LlmModelServiceTest extends BaseUnitTest {
             LlmModel result = modelService.update(7L, request);
 
             assertThat(result.getUpstreamModelId()).isEqualTo("gpt-5");
-            verify(modelRepository, never()).existsByConnectionIdAndUpstreamModelIdAndIdNot(any(), any(), any());
             // An edit to a model every workspace can bind has to leave a trail naming which model on
             // which connection changed — a CREATED row here, or a row naming a different model, reads
             // as a complete audit trail while pointing at the wrong provider.

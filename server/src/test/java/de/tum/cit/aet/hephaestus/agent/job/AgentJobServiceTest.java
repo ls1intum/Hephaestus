@@ -135,8 +135,7 @@ class AgentJobServiceTest extends BaseUnitTest {
                     "claude-sonnet-4",
                     null,
                     null,
-                    false,
-                    FundingSource.INSTANCE
+                    false
                 )
             );
         lenient()

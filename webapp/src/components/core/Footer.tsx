@@ -146,7 +146,7 @@ export default function Footer({ className, isProduction, buildInfo }: FooterPro
 								</Tooltip>
 							)}
 
-							{/* The same ticking, shared-clock relative time every other timestamp in the app uses —
+							{/* The same ticking, shared-clock relative time every standalone timestamp in the app uses —
 							    the deploy age is the one reading here that must not freeze mid-session, and it
 							    brings its own absolute-instant tooltip. */}
 							{buildInfo?.deployedAt && (

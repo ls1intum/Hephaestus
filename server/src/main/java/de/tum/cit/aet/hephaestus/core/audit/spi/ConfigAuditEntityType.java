@@ -14,12 +14,13 @@ public enum ConfigAuditEntityType {
     /** Which model, with what limits, runs practice detection / the mentor for a workspace. */
     AGENT_BINDING,
     /**
-     * Historical only. The named-agent-config aggregate this described was deleted in #1368; the value
-     * survives so rows recording what an operator once did to it keep rendering. Nothing writes it.
+     * Historical only. The named-agent-config aggregate this described no longer exists — per-purpose
+     * bindings replaced it; the value survives so rows recording what an operator once did to it keep
+     * rendering. Nothing writes it.
      */
     AGENT_CONFIG,
     /**
-     * Historical only — what {@link #AGENT_BINDING} was called before #1368. Rows written under the old
+     * Historical only — the earlier spelling of {@link #AGENT_BINDING}. Rows written under the old
      * name keep it: {@code trg_config_audit_event_block_mutation} makes this table append-only, so
      * rewriting them to the current spelling is the exact mutation that trigger exists to refuse.
      * Nothing writes this value any more; the UI renders it with the same label as
@@ -54,7 +55,7 @@ public enum ConfigAuditEntityType {
     /** A workspace's own cap on spend through its own connected provider. Set by its own admins. */
     WORKSPACE_OWN_PROVIDER_LLM_BUDGET,
     /**
-     * Historical only — the pre-#1368 spellings of the two values above. Retained for the same reason as
+     * Historical only — the earlier spellings of the two values above. Retained for the same reason as
      * {@link #AI_CONFIG_BINDING}: this trail is append-only at the database level, so old rows keep the
      * vocabulary they were written in. Nothing writes them.
      */

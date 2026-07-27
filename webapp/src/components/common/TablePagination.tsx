@@ -15,7 +15,7 @@ export interface TablePaginationProps {
 	className?: string;
 }
 
-/** Below this many pages every page gets its own token and no window is needed. */
+/** At or below this many pages every page gets its own token and no window is needed. */
 const WINDOW_THRESHOLD = 7;
 
 /**

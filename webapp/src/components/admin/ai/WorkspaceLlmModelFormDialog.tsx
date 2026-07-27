@@ -1,5 +1,5 @@
 import { AlertTriangle } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import type {
 	CreateWorkspaceLlmModelRequest,
 	UpdateWorkspaceLlmModelRequest,
@@ -102,6 +102,12 @@ function WorkspaceLlmModelFormDialogContent({
 	const [enabled, setEnabled] = useState(editing?.enabled ?? false);
 	const [price, setPrice] = useState<PriceModeValue>(() => priceValueOf(editing));
 	const [errors, setErrors] = useState<FieldErrors<LlmModelFormField>>({});
+	// One id per error, joined into its own control's `aria-describedby`: `aria-invalid` says a field
+	// is wrong and never says why, so a reader tabbing back to it hears "invalid" alone (SC 3.3.1).
+	const displayNameErrorId = useId();
+	const upstreamModelIdErrorId = useId();
+	const contextWindowErrorId = useId();
+	const maxOutputTokensErrorId = useId();
 
 	const validate = (): boolean => {
 		const next = validateLlmModelForm({
@@ -166,8 +172,11 @@ function WorkspaceLlmModelFormDialogContent({
 							placeholder="e.g. GPT-5 mini"
 							required
 							aria-invalid={Boolean(errors.displayName)}
+							aria-describedby={errors.displayName ? displayNameErrorId : undefined}
 						/>
-						{errors.displayName && <FieldError>{errors.displayName}</FieldError>}
+						{errors.displayName && (
+							<FieldError id={displayNameErrorId}>{errors.displayName}</FieldError>
+						)}
 					</Field>
 
 					<Field data-invalid={Boolean(errors.upstreamModelId)}>
@@ -181,13 +190,16 @@ function WorkspaceLlmModelFormDialogContent({
 							required
 							autoComplete="off"
 							aria-invalid={Boolean(errors.upstreamModelId)}
+							aria-describedby={errors.upstreamModelId ? upstreamModelIdErrorId : undefined}
 						/>
 						<FieldDescription>
 							{isEdit
 								? "Create a new model to use a different upstream id."
 								: "The exact id your provider expects. Slashes are part of the id."}
 						</FieldDescription>
-						{errors.upstreamModelId && <FieldError>{errors.upstreamModelId}</FieldError>}
+						{errors.upstreamModelId && (
+							<FieldError id={upstreamModelIdErrorId}>{errors.upstreamModelId}</FieldError>
+						)}
 					</Field>
 
 					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -203,8 +215,11 @@ function WorkspaceLlmModelFormDialogContent({
 								value={contextWindow}
 								onChange={(e) => setContextWindow(e.target.value)}
 								aria-invalid={Boolean(errors.contextWindow)}
+								aria-describedby={errors.contextWindow ? contextWindowErrorId : undefined}
 							/>
-							{errors.contextWindow && <FieldError>{errors.contextWindow}</FieldError>}
+							{errors.contextWindow && (
+								<FieldError id={contextWindowErrorId}>{errors.contextWindow}</FieldError>
+							)}
 						</Field>
 						<Field data-invalid={Boolean(errors.maxOutputTokens)}>
 							<FieldLabel htmlFor="wm-max-output">
@@ -219,8 +234,11 @@ function WorkspaceLlmModelFormDialogContent({
 								value={maxOutputTokens}
 								onChange={(e) => setMaxOutputTokens(e.target.value)}
 								aria-invalid={Boolean(errors.maxOutputTokens)}
+								aria-describedby={errors.maxOutputTokens ? maxOutputTokensErrorId : undefined}
 							/>
-							{errors.maxOutputTokens && <FieldError>{errors.maxOutputTokens}</FieldError>}
+							{errors.maxOutputTokens && (
+								<FieldError id={maxOutputTokensErrorId}>{errors.maxOutputTokens}</FieldError>
+							)}
 						</Field>
 					</div>
 

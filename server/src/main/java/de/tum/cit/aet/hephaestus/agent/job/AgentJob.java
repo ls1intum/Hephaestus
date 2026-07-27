@@ -268,7 +268,11 @@ public class AgentJob {
     @Column(name = "llm_model", length = 100)
     private String llmModel;
 
-    /** Model version/snapshot date (e.g. "2026-03-17"), from agent config. */
+    /**
+     * Model version/snapshot date (e.g. "2026-03-17") carried by jobs frozen before the model catalog
+     * replaced the named agent config, which is where an admin used to type it. Always {@code null} on
+     * anything dispatched since — the catalog identifies a model by its upstream id alone.
+     */
     @Column(name = "llm_model_version", length = 50)
     private String llmModelVersion;
 
@@ -291,8 +295,7 @@ public class AgentJob {
     private Integer llmCacheWriteTokens;
 
     // No cost field here. Cost is money, and money lives in llm_usage_event as NUMERIC(18,6) with the
-    // rates it was charged at — not as a binary float on the job row. The physical llm_cost_usd column
-    // is unmapped and awaiting its drop migration; its historical values were copied into the ledger.
+    // rates it was charged at — not as a binary float on the job row.
 
     @PrePersist
     public void prePersist() {

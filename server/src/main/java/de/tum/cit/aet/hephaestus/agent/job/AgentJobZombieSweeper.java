@@ -352,10 +352,10 @@ public class AgentJobZombieSweeper {
      * Read a job's frozen {@link ConfigSnapshot}, or {@code null} when it cannot be read.
      *
      * <p>The ONE place this sweeper parses a snapshot, because the two things it reads out of one —
-     * the timeout and the price — are needed on the same job in the same pass, and they used to
-     * disagree about whether an unreadable snapshot was fatal. It is never: a snapshot the sweeper
-     * cannot read is a fact about a job that is already being taken off the queue, and refusing to
-     * take it off would leave it RUNNING forever.
+     * the timeout and the price — are needed on the same job in the same pass and must agree on
+     * whether an unreadable snapshot is fatal. It is never: a snapshot the sweeper cannot read is a
+     * fact about a job that is already being taken off the queue, and refusing to take it off would
+     * leave it RUNNING forever.
      *
      * <p>Unreadable is a real, expected state, not a corrupt row. {@link ConfigSnapshot#fromJson}
      * deliberately rejects a snapshot written by a NEWER schema version, so a reverted rolling deploy

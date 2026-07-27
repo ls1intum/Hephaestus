@@ -87,7 +87,7 @@ describe("AdminLlmUsagePage", () => {
 		expect(screen.getByText("Shared-model spend so far")).toBeTruthy();
 		expect(screen.getByText("Shared-model budget · set by your host")).toBeTruthy();
 		expect(screen.getByText("Your provider spend so far")).toBeTruthy();
-		expect(screen.getByText("Billed directly to you by your provider.")).toBeTruthy();
+		expect(screen.getByText("Provider cap · set by you, billed by your provider")).toBeTruthy();
 
 		const byJobType = screen.getByRole("table", { name: "AI spend by run type" });
 		expect(within(byJobType).getByRole("columnheader", { name: "Shared models" })).toBeTruthy();
@@ -242,7 +242,7 @@ describe("AdminLlmUsagePage", () => {
 				"warns at 80% with the date the pace reaches the cap",
 				{ ownProviderTotalCostUsd: 8.4 },
 				new Date("2026-07-10T12:00:00.000Z"),
-				"You've used 84% of your provider cap$8.40 of $10. At this pace you'll hit it around July 12.",
+				"You've used 84% of your provider cap$8.40 of $10. At this pace, the cap is reached around July 12.",
 			],
 			[
 				"keeps the warning but withholds a projection the month is too young to support",
@@ -273,9 +273,9 @@ describe("AdminLlmUsagePage", () => {
 			[
 				"nothing has run on it",
 				{ ownProviderTotalCostUsd: 0, byJobType: [], byDay: [] },
-				/Nothing ran on your own provider this month\./,
+				/Connect your own provider in/,
 			],
-			["there is uncapped spend", {}, "No cap set."],
+			["there is uncapped spend", {}, "No provider cap set · billed to you by your provider"],
 		])("offers a cap when %s", async (_name, patch, copy) => {
 			const onEditOwnProviderCap = vi.fn();
 			await renderPage(
@@ -406,10 +406,10 @@ describe("AdminLlmUsagePage", () => {
 			);
 
 			const alert = screen.getByText(/At this pace/);
-			// Half a converted sentence reads as a mistake: "$43.90 of $50 (≈ €38.59 of €44) … you'll
-			// finish the month around $61.20" made the reader switch currencies mid-breath.
+			// Half a converted sentence reads as a mistake: "$43.90 of $50 (≈ €38.59 of €44) … the month
+			// finishes around $61.20" would make the reader switch currencies mid-breath.
 			expect(alert.textContent).toContain("≈ €38.59 of €44");
-			expect(alert.textContent).toMatch(/finish the month around \$[\d.]+ \(≈ €[\d.]+\)\./);
+			expect(alert.textContent).toMatch(/the month finishes around \$[\d.]+ \(≈ €[\d.]+\)\./);
 		});
 	});
 });

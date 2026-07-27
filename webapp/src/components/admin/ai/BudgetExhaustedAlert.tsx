@@ -14,7 +14,10 @@ interface BudgetExhaustedAlertProps {
 	 * cap, which they can raise or remove themselves.
 	 */
 	scope: "shared" | "own";
-	/** The month's verdict for that cap — selects between "reached" and "can't be checked" copy. */
+	/**
+	 * The month's verdict for that cap — selects between "reached" and "can't be checked" copy.
+	 * Optional only so a story can omit it; every production call site passes it.
+	 */
 	verdict?: BudgetVerdict;
 	/**
 	 * ISO `yyyy-MM` month the pause belongs to. Defaults to the current UTC month, which is the only
@@ -26,8 +29,7 @@ interface BudgetExhaustedAlertProps {
 	unpricedEventCount?: number;
 	/**
 	 * Which surface is rendering the banner. It selects the action offered — never a word of the
-	 * sentence: each remedy is a link from the page that doesn't own it, and nothing from the page
-	 * that does.
+	 * sentence: the remedy the current page can perform itself, or a link to the page that owns it.
 	 */
 	context: "usage" | "models";
 	workspaceSlug: string;
@@ -116,8 +118,9 @@ interface PauseActionProps {
 }
 
 /**
- * The remedy the current page can't perform itself. Prices are edited on AI models and caps on AI
- * usage, so each surface links to the other one and offers nothing that is already on screen.
+ * The remedy, offered in place where the current page owns it and as a link where it does not.
+ * Prices are edited on AI models and caps on AI usage, so the usage page opens the cap editor itself
+ * and links out for a price, and the models page does the reverse.
  */
 function PauseAction({
 	scope,

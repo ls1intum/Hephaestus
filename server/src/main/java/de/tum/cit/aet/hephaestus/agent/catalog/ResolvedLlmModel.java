@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -15,6 +14,10 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>{@code apiProtocol} is Pi's own {@code api} token, stored and passed through verbatim
  * (e.g. {@code openai-completions}) — the Java server translates nothing.
+ *
+ * <p>Deliberately carries no funding source either: who pays is a fact about the CONNECTION the model
+ * hangs off, and {@code LlmModelResolver.ConnectionRef#scope()} is its single source of truth. A second
+ * copy here could only ever disagree with it.
  */
 public record ResolvedLlmModel(
     String baseUrl,
@@ -22,6 +25,5 @@ public record ResolvedLlmModel(
     String upstreamModelId,
     @Nullable Integer contextWindow,
     @Nullable Integer maxOutputTokens,
-    boolean supportsReasoning,
-    FundingSource fundingSource
+    boolean supportsReasoning
 ) {}

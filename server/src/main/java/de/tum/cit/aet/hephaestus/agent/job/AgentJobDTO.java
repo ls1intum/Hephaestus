@@ -37,7 +37,11 @@ public record AgentJobDTO(
     @Schema(description = "Timestamp when the job started running") Instant startedAt,
     @Schema(description = "Timestamp when the job completed") Instant completedAt,
     @Schema(description = "LLM model used (e.g. gpt-5.4-mini, openai/gpt-oss-120b)") String llmModel,
-    @Schema(description = "Model version/snapshot date (e.g. 2026-03-17)") String llmModelVersion,
+    @Schema(
+        description = "Model version/snapshot date (e.g. 2026-03-17). Only jobs from before the model catalog " +
+            "carry one; absent on everything newer."
+    )
+    String llmModelVersion,
     @Schema(description = "Total LLM API calls (steps) during execution") Integer llmTotalCalls,
     @Schema(description = "Total input tokens consumed") Integer llmTotalInputTokens,
     @Schema(description = "Total output tokens generated") Integer llmTotalOutputTokens,

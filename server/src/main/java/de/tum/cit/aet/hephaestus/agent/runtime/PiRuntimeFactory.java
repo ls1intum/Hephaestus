@@ -22,7 +22,7 @@ import tools.jackson.databind.ObjectMapper;
  * <p>Stays domain-agnostic: callers supply a {@link PiPlanSpec} (resolved LLM behaviour, job token,
  * runner filename, precompute step). Nothing here knows about practices or chat sessions.
  *
- * <p><b>#1368 slice 5 — ONE credential path.</b> Every sandbox talks to the in-app LLM proxy over
+ * <p><b>ONE credential path.</b> Every sandbox talks to the in-app LLM proxy over
  * {@code $LLM_PROXY_URL}/{@code $LLM_PROXY_TOKEN} (injected by the sandbox adapter from
  * {@link PiPlan#networkPolicy()}) and registers a single custom Pi provider named
  * {@code hephaestus} from {@link SandboxLayout#PROVIDER_CONFIG_FILENAME}, which this factory writes

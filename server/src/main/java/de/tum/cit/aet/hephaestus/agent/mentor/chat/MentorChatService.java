@@ -6,7 +6,6 @@ import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MentorContextKeys;
-import de.tum.cit.aet.hephaestus.agent.mentor.MentorAgentProperties;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorAgentRequest;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorLlmConfig;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorPiAdapter;
@@ -35,7 +34,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import io.micrometer.core.instrument.Timer;
 import java.time.Duration;
 import java.util.List;
@@ -75,8 +73,6 @@ public class MentorChatService implements MentorTurnRunner {
     private final UserRepository userRepository;
     private final ChatThreadRepository chatThreadRepository;
     private final WorkspaceAgentBindingRepository agentBindingRepository;
-    private final WorkspaceRepository workspaceRepository;
-    private final MentorAgentProperties mentorAgentProperties;
     private final WorkspaceContextBuilder workspaceContextBuilder;
     private final MentorPiAdapter mentorPiAdapter;
     // Resolved lazily: the InteractiveSandboxService bean is part of the worker capability

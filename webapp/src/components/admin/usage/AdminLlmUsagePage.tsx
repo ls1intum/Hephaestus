@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { CircleAlert, CircleDollarSign } from "lucide-react";
+import { useId } from "react";
 import type { WorkspaceLlmUsageReport } from "@/api/types.gen";
 import { BudgetExhaustedAlert } from "@/components/admin/ai/BudgetExhaustedAlert";
 import { formatCapUsd, formatCostUsd } from "@/components/admin/ai/job-utils";
@@ -123,8 +124,8 @@ export function AdminLlmUsagePage({
 			: spendConversion(providerSpend, fx);
 	// Every converted figure on the page, not just the cards: the breakdown tables convert their own
 	// footer totals, and a card can convert nothing (a $0 budget, say — the supported "pause now"
-	// state). Only figures that actually render count — a cap conversion computed and shown nowhere
-	// once put the whole "EUR amounts are estimates…" footnote under a page with no estimates on it.
+	// state). Only figures that actually render count, so the "EUR amounts are estimates…" footnote
+	// never appears under a page with no estimates on it.
 	const hasConversion =
 		sharedTitleFx != null ||
 		providerTitleFx != null ||
@@ -363,10 +364,13 @@ function SharedBudgetCard({
 	paused,
 	titleFx,
 }: SharedBudgetCardProps) {
+	const labelId = useId();
 	return (
-		<Card>
+		// A named region, so the card is reachable in the accessible tree — "which purse is this
+		// figure in" is the whole question this page answers, and the answer is the card's own label.
+		<Card role="region" aria-labelledby={labelId}>
 			<CardHeader>
-				<CardDescription>
+				<CardDescription id={labelId}>
 					{isCurrentMonth ? "Shared-model spend so far" : "Shared-model spend"}
 				</CardDescription>
 				<CardTitle className="text-2xl tabular-nums">
@@ -431,10 +435,11 @@ function ProviderCapCard({
 	onEditOwnProviderCap,
 	titleFx,
 }: ProviderCapCardProps) {
+	const labelId = useId();
 	return (
-		<Card>
+		<Card role="region" aria-labelledby={labelId}>
 			<CardHeader>
-				<CardDescription>
+				<CardDescription id={labelId}>
 					{isCurrentMonth ? "Your provider spend so far" : "Your provider spend"}
 				</CardDescription>
 				<CardTitle className="text-2xl tabular-nums">
@@ -453,7 +458,13 @@ function ProviderCapCard({
 						)
 					)}
 				</CardTitle>
-				<CardDescription>Billed directly to you by your provider.</CardDescription>
+				{/* Says which cap bounds the figure above and who owns it, in the same shape as the
+				    shared-model card's line — the two purses are only told apart by these two sentences. */}
+				<CardDescription>
+					{capUsd != null
+						? "Provider cap · set by you, billed by your provider"
+						: "No provider cap set · billed to you by your provider"}
+				</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-3">
 				{percent != null && capUsd != null && (
@@ -466,9 +477,6 @@ function ProviderCapCard({
 						label="Your provider cap used"
 					/>
 				)}
-				{/* A set cap is already the "of $50" in the headline and the meter under it; only its
-				    absence still needs saying. */}
-				{capUsd == null && <p className="text-sm text-muted-foreground">No cap set.</p>}
 				{isCurrentMonth ? (
 					<Button variant="outline" size="sm" onClick={onEditOwnProviderCap}>
 						{capUsd != null ? "Change cap" : "Set cap"}
@@ -493,18 +501,23 @@ function NoProviderCard({
 	workspaceSlug,
 	onEditOwnProviderCap,
 }: NoProviderCardProps) {
+	const labelId = useId();
 	return (
-		<Card>
+		<Card role="region" aria-labelledby={labelId}>
 			<CardHeader>
-				<CardDescription>Your provider spend</CardDescription>
-				<CardTitle className="text-2xl tabular-nums">No spend</CardTitle>
+				<CardDescription id={labelId}>Your provider spend</CardDescription>
+				{/* Zero money is `$0` on every card on this page — a second vocabulary for it would read
+				    as a different kind of number. */}
+				<CardTitle className="text-2xl tabular-nums">{formatCostUsd(0)}</CardTitle>
 				<CardDescription>
-					Nothing ran on your own provider this month. Connect one in{" "}
-					<AiModelsLink workspaceSlug={workspaceSlug} />.
+					No provider cap set · nothing has run on a provider of your own
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-3">
-				<p className="text-sm text-muted-foreground">No cap set.</p>
+				<p className="text-sm text-muted-foreground">
+					Connect your own provider in <AiModelsLink workspaceSlug={workspaceSlug} /> to bill AI
+					work to your own account.
+				</p>
 				{isCurrentMonth ? (
 					<Button variant="outline" size="sm" onClick={onEditOwnProviderCap}>
 						Set cap

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.practice;
 
 import de.tum.cit.aet.hephaestus.agent.runtime.PiRunnerProfile;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import java.util.List;
 import java.util.Map;
 
@@ -18,7 +19,10 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
      * {@code ./pi-provider.mjs} provider-registration helper — stage both beside the
      * runner.
      */
-    private static final List<String> SIDECARS = List.of("pi-finding-normalize.mjs", "pi-provider.mjs");
+    private static final List<String> SIDECARS = List.of(
+        "pi-finding-normalize.mjs",
+        SandboxLayout.PROVIDER_HELPER_FILENAME
+    );
 
     private static final List<String> FLAGS = List.of("--no-warnings");
 

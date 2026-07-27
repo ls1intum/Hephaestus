@@ -79,6 +79,11 @@ tags:
   name: Practice Review Settings
 - description: Active sessions
   name: Account
+- description: |-
+    GitLab-specific REST endpoints used during the workspace creation wizard: one validates a personal
+     access token, the other lists the groups that token can reach. Both require the
+     <code>GITLAB_WORKSPACE_CREATION</code> feature flag.
+  name: git-lab-preflight-controller
 - description: Workspace integration connection management
   name: Connections
 - description: Instance-admin LLM connection and settings management
@@ -105,16 +110,6 @@ tags:
   name: Feedback Reaction
 - description: Identity provider discovery (public)
   name: Auth discovery
-- description: |-
-    GitLab-specific REST endpoints used during the workspace creation wizard:
-     <code>POST /workspaces/gitlab/preflight</code> validates a PAT, <code>POST /workspaces/gitlab/groups</code>
-     lists accessible groups for one. Split from <code>WorkspaceRegistryController</code> so the
-     workspace module no longer imports {@link GitLabPreflightService GitLabPreflightService}; the routes keep the
-     existing <code>/workspaces/gitlab/*</code> URL space for API stability.
-
-     <p>Both endpoints are gated by the <code>GITLAB_WORKSPACE_CREATION</code> feature flag via
-     <code>@PreAuthorize</code> — identical to the previous protection on the merged controller.
-  name: git-lab-preflight-controller
 - description: Integration sync observability and manual controls
   name: Sync
 - description: "Current user identity, linked accounts, deletion"
@@ -5574,7 +5569,8 @@ components:
           description: "LLM model used (e.g. gpt-5.4-mini, openai/gpt-oss-120b)"
         llmModelVersion:
           type: string
-          description: Model version/snapshot date (e.g. 2026-03-17)
+          description: Model version/snapshot date (e.g. 2026-03-17). Only jobs from
+            before the model catalog carry one; absent on everything newer.
         llmTotalCalls:
           type: integer
           format: int32

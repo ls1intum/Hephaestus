@@ -278,7 +278,7 @@ async function ensureRuntime() {
         // Same race workaround as pi-runner.mjs: register the hephaestus provider directly on
         // the ModelRegistry before createAgentSession. Reused across cwd switches; providers are
         // cwd-independent. PROTOCOL_ONLY mode's stub SDK exposes neither class. Config comes from the
-        // server-written pi-provider.json via the shared pi-provider.mjs helper (#1368 slice 5) — kept
+        // server-written pi-provider.json via the shared pi-provider.mjs helper — kept
         // byte-identical with pi-runner.mjs's registration so the two runners cannot drift.
         let sharedAuthStorage;
         let sharedModelRegistry;

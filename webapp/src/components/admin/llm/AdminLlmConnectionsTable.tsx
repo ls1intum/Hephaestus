@@ -19,6 +19,7 @@ import { Switch } from "@/components/ui/switch";
 import {
 	Table,
 	TableBody,
+	TableCaption,
 	TableCell,
 	TableHead,
 	TableHeader,
@@ -30,7 +31,11 @@ export interface AdminLlmConnectionsTableProps {
 	connections: LlmConnection[];
 	/** Model count per connection id, computed by the container from the (unscoped) models list. */
 	modelCounts: Record<number, number>;
-	/** False while the model catalog is unavailable; destructive connection actions are blocked. */
+	/**
+	 * False while the model catalog is unavailable, so the counts read `—`. Turning a connection *off*
+	 * is blocked while it is false, because that confirm has to count the models it stops. Delete stays
+	 * offered: the server refuses a connection that still has models on it, whatever the client knows.
+	 */
 	modelCountsAvailable?: boolean;
 	isLoading: boolean;
 	isError: boolean;
@@ -64,22 +69,29 @@ function hostOf(baseUrl: string): string {
  */
 const SKELETON_COLUMNS = ["w-40", "w-24", "w-6", "w-9", null];
 
-/** Mounted by both the loading and the loaded table, so the skeleton lines up with the real columns. */
+/**
+ * Mounted by both the loading and the loaded table, so the skeleton lines up with the real columns.
+ *
+ * `scope="col"` on every header, like every other table on these surfaces: it is what lets a screen
+ * reader announce the column a cell belongs to (WCAG SC 1.3.1).
+ */
 function ConnectionsTableHeader() {
 	return (
 		<TableHeader>
 			<TableRow>
-				<TableHead>Connection</TableHead>
-				<TableHead>API</TableHead>
-				<TableHead>Models</TableHead>
-				<TableHead>Active</TableHead>
-				<TableHead className="text-right">Actions</TableHead>
+				<TableHead scope="col">Connection</TableHead>
+				<TableHead scope="col">API</TableHead>
+				<TableHead scope="col">Models</TableHead>
+				<TableHead scope="col">Active</TableHead>
+				<TableHead scope="col" className="text-right">
+					Actions
+				</TableHead>
 			</TableRow>
 		</TableHeader>
 	);
 }
 
-/** Instance-admin provider connections list (#1368) — never shows the API key, only "ends in ····last4". */
+/** Instance-admin provider connections list (#1368). Credentials are never shown here at all. */
 export function AdminLlmConnectionsTable({
 	connections,
 	modelCounts,
@@ -107,6 +119,7 @@ export function AdminLlmConnectionsTable({
 	if (isLoading) {
 		return (
 			<Table containerClassName="rounded-md border">
+				<TableCaption className="sr-only">Provider connections on this instance</TableCaption>
 				<ConnectionsTableHeader />
 				<TableRowsSkeleton columns={SKELETON_COLUMNS} rows={3} />
 			</Table>
@@ -138,6 +151,7 @@ export function AdminLlmConnectionsTable({
 	return (
 		<>
 			<Table containerClassName="rounded-md border">
+				<TableCaption className="sr-only">Provider connections on this instance</TableCaption>
 				<ConnectionsTableHeader />
 				<TableBody>
 					{connections.map((connection) => {
@@ -165,7 +179,10 @@ export function AdminLlmConnectionsTable({
 											checked={connection.enabled}
 											disabled={busy || (connection.enabled && !modelCountsAvailable)}
 											aria-busy={busy}
-											aria-label={`${connection.enabled ? "Turn off" : "Turn on"} ${connection.displayName}`}
+											// Names the object, not the action: a `switch` carries its own state in
+											// `aria-checked`, and a name that flips as the user toggles is announced
+											// as "Turn off Production OpenAI, switch, on" (APG, WAI-ARIA switch).
+											aria-label={connection.displayName}
 											onCheckedChange={(checked) => {
 												if (checked) onToggleEnabled(connection, true);
 												// A connection with no models on it stops nothing, so there is nothing to
@@ -185,6 +202,12 @@ export function AdminLlmConnectionsTable({
 											variant="outline"
 											size="sm"
 											disabled={busy}
+											// The button discloses the models section below the table. `aria-expanded`
+											// rather than `aria-pressed`, which would re-announce it as a toggle; no
+											// `aria-controls`, because the route swaps that region between a spinner,
+											// an error alert and the section, and an IDREF that dangles for two of the
+											// three is worse than none.
+											aria-expanded={selectedId === connection.id}
 											aria-label={`Manage models for ${connection.displayName}`}
 											onClick={() => onSelect(connection)}
 										>

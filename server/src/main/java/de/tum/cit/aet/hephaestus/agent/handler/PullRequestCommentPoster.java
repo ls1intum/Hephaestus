@@ -359,7 +359,7 @@ class PullRequestCommentPoster {
     }
 
     /**
-     * Delivery-recovery dedup lookup (#1368 hardening; tri-state #1368 fix wave, finding #6): does an
+     * Delivery-recovery dedup lookup: does an
      * already-posted summary comment carrying THIS job's marker exist? See {@link JobDeliveryException}
      * callers' {@code JobTypeHandler#findExistingDelivery} for why this matters — a crash between posting
      * and recording {@code deliveryCommentId} leaves the DB unaware a comment already landed.

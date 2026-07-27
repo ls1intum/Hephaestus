@@ -16,7 +16,6 @@ import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
-import de.tum.cit.aet.hephaestus.agent.mentor.MentorAgentProperties;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorLlmConfig;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorPiAdapter;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.exception.MentorRunnerException;
@@ -48,7 +47,6 @@ import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.mentor.ThreadSurface;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
@@ -124,9 +122,6 @@ class MentorChatServiceTest extends BaseUnitTest {
     WorkspaceAgentBindingRepository agentBindingRepository;
 
     @Mock
-    WorkspaceRepository workspaceRepository;
-
-    @Mock
     WorkspaceContextBuilder workspaceContextBuilder;
 
     @Mock
@@ -192,13 +187,10 @@ class MentorChatServiceTest extends BaseUnitTest {
             new MentorChatExecutorConfig.MentorRunnerTimeoutScheduler(scheduler);
 
         meterRegistry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
-        MentorAgentProperties mentorProps = new MentorAgentProperties(100_000);
         service = new MentorChatService(
             userRepository,
             chatThreadRepository,
             agentBindingRepository,
-            workspaceRepository,
-            mentorProps,
             workspaceContextBuilder,
             mentorPiAdapter,
             sandboxServiceProvider(interactiveSandboxService),
@@ -222,28 +214,12 @@ class MentorChatServiceTest extends BaseUnitTest {
         // this; individual tests override where the resolved shape matters. Class-level
         // Strictness.LENIENT (see @MockitoSettings above) covers any test that never resolves a binding.
         when(llmModelResolver.resolve(any())).thenReturn(
-            new ResolvedLlmModel(
-                "https://api.openai.com",
-                "openai-completions",
-                "test-model",
-                null,
-                null,
-                false,
-                FundingSource.INSTANCE
-            )
+            new ResolvedLlmModel("https://api.openai.com", "openai-completions", "test-model", null, null, false)
         );
         when(llmModelResolver.connectionRef(any())).thenReturn(LlmModelResolver.ConnectionRef.NONE);
         when(llmAdmissionService.admit(any(WorkspaceAgentBinding.class))).thenReturn(
             new AdmittedLlmModel(
-                new ResolvedLlmModel(
-                    "https://api.openai.com",
-                    "openai-completions",
-                    "test-model",
-                    null,
-                    null,
-                    false,
-                    FundingSource.INSTANCE
-                ),
+                new ResolvedLlmModel("https://api.openai.com", "openai-completions", "test-model", null, null, false),
                 new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 1L, 2L, WORKSPACE_ID),
                 new LlmPriceSnapshot(FundingSource.INSTANCE, PricingState.NO_CHARGE, 3L, null, null, null, null, null)
             )
@@ -262,7 +238,6 @@ class MentorChatServiceTest extends BaseUnitTest {
         mentorBinding.setTimeoutSeconds(600);
         Workspace ws = new Workspace();
         ws.setWorkspaceSlug("acme");
-        when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(ws));
         when(agentBindingRepository.findByWorkspaceIdAndPurpose(WORKSPACE_ID, AgentPurpose.MENTOR)).thenReturn(
             Optional.of(mentorBinding)
         );
@@ -453,7 +428,6 @@ class MentorChatServiceTest extends BaseUnitTest {
     @Test
     void runTurn_prefersBoundEnabledMentorConfig_overFallback() throws Exception {
         Workspace boundWs = new Workspace();
-        when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(boundWs));
         WorkspaceAgentBinding boundBinding = new WorkspaceAgentBinding();
         // Deliberately NOT the id the default setUp binding carries: only an assertion on the
         // identity can tell "the workspace-scoped finder's binding was used" from "some binding was".
@@ -479,7 +453,6 @@ class MentorChatServiceTest extends BaseUnitTest {
     @Test
     void runTurn_disabledBoundConfig_failsClosedBeforeSandboxAttach() throws Exception {
         Workspace boundWs = new Workspace();
-        when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(boundWs));
         WorkspaceAgentBinding disabled = new WorkspaceAgentBinding();
         disabled.setId(99L);
         disabled.setPurpose(AgentPurpose.MENTOR);
@@ -541,15 +514,7 @@ class MentorChatServiceTest extends BaseUnitTest {
     private void admitWorkspaceFundedMentorModel() {
         when(llmAdmissionService.admit(any(WorkspaceAgentBinding.class))).thenReturn(
             new AdmittedLlmModel(
-                new ResolvedLlmModel(
-                    "https://byo.example.com",
-                    "openai-completions",
-                    "byo-model",
-                    null,
-                    null,
-                    false,
-                    FundingSource.WORKSPACE
-                ),
+                new ResolvedLlmModel("https://byo.example.com", "openai-completions", "byo-model", null, null, false),
                 new LlmModelResolver.ConnectionRef(FundingSource.WORKSPACE, 1L, 2L, WORKSPACE_ID),
                 new LlmPriceSnapshot(FundingSource.WORKSPACE, PricingState.NO_CHARGE, null, 4L, null, null, null, null)
             )
@@ -858,15 +823,7 @@ class MentorChatServiceTest extends BaseUnitTest {
     private void admitAtTenDollarsPerMillionInputTokens() {
         when(llmAdmissionService.admit(any(WorkspaceAgentBinding.class))).thenReturn(
             new AdmittedLlmModel(
-                new ResolvedLlmModel(
-                    "https://api.openai.com",
-                    "openai-completions",
-                    "test-model",
-                    null,
-                    null,
-                    false,
-                    FundingSource.INSTANCE
-                ),
+                new ResolvedLlmModel("https://api.openai.com", "openai-completions", "test-model", null, null, false),
                 new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 1L, 2L, WORKSPACE_ID),
                 new LlmPriceSnapshot(
                     FundingSource.INSTANCE,

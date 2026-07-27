@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
+import de.tum.cit.aet.hephaestus.agent.LlmProperties;
 import de.tum.cit.aet.hephaestus.core.WebClientConnectors;
 import io.netty.channel.ChannelOption;
 import io.netty.handler.timeout.WriteTimeoutHandler;
 import java.time.Duration;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
@@ -28,7 +28,9 @@ import reactor.netty.resources.LoopResources;
  * target (public answer during validation, private answer at connect time) would sail straight
  * through this WebClient. {@link WebClientConnectors#resolverGroup} pins the SAME check to the
  * actual connection, and threads the {@code allow-loopback} dev/e2e exemption through so it agrees
- * with {@code EgressPolicy}'s own literal-host allowance instead of re-blocking it.
+ * with {@code EgressPolicy}'s own literal-host allowance instead of re-blocking it. That flag is read
+ * from {@link LlmProperties} — the one owner of its default — for the same reason {@code EgressPolicy}
+ * reads it there: the validator and this dialler must not drift on what "loopback allowed" means.
  */
 @Configuration
 class LlmProxyWebClientConfig {
@@ -55,8 +57,9 @@ class LlmProxyWebClientConfig {
     WebClient llmProxyWebClient(
         ConnectionProvider llmProxyConnectionProvider,
         LoopResources llmProxyLoopResources,
-        @Value("${hephaestus.llm.egress.allow-loopback:false}") boolean allowLoopback
+        LlmProperties llmProperties
     ) {
+        boolean allowLoopback = llmProperties.egress().allowLoopback();
         HttpClient httpClient = HttpClient.create(llmProxyConnectionProvider)
             .runOn(llmProxyLoopResources)
             .responseTimeout(Duration.ofSeconds(300))

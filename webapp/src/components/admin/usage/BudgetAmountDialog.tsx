@@ -17,8 +17,6 @@ import { type Fx, FxApprox, fxCapHint } from "./fx";
 
 export interface BudgetAmountDialogProps {
 	open: boolean;
-	/** Changing this remounts the form, so the input never carries the previous subject's amount. */
-	resetKey?: string | number;
 	title: string;
 	description: ReactNode;
 	fieldLabel: string;
@@ -49,16 +47,18 @@ export interface BudgetAmountDialogProps {
  */
 export function BudgetAmountDialog({
 	open,
-	resetKey,
 	isPending,
 	onOpenChange,
 	...contentProps
 }: BudgetAmountDialogProps) {
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
+			{/* Keyed on the value the form seeds from, the way the five sibling LLM dialogs key on
+			    `editing` — so the input can never carry the previous subject's amount, and a caller
+			    cannot forget to say so. */}
 			{open && (
 				<BudgetAmountDialogContent
-					key={resetKey ?? "budget-amount"}
+					key={contentProps.currentValueUsd ?? "none"}
 					isPending={isPending}
 					{...contentProps}
 				/>
@@ -67,10 +67,7 @@ export function BudgetAmountDialog({
 	);
 }
 
-type BudgetAmountDialogContentProps = Omit<
-	BudgetAmountDialogProps,
-	"open" | "resetKey" | "onOpenChange"
->;
+type BudgetAmountDialogContentProps = Omit<BudgetAmountDialogProps, "open" | "onOpenChange">;
 
 function BudgetAmountDialogContent({
 	title,
@@ -87,6 +84,7 @@ function BudgetAmountDialogContent({
 }: BudgetAmountDialogContentProps) {
 	const fieldId = useId();
 	const fxHintId = useId();
+	const errorId = useId();
 	const [value, setValue] = useState(currentValueUsd != null ? String(currentValueUsd) : "");
 	// Withheld until the first submit so the field isn't red before anything was attempted.
 	const [showError, setShowError] = useState(false);
@@ -99,9 +97,14 @@ function BudgetAmountDialogContent({
 	// At most two decimals: a cap is an amount of money, and the server column is NUMERIC(10,2).
 	const hasCentPrecision = /^\d*(\.\d{0,2})?$/.test(value.trim());
 	const isValid = !isEmpty && Number.isFinite(parsed) && parsed >= 0 && hasCentPrecision;
+	const canRemove = currentValueUsd != null;
 	const localError = isEmpty
-		? // Names the button actually on screen; the budget editor labels it "Remove budget".
-			`Enter an amount, or use ${removeLabel}.`
+		? // Names the button actually on screen — and only when it is on screen: the remove button is
+			// not rendered for a subject that has no cap yet, and an error pointing at a control that
+			// isn't there is worse than one that doesn't.
+			canRemove
+			? `Enter an amount, or use ${removeLabel}.`
+			: "Enter an amount."
 		: !Number.isFinite(parsed) || parsed < 0
 			? "Enter an amount of $0 or more."
 			: "Use at most two decimal places.";
@@ -146,7 +149,13 @@ function BudgetAmountDialogContent({
 								value={value}
 								aria-invalid={isInvalid}
 								// Described-by, not a live region: the latter would interrupt typing once per digit.
-								aria-describedby={fxHint != null ? fxHintId : undefined}
+								// Both the estimate and the rejection reason, so tabbing back to a field marked
+								// invalid announces *why* rather than just "invalid" (WCAG SC 3.3.1).
+								aria-describedby={
+									[fxHint != null ? fxHintId : null, isInvalid ? errorId : null]
+										.filter(Boolean)
+										.join(" ") || undefined
+								}
 								onChange={(event) => {
 									setValue(event.target.value);
 									setShowError(false);
@@ -161,12 +170,12 @@ function BudgetAmountDialogContent({
 									{fxHint.tail}
 								</FieldDescription>
 							)}
-							{errorMessage != null && <FieldError>{errorMessage}</FieldError>}
+							{errorMessage != null && <FieldError id={errorId}>{errorMessage}</FieldError>}
 						</Field>
 					</FieldGroup>
 				</DialogBody>
 				<DialogFooter>
-					{currentValueUsd != null && (
+					{canRemove && (
 						<Button
 							type="button"
 							variant="destructive-outline"

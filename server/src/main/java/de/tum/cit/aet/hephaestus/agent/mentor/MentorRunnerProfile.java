@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.mentor;
 
 import de.tum.cit.aet.hephaestus.agent.runtime.PiRunnerProfile;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -25,7 +26,7 @@ public final class MentorRunnerProfile implements PiRunnerProfile {
     public static final String SCRIPT = "pi-mentor-runner.mjs";
 
     /** Shared with the practice runner — stage it beside pi-mentor-runner.mjs. */
-    private static final List<String> SIDECARS = List.of("pi-provider.mjs");
+    private static final List<String> SIDECARS = List.of(SandboxLayout.PROVIDER_HELPER_FILENAME);
 
     private static final List<String> FLAGS = List.of("--max-old-space-size=256", "--no-warnings", "--expose-gc");
 

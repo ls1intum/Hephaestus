@@ -86,7 +86,7 @@ class FeedbackDeliveryService {
     }
 
     /**
-     * Delivery-recovery dedup lookup (#1368 hardening; tri-state #1368 fix wave, finding #6) — see
+     * Delivery-recovery dedup lookup — see
      * {@link PullRequestCommentPoster#findExistingSummaryComment}. Exposed here so {@link
      * de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewHandler} (which only holds a reference to
      * this service, not {@code PullRequestCommentPoster} directly) can implement {@link

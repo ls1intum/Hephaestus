@@ -36,8 +36,7 @@ public class LlmModelResolver {
                 instance.getUpstreamModelId(),
                 instance.getContextWindow(),
                 instance.getMaxOutputTokens(),
-                instance.isSupportsReasoning(),
-                FundingSource.INSTANCE
+                instance.isSupportsReasoning()
             );
         }
         WorkspaceLlmModel byo = config.getWorkspaceModel();
@@ -57,8 +56,7 @@ public class LlmModelResolver {
                 byo.getUpstreamModelId(),
                 byo.getContextWindow(),
                 byo.getMaxOutputTokens(),
-                byo.isSupportsReasoning(),
-                FundingSource.WORKSPACE
+                byo.isSupportsReasoning()
             );
         }
         throw new IllegalStateException("The agent config must bind an available OpenAI-compatible model");
@@ -115,7 +113,7 @@ public class LlmModelResolver {
 
     /**
      * The live routing + credential material the proxy injects — resolved TOGETHER from the live
-     * connection row (#1368 security fix wave). {@code baseUrl} deliberately does NOT come from the
+     * connection row. {@code baseUrl} deliberately does NOT come from the
      * job's frozen {@code ConfigSnapshot}: repointing a connection's host must not be split-brained
      * against its rotated key (an old-host + new-key mismatch would otherwise leak the new credential to
      * whatever now answers at the stale host). {@code apiKey} is {@code null} for a deliberately keyless

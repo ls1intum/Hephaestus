@@ -68,10 +68,10 @@ function ModelsContainer() {
 	 *
 	 * Reseeding is keyed on `saveRevisions`, and a key change takes effect on the very next render —
 	 * so whatever the cache holds at that moment is what the admin reads back. `invalidateQueries`
-	 * does not touch `data`; it schedules a refetch. Bumping the revision on the strength of it
-	 * remounted the card against the *pre-save* array: the picker snapped back to the model that had
-	 * just been replaced, under a success toast, and stayed there — the key never changes again when
-	 * the refetch lands. Saving again from that screen wrote the old model back.
+	 * does not touch `data`; it schedules a refetch. Bumping the revision on the strength of it alone
+	 * remounts the card against the *pre-save* array: the picker snaps back to the model that was
+	 * just replaced, under a success toast, and stays there, because the key never changes again when
+	 * the refetch lands. Saving again from that screen writes the old model back.
 	 *
 	 * The response is the server's own view of the binding it just stored, so this is not an
 	 * optimistic guess. The invalidation still follows, to reconcile anything computed elsewhere and
@@ -155,8 +155,10 @@ function ModelsContainer() {
 				llmSettingsQuery.isError ||
 				availableModelsQuery.isError
 			}
-			// Whichever of the four failed first supplies the ProblemDetail and the status the alert
-			// classifies on — a 403 must not offer a Retry that would be refused identically.
+			// The first of the four in this order supplies the ProblemDetail and the status the alert
+			// classifies on — a 403 must not offer a Retry that would be refused identically. Fixed
+			// precedence, not whichever failed first: the bindings answer the page's own question, so
+			// when several are down it is the one worth naming.
 			loadError={
 				bindingsQuery.error ??
 				workspaceQuery.error ??

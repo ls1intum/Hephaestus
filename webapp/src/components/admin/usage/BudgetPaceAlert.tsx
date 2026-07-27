@@ -36,6 +36,9 @@ export function BudgetPaceAlert({
 	fx,
 }: BudgetPaceAlertProps) {
 	const capName = scope === "provider" ? "provider cap" : "shared-model budget";
+	// The short noun for the sentence underneath, where the title one line up has already said which
+	// of the two purses this is — repeating the full name there reads as a second cap.
+	const capNoun = scope === "provider" ? "cap" : "budget";
 	return (
 		<Alert variant="warning" role="status">
 			<TrendingUp aria-hidden />
@@ -48,15 +51,17 @@ export function BudgetPaceAlert({
 				<p>
 					{formatCostUsd(spendUsd)} of {formatCapUsd(capUsd)}
 					<FxAmount conversion={spendOfCapConversion(spendUsd, capUsd, fx)} />.
+					{/* Person-neutral, because the same sentence runs under two different subjects: "Acme has
+					    used …" on the instance console and "You've used …" on the workspace's own page. */}
 					{projection != null &&
 						(projection.reachedOn != null ? (
-							` At this pace you'll hit it around ${formatDayLabel(projection.reachedOn)}.`
+							` At this pace, the ${capNoun} is reached around ${formatDayLabel(projection.reachedOn)}.`
 						) : (
 							// The month-end figure converts too: one sentence that quotes "$43.90 of $50
 							// (≈ €38.59 of €44)" and then a bare "$61.20" makes the reader switch currencies
 							// mid-breath.
 							<>
-								{` At this pace you'll finish the month around ${formatCostUsd(projection.projectedMonthEndUsd)}`}
+								{` At this pace, the month finishes around ${formatCostUsd(projection.projectedMonthEndUsd)}`}
 								<FxAmount conversion={spendConversion(projection.projectedMonthEndUsd, fx)} />.
 							</>
 						))}

@@ -13,8 +13,8 @@ package de.tum.cit.aet.hephaestus.agent.sandbox.spi;
  * DockerSandboxAdapter}'s catch-all wrap of an unexpected exception — is deterministic across retries
  * (it will fail identically every time) or an unknown defect that should not be assumed safe to retry.
  * Retrying those anyway would let a genuinely broken job silently burn its whole retry budget on a
- * failure that was never going to resolve itself, instead of failing fast as it did before this
- * hardening existed. Only failures thrown from an ACTUAL {@code DockerException}/I/O-wrapping call site
+ * failure that was never going to resolve itself, instead of failing fast. Only failures thrown from
+ * an ACTUAL {@code DockerException}/I/O-wrapping call site
  * — the kind that self-heals when the daemon recovers, a transient network blip clears, or contention
  * eases — use this subtype.
  */

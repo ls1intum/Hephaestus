@@ -14,9 +14,12 @@ test("dev-login then configure practice review settings (read + mutate over http
 
 	await page.goto("/w/e2e/admin/practices/settings");
 	await expect(page.getByRole("heading", { name: "Review settings" })).toBeVisible();
-	// `exact` so the "AI model" binding-card title is not confused with any longer label.
-	await expect(page.getByText("AI model", { exact: true })).toBeVisible();
-	await expect(page.getByText("Review policy")).toBeVisible();
+	// The two card titles. `exact` on "Model" because it is a short word: without it the matcher also
+	// takes "Model #12", "AI models" in the sidebar, and any label that merely contains it. Card
+	// titles are `<div>`s (`ui/card.tsx`), not headings, so `getByText` is the query that reaches
+	// them — `getByRole("heading")` finds neither.
+	await expect(page.getByText("Model", { exact: true })).toBeVisible();
+	await expect(page.getByText("Review policy", { exact: true })).toBeVisible();
 
 	// Toggle "Skip drafts" — the PATCH proves CSRF double-submit works over plain http.
 	const skipDrafts = page.getByRole("switch", { name: /skip drafts/i });

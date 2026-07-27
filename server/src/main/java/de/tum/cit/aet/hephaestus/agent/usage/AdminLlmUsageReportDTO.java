@@ -10,10 +10,9 @@ import org.jspecify.annotations.Nullable;
  * The instance-admin cross-tenant rollup for one month.
  *
  * <p>An envelope rather than a bare array because {@code month} and {@code fx} are facts about the
- * REQUEST, not about any workspace in it. They previously rode on every row — one month resolves to
- * exactly one rate, so the value was identical on all N rows and a client had to reach into
- * {@code rows[0]} to find a response-level fact. That is a shape defect, and with the array gone
- * there is now exactly one place each of them can be read from.
+ * REQUEST, not about any workspace in it: one month resolves to exactly one rate, so carrying them
+ * per row would repeat one value N times and force a client to reach into {@code rows[0]} for a
+ * response-level fact. Here there is exactly one place each of them can be read from.
  */
 @Schema(description = "Instance-admin per-workspace month rollup (metadata only, no tenant content)")
 public record AdminLlmUsageReportDTO(

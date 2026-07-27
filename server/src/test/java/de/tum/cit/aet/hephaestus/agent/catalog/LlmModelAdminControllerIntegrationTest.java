@@ -133,7 +133,6 @@ class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
             new BigDecimal("2.00"),
             null,
             null,
-            null,
             null
         );
         webTestClient
@@ -150,7 +149,6 @@ class LlmModelAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
             PricingMode.PRICED,
             new BigDecimal("3.00"),
             new BigDecimal("4.00"),
-            null,
             null,
             null,
             null

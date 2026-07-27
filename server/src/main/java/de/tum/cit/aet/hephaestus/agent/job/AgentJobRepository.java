@@ -589,10 +589,10 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      *
      * <p>Two exclusions:
      * <ul>
-     *   <li><b>{@code delivery_status = 'PENDING'}</b> (finding #2) — a job whose delivery has not
+     *   <li><b>{@code delivery_status = 'PENDING'}</b> — a job whose delivery has not
      *       landed yet must survive for the delivery-recovery sweep to retry; deleting it outright
      *       would silently drop the delivery forever.</li>
-     *   <li><b>Referenced by {@code feedback}</b> (finding #1, BLOCKER) — {@code feedback.agent_job_id}
+     *   <li><b>Referenced by {@code feedback}</b> — {@code feedback.agent_job_id}
      *       carries {@code ON DELETE CASCADE} (1781092589259-32: "purging a job removes its synthesized
      *       feedback"), which transitively cascades to {@code feedback_observation}, {@code
      *       feedback_placement}, and {@code reaction} — append-only research/product data that must
@@ -625,7 +625,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      * would be slowest exactly when an incident has inflated the backlog — when the signal matters most.
      * One query with {@code FILTER} clauses scans the row set once, still index-backed via the
      * {@code status IN (...)} predicate matching the partial indexes
-     * {@code ix_agent_job_queued_available} / {@code ix_agent_job_running_config}.
+     * {@code ix_agent_job_queued_available} / {@code ix_agent_job_running_purpose}.
      *
      * <p>{@code :now} is a bind parameter rather than JPQL/SQL {@code now()} for the same reason as
      * elsewhere in this repository — judged on the same app-clock instant {@code available_at} was

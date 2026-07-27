@@ -21,9 +21,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 /**
  * A workspace's practice-review policy: when a review runs and where its feedback lands.
  *
- * <p>This used to be {@code /ai-settings}, a container that ended up holding one thing that was not an
- * AI setting. The policy is a property of practice review, so it lives beside the practice catalogue —
- * which also lets its service drop the last {@code agent} dependency it had.
+ * <p>The policy is a property of practice review, not of the AI configuration, so it lives beside the
+ * practice catalogue — which also keeps its service free of any {@code agent} dependency.
  */
 @WorkspaceScopedController
 @RequestMapping("/practices/review-settings")

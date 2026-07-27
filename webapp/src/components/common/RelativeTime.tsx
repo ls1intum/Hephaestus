@@ -101,8 +101,11 @@ export interface RelativeTimeProps {
 
 /**
  * A timestamp as "4 minutes ago", against the shared clock, with the absolute time one hover away.
- * The one way this app humanises an instant — a second implementation would phrase the same moment
- * differently and, without the shared clock, would freeze on screen.
+ * Every standalone timestamp on a surface goes through this — a second implementation would phrase
+ * the same moment differently and, without the shared clock, would freeze on screen. The string
+ * helpers in `admin/integrations/sync-format.ts` (`relativeTime`, `nextRunLabel`) are the deliberate
+ * exception: those phrases sit *inside* a sentence or a tooltip, where a live-updating element can
+ * neither be composed nor usefully tick.
  *
  * Both halves matter. The relative phrase must re-render against the shared clock: a "2 minutes ago"
  * that has silently been on screen for an hour is worse than no reading. The absolute instant stays

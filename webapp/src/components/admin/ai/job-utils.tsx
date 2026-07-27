@@ -92,10 +92,10 @@ const USD_WHOLE = new Intl.NumberFormat("en-US", {
 /**
  * An amount of money that was spent.
  *
- * <p>Three cases, because reading spend at a glance is the whole job of these tables:
- * nothing spent reads as `$0` — not `$0.000`, which looks like a broken decimal; an amount too
- * small to show in cents reads as `<$0.01`, which is honest about being nonzero where rounding to
- * `$0.00` would claim the opposite; everything else is plain cents.
+ * <p>Three cases, because reading spend at a glance is the whole job of these tables: nothing spent
+ * reads as `$0`, dropping the cents a reader would have to skip past; an amount too small to show in
+ * cents reads as `<$0.01`, which is honest about being nonzero where rounding to `$0.00` would claim
+ * the opposite; everything else is plain cents.
  */
 export function formatCostUsd(value: number | undefined): string {
 	if (value == null) return "—";

@@ -26,8 +26,8 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Spring Security filter that authenticates requests to the LLM proxy using proxy-scoped bearer
- * tokens: an {@code AgentJob}'s job token, or a mentor session's registry-minted token (#1368
- * slice 5 — the mentor's interactive sandbox is not an {@code AgentJob} row).
+ * tokens: an {@code AgentJob}'s job token, or a mentor session's registry-minted token (the mentor's
+ * interactive sandbox is not an {@code AgentJob} row).
  *
  * <p>Agent containers send their token as the standard {@code Authorization: Bearer} header (Pi's
  * custom-provider convention — see {@code pi-provider.mjs}). This filter validates it against the

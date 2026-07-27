@@ -1,5 +1,5 @@
 import type { LlmModel } from "@/api/types.gen";
-import { formatRateUsd } from "@/components/admin/ai/job-utils";
+import { formatRateUsd } from "./money";
 
 export type PricingMode = "PRICED" | "NO_CHARGE" | "UNPRICED";
 

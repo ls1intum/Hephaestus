@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleAlert, Plug, Plus } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { toast } from "sonner";
 import {
 	workspaceCreateLlmConnectionMutation,
@@ -45,6 +45,11 @@ import { WorkspaceLlmModelsTable } from "./WorkspaceLlmModelsTable";
 
 export interface WorkspaceLlmProviderPanelProps {
 	workspaceSlug: string;
+	/**
+	 * Whether the instance still lets this workspace register *new* providers and models. False does
+	 * not hide the panel: providers already connected stay listed and stay editable, which is exactly
+	 * what the banner promises, so hiding the section would make it a lie.
+	 */
 	ownProviderAllowed: boolean;
 }
 
@@ -62,8 +67,13 @@ const PROBE_MUTATION_KEY = ["workspaceProbeLlmConnection"];
  * settles first.
  */
 const MODEL_WRITE_MUTATION_KEY = ["workspaceWriteLlmModel"];
-/** Same reason, for connections: disconnecting one provider must not disable the others' buttons. */
-const CONNECTION_DELETE_MUTATION_KEY = ["workspaceDeleteLlmConnection"];
+/**
+ * Same reason, for connections: a write against one provider must not disable the others' buttons.
+ * Update and delete share the prefix, so one lookup answers "is this card busy" for both — the
+ * instance twin files both writes the same way, and filing only the delete left Edit/Test/Disconnect
+ * clickable while a PATCH was still out.
+ */
+const CONNECTION_WRITE_MUTATION_KEY = ["workspaceWriteLlmConnection"];
 
 /** Workspace-owned OpenAI-compatible connections and the models grouped under each connection. */
 export function WorkspaceLlmProviderPanel({
@@ -71,6 +81,14 @@ export function WorkspaceLlmProviderPanel({
 	ownProviderAllowed,
 }: WorkspaceLlmProviderPanelProps) {
 	const queryClient = useQueryClient();
+	// Prefixes the per-card heading ids each provider card's `aria-labelledby` points at.
+	const cardLabelPrefix = useId();
+	// Hoisted once. Spread inline at each site, a `filedUnder` key and the `usePendingMutationIds` key
+	// that reads it can drift apart, and the lookup then silently returns an empty set — every row
+	// re-enables mid-flight with no test failing.
+	const modelWriteKey = [...MODEL_WRITE_MUTATION_KEY, workspaceSlug];
+	const connectionWriteKey = [...CONNECTION_WRITE_MUTATION_KEY, workspaceSlug];
+	const probeKey = [...PROBE_MUTATION_KEY, workspaceSlug];
 	const [connectionDialogOpen, setConnectionDialogOpen] = useState(false);
 	const [editingConnection, setEditingConnection] = useState<WorkspaceLlmConnection | null>(null);
 	const [modelDialogOpen, setModelDialogOpen] = useState(false);
@@ -109,32 +127,31 @@ export function WorkspaceLlmProviderPanel({
 		},
 		onError: (error) => {
 			if (problemStatusOf(error) === 403) setRegistrationDisabled(true);
-			toast.error(problemDetailOf(error, "Could not connect your provider"));
+			toast.error("Couldn't connect your provider", { description: problemDetailOf(error) });
 		},
 	});
 	const updateConnection = useMutation({
-		...workspaceUpdateLlmConnectionMutation(),
+		...filedUnder(connectionWriteKey, workspaceUpdateLlmConnectionMutation()),
 		onSuccess: () => {
 			invalidateConnections();
 			setConnectionDialogOpen(false);
 			toast.success("Provider updated");
 		},
-		onError: (error) => toast.error(problemDetailOf(error, "Could not update your provider")),
+		onError: (error) =>
+			toast.error("Couldn't update your provider", { description: problemDetailOf(error) }),
 	});
 	const deleteConnection = useMutation({
-		...filedUnder(
-			[...CONNECTION_DELETE_MUTATION_KEY, workspaceSlug],
-			workspaceDeleteLlmConnectionMutation(),
-		),
+		...filedUnder(connectionWriteKey, workspaceDeleteLlmConnectionMutation()),
 		onSuccess: () => {
 			invalidateConnections();
 			invalidateModels();
 			toast.success("Provider disconnected");
 		},
-		onError: (error) => toast.error(problemDetailOf(error, "Could not disconnect your provider")),
+		onError: (error) =>
+			toast.error("Couldn't disconnect your provider", { description: problemDetailOf(error) }),
 	});
 	const probeConnection = useMutation({
-		...filedUnder([...PROBE_MUTATION_KEY, workspaceSlug], workspaceProbeLlmConnectionMutation()),
+		...filedUnder(probeKey, workspaceProbeLlmConnectionMutation()),
 		onSuccess: (result, variables) => {
 			setTestResults((current) => ({
 				...current,
@@ -157,11 +174,11 @@ export function WorkspaceLlmProviderPanel({
 		},
 	});
 	const probingConnectionIds = usePendingMutationIds<{ path: { id: number } }>(
-		[...PROBE_MUTATION_KEY, workspaceSlug],
+		probeKey,
 		(variables) => variables.path.id,
 	);
-	const disconnectingConnectionIds = usePendingMutationIds<{ path: { id: number } }>(
-		[...CONNECTION_DELETE_MUTATION_KEY, workspaceSlug],
+	const writingConnectionIds = usePendingMutationIds<{ path: { id: number } }>(
+		connectionWriteKey,
 		(variables) => variables.path.id,
 	);
 
@@ -174,28 +191,30 @@ export function WorkspaceLlmProviderPanel({
 		},
 		onError: (error) => {
 			if (problemStatusOf(error) === 403) setRegistrationDisabled(true);
-			toast.error(problemDetailOf(error, "Could not add the model"));
+			toast.error("Couldn't add the model", { description: problemDetailOf(error) });
 		},
 	});
 	const updateModel = useMutation({
-		...filedUnder([...MODEL_WRITE_MUTATION_KEY, workspaceSlug], workspaceUpdateLlmModelMutation()),
+		...filedUnder(modelWriteKey, workspaceUpdateLlmModelMutation()),
 		onSuccess: () => {
 			invalidateModels();
 			setModelDialogOpen(false);
 			toast.success("Model updated");
 		},
-		onError: (error) => toast.error(problemDetailOf(error, "Could not update the model")),
+		onError: (error) =>
+			toast.error("Couldn't update the model", { description: problemDetailOf(error) }),
 	});
 	const deleteModel = useMutation({
-		...filedUnder([...MODEL_WRITE_MUTATION_KEY, workspaceSlug], workspaceDeleteLlmModelMutation()),
+		...filedUnder(modelWriteKey, workspaceDeleteLlmModelMutation()),
 		onSuccess: () => {
 			invalidateModels();
 			toast.success("Model deleted");
 		},
-		onError: (error) => toast.error(problemDetailOf(error, "Could not delete the model")),
+		onError: (error) =>
+			toast.error("Couldn't delete the model", { description: problemDetailOf(error) }),
 	});
 	const mutatingModelIds = usePendingMutationIds<{ path: { id: number } }>(
-		[...MODEL_WRITE_MUTATION_KEY, workspaceSlug],
+		modelWriteKey,
 		(variables) => variables.path.id,
 	);
 
@@ -287,11 +306,19 @@ export function WorkspaceLlmProviderPanel({
 						const connectionModels = models.filter((model) => model.connectionId === connection.id);
 						const testResult = testResults[connection.id];
 						return (
-							<Card key={connection.id}>
+							<Card
+								key={connection.id}
+								// A named region, so a screen-reader user can reach one provider's card directly;
+								// without it the card's name lives in a `<div>` with no relationship to anything.
+								role="region"
+								aria-labelledby={`${cardLabelPrefix}-${connection.id}`}
+							>
 								<CardHeader>
 									<div className="flex flex-wrap items-start justify-between gap-3">
 										<div>
-											<CardTitle>{connection.displayName}</CardTitle>
+											<CardTitle id={`${cardLabelPrefix}-${connection.id}`}>
+												{connection.displayName}
+											</CardTitle>
 											<CardDescription>
 												{connection.hasApiKey
 													? `Credential configured · ends in ····${connection.apiKeyLast4 ?? "····"}`
@@ -304,10 +331,17 @@ export function WorkspaceLlmProviderPanel({
 									</div>
 								</CardHeader>
 								<CardContent className="space-y-4">
+									{/* Each control names its own provider: three cards deep, "Edit" / "Test connection" /
+									    "Disconnect" are otherwise the same three names repeated, and nothing ties a
+									    button to the card title above it (WCAG SC 2.4.6). Each name opens with the
+									    button's own visible text — including the "Testing…" the probe swaps in — so
+									    speech control still matches what the reader can see (SC 2.5.3). */}
 									<div className="flex flex-wrap gap-2">
 										<Button
 											variant="outline"
 											size="sm"
+											aria-label={`Edit ${connection.displayName}`}
+											disabled={writingConnectionIds.has(connection.id)}
 											onClick={() => {
 												setEditingConnection(connection);
 												setConnectionDialogOpen(true);
@@ -318,7 +352,15 @@ export function WorkspaceLlmProviderPanel({
 										<Button
 											variant="outline"
 											size="sm"
-											disabled={probingConnectionIds.has(connection.id)}
+											aria-label={
+												probingConnectionIds.has(connection.id)
+													? `Testing… ${connection.displayName}`
+													: `Test connection to ${connection.displayName}`
+											}
+											disabled={
+												probingConnectionIds.has(connection.id) ||
+												writingConnectionIds.has(connection.id)
+											}
 											onClick={() => {
 												setTestResults((current) => {
 													const next = { ...current };
@@ -334,20 +376,29 @@ export function WorkspaceLlmProviderPanel({
 											variant="outline"
 											size="sm"
 											className="text-destructive"
-											disabled={disconnectingConnectionIds.has(connection.id)}
+											aria-label={`Disconnect ${connection.displayName}`}
+											disabled={writingConnectionIds.has(connection.id)}
 											onClick={() => setDeletingConnection(connection)}
 										>
 											Disconnect
 										</Button>
 									</div>
 									{testResult && (
-										<Alert variant={testResult.ok ? "success" : "destructive"}>
+										// The outcome of a button the reader just pressed. Assertive `alert` on the
+										// success branch would cut across whatever is being read (SC 4.1.3); a failure
+										// still earns it.
+										<Alert
+											variant={testResult.ok ? "success" : "destructive"}
+											role={testResult.ok ? "status" : "alert"}
+										>
 											<AlertDescription>{testResult.message}</AlertDescription>
 										</Alert>
 									)}
 									<div className="space-y-3">
 										<div className="flex items-center justify-between">
-											<h4 className="text-sm font-medium">Models</h4>
+											{/* One level below the section heading above; `CardTitle` is a `<div>`, so an
+											    `h4` here would skip a level (WCAG SC 1.3.1). */}
+											<h3 className="text-sm font-medium">Models</h3>
 											{!registrationBlocked && (
 												<Button
 													size="sm"

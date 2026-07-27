@@ -96,18 +96,23 @@ describe("WorkspaceLlmProviderPanel", () => {
 		);
 		renderPanel();
 
-		const cards = await screen.findAllByText(/OpenAI production|Local GPU/);
-		const openAiCard = cards[0].closest("[data-slot='card']") as HTMLElement;
-		const gpuCard = cards[1].closest("[data-slot='card']") as HTMLElement;
+		// Each card is a region named by its own provider, so this reaches one by the same route
+		// assistive tech does rather than by a kit-internal `data-slot`.
+		const openAiCard = await screen.findByRole("region", { name: "OpenAI production" });
+		const gpuCard = screen.getByRole("region", { name: "Local GPU" });
 
-		fireEvent.click(within(openAiCard).getByRole("button", { name: "Test connection" }));
-		fireEvent.click(within(gpuCard).getByRole("button", { name: "Test connection" }));
+		fireEvent.click(
+			within(openAiCard).getByRole("button", { name: "Test connection to OpenAI production" }),
+		);
+		fireEvent.click(within(gpuCard).getByRole("button", { name: "Test connection to Local GPU" }));
 
 		// The fast one settles first.
 		expect(await within(gpuCard).findByText(/1 model available/)).toBeTruthy();
 
 		// The slow one must still read as in flight, and must still refuse a second click.
-		const slowButton = within(openAiCard).getByRole("button", { name: "Testing…" });
+		const slowButton = within(openAiCard).getByRole("button", {
+			name: "Testing… OpenAI production",
+		});
 		expect((slowButton as HTMLButtonElement).disabled).toBe(true);
 
 		releaseSlowProbe?.();
@@ -168,7 +173,7 @@ describe("WorkspaceLlmProviderPanel", () => {
 			}),
 		);
 		renderPanel();
-		fireEvent.click(await screen.findByRole("button", { name: "Disconnect" }));
+		fireEvent.click(await screen.findByRole("button", { name: "Disconnect OpenAI production" }));
 		expect(deleted).toBe(false);
 		const dialog = screen.getByRole("alertdialog");
 		fireEvent.click(within(dialog).getByRole("button", { name: "Disconnect provider" }));
@@ -207,7 +212,7 @@ describe("WorkspaceLlmProviderPanel", () => {
 		expect(await screen.findByText("Existing model")).toBeTruthy();
 		expect(screen.queryByRole("button", { name: "Add provider" })).toBeNull();
 		expect(screen.queryByRole("button", { name: "Add model" })).toBeNull();
-		expect(screen.getByRole("button", { name: "Edit" })).toBeTruthy();
+		expect(screen.getByRole("button", { name: "Edit OpenAI production" })).toBeTruthy();
 		expect(screen.getByRole("button", { name: "Edit Existing model" })).toBeTruthy();
 		expect(screen.getByRole("button", { name: "Delete Existing model" })).toBeTruthy();
 	});

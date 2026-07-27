@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import type { PricingMode } from "@/lib/llm-pricing";
+import { type PricingMode, priceLabel } from "@/lib/llm-pricing";
 
 export interface PriceModeValue {
 	pricingMode: PricingMode;
@@ -26,29 +26,29 @@ export interface PriceModeEditorProps {
 	value: PriceModeValue;
 	onChange: (value: PriceModeValue) => void;
 	errors?: { per1mInputUsd?: string; per1mOutputUsd?: string; note?: string };
-	disabled?: boolean;
 	idPrefix: string;
 }
 
 /**
- * The price radio + fields shared by the instance model form and the workspace's own-provider model form
- * (#1368 glossary). "Free" and "No price set" relabel per audience — every workspace model would
- * otherwise read "Free", which undersells that the organization is paying for it.
+ * The price radio + fields shared by the instance model form and the workspace's own-provider model
+ * form (#1368 glossary). The two "no rate" options are worded by {@link priceLabel}, the one owner of
+ * that vocabulary, so the radio a model's price was chosen on and the label the tables print for it
+ * cannot drift: an instance model with no price reads "No price set" and a workspace model reads
+ * "Price not set", in both places.
  */
 export function PriceModeEditor({
 	audience,
 	value,
 	onChange,
 	errors,
-	disabled = false,
 	idPrefix,
 }: PriceModeEditorProps) {
 	const set = <K extends keyof PriceModeValue>(key: K, next: PriceModeValue[K]) => {
 		onChange({ ...value, [key]: next });
 	};
 
-	const noChargeLabel = "No metered API cost";
-	const unpricedLabel = audience === "instance" ? "No price set" : "Price not set";
+	const noChargeLabel = priceLabel({ pricingMode: "NO_CHARGE" }, audience);
+	const unpricedLabel = priceLabel({ pricingMode: "UNPRICED" }, audience);
 
 	const numberField = (
 		key: "per1mInputUsd" | "per1mOutputUsd" | "per1mCacheReadUsd" | "per1mCacheWriteUsd",
@@ -56,6 +56,7 @@ export function PriceModeEditor({
 		required: boolean,
 	) => {
 		const id = `${idPrefix}-${key}`;
+		const errorId = `${id}-error`;
 		const error =
 			key === "per1mInputUsd"
 				? errors?.per1mInputUsd
@@ -79,15 +80,17 @@ export function PriceModeEditor({
 					step="0.01"
 					inputMode="decimal"
 					value={value[key] != null ? String(value[key]) : ""}
-					disabled={disabled}
 					onChange={(e) => {
 						const raw = e.target.value;
 						set(key, raw === "" ? undefined : Number(raw));
 					}}
 					aria-required={required}
 					aria-invalid={Boolean(error)}
+					// Tabbing back to a field marked invalid has to announce *why* (WCAG SC 3.3.1), which
+					// `aria-invalid` alone never does.
+					aria-describedby={error ? errorId : undefined}
 				/>
-				{error && <FieldError>{error}</FieldError>}
+				{error && <FieldError id={errorId}>{error}</FieldError>}
 			</Field>
 		);
 	};
@@ -113,7 +116,6 @@ export function PriceModeEditor({
 				onValueChange={(next) => {
 					if (next) set("pricingMode", next as PricingMode);
 				}}
-				disabled={disabled}
 				aria-label="Price"
 			>
 				{modes.map((mode) => (
@@ -149,16 +151,16 @@ export function PriceModeEditor({
 					<Input
 						id={`${idPrefix}-note`}
 						value={value.note ?? ""}
-						disabled={disabled}
 						onChange={(e) => set("note", e.target.value)}
 						placeholder="e.g. internal endpoint; infrastructure billed separately"
 						aria-required="true"
 						aria-invalid={Boolean(errors?.note)}
+						aria-describedby={`${idPrefix}-note-hint${errors?.note ? ` ${idPrefix}-note-error` : ""}`}
 					/>
-					<FieldDescription>
+					<FieldDescription id={`${idPrefix}-note-hint`}>
 						Explain why no per-token API rate applies. Infrastructure cost may still apply.
 					</FieldDescription>
-					{errors?.note && <FieldError>{errors.note}</FieldError>}
+					{errors?.note && <FieldError id={`${idPrefix}-note-error`}>{errors.note}</FieldError>}
 				</Field>
 			)}
 		</FieldSet>

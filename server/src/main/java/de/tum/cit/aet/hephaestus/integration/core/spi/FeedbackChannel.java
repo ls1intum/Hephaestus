@@ -35,7 +35,7 @@ public interface FeedbackChannel {
     }
 
     /**
-     * Best-effort dedup lookup (#1368 hardening — delivery-recovery crash window): search the target's
+     * Best-effort dedup lookup for the delivery-recovery crash window: search the target's
      * existing comments for one carrying {@code marker} (the invisible HTML-comment marker every summary
      * post embeds, e.g. {@code PullRequestCommentPoster.SUMMARY_MARKER_PREFIX + jobId}), so a
      * delivery-recovery retry can record the already-posted comment's id instead of posting a duplicate.

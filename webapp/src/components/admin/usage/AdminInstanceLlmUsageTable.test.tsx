@@ -193,7 +193,7 @@ describe("AdminInstanceLlmUsageTable", () => {
 			.map((button) => button.getAttribute("aria-label") ?? button.textContent);
 		expect(buttons).toEqual([
 			"View usage details for Example Workspace",
-			"Set shared-model budget for Example Workspace",
+			"Set budget for Example Workspace (shared models)",
 		]);
 	});
 
@@ -270,11 +270,12 @@ describe("AdminInstanceLlmUsageTable", () => {
 		);
 
 		// Third person here, second person on the workspace's own page ("You've used …% of your …"):
-		// the instance admin is reading about someone else's budget, and the sentence says so.
+		// the instance admin is reading about someone else's budget, and the sentence says so. The
+		// projection underneath is person-neutral, because it is one text under both subjects.
 		expect(
 			screen.getByText("Example Workspace has used 84% of its shared-model budget"),
 		).toBeTruthy();
-		expect(screen.getByText(/At this pace you'll hit it around July 12\./)).toBeTruthy();
+		expect(screen.getByText(/At this pace, the budget is reached around July 12\./)).toBeTruthy();
 		// The provider cap is nowhere near its own, so it stays quiet.
 		expect(screen.queryByText(/of its provider cap/)).toBeNull();
 	});

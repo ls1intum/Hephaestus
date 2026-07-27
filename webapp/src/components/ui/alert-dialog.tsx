@@ -6,10 +6,15 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
- * ⚠️ Diverges from the shadcn registry, in `AlertDialogContent` only: a `w-[calc(100%-2rem)]` gutter
- * (upstream's `w-full` runs edge to edge at exactly 320 px, where `max-w-xs` stops clamping) and the
- * same height bound `DialogContent` carries, for the same reason (WCAG 2.2 SC 1.4.10). No new API —
- * alert dialogs are short by contract, so the whole popup scrolls and there is no body to pin.
+ * ⚠️ Diverges from the shadcn registry in two places.
+ *
+ * 1. `AlertDialogContent`: a `w-[calc(100%-2rem)]` gutter (upstream's `w-full` runs edge to edge at
+ *    exactly 320 px, where `max-w-xs` stops clamping) and the same height bound `DialogContent`
+ *    carries, for the same reason (WCAG 2.2 SC 1.4.10). Alert dialogs are short by contract, so the
+ *    whole popup scrolls and there is no body to pin.
+ * 2. `AlertDialogClose` — exported here, absent from the registry's own export block, for callers
+ *    that need a dismiss control outside the Cancel/Action pair.
+ *
  * Re-vendoring drops both; re-apply them.
  */
 function AlertDialog({ ...props }: AlertDialogPrimitive.Root.Props) {

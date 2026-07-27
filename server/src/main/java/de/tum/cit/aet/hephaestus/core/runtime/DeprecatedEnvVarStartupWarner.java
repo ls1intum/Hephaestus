@@ -18,22 +18,20 @@ import org.springframework.stereotype.Component;
  *
  * <p>Covers two retirements:
  * <ul>
- *   <li>#1368 (LLM catalog): {@code HEPHAESTUS_WORKER_LLM_BASE_URL} / {@code
+ *   <li>LLM catalog: {@code HEPHAESTUS_WORKER_LLM_BASE_URL} / {@code
  *       HEPHAESTUS_WORKER_LLM_API_KEY} / {@code HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED} — LLM
  *       providers moved from env vars to the admin console.</li>
- *   <li>#1368 (NATS→Postgres agent queue cutover): {@code AGENT_NATS_ENABLED} / {@code
+ *   <li>NATS→Postgres agent queue cutover: {@code AGENT_NATS_ENABLED} / {@code
  *       HEPHAESTUS_AGENT_NATS_SERVER} / {@code AGENT_NATS_MAX_ACK_PENDING} / {@code
  *       AGENT_NATS_FETCH_BATCH_SIZE} — the agent job queue is now the {@code agent_job} table,
  *       polled rather than pushed over NATS; every tuning knob the old JetStream consumer had
  *       (ack-pending, fetch batch size) has no poll-based equivalent and is simply dropped.</li>
  * </ul>
  *
- * <p>Deliberately checks the retired {@code hephaestus.agent.nats.*} keys, not any surviving
- * property with a similar name — {@code application-worker.yml} no longer sets {@code
- * hephaestus.agent.nats.enabled} itself (that YAML assignment used to make this warner false-positive
- * on every worker boot, since a YAML-set placeholder default resolves to a present-but-empty value,
- * not absent), so a real WARN here now means the operator's own deployment config still sets one of
- * these, not the shipped profile.
+ * <p>Deliberately checks the retired {@code hephaestus.agent.nats.*} keys, not any surviving property
+ * with a similar name, and no shipped profile assigns one — a YAML-set placeholder default resolves
+ * to a present-but-empty value rather than absent, which would make this warner fire on every boot.
+ * A WARN here therefore means the operator's own deployment config still sets one of these.
  */
 @Component
 public class DeprecatedEnvVarStartupWarner {

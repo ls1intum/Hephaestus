@@ -120,7 +120,8 @@ function AdminLlmPage() {
 			);
 			toast.success("Connection added");
 		},
-		onError: (error) => toast.error(problemDetailOf(error, "Could not add the connection")),
+		onError: (error) =>
+			toast.error("Couldn't add the connection", { description: problemDetailOf(error) }),
 	});
 
 	const updateConnection = useMutation({
@@ -130,7 +131,8 @@ function AdminLlmPage() {
 			setConnectionDialogOpen(false);
 			toast.success("Connection updated");
 		},
-		onError: (error) => toast.error(problemDetailOf(error, "Could not update the connection")),
+		onError: (error) =>
+			toast.error("Couldn't update the connection", { description: problemDetailOf(error) }),
 	});
 
 	const deleteConnection = useMutation({
@@ -140,7 +142,8 @@ function AdminLlmPage() {
 			if (variables.path.id === selectedConnectionId) setSelectedConnectionId(null);
 			toast.success("Connection deleted");
 		},
-		onError: (error) => toast.error(problemDetailOf(error, "Could not delete the connection")),
+		onError: (error) =>
+			toast.error("Couldn't delete the connection", { description: problemDetailOf(error) }),
 	});
 
 	const mutatingConnectionIds = usePendingMutationIds<{ path: { id: number } }>(
@@ -163,7 +166,8 @@ function AdminLlmPage() {
 			invalidateModels();
 			toast.success("Model deleted");
 		},
-		onError: (error) => toast.error(problemDetailOf(error, "Could not delete the model")),
+		onError: (error) =>
+			toast.error("Couldn't delete the model", { description: problemDetailOf(error) }),
 	});
 
 	const mutatingModelIds = usePendingMutationIds<{ path: { id: number } }>(
@@ -177,7 +181,8 @@ function AdminLlmPage() {
 			queryClient.invalidateQueries({ queryKey: adminGetLlmSettingsQueryKey() });
 			toast.success("Settings saved");
 		},
-		onError: (error) => toast.error(problemDetailOf(error, "Could not save settings")),
+		onError: (error) =>
+			toast.error("Couldn't save settings", { description: problemDetailOf(error) }),
 	});
 
 	const isModelSaving =
@@ -213,7 +218,7 @@ function AdminLlmPage() {
 					description: "Review the model and save again before activating it.",
 				});
 			} else {
-				toast.error(problemDetailOf(error, "Could not save the model"));
+				toast.error("Couldn't save the model", { description: problemDetailOf(error) });
 			}
 		}
 	};
@@ -380,10 +385,10 @@ function AdminLlmPage() {
 
 			<AdminLlmModelAccessDialog
 				open={accessModel != null}
-				// Dismissal is always allowed, including while the PUT is in flight. Refusing it made
+				// Dismissal is always allowed, including while the PUT is in flight. Refusing it leaves
 				// Escape, the close button and Cancel inert with focus held inside the popup, and `fetch`
-				// has no timeout of its own — against a black-holed connection there was no way out. The
-				// request is not cancelled: its toast reports the outcome, and the row it belongs to
+				// has no timeout of its own — against a black-holed connection there is then no way out.
+				// The request is not cancelled: its toast reports the outcome, and the row it belongs to
 				// stays disabled until it settles, so the dialog cannot be reopened onto a second save.
 				onOpenChange={(open) => {
 					if (!open) setAccessModel(null);
@@ -405,7 +410,9 @@ function AdminLlmPage() {
 								toast.success("Workspace access updated");
 							},
 							onError: (error) =>
-								toast.error(problemDetailOf(error, "Could not update workspace access")),
+								toast.error("Couldn't update workspace access", {
+									description: problemDetailOf(error),
+								}),
 						},
 					);
 				}}

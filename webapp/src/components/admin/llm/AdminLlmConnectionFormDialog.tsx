@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type {
 	CreateLlmConnectionRequest,
 	LlmConnection,
@@ -198,6 +198,18 @@ function AdminLlmConnectionFormDialogContent({
 		);
 	};
 
+	// `useId()` rather than hand-spelled ids, the house rule `BudgetAmountDialog` set: the workspace
+	// twin of this dialog spells out the same field names, and two forms cannot own one id.
+	const displayNameId = useId();
+	const presetId = useId();
+	const responsesApiId = useId();
+	const baseUrlId = useId();
+	const authModeId = useId();
+	const apiKeyId = useId();
+	const clearApiKeyId = useId();
+	const displayNameErrorId = useId();
+	const baseUrlErrorId = useId();
+
 	const handleSubmit = (event: React.FormEvent) => {
 		event.preventDefault();
 		if (!validate()) return;
@@ -237,20 +249,29 @@ function AdminLlmConnectionFormDialogContent({
 				    overflows every phone in both directions; only the body scrolls. */}
 				<DialogBody className="space-y-4 py-1">
 					<Field data-invalid={Boolean(errors.displayName)}>
-						<FieldLabel htmlFor="llm-conn-display-name">Display name</FieldLabel>
+						<FieldLabel htmlFor={displayNameId}>Display name</FieldLabel>
 						<Input
-							id="llm-conn-display-name"
+							id={displayNameId}
 							value={displayName}
 							onChange={(event) => setDisplayName(event.target.value)}
 							placeholder="e.g. Production OpenAI"
+							// `required` is semantics only — the form is `noValidate`, so the browser never acts
+							// on it — but it is what tells a screen reader the field is required before submit
+							// (WCAG SC 3.3.2), and the workspace twin already marks the same field.
+							required
 							aria-invalid={Boolean(errors.displayName)}
+							// Announces *why* the field is invalid on the way back to it, which `aria-invalid`
+							// alone never does (WCAG SC 3.3.1).
+							aria-describedby={errors.displayName ? displayNameErrorId : undefined}
 						/>
-						{errors.displayName && <FieldError>{errors.displayName}</FieldError>}
+						{errors.displayName && (
+							<FieldError id={displayNameErrorId}>{errors.displayName}</FieldError>
+						)}
 					</Field>
 
 					{!isEdit && (
 						<Field>
-							<FieldLabel htmlFor="llm-conn-provider-preset">Endpoint preset</FieldLabel>
+							<FieldLabel htmlFor={presetId}>Endpoint preset</FieldLabel>
 							<Select
 								items={PROVIDER_PRESET_SELECT_ITEMS}
 								value={preset}
@@ -265,7 +286,7 @@ function AdminLlmConnectionFormDialogContent({
 									clearProbe();
 								}}
 							>
-								<SelectTrigger id="llm-conn-provider-preset" className="w-full">
+								<SelectTrigger id={presetId} className="w-full">
 									<SelectValue />
 								</SelectTrigger>
 								<SelectContent>
@@ -278,7 +299,7 @@ function AdminLlmConnectionFormDialogContent({
 							</Select>
 							<Field orientation="horizontal" className="mt-2">
 								<Checkbox
-									id="llm-conn-responses-api"
+									id={responsesApiId}
 									checked={useResponsesApi}
 									onCheckedChange={(checked) => {
 										setUseResponsesApi(checked === true);
@@ -286,7 +307,7 @@ function AdminLlmConnectionFormDialogContent({
 									}}
 								/>
 								<FieldContent>
-									<FieldLabel htmlFor="llm-conn-responses-api" className="font-normal">
+									<FieldLabel htmlFor={responsesApiId} className="font-normal">
 										Use the Responses API instead of Chat Completions
 									</FieldLabel>
 								</FieldContent>
@@ -301,9 +322,9 @@ function AdminLlmConnectionFormDialogContent({
 					)}
 
 					<Field data-invalid={Boolean(errors.baseUrl)}>
-						<FieldLabel htmlFor="llm-conn-base-url">Base URL</FieldLabel>
+						<FieldLabel htmlFor={baseUrlId}>Base URL</FieldLabel>
 						<Input
-							id="llm-conn-base-url"
+							id={baseUrlId}
 							type="url"
 							value={baseUrl}
 							onChange={(event) => {
@@ -312,7 +333,9 @@ function AdminLlmConnectionFormDialogContent({
 							}}
 							disabled={isEdit}
 							placeholder="https://api.openai.com/v1"
+							required
 							aria-invalid={Boolean(errors.baseUrl)}
+							aria-describedby={errors.baseUrl ? baseUrlErrorId : undefined}
 						/>
 						{isEdit && (
 							<FieldDescription>
@@ -320,12 +343,12 @@ function AdminLlmConnectionFormDialogContent({
 								them.
 							</FieldDescription>
 						)}
-						{errors.baseUrl && <FieldError>{errors.baseUrl}</FieldError>}
+						{errors.baseUrl && <FieldError id={baseUrlErrorId}>{errors.baseUrl}</FieldError>}
 					</Field>
 
 					{!isEdit && preset === "OTHER" && (
 						<Field>
-							<FieldLabel htmlFor="llm-conn-auth-mode">Authentication</FieldLabel>
+							<FieldLabel htmlFor={authModeId}>Authentication</FieldLabel>
 							<Select
 								items={[
 									{ value: "BEARER", label: "Bearer token" },
@@ -338,7 +361,7 @@ function AdminLlmConnectionFormDialogContent({
 									clearProbe();
 								}}
 							>
-								<SelectTrigger id="llm-conn-auth-mode" className="w-full">
+								<SelectTrigger id={authModeId} className="w-full">
 									<SelectValue />
 								</SelectTrigger>
 								<SelectContent>
@@ -350,9 +373,9 @@ function AdminLlmConnectionFormDialogContent({
 					)}
 
 					<Field>
-						<FieldLabel htmlFor="llm-conn-api-key">API key</FieldLabel>
+						<FieldLabel htmlFor={apiKeyId}>API key</FieldLabel>
 						<Input
-							id="llm-conn-api-key"
+							id={apiKeyId}
 							type="password"
 							value={apiKey}
 							onChange={(event) => {
@@ -373,7 +396,7 @@ function AdminLlmConnectionFormDialogContent({
 						{editing?.hasApiKey && (
 							<Field orientation="horizontal">
 								<Checkbox
-									id="llm-conn-clear-api-key"
+									id={clearApiKeyId}
 									checked={clearApiKey}
 									onCheckedChange={(checked) => {
 										setClearApiKey(checked === true);
@@ -382,7 +405,7 @@ function AdminLlmConnectionFormDialogContent({
 									}}
 								/>
 								<FieldContent>
-									<FieldLabel htmlFor="llm-conn-clear-api-key" className="font-normal">
+									<FieldLabel htmlFor={clearApiKeyId} className="font-normal">
 										Remove stored API key
 									</FieldLabel>
 								</FieldContent>
@@ -413,8 +436,10 @@ function AdminLlmConnectionFormDialogContent({
 										? "Test changes"
 										: "Test & fetch models"}
 						</Button>
+						{/* The outcome of a button the admin just pressed, not a failure: `role="alert"` is
+						    assertive and would cut across whatever is being read (SC 4.1.3). */}
 						{probeResult?.reachable && (
-							<Alert variant="success">
+							<Alert variant="success" role="status">
 								<AlertDescription>
 									Reachable. Found {probeResult.models.length} model
 									{probeResult.models.length === 1 ? "" : "s"}.

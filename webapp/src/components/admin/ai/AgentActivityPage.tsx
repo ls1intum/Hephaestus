@@ -9,12 +9,22 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import type { AgentJob } from "@/api/types.gen";
 import { TablePagination } from "@/components/common/TablePagination";
+import { filedUnder, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import { problemDetailOf } from "@/lib/problem-detail";
 import { AgentJobDetailsPanel } from "./AgentJobDetailsPanel";
 import { AgentJobsTable } from "./AgentJobsTable";
 import type { JobStatus } from "./job-utils";
 
 const PAGE_SIZE = 20;
+
+/**
+ * Filed per job, not observed per hook. A `useMutation`'s own `isPending` belongs to the hook, not to
+ * the job it was called with: cancel one run, close the panel and open another, and the second run's
+ * Cancel is disabled by the first run's request. One key per operation, so a retry never disables a
+ * cancel either.
+ */
+const CANCEL_MUTATION_KEY = ["cancelAgentJob"];
+const RETRY_DELIVERY_MUTATION_KEY = ["retryAgentJobDelivery"];
 
 interface AgentActivityPageProps {
 	workspaceSlug: string;
@@ -48,8 +58,11 @@ export function AgentActivityPage({ workspaceSlug }: AgentActivityPageProps) {
 		});
 	};
 
+	const cancelKey = [...CANCEL_MUTATION_KEY, workspaceSlug];
+	const retryDeliveryKey = [...RETRY_DELIVERY_MUTATION_KEY, workspaceSlug];
+
 	const cancelJob = useMutation({
-		...cancelAgentJobMutation(),
+		...filedUnder(cancelKey, cancelAgentJobMutation()),
 		onSuccess: (updated) => {
 			invalidateJobs();
 			setSelectedJob(updated);
@@ -65,7 +78,7 @@ export function AgentActivityPage({ workspaceSlug }: AgentActivityPageProps) {
 	});
 
 	const retryDelivery = useMutation({
-		...retryAgentJobDeliveryMutation(),
+		...filedUnder(retryDeliveryKey, retryAgentJobDeliveryMutation()),
 		onSuccess: (updated) => {
 			invalidateJobs();
 			setSelectedJob(updated);
@@ -77,6 +90,15 @@ export function AgentActivityPage({ workspaceSlug }: AgentActivityPageProps) {
 			});
 		},
 	});
+
+	const cancellingJobIds = usePendingMutationIds<{ path: { jobId: string } }, string>(
+		cancelKey,
+		(variables) => variables.path.jobId,
+	);
+	const retryingJobIds = usePendingMutationIds<{ path: { jobId: string } }, string>(
+		retryDeliveryKey,
+		(variables) => variables.path.jobId,
+	);
 
 	const handleSelectJob = (job: AgentJob) => {
 		setSelectedJob(job);
@@ -118,8 +140,8 @@ export function AgentActivityPage({ workspaceSlug }: AgentActivityPageProps) {
 				job={selectedJob}
 				open={panelOpen}
 				onOpenChange={setPanelOpen}
-				isCancelling={cancelJob.isPending}
-				isRetrying={retryDelivery.isPending}
+				isCancelling={selectedJob != null && cancellingJobIds.has(selectedJob.id)}
+				isRetrying={selectedJob != null && retryingJobIds.has(selectedJob.id)}
 				onCancel={(job) => cancelJob.mutate({ path: { workspaceSlug, jobId: job.id } })}
 				onRetryDelivery={(job) => retryDelivery.mutate({ path: { workspaceSlug, jobId: job.id } })}
 			/>

@@ -27,20 +27,6 @@ function sumBy<T>(rows: T[], pick: (row: T) => number): number {
 	return rows.reduce((total, row) => total + pick(row), 0);
 }
 
-/**
- * The month's two spend figures, as the server computed them in SQL.
- *
- * The client does no money arithmetic. Re-adding the row costs in float would drift from the exact
- * figure the server already put on the same payload — invisible at two decimal places today, and a
- * second source of truth for a number the budget gate enforces against. Passing the report rather
- * than a bare `rows` array is what makes that impossible to forget: there is no way to render a
- * total the server did not send.
- */
-export type LlmUsageMonthTotals = Pick<
-	WorkspaceLlmUsageReport,
-	"instanceTotalCostUsd" | "ownProviderTotalCostUsd"
->;
-
 const JOB_TYPE_SKELETON_COLUMNS = [
 	"w-32",
 	"w-16",
@@ -55,7 +41,12 @@ const JOB_TYPE_SKELETON_COLUMNS = [
 const DAY_SKELETON_COLUMNS = ["w-16", "w-16", "w-16", "w-16", "w-12"];
 
 export interface LlmUsageByJobTypeTableProps {
-	/** Omit while the report is loading to keep the table shell stable. */
+	/**
+	 * The whole report, not a bare `rows` array — that is what makes the money rule impossible to
+	 * forget. Re-adding the row costs in float would drift from the exact figure the server already
+	 * put on the same payload, and become a second source of truth for a number the budget gate
+	 * enforces against. Omit while it loads, to keep the table shell stable.
+	 */
 	report?: WorkspaceLlmUsageReport;
 	/**
 	 * Display-only conversion for the totals row. Body cells stay USD-only: they are sub-dollar
@@ -226,7 +217,12 @@ function AvgPerRun({ row }: { row: LlmUsageByJobType }) {
 }
 
 export interface LlmUsageByDayTableProps {
-	/** Omit while the report is loading to keep the table shell stable. */
+	/**
+	 * The whole report, not a bare `rows` array — that is what makes the money rule impossible to
+	 * forget. Re-adding the row costs in float would drift from the exact figure the server already
+	 * put on the same payload, and become a second source of truth for a number the budget gate
+	 * enforces against. Omit while it loads, to keep the table shell stable.
+	 */
 	report?: WorkspaceLlmUsageReport;
 	/** Display-only conversion for the totals row; per-day cells stay USD-only. */
 	fx?: Fx;

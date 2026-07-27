@@ -437,7 +437,7 @@ hephaestus:
         trigger-enabled: ${HEPHAESTUS_DEV_TRIGGER_ENABLED:false}
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # AGENT JOB QUEUE (PostgreSQL-backed, #1368 NATS→Postgres cutover)
+    # AGENT JOB QUEUE (PostgreSQL-backed)
     # ═══════════════════════════════════════════════════════════════════════════
     # The queue IS the agent_job table — a QUEUED insert is the enqueue. AgentJobExecutor polls
     # for QUEUED rows on a fixed interval instead of a NATS push consumer. Disabled by default.
@@ -452,13 +452,13 @@ hephaestus:
         # instead of requeued again. Authoritative budget lives on agent_job.retry_count.
         max-retries: ${AGENT_MAX_RETRIES:5}
         heartbeat-interval: 25s
-        # Retention (#1368 hardening): AgentJobRetentionService. payload-retention strips container_logs/
+        # Retention: AgentJobRetentionService. payload-retention strips container_logs/
         # output to NULL past this age; row-retention deletes the whole terminal row past this age.
         payload-retention: ${AGENT_PAYLOAD_RETENTION:P14D}
         row-retention: ${AGENT_ROW_RETENTION:P90D}
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # LLM GOVERNANCE (#1368)
+    # LLM GOVERNANCE
     # ═══════════════════════════════════════════════════════════════════════════
     # Bound to hephaestus.llm.* via agent.LlmProperties (@Validated). Everything that is NOT here
     # lives in the database and is edited by an admin in the UI: the provider connections and their

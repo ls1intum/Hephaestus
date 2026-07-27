@@ -2,6 +2,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryHistory, createRouter, RouterProvider } from "@tanstack/react-router";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { delay, HttpResponse, http } from "msw";
+// `@testing-library/user-event` re-exported. Not installed under its own name (see `package.json`),
+// and this is the only import path in the repo that reaches it. `fireEvent` is the house idiom and
+// is used for everything else here; see the combobox call below for why one case cannot use it.
 import { userEvent } from "storybook/test";
 import { describe, expect, it, vi } from "vitest";
 import { listAgentsQueryKey } from "@/api/@tanstack/react-query.gen";
@@ -12,6 +15,13 @@ import { routeTree } from "@/routeTree.gen";
 
 // Mounting the real route pulls in the whole admin layout and its lazy modules.
 vi.setConfig({ testTimeout: 20_000 });
+
+/**
+ * The first mount in a file pays the lazy transform of the whole admin layout and its route
+ * modules — seconds under a loaded box, well past `findBy`'s own 1s default, which is separate
+ * from the `testTimeout` above and is what actually decides these.
+ */
+const TRANSFORM_WAIT = { timeout: 10_000 };
 
 const MODELS = [
 	{
@@ -112,9 +122,9 @@ async function renderModelsRoute(bindings: () => AgentBinding[]) {
 			</AuthProvider>
 		</QueryClientProvider>,
 	);
-	await screen.findByRole("heading", { name: "AI models" });
+	await screen.findByRole("heading", { name: "AI models" }, TRANSFORM_WAIT);
 	// The four page queries land after the first paint; until they do the page renders a spinner.
-	await screen.findByLabelText("Practice detection runs on");
+	await screen.findByLabelText("Practice detection runs on", undefined, TRANSFORM_WAIT);
 	return queryClient;
 }
 

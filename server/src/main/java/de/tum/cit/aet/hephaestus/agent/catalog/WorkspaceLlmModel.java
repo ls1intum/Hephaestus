@@ -37,6 +37,12 @@ import org.jspecify.annotations.Nullable;
     uniqueConstraints = {
         @UniqueConstraint(name = "ux_ws_llm_model_ws_slug", columnNames = { "workspace_id", "slug" }),
         @UniqueConstraint(name = "ux_ws_llm_model_id_ws", columnNames = { "id", "workspace_id" }),
+        // Declared here so the ddl-auto test schema matches production, where the changelog creates it.
+        // WorkspaceLlmModelService#create catches the violation of this one by name.
+        @UniqueConstraint(
+            name = "ux_ws_llm_model_connection_upstream",
+            columnNames = { "connection_id", "upstream_model_id" }
+        ),
     }
 )
 @Getter

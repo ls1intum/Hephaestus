@@ -8,7 +8,7 @@ const ISO_MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
  * same reason the audit filters do — a spend report exists to be cited. An admin forwards
  * `…/admin/usage?month=2026-06` to finance and they see June; Back steps months; reload stays put.
  *
- * `.catch()` rather than a hard rejection, matching `auditSearch`: a hand-typed or stale `?month=`
+ * `.catch()` rather than a hard rejection, matching `audit-search.ts`: a hand-typed or stale `?month=`
  * must still open the report on a sensible month instead of rendering an error page.
  */
 export const usageSearchSchema = z.object({

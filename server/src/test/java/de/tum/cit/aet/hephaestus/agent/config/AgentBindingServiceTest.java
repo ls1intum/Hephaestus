@@ -186,15 +186,7 @@ class AgentBindingServiceTest extends BaseUnitTest {
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
         binding.setEnabled(true);
         when(llmModelResolver.resolve(binding)).thenReturn(
-            new ResolvedLlmModel(
-                "https://api.openai.com",
-                "openai-completions",
-                "gpt-test",
-                null,
-                null,
-                false,
-                FundingSource.INSTANCE
-            )
+            new ResolvedLlmModel("https://api.openai.com", "openai-completions", "gpt-test", null, null, false)
         );
 
         assertThat(service.isReady(binding)).isTrue();

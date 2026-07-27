@@ -19,14 +19,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * GitLab-specific REST endpoints used during the workspace creation wizard:
- * {@code POST /workspaces/gitlab/preflight} validates a PAT, {@code POST /workspaces/gitlab/groups}
- * lists accessible groups for one. Split from {@code WorkspaceRegistryController} so the
- * workspace module no longer imports {@link GitLabPreflightService}; the routes keep the
- * existing {@code /workspaces/gitlab/*} URL space for API stability.
- *
- * <p>Both endpoints are gated by the {@code GITLAB_WORKSPACE_CREATION} feature flag via
- * {@code @PreAuthorize} — identical to the previous protection on the merged controller.
+ * GitLab-specific REST endpoints used during the workspace creation wizard: one validates a personal
+ * access token, the other lists the groups that token can reach. Both require the
+ * {@code GITLAB_WORKSPACE_CREATION} feature flag.
  */
 @RestController
 @RequestMapping("/workspaces/gitlab")

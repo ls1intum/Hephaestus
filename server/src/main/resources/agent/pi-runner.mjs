@@ -532,7 +532,7 @@ async function main() {
     // pending registrations into the model registry. Register the hephaestus provider directly
     // here so the session resolves a real model on first prompt. Config (protocol/model/capability)
     // comes from the server-written pi-provider.json; baseUrl/token come from the sandbox env
-    // (#1368 slice 5 — shared with pi-mentor-runner.mjs via pi-provider.mjs).
+    // (shared with pi-mentor-runner.mjs via pi-provider.mjs).
     const providerConfig = loadProviderConfig(CWD);
     const registered = registerHephaestusProvider(modelRegistry, providerConfig);
     if (registered) {

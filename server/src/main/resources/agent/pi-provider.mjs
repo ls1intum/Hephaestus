@@ -1,4 +1,4 @@
-// Shared Pi custom-provider registration helper (#1368 slice 5 — ONE credential path).
+// Shared Pi custom-provider registration helper (ONE credential path).
 //
 // Both pi-runner.mjs and pi-mentor-runner.mjs import this so the two runners can NEVER drift on how
 // the "hephaestus" Pi provider is registered. Byte-identical registration holds by construction, not

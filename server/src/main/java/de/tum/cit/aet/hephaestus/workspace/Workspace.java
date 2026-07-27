@@ -276,8 +276,8 @@ public class Workspace {
      * own owner can clear (an unpriced shared model is the host's to fix; an unpriced own-provider
      * model is the workspace's).
      *
-     * <p><b>Why this still says "byo" when the API says "ownProvider".</b> #1368 renamed the jargon out
-     * of the HTTP surface and the UI. The column keeps its name because renaming a released column is a
+     * <p><b>Why this still says "byo" when the API says "ownProvider".</b> The jargon is kept out of the
+     * HTTP surface and the UI. The column keeps its name because renaming a released column is a
      * destructive migration that has to run deprecate-then-remove across two releases
      * (docs/contributor/database-migration.mdx) — a cost with no operator-visible benefit. The field
      * follows the column so that the mapping stays greppable in both directions.

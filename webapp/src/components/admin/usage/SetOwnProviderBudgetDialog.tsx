@@ -41,8 +41,8 @@ export function SetOwnProviderBudgetDialog({
 			isCurrentMonth={isCurrentMonth}
 			isPending={isPending}
 			serverError={serverError}
-			submitLabel="Save cap"
-			removeLabel="Remove cap"
+			// No `submitLabel`/`removeLabel`: "Save cap" / "Remove cap" are the shared editor's own
+			// defaults. Only the budget wrapper, which calls the number a budget, has to override them.
 			onOpenChange={onOpenChange}
 			onSubmit={onSubmit}
 		/>

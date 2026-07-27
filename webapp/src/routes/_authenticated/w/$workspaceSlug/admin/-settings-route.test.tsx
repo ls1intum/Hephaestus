@@ -14,6 +14,13 @@ import { routeTree } from "@/routeTree.gen";
 // Mounting the real route pulls in the whole admin layout and its lazy modules.
 vi.setConfig({ testTimeout: 15_000 });
 
+/**
+ * The first mount in a file pays the lazy transform of the whole admin layout and its route
+ * modules — seconds under a loaded box, well past `findBy`'s own 1s default, which is separate
+ * from the `testTimeout` above and is what actually decides these.
+ */
+const TRANSFORM_WAIT = { timeout: 10_000 };
+
 const WORKSPACE = {
 	id: 1,
 	workspaceSlug: "acme",
@@ -86,7 +93,7 @@ async function renderSettingsRoute() {
 			</AuthProvider>
 		</QueryClientProvider>,
 	);
-	await screen.findByRole("button", { name: "Reset and Recalculate Leagues" });
+	await screen.findByRole("button", { name: "Reset and Recalculate Leagues" }, TRANSFORM_WAIT);
 	return { queryClient, resetCalls: () => resetCalls };
 }
 

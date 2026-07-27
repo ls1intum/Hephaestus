@@ -409,7 +409,6 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
             WorkspaceLlmModel result = modelService.update(workspaceContext, 7L, request);
 
             assertThat(result.getUpstreamModelId()).isEqualTo("gpt-5");
-            verify(modelRepository, never()).existsByConnectionIdAndUpstreamModelIdAndIdNot(any(), any(), any());
         }
 
         /**

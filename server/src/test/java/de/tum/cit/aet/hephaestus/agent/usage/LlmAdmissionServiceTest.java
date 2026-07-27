@@ -89,8 +89,7 @@ class LlmAdmissionServiceTest extends BaseUnitTest {
             "gpt-authoritative",
             null,
             null,
-            false,
-            FundingSource.INSTANCE
+            false
         );
         when(resolver.resolve(binding)).thenReturn(resolved);
         when(resolver.connectionRef(binding)).thenReturn(
@@ -130,15 +129,7 @@ class LlmAdmissionServiceTest extends BaseUnitTest {
             Optional.of(binding.getWorkspaceModel())
         );
         when(resolver.resolve(binding)).thenReturn(
-            new ResolvedLlmModel(
-                "https://byo.example/v1",
-                "openai-responses",
-                "byo-model",
-                null,
-                null,
-                false,
-                FundingSource.WORKSPACE
-            )
+            new ResolvedLlmModel("https://byo.example/v1", "openai-responses", "byo-model", null, null, false)
         );
         when(resolver.connectionRef(binding)).thenReturn(
             new LlmModelResolver.ConnectionRef(FundingSource.WORKSPACE, 11L, 21L, 30L)
@@ -175,15 +166,7 @@ class LlmAdmissionServiceTest extends BaseUnitTest {
             Optional.of(binding.getWorkspaceModel())
         );
         when(resolver.resolve(binding)).thenReturn(
-            new ResolvedLlmModel(
-                "https://byo.example/v1",
-                "openai-responses",
-                "byo-model",
-                null,
-                null,
-                false,
-                FundingSource.WORKSPACE
-            )
+            new ResolvedLlmModel("https://byo.example/v1", "openai-responses", "byo-model", null, null, false)
         );
         when(resolver.connectionRef(binding)).thenReturn(
             new LlmModelResolver.ConnectionRef(FundingSource.WORKSPACE, 11L, 21L, 30L)

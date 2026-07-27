@@ -1,5 +1,5 @@
 import { AlertTriangle } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import type {
 	CreateLlmModelRequest,
 	LlmModel,
@@ -26,15 +26,10 @@ import {
 	FieldDescription,
 	FieldError,
 	FieldLabel,
+	FieldLegend,
+	FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import type { AdminLlmModelSaveBody } from "@/lib/admin-llm-model-save";
 import {
@@ -42,15 +37,9 @@ import {
 	type LlmModelFormField,
 	validateLlmModelForm,
 } from "@/lib/llm-form-validation";
+import { type ModelAccessScope, ModelAccessScopeChoice } from "./ModelAccessScopeChoice";
 import { PriceModeEditor, type PriceModeValue } from "./PriceModeEditor";
 import { type WorkspaceOption, workspaceFacetOptions } from "./workspace-options";
-
-// Passed as `items` so the trigger can render the selected label before the popup has ever opened
-// (Base UI Select otherwise has no label to show until the matching item has mounted once).
-const SHARE_WITH_ITEMS = [
-	{ value: "ALL", label: "All workspaces" },
-	{ value: "SELECTED", label: "Selected workspaces" },
-];
 
 export interface AdminLlmModelFormDialogProps {
 	open: boolean;
@@ -126,11 +115,17 @@ function AdminLlmModelFormDialogContent({
 	const [supportsReasoning, setSupportsReasoning] = useState(editing?.supportsReasoning ?? false);
 	const [enabled, setEnabled] = useState(editing?.enabled ?? false);
 	const [price, setPrice] = useState<PriceModeValue>(() => priceValueOf(editing));
-	const [shareAll, setShareAll] = useState(editing ? editing.visibility === "PUBLIC" : false);
+	// The same shape and the same control as the dedicated access editor: "who may use this model" is
+	// one question, and two screens of one feature answering it two ways reads as two settings.
+	const [accessScope, setAccessScope] = useState<ModelAccessScope>(
+		editing?.visibility === "PUBLIC" ? "ALL" : "SELECTED",
+	);
 	const [sharedWorkspaceIds, setSharedWorkspaceIds] = useState<number[]>(
 		editing?.grantedWorkspaceIds ?? [],
 	);
 	const [errors, setErrors] = useState<FieldErrors<LlmModelFormField>>({});
+	const displayNameErrorId = useId();
+	const upstreamModelIdErrorId = useId();
 
 	// The shared rules, not this form's own: a rule the workspace console enforces and the instance
 	// console does not is a rule an admin discovers from a 400.
@@ -173,7 +168,7 @@ function AdminLlmModelFormDialogContent({
 
 		const sharingBody: UpdateLlmModelSharingRequest | undefined = isEdit
 			? undefined
-			: shareAll
+			: accessScope === "ALL"
 				? { visibility: "PUBLIC" }
 				: { visibility: "GRANTED", workspaceIds: sharedWorkspaceIds };
 
@@ -203,9 +198,18 @@ function AdminLlmModelFormDialogContent({
 							value={displayName}
 							onChange={(e) => setDisplayName(e.target.value)}
 							placeholder="e.g. GPT-5"
+							// `required` is semantics only — the form is `noValidate`, so the browser never acts
+							// on it — but it is what tells a screen reader the field is required before submit
+							// (WCAG SC 3.3.2), and the workspace twin already marks the same two fields.
+							required
 							aria-invalid={Boolean(errors.displayName)}
+							// Announces *why* the field is invalid on the way back to it, which `aria-invalid`
+							// alone never does (WCAG SC 3.3.1).
+							aria-describedby={errors.displayName ? displayNameErrorId : undefined}
 						/>
-						{errors.displayName && <FieldError>{errors.displayName}</FieldError>}
+						{errors.displayName && (
+							<FieldError id={displayNameErrorId}>{errors.displayName}</FieldError>
+						)}
 					</Field>
 
 					<Field data-invalid={Boolean(errors.upstreamModelId)}>
@@ -216,9 +220,11 @@ function AdminLlmModelFormDialogContent({
 							onChange={(e) => setUpstreamModelId(e.target.value)}
 							disabled={isEdit}
 							placeholder="e.g. openai/gpt-5"
+							required={!isEdit}
 							autoComplete="off"
 							list="llm-model-upstream-id-options"
 							aria-invalid={Boolean(errors.upstreamModelId)}
+							aria-describedby={errors.upstreamModelId ? upstreamModelIdErrorId : undefined}
 						/>
 						{probedModelIds.length > 0 && (
 							<datalist id="llm-model-upstream-id-options">
@@ -232,7 +238,9 @@ function AdminLlmModelFormDialogContent({
 								? "Create a new model to use a different upstream id."
 								: "The exact id the provider expects. Slashes are part of the id."}
 						</FieldDescription>
-						{errors.upstreamModelId && <FieldError>{errors.upstreamModelId}</FieldError>}
+						{errors.upstreamModelId && (
+							<FieldError id={upstreamModelIdErrorId}>{errors.upstreamModelId}</FieldError>
+						)}
 					</Field>
 
 					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -316,30 +324,22 @@ function AdminLlmModelFormDialogContent({
 					/>
 
 					{!isEdit && (
-						<Field>
-							<FieldLabel htmlFor="llm-model-share-with">Initial workspace access</FieldLabel>
-							<Select
-								items={SHARE_WITH_ITEMS}
-								value={shareAll ? "ALL" : "SELECTED"}
-								onValueChange={(v) => {
-									if (v) setShareAll(v === "ALL");
-								}}
-							>
-								<SelectTrigger id="llm-model-share-with" className="w-full">
-									<SelectValue />
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="ALL">All workspaces</SelectItem>
-									<SelectItem value="SELECTED">Selected workspaces</SelectItem>
-								</SelectContent>
-							</Select>
-							{!shareAll && (
-								<>
+						// A fieldset, not a Field: one question, several answers, and then the answer's own
+						// input — which is what a legend is for. Same shape as `PriceModeEditor` above.
+						<FieldSet>
+							<FieldLegend variant="label">Initial workspace access</FieldLegend>
+							<ModelAccessScopeChoice
+								idPrefix="llm-model-share"
+								label="Initial workspace access"
+								value={accessScope}
+								onChange={setAccessScope}
+							/>
+							{accessScope === "SELECTED" && (
+								<Field className="mt-3">
 									<FacetMultiSelect
 										variant="field"
 										id="llm-model-share-workspaces"
 										title="Workspaces"
-										className="mt-2"
 										options={workspaceFacetOptions(workspaceOptions)}
 										selected={sharedWorkspaceIds}
 										onChange={setSharedWorkspaceIds}
@@ -351,9 +351,9 @@ function AdminLlmModelFormDialogContent({
 											from the model table when it is ready.
 										</FieldDescription>
 									)}
-								</>
+								</Field>
 							)}
-						</Field>
+						</FieldSet>
 					)}
 				</DialogBody>
 

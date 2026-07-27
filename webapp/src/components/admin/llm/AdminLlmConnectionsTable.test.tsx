@@ -69,7 +69,7 @@ describe("AdminLlmConnectionsTable", () => {
 	it("confirms before turning off every model on a connection", async () => {
 		const { onToggleEnabled } = renderTable({ 1: 2 });
 
-		fireEvent.click(screen.getByRole("switch", { name: "Turn off OpenAI production" }));
+		fireEvent.click(screen.getByRole("switch", { name: "OpenAI production" }));
 
 		// The confirmation is the point of the test, so it is the confirmation that gets read: it names
 		// the connection and how many models stop with it, which is the number the admin is deciding on.
@@ -89,7 +89,7 @@ describe("AdminLlmConnectionsTable", () => {
 		// interpolated, so a fixture of two alone would let "all 1 models on this connection" through.
 		renderTable({ 1: 1 });
 
-		fireEvent.click(screen.getByRole("switch", { name: "Turn off OpenAI production" }));
+		fireEvent.click(screen.getByRole("switch", { name: "OpenAI production" }));
 
 		expect(screen.getByRole("alertdialog").textContent).toContain(
 			"This immediately stops requests through the model on this connection.",
@@ -101,7 +101,7 @@ describe("AdminLlmConnectionsTable", () => {
 		// and the sentence it would render is about nothing.
 		const { onToggleEnabled } = renderTable({});
 
-		fireEvent.click(screen.getByRole("switch", { name: "Turn off OpenAI production" }));
+		fireEvent.click(screen.getByRole("switch", { name: "OpenAI production" }));
 
 		expect(screen.queryByRole("alertdialog")).toBeNull();
 		expect(onToggleEnabled).toHaveBeenCalledWith(connection, false);
@@ -125,7 +125,7 @@ describe("AdminLlmConnectionsTable", () => {
 		);
 
 		// Announced as unavailable and out of the tab order, not merely greyed (WCAG 2.2 SC 4.1.2)…
-		const toggle = screen.getByRole("switch", { name: "Turn off OpenAI production" });
+		const toggle = screen.getByRole("switch", { name: "OpenAI production" });
 		await expectUnavailable(toggle);
 		expect(screen.getByRole("cell", { name: "—" })).toBeTruthy();
 

@@ -45,15 +45,7 @@ class DefaultMentorReadinessQueryTest extends BaseUnitTest {
             Optional.of(binding)
         );
         when(llmModelResolver.resolve(binding)).thenReturn(
-            new ResolvedLlmModel(
-                "https://api.openai.com",
-                "openai-completions",
-                "gpt-test",
-                null,
-                null,
-                false,
-                FundingSource.INSTANCE
-            )
+            new ResolvedLlmModel("https://api.openai.com", "openai-completions", "gpt-test", null, null, false)
         );
 
         assertThat(query.isReady(1L)).isTrue();

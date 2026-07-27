@@ -8,9 +8,15 @@
  */
 const APP_NAME = "Hephaestus";
 
-/** `"AI usage · Instance admin · Hephaestus"`; omit `scope` for non-scoped pages. */
-export function pageTitle(page: string, scope?: string): string {
-	return scope ? `${page} · ${scope} · ${APP_NAME}` : `${page} · ${APP_NAME}`;
+/**
+ * `"AI usage · Instance admin · Hephaestus"`.
+ *
+ * Scoped, always: the two helpers below are the only callers, and a page outside a console needs no
+ * disambiguating segment — it keeps `__root.tsx`'s default title. Adding an unscoped branch here
+ * before there is a page for it invents a second title grammar nothing renders.
+ */
+function pageTitle(page: string, scope: string): string {
+	return `${page} · ${scope} · ${APP_NAME}`;
 }
 
 /** `head` for a route under `/admin` (the instance console). */
