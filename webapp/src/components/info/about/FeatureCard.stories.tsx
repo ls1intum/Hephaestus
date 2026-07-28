@@ -31,7 +31,7 @@ export const Default: Story = {
 			title: "Practice feedback",
 			description: "Specific feedback on how the work was done",
 			content:
-				"Hephaestus reviews pull requests, merge requests, and issues against the practices a workspace has chosen. Each comment points to evidence in the work and suggests what to try next.",
+				"Hephaestus reviews pull requests, merge requests, and issues against the practices a workspace has chosen. Each piece of feedback points to evidence in the work and suggests what to try next.",
 		},
 	},
 };

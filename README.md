@@ -13,11 +13,18 @@ Hephaestus gives developers feedback on the engineering practices they use in so
 
 Developers decide what to do with that feedback: act on it, push back with a reason, or let it pass. Hephaestus supports mentors, teachers, and maintainers by covering routine feedback. It does not replace their judgement or the relationships they build with developers.
 
-The core loop is to **gather** a developer's work, **observe** the practices it shows, **compose** feedback worth acting on, and **deliver** it while the work is still fresh. The developer's **response** closes the loop.
+The core loop is to **gather** a developer's work, **observe** the practices it shows, **compose** feedback worth acting on, and **deliver** it where and when it is useful. The developer's **response** closes the loop.
 
 Hephaestus is built for software engineering courses, open-source projects, and teams where mentors and maintainers cannot review every contribution themselves.
 
 The project is named after Hephaestus, the Greek god of blacksmiths and craftsmen.
+
+> [!IMPORTANT]
+> **Hephaestus is still pre-1.0.** Until 1.0, a minor release can change configuration or APIs in ways that require action. If you self-host it, use the [latest release](https://github.com/ls1intum/Hephaestus/releases/latest), read its release notes and the [migration guide](./MIGRATION.md), and test upgrades in staging.
+>
+> We are targeting **v1.0.0 for 30 September 2026**. Version 1.0 is a compatibility promise, not a claim that development is finished. It will establish a [stable operator contract](./docs/admin/compatibility-policy.mdx) for upgrades, configuration, Docker Compose, and the REST API.
+>
+> The v1.0 plan brings together four complementary ways to use feedback: comments alongside project work, a private reflection view, conversations with Heph, and facilitator views that help people support developers. Release gates take priority over the date. Follow the [v1.0 milestone](https://github.com/ls1intum/Hephaestus/milestone/5) and [release plan](https://github.com/ls1intum/Hephaestus/issues/1377) for current scope and progress.
 
 ## What Hephaestus does today
 

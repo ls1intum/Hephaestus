@@ -12,11 +12,11 @@ export function LandingFeaturesSection() {
 						Key features
 					</Badge>
 					<h2 className="text-3xl font-bold tracking-tighter sm:text-4xl mb-4">
-						Two ways to get feedback
+						Feedback where it can help
 					</h2>
 					<p className="text-muted-foreground text-lg">
-						Read practice feedback on GitHub or GitLab, then talk it through with Heph when you want
-						a broader view.
+						Today, feedback can appear alongside the work in GitHub or GitLab, or become part of a
+						conversation with Heph.
 					</p>
 				</div>
 
@@ -27,7 +27,7 @@ export function LandingFeaturesSection() {
 								<GitPullRequest className="h-5 w-5 text-primary" />
 							</div>
 							<CardTitle>Practice feedback</CardTitle>
-							<CardDescription>Specific feedback on how the work was done</CardDescription>
+							<CardDescription>Delivered alongside the work</CardDescription>
 						</CardHeader>
 						<CardContent>
 							<ul className="space-y-2">

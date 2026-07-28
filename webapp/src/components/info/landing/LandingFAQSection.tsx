@@ -17,7 +17,7 @@ const faqItems = [
 	{
 		key: "faq-item-2",
 		q: "What is practice feedback?",
-		a: "It is feedback on an observable way of working, such as keeping a change reviewable or explaining why it is needed. Each comment points to the work it is based on and suggests a next step.",
+		a: "It is feedback on an observable way of working, such as keeping a change reviewable or explaining why it is needed. Each piece of feedback points to the work it is based on and suggests a next step.",
 	},
 	{
 		key: "faq-item-3",
