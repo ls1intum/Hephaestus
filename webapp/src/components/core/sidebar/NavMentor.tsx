@@ -17,7 +17,7 @@ export function NavMentor({ workspaceSlug }: { workspaceSlug: string }) {
 			<SidebarMenu>
 				<SidebarMenuItem>
 					<SidebarMenuButton
-						tooltip="Heph - AI Mentor"
+						tooltip="Heph - AI mentor"
 						render={
 							<Link
 								to="/w/$workspaceSlug/mentor"
@@ -30,7 +30,7 @@ export function NavMentor({ workspaceSlug }: { workspaceSlug: string }) {
 						<span className="flex items-center gap-2">
 							Heph
 							<Badge variant="outline" className="text-muted-foreground">
-								<Sparkles className="h-3.5 w-3.5" /> AI Mentor
+								<Sparkles className="h-3.5 w-3.5" /> AI mentor
 							</Badge>
 						</span>
 						<div className="flex justify-end w-full">

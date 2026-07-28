@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat.wire;
 
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,19 +47,17 @@ public final class TranslatorState {
     /** Did we emit at least one {@code Start} chunk? Defensive — runner may replay an event. */
     private boolean started = false;
 
+    private boolean llmCallStarted = false;
+
     /** Step counter — Pi internally tracks turns; we surface them as AI SDK steps for grouping. */
     private int stepDepth = 0;
 
-    /**
-     * Latest observed token usage snapshot from Pi message events. Pi emits running counts on
-     * {@code message_update.assistantMessageEvent.partial.usage} and a final, authoritative
-     * snapshot on {@code message_end.message.usage}. {@code agent_end} carries no usage of
-     * its own (per pi-coding-agent/dist/core/extensions/types.d.ts AgentEndEvent — only
-     * {@code messages: AgentMessage[]}). The translator threads the latest observation here so
-     * the Finish chunk + persistence layer surface real cost.
-     */
+    private final ObjectNode completedUsage = nodes.objectNode();
+
     @Nullable
-    private JsonNode observedUsage;
+    private JsonNode currentUsage;
+
+    private int completedCallCount;
 
     /** Model id observed on the first AssistantMessage; used for pricing lookup. */
     @Nullable
@@ -75,8 +75,52 @@ public final class TranslatorState {
     @Nullable
     private byte[] observedSessionJsonl;
 
+    /**
+     * Which connection funds this turn's LLM calls, frozen at turn start. Unsynchronized unlike the
+     * streaming mutators below: written once, before any runner event can race it.
+     */
+    @Nullable
+    private FundingSource connectionScope;
+
+    @Nullable
+    private Long connectionId;
+
+    @Nullable
+    private String admittedModel;
+
+    @Nullable
+    private LlmPriceSnapshot admittedPrice;
+
     public TranslatorState(UUID assistantMessageId) {
         this.assistantMessageId = assistantMessageId;
+    }
+
+    public void bindConnection(@Nullable FundingSource connectionScope, @Nullable Long connectionId) {
+        this.connectionScope = connectionScope;
+        this.connectionId = connectionId;
+    }
+
+    public void bindAdmission(String model, LlmPriceSnapshot price) {
+        this.admittedModel = model;
+        this.admittedPrice = price;
+    }
+
+    public @Nullable String admittedModel() {
+        return admittedModel;
+    }
+
+    public @Nullable LlmPriceSnapshot admittedPrice() {
+        return admittedPrice;
+    }
+
+    @Nullable
+    public FundingSource connectionScope() {
+        return connectionScope;
+    }
+
+    @Nullable
+    public Long connectionId() {
+        return connectionId;
     }
 
     public UUID assistantMessageId() {
@@ -89,6 +133,14 @@ public final class TranslatorState {
 
     public synchronized void markStarted() {
         this.started = true;
+    }
+
+    public synchronized void markLlmCallStarted() {
+        this.llmCallStarted = true;
+    }
+
+    public synchronized boolean hasLlmCallStarted() {
+        return llmCallStarted;
     }
 
     public synchronized int incrementStep() {
@@ -168,16 +220,29 @@ public final class TranslatorState {
         return partsAccumulator.deepCopy();
     }
 
-    /**
-     * Record the latest usage snapshot from a Pi {@code AssistantMessage.usage} block. We hold
-     * the deep-copied node so subsequent runner emissions can mutate the original without
-     * leaking into persisted metadata. Each call overwrites — Pi's contract is that the latest
-     * snapshot is monotonically more complete than the previous one (running totals).
-     */
     public synchronized void observeUsage(JsonNode usage) {
         if (usage != null && usage.isObject() && !usage.isEmpty()) {
-            this.observedUsage = usage.deepCopy();
+            this.currentUsage = usage.deepCopy();
         }
+    }
+
+    public synchronized void completeUsage(JsonNode usage) {
+        if (usage != null && usage.isObject() && !usage.isEmpty()) {
+            addUsage(completedUsage, usage);
+            completedCallCount++;
+        }
+        currentUsage = null;
+    }
+
+    /** Authoritative totals from {@code agent_end}; a runner may omit them, keeping what was streamed. */
+    public synchronized void replaceCompletedUsage(List<JsonNode> usages) {
+        if (usages.isEmpty()) return;
+        completedUsage.removeAll();
+        for (JsonNode usage : usages) {
+            addUsage(completedUsage, usage);
+        }
+        completedCallCount = usages.size();
+        currentUsage = null;
     }
 
     /** Record the assistant message's model id; first non-blank wins (model rarely changes mid-turn). */
@@ -187,13 +252,44 @@ public final class TranslatorState {
         }
     }
 
-    public synchronized boolean hasObservedUsage() {
-        return observedUsage != null;
+    private boolean hasObservedUsage() {
+        return !completedUsage.isEmpty() || currentUsage != null;
     }
 
     @Nullable
     public synchronized JsonNode observedUsage() {
-        return observedUsage;
+        if (!hasObservedUsage()) return null;
+        ObjectNode total = completedUsage.deepCopy();
+        if (currentUsage != null) addUsage(total, currentUsage);
+        return total;
+    }
+
+    /** Calls represented by {@link #observedUsage()}, including an interrupted in-progress call. */
+    public synchronized int observedCallCount() {
+        return completedCallCount + (currentUsage != null ? 1 : 0);
+    }
+
+    private static void addUsage(ObjectNode target, JsonNode source) {
+        source
+            .properties()
+            .forEach(entry -> {
+                String name = entry.getKey();
+                JsonNode value = entry.getValue();
+                if (value.isObject()) {
+                    ObjectNode nested =
+                        target.has(name) && target.get(name).isObject()
+                            ? (ObjectNode) target.get(name)
+                            : target.putObject(name);
+                    addUsage(nested, value);
+                } else if (value.isIntegralNumber()) {
+                    long existing = target.has(name) && target.get(name).isNumber() ? target.get(name).asLong() : 0L;
+                    target.put(name, existing + value.asLong());
+                } else if (value.isFloatingPointNumber()) {
+                    double existing =
+                        target.has(name) && target.get(name).isNumber() ? target.get(name).asDouble() : 0D;
+                    target.put(name, existing + value.asDouble());
+                }
+            });
     }
 
     @Nullable

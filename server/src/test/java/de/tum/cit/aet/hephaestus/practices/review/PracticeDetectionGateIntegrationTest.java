@@ -6,10 +6,13 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmConnection;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmConnectionRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModel;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -40,15 +43,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Integration test for {@link PracticeReviewDetectionGate} exercising real PostgreSQL
- * queries for workspace resolution, agent config checking, and JSONB practice matching.
- *
- * <p>Primary integration value: workspace resolver heuristic, agent config existence check,
- * and JSONB containment query ({@code triggerEvents @> ?}) against real PostgreSQL.
- *
- * <p>Mocks only the role-check SPI ({@link UserRoleChecker}).
- * Label/draft/assignee checks operate on the in-memory PR object passed to the gate
- * (matching production behavior where the PR is loaded once by the caller).
+ * Mocks only the role-check SPI ({@link UserRoleChecker}); label/draft/assignee checks run against the
+ * in-memory PR object, matching production where the PR is loaded once by the caller.
  */
 class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
 
@@ -61,7 +57,13 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
     private PracticeRepository practiceRepository;
 
     @Autowired
-    private AgentConfigRepository agentConfigRepository;
+    private WorkspaceAgentBindingRepository agentBindingRepository;
+
+    @Autowired
+    private WorkspaceLlmConnectionRepository workspaceLlmConnectionRepository;
+
+    @Autowired
+    private WorkspaceLlmModelRepository workspaceLlmModelRepository;
 
     @Autowired
     private WorkspaceRepository workspaceRepository;
@@ -85,6 +87,7 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
     private UserRoleChecker userRoleChecker;
 
     private Workspace workspace;
+    private WorkspaceLlmModel workspaceModel;
     private Repository repo;
     private IdentityProvider provider;
     private User assignee;
@@ -99,15 +102,31 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
         workspace.getFeatures().setPracticesEnabled(true);
         workspace = workspaceRepository.save(workspace);
 
-        // Agent config (enabled)
-        AgentConfig config = new AgentConfig();
-        config.setWorkspace(workspace);
-        config.setName("gate-config");
-        config.setEnabled(true);
-        config.setLlmProvider(LlmProvider.ANTHROPIC);
-        config.setCredentialMode(CredentialMode.PROXY);
-        config.setTimeoutSeconds(300);
-        agentConfigRepository.save(config);
+        WorkspaceLlmConnection connection = new WorkspaceLlmConnection();
+        connection.setWorkspace(workspace);
+        connection.setSlug("gate-connection");
+        connection.setDisplayName("Gate connection");
+        connection.setBaseUrl("https://api.openai.com");
+        connection.setApiProtocol("openai-completions");
+        connection.setEnabled(true);
+        connection = workspaceLlmConnectionRepository.save(connection);
+
+        workspaceModel = new WorkspaceLlmModel();
+        workspaceModel.setWorkspace(workspace);
+        workspaceModel.setConnection(connection);
+        workspaceModel.setSlug("gate-model");
+        workspaceModel.setDisplayName("Gate model");
+        workspaceModel.setUpstreamModelId("gpt-5");
+        workspaceModel.setEnabled(true);
+        workspaceModel = workspaceLlmModelRepository.save(workspaceModel);
+
+        WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
+        binding.setWorkspace(workspace);
+        binding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        binding.setEnabled(true);
+        binding.setWorkspaceModel(workspaceModel);
+        binding.setTimeoutSeconds(300);
+        agentBindingRepository.save(binding);
 
         provider = gitProviderRepository
             .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
@@ -127,7 +146,6 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
         repo.setDefaultBranch("main");
         repo = repositoryRepository.save(repo);
 
-        // Mock role checker: healthy + assignee has role
         when(userRoleChecker.isHealthy()).thenReturn(true);
         // Role is resolved by the stable (gitProviderId, subject) identity; subject == User.nativeId.
         when(userRoleChecker.hasRole(anyLong(), eq(String.valueOf(assignee.getNativeId())), anyString())).thenReturn(
@@ -254,16 +272,28 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
     class GateSkips {
 
         @Test
-        void skipsNoConfig() {
-            agentConfigRepository.deleteAll();
+        void skipsNoBinding() {
+            agentBindingRepository.deleteAll();
             createPractice("no-config", "No Config", List.of("PullRequestCreated"), true);
             PullRequest pr = createPullRequest(false, Set.of(), Set.of(assignee));
 
             GateDecision decision = gate.evaluate(pr, "PullRequestCreated", TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            // No runnable practice config → gate skips before detection.
-            assertThat(((GateDecision.Skip) decision).reason()).contains("no runnable practice config");
+            assertThat(((GateDecision.Skip) decision).reason()).contains("no runnable practice-detection agent");
+        }
+
+        @Test
+        void skipsUnavailableModelWithoutPoisoningTheReadTransaction() {
+            workspaceModel.setEnabled(false);
+            workspaceLlmModelRepository.saveAndFlush(workspaceModel);
+            createPractice("unavailable-model", "Unavailable model", List.of("PullRequestCreated"), true);
+            PullRequest pr = createPullRequest(false, Set.of(), Set.of(assignee));
+
+            GateDecision decision = gate.evaluate(pr, "PullRequestCreated", TriggerMode.AUTO);
+
+            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
+            assertThat(((GateDecision.Skip) decision).reason()).contains("no runnable practice-detection agent");
         }
 
         @Test
@@ -308,7 +338,6 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
         void skipsUnresolvableWorkspace() {
             createPractice("orphan", "Orphan", List.of("PullRequestCreated"), true);
 
-            // Create a repo with unknown owner
             Repository unknownRepo = new Repository();
             unknownRepo.setNativeId(3099L);
             unknownRepo.setProvider(provider);

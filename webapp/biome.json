@@ -75,6 +75,23 @@
 	},
 	"overrides": [
 		{
+			"includes": ["src/components/**", "src/lib/**", "src/hooks/**", "src/integrations/**"],
+			"linter": {
+				"rules": {
+					"style": {
+						"useFilenamingConvention": {
+							"level": "error",
+							"options": {
+								"filenameCases": ["kebab-case", "PascalCase"],
+								"strictCase": false,
+								"requireAscii": true
+							}
+						}
+					}
+				}
+			}
+		},
+		{
 			"includes": ["src/components/ui/**"],
 			"linter": {
 				"rules": {

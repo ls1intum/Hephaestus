@@ -6,6 +6,9 @@
 # can never leak to production:
 #   - dev-login-enabled / cookie-secure=false → startup FAILS under `prod` (see DevLoginService / SecurityConfig)
 #   - creation-policy / the GitLab feature flag are operator toggles, set only in this profile
+#   - llm.egress.allow-loopback defaults to false everywhere else (see EgressPolicy) — only this
+#     profile turns it on, to test a workspace/instance BYO connection against a local gateway
+#     (Ollama/vLLM on localhost)
 #
 # Together they remove the manual setup that used to block UI-driven E2E:
 #   - passwordless dev sign-in (no OAuth IdP)
@@ -35,3 +38,6 @@ hephaestus:
   integration:
     gitlab:
       enabled: true
+  llm:
+    egress:
+      allow-loopback: true

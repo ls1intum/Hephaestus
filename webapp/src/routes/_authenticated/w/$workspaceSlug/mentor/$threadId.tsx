@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Chat } from "@/components/mentor/Chat";
 import { defaultPartRenderers } from "@/components/mentor/renderers";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useMentorChat } from "@/hooks/useMentorChat";
+import { useMentorChat } from "@/hooks/use-mentor-chat";
 import type { ChatMessage } from "@/lib/types";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/mentor/$threadId")({

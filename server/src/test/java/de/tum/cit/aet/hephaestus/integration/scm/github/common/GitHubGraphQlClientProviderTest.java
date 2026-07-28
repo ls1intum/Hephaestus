@@ -40,6 +40,9 @@ class GitHubGraphQlClientProviderTest extends BaseUnitTest {
     @Mock
     private RateLimitTracker rateLimitTracker;
 
+    @Mock
+    private GitHubRestRateLimitSeeder rateLimitSeeder;
+
     private GitHubGraphQlClientProvider provider;
 
     @BeforeEach
@@ -49,7 +52,8 @@ class GitHubGraphQlClientProviderTest extends BaseUnitTest {
             tokenProvider,
             appTokens,
             circuitBreaker,
-            rateLimitTracker
+            rateLimitTracker,
+            rateLimitSeeder
         );
     }
 

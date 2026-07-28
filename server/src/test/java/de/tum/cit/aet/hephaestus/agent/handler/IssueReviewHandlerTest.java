@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.List;
@@ -148,23 +149,55 @@ class IssueReviewHandlerTest extends BaseUnitTest {
         }
 
         private DeliveryContent note() {
-            return new DeliveryContent("One thing to tighten: add acceptance criteria.", List.of());
+            return new DeliveryContent("One thing to tighten: add acceptance criteria.", List.of(), List.of());
         }
 
         @Test
         void closedIssue_isSuppressed_neverPosts() {
-            handler.postIssueNote(issueJob("CLOSED"), note());
+            AgentJob job = issueJob("CLOSED");
+            DeliveryContent delivery = note();
+
+            handler.postIssueNote(job, delivery);
+
             verify(commentPoster, never()).postIssueFormattedBody(any(), any());
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                eq(job),
+                eq(delivery),
+                eq(FeedbackSuppressionReason.ARTIFACT_CLOSED)
+            );
+        }
+
+        @Test
+        void blankAfterSanitize_isSuppressed_withEmptyAfterSanitizeReason() {
+            // Issues have no inline lane: a body that sanitises to blank means nothing reached the developer.
+            AgentJob job = issueJob("OPEN");
+            DeliveryContent delivery = new DeliveryContent("", List.of(), List.of());
+
+            handler.postIssueNote(job, delivery);
+
+            verify(commentPoster, never()).postIssueFormattedBody(any(), any());
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                eq(job),
+                eq(delivery),
+                eq(FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE)
+            );
         }
 
         @Test
         void silentModeEngaged_isSuppressed_neverPosts() {
             silentModeEngaged = true;
+            AgentJob job = issueJob("OPEN");
+            var delivery = note();
 
-            handler.postIssueNote(issueJob("OPEN"), note());
+            handler.postIssueNote(job, delivery);
 
             verify(commentPoster, never()).postIssueFormattedBody(any(), any());
-            // Suppression is not a delivery failure, so no undelivered ledger unit is recorded.
+            // Withheld, not failed: it lands a SUPPRESSED unit naming the brake, never an undelivered one.
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                eq(job),
+                eq(delivery),
+                eq(FeedbackSuppressionReason.INSTANCE_SILENCED)
+            );
             verify(feedbackLedgerRecorder, never()).recordUndelivered(any(), any());
         }
 

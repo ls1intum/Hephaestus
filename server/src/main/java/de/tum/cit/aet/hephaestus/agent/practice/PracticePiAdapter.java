@@ -29,11 +29,11 @@ public class PracticePiAdapter {
     public PracticeSandboxSpec buildSandboxSpec(PracticeAgentRequest request) {
         PiRuntimeFactory.PiPlan plan = runtimeFactory.build(
             new PiPlanSpec(
-                request.llmProvider(),
-                request.credentialMode(),
-                request.credential(),
-                request.modelName(),
-                request.baseUrl(),
+                request.apiProtocol(),
+                request.upstreamModelId(),
+                request.contextWindow(),
+                request.maxOutputTokens(),
+                request.supportsReasoning(),
                 request.jobToken(),
                 request.allowInternet(),
                 request.timeoutSeconds(),
@@ -50,7 +50,8 @@ public class PracticePiAdapter {
             SandboxLayout.OUTPUT_PATH,
             null,
             plan.networkPolicy(),
-            null
+            null,
+            plan.promptDigest()
         );
     }
 

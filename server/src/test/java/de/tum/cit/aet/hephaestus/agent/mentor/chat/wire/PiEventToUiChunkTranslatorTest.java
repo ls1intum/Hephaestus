@@ -177,6 +177,32 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         assertThat(state.observedModel()).isEqualTo("claude-3-5-haiku-20241022");
     }
 
+    @Test
+    void multiStepTurn_sumsEveryCompletedAssistantCall() throws Exception {
+        ObjectNode first = (ObjectNode) fixture("message_end_assistant.json").deepCopy();
+        ObjectNode second = (ObjectNode) fixture("message_end_assistant.json").deepCopy();
+        ((ObjectNode) second.path("message").path("usage")).put("input", 40)
+            .put("output", 10)
+            .put("cacheRead", 3)
+            .put("cacheWrite", 2)
+            .put("totalTokens", 55);
+
+        translator.translate(first, state);
+        translator.translate(second, state);
+
+        ObjectNode end = mapper.createObjectNode();
+        end.put("type", "agent_end");
+        end.putArray("messages");
+        UIMessageChunk.Finish finish = (UIMessageChunk.Finish) translator.translate(end, state).getLast();
+
+        assertThat(finish.messageMetadata().usage().input()).isEqualTo(65);
+        assertThat(finish.messageMetadata().usage().output()).isEqualTo(15);
+        assertThat(finish.messageMetadata().usage().cacheRead()).isEqualTo(5);
+        assertThat(finish.messageMetadata().usage().cacheWrite()).isEqualTo(3);
+        assertThat(finish.messageMetadata().usage().totalTokens()).isEqualTo(88);
+        assertThat(state.observedCallCount()).isEqualTo(2);
+    }
+
     // tool_execution_start / end with real camelCase shapes
 
     @Test
@@ -242,9 +268,10 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
-    void agentEnd_prefersMessageEndUsage() throws Exception {
+    void agentEndMessagesAreTheAuthoritativeTurnTotal() throws Exception {
         translator.translate(fixture("message_end_assistant.json"), state);
-        // Override the agent_end messages with a wildly different usage to prove we don't trust it.
+        // The terminal event contains the complete assistant-message set for the turn, so it
+        // replaces streaming observations rather than double-counting them.
         ObjectNode event = mapper.createObjectNode();
         event.put("type", "agent_end");
         event
@@ -258,8 +285,8 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         List<UIMessageChunk> out = translator.translate(event, state);
 
         UIMessageChunk.Finish finish = (UIMessageChunk.Finish) out.get(out.size() - 1);
-        // message_end snapshot wins.
-        assertThat(finish.messageMetadata().usage().input()).isEqualTo(25);
+        assertThat(finish.messageMetadata().usage().input()).isEqualTo(999);
+        assertThat(state.observedCallCount()).isEqualTo(1);
     }
 
     @Test
@@ -269,7 +296,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         event.putArray("messages");
         List<UIMessageChunk> out = translator.translate(event, state);
         UIMessageChunk.Finish finish = (UIMessageChunk.Finish) out.get(out.size() - 1);
-        // No model, no usage, no top-level cost — the Finish carries null metadata.
         assertThat(finish.messageMetadata()).isNull();
     }
 
@@ -464,7 +490,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         translator.translate(messageEnd, state);
         assertThat(state.observedStopReason()).isEqualTo("length");
 
-        // agent_end with NO stopReason on messages[] uses the captured value.
         ObjectNode agentEnd = mapper.createObjectNode();
         agentEnd.put("type", "agent_end");
         agentEnd.putArray("messages");
@@ -504,7 +529,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     void stateAccumulatesPartsAcrossDeltas() throws Exception {
         translator.translate(fixture("message_start_assistant.json"), state);
         translator.translate(fixture("message_update_text_delta.json"), state);
-        // Append another delta with same contentIndex
         ObjectNode second = (ObjectNode) fixture("message_update_text_delta.json").deepCopy();
         ((ObjectNode) second.get("assistantMessageEvent")).put("delta", "lo");
         translator.translate(second, state);

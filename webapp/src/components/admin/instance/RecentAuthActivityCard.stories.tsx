@@ -54,7 +54,7 @@ export const Default: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		// eventLabel humanizes the raw type — proves the row renders, not just the framework.
-		await expect(canvas.getByText("Login failed")).toBeInTheDocument();
+		await expect(canvas.getByText("Failed sign-in")).toBeInTheDocument();
 	},
 };
 

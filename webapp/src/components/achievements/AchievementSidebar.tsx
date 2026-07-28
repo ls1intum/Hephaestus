@@ -6,7 +6,6 @@ import {
 	GitPullRequest,
 	Layers,
 	List,
-	Loader2,
 	Map as MapIcon,
 	Maximize2,
 	MessageSquare,
@@ -44,6 +43,7 @@ import {
 	SidebarHeader,
 	SidebarSeparator,
 } from "@/components/ui/sidebar";
+import { Spinner } from "@/components/ui/spinner";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
@@ -113,7 +113,7 @@ function SidebarBody({
 
 				{isLoading && (
 					<div className="mt-3 flex items-center gap-2 px-3 py-1.5 bg-secondary/30 text-muted-foreground rounded-full border border-border text-xs font-medium">
-						<Loader2 className="w-3.5 h-3.5 animate-spin" />
+						<Spinner className="size-3.5" />
 						Loading achievements…
 					</div>
 				)}
@@ -145,7 +145,7 @@ function SidebarBody({
 								<ToggleGroupItem
 									value="tree"
 									aria-label="Tree view"
-									className="h-8 px-3 flex-1 data-[state=on]:bg-background"
+									className="h-8 px-3 flex-1 data-pressed:bg-background data-pressed:shadow-sm"
 								>
 									<MapIcon className="w-4 h-4 mr-1.5" />
 									<span className="text-sm">Tree</span>
@@ -153,7 +153,7 @@ function SidebarBody({
 								<ToggleGroupItem
 									value="list"
 									aria-label="List view"
-									className="h-8 px-3 flex-1 data-[state=on]:bg-background"
+									className="h-8 px-3 flex-1 data-pressed:bg-background data-pressed:shadow-sm"
 								>
 									<List className="w-4 h-4 mr-1.5" />
 									<span className="text-sm">List</span>

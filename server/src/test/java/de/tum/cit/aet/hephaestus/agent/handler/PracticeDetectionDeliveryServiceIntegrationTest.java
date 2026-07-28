@@ -4,10 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
@@ -79,9 +76,6 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
     private AgentJobRepository agentJobRepository;
 
     @Autowired
-    private AgentConfigRepository agentConfigRepository;
-
-    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -113,18 +107,9 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         createPractice("pr-description-quality", "PR Description Quality");
         createPractice("error-handling", "Error Handling");
 
-        AgentConfig config = new AgentConfig();
-        config.setWorkspace(workspace);
-        config.setName("delivery-config");
-        config.setEnabled(true);
-        config.setLlmProvider(LlmProvider.ANTHROPIC);
-        config.setCredentialMode(CredentialMode.PROXY);
-        config.setTimeoutSeconds(300);
-        config = agentConfigRepository.save(config);
-
         agentJob = new AgentJob();
         agentJob.setWorkspace(workspace);
-        agentJob.setConfig(config);
+        agentJob.setPurpose(AgentPurpose.PRACTICE_DETECTION);
         agentJob.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         agentJob.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
         agentJob = agentJobRepository.save(agentJob);
@@ -251,7 +236,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         }
 
         @Test
-        @DisplayName("returned findingFingerprints align exactly with the persisted recurrence_key set")
+        @DisplayName("returned observationKeys align exactly with the persisted recurrence_key set")
         void returnedFingerprintsMatchPersistedRecurrenceKeys() {
             var findings = List.of(
                 finding("pr-description-quality", Presence.PRESENT),
@@ -260,9 +245,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
 
             var result = deliveryService.deliver(agentJob, findings);
 
-            // The map the service returns is the contract the delivery layer keys feedback supersession on;
-            // it MUST be the same value written to observation.recurrence_key, or supersession breaks.
-            assertThat(result.findingFingerprints().values())
+            assertThat(result.observationKeys().values().stream().map(ObservationKeys::recurrenceKey).toList())
                 .as("one stable key returned per delivered finding")
                 .hasSize(2)
                 .allMatch(k -> k != null && k.matches("[0-9a-f]{64}"));
@@ -274,7 +257,9 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
                 .toList();
             assertThat(persistedKeys)
                 .as("every returned fingerprint is persisted as a recurrence_key, and vice versa")
-                .containsExactlyInAnyOrderElementsOf(result.findingFingerprints().values());
+                .containsExactlyInAnyOrderElementsOf(
+                    result.observationKeys().values().stream().map(ObservationKeys::recurrenceKey).toList()
+                );
         }
 
         @Test
@@ -316,8 +301,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         @Test
         @DisplayName("persisted finding pins the practice's current criteria revision (SCD-2)")
         void findingPinsCurrentRevision() {
-            // The seeded practice was saved straight through the repository, so it has no revision yet.
-            // Append revision 1 (the ostensive-as-authored) exactly as PracticeService.createPractice would.
+            // Seeded straight through the repository, so no revision exists yet; append one as createPractice would.
             Practice practice = practiceRepository
                 .findByWorkspaceIdAndSlug(workspace.getId(), "pr-description-quality")
                 .orElseThrow();
@@ -333,8 +317,6 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
 
             List<Observation> persisted = observationRepository.findAll();
             assertThat(persisted).hasSize(1);
-            // The delivery service looks up the current revision per practice and passes practiceRevisionId
-            // to insertIfAbsent — so the finding must pin to exactly that revision, not null.
             Observation only = persisted.get(0);
             assertThat(only.getPracticeRevision()).isNotNull();
             assertThat(only.getPracticeRevision().getId()).isEqualTo(revision.getId());
@@ -346,9 +328,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
 
         @Test
         void persistsEveryDistinctBadFinding() {
-            // Each finding gets a unique idempotency key (includes index), so all 7 are
-            // distinct. There is NO per-practice cap on BAD findings: every distinct one
-            // is persisted (none discarded as a duplicate).
+            // Each idempotency key includes the index, so all 7 are distinct: there is no per-practice cap.
             var findings = new ArrayList<ValidatedFinding>();
             for (int i = 0; i < 7; i++) {
                 findings.add(

@@ -113,6 +113,22 @@ public class AuthEvent {
         EXPORT_REQUESTED,
         APP_ROLE_CHANGED,
         RESEARCH_CONSENT_REVOKED,
+        // Instance LLM catalog: GLOBAL, so config_audit_event cannot carry it (workspace_id is NOT NULL).
+        LLM_CONNECTION_CREATED,
+        LLM_CONNECTION_UPDATED,
+        LLM_CONNECTION_DELETED,
+        LLM_MODEL_CREATED,
+        LLM_MODEL_UPDATED,
+        LLM_MODEL_DELETED,
+        LLM_MODEL_PRICE_CHANGED,
+        LLM_MODEL_SHARING_CHANGED,
+        LLM_SETTINGS_CHANGED,
+        // Instance login providers: GLOBAL, and they change how everyone signs in to this instance.
+        LOGIN_PROVIDER_CREATED,
+        LOGIN_PROVIDER_UPDATED,
+        LOGIN_PROVIDER_DELETED,
+        // Instance emergency brake: GLOBAL, and it decides whether the instance talks to anyone at all.
+        SILENT_MODE_CHANGED,
     }
 
     public enum Result {

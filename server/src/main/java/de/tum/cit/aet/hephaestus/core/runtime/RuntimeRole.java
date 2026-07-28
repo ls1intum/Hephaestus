@@ -29,7 +29,7 @@ public final class RuntimeRole {
 
     /**
      * Wired property key for the worker-role gate. Gates {@code DockerSandboxConfiguration}
-     * and {@code AgentNatsConsumerConfig}.
+     * and the poll-based {@code AgentJobExecutor}.
      */
     public static final String WORKER_PROPERTY = PROPERTY_PREFIX + ".worker.enabled";
 
@@ -47,9 +47,9 @@ public final class RuntimeRole {
     public static final String WEBHOOK_PROPERTY = PROPERTY_PREFIX + ".webhook.enabled";
 
     /**
-     * Capability flag (NOT a role): toggles the worker-internal LLM proxy controller +
-     * security chain. Default true on the server; the BYO-runner trust model keeps LLM
-     * credentials on the coordinator (see ADR 0006).
+     * Property key enabling the agent job poller, which additionally requires
+     * {@link #WORKER_PROPERTY}. The LLM proxy gates on {@link #WORKER_PROPERTY} alone, so it is always
+     * up wherever jobs can run — it is the only LLM credential path a job has.
      */
-    public static final String SANDBOX_LLM_PROXY_PROPERTY = "hephaestus.sandbox.llm-proxy.enabled";
+    public static final String AGENT_ENABLED_PROPERTY = "hephaestus.agent.enabled";
 }

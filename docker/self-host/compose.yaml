@@ -1,0 +1,37 @@
+# =============================================================================
+# Hephaestus — the one blessed self-hosted deployment
+# =============================================================================
+#
+#   cp .env.example .env   # fill in the values
+#   docker compose up -d
+#
+# This file composes the same service definitions the maintainers deploy
+# (../compose.{proxy,core,app}.yaml) and applies `compose.single-host.yaml` on top, which
+# adapts them to a single host: no separate worker pod, no maintenance page,
+# secrets required instead of defaulted, and a proxy trust anchor that works
+# out of the box.
+#
+# There is deliberately no second copy of the service definitions, so most
+# changes to the reference (a new env var, a changed image, a fixed healthcheck)
+# reach this install with no edit here. Two things still need attention when the
+# reference changes: reverse-proxy's command/ports are pinned via `!override` and
+# must be re-synced by hand, and a service renamed in or added to the reference
+# can silently join or leave this stack. The Validate Compose CI job renders both
+# stacks on every change to catch the interpolation- and merge-level cases.
+#
+# Requires Docker Compose >= 2.24.4 (`include` + the `!override` merge tag; 2.21-2.23
+# parse this file but silently ignore `!override`). Check with:
+#   docker compose version
+#
+# See docs/admin/install.mdx for the full guide.
+# =============================================================================
+
+name: hephaestus
+
+include:
+  - path:
+      - ../compose.proxy.yaml
+      - ../compose.core.yaml
+      - ../compose.app.yaml
+      - ./compose.single-host.yaml
+    project_directory: .

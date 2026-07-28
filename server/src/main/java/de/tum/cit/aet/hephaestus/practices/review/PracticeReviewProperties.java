@@ -22,7 +22,6 @@ import org.springframework.validation.annotation.Validated;
  *                            notifying reply (A4). Off by default; needs ≥2 runs on a target to render.
  * @param reactionSuppression drop re-nagging a locus the student already DISPUTED / marked NOT_APPLICABLE
  *                            (B2). Off by default; inert until a reaction exists for a recurring locus.
- * @param policyFloor         apply the per-run volume cap (C3). Off by default; behaviour-preserving when off.
  */
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.practice-review")
@@ -35,6 +34,5 @@ public record PracticeReviewProperties(
     String appBaseUrl,
     @Min(0) @DefaultValue("15") int cooldownMinutes,
     @DefaultValue("false") boolean progressFooter,
-    @DefaultValue("false") boolean reactionSuppression,
-    @DefaultValue("false") boolean policyFloor
+    @DefaultValue("false") boolean reactionSuppression
 ) {}

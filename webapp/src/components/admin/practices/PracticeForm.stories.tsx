@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
 import { PracticeForm } from "./PracticeForm";
-import { mockAreas, mockPractices, mockPracticeWithAllTriggers } from "./storyMockData";
+import { mockAreas, mockPractices, mockPracticeWithAllTriggers } from "./story-mock-data";
 
 /**
  * Full-page form for creating or editing a practice definition.

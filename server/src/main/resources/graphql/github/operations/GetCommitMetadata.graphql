@@ -1,0 +1,25 @@
+# Single-commit form of the commit-enrichment request.
+#
+# CommitMetadataEnrichmentService does not send this document: it batches up to 50 commits into one
+# request under generated commit0…commitN aliases, and an alias is syntax that no GraphQL variable can
+# stand in for. What it does send is this selection set, spread from CommitEnrichmentFields, once per
+# alias.
+#
+# So this document is how the fields get guarded: it is what makes
+# GraphQlOperationDocumentValidationTest check them against the vendor schema, and it is the named
+# document GraphQlResponseStubValidator resolves when a test asserts that GitHub could really have
+# returned the commit payload it mocks. The `commit0` alias is kept deliberately, so a stub written
+# against the batch response validates at the same path it arrives on.
+query GetCommitMetadata($owner: String!, $name: String!, $oid: GitObjectID!) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
+    repository(owner: $owner, name: $name) {
+        commit0: object(oid: $oid) {
+            ...CommitEnrichmentFields
+        }
+    }
+}

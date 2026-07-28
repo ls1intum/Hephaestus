@@ -51,8 +51,6 @@ public class WorkspaceScopedTables {
         "organization",
         "identity_provider",
         "issue_type",
-        // Vendor pricing (#1071: model pricing is global, not tenant-scoped)
-        "model_pricing",
         // Fleet-wide worker JWT revocation; worker JWTs are not workspace-scoped
         "worker_token_denylist",
         // core.auth (ADR 0017) — identity is user/system-scoped, not workspace-scoped.
@@ -71,6 +69,18 @@ public class WorkspaceScopedTables {
         "login_provider",
         // Singleton instance-wide operator settings (silent-mode brake, #1386); by definition cross-tenant
         "instance_settings",
+        // Instance LLM-config catalog — app_admin-owned, curated, shared across all workspaces
+        "llm_connection",
+        // Instance-curated models behind a catalog connection; global, not tenant-scoped
+        "llm_model",
+        // Instance model price history; global pricing authority, not tenant-scoped
+        "llm_model_price",
+        // llm_model_workspace_grant is deliberately absent: it carries a workspace_id, so the
+        // inspector watches it and its cross-tenant admin reads opt out per method instead.
+        // Instance LLM settings singleton (egress allowlist + BYO enable); global
+        "instance_llm_settings",
+        // ECB daily reference rates for display-only currency conversion; not a tenant's property
+        "fx_rate",
         // Liquibase machinery
         "databasechangelog",
         "databasechangeloglock"

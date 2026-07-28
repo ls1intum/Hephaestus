@@ -2,9 +2,13 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.repository;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
@@ -13,21 +17,24 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectIntegrityService;
 import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryEventDTO;
 import java.util.List;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Handles GitHub repository webhook events (deleted, archived, renamed, etc.).
- * <p>
- * This handler processes repository-level lifecycle events that affect the repository
- * entity itself, ensuring local state stays in sync with GitHub. Key actions:
- * <ul>
- *   <li><b>deleted</b>: Removes the repository and monitors, preventing orphan sync errors</li>
- *   <li><b>archived/unarchived</b>: Updates repository visibility state</li>
- *   <li><b>renamed</b>: Updates the repository name to prevent NOT_FOUND errors</li>
- * </ul>
+ * Handles GitHub repository webhook events: deletion, archive state, visibility, and
+ * rename/transfer. Renamed/transferred repositories are re-keyed — the mirrored repository AND
+ * every workspace's monitor — by the provider-stable {@code repository.id}, then the NATS
+ * consumer filters are rebuilt.
+ *
+ * <p><b>Subject tier.</b> Registered on the {@code organization.} tier: {@code GithubSubjectKeyDeriver}
+ * emits {@code repository} lifecycle events as {@code github.<owner>.?.repository} because the repo-name
+ * token is unstable across rename/transfer (a repo-tier subject built from the NEW name matches no
+ * monitored-repo filter and is silently ACK-dropped). Nothing here consumes repository-tier subject
+ * context — the handler is driven entirely by the payload — so the tier move costs it nothing and buys
+ * delivery of events for repositories whose name has already moved.
  *
  * @see <a href="https://docs.github.com/en/webhooks/webhook-events-and-payloads#repository">
  *      GitHub Repository Webhook Events</a>
@@ -37,20 +44,30 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
 
     private static final Logger log = LoggerFactory.getLogger(GitHubRepositoryMessageHandler.class);
 
+    private static final String GITHUB_SERVER_URL = "https://github.com";
+
     private final ProvisioningListener provisioningListener;
     private final RepositoryRepository repositoryRepository;
     private final ProjectIntegrityService projectIntegrityService;
+    private final IdentityProviderRepository gitProviderRepository;
+    private final SyncTargetProvider syncTargetProvider;
 
     GitHubRepositoryMessageHandler(
         ProvisioningListener provisioningListener,
         RepositoryRepository repositoryRepository,
         ProjectIntegrityService projectIntegrityService,
+        IdentityProviderRepository gitProviderRepository,
+        SyncTargetProvider syncTargetProvider,
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
         super(
             IntegrationKind.GITHUB,
-            "repository." + GitHubEventType.REPOSITORY.getValue(),
+            // Org tier, not repository tier — see the class javadoc. Must stay in lockstep with
+            // GithubSubjectKeyDeriver's org-scoping of the `repository` event: registering this on
+            // `repository.` again makes every repository lifecycle event resolve no handler and be
+            // ACK-dropped silently (WebhookFixtureHandlerResolutionTest guards exactly that).
+            "organization." + GitHubEventType.REPOSITORY.getValue(),
             GitHubRepositoryEventDTO.class,
             deserializer,
             transactionTemplate
@@ -58,6 +75,8 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
         this.provisioningListener = provisioningListener;
         this.repositoryRepository = repositoryRepository;
         this.projectIntegrityService = projectIntegrityService;
+        this.gitProviderRepository = gitProviderRepository;
+        this.syncTargetProvider = syncTargetProvider;
     }
 
     @Override
@@ -85,7 +104,9 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
             case DELETED -> handleRepositoryDeleted(event, fullName, safeFullName);
             case ARCHIVED -> handleRepositoryArchived(fullName, safeFullName, true);
             case UNARCHIVED -> handleRepositoryArchived(fullName, safeFullName, false);
-            case RENAMED -> handleRepositoryRenamed(event, safeFullName);
+            // A transfer carries the same payload shape as a rename (only the changed component
+            // differs: changes.owner vs changes.repository.name) and needs the identical healing.
+            case RENAMED, TRANSFERRED -> handleRepositoryMoved(event, safeFullName);
             case PRIVATIZED -> handleVisibilityChanged(fullName, safeFullName, true);
             case PUBLICIZED -> handleVisibilityChanged(fullName, safeFullName, false);
             default -> log.debug(
@@ -97,17 +118,14 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
     }
 
     /**
-     * Handles repository deletion by cleaning up local state.
-     * <p>
-     * Uses the ProvisioningListener SPI to remove monitors and delete orphaned repository
-     * entities, preventing future sync attempts from failing with NOT_FOUND errors.
+     * Cleans up local state on repository deletion, via the ProvisioningListener SPI, preventing
+     * future sync attempts from failing with NOT_FOUND errors.
      */
     private void handleRepositoryDeleted(GitHubRepositoryEventDTO event, String fullName, String safeFullName) {
         var installation = event.installation();
 
         if (installation == null || installation.id() == null) {
             log.warn("Cannot clean up deleted repository - missing installation ID: repoName={}", safeFullName);
-            // Still try to delete the repository directly if we can find it
             deleteRepositoryByName(fullName, safeFullName);
             return;
         }
@@ -116,8 +134,6 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
 
         log.info("Processing repository deletion: repoName={}, installationId={}", safeFullName, installationId);
 
-        // Use the ProvisioningListener SPI to properly clean up monitors AND repository
-        // This triggers onRepositoriesRemoved which will remove monitors and orphaned repos
         provisioningListener.onRepositoriesRemoved(installationId, List.of(fullName));
 
         log.info("Completed repository deletion cleanup: repoName={}, installationId={}", safeFullName, installationId);
@@ -136,8 +152,6 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
             .ifPresent(repository -> {
                 Long repoId = repository.getId();
 
-                // Cascade delete projects owned by this repository
-                // This must be done BEFORE deleting the repository to maintain referential integrity
                 int deletedProjects = projectIntegrityService.cascadeDeleteProjectsForRepository(repoId);
                 if (deletedProjects > 0) {
                     log.info(
@@ -153,9 +167,6 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
             });
     }
 
-    /**
-     * Handles repository archive/unarchive by updating the archived flag.
-     */
     private void handleRepositoryArchived(String fullName, String safeFullName, boolean archived) {
         repositoryRepository
             .findByNameWithOwner(fullName)
@@ -175,42 +186,94 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
     }
 
     /**
-     * Handles repository rename by updating the name and full name.
+     * Heals a rename or transfer in real time.
+     * <p>
+     * Two rows go stale at once and both are re-keyed off the provider-stable {@code repository.id},
+     * never off the name (the name is precisely the value that just moved):
+     * <ol>
+     *   <li>the mirrored domain {@code Repository}, so name-keyed sync lookups keep resolving;</li>
+     *   <li>every {@code RepositoryToMonitor} tracking this repository — across <em>all</em> workspaces,
+     *       since a repository can be monitored by several tenants — via
+     *       {@code reconcileSyncTargetsForRepository}, which also rebuilds each affected workspace's
+     *       NATS consumer filters. Without step 2 the repo-scoped filter stays pinned to the old name
+     *       and every subsequent issue/PR/review/push event for the repository is silently ACK-dropped
+     *       until the next reconcile cycle.
+     * </ol>
+     * <b>Residual:</b> a transfer to a <em>different</em> owner derives the new owner's subject and so
+     * never reaches the old workspace's org filter; that case heals on the next reconcile pass, which
+     * resolves the monitor by {@code nativeId}.
      */
-    private void handleRepositoryRenamed(GitHubRepositoryEventDTO event, String safeNewFullName) {
-        String oldFullName = event.getOldFullName();
+    private void handleRepositoryMoved(GitHubRepositoryEventDTO event, String safeNewFullName) {
         String newFullName = event.repository().fullName();
         String newName = event.repository().name();
+        Long nativeId = event.repository().id();
+        String previousNameWithOwner = event.getPreviousNameWithOwner();
+        String safeOldFullName = sanitizeForLog(previousNameWithOwner);
 
-        if (oldFullName == null) {
-            log.warn("Cannot process repository rename - missing old name in changes: newRepoName={}", safeNewFullName);
+        if (nativeId == null && previousNameWithOwner == null) {
+            log.warn(
+                "Cannot process repository {} - payload carries neither a repository id nor a previous name: newRepoName={}",
+                event.action(),
+                safeNewFullName
+            );
             return;
         }
 
-        String safeOldFullName = sanitizeForLog(oldFullName);
+        resolveMovedRepository(nativeId, previousNameWithOwner).ifPresentOrElse(
+            repository -> {
+                repository.setName(newName);
+                repository.setNameWithOwner(newFullName);
+                repository.setHtmlUrl(GITHUB_SERVER_URL + "/" + newFullName);
+                repositoryRepository.save(repository);
+                log.info(
+                    "Renamed repository: action={}, oldName={}, newName={}, nativeId={}",
+                    event.action(),
+                    safeOldFullName,
+                    safeNewFullName,
+                    nativeId
+                );
+            },
+            () ->
+                log.debug(
+                    "Repository not found locally for {}: oldName={}, newName={}, nativeId={}",
+                    event.action(),
+                    safeOldFullName,
+                    safeNewFullName,
+                    nativeId
+                )
+        );
 
-        repositoryRepository
-            .findByNameWithOwner(oldFullName)
-            .ifPresentOrElse(
-                repository -> {
-                    repository.setName(newName);
-                    repository.setNameWithOwner(newFullName);
-                    repository.setHtmlUrl("https://github.com/" + newFullName);
-                    repositoryRepository.save(repository);
-                    log.info("Renamed repository: oldName={}, newName={}", safeOldFullName, safeNewFullName);
-                },
-                () ->
-                    log.debug(
-                        "Repository not found locally for rename: oldName={}, newName={}",
-                        safeOldFullName,
-                        safeNewFullName
-                    )
-            );
+        // Always attempt the monitor re-key, even when no domain row is mirrored yet: the monitor is
+        // what the NATS filter is built from, so leaving it stale is the actual data-loss path.
+        syncTargetProvider.reconcileSyncTargetsForRepository(nativeId, newFullName);
     }
 
     /**
-     * Handles visibility changes (privatized/publicized).
+     * Locates the mirrored row for a repository whose name has just moved. Prefers the stable
+     * {@code (nativeId, providerId)} key — the only identity a transfer preserves — and falls back to
+     * the previous {@code owner/name} for legacy rows whose {@code native_id} was never captured.
      */
+    private Optional<Repository> resolveMovedRepository(Long nativeId, String previousNameWithOwner) {
+        if (nativeId != null) {
+            Long providerId = gitProviderRepository
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
+                .map(IdentityProvider::getId)
+                .orElse(null);
+            if (providerId != null) {
+                Optional<Repository> byNativeId = repositoryRepository.findByNativeIdAndProviderId(
+                    nativeId,
+                    providerId
+                );
+                if (byNativeId.isPresent()) {
+                    return byNativeId;
+                }
+            }
+        }
+        return previousNameWithOwner == null
+            ? Optional.empty()
+            : repositoryRepository.findByNameWithOwner(previousNameWithOwner);
+    }
+
     private void handleVisibilityChanged(String fullName, String safeFullName, boolean isPrivate) {
         repositoryRepository
             .findByNameWithOwner(fullName)

@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -18,12 +19,14 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.outline.OutlineProperties;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiException;
+import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineClientModels;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineRateLimitedException;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineCollectionListResponse;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineDocumentListResponse;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocumentModel;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.MirrorState;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.SyncStatus;
@@ -39,6 +42,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -46,14 +50,16 @@ import org.mockito.Mock;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
- * Unit coverage for the sync paths a real-Postgres test cannot cheaply pin. The load-bearing invariant is
+ * Unit coverage for the sync paths a real-Postgres test cannot cheaply pin. The core invariant is
  * <em>no-wipe</em>: a pass that dies mid-way (429, revoked token) must leave already-mirrored documents
  * intact, because the alternative is silent, irreversible data loss.
  *
- * <p>{@link OutlineMirrorWriter} and {@link OutlineMirrorTransactions} are the real production objects over
- * mocked repositories, so the load-or-create + mutate + save + retry-in-a-fresh-transaction shape is under
- * test rather than stubbed. The {@code @Transactional} boundaries themselves need a container and are pinned
- * by {@code OutlineDocumentSyncIntegrationTest}.
+ * <p>{@link OutlineMirrorWriter}, {@link OutlineMirrorTransactions} and {@link OutlineMirrorRetentionService}
+ * are the real production objects over mocked repositories, so the load-or-create + mutate + save +
+ * retry-in-a-fresh-transaction shape is under test rather than stubbed — and so the tombstone, sweep and
+ * eviction assertions below still run through the erasure code that ships, not a stub of it. The
+ * {@code @Transactional} boundaries themselves need a container and are pinned by
+ * {@code OutlineDocumentSyncIntegrationTest}.
  */
 class OutlineDocumentSyncServiceTest extends BaseUnitTest {
 
@@ -95,6 +101,9 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
             new OutlineProperties.Cache(cacheMaxSizeMb),
             Duration.ofDays(30)
         );
+        OutlineMirrorWriter mirrorWriter = new OutlineMirrorWriter(
+            new OutlineMirrorTransactions(documentRepository, collectionRepository)
+        );
         return new OutlineDocumentSyncService(
             connectionService,
             outlineApiClient,
@@ -102,7 +111,8 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
             collectionRepository,
             webhookRegistrar,
             properties,
-            new OutlineMirrorWriter(new OutlineMirrorTransactions(documentRepository, collectionRepository))
+            mirrorWriter,
+            new OutlineMirrorRetentionService(documentRepository, mirrorWriter, properties)
         );
     }
 
@@ -153,9 +163,7 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
             .thenReturn(Optional.of(collection));
         lenient()
             .when(outlineApiClient.listCollections(SERVER_URL, "token"))
-            .thenReturn(
-                List.of(new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", "col1", null, null, null))
-            );
+            .thenReturn(List.of(OutlineClientModels.collection(COLLECTION_ID, "Design", "col1", null, null, null)));
         lenient()
             .when(outlineApiClient.listCollectionDocuments(SERVER_URL, "token", COLLECTION_ID))
             .thenReturn(List.of());
@@ -164,8 +172,8 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
             .thenReturn(List.of());
     }
 
-    private static OutlineDocumentListResponse.Meta meta(String id, Instant updatedAt) {
-        return new OutlineDocumentListResponse.Meta(
+    private static OutlineDocumentModel meta(String id, Instant updatedAt) {
+        return OutlineClientModels.document(
             id,
             null,
             id,
@@ -181,8 +189,8 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         );
     }
 
-    private static OutlineDocumentListResponse.Meta metaWithUrl(String id, Instant updatedAt, String url) {
-        return new OutlineDocumentListResponse.Meta(
+    private static OutlineDocumentModel metaWithUrl(String id, Instant updatedAt, String url) {
+        return OutlineClientModels.document(
             id,
             url,
             id,
@@ -198,8 +206,8 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         );
     }
 
-    private static OutlineDocumentListResponse.Meta archivedMeta(String id, Instant updatedAt, Instant archivedAt) {
-        return new OutlineDocumentListResponse.Meta(
+    private static OutlineDocumentModel archivedMeta(String id, Instant updatedAt, Instant archivedAt) {
+        return OutlineClientModels.document(
             id,
             "/doc/" + id,
             id,
@@ -288,12 +296,76 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
 
         assertThat(collection.getSyncStatus()).isEqualTo(SyncStatus.COMPLETE);
         assertThat(collection.getDocumentsSyncedAt()).isNotNull();
-        // Clean-pass counters: full coverage, nothing skipped.
         assertThat(collection.getDocumentsUpstream()).isEqualTo(1);
         assertThat(collection.getExportsSkippedForBudget()).isZero();
         assertThat(staleRow.isDeleted()).isTrue();
         assertThat(staleRow.getBodyMarkdown()).isNull();
         assertThat(staleRow.getCreatedBySubject()).isNull();
+    }
+
+    // --- upstream-deletion inference is RECONCILIATION-only, in every integration (ADR 0024) ---
+
+    @Test
+    void initialPass_tombstonesNothing_evenWhenACleanEnumerationOmitsAMirroredDocument() {
+        // Identical fixture to cleanPass_marksCompleteAndTombstonesVanishedRows: the enumeration is clean
+        // and doc-stale is absent upstream. An INITIAL job must still not infer a deletion — the mirror is
+        // being populated, so "absent from the mirror's own half-built state" is not evidence of anything.
+        // This is the rule every SCM sweep already obeys.
+        OutlineDocument staleRow = mirrored("doc-stale");
+        staleRow.setBodyMarkdown("# old");
+        staleRow.setCreatedBySubject("user-1");
+        inMirror(staleRow);
+        when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenReturn(List.of(meta("doc-1", T2)));
+        when(outlineApiClient.exportDocument(SERVER_URL, "token", "doc-1")).thenReturn("# body");
+
+        service(10).syncWorkspace(WORKSPACE, null, SyncJobType.INITIAL);
+
+        // Everything else about the pass is unchanged: it still upserts and still completes cleanly.
+        assertThat(collection.getSyncStatus()).isEqualTo(SyncStatus.COMPLETE);
+        assertThat(collection.getDocumentsSyncedAt()).isNotNull();
+        assertThat(collection.getDocumentsUpstream()).isEqualTo(1);
+        assertThat(collection.getExportsSkippedForBudget()).isZero();
+        // Only the tombstone is withheld — body, authorship and the marker itself survive untouched.
+        assertThat(staleRow.isDeleted()).isFalse();
+        assertThat(staleRow.getBodyMarkdown()).isEqualTo("# old");
+        assertThat(staleRow.getCreatedBySubject()).isEqualTo("user-1");
+    }
+
+    @Test
+    void reconciliationPass_withTheSameFixture_doesTombstoneTheVanishedDocument() {
+        // Same fixture as the INITIAL test but RECONCILIATION: the tombstone lands, proving the gate
+        // discriminates on job type alone.
+        OutlineDocument staleRow = mirrored("doc-stale");
+        staleRow.setBodyMarkdown("# old");
+        staleRow.setCreatedBySubject("user-1");
+        inMirror(staleRow);
+        when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenReturn(List.of(meta("doc-1", T2)));
+        when(outlineApiClient.exportDocument(SERVER_URL, "token", "doc-1")).thenReturn("# body");
+
+        service(10).syncWorkspace(WORKSPACE, null, SyncJobType.RECONCILIATION);
+
+        assertThat(staleRow.isDeleted()).isTrue();
+        assertThat(staleRow.getBodyMarkdown()).isNull();
+        assertThat(staleRow.getCreatedBySubject()).isNull();
+    }
+
+    @Test
+    void reconciliationPass_withAnIncompleteEnumeration_stillTombstonesNothing() {
+        // The two guards are independent and both must hold. Here the job type permits a sweep, but the
+        // enumeration ran out of export budget, so it is not provably clean — fail closed, delete nothing.
+        OutlineDocument staleRow = mirrored("doc-stale");
+        staleRow.setBodyMarkdown("# old");
+        inMirror(staleRow);
+        when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenReturn(
+            List.of(meta("doc-1", T2), meta("doc-2", T1))
+        );
+        when(outlineApiClient.exportDocument(eq(SERVER_URL), eq("token"), anyString())).thenReturn("# body");
+
+        service(1).syncWorkspace(WORKSPACE, null, SyncJobType.RECONCILIATION);
+
+        assertThat(collection.getSyncStatus()).isEqualTo(SyncStatus.PENDING);
+        assertThat(staleRow.isDeleted()).isFalse();
+        assertThat(staleRow.getBodyMarkdown()).isEqualTo("# old");
     }
 
     @Test
@@ -343,7 +415,6 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         service(10).syncWorkspace(WORKSPACE);
 
         verify(outlineApiClient, never()).exportDocument(anyString(), anyString(), anyString());
-        // The metadata-only refresh landed: the title now matches upstream, the body is untouched.
         assertThat(renamed.getTitle()).isEqualTo("doc-1");
         assertThat(renamed.getBodyMarkdown()).isEqualTo("# body");
         verify(documentRepository).saveAndFlush(argThat(d -> "doc-1".equals(d.getDocumentId())));
@@ -384,7 +455,6 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         assertThat(docTwo.getCreatedBySubject()).isEqualTo("user-2");
         assertThat(docOne.isDeleted()).isFalse();
         assertThat(docOne.getBodyMarkdown()).isEqualTo("# one");
-        // Nothing was tombstoned — not one write carried a deletedAt.
         verify(documentRepository, never()).saveAndFlush(argThat(OutlineDocument::isDeleted));
     }
 
@@ -521,7 +591,7 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
     @Test
     void refreshDocument_prefetchedMetaMissingCollectionId_fallsBackToDocumentsInfo() {
         when(documentRepository.findSnapshotByDocumentId(WORKSPACE, CONNECTION, "doc-1")).thenReturn(Optional.empty());
-        OutlineDocumentListResponse.Meta incomplete = new OutlineDocumentListResponse.Meta(
+        OutlineDocumentModel incomplete = OutlineClientModels.document(
             "doc-1",
             null,
             "Doc 1",
@@ -617,7 +687,7 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         when(documentRepository.findSnapshotByDocumentId(WORKSPACE, CONNECTION, "doc-x")).thenReturn(Optional.empty());
         when(outlineApiClient.getDocumentInfo(SERVER_URL, "token", "doc-x")).thenReturn(
             Optional.of(
-                new OutlineDocumentListResponse.Meta(
+                OutlineClientModels.document(
                     "doc-x",
                     null,
                     "X",
@@ -724,7 +794,7 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         inMirror(evicted);
         when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenReturn(
             List.of(
-                new OutlineDocumentListResponse.Meta(
+                OutlineClientModels.document(
                     "doc-1",
                     null,
                     "Doc 1",
@@ -733,8 +803,8 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
                     "doc-1",
                     null,
                     COLLECTION_ID,
-                    new OutlineDocumentListResponse.OutlineUser("user-1", "Ada"),
-                    new OutlineDocumentListResponse.OutlineUser("user-2", "Grace"),
+                    OutlineClientModels.user("user-1", "Ada"),
+                    OutlineClientModels.user("user-2", "Grace"),
                     List.of("user-1", "user-2", "user-3"),
                     null
                 )
@@ -882,8 +952,8 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         ).thenReturn(Optional.of(collectionB));
         when(outlineApiClient.listCollections(SERVER_URL, "token")).thenReturn(
             List.of(
-                new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", "col1", null, null, null),
-                new OutlineCollectionListResponse.Collection(COLLECTION_ID_B, "Eng", "col2", null, null, null)
+                OutlineClientModels.collection(COLLECTION_ID, "Design", "col1", null, null, null),
+                OutlineClientModels.collection(COLLECTION_ID_B, "Eng", "col2", null, null, null)
             )
         );
         when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenThrow(
@@ -1035,6 +1105,83 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         service(10).syncWorkspace(WORKSPACE);
 
         // The catalog write lost its race and was replayed; the pass still completes the collection.
+        assertThat(collection.getSyncStatus()).isEqualTo(SyncStatus.COMPLETE);
+    }
+
+    // --- cooperative cancellation: the job handle reaches the per-document loop, not just the collection loop ---
+
+    /**
+     * Cancellation is checked per document, not just between collections, so a job cancelled while inside a
+     * single large collection stops promptly rather than exporting up to the whole export budget of
+     * documents after the admin pressed Cancel.
+     */
+    @Test
+    void cancellationMidCollection_stopsExportingAtTheNextDocument() {
+        SyncExecutionHandle handle = mock(SyncExecutionHandle.class);
+        AtomicInteger polls = new AtomicInteger();
+        // false for the collection-loop check and for doc-1, true from doc-2 onwards.
+        when(handle.isCancellationRequested()).thenAnswer(inv -> polls.getAndIncrement() >= 2);
+        when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenReturn(
+            List.of(meta("doc-1", T1), meta("doc-2", T1), meta("doc-3", T1), meta("doc-4", T1))
+        );
+        when(outlineApiClient.exportDocument(anyString(), anyString(), anyString())).thenReturn("# body");
+
+        service(500).syncWorkspace(WORKSPACE, handle, SyncJobType.RECONCILIATION);
+
+        verify(outlineApiClient, times(1)).exportDocument(SERVER_URL, "token", "doc-1");
+        verify(outlineApiClient, never()).exportDocument(SERVER_URL, "token", "doc-2");
+        verify(outlineApiClient, never()).exportDocument(SERVER_URL, "token", "doc-3");
+    }
+
+    /**
+     * An aborted enumeration is an incomplete one, so it must take the same exit a budget-exhausted pass
+     * takes: PENDING (so the catch-up tick resumes it), never COMPLETE, and above all never the
+     * tombstone-by-absence sweep — its {@code seen} set is short by every document it did not reach.
+     */
+    @Test
+    void cancellationMidCollection_leavesThePassPending_andTombstonesNothing() {
+        // Start from COMPLETE so PENDING has to be written by the abort rather than merely left in place.
+        collection.setSyncStatus(SyncStatus.COMPLETE);
+        OutlineDocument reached = mirrored("doc-1");
+        reached.setBodyMarkdown("# one");
+        reached.setContentHash("hash-1");
+        reached.setOutlineUpdatedAt(T1);
+        // Mirrored, upstream, but never enumerated because the cancel landed first. A pass that wrongly
+        // counted as clean would read it as vanished and tombstone it.
+        OutlineDocument unreached = mirrored("doc-4");
+        unreached.setBodyMarkdown("# four");
+        unreached.setContentHash("hash-4");
+        unreached.setOutlineUpdatedAt(T1);
+        inMirror(reached, unreached);
+
+        SyncExecutionHandle handle = mock(SyncExecutionHandle.class);
+        AtomicInteger polls = new AtomicInteger();
+        when(handle.isCancellationRequested()).thenAnswer(inv -> polls.getAndIncrement() >= 2);
+        when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenReturn(
+            List.of(meta("doc-1", T2), meta("doc-4", T2))
+        );
+        when(outlineApiClient.exportDocument(anyString(), anyString(), anyString())).thenReturn("# body");
+
+        service(500).syncWorkspace(WORKSPACE, handle, SyncJobType.RECONCILIATION);
+
+        assertThat(collection.getSyncStatus()).isEqualTo(SyncStatus.PENDING);
+        assertThat(collection.getDocumentsSyncedAt()).isNull();
+        assertThat(unreached.isDeleted()).isFalse();
+        assertThat(unreached.getBodyMarkdown()).isEqualTo("# four");
+        verify(documentRepository, never()).saveAndFlush(argThat(OutlineDocument::isDeleted));
+    }
+
+    /** Without a handle (scheduled tick, webhook, targeted kick) nothing is interruptible and the pass completes. */
+    @Test
+    void withoutAHandle_everyDocumentIsStillExported() {
+        when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenReturn(
+            List.of(meta("doc-1", T1), meta("doc-2", T1), meta("doc-3", T1))
+        );
+        when(outlineApiClient.exportDocument(anyString(), anyString(), anyString())).thenReturn("# body");
+
+        service(500).syncWorkspace(WORKSPACE);
+
+        verify(outlineApiClient, times(3)).exportDocument(anyString(), anyString(), anyString());
         assertThat(collection.getSyncStatus()).isEqualTo(SyncStatus.COMPLETE);
     }
 }

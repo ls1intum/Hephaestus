@@ -1,268 +1,222 @@
-.DS_Store
-.context
 
-# IDE files
-.project
-.classpath
-.settings/
-
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
 *$py.class
-
-# C extensions
-*.so
-
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-cover/
-
-# Translations
-*.mo
-*.pot
-
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-
-# Flask stuff:
-/instance/
-.webassets-cache
-
-# Scrapy stuff:
-.scrapy
-
-# Sphinx documentation
-docs/_build/
-
-# PyBuilder
-.pybuilder/
-target/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# IPython
-profile_default/
-ipython_config.py
-
-# pyenv
-#   For a library or package, you might want to ignore these files since the code is
-#   intended to run in multiple environments; otherwise, check them in:
-# .python-version
-
-# pipenv
 #   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
-
-# poetry
-#   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-#   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
-#poetry.lock
-
-# pdm
-#   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
-#pdm.lock
-#   pdm stores project-wide configurations in .pdm.toml, but it is recommended to not include it
-#   in version control.
-#   https://pdm.fming.dev/#use-with-ide
-.pdm.toml
-
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
-__pypackages__/
-
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-/server/src/test/resources/application-github-integration-local.yml
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# pytype static type analyzer
-.pytype/
-
-# Cython debug symbols
-cython_debug/
-
-# PyCharm
-#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
-#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
+# Agent scratch / plan / handoff notes (not part of the codebase)
+.ai/
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
-#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
-#.idea/
-
-node_modules/
-
-application-local.yml
 application-live-local.yml
-
-server/postgres-data/
-server/postgres-data-temp/
-server/postgres-data-local/
-server/postgres-data*.tgz
-server/logs/
-
-# Private keys
-*.pem
-
-# Java-Client creation temporary
-tmp
-
+application-local.yml
+**/atlassian-ide-plugin.xml
+# auto-import.
 # Beads (AI agent issue tracker) - local-only files
+.beads/bd.pipe
+.beads/bd.sock
 .beads/beads.db
 .beads/beads.db-*
-.beads/bd.sock
-.beads/bd.pipe
 .beads/.exclusive-lock
-
-# Research directory (local only)
-.research/
-
-# OpenCode builder mission files (per-worktree, ephemeral)
-MISSION.md
-# Builder session tracking (per-worktree)
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
+build/
 .builder-session
-
-# ----- JetBrains IDE Template (cleaned up to include only relevant parts) ----- #
+# Builder session tracking (per-worktree)
+# Byte-compiled / optimized / DLL files
+.cache
+celerybeat.pid
+celerybeat-schedule
+# Celery stuff
+# C extensions
+.classpath
+#   commonly ignored for libraries.
+.context
+.context/
+*.cover
+cover/
+.coverage
+.coverage.*
+coverage.xml
 # Covers JetBrains IDEs: IntelliJ, GoLand, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio, WebStorm and Rider
-# Reference: https://intellij-support.jetbrains.com/hc/en-us/articles/206544839
-
-# User-specific stuff
-**/.idea/**/workspace.xml
-**/.idea/**/tasks.xml
-**/.idea/**/usage.statistics.xml
-**/.idea/**/dictionaries
-**/.idea/**/shelf
-**/.idea/**/sqldialects.xml
-
+# Cursive Clojure plugin
+cython_debug/
+# Cython debug symbols
+db.sqlite3
+db.sqlite3-journal
+develop-eggs/
+dist/
+# Distribution / packaging
+# Django stuff:
+.dmypy.json
+dmypy.json
+docker/self-host/letsencrypt/
+docs/_build/
+downloads/
+.DS_Store
+# Editor-based HTTP Client
+*.egg
+*.egg-info/
+.eggs/
+eggs/
+.env
+env/
+ENV/
+*.env.bak.*
+env.bak/
+# Environments
+# File-based project format
+# Flask stuff:
+#   For a library or package, you might want to ignore these files since the code is
 # Generated files
+# Github Copilot persisted session migrations, see: https://github.com/microsoft/copilot-intellij-feedback/issues/712#issuecomment-3322062215
+# Gradle and Maven with auto-import
+#   having no cross-platform support, pipenv may install dependencies that don't work, or not
+#   However, in case of collaboration, if having platform-specific dependencies or dependencies
+htmlcov/
+**/http-client.private.env.json
+#   https://pdm.fming.dev/#use-with-ide
+#   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
+.hypothesis/
+#.idea/
+**/.idea/artifacts
+**/.idea/**/biome.xml
+**/.idea/compiler.xml
 **/.idea/**/contentModel.xml
-
-# Sensitive or high-churn files
+**/.idea/**/copilot.data.migration.*.xml
 **/.idea/**/dataSources/
 **/.idea/**/dataSources.ids
 **/.idea/**/dataSources.local.xml
-**/.idea/**/sqlDataSources.xml
-**/.idea/**/dynamic.xml
-**/.idea/**/uiDesigner.xml
-**/.idea/**/dbnavigator.xml
 **/.idea/**/dataSources.xml
-**/.idea/**/biome.xml
-
-
-# Gradle and Maven with auto-import
-# When using Gradle or Maven with auto-import, you should exclude module files,
-# since they will be recreated, and may cause churn.  Uncomment if using
-# auto-import.
-**/.idea/artifacts
-**/.idea/compiler.xml
-**/.idea/jarRepositories.xml
-**/.idea/modules.xml
+**/.idea/**/dbnavigator.xml
+**/.idea/**/dictionaries
+**/.idea/**/dynamic.xml
+**/.idea/httpRequests
 **/.idea/*.iml
+**/.idea/jarRepositories.xml
 **/.idea/modules
-**/*.iml
-**/*.ipr
-
-# File-based project format
-**/*.iws
-
-# IntelliJ
-**/out/
-
-# JIRA plugin
-**/atlassian-ide-plugin.xml
-
-# Cursive Clojure plugin
+**/.idea/modules.xml
 **/.idea/replstate.xml
-
-# SonarLint plugin
+**/.idea/**/shelf
 **/.idea/sonarlint/
 **/.idea/sonarlint.xml # see https://community.sonarsource.com/t/is-the-file-idea-idea-idea-sonarlint-xml-intended-to-be-under-source-control/121119
-
-# Editor-based HTTP Client
-**/.idea/httpRequests
-**/http-client.private.env.json
-
-# Github Copilot persisted session migrations, see: https://github.com/microsoft/copilot-intellij-feedback/issues/712#issuecomment-3322062215
-**/.idea/**/copilot.data.migration.*.xml
-
-# Agent scratch / plan / handoff notes (not part of the codebase)
-.ai/
-server/postgres-data-temp-*
+**/.idea/**/sqlDataSources.xml
+**/.idea/**/sqldialects.xml
+**/.idea/**/tasks.xml
+**/.idea/**/uiDesigner.xml
+**/.idea/**/usage.statistics.xml
+**/.idea/**/workspace.xml
+# IDE files
+**/*.iml
+#   install all needed dependencies.
+.installed.cfg
+# Installer logs
+/instance/
+# IntelliJ
+#   intended to run in multiple environments; otherwise, check them in:
+#   in version control.
+**/*.ipr
+.ipynb_checkpoints
+# IPython
+ipython_config.py
+**/*.iws
+# Java-Client creation temporary
+# ----- JetBrains IDE Template (cleaned up to include only relevant parts) ----- #
+#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
+# JIRA plugin
+# Jupyter Notebook
+lib64/
+# local .env backups (deploy scratch) — must never be committed
+local_settings.py
+*.log
+*.manifest
+MANIFEST
+MISSION.md
+# mkdocs documentation
+*.mo
+# mypy
+.mypy_cache/
+node_modules/
+nosetests.xml
+.nox/
+# OpenCode builder mission files (per-worktree, ephemeral)
+#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
+**/out/
+parts/
+# pdm
+#pdm.lock
+#   pdm stores project-wide configurations in .pdm.toml, but it is recommended to not include it
+.pdm.toml
+*.pem
+# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
+pip-delete-this-directory.txt
+# pipenv
+#Pipfile.lock
+pip-log.txt
+# poetry
+#poetry.lock
 postgres-data-temp-*/
+*.pot
+# Private keys
+profile_default/
+.project
+.pybuilder/
+# PyBuilder
+__pycache__/
+# PyCharm
+*.py[cod]
+*.py,cover
+# pyenv
+# PyInstaller
+__pypackages__/
+.pyre/
+# Pyre type checker
+.pytest_cache/
+.Python
+# .python-version
+.pytype/
+# pytype static type analyzer
+# Reference: https://intellij-support.jetbrains.com/hc/en-us/articles/206544839
+.research/
+# Research directory (local only)
+.ropeproject
+# Rope project settings
+# SageMath parsed files
+*.sage.py
+.scrapy
+# Scrapy stuff:
+sdist/
+# Self-host: Traefik writes cert material here inside the operator's checkout
+# Sensitive or high-churn files
+server/.env.bak.*
+server/logs/
+server/postgres-data/
+server/postgres-data-local/
+server/postgres-data-temp-*
+server/postgres-data-temp/
+server/postgres-data*.tgz
+/server/src/test/resources/application-github-integration-local.yml
+.settings/
+share/python-wheels/
+#   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
+#   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
+# since they will be recreated, and may cause churn.  Uncomment if using
+/site
+*.so
+# SonarLint plugin
+*.spec
+# Sphinx documentation
+.spyderproject
+# Spyder project settings
+.spyproject
+target/
+#   This is especially recommended for binary packages to ensure reproducibility, and is more
+tmp
+.tox/
+# Translations
+# Unit test / coverage reports
+# User-specific stuff
+#  Usually these files are written by a python script from a template
+var/
+.venv
+venv/
+venv.bak/
+.webassets-cache
+wheels/
+# When using Gradle or Maven with auto-import, you should exclude module files,

@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectClass;
@@ -33,26 +33,16 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Generic execution record for agent jobs.
- *
- * <p>Each job represents a single container execution of a coding agent. The job is
- * domain-agnostic — it knows about Docker lifecycle (queued, running, completed/failed),
- * not about PRs or code. Domain-specific routing data lives in {@link #metadata} (JSONB)
- * and results in {@link #output} (JSONB), with schema defined by the {@link AgentJobType} handler.
- *
- * <h2>Security</h2>
- * <ul>
- *   <li>{@link #jobToken} is a 256-bit SecureRandom token encrypted at rest, used for LLM proxy
- *       authentication. It is never exposed in API responses, logs, or NATS messages.</li>
- *   <li>{@link #configSnapshot} freezes the agent config at submit time so in-flight jobs
- *       are not affected by config changes.</li>
- * </ul>
+ * One container execution of a coding agent. Domain-agnostic: it knows the sandbox lifecycle, not PRs
+ * or code. Domain-specific routing data lives in {@link #metadata} and results in {@link #output},
+ * both shaped by the {@link AgentJobType} handler.
  */
 @Entity
 @Table(
@@ -68,6 +58,8 @@ public class AgentJob {
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
+    private static final int TOKEN_BYTES = 32;
+
     @Id
     @EqualsAndHashCode.Include
     private UUID id;
@@ -77,10 +69,10 @@ public class AgentJob {
     @ToString.Exclude
     private Workspace workspace;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "config_id", foreignKey = @ForeignKey(name = "fk_agent_job_config"))
-    @ToString.Exclude
-    private AgentConfig config;
+    /** The workspace agent binding this job runs on; the executor re-admits it at claim time. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "purpose", length = 32)
+    private AgentPurpose purpose;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "job_type", nullable = false, length = 50)
@@ -91,9 +83,8 @@ public class AgentJob {
     private AgentJobStatus status = AgentJobStatus.QUEUED;
 
     /**
-     * Identifies which external system this job runs against. Resolves the per-kind
-     * {@code FeedbackChannel} / {@code InlineFindingChannel}. New rows MUST set this
-     * at submit time; nullable on the column only because legacy rows are backfilled.
+     * Which external system this job runs against; resolves the per-kind delivery channel. New rows MUST
+     * set this at submit time — nullable on the column only because legacy rows are backfilled.
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "integration_kind", length = 48)
@@ -101,13 +92,8 @@ public class AgentJob {
     private IntegrationKind integrationKind;
 
     /**
-     * Discriminator for the work subject this job analyses. Drives polymorphic agent
-     * dispatch — for example {@code DiffNotePoster} short-circuits when this is not
-     * {@link SubjectClass#PULL_REQUEST} so issues / docs / threads don't attempt
-     * diff-note delivery.
-     *
-     * <p>Nullable for legacy rows; backfill assumes {@code PULL_REQUEST} because
-     * today's review pipeline only operates on PRs/MRs.
+     * Discriminator for the work subject this job analyses; drives polymorphic delivery dispatch.
+     * Nullable for legacy rows, which are backfilled as {@link SubjectClass#PULL_REQUEST}.
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "subject_class", length = 48)
@@ -122,8 +108,13 @@ public class AgentJob {
     @Column(name = "output", columnDefinition = "jsonb")
     private JsonNode output;
 
+    /**
+     * Agent config frozen at submit time, so a config change cannot alter an in-flight job. Contains the
+     * provider base URL, which is why it is kept out of {@code toString()}.
+     */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "config_snapshot", columnDefinition = "jsonb", nullable = false)
+    @ToString.Exclude
     private JsonNode configSnapshot;
 
     @JsonIgnore
@@ -137,20 +128,8 @@ public class AgentJob {
     @ToString.Exclude
     private String jobTokenHash;
 
-    @JsonIgnore
-    @Convert(converter = EncryptedStringConverter.class)
-    @Column(name = "llm_api_key", columnDefinition = "TEXT")
-    @ToString.Exclude
-    private String llmApiKey;
-
     @Column(name = "idempotency_key", length = 255)
     private String idempotencyKey;
-
-    @Column(name = "container_id", length = 64)
-    private String containerId;
-
-    @Column(name = "network_id", length = 64)
-    private String networkId;
 
     @Column(name = "exit_code")
     private Integer exitCode;
@@ -158,11 +137,6 @@ public class AgentJob {
     @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
 
-    /**
-     * When {@link #status} is {@link AgentJobStatus#CANCELLED}, distinguishes drain-initiated
-     * cancellation (with operator intent) from user/timeout cancellation. Null for non-cancelled
-     * terminal states.
-     */
     @Enumerated(EnumType.STRING)
     @Column(name = "cancellation_reason", length = 32)
     private AgentJobCancellationReason cancellationReason;
@@ -182,19 +156,67 @@ public class AgentJob {
     private int retryCount = 0;
 
     /**
-     * Worker that owns this job while {@link #status} is {@link AgentJobStatus#RUNNING} (#1138).
-     * Soft reference to {@code worker_registry.worker_id} (no FK: a finished job must survive its
-     * worker row being reaped). Set on claim; routes cancels to the owner, detects jobs orphaned by a
-     * dead worker, and fences terminal writes so a requeued job's original worker can't clobber it.
+     * When this job becomes eligible for a poll-loop claim; defaults to submit time. A requeue pushes it
+     * into the future by {@link AgentJobBackoff#compute} so a crash-looping job backs off.
+     */
+    @Column(name = "available_at", nullable = false)
+    private Instant availableAt;
+
+    /** {@link #holdReason} value for a job held because its payer is over their monthly LLM cap. */
+    public static final String HOLD_REASON_BUDGET = "BUDGET";
+
+    /**
+     * Why this QUEUED job's {@link #availableAt} was pushed into the future, when the reason is one an
+     * admin can undo. It exists so raising a cap can release exactly those jobs
+     * ({@link AgentJobRepository#releaseBudgetHolds}) without also fast-forwarding a crash-retry backoff
+     * and hammering a failing upstream. Cleared on claim.
+     */
+    @Column(name = "hold_reason", length = 32)
+    private String holdReason;
+
+    /**
+     * Delivery-recovery attempts, distinct from {@link #retryCount}, which counts EXECUTION retries — a
+     * COMPLETED job can have no execution retries left and still need several delivery attempts.
+     */
+    @ColumnDefault("0")
+    @Column(name = "delivery_attempts", nullable = false)
+    private short deliveryAttempts = 0;
+
+    /**
+     * Worker that owns this job while RUNNING. Soft reference to {@code worker_registry.worker_id} (no
+     * FK: a finished job must survive its worker row being reaped). Fences terminal writes, so a
+     * requeued job's original worker cannot clobber the new owner's.
      */
     @Column(name = "worker_id", length = 255)
     private String workerId;
+
+    /**
+     * Digest of the prompt scaffolding this run consumed. Equal digests ran byte-identical prompt
+     * assembly, which is how an evaluation groups runs. Null for rows written before provenance existed.
+     */
+    @Column(name = "prompt_digest", length = 64)
+    private String promptDigest;
+
+    /**
+     * Digest over every file materialised into the sandbox workspace, with the job's own id elided so two
+     * runs over identical work agree. The read-only repo mount is NOT hashed — its state is pinned by
+     * {@code metadata.commit_sha}. Null for rows written before provenance existed.
+     */
+    @Column(name = "inputs_digest", length = 64)
+    private String inputsDigest;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
     @Column(name = "started_at")
     private Instant startedAt;
+
+    /**
+     * Set immediately before sandbox/provider execution, after preparation. Null means the job cannot yet
+     * have spent anything, so cancellation and recovery paths test this before recording LLM usage.
+     */
+    @Column(name = "execution_started_at")
+    private Instant executionStartedAt;
 
     @Column(name = "completed_at")
     private Instant completedAt;
@@ -204,7 +226,7 @@ public class AgentJob {
     @Column(name = "llm_model", length = 100)
     private String llmModel;
 
-    /** Model version/snapshot date (e.g. "2026-03-17"), from agent config. */
+    /** Only carried by jobs frozen before the model catalog; the catalog identifies a model by id alone. */
     @Column(name = "llm_model_version", length = 50)
     private String llmModelVersion;
 
@@ -226,8 +248,8 @@ public class AgentJob {
     @Column(name = "llm_cache_write_tokens")
     private Integer llmCacheWriteTokens;
 
-    @Column(name = "llm_cost_usd")
-    private Double llmCostUsd;
+    // No cost field here: money lives in llm_usage_event as NUMERIC(18,6) with the rates it was charged
+    // at, never as a binary float on the job row.
 
     @PrePersist
     public void prePersist() {
@@ -246,18 +268,23 @@ public class AgentJob {
         if (this.createdAt == null) {
             this.createdAt = Instant.now();
         }
+        if (this.availableAt == null) {
+            this.availableAt = this.createdAt;
+        }
     }
 
-    private static String generateJobToken() {
-        byte[] bytes = new byte[32]; // 256 bits
+    /**
+     * Generate a fresh job token. Public so a requeue can rotate it without going through
+     * {@code prePersist}: a partitioned-but-alive zombie sandbox must stop authenticating against the LLM
+     * proxy the moment a sibling worker re-claims its job row.
+     */
+    public static String generateJobToken() {
+        byte[] bytes = new byte[TOKEN_BYTES];
         SECURE_RANDOM.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
-    /**
-     * Compute SHA-256 hex digest of a plaintext job token.
-     * Used for indexed lookup since the encrypted column cannot be queried directly.
-     */
+    /** Indexed lookup key for a job token, since the encrypted column cannot be queried directly. */
     public static String computeTokenHash(String token) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");

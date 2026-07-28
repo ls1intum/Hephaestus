@@ -176,6 +176,7 @@ public class WorkspaceRepositoryMonitorService {
 
         RepositoryToMonitor repositoryToMonitor = new RepositoryToMonitor();
         repositoryToMonitor.setNameWithOwner(nameWithOwner);
+        repositoryToMonitor.setNativeId(resolveNativeId(nameWithOwner));
         repositoryToMonitor.setWorkspace(workspace);
         persistRepositoryMonitor(workspace, repositoryToMonitor);
     }
@@ -489,6 +490,21 @@ public class WorkspaceRepositoryMonitorService {
         return repositoryRepository.findByNameWithOwner(nameWithOwner);
     }
 
+    /**
+     * Best-effort capture of the provider's stable repository id ({@code native_id}) at
+     * monitor-creation time by resolving the (already-upserted) domain {@link Repository} by name.
+     * Returns {@code null} when the repository is not yet known locally — e.g. a GitLab PAT repo added
+     * by name before its first sync — in which case the periodic sync backfills it later via
+     * {@link de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider#reconcileSyncTargetIdentity}.
+     */
+    @org.jspecify.annotations.Nullable
+    private Long resolveNativeId(String nameWithOwner) {
+        if (StringUtils.isBlank(nameWithOwner)) {
+            return null;
+        }
+        return findRepository(nameWithOwner).map(Repository::getNativeId).orElse(null);
+    }
+
     private boolean shouldUseNats(Workspace workspace) {
         return natsProperties.enabled() && workspace != null;
     }
@@ -497,8 +513,20 @@ public class WorkspaceRepositoryMonitorService {
      * Deletes a repository only if no workspace is monitoring it (repositories are shared
      * across workspaces). Cascades deletion to any projects owned by this repository to
      * maintain referential integrity for the polymorphic project ownership model.
+     *
+     * <p><b>The cross-tenant guard of the whole SCM domain.</b> {@code repository} and everything
+     * hanging off it carry no {@code workspace_id} — they key on {@code (provider_id, native_id)}
+     * ({@code BaseGitServiceEntity}) and are genuinely SHARED between workspaces that monitor the
+     * same source repository. The {@code countByNameWithOwner} check below is therefore the only
+     * thing standing between a workspace-scoped erase and a global one: the caller removes
+     * <em>its own</em> {@code repository_to_monitor} row first, then asks this method to drop the
+     * shared row only if the count fell to zero. Callers MUST flush the monitor removal before
+     * calling (a pending orphanRemoval delete is invisible to this count query).
+     *
+     * <p>Public so {@link ScmWorkspaceContentEraser} can route the disconnect and workspace-purge
+     * erase triggers through this exact cascade instead of a second, unguarded deleter.
      */
-    private void deleteRepositoryIfOrphaned(String nameWithOwner) {
+    public void deleteRepositoryIfOrphaned(String nameWithOwner) {
         if (StringUtils.isBlank(nameWithOwner)) {
             return;
         }
@@ -615,6 +643,7 @@ public class WorkspaceRepositoryMonitorService {
 
         RepositoryToMonitor monitor = new RepositoryToMonitor();
         monitor.setNameWithOwner(nameWithOwner);
+        monitor.setNativeId(resolveNativeId(nameWithOwner));
         monitor.setWorkspace(workspace);
 
         try {

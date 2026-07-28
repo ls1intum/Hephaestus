@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
+import static de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures.admittedMentorConfig;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorTurnPersistence;
@@ -23,11 +24,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /**
- * Boot-validation + behavior coverage for the file's only {@code nativeQuery=true}
- * ({@code findFirstUserMessagePartsByThreadIds}). Native SQL is NOT boot-validated like JPQL, so a
- * jsonb type-mapping regression can degrade the whole prior-conversation context to empty undetected.
- * This test pins the {@code DISTINCT ON} earliest-user-message-per-thread contract, the
- * workspace-scope guard, and the jsonb-to-text projection against a real Postgres container.
+ * {@code findFirstUserMessagePartsByThreadIds} is native SQL, so it isn't boot-validated like JPQL — a
+ * jsonb type-mapping regression could silently empty the prior-conversation context. Runs against a real
+ * Postgres container to pin the {@code DISTINCT ON} and jsonb-to-text projection contracts.
  */
 class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
 
@@ -80,7 +79,7 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
 
     private ChatThread seedThreadWithUserMessage(String firstPrompt) {
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, firstPrompt);
-        persistence.persistInFlight(thread, firstPrompt, UUID.randomUUID(), null);
+        persistence.persistInFlight(thread, firstPrompt, UUID.randomUUID(), null, admittedMentorConfig());
         return thread;
     }
 
@@ -116,10 +115,8 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
         other.setAccountType(AccountType.ORG);
         other = workspaceRepository.save(other);
         ChatThread foreign = persistence.ensureThread(other.getId(), UUID.randomUUID(), user, "foreign prompt");
-        persistence.persistInFlight(foreign, "foreign prompt", UUID.randomUUID(), null);
+        persistence.persistInFlight(foreign, "foreign prompt", UUID.randomUUID(), null, admittedMentorConfig());
 
-        // Query scoped to MY workspace but passing both ids: the foreign thread is filtered out by the
-        // workspace_id join, even though its id was supplied.
         List<Object[]> rows = queryRepository.findFirstUserMessagePartsByThreadIds(
             workspace.getId(),
             List.of(mine.getId(), foreign.getId())

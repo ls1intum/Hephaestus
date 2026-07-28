@@ -1,7 +1,7 @@
 import { Volume2, VolumeX } from "lucide-react";
 import { useState } from "react";
 import type { InstanceSettings } from "@/api/types.gen";
-import { formatTimestamp } from "@/components/admin/audit/auditFormat";
+import { formatTimestamp } from "@/components/admin/audit-shared/time-format";
 import {
 	AlertDialog,
 	AlertDialogContent,

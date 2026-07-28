@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "storybook/test";
+import { expect, fn, within } from "storybook/test";
 import type { FeatureValues } from "./AdminFeaturesSettings";
 import { AdminSettingsPage } from "./AdminSettingsPage";
 
@@ -19,58 +19,30 @@ const meta = {
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
 	args: {
-		repositories: [
-			{ nameWithOwner: "octocat/Hello-World" },
-			{ nameWithOwner: "microsoft/vscode" },
-			{ nameWithOwner: "facebook/react" },
-		],
-		isLoadingRepositories: false,
-		repositoriesError: null,
-		addRepositoryError: null,
-		isAddingRepository: false,
-		isRemovingRepository: false,
 		isResettingLeagues: false,
-		isAppInstallationWorkspace: false,
-		onAddRepository: fn(),
-		onRemoveRepository: fn(),
 		onResetLeagues: fn(),
 		features: allOff,
 		isSavingFeatures: false,
 		onToggleFeature: fn(),
-		workspaceSlug: "demo",
-		hasSlackConnection: false,
-		slackNotificationsEnabled: false,
-		onSlackSaved: fn(),
-		slackChannels: [],
-		slackChannelCandidates: [],
-		isLoadingSlackChannels: false,
-		onRegisterSlackChannel: fn(),
-		onUpdateSlackChannelConsent: fn(),
-		onRemoveSlackChannel: fn(),
 	},
 } satisfies Meta<typeof AdminSettingsPage>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
-
-export const LoadingRepositories: Story = {
-	args: { isLoadingRepositories: true, repositories: [] },
+/** Every feature off — the Features section still renders; only the league card is conditional. */
+export const Default: Story = {
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByRole("heading", { name: /^features$/i })).toBeInTheDocument();
+		await expect(canvas.queryByText(/reset and recalculate leagues/i)).not.toBeInTheDocument();
+	},
 };
 
-export const RepositoriesError: Story = {
-	args: { repositoriesError: new Error("Failed to load repositories"), repositories: [] },
+export const ResettingLeagues: Story = {
+	args: { isResettingLeagues: true, features: { ...allOff, leaguesEnabled: true } },
 };
 
-export const AddingRepository: Story = { args: { isAddingRepository: true } };
-
-export const ResettingLeagues: Story = { args: { isResettingLeagues: true } };
-
-/** GitHub App Installation workspace — repository management is read-only. */
-export const AppInstallationWorkspace: Story = { args: { isAppInstallationWorkspace: true } };
-
-/** Practice Review on with auto-trigger only — exercises the nested sub-toggle layout. */
 export const PracticeReviewWithSubToggles: Story = {
 	args: {
 		features: {
@@ -82,13 +54,6 @@ export const PracticeReviewWithSubToggles: Story = {
 	},
 };
 
-/** Slack connected + configured — pins that the Slack digest card renders within the page. */
-export const SlackConfigured: Story = {
-	args: {
-		hasSlackConnection: true,
-		slackChannelId: "C0974LJBPBK",
-		slackNotificationsEnabled: true,
-		slackScheduleDay: 3,
-		slackScheduleTime: "09:00",
-	},
+export const LeaguesEnabled: Story = {
+	args: { features: { ...allOff, leaguesEnabled: true } },
 };

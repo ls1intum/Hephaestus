@@ -6,6 +6,7 @@ import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requ
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
@@ -17,7 +18,9 @@ import de.tum.cit.aet.hephaestus.agent.task.Task;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.core.settings.spi.SilentModeQuery;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -183,8 +186,9 @@ public class IssueReviewHandler implements JobTypeHandler {
             job.getWorkspace() == null
                 ? Set.of()
                 : practiceCatalogInjector.defectDetectorSlugs(job.getWorkspace().getId(), WorkArtifact.ISSUE);
-        List<PracticeDetectionResultParser.ValidatedFinding> coercedFindings =
-            PracticeDetectionResultParser.coerceCoherence(parsed.validFindings(), defectDetectorSlugs);
+        List<PracticeDetectionResultParser.ValidatedFinding> coercedFindings = new ArrayList<>(
+            PracticeDetectionResultParser.coerceCoherence(parsed.validFindings(), defectDetectorSlugs)
+        );
         PracticeDetectionDeliveryService.DeliveryResult result = deliveryService.deliver(job, coercedFindings);
         log.info(
             "Issue delivery complete: inserted={}, unknownSlug={}, duplicate={}, jobId={}",
@@ -193,6 +197,13 @@ public class IssueReviewHandler implements JobTypeHandler {
             result.discardedDuplicate(),
             job.getId()
         );
+
+        // Stamp the keys deliver() persisted (ADR 0021 C2, mirrors the PR handler) so the composer's withheld
+        // report and the ledger address the stored observation rather than recomputing a key downstream.
+        Map<PracticeDetectionResultParser.ValidatedFinding, ObservationKeys> keysByFinding = result.observationKeys();
+        for (int i = 0; i < coercedFindings.size(); i++) {
+            coercedFindings.set(i, coercedFindings.get(i).withKeys(keysByFinding.get(coercedFindings.get(i))));
+        }
 
         Map<String, String> whyBySlug =
             job.getWorkspace() == null
@@ -204,6 +215,11 @@ public class IssueReviewHandler implements JobTypeHandler {
             whyBySlug
         );
         postIssueNote(job, delivery);
+    }
+
+    @Override
+    public ExistingDeliveryLookup findExistingDelivery(AgentJob job) {
+        return commentPoster.findExistingSummaryComment(job);
     }
 
     /**
@@ -218,16 +234,20 @@ public class IssueReviewHandler implements JobTypeHandler {
         }
         if (silentModeQuery.isSilentModeEngaged()) {
             log.warn("Issue delivery suppressed: instance silent mode engaged, jobId={}", job.getId());
+            recordGateSuppressed(job, delivery, FeedbackSuppressionReason.INSTANCE_SILENCED);
             return;
         }
         JsonNode metadata = job.getMetadata();
         if (metadata != null && "closed".equalsIgnoreCase(metadata.path("state").asString(""))) {
             log.info("Issue delivery suppressed: issue closed, jobId={}", job.getId());
+            recordGateSuppressed(job, delivery, FeedbackSuppressionReason.ARTIFACT_CLOSED);
             return;
         }
         String sanitized = PullRequestCommentPoster.sanitize(delivery.mrNote());
         if (sanitized.isBlank()) {
             log.debug("Issue note empty after sanitization, skipping post: jobId={}", job.getId());
+            // Issues have no inline lane, so a blank-sanitised body means NOTHING reached the developer.
+            recordGateSuppressed(job, delivery, FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE);
             return;
         }
         boolean posted = false;
@@ -264,6 +284,24 @@ public class IssueReviewHandler implements JobTypeHandler {
             log.warn(
                 "Feedback ledger record failed (delivery unaffected): jobId={}, error={}",
                 job.getId(),
+                e.getMessage()
+            );
+        }
+    }
+
+    /** Best-effort SUPPRESSED-unit persist for a whole-review gate — see {@link FeedbackLedgerRecorder#recordSuppressedUnit}. */
+    private void recordGateSuppressed(
+        AgentJob job,
+        PracticeDetectionResultParser.DeliveryContent delivery,
+        FeedbackSuppressionReason reason
+    ) {
+        try {
+            feedbackLedgerRecorder.recordSuppressedUnit(job, delivery, reason);
+        } catch (RuntimeException e) {
+            log.warn(
+                "Gate-suppressed ledger record failed (delivery unaffected): jobId={}, reason={}, error={}",
+                job.getId(),
+                reason,
                 e.getMessage()
             );
         }

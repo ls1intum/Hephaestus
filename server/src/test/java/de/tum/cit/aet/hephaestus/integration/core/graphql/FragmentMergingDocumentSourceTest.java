@@ -233,6 +233,43 @@ class FragmentMergingDocumentSourceTest extends BaseUnitTest {
     }
 
     @Nested
+    class MultipleFragmentFileTests {
+
+        /**
+         * A fragment file's last definition runs to end-of-file, so parsing the concatenation of several
+         * files staples the next file's header comment onto it. If that header happens to contain
+         * {@code ...SomethingElse} — an ordinary way to write a comment about a fragment — the spread
+         * scanner reads it as a real reference and drags an unrelated fragment into every document that
+         * uses the neighbour. GitHub then rejects the whole query for the unused fragment (§5.5.1.4), so
+         * the symptom is every project/issue sync failing at once.
+         */
+        @Test
+        void aCommentInOneFileCannotDragInAFragmentFromAnother() {
+            Resource first = byteResource("fragment ActorFields on Actor { login }\n", "first");
+            Resource second = byteResource(
+                """
+                # Spread this with ...LonelyFragment where a commit is selected.
+                fragment LonelyFragment on Commit { oid }
+                """,
+                "second"
+            );
+            FragmentMergingDocumentSource source = new FragmentMergingDocumentSource(
+                List.of(new ClassPathResource("graphql/github/operations/")),
+                List.of(".graphql"),
+                List.of(first, second)
+            );
+
+            String document = source.getDocument("GetOrganizationProjects").block();
+
+            assertThat(document).isNotNull();
+            assertThat(document).contains("fragment ActorFields on Actor");
+            assertThat(document)
+                .as("GetOrganizationProjects never spreads LonelyFragment; only the other file's comment mentions it")
+                .doesNotContain("LonelyFragment");
+        }
+    }
+
+    @Nested
     class ParseFragmentsTests {
 
         @Test

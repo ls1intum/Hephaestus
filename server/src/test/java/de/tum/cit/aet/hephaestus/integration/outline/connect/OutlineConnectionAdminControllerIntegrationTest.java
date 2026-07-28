@@ -33,12 +33,15 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
- * Authorization proof for {@link OutlineConnectionAdminController} — the secret-adjacent connection
- * surface ({@code /connections/outline/token}, {@code /status}, {@code /sync}). The controller is
- * guarded by a class-level {@code @RequireAtLeastWorkspaceAdmin}; this test pins that a workspace
- * MEMBER is refused on every endpoint (403) while a workspace ADMIN is admitted (200/202), so a
- * future refactor dropping the annotation cannot ship silently. Business behaviour lives in
- * {@link OutlineConnectionAdminServiceTest} — this stays scoped to access control.
+ * Authorization proof for {@link OutlineConnectionAdminController} — now just the secret-adjacent
+ * {@code /connections/outline/token} endpoint (the health snapshot and manual reconcile trigger were
+ * absorbed into the unified sync-observability API — see
+ * {@code de.tum.cit.aet.hephaestus.integration.core.sync.api.SyncControllerIntegrationTest} for that
+ * authorization coverage). The controller is guarded by a class-level
+ * {@code @RequireAtLeastWorkspaceAdmin}; this test pins that a workspace MEMBER is refused (403) while a
+ * workspace ADMIN is admitted (200), so a future refactor dropping the annotation cannot ship silently.
+ * Business behaviour lives in {@link OutlineConnectionAdminServiceTest} — this stays scoped to access
+ * control.
  */
 @TestPropertySource(properties = "hephaestus.integration.outline.enabled=true")
 class OutlineConnectionAdminControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
@@ -86,53 +89,29 @@ class OutlineConnectionAdminControllerIntegrationTest extends AbstractWorkspaceI
 
     @Test
     @WithMentorUser
-    @DisplayName("a workspace MEMBER cannot reach the connection control plane → 403 everywhere")
+    @DisplayName("a workspace MEMBER cannot reach the token endpoint → 403")
     void nonAdmin_forbidden() {
         User mentor = persistUser("mentor");
         ensureWorkspaceMembership(workspace, mentor, WorkspaceRole.MEMBER);
 
-        statusRequest().expectStatus().isForbidden();
         tokenRequest().expectStatus().isForbidden();
-        syncRequest().expectStatus().isForbidden();
     }
 
     @Test
     @WithAdminUser
-    @DisplayName("a workspace ADMIN is admitted: status 200, token 200, sync 202")
+    @DisplayName("a workspace ADMIN is admitted: token 200")
     void admin_admitted() {
         ensureAdminMembership(workspace);
 
-        statusRequest().expectStatus().isOk();
         tokenRequest().expectStatus().isOk();
-        syncRequest()
-            .expectStatus()
-            .isAccepted()
-            .expectHeader()
-            .location("/workspaces/" + workspace.getWorkspaceSlug() + "/connections/outline/status");
     }
 
     // --- helpers ---
-
-    private WebTestClient.ResponseSpec statusRequest() {
-        return webTestClient
-            .get()
-            .uri("/workspaces/{slug}/connections/outline/status", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange();
-    }
 
     private WebTestClient.ResponseSpec tokenRequest() {
         return webTestClient
             .get()
             .uri("/workspaces/{slug}/connections/outline/token", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange();
-    }
-
-    private WebTestClient.ResponseSpec syncRequest() {
-        return webTestClient
-            .post()
-            .uri("/workspaces/{slug}/connections/outline/sync", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange();
     }

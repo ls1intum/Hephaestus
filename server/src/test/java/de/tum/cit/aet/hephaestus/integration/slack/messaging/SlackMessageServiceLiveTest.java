@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.slack.credentials.SlackCredentialProvider;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Tag;
@@ -65,7 +66,11 @@ class SlackMessageServiceLiveTest {
         when(connectionService.findActive(workspaceId, IntegrationKind.SLACK)).thenReturn(Optional.of(connection));
 
         SlackCredentialProvider credentialProvider = new SlackCredentialProvider(connectionService, converter);
-        SlackMessageService service = new SlackMessageService(credentialProvider, () -> false);
+        SlackMessageService service = new SlackMessageService(
+            credentialProvider,
+            new SlackRateLimitTracker(new SimpleMeterRegistry()),
+            () -> false
+        );
 
         // The real send: block-kit payload through the app's SlackMessageService to the live channel.
         assertThatCode(() ->

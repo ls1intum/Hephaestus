@@ -1,13 +1,20 @@
 package de.tum.cit.aet.hephaestus.core.settings;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventWriter;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * The silent-mode read the delivery paths consult, and the toggle's reason/actor bookkeeping. Uses a
@@ -21,9 +28,29 @@ class InstanceSettingsServiceTest extends BaseUnitTest {
 
     private InstanceSettingsService service;
 
+    private AuthEventWriter authEventWriter;
+
     @BeforeEach
     void setUp() {
-        service = new InstanceSettingsService(repository);
+        authEventWriter = mock(AuthEventWriter.class);
+        service = new InstanceSettingsService(repository, new AuthEventLogger(authEventWriter), new ObjectMapper());
+    }
+
+    @Test
+    void toggleIsRecordedOnTheAuditTrail() {
+        givenRow(new InstanceSettings());
+
+        service.updateSilentMode(true, "incident #42", "felix");
+
+        // Server logs are not a trail: an incident review reads who silenced the instance off auth_event.
+        verify(authEventWriter).write(
+            org.mockito.ArgumentMatchers.argThat(
+                data ->
+                    data.type() == AuthEvent.EventType.SILENT_MODE_CHANGED &&
+                    data.details() != null &&
+                    data.details().contains("incident #42")
+            )
+        );
     }
 
     @Test

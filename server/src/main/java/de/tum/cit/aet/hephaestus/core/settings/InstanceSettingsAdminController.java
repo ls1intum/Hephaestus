@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.settings;
 
+import de.tum.cit.aet.hephaestus.core.AuditLedger;
+import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.web.CurrentAccount;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
@@ -70,6 +72,7 @@ public class InstanceSettingsAdminController {
 
     @PutMapping("/silent-mode")
     @Operation(summary = "Engage or release the instance-wide silent mode", operationId = "adminUpdateSilentMode")
+    @Audited(ledger = AuditLedger.AUTH_EVENT, type = "SILENT_MODE_CHANGED")
     public ResponseEntity<InstanceSettingsDTO> updateSilentMode(@Valid @RequestBody UpdateSilentModeRequestDTO body) {
         InstanceSettings updated = instanceSettingsService.updateSilentMode(
             body.engaged(),

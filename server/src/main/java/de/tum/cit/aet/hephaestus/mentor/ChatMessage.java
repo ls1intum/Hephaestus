@@ -126,9 +126,40 @@ public class ChatMessage {
     private JsonNode parts;
 
     /**
-     * Optimistic-lock version — Hibernate bumps on managed writes, {@code reapStaleInFlight}
-     * bumps explicitly. Stale-snapshot writers (reaper-vs-finalise, finalise-vs-interrupt) get
+     * Tokens the LLM proxy has served for this turn, added one call at a time by
+     * {@code ChatMessageRepository#accumulateLlmUsage} while the row is {@code in_flight} — the only
+     * record of a turn that dies before its runner reports anything.
+     *
+     * <p>Read-only to JPA on purpose: that native UPDATE is the single writer, so an entity flush of a
+     * snapshot loaded before a proxy call landed cannot roll that call's tokens back. {@code @ColumnDefault}
+     * therefore has to supply the initial zero that satisfies NOT NULL, and keeps the schema Hibernate
+     * generates for the test tier in step with Liquibase.
+     */
+    @org.hibernate.annotations.ColumnDefault("0")
+    @Column(name = "llm_total_calls", nullable = false, insertable = false, updatable = false)
+    private int llmTotalCalls;
+
+    @org.hibernate.annotations.ColumnDefault("0")
+    @Column(name = "llm_total_input_tokens", nullable = false, insertable = false, updatable = false)
+    private long llmTotalInputTokens;
+
+    @org.hibernate.annotations.ColumnDefault("0")
+    @Column(name = "llm_total_output_tokens", nullable = false, insertable = false, updatable = false)
+    private long llmTotalOutputTokens;
+
+    @org.hibernate.annotations.ColumnDefault("0")
+    @Column(name = "llm_total_reasoning_tokens", nullable = false, insertable = false, updatable = false)
+    private long llmTotalReasoningTokens;
+
+    @org.hibernate.annotations.ColumnDefault("0")
+    @Column(name = "llm_cache_read_tokens", nullable = false, insertable = false, updatable = false)
+    private long llmCacheReadTokens;
+
+    /**
+     * Optimistic-lock version — Hibernate bumps it on every managed write, including the reaper's.
+     * Stale-snapshot writers (reaper-vs-finalise, finalise-vs-interrupt) get
      * {@code OptimisticLockingFailureException}; the orchestrator skips so the winner survives.
+     * {@code accumulateLlmUsage} deliberately leaves it alone — see that query.
      */
     @org.hibernate.annotations.ColumnDefault("0")
     @jakarta.persistence.Version

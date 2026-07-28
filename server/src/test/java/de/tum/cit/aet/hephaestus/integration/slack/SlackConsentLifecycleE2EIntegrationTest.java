@@ -73,13 +73,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * The one end-to-end composition proof for the Slack consent redesign: it walks a channel through its whole
- * lifecycle — register → activate (announce + stamp + audit) → forward-only ingest → settled-thread detection over
- * the real {@code bigint[]} participant array → person opt-out (stop + channel-data erase) → revoke (full erase +
- * audit survival + sibling-channel isolation) — asserting real DB state at every hop, catching cross-slice wiring
- * breaks where each unit stays green but the pipeline is severed.
- *
- * <p><b>Scope split.</b> The pipeline is driven at the service layer (the outbound {@link SlackMessageService} and
+ * <b>Scope split.</b> The pipeline is driven at the service layer (the outbound {@link SlackMessageService} and
  * {@link AgentJobService} are the only mocks) rather than over HTTP — REST authorization is covered by
  * {@code SlackChannelAdminControllerIntegrationTest}. It runs on the fast entity-derived schema (with the raw-JDBC
  * {@code slack_thread} columns added via {@link SlackConversationTestSupport}); the companion
@@ -218,12 +212,11 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
             userRepository,
             new SlackHephaestusUiLinks(
                 workspaceId ->
-                    Optional.of(
-                        new WorkspaceSummaryQuery.WorkspaceSummary(workspaceId, "hephaestus", "Hephaestus", null)
-                    ),
+                    Optional.of(new WorkspaceSummaryQuery.WorkspaceSummary(workspaceId, "hephaestus", "Hephaestus")),
                 "https://hephaestus.test"
             ),
-            new TransactionTemplate(transactionManager)
+            new TransactionTemplate(transactionManager),
+            event -> {} // activation kick intentionally not asserted here
         );
         handler = new SlackInteractivityHandler(
             workspaceResolver,
@@ -250,7 +243,13 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
         assertThat(currentChannel(C1).getConsentState()).isEqualTo(ConsentState.ACTIVE);
         Instant announcedAt = currentChannel(C1).getConsentAnnouncedAt();
         assertThat(announcedAt).isNotNull();
-        verify(slackMessageService).sendForWorkspace(eq(workspaceId), eq(C1), any(), any());
+        // The announcement text IS the consent: activating a channel silently, or posting some other
+        // notice, would start ingesting members' messages without telling them.
+        var fallbackText = ArgumentCaptor.forClass(String.class);
+        verify(slackMessageService).sendForWorkspace(eq(workspaceId), eq(C1), any(), fallbackText.capture());
+        assertThat(fallbackText.getValue())
+            .contains("Hephaestus is now active in this channel")
+            .contains("does not read earlier history");
         assertThat(auditToStates(C1)).containsExactly(ConsentState.ACTIVE);
 
         // Hop 3 — forward-only ingest: ts strictly after the announcement is stored, ts before it is not.
@@ -276,7 +275,6 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
             .findByWorkspaceIdAndSlackChannelIdAndSlackThreadTs(workspaceId, C1, rootTs)
             .orElseThrow()
             .getId();
-        // Derived CONVERSATION feedback about each participant, anchored to the settled thread id.
         SlackConversationTestSupport.BoundConversation u1Conv = seedBoundConversation(settledThreadId, u1MemberId);
         UUID u1Obs = u1Conv.observationId();
         UUID u1Fb = u1Conv.feedbackId();
@@ -302,7 +300,6 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
 
         // Hop 5 — U1 opts out: ingestion stops AND U1's channel data is erased, U2's survives.
         handler.handleBlockActions(optOut("U1"));
-        // (a) ingestion now blocked for U1.
         assertThat(
             participantConsentRepository.existsByWorkspaceIdAndSlackUserIdAndIngestionOptedOutTrue(workspaceId, "U1")
         ).isTrue();
@@ -311,7 +308,6 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
         assertThat(
             messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, C1, tsAfterOptOut)
         ).isFalse();
-        // (b) U1's already-stored message erased + pruned from participant_member_ids; (c) U2 survives.
         assertThat(
             messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, C1, tsAfter)
         ).isFalse();
@@ -337,9 +333,7 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
         assertThat(threadCount(C1)).isZero();
         assertThat(messageCount(C1)).isZero();
         assertThat(observationRepository.findById(u2Obs)).isEmpty(); // remaining C1 derived rows erased too
-        // The immutable audit trail retains BOTH transitions.
         assertThat(auditToStates(C1)).containsExactly(ConsentState.ACTIVE, ConsentState.REVOKED);
-        // Sibling C2 completely untouched.
         assertThat(currentChannel(C2).getConsentState()).isEqualTo(ConsentState.ACTIVE);
         assertThat(messageCount(C2)).isEqualTo(1);
     }

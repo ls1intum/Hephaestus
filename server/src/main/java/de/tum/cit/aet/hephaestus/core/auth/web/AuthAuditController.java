@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -58,8 +59,8 @@ public class AuthAuditController {
     public record AuditFilterParams(
         @RequestParam(required = false) @Nullable Long accountId,
         @RequestParam(required = false) @Nullable Long actingAccountId,
-        @RequestParam(required = false) AuthEvent.@Nullable EventType eventType,
-        @RequestParam(required = false) AuthEvent.@Nullable Result result,
+        @RequestParam(required = false) @Nullable List<AuthEvent.EventType> eventType,
+        @RequestParam(required = false) @Nullable List<AuthEvent.Result> result,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) @Nullable Instant from,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) @Nullable Instant to
     ) {

@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, Volume2, VolumeX } from "lucide-react";
 import type { InstanceSettings } from "@/api/types.gen";
-import { relativeTime } from "@/components/admin/audit/auditFormat";
+import { RelativeTime } from "@/components/common/RelativeTime";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -53,9 +53,12 @@ export function SilentModeStatusCard({ settings, isLoading = false }: SilentMode
 						<p className="text-sm text-muted-foreground">
 							Nothing is being delivered
 							{settings?.silentModeChangedBy ? ` — engaged by ${settings.silentModeChangedBy}` : ""}
-							{settings?.silentModeChangedAt
-								? ` ${relativeTime(settings.silentModeChangedAt)}`
-								: ""}
+							{settings?.silentModeChangedAt ? (
+								<>
+									{" "}
+									<RelativeTime value={settings.silentModeChangedAt} tooltip={false} />
+								</>
+							) : null}
 							.
 						</p>
 					</div>

@@ -8,6 +8,7 @@ import io.github.resilience4j.retry.Retry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.web.reactive.function.client.WebClient;
 
 /**
  * The Outline server URL is admin-supplied, so it must be validated before any request is made.
@@ -16,9 +17,11 @@ import org.junit.jupiter.params.provider.ValueSource;
  */
 class OutlineApiClientSsrfTest extends BaseUnitTest {
 
+    // The URL is rejected by ServerUrlValidator before any request is made, so the WebClient is never used.
     private final OutlineApiClient client = new OutlineApiClient(
         CircuitBreaker.ofDefaults("outlineRestApi"),
-        Retry.ofDefaults("outlineRestApi")
+        Retry.ofDefaults("outlineRestApi"),
+        WebClient.builder().build()
     );
 
     @ParameterizedTest

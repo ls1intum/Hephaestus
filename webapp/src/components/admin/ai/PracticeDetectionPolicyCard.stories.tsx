@@ -1,24 +1,34 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "storybook/test";
+import { fn, within } from "storybook/test";
+import type { AgentBinding } from "@/api/types.gen";
+import { expectPageReflows, expectTargetSpacing, expectWithinViewport } from "@/test/reflow";
 import { PracticeDetectionPolicyCard } from "./PracticeDetectionPolicyCard";
-import { mockAiSettings, mockConfigs } from "./storyMockData";
+import { mockAvailableModels, mockPracticeReviewSettings } from "./story-mock-data";
+
+const readyBinding: AgentBinding = {
+	purpose: "PRACTICE_DETECTION",
+	enabled: true,
+	ready: true,
+	instanceModelId: 1,
+};
 
 /**
- * Policy editor for practice-detection reviews: runtime binding, automatic/manual
- * triggers, and review policy (drafts, cooldown, coverage). Saves field-by-field.
+ * Policy editor for practice-detection reviews: the bound model (read-only — the AI models page
+ * owns it), the triggers, and the review policy. Saves field by field.
  */
 const meta = {
 	component: PracticeDetectionPolicyCard,
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
 	args: {
-		settings: mockAiSettings,
-		configs: mockConfigs,
+		settings: mockPracticeReviewSettings,
+		detectionBinding: readyBinding,
+		availableModels: mockAvailableModels,
+		workspaceSlug: "acme",
 		autoTriggerEnabled: true,
 		manualTriggerEnabled: true,
 		isLoading: false,
 		isSaving: false,
-		onBindConfig: fn(),
 		onUpdateReviewSettings: fn(),
 		onUpdateFeatures: fn(),
 		onResetReviewField: fn(),
@@ -35,35 +45,26 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** A specific model is selected; triggers and policy populated. */
 export const RuntimeBound: Story = {};
 
-/** No specific model selected — reviews run on every enabled model (the Select shows "All enabled models"). */
-export const FanOut: Story = {
-	args: {
-		settings: { ...mockAiSettings, practiceConfigId: undefined },
-	},
+export const Unbound: Story = {
+	args: { detectionBinding: undefined },
 };
 
-/** The selected model was disabled elsewhere — detection is paused (destructive warning). */
-export const BoundRuntimeDisabled: Story = {
-	args: {
-		settings: { ...mockAiSettings, practiceConfigId: 3 }, // mockConfigDisabled (enabled: false)
-	},
+export const BoundModelUnavailable: Story = {
+	args: { detectionBinding: { ...readyBinding, ready: false } },
 };
 
-/** Coverage scoped to the opt-in role. */
 export const RoleScopedCoverage: Story = {
 	args: {
-		settings: { ...mockAiSettings, runForAllUsers: false },
+		settings: { ...mockPracticeReviewSettings, runForAllUsers: false },
 	},
 };
 
-/** All policy fields inherit the fleet default — every control shows "Inherited from default". */
 export const AllInherited: Story = {
 	args: {
 		settings: {
-			...mockAiSettings,
+			...mockPracticeReviewSettings,
 			skipDraftsOverride: undefined,
 			deliverToMergedOverride: undefined,
 			cooldownMinutesOverride: undefined,
@@ -72,16 +73,45 @@ export const AllInherited: Story = {
 	},
 };
 
-/** Both triggers disabled — reviews never start automatically or on demand. */
 export const TriggersOff: Story = {
 	args: { autoTriggerEnabled: false, manualTriggerEnabled: false },
 };
 
-/** A save is in flight — controls disabled. */
 export const Saving: Story = {
 	args: { isSaving: true },
 };
 
 export const Loading: Story = {
 	args: { isLoading: true, settings: undefined },
+};
+
+export const LoadForbidden: Story = {
+	args: {
+		isError: true,
+		settings: undefined,
+		error: { status: 403, detail: "You are not an admin of this workspace." },
+		onRetry: fn(),
+	},
+};
+
+/**
+ * WCAG 2.2 SC 1.4.10 at 320 px: nothing here is tabular, so nothing may scroll sideways.
+ *
+ * The switches meet SC 2.5.8 through a pseudo-element `getBoundingClientRect` cannot see, so the
+ * Spacing exception is what this can actually measure — and what a denser layout breaks first.
+ */
+export const MobileReflow: Story = {
+	parameters: {
+		layout: "fullscreen",
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320, 375, 768] },
+	},
+	play: async ({ canvasElement }) => {
+		await expectPageReflows();
+		const switches = within(canvasElement).getAllByRole("switch");
+		for (const control of switches) {
+			await expectWithinViewport(control);
+		}
+		await expectTargetSpacing(switches);
+	},
 };

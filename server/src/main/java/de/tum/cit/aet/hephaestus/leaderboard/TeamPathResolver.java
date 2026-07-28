@@ -5,6 +5,8 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceTeamScope;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceTeamScopeResolver;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamSettingsService;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -32,10 +34,16 @@ public class TeamPathResolver {
 
     private final TeamRepository teamRepository;
     private final WorkspaceTeamSettingsService workspaceTeamSettingsService;
+    private final WorkspaceTeamScopeResolver workspaceTeamScopeResolver;
 
-    public TeamPathResolver(TeamRepository teamRepository, WorkspaceTeamSettingsService workspaceTeamSettingsService) {
+    public TeamPathResolver(
+        TeamRepository teamRepository,
+        WorkspaceTeamSettingsService workspaceTeamSettingsService,
+        WorkspaceTeamScopeResolver workspaceTeamScopeResolver
+    ) {
         this.teamRepository = teamRepository;
         this.workspaceTeamSettingsService = workspaceTeamSettingsService;
+        this.workspaceTeamScopeResolver = workspaceTeamScopeResolver;
     }
 
     /**
@@ -49,6 +57,10 @@ public class TeamPathResolver {
         if (workspace == null || workspace.getAccountLogin() == null || path.isBlank()) {
             return Optional.empty();
         }
+        WorkspaceTeamScope scope = workspaceTeamScopeResolver.resolve(workspace).orElse(null);
+        if (scope == null) {
+            return Optional.empty();
+        }
 
         // Get hidden team IDs for this workspace
         Set<Long> hiddenTeamIds = workspaceTeamSettingsService.getHiddenTeamIds(workspace.getId());
@@ -56,9 +68,9 @@ public class TeamPathResolver {
         String[] parts = path.split(" / ");
         String leaf = parts[parts.length - 1];
         List<Team> candidates = teamRepository
-            .findAllByName(leaf)
+            .findAllByNameAndProviderId(leaf, scope.providerId())
             .stream()
-            .filter(team -> belongsToWorkspace(team, workspace))
+            .filter(scope::contains)
             .toList();
         if (candidates.isEmpty()) {
             return Optional.empty();
@@ -130,7 +142,7 @@ public class TeamPathResolver {
                         .findAllById(missingIds)
                         .forEach(parent -> {
                             Long parentId = parent.getId();
-                            if (parentId != null && belongsToWorkspace(parent, workspace)) {
+                            if (parentId != null && scope.contains(parent)) {
                                 cache.putIfAbsent(parentId, parent);
                             }
                         });
@@ -142,11 +154,7 @@ public class TeamPathResolver {
             for (Map.Entry<Long, Team> e : currentByCandidate.entrySet()) {
                 Long candidateId = e.getKey();
                 Team nextVisible = nextVisibleByCandidate.get(candidateId);
-                if (
-                    nextVisible != null &&
-                    expected.equals(nextVisible.getName()) &&
-                    belongsToWorkspace(nextVisible, workspace)
-                ) {
+                if (nextVisible != null && expected.equals(nextVisible.getName()) && scope.contains(nextVisible)) {
                     filtered.put(candidateId, nextVisible);
                     if (nextVisible.getId() != null) {
                         cache.putIfAbsent(nextVisible.getId(), nextVisible);
@@ -172,7 +180,7 @@ public class TeamPathResolver {
                 Team candidate = cache.get(candidateId);
                 if (
                     candidate != null &&
-                    belongsToWorkspace(candidate, workspace) &&
+                    scope.contains(candidate) &&
                     equalsVisiblePath(candidate, parts, cache, hiddenTeamIds)
                 ) {
                     return Optional.of(candidate);
@@ -195,7 +203,14 @@ public class TeamPathResolver {
         if (workspace == null || workspace.getAccountLogin() == null) {
             return Collections.emptyMap();
         }
-        List<Team> all = teamRepository.findAllByOrganizationIgnoreCase(workspace.getAccountLogin());
+        WorkspaceTeamScope scope = workspaceTeamScopeResolver.resolve(workspace).orElse(null);
+        if (scope == null) {
+            return Collections.emptyMap();
+        }
+        List<Team> all = teamRepository.findAllByOrganizationIgnoreCaseAndProviderId(
+            scope.accountLogin(),
+            scope.providerId()
+        );
         return all
             .stream()
             .collect(
@@ -286,14 +301,5 @@ public class TeamPathResolver {
                 });
             pending = nextRound;
         }
-    }
-
-    private boolean belongsToWorkspace(Team team, Workspace workspace) {
-        if (team == null || workspace == null) {
-            return false;
-        }
-        String org = team.getOrganization();
-        String workspaceLogin = workspace.getAccountLogin();
-        return org != null && workspaceLogin != null && org.equalsIgnoreCase(workspaceLogin);
     }
 }

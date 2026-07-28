@@ -112,7 +112,6 @@ class DockerSandboxLiveTest {
                 });
         } catch (Exception ignored) {}
 
-        // Cleanup orphaned networks
         try {
             networkManager
                 .listOrphanedNetworks()
@@ -135,7 +134,6 @@ class DockerSandboxLiveTest {
         void shouldRunAndCollectOutput() {
             UUID jobId = UUID.randomUUID();
 
-            // Create a script that writes output
             String script =
                 "#!/bin/sh\nmkdir -p /workspace/out\necho '{\"status\":\"ok\"}' > /workspace/out/result.json\necho 'done'";
 
@@ -144,7 +142,7 @@ class DockerSandboxLiveTest {
                 "alpine:latest",
                 List.of("sh", "-c", script),
                 Map.of("TEST_VAR", "hello"),
-                new NetworkPolicy(true, null, null, null), // Use bridge for simplicity
+                new NetworkPolicy(true, null, null), // Use bridge for simplicity
                 new ResourceLimits(512 * 1024 * 1024, 1.0, 128, Duration.ofMinutes(1)),
                 testSecurityProfile(),
                 Map.of(),
@@ -170,7 +168,7 @@ class DockerSandboxLiveTest {
                 "alpine:latest",
                 List.of("sh", "-c", "exit 42"),
                 Map.of(),
-                new NetworkPolicy(true, null, null, null),
+                new NetworkPolicy(true, null, null),
                 new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofMinutes(1)),
                 testSecurityProfile(),
                 Map.of(),
@@ -197,7 +195,7 @@ class DockerSandboxLiveTest {
                 "alpine:latest",
                 List.of("sh", "-c", "sleep 300"),
                 Map.of(),
-                new NetworkPolicy(true, null, null, null),
+                new NetworkPolicy(true, null, null),
                 new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofSeconds(3)),
                 testSecurityProfile(),
                 Map.of(),
@@ -225,7 +223,7 @@ class DockerSandboxLiveTest {
                 "alpine:latest",
                 List.of("sh", "-c", "mkdir -p /workspace/out && cat /workspace/.prompt > /workspace/out/echo.txt"),
                 Map.of(),
-                new NetworkPolicy(true, null, null, null),
+                new NetworkPolicy(true, null, null),
                 new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofMinutes(1)),
                 testSecurityProfile(),
                 Map.of(".prompt", "injected content".getBytes()),
@@ -253,7 +251,7 @@ class DockerSandboxLiveTest {
                 "alpine:latest",
                 List.of("echo", "cleanup-test"),
                 Map.of(),
-                new NetworkPolicy(true, null, null, null),
+                new NetworkPolicy(true, null, null),
                 new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofMinutes(1)),
                 testSecurityProfile(),
                 Map.of(),
@@ -263,7 +261,6 @@ class DockerSandboxLiveTest {
 
             sandboxAdapter.execute(spec);
 
-            // Verify no managed containers remain
             assertThat(
                 containerManager
                     .listManagedContainers()
@@ -272,7 +269,6 @@ class DockerSandboxLiveTest {
                     .toList()
             ).isEmpty();
 
-            // Verify no orphaned networks remain for this job
             assertThat(
                 networkManager
                     .listOrphanedNetworks()

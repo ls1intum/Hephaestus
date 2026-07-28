@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.slack.sync;
 
 import java.time.Duration;
+import java.util.function.BooleanSupplier;
 
 /**
  * Per-workspace request budget for the rate-clamped history/replies methods. {@link #acquire()} self-paces by
@@ -29,18 +30,29 @@ final class SlackSyncBudget {
      * exhausted or the thread was interrupted (the caller stops syncing; the watermark is simply not advanced).
      */
     boolean acquire() {
+        return acquire(() -> false);
+    }
+
+    boolean acquire(BooleanSupplier cancelled) {
         if (used >= maxRequests) {
             return false;
         }
         long now = System.currentTimeMillis();
         long waitMs = used == 0 ? 0 : lastRequestAt + intervalMillis - now;
-        if (waitMs > 0) {
+        while (waitMs > 0) {
+            if (cancelled.getAsBoolean()) {
+                return false;
+            }
             try {
-                Thread.sleep(waitMs);
+                Thread.sleep(Math.min(waitMs, 1000));
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return false;
             }
+            waitMs = lastRequestAt + intervalMillis - System.currentTimeMillis();
+        }
+        if (cancelled.getAsBoolean()) {
+            return false;
         }
         used++;
         lastRequestAt = System.currentTimeMillis();

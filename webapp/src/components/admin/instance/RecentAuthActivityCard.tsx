@@ -2,12 +2,12 @@ import { Link } from "@tanstack/react-router";
 import { ArrowRight, ScrollText } from "lucide-react";
 import type { AuthEventView } from "@/api/types.gen";
 import {
-	accountLabel,
+	type AuditSeverity,
 	eventLabel,
 	eventSeverity,
-	relativeTime,
-	SEVERITY_DOT,
-} from "@/components/admin/audit/auditFormat";
+} from "@/components/admin/audit/audit-format";
+import { refLabel } from "@/components/admin/audit-shared/ref-label";
+import { RelativeTime } from "@/components/common/RelativeTime";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -26,6 +26,13 @@ import {
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 
+/** Mirrors the audit table's severity dots so the overview and the full log read the same. */
+const SEVERITY_DOT: Record<AuditSeverity, string> = {
+	error: "bg-destructive",
+	warning: "bg-amber-500",
+	info: "bg-muted-foreground/40",
+};
+
 interface RecentAuthActivityCardProps {
 	events: AuthEventView[];
 	isLoading?: boolean;
@@ -42,7 +49,11 @@ export function RecentAuthActivityCard({ events, isLoading = false }: RecentAuth
 				<CardTitle>Recent activity</CardTitle>
 				<CardDescription>Latest authentication and admin events</CardDescription>
 				<CardAction>
-					<Button variant="ghost" size="sm" render={<Link to="/admin/audit" />}>
+					<Button
+						variant="ghost"
+						size="sm"
+						render={<Link to="/admin/audit" search={{ tab: "signins" }} />}
+					>
 						View audit log
 						<ArrowRight aria-hidden />
 					</Button>
@@ -72,8 +83,8 @@ export function RecentAuthActivityCard({ events, isLoading = false }: RecentAuth
 						{events.map((event) => {
 							const severity = eventSeverity(event.eventType, event.result);
 							const actor =
-								accountLabel(event.actor, event.actingAccountId) ??
-								accountLabel(event.account, event.accountId);
+								refLabel(event.actor, event.actingAccountId) ??
+								refLabel(event.account, event.accountId);
 							return (
 								<li key={event.id} className="flex items-center gap-2 text-sm">
 									<span
@@ -82,9 +93,10 @@ export function RecentAuthActivityCard({ events, isLoading = false }: RecentAuth
 									/>
 									<span className="truncate">{eventLabel(event.eventType)}</span>
 									{actor ? <span className="truncate text-muted-foreground">{actor}</span> : null}
-									<span className="ml-auto shrink-0 whitespace-nowrap text-xs text-muted-foreground">
-										{relativeTime(event.occurredAt)}
-									</span>
+									<RelativeTime
+										value={event.occurredAt}
+										className="ml-auto shrink-0 whitespace-nowrap text-xs"
+									/>
 								</li>
 							);
 						})}

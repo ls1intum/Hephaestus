@@ -199,6 +199,19 @@ public class PullRequestContentSource implements ContentSource {
                     String cloneUrl = serverUrl + "/" + repoFullName + ".git";
                     gitRepositoryManager.ensureRepository(repositoryId, cloneUrl, token);
                     fetched = true;
+                    long pullRequestNumber = requireLong(metadata, "pr_number");
+                    Optional<String> reviewHeadRef = source.reviewHeadRef(pullRequestNumber);
+                    if (headSha != null && !headSha.isBlank() && reviewHeadRef.isPresent()) {
+                        boolean pinnedHeadFetched = gitRepositoryManager.fetchRemoteCommit(
+                            repositoryId,
+                            reviewHeadRef.get(),
+                            headSha,
+                            token
+                        );
+                        if (!pinnedHeadFetched) {
+                            log.warn("Remote review ref did not match the pinned commit: repoId={}", repositoryId);
+                        }
+                    }
                     log.debug("Fetched latest refs: repoId={}", repositoryId);
                 }
             }
@@ -420,27 +433,21 @@ public class PullRequestContentSource implements ContentSource {
         try {
             String[] range = gitDiffOperations.resolveDiffRange(repoPath, targetBranch, sourceBranch, headSha);
             if (range == null) {
-                if (headVerified) {
-                    throw new JobPreparationException(
-                        "Cannot compute diff: all resolution strategies failed despite head commit " +
-                            headSha +
-                            " being present. targetBranch=" +
-                            targetBranch +
-                            ", sourceBranch=" +
-                            sourceBranch +
-                            ", repoId=" +
-                            repositoryId
-                    );
-                }
-                log.error(
-                    "Cannot compute diff: head commit not available locally. " +
-                        "headSha={}, targetBranch={}, sourceBranch={}, repoId={}",
-                    headSha,
-                    targetBranch,
-                    sourceBranch,
-                    repositoryId
+                String reason = headVerified
+                    ? "all resolution strategies failed"
+                    : "the pinned head commit is unavailable after repository refresh";
+                throw new JobPreparationException(
+                    "Cannot compute diff because " +
+                        reason +
+                        ". headSha=" +
+                        headSha +
+                        ", targetBranch=" +
+                        targetBranch +
+                        ", sourceBranch=" +
+                        sourceBranch +
+                        ", repoId=" +
+                        repositoryId
                 );
-                return;
             }
             String diffStat = gitDiffOperations.diffStat(repoPath, range[0], range[1]);
             String diff = gitDiffOperations.diff(repoPath, range[0], range[1]);

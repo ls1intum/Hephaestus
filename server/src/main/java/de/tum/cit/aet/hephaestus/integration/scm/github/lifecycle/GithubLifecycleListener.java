@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.RepositorySelection;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceLifecycleService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -52,8 +53,9 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>{@link #onInstanceInstalled} — parses installation id from
  *       {@link IntegrationRef#instanceKey()} and delegates to
  *       {@link #createOrUpdateFromInstallation(long, Long, String, AccountKind, String, RepositorySelection)}.</li>
- *   <li>{@link #onInstanceUninstalled} — marks the workspace {@code PURGED} (final state)
- *       after stopping its NATS scope consumer.</li>
+ *   <li>{@link #onInstanceUninstalled} — runs the full workspace purge via
+ *       {@link #purgeWorkspaceForInstallation}, which is the same
+ *       {@code WorkspaceLifecycleService#purgeWorkspace} chain an admin deletion runs.</li>
  *   <li>{@link #onScopeChanged} — logs delta sizes for audit (repository membership
  *       reconciliation runs in {@code WorkspaceProvisioningAdapter} which has the
  *       monitor-service dependency; pure SPI dispatch arrives here without that
@@ -91,6 +93,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
     private final GitHubAppTokenService gitHubAppTokenService;
     private final OrganizationService organizationService;
     private final ConnectionService connectionService;
+    private final WorkspaceLifecycleService workspaceLifecycleService;
 
     public GithubLifecycleListener(
         NatsConnectionProperties natsProperties,
@@ -104,7 +107,8 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
         GitHubAppTokenService gitHubAppTokenService,
         OrganizationService organizationService,
-        ConnectionService connectionService
+        ConnectionService connectionService,
+        WorkspaceLifecycleService workspaceLifecycleService
     ) {
         this.natsProperties = natsProperties;
         this.workspaceRepository = workspaceRepository;
@@ -118,6 +122,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         this.gitHubAppTokenService = gitHubAppTokenService;
         this.organizationService = organizationService;
         this.connectionService = connectionService;
+        this.workspaceLifecycleService = workspaceLifecycleService;
     }
 
     @Override
@@ -131,10 +136,9 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
      * SPI hook: bridge to {@link #createOrUpdateFromInstallation} by parsing the
      * installation id from {@link IntegrationRef#instanceKey()}.
      *
-     * <p>The {@code initialResources} list is intentionally ignored here: repository
-     * monitor creation lives in {@code WorkspaceProvisioningAdapter} which has the
-     * monitor-service dependency. SPI dispatch arrives without that context; the
-     * adapter path is the rich entry, this is the framework-symmetric one.
+     * <p>The {@code initialResources} list is ignored: repository monitor creation lives
+     * in {@code WorkspaceProvisioningAdapter}, which holds the monitor-service dependency
+     * that plain SPI dispatch doesn't carry.
      */
     @Override
     public void onInstanceInstalled(InstanceProvisioned event) {
@@ -156,9 +160,9 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
     }
 
     /**
-     * SPI hook: stop the NATS scope consumer and mark the workspace {@code PURGED}.
-     * Repository monitor cleanup is the adapter's responsibility (needs the monitor
-     * service); we own status + NATS lifecycle here.
+     * SPI hook: run the full workspace purge for a vendor-side uninstall.
+     * Delegates to {@link #purgeWorkspaceForInstallation(long)} — see there for why a bare
+     * status write is not an acceptable substitute.
      */
     @Override
     public void onInstanceUninstalled(IntegrationRef ref) {
@@ -167,8 +171,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             log.warn("GitHub onInstanceUninstalled: skipped, reason=invalidInstanceKey, ref={}", ref);
             return;
         }
-        stopNatsForInstallation(installationId);
-        updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.PURGED);
+        purgeWorkspaceForInstallation(installationId);
     }
 
     /**
@@ -256,25 +259,21 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         String avatarUrl,
         RepositorySelection repositorySelection
     ) {
-        // Check if installation is suspended BEFORE any reactivation logic.
-        // This prevents NATS replay of old "created" events from reactivating suspended workspaces
-        // and triggering hundreds of failed repository syncs.
+        // Check suspension before any reactivation logic: replayed NATS "created" events
+        // must not reactivate a suspended workspace and re-trigger failed repository syncs.
         if (gitHubAppTokenService.isInstallationMarkedSuspended(installationId)) {
             log.info("Skipped workspace reactivation: reason=installationSuspended, installationId={}", installationId);
             return null;
         }
 
-        // First check if an installation-backed workspace already exists for this
-        // installation ID
         Workspace workspace = workspaceRepository.findByInstallationId(installationId).orElse(null);
 
         if (workspace == null && !isBlank(accountLogin)) {
-            // Check if there's an existing workspace for this account
             Workspace existingByLogin = workspaceRepository.findByAccountLoginIgnoreCase(accountLogin).orElse(null);
 
-            // Refuse cross-vendor attach. A GitHub install for "HephaestusTest" must not
-            // co-tenant onto a workspace whose ACTIVE Connection is GITLAB/SLACK
-            // — they are separate tenants that happen to share the account-login string.
+            // Refuse cross-vendor attach: a GitHub install must not co-tenant onto a workspace
+            // whose ACTIVE Connection is GITLAB/SLACK — separate tenants that happen to share
+            // the account-login string.
             if (existingByLogin != null) {
                 boolean hasNonGithubActive =
                     connectionService.findActive(existingByLogin.getId(), IntegrationKind.GITLAB).isPresent() ||
@@ -345,8 +344,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             );
 
             if (ownerUserId == null) {
-                // Cannot sync the owner user - likely an old/deleted installation
-                // Log and return null to skip workspace creation
+                // Likely an old or deleted installation whose owner user can no longer be resolved.
                 log.warn(
                     "Skipped workspace creation, cannot sync owner user: installationId={}, accountLogin={}",
                     installationId,
@@ -363,10 +361,9 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
                 "install-" + installationId + "-" + accountLogin
             );
 
-            // We intentionally do NOT create a redirect from the desired slug to the
-            // allocated slug here, because the desired slug may already belong to
-            // another workspace. Redirecting would leak or hijack that workspace.
-            // Instead, callers must surface the allocated slug to the user.
+            // Do NOT redirect the desired slug to the allocated slug: the desired slug may
+            // belong to another workspace, and redirecting would leak or hijack it. Callers
+            // must surface the allocated slug to the user instead.
             workspace = createWorkspace(availableSlug, accountLogin, accountLogin, wsAccountType, ownerUserId);
             log.info(
                 "Created workspace from installation: workspaceSlug={}, installationId={}, ownerUserId={}, requestedSlug={}",
@@ -385,8 +382,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             workspace.setRepositorySelection(repositorySelection);
         }
 
-        // Reactivate workspace if it was previously purged or suspended
-        // This handles the case where an installation is deleted and then recreated
+        // Reactivating (was PURGED or SUSPENDED) covers an installation deleted and recreated.
         if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE) {
             log.info(
                 "Reactivated workspace from installation: workspaceId={}, previousStatus={}, installationId={}",
@@ -397,8 +393,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         }
 
-        // Create Organization entity BEFORE repositories are created
-        // This ensures repositories created during provisioning have organization_id set
+        // Organization must exist before repositories are created so they get organization_id set.
         if (accountKind == AccountKind.ORGANIZATION && accountId != null) {
             Long providerId = gitProviderRepository
                 .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
@@ -416,10 +411,9 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
 
         Workspace saved = workspaceRepository.save(workspace);
 
-        // Bind the GitHub App installation to this workspace via the Connection registry.
-        // upsertGitHubAppConnection retires any non-matching GITHUB connection on this
-        // workspace (PAT or stale App) and either re-uses or creates the new App row.
-        // Correlation id is stable per installation so webhook redelivery is idempotent.
+        // upsertGitHubAppConnection retires any non-matching GITHUB connection on this workspace
+        // (PAT or stale App) and reuses or creates the App row. Correlation id is stable per
+        // installation so webhook redelivery is idempotent.
         connectionService.upsertGitHubAppConnection(
             saved,
             installationId,
@@ -431,9 +425,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
     }
 
     /**
-     * Stop NATS consumer for a workspace tied to an installation.
-     * Used when an installation is deleted to clean up consumers before removing
-     * monitors.
+     * Used when an installation is deleted, to stop the NATS consumer before monitors are removed.
      *
      * @param installationId the GitHub App installation ID
      */
@@ -448,8 +440,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
     }
 
     /**
-     * Start NATS consumer for a workspace tied to an installation.
-     * Used when an installation is activated (unsuspended) to resume webhook processing.
+     * Used when an installation is unsuspended, to resume webhook processing.
      *
      * @param installationId the GitHub App installation ID
      */
@@ -464,14 +455,77 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
     }
 
     /**
+     * Vendor-side uninstall ({@code installation.deleted}) — runs the SAME purge an admin-initiated
+     * workspace deletion runs, via {@link WorkspaceLifecycleService#purgeWorkspace(String)}.
+     *
+     * <p><b>Why not a status write.</b> {@code PURGED} is a terminal, slug-burning state that the
+     * rest of the system reads as "this workspace's data is gone". Setting it without running the
+     * purge chain makes that a lie: none of the {@code WorkspacePurgeContributor} beans fire, so
+     * mirrored Slack messages, Outline documents, org-tier {@code team} /
+     * {@code organization_membership} rows, practices/activity derived rows and still-ACTIVE
+     * {@code Connection} rows all survive under a label that says they were erased. An org admin
+     * uninstalling the App on github.com is exactly the moment the lawful basis for holding that
+     * mirror ends, so it must erase at least as much as an admin disconnect does.
+     *
+     * <p><b>Idempotent.</b> {@code installation.deleted} can be redelivered; the delegate returns
+     * early on an already-{@code PURGED} workspace, and every step underneath is delete-if-present.
+     *
+     * <p><b>Scope.</b> {@code findByInstallationId} resolves through the {@code Connection} row
+     * ({@code kind=GITHUB, instance_key=installationId}) and is at-most-one by construction, so
+     * this purges exactly the workspace that installation backs — never a sibling tenant. Shared
+     * rows (repositories another workspace still monitors, the {@code Organization} identity) are
+     * protected by the orphan guards inside the purge chain, not by this method.
+     *
+     * <p><b>Transaction.</b> Callers on the webhook-consumer path already run inside the
+     * {@code TransactionTemplate} boundary opened by {@code AbstractIntegrationMessageHandler},
+     * which the delegate's {@code REQUIRED} propagation joins; the reconciliation path opens its
+     * own here. Tenancy needs no ambient workspace context — the purge chain's cross-tenant
+     * queries are the {@code @WorkspaceAgnostic} ones that open their own bypass scope.
+     *
+     * @param installationId the GitHub App installation ID
+     * @return the purged workspace, or empty if no workspace is bound to the installation
+     */
+    @Transactional
+    public Optional<Workspace> purgeWorkspaceForInstallation(long installationId) {
+        var workspaceOpt = workspaceRepository.findByInstallationId(installationId);
+        if (workspaceOpt.isEmpty()) {
+            log.warn(
+                "Skipped installation purge: reason=noWorkspaceForInstallation, installationId={}",
+                installationId
+            );
+            return Optional.empty();
+        }
+
+        Workspace purged = workspaceLifecycleService.purgeWorkspace(workspaceOpt.get().getWorkspaceSlug());
+        log.info(
+            "Purged workspace after vendor-side uninstall: installationId={}, workspaceId={}",
+            installationId,
+            purged.getId()
+        );
+        return Optional.of(purged);
+    }
+
+    /**
      * Update workspace status for a given installation if the status differs.
+     *
+     * <p>{@code PURGED} is rejected: it is not a status flip but a data-erasure operation, and
+     * routing it through here silently skipped every {@code WorkspacePurgeContributor}. Use
+     * {@link #purgeWorkspaceForInstallation(long)}.
      *
      * @param installationId the GitHub App installation ID
      * @param status         the new workspace status
      * @return the updated workspace, or empty if no workspace exists for the installation
+     * @throws IllegalArgumentException if {@code status} is {@code PURGED}
      */
     @Transactional
     public Optional<Workspace> updateWorkspaceStatus(long installationId, Workspace.WorkspaceStatus status) {
+        if (status == Workspace.WorkspaceStatus.PURGED) {
+            throw new IllegalArgumentException(
+                "PURGED must go through purgeWorkspaceForInstallation so the purge contributors run: installationId=" +
+                    installationId
+            );
+        }
+
         var workspaceOpt = workspaceRepository.findByInstallationId(installationId);
         if (workspaceOpt.isEmpty() || status == null) {
             return workspaceOpt;
@@ -545,9 +599,6 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
 
     // Private helpers
 
-    /**
-     * Retargets repository monitors from the old login prefix to the new login.
-     */
     private void retargetRepositoryMonitors(Workspace workspace, String oldLogin, String newLogin) {
         if (workspace == null || isBlank(oldLogin) || isBlank(newLogin) || oldLogin.equalsIgnoreCase(newLogin)) {
             return;
@@ -574,15 +625,11 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
                 repositoryToMonitorRepository.save(monitor);
             });
 
-        // Update the workspace consumer with new subjects after all renames
         if (shouldUseNats(workspace)) {
             natsConsumerService.ifAvailable(svc -> svc.updateScopeConsumer(workspace.getId()));
         }
     }
 
-    /**
-     * Renames tracked repositories from the old login prefix to the new login.
-     */
     private void renameTrackedRepositories(String oldLogin, String newLogin) {
         if (isBlank(oldLogin) || isBlank(newLogin) || oldLogin.equalsIgnoreCase(newLogin)) {
             return;
@@ -610,9 +657,6 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         repositoryRepository.saveAll(repositories);
     }
 
-    /**
-     * Rotates the NATS organization consumer after an account rename.
-     */
     private void rotateOrganizationConsumer(Workspace workspace, String oldLogin, String newLogin) {
         if (
             !natsProperties.enabled() ||
@@ -624,14 +668,9 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             return;
         }
 
-        // Update the workspace consumer - it will pick up the new org login from
-        // workspace
         natsConsumerService.ifAvailable(svc -> svc.updateScopeConsumer(workspace.getId()));
     }
 
-    /**
-     * Creates a new workspace with the given parameters.
-     */
     private Workspace createWorkspace(
         String slug,
         String displayName,
@@ -655,10 +694,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
     }
 
     /**
-     * Looks up or creates a user for workspace ownership assignment.
-     * <p>
-     * If the user doesn't exist in the database but we have account info from the
-     * installation webhook, we create the user entity directly.
+     * Looks up an existing user by login, or creates one from installation webhook account info.
      *
      * @param installationId the GitHub App installation ID
      * @param accountId      the GitHub account database ID
@@ -674,7 +710,6 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         AccountKind accountKind,
         String avatarUrl
     ) {
-        // First check if user already exists
         var existingUser = userRepository.findByLogin(accountLogin);
         if (existingUser.isPresent()) {
             log.info(
@@ -685,8 +720,8 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             return existingUser.get().getId();
         }
 
-        // If we have the account ID, upsert the user using the three-step
-        // approach (lock, free conflicts, insert) to avoid uk_user_login_lower violations.
+        // Three-step upsert (lock, free conflicts, insert) avoids uk_user_login_lower
+        // violations under concurrent installs.
         if (accountId != null) {
             String htmlUrl = "https://github.com/" + accountLogin;
             String typeStr =
@@ -718,8 +753,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
                 typeStr,
                 installationId
             );
-            // Retrieve the JPA-managed entity to get the auto-generated PK
-            // (upsertUser is a native SQL INSERT that doesn't return the generated id)
+            // upsertUser is a native INSERT that doesn't return the generated id; re-fetch for the PK.
             return userRepository
                 .findByLogin(accountLogin)
                 .map(User::getId)
@@ -734,16 +768,10 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         return null;
     }
 
-    /**
-     * Checks if NATS should be used for the given workspace.
-     */
     private boolean shouldUseNats(Workspace workspace) {
         return natsProperties.enabled() && workspace != null;
     }
 
-    /**
-     * Checks if a string is null or blank.
-     */
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
     }

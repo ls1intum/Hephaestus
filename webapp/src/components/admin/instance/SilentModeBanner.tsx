@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { VolumeX } from "lucide-react";
 import type { InstanceSettings } from "@/api/types.gen";
-import { relativeTime } from "@/components/admin/audit/auditFormat";
+import { RelativeTime } from "@/components/common/RelativeTime";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 
@@ -15,20 +15,22 @@ interface SilentModeBannerProps {
  * decides visibility; this renders the engaged state only.
  */
 export function SilentModeBanner({ settings }: SilentModeBannerProps) {
-	const engagedSince = settings.silentModeChangedAt
-		? relativeTime(settings.silentModeChangedAt)
-		: null;
 	return (
 		<Alert variant="destructive">
 			<VolumeX aria-hidden />
 			<AlertTitle>Silent mode is engaged — nothing is being delivered</AlertTitle>
 			<AlertDescription>
 				Hephaestus is not posting practice feedback or Slack messages anywhere on this instance.
-				{settings.silentModeChangedBy || engagedSince ? (
+				{settings.silentModeChangedBy || settings.silentModeChangedAt ? (
 					<>
 						{" Engaged"}
 						{settings.silentModeChangedBy ? ` by ${settings.silentModeChangedBy}` : ""}
-						{engagedSince ? ` ${engagedSince}` : ""}
+						{settings.silentModeChangedAt ? (
+							<>
+								{" "}
+								<RelativeTime value={settings.silentModeChangedAt} tooltip={false} />
+							</>
+						) : null}
 						{settings.silentModeReason ? ` — “${settings.silentModeReason}”` : ""}.
 					</>
 				) : null}

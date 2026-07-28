@@ -1,13 +1,19 @@
 package de.tum.cit.aet.hephaestus.core.settings;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
+import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.core.settings.spi.SilentModeQuery;
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Reads and updates the singleton {@link InstanceSettings} row. Unconditional bean (no runtime-role
@@ -21,9 +27,17 @@ public class InstanceSettingsService implements SilentModeQuery {
     private static final Logger log = LoggerFactory.getLogger(InstanceSettingsService.class);
 
     private final InstanceSettingsRepository repository;
+    private final AuthEventLogger authEventLogger;
+    private final ObjectMapper objectMapper;
 
-    InstanceSettingsService(InstanceSettingsRepository repository) {
+    InstanceSettingsService(
+        InstanceSettingsRepository repository,
+        AuthEventLogger authEventLogger,
+        ObjectMapper objectMapper
+    ) {
         this.repository = repository;
+        this.authEventLogger = authEventLogger;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional
@@ -73,6 +87,19 @@ public class InstanceSettingsService implements SilentModeQuery {
             actor,
             trimmedReason
         );
+        // On the auth_event trail (not config_audit_event, whose workspace_id is NOT NULL): this is an
+        // instance-level action. Logs alone are not a trail — an incident review needs to see who silenced
+        // the instance, when, and why, next to the sign-ins and role changes around it.
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("engaged", engaged);
+        if (trimmedReason != null) {
+            details.put("reason", trimmedReason);
+        }
+        authEventLogger
+            .event(AuthEvent.EventType.SILENT_MODE_CHANGED, AuthEvent.Result.SUCCESS)
+            .actingAccount(SecurityUtils.getCurrentAccountId().orElse(null))
+            .details(objectMapper.writeValueAsString(details))
+            .record();
         return settings;
     }
 }

@@ -39,14 +39,6 @@ import org.springframework.scheduling.annotation.EnableAsync;
  * The monitoringExecutor is replaced with a no-op to skip sync
  * operations entirely (which would otherwise cause transaction rollback issues).
  *
- * <p><b>Benefits:</b>
- * <ul>
- *   <li>Deterministic test execution - no race conditions</li>
- *   <li>Faster tests - no thread pool overhead for event listeners</li>
- *   <li>Complete stack traces for debugging</li>
- *   <li>No flaky tests due to timing issues</li>
- * </ul>
- *
  * @see org.springframework.scheduling.annotation.Async
  * @see org.springframework.core.task.SyncTaskExecutor
  */
@@ -57,11 +49,6 @@ public class TestAsyncConfiguration implements AsyncConfigurer {
 
     private final SyncAsyncTaskExecutor syncExecutor = new SyncAsyncTaskExecutor();
 
-    /**
-     * Configures the default executor for all @Async annotated methods.
-     * This returns our synchronous executor to ensure all async methods
-     * run in the calling thread during tests.
-     */
     @Override
     public Executor getAsyncExecutor() {
         return syncExecutor;
@@ -85,6 +72,11 @@ public class TestAsyncConfiguration implements AsyncConfigurer {
     @Bean(name = TaskExecutionAutoConfiguration.APPLICATION_TASK_EXECUTOR_BEAN_NAME)
     @Primary
     public AsyncTaskExecutor taskExecutor() {
+        return syncExecutor;
+    }
+
+    @Bean(name = "syncJobExecutor")
+    public AsyncTaskExecutor syncJobExecutor() {
         return syncExecutor;
     }
 

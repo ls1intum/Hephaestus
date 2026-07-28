@@ -2,10 +2,12 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.net.URI;
 import java.time.Instant;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
 
 @Schema(description = "Agent job execution record (job_token intentionally omitted)")
 public record AgentJobDTO(
@@ -14,10 +16,15 @@ public record AgentJobDTO(
     @NonNull @Schema(description = "Current job status") AgentJobStatus status,
     @Schema(description = "Job metadata (routing/display info)") Object metadata,
     @Schema(description = "Job output (agent results)") Object output,
-    @NonNull @Schema(description = "Frozen agent config at submit time") Object configSnapshot,
-    @Schema(description = "ID of the agent config that ran this job (from the frozen snapshot)") Long configId,
-    @Schema(description = "Name of the agent config that ran this job (from the frozen snapshot)") String configName,
-    @Schema(description = "Docker container ID") String containerId,
+    @NonNull
+    @Schema(
+        description = "Frozen agent config at submit time (an INSTANCE-scoped connection's baseUrl is redacted to scheme://host; only a WORKSPACE-scoped connection's baseUrl is left intact)"
+    )
+    Object configSnapshot,
+    @Schema(
+        description = "Upstream model this job was admitted on, frozen at submit time (e.g. gpt-5.4-mini). Available from submission, unlike llmModel, which the runner reports only once the job has run."
+    )
+    String model,
     @Schema(description = "Container exit code") Integer exitCode,
     @Schema(description = "Human-readable error message") String errorMessage,
     @Schema(
@@ -26,18 +33,35 @@ public record AgentJobDTO(
     DeliveryStatus deliveryStatus,
     @Schema(description = "Git provider comment/note ID for posted feedback") String deliveryCommentId,
     @NonNull @Schema(description = "Number of retry attempts") Integer retryCount,
+    @NonNull
+    @Schema(
+        description = "When this job becomes eligible to be claimed. In the future while the job is " +
+            "waiting — on a retry backoff, or on a hold. Read together with holdReason: a QUEUED job " +
+            "with availableAt in the future is waiting, not starved for workers."
+    )
+    Instant availableAt,
+    @Schema(
+        description = "Why a QUEUED job is waiting rather than eligible, when the reason is one an admin " +
+            "can undo. BUDGET = the payer is over its monthly LLM cap and the job resumes by itself once " +
+            "the cap is raised or the month rolls over. Absent means no such hold — a future availableAt " +
+            "is then an ordinary retry backoff."
+    )
+    String holdReason,
     @NonNull @Schema(description = "Timestamp when the job was created") Instant createdAt,
     @Schema(description = "Timestamp when the job started running") Instant startedAt,
     @Schema(description = "Timestamp when the job completed") Instant completedAt,
-    @Schema(description = "LLM model used (e.g. gpt-5.4-mini, claude-sonnet-4-5)") String llmModel,
-    @Schema(description = "Model version/snapshot date (e.g. 2026-03-17)") String llmModelVersion,
+    @Schema(description = "LLM model used (e.g. gpt-5.4-mini, openai/gpt-oss-120b)") String llmModel,
+    @Schema(
+        description = "Model version/snapshot date (e.g. 2026-03-17). Only jobs from before the model catalog " +
+            "carry one; absent on everything newer."
+    )
+    String llmModelVersion,
     @Schema(description = "Total LLM API calls (steps) during execution") Integer llmTotalCalls,
     @Schema(description = "Total input tokens consumed") Integer llmTotalInputTokens,
     @Schema(description = "Total output tokens generated") Integer llmTotalOutputTokens,
     @Schema(description = "Total reasoning/thinking tokens") Integer llmTotalReasoningTokens,
     @Schema(description = "Tokens read from prompt cache") Integer llmCacheReadTokens,
-    @Schema(description = "Tokens written to prompt cache") Integer llmCacheWriteTokens,
-    @Schema(description = "Estimated cost in USD (agent-reported)") Double llmCostUsd
+    @Schema(description = "Tokens written to prompt cache") Integer llmCacheWriteTokens
 ) {
     public static AgentJobDTO from(AgentJob job) {
         JsonNode snapshot = job.getConfigSnapshot();
@@ -47,15 +71,15 @@ public record AgentJobDTO(
             job.getStatus(),
             job.getMetadata(),
             job.getOutput(),
-            snapshot,
-            snapshotLong(snapshot, "configId"),
-            snapshotString(snapshot, "configName"),
-            job.getContainerId(),
+            redactInstanceBaseUrl(snapshot),
+            snapshotString(snapshot, "upstreamModelId"),
             job.getExitCode(),
             job.getErrorMessage(),
             job.getDeliveryStatus(),
             job.getDeliveryCommentId(),
             job.getRetryCount(),
+            job.getAvailableAt(),
+            job.getHoldReason(),
             job.getCreatedAt(),
             job.getStartedAt(),
             job.getCompletedAt(),
@@ -66,16 +90,40 @@ public record AgentJobDTO(
             job.getLlmTotalOutputTokens(),
             job.getLlmTotalReasoningTokens(),
             job.getLlmCacheReadTokens(),
-            job.getLlmCacheWriteTokens(),
-            job.getLlmCostUsd()
+            job.getLlmCacheWriteTokens()
         );
     }
 
-    private static Long snapshotLong(JsonNode snapshot, String field) {
-        if (snapshot == null || !snapshot.has(field) || snapshot.get(field).isNull()) {
-            return null;
+    /**
+     * The audience here is a workspace admin, who may see the full {@code baseUrl} only of a
+     * {@code WORKSPACE}-scoped connection they configured themselves. Anything else — an INSTANCE
+     * connection, or a scope-less snapshot from a rolling upgrade — is cut back to {@code scheme://host}
+     * so an operator's gateway or deployment path cannot leak.
+     */
+    private static Object redactInstanceBaseUrl(JsonNode snapshot) {
+        if (!(snapshot instanceof ObjectNode obj) || !obj.has("baseUrl")) {
+            return snapshot;
         }
-        return snapshot.get(field).asLong();
+        if ("WORKSPACE".equals(snapshotString(snapshot, "connectionScope"))) {
+            return snapshot;
+        }
+        ObjectNode redacted = obj.deepCopy();
+        redacted.put("baseUrl", hostOnly(obj.path("baseUrl").asString(null)));
+        return redacted;
+    }
+
+    private static String hostOnly(String baseUrl) {
+        if (baseUrl == null || baseUrl.isBlank()) {
+            return baseUrl;
+        }
+        try {
+            URI uri = URI.create(baseUrl);
+            String scheme = uri.getScheme();
+            String host = uri.getHost();
+            return scheme != null && host != null ? scheme + "://" + host : "(redacted)";
+        } catch (IllegalArgumentException e) {
+            return "(redacted)";
+        }
     }
 
     private static String snapshotString(JsonNode snapshot, String field) {

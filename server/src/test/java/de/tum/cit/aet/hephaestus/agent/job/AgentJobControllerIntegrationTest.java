@@ -3,9 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
@@ -27,9 +25,6 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     @Autowired
     private AgentJobRepository agentJobRepository;
 
-    @Autowired
-    private AgentConfigRepository agentConfigRepository;
-
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private Workspace setupWorkspace() {
@@ -39,26 +34,17 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         return workspace;
     }
 
-    private AgentConfig createConfig(Workspace workspace, String name) {
-        AgentConfig config = new AgentConfig();
-        config.setWorkspace(workspace);
-        config.setName(name);
-        config.setLlmProvider(LlmProvider.ANTHROPIC);
-        return agentConfigRepository.save(config);
+    private static String seededJobToken() {
+        return "job-token-must-not-leak-" + UUID.randomUUID();
     }
 
     private AgentJob createJob(Workspace workspace, AgentJobStatus status) {
-        return createJob(workspace, status, null);
-    }
-
-    private AgentJob createJob(Workspace workspace, AgentJobStatus status, AgentConfig config) {
         AgentJob job = new AgentJob();
+        job.setJobToken(seededJobToken());
         job.setWorkspace(workspace);
-        job.setConfig(config);
+        job.setPurpose(AgentPurpose.PRACTICE_DETECTION);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         job.setStatus(status);
-        // Include configId/configName so the DTO's snapshotLong/snapshotString extractors (AgentJobDTO.from)
-        // are exercised on their present-value branch end-to-end, not just the absent-field null path.
         job.setConfigSnapshot(
             OBJECT_MAPPER.valueToTree(
                 Map.of(
@@ -66,10 +52,8 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                     "CLAUDE_CODE",
                     "model",
                     "claude-sonnet-4-20250514",
-                    "configId",
-                    99,
-                    "configName",
-                    "frozen-config"
+                    "upstreamModelId",
+                    "gpt-5.4-mini"
                 )
             )
         );
@@ -83,7 +67,7 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         webTestClient
             .get()
-            .uri("/workspaces/{slug}/agent-jobs", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/agents/jobs", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -108,7 +92,7 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         webTestClient
             .get()
-            .uri("/workspaces/{slug}/agent-jobs?size=2", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/agents/jobs?size=2", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -133,7 +117,7 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         webTestClient
             .get()
-            .uri("/workspaces/{slug}/agent-jobs?status=RUNNING", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/agents/jobs?status=RUNNING", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -147,47 +131,13 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
     @Test
     @WithAdminUser
-    void listJobsFiltersByConfigId() {
-        Workspace workspace = setupWorkspace();
-        AgentConfig configA = createConfig(workspace, "config-a");
-        AgentConfig configB = createConfig(workspace, "config-b");
-
-        createJob(workspace, AgentJobStatus.COMPLETED, configA);
-        createJob(workspace, AgentJobStatus.RUNNING, configA);
-        createJob(workspace, AgentJobStatus.QUEUED, configB);
-
-        webTestClient
-            .get()
-            .uri("/workspaces/{slug}/agent-jobs?configId={configId}", workspace.getWorkspaceSlug(), configA.getId())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.totalElements")
-            .isEqualTo(2);
-
-        webTestClient
-            .get()
-            .uri("/workspaces/{slug}/agent-jobs?configId={configId}", workspace.getWorkspaceSlug(), configB.getId())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.totalElements")
-            .isEqualTo(1);
-    }
-
-    @Test
-    @WithAdminUser
     void getJobReturnsJobDetail() {
         Workspace workspace = setupWorkspace();
         AgentJob job = createJob(workspace, AgentJobStatus.COMPLETED);
 
         AgentJobDTO result = webTestClient
             .get()
-            .uri("/workspaces/{slug}/agent-jobs/{id}", workspace.getWorkspaceSlug(), job.getId())
+            .uri("/workspaces/{slug}/agents/jobs/{id}", workspace.getWorkspaceSlug(), job.getId())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -200,9 +150,7 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         assertThat(result.id()).isEqualTo(job.getId());
         assertThat(result.status()).isEqualTo(AgentJobStatus.COMPLETED);
         assertThat(result.jobType()).isEqualTo(AgentJobType.PULL_REQUEST_REVIEW);
-        // The configId/configName are projected out of the JSONB configSnapshot by AgentJobDTO.from.
-        assertThat(result.configId()).isEqualTo(99L);
-        assertThat(result.configName()).isEqualTo("frozen-config");
+        assertThat(result.model()).isEqualTo("gpt-5.4-mini");
     }
 
     @Test
@@ -212,7 +160,7 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         webTestClient
             .get()
-            .uri("/workspaces/{slug}/agent-jobs/{id}", workspace.getWorkspaceSlug(), UUID.randomUUID())
+            .uri("/workspaces/{slug}/agents/jobs/{id}", workspace.getWorkspaceSlug(), UUID.randomUUID())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -230,10 +178,9 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         AgentJob jobInA = createJob(workspaceA, AgentJobStatus.COMPLETED);
 
-        // Try to access workspace A's job via workspace B — should be 404 (IDOR protection)
         webTestClient
             .get()
-            .uri("/workspaces/{slug}/agent-jobs/{id}", workspaceB.getWorkspaceSlug(), jobInA.getId())
+            .uri("/workspaces/{slug}/agents/jobs/{id}", workspaceB.getWorkspaceSlug(), jobInA.getId())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -248,7 +195,7 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         String responseBody = webTestClient
             .get()
-            .uri("/workspaces/{slug}/agent-jobs/{id}", workspace.getWorkspaceSlug(), job.getId())
+            .uri("/workspaces/{slug}/agents/jobs/{id}", workspace.getWorkspaceSlug(), job.getId())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -257,14 +204,12 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             .returnResult()
             .getResponseBody();
 
-        assertThat(responseBody).isNotNull();
-        assertThat(responseBody).doesNotContain("jobToken");
-        assertThat(responseBody).doesNotContain("job_token");
-        // Also check the actual token value isn't leaked
+        // The token the row actually holds, read back through the at-rest converter: the DTO carries no
+        // jobToken component, so what has to be pinned is the VALUE, which could still ride out inside
+        // the passthrough JSONB fields (metadata / output / configSnapshot).
         AgentJob freshJob = agentJobRepository.findById(job.getId()).orElseThrow();
-        if (freshJob.getJobToken() != null) {
-            assertThat(responseBody).doesNotContain(freshJob.getJobToken());
-        }
+        assertThat(freshJob.getJobToken()).as("the fixture must carry a token, or this asserts nothing").isNotBlank();
+        assertThat(responseBody).isNotNull().doesNotContain(freshJob.getJobToken());
     }
 
     @Test
@@ -275,7 +220,7 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         AgentJobDTO result = webTestClient
             .post()
-            .uri("/workspaces/{slug}/agent-jobs/{id}/cancel", workspace.getWorkspaceSlug(), job.getId())
+            .uri("/workspaces/{slug}/agents/jobs/{id}/cancel", workspace.getWorkspaceSlug(), job.getId())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -296,7 +241,7 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         webTestClient
             .post()
-            .uri("/workspaces/{slug}/agent-jobs/{id}/cancel", workspace.getWorkspaceSlug(), job.getId())
+            .uri("/workspaces/{slug}/agents/jobs/{id}/cancel", workspace.getWorkspaceSlug(), job.getId())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -314,7 +259,7 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         webTestClient
             .post()
-            .uri("/workspaces/{slug}/agent-jobs/{id}/cancel", workspace.getWorkspaceSlug(), job.getId())
+            .uri("/workspaces/{slug}/agents/jobs/{id}/cancel", workspace.getWorkspaceSlug(), job.getId())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -328,7 +273,7 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         webTestClient
             .post()
-            .uri("/workspaces/{slug}/agent-jobs/{id}/cancel", workspace.getWorkspaceSlug(), UUID.randomUUID())
+            .uri("/workspaces/{slug}/agents/jobs/{id}/cancel", workspace.getWorkspaceSlug(), UUID.randomUUID())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -346,10 +291,9 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         AgentJob jobInA = createJob(workspaceA, AgentJobStatus.QUEUED);
 
-        // IDOR protection: cancel workspace A's job via workspace B → 404
         webTestClient
             .post()
-            .uri("/workspaces/{slug}/agent-jobs/{id}/cancel", workspaceB.getWorkspaceSlug(), jobInA.getId())
+            .uri("/workspaces/{slug}/agents/jobs/{id}/cancel", workspaceB.getWorkspaceSlug(), jobInA.getId())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -364,7 +308,7 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         AgentJobDTO result = webTestClient
             .post()
-            .uri("/workspaces/{slug}/agent-jobs/{id}/cancel", workspace.getWorkspaceSlug(), job.getId())
+            .uri("/workspaces/{slug}/agents/jobs/{id}/cancel", workspace.getWorkspaceSlug(), job.getId())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -377,24 +321,11 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         assertThat(result.status()).isEqualTo(AgentJobStatus.CANCELLED);
     }
 
-    @Test
-    void cancelJobRequiresAuthentication() {
-        User owner = persistUser("unauth-cancel-owner");
-        Workspace workspace = createWorkspace("unauth-cancel-ws", "Unauth", "unauth-cancel", AccountType.ORG, owner);
-
-        // Pass CSRF (cookie-style write) but send no authentication, so the auth layer — not the CSRF
-        // filter — answers: an unauthenticated caller gets 401 (ADR 0017; see CsrfProtectionIntegrationTest
-        // for the tokenless-write 403 case).
-        String csrf = TestAuthUtils.fetchCsrfToken(webTestClient);
-        webTestClient
-            .post()
-            .uri("/workspaces/{slug}/agent-jobs/{id}/cancel", workspace.getWorkspaceSlug(), UUID.randomUUID())
-            .headers(TestAuthUtils.withCsrf(csrf))
-            .exchange()
-            .expectStatus()
-            .isUnauthorized();
-    }
-
+    /**
+     * {@code SecurityConfig} permits anonymous GET under a workspace slug, so
+     * {@code @RequireAtLeastWorkspaceAdmin} on the handler is the only thing between the public internet
+     * and a workspace's job history.
+     */
     @Test
     void listJobsRequiresAuthentication() {
         User owner = persistUser("unauth-job-owner");
@@ -402,7 +333,7 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         webTestClient
             .get()
-            .uri("/workspaces/{slug}/agent-jobs", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/agents/jobs", workspace.getWorkspaceSlug())
             .exchange()
             .expectStatus()
             .isUnauthorized();

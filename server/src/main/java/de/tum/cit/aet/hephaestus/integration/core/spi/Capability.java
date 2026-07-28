@@ -6,8 +6,7 @@ package de.tum.cit.aet.hephaestus.integration.core.spi;
  * capability binds to a specific bean-wiring requirement enforced at startup by
  * {@code IntegrationFrameworkBootstrap}.
  *
- * <p>This enum is intentionally narrow: every value is satisfied by code that ships
- * today. New capabilities re-add once their SPI lands.
+ * <p>This enum is intentionally narrow: every value is backed by a shipped SPI.
  */
 public enum Capability {
     /** Receives HTTP webhook events. */

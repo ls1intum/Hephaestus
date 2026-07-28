@@ -18,11 +18,17 @@ import type {
 import { LoginProviderFormDialog } from "@/components/admin/login-providers/LoginProviderFormDialog";
 import { LoginProvidersTable } from "@/components/admin/login-providers/LoginProvidersTable";
 import { Button } from "@/components/ui/button";
+import { filedUnder, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
+import { instanceAdminHead } from "@/lib/page-title";
 import { problemDetailOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute("/_authenticated/admin/login-providers")({
+	head: instanceAdminHead("Login providers"),
 	component: AdminLoginProvidersPage,
 });
+
+/** One prefix for toggle and delete, so one lookup covers both. Creation has no row to disable. */
+const PROVIDER_WRITE_MUTATION_KEY = ["adminWriteLoginProvider"];
 
 function AdminLoginProvidersPage() {
 	const queryClient = useQueryClient();
@@ -31,7 +37,6 @@ function AdminLoginProvidersPage() {
 
 	const [dialogOpen, setDialogOpen] = useState(false);
 	const [editing, setEditing] = useState<LoginProviderView | null>(null);
-	const [mutatingId, setMutatingId] = useState<string | null>(null);
 
 	const invalidate = () =>
 		queryClient.invalidateQueries({ queryKey: adminListLoginProvidersQueryKey() });
@@ -47,25 +52,28 @@ function AdminLoginProvidersPage() {
 	});
 
 	const updateMutation = useMutation({
-		...adminUpdateLoginProviderMutation(),
+		...filedUnder(PROVIDER_WRITE_MUTATION_KEY, adminUpdateLoginProviderMutation()),
 		onSuccess: () => {
 			invalidate();
 			setDialogOpen(false);
 			toast.success("Login provider updated");
 		},
 		onError: (error) => toast.error(problemDetailOf(error, "Could not update the login provider")),
-		onSettled: () => setMutatingId(null),
 	});
 
 	const deleteMutation = useMutation({
-		...adminDeleteLoginProviderMutation(),
+		...filedUnder(PROVIDER_WRITE_MUTATION_KEY, adminDeleteLoginProviderMutation()),
 		onSuccess: () => {
 			invalidate();
 			toast.success("Login provider deleted");
 		},
 		onError: (error) => toast.error(problemDetailOf(error, "Could not delete the login provider")),
-		onSettled: () => setMutatingId(null),
 	});
+
+	const mutatingIds = usePendingMutationIds<{ path: { registrationId: string } }, string>(
+		PROVIDER_WRITE_MUTATION_KEY,
+		(variables) => variables.path.registrationId,
+	);
 
 	const openCreate = () => {
 		setEditing(null);
@@ -78,15 +86,12 @@ function AdminLoginProvidersPage() {
 
 	const handleCreate = (body: CreateLoginProviderRequest) => createMutation.mutate({ body });
 	const handleUpdate = (registrationId: string, body: UpdateLoginProviderRequest) => {
-		setMutatingId(registrationId);
 		updateMutation.mutate({ path: { registrationId }, body });
 	};
 	const handleToggleEnabled = (provider: LoginProviderView, enabled: boolean) => {
-		setMutatingId(provider.registrationId);
 		updateMutation.mutate({ path: { registrationId: provider.registrationId }, body: { enabled } });
 	};
 	const handleDelete = (provider: LoginProviderView) => {
-		setMutatingId(provider.registrationId);
 		deleteMutation.mutate({ path: { registrationId: provider.registrationId } });
 	};
 
@@ -116,7 +121,7 @@ function AdminLoginProvidersPage() {
 				isError={listQuery.isError}
 				error={listQuery.error}
 				onRetry={() => listQuery.refetch()}
-				mutatingId={mutatingId}
+				mutatingIds={mutatingIds}
 				onEdit={openEdit}
 				onToggleEnabled={handleToggleEnabled}
 				onDelete={handleDelete}

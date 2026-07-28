@@ -1,16 +1,12 @@
-import { formatDistanceToNow } from "date-fns";
 import { AlertCircle, Bot, ChevronRight } from "lucide-react";
-import type { AgentConfig, AgentJob } from "@/api/types.gen";
+import { useId } from "react";
+import type { AgentJob } from "@/api/types.gen";
+import { RelativeTime } from "@/components/common/RelativeTime";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-	Empty,
-	EmptyDescription,
-	EmptyHeader,
-	EmptyMedia,
-	EmptyTitle,
-} from "@/components/ui/empty";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Field, FieldLabel } from "@/components/ui/field";
 import {
 	Select,
 	SelectContent,
@@ -22,33 +18,33 @@ import { Spinner } from "@/components/ui/spinner";
 import {
 	Table,
 	TableBody,
+	TableCaption,
 	TableCell,
 	TableHead,
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import {
-	configLabel,
 	DELIVERY_STATUS_LABELS,
 	deliveryBadgeVariant,
-	formatCostUsd,
 	formatTokens,
+	holdReasonCopy,
 	type JobStatus,
+	jobWait,
+	modelLabel,
 	STATUS_LABELS,
 	statusBadgeVariant,
-} from "./jobUtils";
+} from "./job-utils";
 
 const FILTER_ALL = "ALL";
 
 export interface AgentJobsTableProps {
 	jobs: AgentJob[];
-	configs: AgentConfig[];
 	isLoading: boolean;
 	isError?: boolean;
 	statusFilter: JobStatus | "ALL";
-	configFilter: number | "ALL";
 	onStatusFilterChange: (status: JobStatus | "ALL") => void;
-	onConfigFilterChange: (configId: number | "ALL") => void;
 	onSelectJob: (job: AgentJob) => void;
 	onRetry?: () => void;
 }
@@ -69,26 +65,27 @@ const STATUS_ITEMS = [
 
 export function AgentJobsTable({
 	jobs,
-	configs,
 	isLoading,
 	isError = false,
 	statusFilter,
-	configFilter,
 	onStatusFilterChange,
-	onConfigFilterChange,
 	onSelectJob,
 	onRetry,
 }: AgentJobsTableProps) {
-	const runtimeItems = [
-		{ value: FILTER_ALL, label: "All models" },
-		...configs.map((c) => ({ value: String(c.id), label: c.name })),
-	];
-
+	const statusFilterId = useId();
 	return (
 		<div className="space-y-4">
 			<div className="flex flex-wrap items-center gap-3">
-				<div className="flex items-center gap-2 text-sm">
-					<span className="text-muted-foreground">Status</span>
+				{/* The visible "Status" text *is* the control's label, so the accessible name can never
+				    drift from what a speech-control user reads out loud (WCAG SC 2.5.3). */}
+				{/* `w-40` is 10rem, which under SC 1.4.4 text-only zoom at 200 % becomes 320 px — the
+				    entire reflow viewport, leaving no room for the label beside it. `max-w-full` caps the
+				    control against the row and `flex-wrap` lets it drop below its label instead of
+				    overflowing once the two no longer fit side by side. */}
+				<Field orientation="horizontal" className="w-auto max-w-full flex-wrap text-sm">
+					<FieldLabel htmlFor={statusFilterId} className="text-muted-foreground">
+						Status
+					</FieldLabel>
 					<Select
 						items={STATUS_ITEMS}
 						value={statusFilter}
@@ -96,7 +93,7 @@ export function AgentJobsTable({
 							onStatusFilterChange(value === FILTER_ALL ? "ALL" : (value as JobStatus))
 						}
 					>
-						<SelectTrigger size="sm" className="w-40" aria-label="Filter by status">
+						<SelectTrigger id={statusFilterId} size="sm" className="w-40 max-w-full">
 							<SelectValue />
 						</SelectTrigger>
 						<SelectContent>
@@ -108,38 +105,15 @@ export function AgentJobsTable({
 							))}
 						</SelectContent>
 					</Select>
-				</div>
-
-				<div className="flex items-center gap-2 text-sm">
-					<span className="text-muted-foreground">Model</span>
-					<Select
-						items={runtimeItems}
-						value={configFilter === "ALL" ? FILTER_ALL : String(configFilter)}
-						onValueChange={(value) =>
-							onConfigFilterChange(value === FILTER_ALL ? "ALL" : Number(value))
-						}
-					>
-						<SelectTrigger size="sm" className="w-44" aria-label="Filter by model">
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value={FILTER_ALL}>All models</SelectItem>
-							{configs.map((c) => (
-								<SelectItem key={c.id} value={String(c.id)}>
-									{c.name}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-				</div>
+				</Field>
 			</div>
 
 			{isError ? (
 				<Alert variant="destructive">
 					<AlertCircle />
-					<AlertTitle>Failed to load jobs</AlertTitle>
+					<AlertTitle>Couldn't load runs</AlertTitle>
 					<AlertDescription>
-						<p>The agent jobs could not be loaded.</p>
+						<p>Something went wrong on the way. Try again in a moment.</p>
 						{onRetry && (
 							<Button variant="outline" size="sm" className="mt-2" onClick={onRetry}>
 								Retry
@@ -149,79 +123,111 @@ export function AgentJobsTable({
 				</Alert>
 			) : isLoading ? (
 				<div className="flex h-40 items-center justify-center">
-					<Spinner className="h-6 w-6" />
+					<Spinner className="size-6" />
 				</div>
 			) : jobs.length === 0 ? (
-				<Empty className="border border-dashed">
+				<Empty className="border">
 					<EmptyHeader>
 						<EmptyMedia variant="icon">
 							<Bot />
 						</EmptyMedia>
-						<EmptyTitle>No reviews yet</EmptyTitle>
-						<EmptyDescription>Reviews appear here once a practice review runs.</EmptyDescription>
+						<EmptyTitle>No runs yet</EmptyTitle>
 					</EmptyHeader>
 				</Empty>
 			) : (
-				<Table>
+				// Seven nowrap columns cannot reflow to 320 px, so this table takes the SC 1.4.10 data
+				// exception: it scrolls inside its own bordered container while the page around it does not.
+				<Table containerClassName="rounded-md border">
+					<TableCaption className="sr-only">AI runs for this workspace, newest first</TableCaption>
 					<TableHeader>
 						<TableRow>
-							<TableHead>Status</TableHead>
-							<TableHead>Model</TableHead>
-							<TableHead>Model name</TableHead>
-							<TableHead>Created</TableHead>
-							<TableHead>Delivery</TableHead>
-							<TableHead className="text-right">Usage</TableHead>
-							<TableHead className="text-right">Details</TableHead>
+							<TableHead scope="col">Status</TableHead>
+							<TableHead scope="col">Model</TableHead>
+							<TableHead scope="col">Model name</TableHead>
+							<TableHead scope="col">Created</TableHead>
+							<TableHead scope="col">Delivery</TableHead>
+							<TableHead scope="col" className="text-right">
+								Usage
+							</TableHead>
+							<TableHead scope="col" className="text-right">
+								Details
+							</TableHead>
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{jobs.map((job) => (
-							<TableRow key={job.id} className="cursor-pointer" onClick={() => onSelectJob(job)}>
-								<TableCell>
-									<Badge variant={statusBadgeVariant(job.status)}>
-										{STATUS_LABELS[job.status]}
-									</Badge>
-								</TableCell>
-								<TableCell className="max-w-40 truncate">{configLabel(job)}</TableCell>
-								<TableCell className="text-muted-foreground">
-									{job.llmModel ?? job.llmModelVersion ?? "—"}
-								</TableCell>
-								<TableCell className="text-muted-foreground">
-									{formatDistanceToNow(new Date(job.createdAt), { addSuffix: true })}
-								</TableCell>
-								<TableCell>
-									{job.deliveryStatus ? (
-										<Badge variant={deliveryBadgeVariant(job.deliveryStatus)}>
-											{DELIVERY_STATUS_LABELS[job.deliveryStatus]}
+						{jobs.map((job) => {
+							const wait = jobWait(job);
+							return (
+								<TableRow key={job.id}>
+									<TableCell>
+										{/* A hold is a sub-state of QUEUED, not a peer of it, so it qualifies the status
+										    badge from underneath instead of standing beside it as a second badge. The
+										    server's `JobStatus` is what the filter above sends, and a "Held" badge would
+										    advertise a value that filter cannot ask for. */}
+										<Badge variant={statusBadgeVariant(job.status)}>
+											{STATUS_LABELS[job.status]}
 										</Badge>
-									) : (
-										<span className="text-muted-foreground">—</span>
-									)}
-								</TableCell>
-								<TableCell className="text-right text-muted-foreground">
-									<span className="tabular-nums">
-										{formatTokens(job.llmTotalInputTokens)} /{" "}
-										{formatTokens(job.llmTotalOutputTokens)}
-									</span>
-									<span className="ml-2">{formatCostUsd(job.llmCostUsd)}</span>
-								</TableCell>
-								<TableCell className="text-right">
-									<div className="flex justify-end">
-										<Button
-											variant="ghost"
-											size="icon-sm"
-											aria-label={`View job ${job.id} details`}
-											onClick={(e) => {
-												e.stopPropagation();
-												onSelectJob(job);
-											}}
-										>
-											<ChevronRight className="h-4 w-4" />
-										</Button>
-									</div>
-								</TableCell>
-							</TableRow>
-						))}
+										{wait && (
+											<div
+												className={cn(
+													"mt-1 max-w-56 text-xs",
+													// A hold needs someone to lift it; a backoff clears itself, so it stays
+													// muted. Neither is destructive — the run is waiting, not broken.
+													wait.kind === "hold" ? "text-warning" : "text-muted-foreground",
+												)}
+											>
+												{wait.kind === "hold"
+													? `Held · ${holdReasonCopy(wait.reason).label} · due `
+													: "Backing off · due "}
+												{/* Same reason as the Created cell: a tooltip trigger is a button, and one
+												    per row would sit between every row and its Details action. */}
+												<RelativeTime value={job.availableAt} tooltip={false} />
+											</div>
+										)}
+									</TableCell>
+									<TableCell className="max-w-40 truncate">{modelLabel(job)}</TableCell>
+									<TableCell className="text-muted-foreground">
+										{job.llmModel ?? job.llmModelVersion ?? "—"}
+									</TableCell>
+									<TableCell className="text-muted-foreground">
+										{/* No tooltip: its trigger is a button, and one per row would put a tab stop
+										    between every row and its Details action. */}
+										<RelativeTime value={job.createdAt} tooltip={false} />
+									</TableCell>
+									<TableCell>
+										{job.deliveryStatus ? (
+											<Badge variant={deliveryBadgeVariant(job.deliveryStatus)}>
+												{DELIVERY_STATUS_LABELS[job.deliveryStatus]}
+											</Badge>
+										) : (
+											<span className="text-muted-foreground">—</span>
+										)}
+									</TableCell>
+									<TableCell className="text-right text-muted-foreground">
+										<span className="tabular-nums">
+											{formatTokens(job.llmTotalInputTokens)} /{" "}
+											{formatTokens(job.llmTotalOutputTokens)}
+										</span>
+									</TableCell>
+									<TableCell className="text-right">
+										{/* The button is the only affordance: a click handler on the row itself is
+										    unreachable by keyboard and invisible to assistive tech. */}
+										<div className="flex justify-end">
+											<Button
+												variant="ghost"
+												size="icon-sm"
+												// Never the relative phrase: an accessible name would go stale the moment the
+												// shared clock ticked past it.
+												aria-label={`View details for the ${STATUS_LABELS[job.status].toLowerCase()} ${modelLabel(job)} run`}
+												onClick={() => onSelectJob(job)}
+											>
+												<ChevronRight className="size-4" />
+											</Button>
+										</div>
+									</TableCell>
+								</TableRow>
+							);
+						})}
 					</TableBody>
 				</Table>
 			)}

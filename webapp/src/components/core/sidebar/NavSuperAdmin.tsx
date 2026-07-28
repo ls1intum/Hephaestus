@@ -1,13 +1,16 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import {
+	BrainCircuit,
 	Building2,
 	ChevronLeft,
+	CircleDollarSign,
 	Gauge,
 	KeyRound,
 	ScrollText,
 	Settings2,
 	Users,
 } from "lucide-react";
+import { ADMIN_NAV_LABELS } from "@/components/core/sidebar/admin-nav-labels";
 import {
 	SidebarGroup,
 	SidebarGroupLabel,
@@ -23,8 +26,8 @@ import {
  * so an admin can reach it even with zero workspaces. Distinct from `NavAdmin`, the per-workspace
  * admin nav — the instance and workspace levels are never interleaved.
  *
- * Grouped (#1386). A "Detection" group (catalog, labeling, evaluation) joins once #1361/#1365 land —
- * add a new entry to `ADMIN_NAV_GROUPS`.
+ * Grouped (#1386) so the surfaces the 1.0 backlog keeps adding have a home: a "Detection" group
+ * (catalog, labeling, evaluation) joins once #1361/#1365 land — add a new entry here.
  */
 const ADMIN_NAV_GROUPS = [
 	{
@@ -41,9 +44,31 @@ const ADMIN_NAV_GROUPS = [
 		],
 	},
 	{
+		label: "AI",
+		items: [
+			{
+				to: "/admin/models",
+				label: ADMIN_NAV_LABELS.models,
+				icon: BrainCircuit,
+				tooltip: "Providers and shared models",
+			},
+			{
+				to: "/admin/usage",
+				label: ADMIN_NAV_LABELS.usage,
+				icon: CircleDollarSign,
+				tooltip: "AI spend and budget caps",
+			},
+		],
+	},
+	{
 		label: "Operations",
 		items: [
-			{ to: "/admin/audit", label: "Audit log", icon: ScrollText, tooltip: "Auth audit events" },
+			{
+				to: "/admin/audit",
+				label: ADMIN_NAV_LABELS.audit,
+				icon: ScrollText,
+				tooltip: "Who did what, and when",
+			},
 			{
 				to: "/admin/settings",
 				label: "Instance settings",

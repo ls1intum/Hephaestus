@@ -65,19 +65,22 @@ public class GitHubGraphQlClientProvider {
     private final GitHubAppTokenService appTokens;
     private final CircuitBreaker circuitBreaker;
     private final RateLimitTracker rateLimitTracker;
+    private final GitHubRestRateLimitSeeder rateLimitSeeder;
 
     public GitHubGraphQlClientProvider(
         HttpGraphQlClient gitHubGraphQlClient,
         InstallationTokenProvider tokenProvider,
         GitHubAppTokenService appTokens,
         @Qualifier("githubGraphQlCircuitBreaker") CircuitBreaker circuitBreaker,
-        RateLimitTracker rateLimitTracker
+        RateLimitTracker rateLimitTracker,
+        GitHubRestRateLimitSeeder rateLimitSeeder
     ) {
         this.baseClient = gitHubGraphQlClient;
         this.tokenProvider = tokenProvider;
         this.appTokens = appTokens;
         this.circuitBreaker = circuitBreaker;
         this.rateLimitTracker = rateLimitTracker;
+        this.rateLimitSeeder = rateLimitSeeder;
     }
 
     /**
@@ -91,39 +94,22 @@ public class GitHubGraphQlClientProvider {
         return circuitBreaker.getState() != CircuitBreaker.State.OPEN;
     }
 
-    /**
-     * Gets the current circuit breaker state for monitoring.
-     *
-     * @return current state (CLOSED, OPEN, HALF_OPEN, DISABLED, FORCED_OPEN)
-     */
     public CircuitBreaker.State getCircuitState() {
         return circuitBreaker.getState();
     }
 
-    /**
-     * Records a successful API call for the circuit breaker.
-     * <p>
-     * Call this after a successful GraphQL operation completes.
-     */
+    /** Call after a successful GraphQL operation completes. */
     public void recordSuccess() {
         circuitBreaker.onSuccess(0, TimeUnit.MILLISECONDS);
     }
 
-    /**
-     * Records a failed API call for the circuit breaker.
-     * <p>
-     * Call this when a GraphQL operation fails with a retryable error.
-     *
-     * @param throwable the exception that occurred
-     */
+    /** Call when a GraphQL operation fails with a retryable error. */
     public void recordFailure(Throwable throwable) {
         circuitBreaker.onError(0, TimeUnit.MILLISECONDS, throwable);
     }
 
     /**
-     * Checks if the circuit breaker permits a call, throwing if not.
-     * <p>
-     * Call this before making a GraphQL request to fail fast when circuit is open.
+     * Call before making a GraphQL request to fail fast when the circuit is open.
      *
      * @throws CircuitBreakerOpenException if the circuit is open
      */
@@ -154,6 +140,10 @@ public class GitHubGraphQlClientProvider {
      */
     public HttpGraphQlClient forScope(Long scopeId) {
         String token = getToken(scopeId);
+        // Learn this scope's real GraphQL ceiling from REST GET /rate_limit while it has nothing observed.
+        // Fire-and-forget and self-throttled, so it costs the sync neither latency nor quota (GitHub
+        // documents that endpoint as not counting against the limit) — see GitHubRestRateLimitSeeder.
+        rateLimitSeeder.seedIfUnobserved(scopeId, token);
         return baseClient.mutate().header(HttpHeaders.AUTHORIZATION, "Bearer " + token).build();
     }
 
@@ -174,14 +164,9 @@ public class GitHubGraphQlClientProvider {
     // Rate Limit Tracking (Per-Scope)
 
     /**
-     * Updates the rate limit tracker from a GraphQL response for a specific scope.
-     * <p>
-     * Call this method after every GraphQL query execution to keep the
-     * rate limit tracking up to date. The rate limit data is extracted
-     * from the "rateLimit" field in the response.
+     * Extracts rate limit data from the {@code rateLimit} field of a GraphQL response and updates the
+     * tracker for the given scope. Call after every GraphQL query execution.
      *
-     * @param scopeId the scope that made the API call
-     * @param response the GraphQL response containing rate limit data
      * @return the extracted rate limit info, or null if not present
      */
     @Nullable
@@ -189,22 +174,13 @@ public class GitHubGraphQlClientProvider {
         return rateLimitTracker.updateFromResponse(scopeId, response);
     }
 
-    /**
-     * Gets the rate limit tracker for advanced rate limit management.
-     *
-     * @return the rate limit tracker instance
-     */
     public RateLimitTracker getRateLimitTracker() {
         return rateLimitTracker;
     }
 
     /**
-     * Checks if the rate limit is critically low for a scope and waits if necessary.
-     * <p>
-     * This method should be called before making GraphQL requests in loops
-     * to proactively avoid hitting the rate limit.
+     * Call before making GraphQL requests in a loop to proactively avoid hitting the rate limit.
      *
-     * @param scopeId the scope to check
      * @return true if the method waited, false if no waiting was needed
      * @throws InterruptedException if the thread is interrupted while waiting
      */
@@ -212,34 +188,16 @@ public class GitHubGraphQlClientProvider {
         return rateLimitTracker.waitIfNeeded(scopeId);
     }
 
-    /**
-     * Checks if the rate limit is at a critical level for a scope.
-     * <p>
-     * Use this to decide whether to abort a sync operation early.
-     *
-     * @param scopeId the scope to check
-     * @return true if rate limit is critically low
-     */
+    /** Use to decide whether to abort a sync operation early. */
     public boolean isRateLimitCritical(Long scopeId) {
         return rateLimitTracker.isCritical(scopeId);
     }
 
-    /**
-     * Gets the remaining rate limit points for a scope.
-     *
-     * @param scopeId the scope to check
-     * @return remaining points
-     */
     public int getRateLimitRemaining(Long scopeId) {
         return rateLimitTracker.getRemaining(scopeId);
     }
 
-    /**
-     * Gets the time when the rate limit resets for a scope.
-     *
-     * @param scopeId the scope to check
-     * @return the reset instant, or null if unknown
-     */
+    /** @return the reset instant, or null if unknown */
     public java.time.Instant getRateLimitResetAt(Long scopeId) {
         return rateLimitTracker.getResetAt(scopeId);
     }

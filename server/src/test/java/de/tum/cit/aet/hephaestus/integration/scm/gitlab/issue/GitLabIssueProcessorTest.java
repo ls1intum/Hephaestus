@@ -163,8 +163,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         // upsertUser is void — no stubbing needed
     }
 
-    // Confidential Filtering
-
     @Nested
     class ConfidentialFiltering {
 
@@ -200,6 +198,33 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 any(),
                 any()
             );
+        }
+
+        @Test
+        void purgeConfidentialTombstonesStoredSnapshot() {
+            // Public → confidential flip: the previously-mirrored public row must be tombstoned so it
+            // drops out of every live query.
+            GitLabIssueEventDTO event = createEvent("update", "opened", true);
+            when(
+                issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(eq(REPO_ID), eq(List.of(ISSUE_IID)), any())
+            ).thenReturn(1);
+
+            boolean purged = processor.purgeConfidential(event, createContext());
+
+            assertThat(purged).isTrue();
+            verify(issueRepository).tombstoneIssuesByRepositoryIdAndNumbers(eq(REPO_ID), eq(List.of(ISSUE_IID)), any());
+        }
+
+        @Test
+        void purgeConfidentialIsNoopWhenNothingStored() {
+            GitLabIssueEventDTO event = createEvent("update", "opened", true);
+            when(
+                issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(eq(REPO_ID), eq(List.of(ISSUE_IID)), any())
+            ).thenReturn(0);
+
+            boolean purged = processor.purgeConfidential(event, createContext());
+
+            assertThat(purged).isFalse();
         }
 
         @Test
@@ -256,8 +281,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             );
         }
     }
-
-    // State Mapping
 
     @Nested
     class StateMapping {
@@ -370,8 +393,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             );
         }
     }
-
-    // Webhook Event Processing
 
     @Nested
     class WebhookProcessing {
@@ -519,8 +540,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             verify(eventPublisher, never()).publishEvent(any(ScmDomainEvent.IssueLabeled.class));
         }
     }
-
-    // GraphQL Sync Processing
 
     @Nested
     class SyncProcessing {
@@ -1204,8 +1223,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             );
         }
     }
-
-    // Helpers
 
     private ProcessingContext createContext() {
         return ProcessingContext.forWebhook(1L, testRepo, "open");
