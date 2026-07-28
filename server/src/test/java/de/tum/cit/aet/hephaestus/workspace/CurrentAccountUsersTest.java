@@ -36,13 +36,15 @@ class CurrentAccountUsersTest extends BaseUnitTest {
 
     private AccountIdentityQuery accountIdentityQuery;
     private UserRepository userRepository;
+    private WorkspaceMembershipRepository membershipRepository;
     private CurrentAccountUsers currentAccountUsers;
 
     @BeforeEach
     void setUp() {
         accountIdentityQuery = mock(AccountIdentityQuery.class);
         userRepository = mock(UserRepository.class);
-        currentAccountUsers = new CurrentAccountUsers(accountIdentityQuery, userRepository);
+        membershipRepository = mock(WorkspaceMembershipRepository.class);
+        currentAccountUsers = new CurrentAccountUsers(accountIdentityQuery, userRepository, membershipRepository);
     }
 
     @AfterEach
@@ -122,5 +124,42 @@ class CurrentAccountUsersTest extends BaseUnitTest {
 
         assertThat(currentAccountUsers.resolve()).extracting(User::getId).containsExactly(1L);
         verify(accountIdentityQuery, never()).activeLinksForAccount(ArgumentMatchers.anyLong());
+    }
+
+    private static WorkspaceMembership membershipOf(User user) {
+        WorkspaceMembership membership = new WorkspaceMembership();
+        membership.setUser(user);
+        return membership;
+    }
+
+    @Test
+    void resolveMemberOfPicksTheIdentityThisWorkspaceKnowsTheAccountBy() {
+        authenticateAccount(9L);
+        when(accountIdentityQuery.activeLinksForAccount(9L)).thenReturn(
+            List.of(link(GITHUB, "carol", null), link(GITLAB, "carol-gl", null))
+        );
+        User gitHubActor = user(11L, "carol");
+        User gitLabActor = user(22L, "carol-gl");
+        when(userRepository.findByLoginAndProviderId("carol", GITHUB)).thenReturn(Optional.of(gitHubActor));
+        when(userRepository.findByLoginAndProviderId("carol-gl", GITLAB)).thenReturn(Optional.of(gitLabActor));
+        // Only the GitLab identity holds a membership here, even though the session may have signed in
+        // with the GitHub one.
+        when(membershipRepository.findByWorkspace_IdAndUser_IdIn(5L, List.of(11L, 22L))).thenReturn(
+            List.of(membershipOf(gitLabActor))
+        );
+
+        assertThat(currentAccountUsers.resolveMemberOf(5L)).map(User::getId).contains(22L);
+    }
+
+    @Test
+    void resolveMemberOfIsEmptyForAnAccountWithNoMembershipHere() {
+        // The refusal path that keeps a publicly-readable workspace from serving one person's report to a
+        // non-member who merely shares their login on another provider.
+        authenticateAccount(9L);
+        when(accountIdentityQuery.activeLinksForAccount(9L)).thenReturn(List.of(link(GITHUB, "carol", null)));
+        when(userRepository.findByLoginAndProviderId("carol", GITHUB)).thenReturn(Optional.of(user(11L, "carol")));
+        when(membershipRepository.findByWorkspace_IdAndUser_IdIn(5L, List.of(11L))).thenReturn(List.of());
+
+        assertThat(currentAccountUsers.resolveMemberOf(5L)).isEmpty();
     }
 }

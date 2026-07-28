@@ -53,7 +53,17 @@ class ExportGenerationWorkerTest extends BaseUnitTest {
     @Test
     void generate_success_setsPayloadExpiryAndReady() {
         AccountExport export = existingExport();
-        ExportBundle bundle = new ExportBundle("v1", NOW, null, List.of(), List.of(), List.of(), null, List.of());
+        ExportBundle bundle = new ExportBundle(
+            "v1",
+            NOW,
+            null,
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(),
+            List.of()
+        );
         when(assembler.assemble(ACCOUNT_ID)).thenReturn(bundle);
         when(objectMapper.writeValueAsBytes(bundle)).thenReturn(new byte[] { 1, 2, 3 });
 

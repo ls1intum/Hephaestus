@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace.dto;
 
+import de.tum.cit.aet.hephaestus.workspace.HealthVisibility;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
@@ -17,5 +18,10 @@ public record UpdateWorkspaceFeaturesRequestDTO(
     @Schema(description = "Enable automatic practice reviews triggered by PR events")
     Boolean practiceReviewAutoTriggerEnabled,
     @Schema(description = "Enable manual practice reviews triggered via bot command")
-    Boolean practiceReviewManualTriggerEnabled
+    Boolean practiceReviewManualTriggerEnabled,
+    @Schema(
+        description = "Who may see the anonymised practice-health aggregate (MENTORS_ONLY, EVERYONE). Never widens " +
+            "access to anything that names a person."
+    )
+    HealthVisibility healthVisibility
 ) {}

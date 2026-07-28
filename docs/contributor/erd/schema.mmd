@@ -227,6 +227,15 @@ erDiagram
         TIMESTAMPTZ occurred_at "NOT NULL"
     }
 
+    DataAccessEvent {
+        BIGINT id PK
+        TIMESTAMPTZ occurred_at "NOT NULL"
+        BIGINT workspace_id FK "NOT NULL"
+        BIGINT actor_user_id
+        BIGINT subject_user_id
+        VARCHAR(48) resource_type "NOT NULL"
+    }
+
     Discussion {
         BIGINT id PK
         TIMESTAMPTZ created_at
@@ -1193,6 +1202,7 @@ erDiagram
         INTEGER practice_cooldown_minutes
         NUMERIC(10,2) monthly_llm_budget_usd
         NUMERIC(10,2) monthly_byo_llm_budget_usd
+        VARCHAR(32) health_visibility "NOT NULL"
     }
 
     WorkspaceAgentBinding {
@@ -1364,6 +1374,7 @@ erDiagram
     Account ||--o{ ConfigAuditEvent : actor_account_id
     Account ||--o{ ConfigAuditEvent : acting_account_id
     Connection ||--o{ ConnectionAudit : has
+    Workspace ||--o{ DataAccessEvent : has
     User ||--o{ Discussion : authored_by
     DiscussionCategory ||--o{ Discussion : has
     User ||--o{ Discussion : references

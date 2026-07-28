@@ -31,6 +31,46 @@ import org.springframework.transaction.annotation.Transactional;
 @WorkspaceAgnostic("Findings scoped through Practice.workspace relationship")
 public interface ObservationRepository extends JpaRepository<Observation, UUID> {
     /**
+     * Keeps only each target's latest detection run, so a re-pushed pull request counts once.
+     *
+     * <p>Correlated on {@code (workspace, artifact, about_user)}: without {@code about_user} a later run
+     * covering a co-author becomes "the latest run" for everyone on the artifact. Bounded by the same
+     * {@code :until} as the outer query, so a past window cannot resolve to a run that happened after it.
+     *
+     * <p>Requires the aliases {@code f} (observation) and {@code p} (practice), and a bound {@code :until}.
+     */
+    String LATEST_RUN_WITHIN_WINDOW = """
+          AND f.agent_job_id = (
+              SELECT f2.agent_job_id FROM observation f2
+              JOIN practice p2 ON p2.id = f2.practice_id
+              WHERE p2.workspace_id = p.workspace_id
+                AND f2.artifact_type = f.artifact_type
+                AND f2.artifact_id = f.artifact_id
+                AND f2.about_user_id = f.about_user_id
+                AND f2.observed_at < :until
+              ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
+          )
+        """;
+
+    /**
+     * Counts a BAD observation only if it clears the quarantine floor: a low-confidence finding seen on a
+     * single target is a detector hunch, not a gap. Corroboration counts distinct targets per recurrence
+     * locus where one exists, falling back to the whole practice group otherwise.
+     *
+     * <p>The thresholds are bound from {@code PracticeReportService}'s constants rather than inlined, so the
+     * status derived from these counts cannot drift from the status derived from the items it displays.
+     *
+     * <p>Requires the alias {@code f} over a {@code filtered} CTE and the joined CTEs {@code lt} / {@code gt}.
+     */
+    String QUARANTINE_AWARE_BAD_COUNT = """
+        SUM(CASE WHEN f.assessment = 'BAD' AND NOT (
+                COALESCE(f.confidence, 0) < :quarantineConfidence
+                AND (CASE WHEN f.recurrence_key IS NOT NULL
+                          THEN COALESCE(lt.n, 0) ELSE COALESCE(gt.n, 0) END) < :corroborationTargets
+            ) THEN 1 ELSE 0 END) AS "badCount"
+        """;
+
+    /**
      * Finds a practice finding by ID, scoped to a specific workspace.
      * Used to validate that a finding belongs to the caller's workspace before allowing operations on it.
      */
@@ -386,28 +426,31 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * and {@code GOOD} strengths within the page budget. The NA total still reaches the mentor via the
      * presence-count summary; this is the drill-down list only, and stays recency-ordered (NOT re-ordered by
      * severity) to preserve its "what happened lately" purpose.
+     *
+     * <p>Bounded on both ends so the practice report can derive comparable statuses over two adjacent
+     * windows; callers that want "recent up to now" pass now. See {@link #LATEST_RUN_WITHIN_WINDOW}.
      */
     @Query(
         value = """
-        SELECT f.* FROM observation f
-        JOIN practice p ON p.id = f.practice_id
-        WHERE f.about_user_id = :aboutUserId
-          AND p.workspace_id = :workspaceId
-          AND f.observed_at >= :since
-          AND f.presence <> 'NOT_APPLICABLE'
-          AND f.agent_job_id = (
-              SELECT f2.agent_job_id FROM observation f2
-              WHERE f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
-              ORDER BY f2.observed_at DESC LIMIT 1
-          )
-        ORDER BY f.observed_at DESC
-        """,
+            SELECT f.* FROM observation f
+            JOIN practice p ON p.id = f.practice_id
+            WHERE f.about_user_id = :aboutUserId
+              AND p.workspace_id = :workspaceId
+              AND f.observed_at >= :since
+              AND f.observed_at < :until
+              AND f.presence <> 'NOT_APPLICABLE'
+            """ +
+            LATEST_RUN_WITHIN_WINDOW +
+            """
+            ORDER BY f.observed_at DESC
+            """,
         nativeQuery = true
     )
     List<Observation> findRecentByDeveloperAndWorkspace(
         @Param("aboutUserId") Long aboutUserId,
         @Param("workspaceId") Long workspaceId,
         @Param("since") Instant since,
+        @Param("until") Instant until,
         Pageable pageable
     );
 
@@ -588,6 +631,226 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         @Param("since") Instant since,
         @Param("recentSince") Instant recentSince
     );
+
+    /**
+     * Per-(developer, practice) good/bad activity across every practice area — the input the practice-report
+     * roster and the workspace-health rollup aggregate to an area-grain status.
+     *
+     * <p>Rows stay at PRACTICE grain, carrying their area's slug/name/display-order, and the caller rolls
+     * them up. Aggregating to areas in SQL would have to decide the roll-up rule inside the query, where
+     * neither the developer's own cards nor the health rollup could reuse it; kept out here, one
+     * {@code PracticeStatusDeriver} governs every surface.
+     *
+     * <p>Visibility floor, shared with {@link #existsVisibleReportSubjectBetween} so the roster and the
+     * drill-down never disagree about who exists: hidden workspace members, bot accounts, inactive
+     * practices, {@code NOT_APPLICABLE} rows, and repositories hidden from contributions are all out.
+     * {@code badCount} additionally applies the quarantine floor.
+     */
+    @Query(
+        value = """
+            WITH filtered AS (
+                SELECT f.about_user_id AS about_user_id,
+                       u.login AS login,
+                       u.name AS name,
+                       u.avatar_url AS avatar_url,
+                       p.id AS practice_id,
+                       p.slug AS slug,
+                       pa.slug AS area_slug,
+                       pa.name AS area_name,
+                       pa.display_order AS area_display_order,
+                       f.assessment AS assessment,
+                       f.confidence AS confidence,
+                       f.artifact_id AS artifact_id,
+                       f.recurrence_key AS recurrence_key
+                FROM observation f
+                JOIN practice p ON p.id = f.practice_id
+                JOIN practice_area pa ON pa.id = p.practice_area_id
+                JOIN "user" u ON u.id = f.about_user_id
+                JOIN workspace_membership wm
+                  ON wm.workspace_id = p.workspace_id
+                 AND wm.user_id = f.about_user_id
+                 AND wm.hidden = false
+                WHERE p.workspace_id = :workspaceId
+                  AND p.is_active = true
+                  AND u.type = 'USER'
+                  AND f.observed_at >= :since
+                  AND f.observed_at < :until
+                  AND f.presence <> 'NOT_APPLICABLE'
+            """ +
+            LATEST_RUN_WITHIN_WINDOW +
+            """
+            ),
+            locus_targets AS (
+                SELECT about_user_id, practice_id, recurrence_key, COUNT(DISTINCT artifact_id) AS n
+                FROM filtered
+                WHERE assessment = 'BAD' AND recurrence_key IS NOT NULL
+                GROUP BY about_user_id, practice_id, recurrence_key
+            ),
+            group_targets AS (
+                SELECT about_user_id, practice_id, COUNT(DISTINCT artifact_id) AS n
+                FROM filtered
+                WHERE assessment = 'BAD'
+                GROUP BY about_user_id, practice_id
+            )
+            SELECT f.about_user_id AS "aboutUserId",
+                   f.login AS "userLogin",
+                   f.name AS "userName",
+                   f.avatar_url AS "avatarUrl",
+                   f.area_slug AS "areaSlug",
+                   f.area_name AS "areaName",
+                   f.area_display_order AS "areaDisplayOrder",
+                   f.slug AS "practiceSlug",
+                   SUM(CASE WHEN f.assessment = 'GOOD' THEN 1 ELSE 0 END) AS "goodCount",
+            """ +
+            QUARANTINE_AWARE_BAD_COUNT +
+            """
+            FROM filtered f
+            LEFT JOIN locus_targets lt
+                   ON lt.about_user_id = f.about_user_id AND lt.practice_id = f.practice_id
+                  AND lt.recurrence_key = f.recurrence_key
+            LEFT JOIN group_targets gt
+                   ON gt.about_user_id = f.about_user_id AND gt.practice_id = f.practice_id
+            GROUP BY f.about_user_id, f.login, f.name, f.avatar_url,
+                     f.area_slug, f.area_name, f.area_display_order, f.slug
+            ORDER BY f.login ASC, f.area_display_order ASC, f.slug ASC
+            """,
+        nativeQuery = true
+    )
+    List<AreaRollupRow> findAreaRollupStandingBetween(
+        @Param("workspaceId") Long workspaceId,
+        @Param("since") Instant since,
+        @Param("until") Instant until,
+        @Param("quarantineConfidence") float quarantineConfidence,
+        @Param("corroborationTargets") int corroborationTargets
+    );
+
+    /**
+     * Whether a developer is a visible report subject in the window — the same visibility floor as
+     * {@link #findAreaRollupStandingBetween}, collapsed to an existence check.
+     *
+     * <p>Lets the drill-down answer 404 for a developer the roster would never list, without recomputing the
+     * rollup. The {@code practice_area} join is a filter rather than a projection: the roster is area-grain,
+     * so a developer whose only observations are on area-less practices is not a subject it can show.
+     */
+    @Query(
+        value = """
+            SELECT EXISTS (
+                SELECT 1
+                FROM observation f
+                JOIN practice p ON p.id = f.practice_id
+                JOIN practice_area pa ON pa.id = p.practice_area_id
+                JOIN "user" u ON u.id = f.about_user_id
+                JOIN workspace_membership wm
+                  ON wm.workspace_id = p.workspace_id
+                 AND wm.user_id = f.about_user_id
+                 AND wm.hidden = false
+                WHERE p.workspace_id = :workspaceId
+                  AND f.about_user_id = :aboutUserId
+                  AND p.is_active = true
+                  AND u.type = 'USER'
+                  AND f.observed_at >= :since
+                  AND f.observed_at < :until
+                  AND f.presence <> 'NOT_APPLICABLE'
+            """ +
+            LATEST_RUN_WITHIN_WINDOW +
+            """
+            )
+            """,
+        nativeQuery = true
+    )
+    boolean existsVisibleReportSubjectBetween(
+        @Param("workspaceId") Long workspaceId,
+        @Param("since") Instant since,
+        @Param("until") Instant until,
+        @Param("aboutUserId") Long aboutUserId
+    );
+
+    /**
+     * Per-practice good/bad activity for ONE developer in a bounded window — the previous-window standing
+     * that each report card's {@code trend} is diffed against.
+     *
+     * <p>Same floor and grain as {@link #findRecentByDeveloperAndWorkspace} (which sources the current
+     * window's cards), aggregated to counts instead of rows and NOT restricted to area-bound practices: a
+     * card can exist for a practice that belongs to no area, and it needs a trend too.
+     */
+    @Query(
+        value = """
+            WITH filtered AS (
+                SELECT p.id AS practice_id,
+                       p.slug AS slug,
+                       f.assessment AS assessment,
+                       f.confidence AS confidence,
+                       f.artifact_id AS artifact_id,
+                       f.recurrence_key AS recurrence_key
+                FROM observation f
+                JOIN practice p ON p.id = f.practice_id
+                WHERE f.about_user_id = :aboutUserId
+                  AND p.workspace_id = :workspaceId
+                  AND f.observed_at >= :since
+                  AND f.observed_at < :until
+                  AND f.presence <> 'NOT_APPLICABLE'
+            """ +
+            LATEST_RUN_WITHIN_WINDOW +
+            """
+            ),
+            locus_targets AS (
+                SELECT practice_id, recurrence_key, COUNT(DISTINCT artifact_id) AS n
+                FROM filtered
+                WHERE assessment = 'BAD' AND recurrence_key IS NOT NULL
+                GROUP BY practice_id, recurrence_key
+            ),
+            group_targets AS (
+                SELECT practice_id, COUNT(DISTINCT artifact_id) AS n
+                FROM filtered
+                WHERE assessment = 'BAD'
+                GROUP BY practice_id
+            )
+            SELECT f.slug AS "practiceSlug",
+                   SUM(CASE WHEN f.assessment = 'GOOD' THEN 1 ELSE 0 END) AS "goodCount",
+            """ +
+            QUARANTINE_AWARE_BAD_COUNT +
+            """
+            FROM filtered f
+            LEFT JOIN locus_targets lt
+                   ON lt.practice_id = f.practice_id AND lt.recurrence_key = f.recurrence_key
+            LEFT JOIN group_targets gt
+                   ON gt.practice_id = f.practice_id
+            GROUP BY f.slug
+            """,
+        nativeQuery = true
+    )
+    List<PracticeStandingRow> findPracticeStandingForDeveloperBetween(
+        @Param("aboutUserId") Long aboutUserId,
+        @Param("workspaceId") Long workspaceId,
+        @Param("since") Instant since,
+        @Param("until") Instant until,
+        @Param("quarantineConfidence") float quarantineConfidence,
+        @Param("corroborationTargets") int corroborationTargets
+    );
+
+    /**
+     * Projection: one developer's good/bad activity on one practice, carrying that practice's area — the
+     * standing input the report roster and workspace-health rollup aggregate to an area-grain status.
+     */
+    interface AreaRollupRow {
+        Long getAboutUserId();
+        String getUserLogin();
+        String getUserName();
+        String getAvatarUrl();
+        String getAreaSlug();
+        String getAreaName();
+        Integer getAreaDisplayOrder();
+        String getPracticeSlug();
+        Long getGoodCount();
+        Long getBadCount();
+    }
+
+    /** Projection: one developer's good/bad activity on one practice in a bounded window (trend input). */
+    interface PracticeStandingRow {
+        String getPracticeSlug();
+        Long getGoodCount();
+        Long getBadCount();
+    }
 
     /** Projection: per (area, presence, assessment, severity) standing for a developer. */
     interface AreaStandingRow {

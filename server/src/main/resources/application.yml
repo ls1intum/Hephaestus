@@ -409,6 +409,9 @@ hephaestus:
         app-base-url: ${PRACTICE_REVIEW_APP_BASE_URL:}
         # minimum minutes between reviews for the same PR (0 = no cooldown)
         cooldown-minutes: ${PRACTICE_REVIEW_COOLDOWN_MINUTES:15}
+        # how many days of feedback a practice report covers, and the length of the preceding window its
+        # trend is compared against. Raise it for a low-volume workspace whose reports come out thin.
+        report-window-days: ${PRACTICE_REPORT_WINDOW_DAYS:28}
 
     posthog:
         enabled: ${POSTHOG_ENABLED:false}

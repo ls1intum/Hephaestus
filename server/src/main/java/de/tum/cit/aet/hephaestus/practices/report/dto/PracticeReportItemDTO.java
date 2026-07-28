@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.practices.observation.dto;
+package de.tum.cit.aet.hephaestus.practices.report.dto;
 
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
@@ -11,13 +11,13 @@ import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
 /**
- * One piece of feedback on the reflective dashboard — a single observation rendered for a developer to READ:
+ * One piece of feedback on a practice report — a single observation rendered for a developer to READ:
  * the headline, the actionable guidance, where it is, and a handle to open the full observation. Deliberately
  * NOT the raw {@link Observation}: no observation enum, no reasoning machinery, and never any criteria — the
- * dashboard is a learner surface, so it carries only what helps the developer act.
+ * report is a learner surface, so it carries only what helps the developer act.
  */
 @Schema(description = "A single piece of practice feedback to read and act on")
-public record ReflectionItemDTO(
+public record PracticeReportItemDTO(
     @NonNull @Schema(description = "Observation id — handle to open the full detail") UUID observationId,
     @NonNull @Schema(description = "The headline of the feedback") String title,
     @Nullable
@@ -28,8 +28,8 @@ public record ReflectionItemDTO(
     @NonNull @Schema(description = "Id of the PR / issue this is about") Long artifactId,
     @Nullable @Schema(description = "Where in the work, e.g. \"FrameRecorder.swift:212\", when known") String locator
 ) {
-    public static ReflectionItemDTO from(Observation observation, @Nullable String deliveredGuidance) {
-        return new ReflectionItemDTO(
+    public static PracticeReportItemDTO from(Observation observation, @Nullable String deliveredGuidance) {
+        return new PracticeReportItemDTO(
             observation.getId(),
             observation.getTitle(),
             deliveredGuidance,

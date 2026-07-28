@@ -1,0 +1,226 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        Non-competitive practice report read model (#1421). Purely additive: one new audit table, one
+        workspace privacy column, one index widened. Nothing is dropped or renamed.
+    -->
+
+    <!--
+        Data-access disclosure trail: one row each time a privileged actor is served another person's data.
+        Peer of config_audit_event (1784242879917) rather than a reuse — different identity namespace (SCM
+        actor ids, not login accounts) answering a different question (reads, not changes) — and it follows
+        that table's conventions exactly: append-only trigger in prod context, retention carve-out, per-column
+        erasure carve-out, scalar FK to workspace, sfk_/ck_/ix_ naming.
+
+        The actor and subject columns carry NO foreign key to "user". That table is a synced mirror whose rows
+        ScmWorkspaceContentEraser deletes wholesale; a FK would either block that erase or cascade the
+        disclosure away with it, and a disclosure that happened stays true after the mirror is gone. Both are
+        nullable so account erasure can unlink a person without destroying the record that a disclosure
+        occurred (GDPR Art. 17 against the Art. 30 trail). subject_user_id is additionally null for a bulk
+        view: the roster discloses many subjects at once, so no single id describes it.
+
+        Unpartitioned: this is a low-volume table (a mentor opening reports, not a request log) and no read
+        pattern leads with occurred_at, so partitions would prune nothing.
+    -->
+    <changeSet author="FelixTJDietrich" id="1785211534351-1-data-access-event">
+        <preConditions onFail="MARK_RAN" onFailMessage="data_access_event already present">
+            <not>
+                <tableExists tableName="data_access_event"/>
+            </not>
+        </preConditions>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE data_access_event (
+                id BIGSERIAL PRIMARY KEY,
+                occurred_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                workspace_id BIGINT NOT NULL
+                    CONSTRAINT sfk_data_access_event_workspace_id REFERENCES workspace(id),
+                actor_user_id BIGINT,
+                subject_user_id BIGINT,
+                resource_type VARCHAR(48) NOT NULL,
+                CONSTRAINT ck_data_access_event_resource_type
+                    CHECK (resource_type IN ('PRACTICE_REPORT', 'PRACTICE_ROSTER'))
+            );
+
+            -- Subject leads: "every disclosure about this person" is the GDPR Art. 15(1)(c) query shape,
+            -- and the one an erasure request has to run. workspace_id follows so a per-workspace answer
+            -- stays index-only.
+            CREATE INDEX ix_data_access_event_subject
+                ON data_access_event (subject_user_id, workspace_id, occurred_at DESC);
+
+            -- The mirror question: everything this actor disclosed. Serves the erasure UPDATE too.
+            CREATE INDEX ix_data_access_event_actor
+                ON data_access_event (actor_user_id, occurred_at DESC);
+
+            -- Workspace purge deletes by workspace_id; retention deletes by occurred_at.
+            CREATE INDEX ix_data_access_event_workspace_occurred
+                ON data_access_event (workspace_id, occurred_at DESC);
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DROP TABLE IF EXISTS data_access_event;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <!--
+        Immutability at the storage layer. context="prod" for the same reason config_audit_event's trigger
+        is: the test tier's fixtures mutate freely, and the integration proof runs the real changelog.
+
+        Three carve-outs, each one a decision rather than a convenience:
+
+        1. Erasure may NULL actor_user_id / subject_user_id, per column. Per column (not all-at-once) so a
+           statement clearing only one role does not trip the check. Comparing to_jsonb(NEW) minus the
+           redactable keys covers columns added later with no edit here.
+        2. Retention may DELETE past 365 days. A disclosure trail kept forever is itself an ever-growing
+           store of personal data; storage limitation (GDPR Art. 5(1)(e)) applies to the audit as much as to
+           what it audits. Inside the window the row is untouchable.
+        3. The workspace purge may DELETE inside the window, under the transaction-local marker
+           hephaestus.audit_purge. This is the one intent the trigger cannot read off the row: purge
+           contributors run BEFORE the workspace flips to PURGED, so there is no committed state to check.
+           SET LOCAL scopes the marker to that transaction and to no other session.
+
+        TRUNCATE needs a statement-level trigger — row triggers never fire on it. The REVOKE is inert until a
+        non-superuser app role exists (the app connects as the image's bootstrap superuser, which skips
+        privilege checks); the triggers are the binding control.
+    -->
+    <changeSet author="FelixTJDietrich" id="1785211534351-2-data-access-event-immutability" context="prod">
+        <preConditions onFail="MARK_RAN" onFailMessage="data_access_event immutability trigger already present">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_trigger WHERE tgname = 'trg_data_access_event_block_mutation'
+            </sqlCheck>
+        </preConditions>
+        <sql splitStatements="false"><![CDATA[
+            REVOKE UPDATE, TRUNCATE ON data_access_event FROM CURRENT_USER;
+
+            CREATE OR REPLACE FUNCTION data_access_event_block_mutation() RETURNS trigger AS $dae_immut$
+            BEGIN
+                IF TG_OP = 'DELETE' THEN
+                    IF current_setting('hephaestus.audit_purge', true) = 'on' THEN
+                        RETURN OLD;
+                    END IF;
+                    IF OLD.occurred_at >= now() - interval '365 days' THEN
+                        RAISE EXCEPTION 'data_access_event is append-only: DELETE is permitted only past the 365-day retention window or during a workspace purge';
+                    END IF;
+                    RETURN OLD;
+                END IF;
+
+                IF (NEW.actor_user_id IS NULL OR NEW.actor_user_id = OLD.actor_user_id)
+                   AND (NEW.subject_user_id IS NULL OR NEW.subject_user_id = OLD.subject_user_id)
+                   AND (to_jsonb(NEW) - 'actor_user_id' - 'subject_user_id')
+                        IS NOT DISTINCT FROM (to_jsonb(OLD) - 'actor_user_id' - 'subject_user_id')
+                THEN
+                    RETURN NEW;
+                END IF;
+                RAISE EXCEPTION 'data_access_event is append-only: only erasure (setting actor or subject to NULL) is permitted';
+            END;
+            $dae_immut$ LANGUAGE plpgsql;
+
+            CREATE TRIGGER trg_data_access_event_block_mutation
+                BEFORE UPDATE OR DELETE ON data_access_event
+                FOR EACH ROW EXECUTE FUNCTION data_access_event_block_mutation();
+
+            CREATE OR REPLACE FUNCTION data_access_event_block_truncate() RETURNS trigger AS $dae_trunc$
+            BEGIN
+                RAISE EXCEPTION 'data_access_event is append-only: TRUNCATE is not permitted';
+            END;
+            $dae_trunc$ LANGUAGE plpgsql;
+
+            CREATE TRIGGER trg_data_access_event_block_truncate
+                BEFORE TRUNCATE ON data_access_event
+                FOR EACH STATEMENT EXECUTE FUNCTION data_access_event_block_truncate();
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DROP TRIGGER IF EXISTS trg_data_access_event_block_truncate ON data_access_event;
+                DROP TRIGGER IF EXISTS trg_data_access_event_block_mutation ON data_access_event;
+                DROP FUNCTION IF EXISTS data_access_event_block_truncate();
+                DROP FUNCTION IF EXISTS data_access_event_block_mutation();
+                GRANT UPDATE, TRUNCATE ON data_access_event TO CURRENT_USER;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <!--
+        Who may see the anonymised practice-health aggregate. A privacy control, not a feature switch: the
+        roster and per-developer drill-down stay admin/owner-only in both values, and every developer always
+        sees their own report. Lives on workspace because the workspace_features embeddable maps there, like
+        every other feature column. Defaults to the restrictive value so an upgrade never widens anything.
+    -->
+    <changeSet author="FelixTJDietrich" id="1785211534351-3-workspace-health-visibility">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace.health_visibility already present">
+            <not>
+                <columnExists tableName="workspace" columnName="health_visibility"/>
+            </not>
+        </preConditions>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE workspace
+                ADD COLUMN health_visibility VARCHAR(32) NOT NULL DEFAULT 'MENTORS_ONLY',
+                ADD CONSTRAINT ck_workspace_health_visibility
+                    CHECK (health_visibility IN ('MENTORS_ONLY', 'EVERYONE'));
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                ALTER TABLE workspace DROP COLUMN IF EXISTS health_visibility;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <!--
+        Widen the shipped index idx_observation_subject (from 1781092589259) from (about_user_id) to
+        (about_user_id, observed_at DESC). Every developer-scoped read the report model adds filters by
+        about_user_id and then bounds by observed_at; the single-column form satisfies the equality and
+        leaves the range and sort to do.
+
+        CONCURRENTLY, in its own runInTransaction="false" changeSet, because `observation` is the highest-
+        volume table in the schema and the detection pipeline writes to it continuously: a plain CREATE INDEX
+        holds an ACCESS EXCLUSIVE lock for the whole build, which is a write outage proportional to table
+        size. Liquibase wraps a changeSet in a transaction by default and CREATE INDEX CONCURRENTLY cannot
+        run inside one, hence the split.
+
+        Build first, drop second, so the table is never without a usable index on about_user_id. A failed
+        concurrent build leaves an INVALID index behind; the precondition re-checks by name so a re-run after
+        dropping the invalid one is clean.
+    -->
+    <changeSet
+            author="FelixTJDietrich"
+            id="1785211534351-4-observation-subject-index-build"
+            runInTransaction="false">
+        <preConditions onFail="MARK_RAN" onFailMessage="ix_observation_subject_observed_at already present">
+            <not>
+                <indexExists indexName="ix_observation_subject_observed_at"/>
+            </not>
+        </preConditions>
+        <sql splitStatements="false"><![CDATA[
+            CREATE INDEX CONCURRENTLY ix_observation_subject_observed_at
+                ON observation (about_user_id, observed_at DESC);
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DROP INDEX CONCURRENTLY IF EXISTS ix_observation_subject_observed_at;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet
+            author="FelixTJDietrich"
+            id="1785211534351-5-observation-subject-index-drop-narrow"
+            runInTransaction="false">
+        <preConditions onFail="MARK_RAN" onFailMessage="idx_observation_subject already dropped">
+            <indexExists tableName="observation" indexName="idx_observation_subject"/>
+        </preConditions>
+        <sql splitStatements="false"><![CDATA[
+            DROP INDEX CONCURRENTLY IF EXISTS idx_observation_subject;
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                CREATE INDEX CONCURRENTLY idx_observation_subject ON observation (about_user_id);
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

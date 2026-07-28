@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.workspace.context;
 import static org.junit.jupiter.api.Assertions.*;
 
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.HealthVisibility;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.util.Set;
@@ -61,6 +62,7 @@ class WorkspaceContextTest {
             null,
             false,
             false,
+            HealthVisibility.MENTORS_ONLY,
             Set.of(WorkspaceRole.MEMBER)
         );
 
@@ -79,6 +81,7 @@ class WorkspaceContextTest {
             null,
             false,
             false,
+            HealthVisibility.MENTORS_ONLY,
             Set.of(WorkspaceRole.MEMBER)
         );
 
@@ -90,6 +93,7 @@ class WorkspaceContextTest {
             null,
             false,
             false,
+            HealthVisibility.MENTORS_ONLY,
             Set.of()
         );
 
@@ -115,7 +119,17 @@ class WorkspaceContextTest {
     void shouldSupportMultipleRoles() {
         Set<WorkspaceRole> roles = Set.of(WorkspaceRole.OWNER, WorkspaceRole.ADMIN, WorkspaceRole.MEMBER);
 
-        WorkspaceContext context = new WorkspaceContext(1L, "test", "Test", AccountType.ORG, null, false, false, roles);
+        WorkspaceContext context = new WorkspaceContext(
+            1L,
+            "test",
+            "Test",
+            AccountType.ORG,
+            null,
+            false,
+            false,
+            HealthVisibility.MENTORS_ONLY,
+            roles
+        );
 
         assertTrue(context.hasRole(WorkspaceRole.OWNER));
         assertTrue(context.hasRole(WorkspaceRole.ADMIN));
@@ -126,7 +140,17 @@ class WorkspaceContextTest {
     @Test
     void shouldBeImmutableRecord() {
         Set<WorkspaceRole> roles = Set.of(WorkspaceRole.OWNER);
-        WorkspaceContext context = new WorkspaceContext(1L, "test", "Test", AccountType.ORG, 100L, false, false, roles);
+        WorkspaceContext context = new WorkspaceContext(
+            1L,
+            "test",
+            "Test",
+            AccountType.ORG,
+            100L,
+            false,
+            false,
+            HealthVisibility.MENTORS_ONLY,
+            roles
+        );
 
         // Act - Try to get roles and verify they're the same set
         Set<WorkspaceRole> retrievedRoles = context.roles();

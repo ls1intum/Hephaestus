@@ -3,6 +3,8 @@ package de.tum.cit.aet.hephaestus.workspace;
 import de.tum.cit.aet.hephaestus.workspace.dto.UpdateWorkspaceFeaturesRequestDTO;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
@@ -61,6 +63,16 @@ public class WorkspaceFeatures {
     @Column(name = "practice_review_manual_trigger_enabled", nullable = false)
     private Boolean practiceReviewManualTriggerEnabled = true;
 
+    /**
+     * Who may see the anonymised practice-health aggregate. A privacy control rather than a feature switch:
+     * it never widens access to anything that names a person. Defaults to {@link HealthVisibility#MENTORS_ONLY}.
+     */
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @ColumnDefault("'MENTORS_ONLY'")
+    @Column(name = "health_visibility", nullable = false, length = 32)
+    private HealthVisibility healthVisibility = HealthVisibility.MENTORS_ONLY;
+
     /** PATCH semantics: null fields are ignored, non-null fields overwrite. */
     public void applyPatch(UpdateWorkspaceFeaturesRequestDTO request) {
         if (request.practicesEnabled() != null) this.practicesEnabled = request.practicesEnabled();
@@ -75,5 +87,6 @@ public class WorkspaceFeatures {
         if (request.practiceReviewManualTriggerEnabled() != null) {
             this.practiceReviewManualTriggerEnabled = request.practiceReviewManualTriggerEnabled();
         }
+        if (request.healthVisibility() != null) this.healthVisibility = request.healthVisibility();
     }
 }

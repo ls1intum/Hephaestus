@@ -99,7 +99,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             handlerRegistry,
             objectMapper,
             transactionTemplate,
-            new PracticeReviewProperties(false, true, false, "", 15, false, false),
+            new PracticeReviewProperties(false, true, false, "", 15, false, false, 28),
             llmBudgetService,
             llmModelResolver
         );

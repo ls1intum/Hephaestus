@@ -3,7 +3,18 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
-export type FeatureKey = keyof UpdateWorkspaceFeaturesRequest;
+/**
+ * The boolean feature flags. Derived from the value type rather than `keyof`, so a non-boolean field added
+ * server-side (an audience enum, a retention window) drops out instead of being asserted to be a boolean.
+ */
+export type FeatureKey = {
+	[K in keyof UpdateWorkspaceFeaturesRequest]-?: NonNullable<
+		UpdateWorkspaceFeaturesRequest[K]
+	> extends boolean
+		? K
+		: never;
+}[keyof UpdateWorkspaceFeaturesRequest];
+
 export type FeatureValues = Record<FeatureKey, boolean>;
 
 export interface AdminFeaturesSettingsProps {

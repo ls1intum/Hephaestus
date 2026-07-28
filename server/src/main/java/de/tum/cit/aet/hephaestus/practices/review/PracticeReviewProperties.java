@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -22,6 +23,10 @@ import org.springframework.validation.annotation.Validated;
  *                            notifying reply (A4). Off by default; needs ≥2 runs on a target to render.
  * @param reactionSuppression drop re-nagging a locus the student already DISPUTED / marked NOT_APPLICABLE
  *                            (B2). Off by default; inert until a reaction exists for a recurring locus.
+ * @param reportWindowDays    how many days of feedback a practice report covers, and equally the length of
+ *                            the preceding window its trend is measured against. Four weeks by default:
+ *                            long enough that an ordinary contributor's report is not empty, short enough
+ *                            that what it shows is still current. Raise it for a low-volume workspace.
  */
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.practice-review")
@@ -34,5 +39,9 @@ public record PracticeReviewProperties(
     String appBaseUrl,
     @Min(0) @DefaultValue("15") int cooldownMinutes,
     @DefaultValue("false") boolean progressFooter,
-    @DefaultValue("false") boolean reactionSuppression
+    @DefaultValue("false") boolean reactionSuppression,
+    @Min(value = 1, message = "Report window must cover at least one day")
+    @Max(value = 365, message = "Report window must not exceed a year")
+    @DefaultValue("28")
+    int reportWindowDays
 ) {}
