@@ -31,7 +31,7 @@ function StageNumber({ number }: StageNumberProps) {
 	return (
 		<motion.span
 			className="relative flex size-8 shrink-0 items-center justify-center rounded-full bg-mentor text-xs font-bold text-white"
-			animate={shouldReduceMotion ? undefined : { scale: [1, 1.14, 1] }}
+			animate={shouldReduceMotion ? undefined : { scale: [1, 1.08, 1] }}
 			transition={{
 				duration: 4.8,
 				times: [0, 0.08, 0.18],
@@ -42,13 +42,14 @@ function StageNumber({ number }: StageNumberProps) {
 		>
 			<motion.span
 				aria-hidden="true"
-				className="absolute inset-0 rounded-full border border-mentor"
+				className="absolute inset-0 rounded-full border border-mentor/70"
+				initial={{ opacity: 0, scale: 1 }}
 				animate={
 					shouldReduceMotion
-						? undefined
+						? { opacity: 0, scale: 1 }
 						: {
-								opacity: [0, 0.55, 0],
-								scale: [1, 1.08, 1.65],
+								opacity: [0, 0.32, 0],
+								scale: [1, 1.06, 1.5],
 							}
 				}
 				transition={{
@@ -68,10 +69,9 @@ interface StageProps {
 	children: React.ReactNode;
 	className: string;
 	delay: number;
-	style?: React.CSSProperties;
 }
 
-function Stage({ children, className, delay, style }: StageProps) {
+function Stage({ children, className, delay }: StageProps) {
 	const shouldReduceMotion = useReducedMotion();
 
 	return (
@@ -81,7 +81,6 @@ function Stage({ children, className, delay, style }: StageProps) {
 			viewport={{ once: true, amount: 0.45 }}
 			transition={{ ...enter, delay }}
 			className={className}
-			style={style}
 		>
 			{children}
 		</motion.article>
@@ -176,12 +175,9 @@ function FeedbackStage({ mobile = false }: { mobile?: boolean }) {
 			delay={0.25}
 			className={
 				mobile
-					? "rounded-3xl border border-mentor/55 p-4 shadow-[0_24px_60px_-32px_var(--color-mentor)] sm:p-5"
-					: "absolute right-0 top-[32px] z-10 w-[500px] rounded-3xl border border-mentor/55 p-6 shadow-[0_28px_70px_-34px_var(--color-mentor)]"
+					? "rounded-3xl border border-mentor/35 bg-mentor/5 p-4 shadow-[0_24px_60px_-32px_var(--color-mentor)] sm:p-5"
+					: "absolute right-0 top-[32px] z-10 w-[500px] rounded-3xl border border-mentor/35 bg-mentor/5 p-6 shadow-[0_28px_70px_-34px_var(--color-mentor)]"
 			}
-			style={{
-				backgroundColor: "color-mix(in oklch, var(--background) 92%, var(--mentor))",
-			}}
 		>
 			<div className="flex items-center gap-3">
 				<StageNumber number={3} />

@@ -1,4 +1,5 @@
-import { Hammer, Sparkles } from "lucide-react";
+import { Hammer } from "lucide-react";
+import { MentorIcon } from "@/components/mentor/MentorIcon";
 import { Badge } from "@/components/ui/badge";
 import { FeatureCard, type FeatureData } from "./FeatureCard";
 
@@ -12,7 +13,7 @@ const FEATURES_DATA: FeatureData[] = [
 			"Hephaestus reviews eligible project work against the practices a workspace has chosen. Today, that includes pull requests, merge requests, and issues. Each piece of feedback points to evidence and suggests what to try next.",
 	},
 	{
-		icon: Sparkles,
+		icon: MentorIcon,
 		badge: "Core feature",
 		title: "Chat with Heph",
 		description: "Talk through feedback and recent work",

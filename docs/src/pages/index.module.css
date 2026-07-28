@@ -134,7 +134,6 @@
 
 :global([data-theme='dark']) .heroVisualDark {
   display: block !important;
-  mix-blend-mode: lighten;
 }
 
 .quickstartSection {

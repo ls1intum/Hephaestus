@@ -1,9 +1,13 @@
-import type { LucideIcon } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
+import type { ElementType } from "react";
 import { Badge } from "@/components/ui/badge";
 
 export interface FeatureData {
-	icon: LucideIcon;
+	icon: ElementType<{
+		className?: string;
+		size?: number;
+		strokeWidth?: number;
+	}>;
 	badge: string;
 	title: string;
 	description: string;
@@ -29,7 +33,7 @@ export function FeatureCard({ feature }: FeatureCardProps) {
 		>
 			<div className="mb-5 flex items-center justify-between gap-3">
 				<div className="flex size-11 items-center justify-center rounded-2xl bg-mentor/10 text-mentor transition-transform group-hover:-rotate-3">
-					<Icon className="size-5" strokeWidth={1.7} />
+					<Icon className="size-5" size={20} strokeWidth={1.7} />
 				</div>
 				<Badge variant="secondary">{badge}</Badge>
 			</div>
