@@ -420,6 +420,28 @@ class PullRequestContentSourceTest extends BaseUnitTest {
         }
 
         @Test
+        void unexpectedGitError_abortsWithJobPreparationException() {
+            stubGit();
+            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
+            lenient()
+                .when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L))
+                .thenReturn(List.of());
+            when(
+                gitDiffOperations.resolveDiffRange(Path.of(repoPath), "main", "feature/auth-fix", "abc123def456")
+            ).thenReturn(new String[] { "main", "abc123def456" });
+            lenient()
+                .when(gitDiffOperations.diffStat(Path.of(repoPath), "main", "abc123def456"))
+                .thenReturn("1 file changed");
+            when(gitDiffOperations.diff(Path.of(repoPath), "main", "abc123def456")).thenThrow(
+                new RuntimeException("git process crashed")
+            );
+
+            assertThatThrownBy(() -> provider.contribute(request(sampleMetadata()), new LinkedHashMap<>()))
+                .isInstanceOf(JobPreparationException.class)
+                .hasMessageContaining("Failed to pre-compute diff");
+        }
+
+        @Test
         void realDiff_writesAnnotatedPatchAndSummary() throws Exception {
             stubGit();
             when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());

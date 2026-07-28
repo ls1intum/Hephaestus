@@ -25,7 +25,7 @@ import java.util.UUID;
  *   <li>{@code --ipc=none|private} — close IPC vectors ("host"/"shareable" always rejected)
  *   <li>{@code --dns 0.0.0.0} — block DNS when internet is disabled (CVE-2024-29018)
  *   <li>Mandatory tmpfs with {@code noexec,nosuid,nodev} on /tmp, /run, and /home/agent/.local
- *   <li>Ulimits: nofile={@value #NOFILE_LIMIT}, nproc=pidsLimit, core=0 (no core dumps)
+ *   <li>Ulimits: nofile={@value #NOFILE_LIMIT}, core=0 (no core dumps)
  *   <li>Custom seccomp profile (loaded once at startup)
  *   <li>Optional gVisor runtime ({@code --runtime=runsc})
  * </ul>
@@ -100,12 +100,11 @@ public class ContainerSecurityPolicy {
             dns.add("0.0.0.0");
         }
 
-        // Ulimits: nofile, nproc (defense-in-depth alongside pidsLimit), core=0 (no core dumps)
+        // RLIMIT_NPROC is host-UID scoped and can prevent a non-root container from starting on a
+        // shared host. The cgroup pids limit already constrains all tasks inside the container.
         Map<String, DockerOperations.UlimitSpec> ulimits = Map.of(
             "nofile",
             new DockerOperations.UlimitSpec(NOFILE_LIMIT, NOFILE_LIMIT),
-            "nproc",
-            new DockerOperations.UlimitSpec(resources.pidsLimit(), resources.pidsLimit()),
             "core",
             new DockerOperations.UlimitSpec(0, 0)
         );

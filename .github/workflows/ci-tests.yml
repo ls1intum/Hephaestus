@@ -121,7 +121,8 @@ jobs:
             "webapp-storybook")
               # Install Playwright browsers (cached in ~/.cache/ms-playwright by setup-caches)
               pnpm exec playwright install chromium --with-deps
-              pnpm run test:storybook
+              # Bound browser-runner deadlocks without coupling CI to the current suite duration.
+              timeout --kill-after=30s 15m pnpm run test:storybook
               ;;
             "webapp-visual")
               pnpm run build-storybook
