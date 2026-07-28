@@ -4,8 +4,8 @@ import { LandingHeroSection } from "./LandingHeroSection";
 
 /**
  * Hero section component that introduces Hephaestus with a prominent headline,
- * description, and call-to-action buttons. Features a preview of the mentor's
- * feedback to showcase the platform's core functionality.
+ * description, and call-to-action buttons. Its animated preview connects project
+ * work, practice feedback, delivery surfaces, and a conversation with Heph.
  */
 const meta = {
 	component: LandingHeroSection,
@@ -14,7 +14,7 @@ const meta = {
 		docs: {
 			description: {
 				component:
-					"The hero section serves as the main entry point to the landing page, featuring a clear value proposition and preview of the platform's key features.",
+					"The hero introduces practice feedback in plain language and uses a responsive, reduced-motion-aware preview to show how project work leads to feedback and conversation.",
 			},
 		},
 	},
@@ -49,7 +49,7 @@ type Story = StoryObj<typeof meta>;
 
 /**
  * Default hero section for first-time visitors.
- * Features the sign-in CTA and mentor feedback preview.
+ * Features the sign-in CTA and animated practice-feedback preview.
  */
 export const Default: Story = {
 	args: {
