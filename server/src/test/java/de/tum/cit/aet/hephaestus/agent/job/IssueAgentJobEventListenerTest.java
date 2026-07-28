@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import static de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent.TriggerEventNames;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -119,7 +120,6 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
         return issue;
     }
 
-    /** Sets up a valid issue mock and a gate Detect decision for happy-path tests. */
     private Issue setupHappyPath() {
         Issue issue = createIssue(Issue.State.OPEN);
         when(issueRepository.findByIdWithRepositoryAndAssignees(ISSUE_ID)).thenReturn(Optional.of(issue));
@@ -131,6 +131,12 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
         when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.empty());
 
         return issue;
+    }
+
+    private IssueReviewSubmissionRequest captureSubmission(Long workspaceId) {
+        var captor = ArgumentCaptor.forClass(IssueReviewSubmissionRequest.class);
+        verify(agentJobService).submit(eq(workspaceId), eq(AgentJobType.ISSUE_REVIEW), captor.capture());
+        return captor.getValue();
     }
 
     // Test Groups
@@ -218,17 +224,12 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onIssueCreated(event);
 
-            verify(agentJobService).submit(
-                eq(WORKSPACE_ID),
-                eq(AgentJobType.ISSUE_REVIEW),
-                any(IssueReviewSubmissionRequest.class)
-            );
+            assertThat(captureSubmission(WORKSPACE_ID).triggerEvent()).isEqualTo(TriggerEventNames.ISSUE_CREATED);
         }
 
         @Test
         void shouldUseWorkspaceIdFromGateNotContext() {
             var issueData = createIssueData(Issue.State.OPEN);
-            // Context has scopeId=99, but the gate resolves workspace with id=42
             var event = new ScmDomainEvent.IssueCreated(issueData, webhookContext(99L));
 
             Issue issue = createIssue(Issue.State.OPEN);
@@ -244,7 +245,13 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onIssueCreated(event);
 
-            verify(agentJobService).submit(eq(42L), eq(AgentJobType.ISSUE_REVIEW), any());
+            var workspaceIdCaptor = ArgumentCaptor.forClass(Long.class);
+            verify(agentJobService).submit(
+                workspaceIdCaptor.capture(),
+                eq(AgentJobType.ISSUE_REVIEW),
+                any(IssueReviewSubmissionRequest.class)
+            );
+            assertThat(workspaceIdCaptor.getValue()).isEqualTo(42L).isNotEqualTo(99L);
         }
 
         @Test
@@ -352,10 +359,11 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
             when(
                 practiceReviewDetectionGate.evaluateIssue(issue, TriggerEventNames.ISSUE_CREATED, TriggerMode.AUTO)
             ).thenReturn(new GateDecision.Detect(workspace, List.of()));
-            when(agentJobService.submit(any(), any(), any())).thenThrow(new RuntimeException("NATS error"));
+            when(agentJobService.submit(any(), any(), any())).thenThrow(new RuntimeException("submission failed"));
 
-            // Should not throw — outer catch handles submit exceptions
-            listener.onIssueCreated(event);
+            // Swallowing is the contract: this listener runs on the webhook consumer, and a thrown
+            // exception would NAK the delivery and redeliver the same doomed submission.
+            assertThatCode(() -> listener.onIssueCreated(event)).doesNotThrowAnyException();
         }
     }
 
@@ -363,7 +371,7 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
     class RetrospectiveIssueClosedTests {
 
         @Test
-        void onIssueClosed_routesClosedIssueThroughGateDespiteClosedState() {
+        void onIssueClosed_routesThroughGateAndCarriesTheClosedTriggerOntoTheJob() {
             // The closed terminal state IS this trigger's reason to run — it must reach the gate, unlike the
             // live create/labeled handlers that short-circuit on a closed issue.
             Issue issue = createIssue(Issue.State.CLOSED);
@@ -379,11 +387,7 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
             listener.onIssueClosed(new ScmDomainEvent.IssueClosed(issueData, "completed", webhookContext(1L)));
 
             verify(practiceReviewDetectionGate).evaluateIssue(issue, TriggerEventNames.ISSUE_CLOSED, TriggerMode.AUTO);
-            verify(agentJobService).submit(
-                eq(WORKSPACE_ID),
-                eq(AgentJobType.ISSUE_REVIEW),
-                any(IssueReviewSubmissionRequest.class)
-            );
+            assertThat(captureSubmission(WORKSPACE_ID).triggerEvent()).isEqualTo(TriggerEventNames.ISSUE_CLOSED);
         }
 
         @Test
@@ -411,11 +415,9 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onIssueLabeled(event);
 
-            verify(agentJobService).submit(
-                eq(WORKSPACE_ID),
-                eq(AgentJobType.ISSUE_REVIEW),
-                any(IssueReviewSubmissionRequest.class)
-            );
+            var request = captureSubmission(WORKSPACE_ID);
+            assertThat(request.triggerEvent()).isEqualTo(TriggerEventNames.ISSUE_LABELED);
+            assertThat(request.issueId()).isEqualTo(ISSUE_ID);
         }
 
         @Test

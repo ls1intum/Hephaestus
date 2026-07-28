@@ -2,17 +2,23 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
+	computeUserLeagueStatsQueryKey,
+	getLeaderboardQueryKey,
 	getWorkspaceOptions,
 	listWorkspacesQueryKey,
 	resetAndRecalculateLeaguesMutation,
 	updateFeaturesMutation,
 } from "@/api/@tanstack/react-query.gen";
+import type { Options } from "@/api/sdk.gen";
+import type { ComputeUserLeagueStatsData, GetLeaderboardData } from "@/api/types.gen";
 import type { FeatureKey } from "@/components/admin/AdminFeaturesSettings";
 import { AdminSettingsPage } from "@/components/admin/AdminSettingsPage";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
+import { workspaceAdminHead } from "@/lib/page-title";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/settings")({
+	head: workspaceAdminHead("Workspace settings"),
 	component: AdminSettings,
 });
 
@@ -28,15 +34,25 @@ function AdminSettings() {
 		enabled: Boolean(workspaceSlug),
 	});
 
-	// Reset leagues mutation
 	const resetLeagues = useMutation({
 		...resetAndRecalculateLeaguesMutation(),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["workspace"] });
+		onSuccess: (_data, variables) => {
+			const resetSlug = variables.path.workspaceSlug;
+			// Both keys deliberately carry only `path`, so every cached time range and mode goes at
+			// once. The cast is what lets a *prefix* through a signature written for a *fetch*.
+			for (const queryKey of [
+				getLeaderboardQueryKey({
+					path: { workspaceSlug: resetSlug },
+				} as Options<GetLeaderboardData>),
+				computeUserLeagueStatsQueryKey({
+					path: { workspaceSlug: resetSlug },
+				} as Options<ComputeUserLeagueStatsData>),
+			]) {
+				queryClient.invalidateQueries({ queryKey });
+			}
 		},
 	});
 
-	// Update features mutation
 	const updateFeatures = useMutation({
 		...updateFeaturesMutation(),
 		onSuccess: () => {
@@ -60,7 +76,6 @@ function AdminSettings() {
 		return <NoWorkspace />;
 	}
 
-	// Handle feature toggle
 	const handleToggleFeature = (feature: FeatureKey, enabled: boolean) => {
 		if (!workspaceSlug) {
 			return;

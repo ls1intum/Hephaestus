@@ -1,8 +1,8 @@
 import { ScrollText } from "lucide-react";
 import { useState } from "react";
 import type { AuthEventView } from "@/api/types.gen";
-import { RelativeTime } from "@/components/admin/integrations/RelativeTime";
 import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
+import { RelativeTime } from "@/components/common/RelativeTime";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,31 +24,22 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { FilterLink } from "../audit-shared/FilterLink";
+import { refLabel } from "../audit-shared/ref-label";
 import { AuditEventDetailSheet } from "./AuditEventDetailSheet";
-import {
-	type AuditSeverity,
-	accountLabel,
-	eventLabel,
-	eventSeverity,
-	resultLabel,
-} from "./auditFormat";
+import { type AuditSeverity, eventLabel, eventSeverity, resultLabel } from "./audit-format";
 
 export interface AdminAuditTableProps {
 	events: AuthEventView[];
 	isLoading: boolean;
 	isError: boolean;
 	hasFilter: boolean;
-	/** Clears every filter — the only way out of an over-filtered empty state. */
 	onResetFilters?: () => void;
 	hasNextPage: boolean;
 	isFetchingNextPage: boolean;
 	onLoadMore: () => void;
-	/** Retry the failed page load. */
 	onRetry?: () => void;
-	/** Drill-downs: filter the log to a subject account / to an actor's impersonation session. */
 	onFilterAccount?: (id: number) => void;
 	onFilterActor?: (id: number) => void;
-	/** Resolve a workspace id to its name for the detail drawer (client-side, from the admin list). */
 	resolveWorkspaceName?: (id: number) => string | undefined;
 }
 
@@ -58,11 +49,8 @@ const SEVERITY_DOT: Record<AuditSeverity, string> = {
 	info: "bg-muted-foreground/40",
 };
 
-/**
- * Read-only table of auth audit events (newest first). The actor column attributes impersonated
- * actions to the operator (RFC 8693 `act`); accounts resolve to names (email on hover) and fall back to
- * `#id` for deleted accounts. Click an account/actor to filter; open a row for the full forensic record.
- */
+/** Read-only table of auth audit events, newest first. The actor column attributes an impersonated
+ * action to the operator. */
 export function AdminAuditTable({
 	events,
 	isLoading,
@@ -146,8 +134,8 @@ export function AdminAuditTable({
 					<TableBody>
 						{events.map((e) => {
 							const severity = eventSeverity(e.eventType, e.result);
-							const account = accountLabel(e.account, e.accountId);
-							const actor = accountLabel(e.actor, e.actingAccountId);
+							const account = refLabel(e.account, e.accountId);
+							const actor = refLabel(e.actor, e.actingAccountId);
 							return (
 								<TableRow key={e.id}>
 									<TableCell className="whitespace-nowrap text-sm text-muted-foreground">
@@ -160,8 +148,7 @@ export function AdminAuditTable({
 												aria-hidden
 											/>
 											{severity === "warning" && (
-												// Hue alone is the only marker of a high-risk event on this row; a failure
-												// at least also carries the destructive Result badge.
+												// The dot's hue is the only other marker of a high-risk event.
 												<span className="sr-only">High-risk event: </span>
 											)}
 											<span className="text-sm">{eventLabel(e.eventType)}</span>

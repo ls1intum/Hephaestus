@@ -3,9 +3,8 @@ package de.tum.cit.aet.hephaestus.core.audit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigDTO;
-import de.tum.cit.aet.hephaestus.agent.config.CreateAgentConfigRequestDTO;
+import de.tum.cit.aet.hephaestus.agent.catalog.CreateWorkspaceLlmConnectionRequestDTO;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmAuthMode;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditActorKind;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -61,18 +60,15 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         // Present AND null, not absent: null is "inherit the fleet default", so a serializer that
         // dropped null keys would make clearing an override indistinguishable from never setting one.
         assertThat(row.getNewValue()).contains("\"skipDrafts\":null").contains("\"cooldownMinutes\":45");
-        // Attribution through the real filter chain — the JWT -> CurrentAccount -> actor seam the
-        // recorder's unit test can only simulate. USER, not SYSTEM: a signed-in admin did this. (The
-        // id stays null here because the test harness mints a non-numeric subject; production subjects
-        // are always the account id. ConfigAuditRecorderTest covers the resolved-id case.)
+        // Through the real filter chain (JWT -> CurrentAccount -> actor): USER, not SYSTEM, because a
+        // signed-in admin did this. The id stays null because the test harness mints a non-numeric
+        // subject; production subjects are always the account id.
         assertThat(row.getActorKind()).isEqualTo(ConfigAuditActorKind.USER);
     }
 
     @Test
     @WithAdminUser
     void togglingAFeatureFlagIsRecorded() {
-        // Workspace-administration coverage the trail gained: enabling/disabling a feature is an admin
-        // action with accountability value, now recorded alongside AI config.
         Workspace workspace = setupWorkspace("audit-features");
 
         webTestClient
@@ -129,23 +125,6 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Test
     @WithAdminUser
-    void agentConfigCreateIsAuditedWithoutTheApiKey() {
-        Workspace workspace = setupWorkspace("audit-cfg");
-
-        createConfig(workspace, "primary");
-
-        ConfigAuditEvent row = configAuditEventRepository
-            .findAll()
-            .stream()
-            .filter(e -> e.getEntityType() == ConfigAuditEntityType.AGENT_CONFIG)
-            .findFirst()
-            .orElseThrow();
-        assertThat(row.getOldValue()).isNull();
-        assertThat(row.getNewValue()).contains("\"llmApiKeySet\":true").doesNotContain("sk-test-secret-key-123");
-    }
-
-    @Test
-    @WithAdminUser
     void workspaceAdminSeesOnlyTheirOwnWorkspacesHistory() {
         Workspace mine = setupWorkspace("audit-mine");
         Workspace theirs = setupWorkspace("audit-theirs");
@@ -169,8 +148,6 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Test
     @WithAdminUser
     void filteringByChangedKeyNarrowsToOneControl() {
-        // The per-control History contract (#1357). Without changed_keys this is unanswerable
-        // server-side, and a client cannot filter after paging.
         Workspace workspace = setupWorkspace("audit-filter");
         patchPracticeReview(workspace, Map.of("cooldownMinutes", 45));
         patchPracticeReview(workspace, Map.of("skipDrafts", true));
@@ -257,8 +234,6 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Test
     @WithMentorUser
     void aNonInstanceAdminIsRefusedTheCrossWorkspaceView() {
-        // The one endpoint in this feature that spans tenants; app_admin is the only thing between a
-        // signed-in user and every workspace's configuration history.
         webTestClient
             .get()
             .uri("/admin/config-audit")
@@ -277,7 +252,12 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         String future = Instant.now().plusSeconds(60).toString();
         String past = Instant.now().minusSeconds(60).toString();
         return java.util.stream.Stream.of(
-            org.junit.jupiter.params.provider.Arguments.of("entityType matches", "entityType", "AGENT_CONFIG", 1),
+            org.junit.jupiter.params.provider.Arguments.of(
+                "entityType matches",
+                "entityType",
+                "WORKSPACE_LLM_CONNECTION",
+                1
+            ),
             org.junit.jupiter.params.provider.Arguments.of(
                 "entityType matches the other kind",
                 "entityType",
@@ -300,7 +280,7 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     void eachFilterPredicateNarrowsIndependently(String name, String param, String value, int expected) {
         Workspace workspace = setupWorkspace("audit-matrix");
         patchPracticeReview(workspace, Map.of("cooldownMinutes", 45));
-        createConfig(workspace, "primary");
+        createConnection(workspace, "primary");
 
         assertFilterYields(workspace, uri -> uri.queryParam(param, value), expected);
     }
@@ -336,11 +316,14 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         // single-value test cannot distinguish from plain equality.
         Workspace workspace = setupWorkspace("audit-multi");
         patchPracticeReview(workspace, Map.of("cooldownMinutes", 45));
-        createConfig(workspace, "primary");
+        createConnection(workspace, "primary");
 
         assertFilterYields(
             workspace,
-            uri -> uri.queryParam("entityType", "AGENT_CONFIG").queryParam("entityType", "PRACTICE_REVIEW_SETTINGS"),
+            uri ->
+                uri
+                    .queryParam("entityType", "WORKSPACE_LLM_CONNECTION")
+                    .queryParam("entityType", "PRACTICE_REVIEW_SETTINGS"),
             2
         );
         assertFilterYields(workspace, uri -> uri.queryParam("action", "CREATED").queryParam("action", "DELETED"), 1);
@@ -399,8 +382,8 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @WithAdminUser
     @Transactional
     void anUnscopedReadOfTheAuditTableIsCaughtByTenancyEnforcement() {
-        // Pins that the table is registered workspace-scoped; isolation itself is carried by the gate and
-        // by findForWorkspace, which the two tests above cover.
+        // Pins that the table is registered workspace-scoped; isolation itself is carried by the gate
+        // and by findForWorkspace.
         assertThatThrownBy(() ->
             entityManager.createNativeQuery("SELECT * FROM config_audit_event", ConfigAuditEvent.class).getResultList()
         )
@@ -435,7 +418,7 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     private void patchPracticeReview(Workspace workspace, Map<String, Object> body) {
         webTestClient
             .patch()
-            .uri("/workspaces/{slug}/ai-settings/practice-review", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/practices/review-settings", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(body)
@@ -444,29 +427,26 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
             .isOk();
     }
 
-    private AgentConfigDTO createConfig(Workspace workspace, String name) {
-        return webTestClient
+    /** A second producer, of a different entity type and action, so the filter matrix proves each predicate narrows. */
+    private void createConnection(Workspace workspace, String slug) {
+        webTestClient
             .post()
-            .uri("/workspaces/{slug}/agent-configs", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/llm/connections", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(
-                CreateAgentConfigRequestDTO.builder()
-                    .name(name)
-                    .enabled(true)
-                    .modelName("claude-sonnet-4-20250514")
-                    .llmApiKey("sk-test-secret-key-123")
-                    .llmProvider(LlmProvider.ANTHROPIC)
-                    .timeoutSeconds(300)
-                    .maxConcurrentJobs(2)
-                    .allowInternet(false)
-                    .build()
+                new CreateWorkspaceLlmConnectionRequestDTO(
+                    slug,
+                    "My Provider",
+                    "https://api.openai.com",
+                    "openai-completions",
+                    LlmAuthMode.BEARER,
+                    "sk-workspace-secret-9999",
+                    true
+                )
             )
             .exchange()
             .expectStatus()
-            .isCreated()
-            .expectBody(AgentConfigDTO.class)
-            .returnResult()
-            .getResponseBody();
+            .isCreated();
     }
 }

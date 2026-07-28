@@ -2,6 +2,7 @@ import { ChevronDownIcon, DatabaseIcon, GaugeIcon, WebhookIcon, ZapOffIcon } fro
 import { Fragment, type ReactElement, type ReactNode } from "react";
 import type { ConnectionSyncStatus, RateLimitSnapshot } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { RelativeTime } from "@/components/common/RelativeTime";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -15,13 +16,12 @@ import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { asDate } from "@/lib/dates";
 import { ActiveJobProgress } from "./ActiveJobProgress";
 import { ConnectionHealthBadge } from "./ConnectionHealthBadge";
 import { IntegrationCardHeading } from "./IntegrationCardHeading";
-import { RelativeTime } from "./RelativeTime";
 import { SyncNowButton } from "./SyncNowButton";
 import {
-	asDate,
 	freshnessTone,
 	nextRunLabel,
 	relativeTime,

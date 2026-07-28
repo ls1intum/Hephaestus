@@ -24,23 +24,28 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+/**
+ * Job history for a workspace's agents. The literal {@code jobs} segment collides with the sibling
+ * {@code /agents/{purpose}} template; Spring resolves it here because a literal segment outranks a
+ * variable one.
+ */
 @WorkspaceScopedController
-@RequestMapping("/agent-jobs")
+@RequestMapping("/agents/jobs")
 @Tag(name = "Agent Jobs", description = "Workspace-scoped agent job monitoring")
 @RequiredArgsConstructor
 @Validated
 public class AgentJobController {
 
     private final AgentJobService agentJobService;
+    private final AgentJobLifecycleService agentJobLifecycleService;
 
     @GetMapping
     @Operation(summary = "List agent jobs for a workspace")
     @ApiResponse(responseCode = "200", description = "Paginated job list")
     @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<Page<AgentJobDTO>> listJobs(
+    public ResponseEntity<Page<AgentJobDTO>> listAgentJobs(
         WorkspaceContext workspaceContext,
         @Parameter(description = "Filter by job status") @RequestParam(required = false) AgentJobStatus status,
-        @Parameter(description = "Filter by config ID") @RequestParam(required = false) Long configId,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
@@ -48,7 +53,7 @@ public class AgentJobController {
         int pageSize = Math.max(1, Math.min(size, 100));
         Pageable pageable = PageRequest.of(safePage, pageSize, Sort.by("createdAt").descending());
         Page<AgentJobDTO> jobs = agentJobService
-            .getJobs(workspaceContext.id(), status, configId, pageable)
+            .getJobs(workspaceContext.id(), status, pageable)
             .map(AgentJobDTO::from);
         return ResponseEntity.ok(jobs);
     }
@@ -66,7 +71,7 @@ public class AgentJobController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<AgentJobDTO> getJob(WorkspaceContext workspaceContext, @PathVariable UUID jobId) {
+    public ResponseEntity<AgentJobDTO> getAgentJob(WorkspaceContext workspaceContext, @PathVariable UUID jobId) {
         AgentJob job = agentJobService.getJob(workspaceContext.id(), jobId);
         return ResponseEntity.ok(AgentJobDTO.from(job));
     }
@@ -86,8 +91,8 @@ public class AgentJobController {
     )
     @RequireAtLeastWorkspaceAdmin
     @AuditExempt(reason = "job control, not configuration; job state is its own record")
-    public ResponseEntity<AgentJobDTO> cancelJob(WorkspaceContext workspaceContext, @PathVariable UUID jobId) {
-        AgentJob job = agentJobService.cancel(workspaceContext.id(), jobId);
+    public ResponseEntity<AgentJobDTO> cancelAgentJob(WorkspaceContext workspaceContext, @PathVariable UUID jobId) {
+        AgentJob job = agentJobLifecycleService.cancel(workspaceContext.id(), jobId);
         return ResponseEntity.ok(AgentJobDTO.from(job));
     }
 
@@ -106,8 +111,11 @@ public class AgentJobController {
     )
     @RequireAtLeastWorkspaceAdmin
     @AuditExempt(reason = "job control, not configuration; job state is its own record")
-    public ResponseEntity<AgentJobDTO> retryDelivery(WorkspaceContext workspaceContext, @PathVariable UUID jobId) {
-        AgentJob job = agentJobService.retryDelivery(workspaceContext.id(), jobId);
+    public ResponseEntity<AgentJobDTO> retryAgentJobDelivery(
+        WorkspaceContext workspaceContext,
+        @PathVariable UUID jobId
+    ) {
+        AgentJob job = agentJobLifecycleService.retryDelivery(workspaceContext.id(), jobId);
         return ResponseEntity.ok(AgentJobDTO.from(job));
     }
 }

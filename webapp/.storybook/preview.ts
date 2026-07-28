@@ -145,6 +145,12 @@ const preview: Preview = {
 		// Better viewport defaults
 		viewport: {
 			options: {
+				// The WCAG 2.2 SC 1.4.10 (Reflow) target: 320 x 568 CSS px, which is what 1280 px at 400 %
+				// zoom resolves to. Content must reach it without two-dimensional scrolling.
+				reflow: {
+					name: "Reflow (320px)",
+					styles: { width: "320px", height: "568px" },
+				},
 				mobile: {
 					name: "Mobile",
 					styles: { width: "375px", height: "667px" },

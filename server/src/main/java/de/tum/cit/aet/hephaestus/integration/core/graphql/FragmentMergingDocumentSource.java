@@ -68,7 +68,7 @@ public class FragmentMergingDocumentSource extends ResourceDocumentSource {
         List<Resource> fragmentResources
     ) {
         super(locations, extensions);
-        this.fragmentsByName = parseFragments(loadRawContent(fragmentResources));
+        this.fragmentsByName = parseFragmentsPerResource(fragmentResources);
     }
 
     @Override
@@ -173,21 +173,29 @@ public class FragmentMergingDocumentSource extends ResourceDocumentSource {
         return Collections.unmodifiableMap(fragments);
     }
 
-    private static String loadRawContent(List<Resource> resources) {
-        StringBuilder sb = new StringBuilder();
+    /**
+     * Parses each resource on its own, deliberately: the last fragment in a file runs "to end of
+     * string", so concatenating first would staple the next file's header comment onto it — and a
+     * {@code ...Name} written inside such a comment then reads as a real spread, dragging an unrelated
+     * fragment into every request that uses the neighbour. GitHub rejects the whole query for the
+     * unused fragment that results (§5.5.1.4).
+     */
+    private static Map<String, String> parseFragmentsPerResource(List<Resource> resources) {
+        Map<String, String> merged = new LinkedHashMap<>();
         for (Resource resource : resources) {
-            try (InputStream is = resource.getInputStream()) {
-                if (!sb.isEmpty()) {
-                    sb.append('\n');
-                }
-                sb.append(new String(is.readAllBytes(), StandardCharsets.UTF_8));
-            } catch (IOException e) {
-                throw new IllegalStateException(
-                    "Failed to load GraphQL fragment resource: " + resource.getDescription(),
-                    e
-                );
-            }
+            merged.putAll(parseFragments(readResource(resource)));
         }
-        return sb.toString();
+        return Collections.unmodifiableMap(merged);
+    }
+
+    private static String readResource(Resource resource) {
+        try (InputStream is = resource.getInputStream()) {
+            return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new IllegalStateException(
+                "Failed to load GraphQL fragment resource: " + resource.getDescription(),
+                e
+            );
+        }
     }
 }

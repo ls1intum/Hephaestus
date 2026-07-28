@@ -8,9 +8,9 @@ import java.util.Optional;
 import org.springframework.stereotype.Component;
 
 /**
- * Loads the reviewable SCM artifact (pull request or issue) a job targets, each with the eager-fetch
- * graph its review path needs. Keeping "which artifact is this job about" here gives it one home and
- * keeps {@code AgentJobService}'s dependency surface within the god-class budget.
+ * Loads the reviewable SCM artifact a job targets, each with the eager-fetch graph its review path
+ * needs. Thin on purpose: it exists so {@link DevTriggerController} does not depend on a
+ * {@code @Repository}, which the architecture rules forbid a controller to do.
  */
 @Component
 class ReviewableArtifactLoader {
@@ -23,21 +23,11 @@ class ReviewableArtifactLoader {
         this.issueRepository = issueRepository;
     }
 
-    /** Loads a pull request with the full association graph the detection gate needs. */
     Optional<PullRequest> findPullRequestForGate(long pullRequestId) {
         return pullRequestRepository.findByIdWithAllForGate(pullRequestId);
     }
 
-    /** Loads an issue with its repository eagerly fetched (gate-bypass path; no role check). */
-    Optional<Issue> findIssueWithRepository(long issueId) {
-        return issueRepository.findByIdWithRepository(issueId);
-    }
-
-    /**
-     * Loads an issue with the association graph the detection gate needs — repository AND assignees, since
-     * the gate's role check iterates {@code getAssignees()}. Mirrors what the production issue listener
-     * loads, so the dev gate-routed path exercises the same eager-fetch precondition.
-     */
+    /** Assignees must be fetched too: the gate's role check iterates them. */
     Optional<Issue> findIssueForGate(long issueId) {
         return issueRepository.findByIdWithRepositoryAndAssignees(issueId);
     }

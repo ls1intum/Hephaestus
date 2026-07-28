@@ -32,9 +32,8 @@ export interface HeaderProps {
 	sidebarTrigger?: React.ReactNode;
 	/** Application version displayed beside logo (used in production) */
 	version: string;
-	/** Friendly deployment environment name, e.g. "Staging" */
+	/** Friendly deployment environment name, e.g. "Staging". */
 	environmentName: string;
-	/** Whether this is the production deployment */
 	isProduction: boolean;
 	/** User authentication state */
 	isAuthenticated: boolean;
@@ -96,7 +95,6 @@ export default function Header({
 							<span className="text-xl font-semibold">Hephaestus</span>
 						</Link>
 					)}
-					{/* Release version in production; environment pill elsewhere. */}
 					{badge.kind === "release" ? (
 						<Tooltip>
 							<TooltipTrigger

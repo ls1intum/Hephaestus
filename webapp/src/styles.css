@@ -42,9 +42,11 @@ code {
   --accent-foreground: oklch(0.21 0.006 285.885);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
-  --success: oklch(0.596 0.145 163.225);
+  /* Darkened from the palette default: at stock lightness `text-success` / `text-warning` miss
+     WCAG 2.2 SC 1.4.3 (4.5:1) against --card. */
+  --success: oklch(0.52 0.145 163.225);
   --success-foreground: oklch(0.985 0 0);
-  --warning: oklch(0.646 0.153 70.08);
+  --warning: oklch(0.54 0.153 70.08);
   --warning-foreground: oklch(0.985 0 0);
   --border: oklch(0.92 0.004 286.32);
   --input: oklch(0.92 0.004 286.32);

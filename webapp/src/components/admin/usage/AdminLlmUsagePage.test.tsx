@@ -1,0 +1,365 @@
+import {
+	createMemoryHistory,
+	createRootRoute,
+	createRouter,
+	RouterProvider,
+} from "@tanstack/react-router";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import type { FxRateInfo, WorkspaceLlmUsageReport } from "@/api/types.gen";
+import { AdminLlmUsagePage } from "./AdminLlmUsagePage";
+
+const baseReport: WorkspaceLlmUsageReport = {
+	month: "2026-07",
+	instanceMonthlyBudgetUsd: 25,
+	ownProviderMonthlyBudgetUsd: 10,
+	instanceTotalCostUsd: 4.25,
+	ownProviderTotalCostUsd: 1.75,
+	instanceBudgetVerdict: "WITHIN",
+	ownProviderBudgetVerdict: "WITHIN",
+	instancePaused: false,
+	ownProviderPaused: false,
+	unpricedEventCount: 2,
+	byJobType: [
+		{
+			jobType: "PULL_REQUEST_REVIEW",
+			instanceTotalCostUsd: 4.25,
+			ownProviderTotalCostUsd: 1.75,
+			unpricedEventCount: 2,
+			inputTokens: 1_000,
+			outputTokens: 250,
+			cacheReadTokens: 0,
+			cacheWriteTokens: 0,
+			totalCalls: 7,
+			events: 5,
+		},
+	],
+	byDay: [
+		{
+			day: new Date("2026-07-05T00:00:00.000Z"),
+			instanceTotalCostUsd: 4.25,
+			ownProviderTotalCostUsd: 1.75,
+			unpricedEventCount: 2,
+			events: 3,
+		},
+	],
+};
+
+/** The page links to the workspace's models page, so it needs a router in scope. */
+async function renderPage(
+	report: WorkspaceLlmUsageReport = baseReport,
+	props: Partial<React.ComponentProps<typeof AdminLlmUsagePage>> = {},
+) {
+	const rootRoute = createRootRoute({
+		component: () => (
+			<AdminLlmUsagePage
+				month="2026-07"
+				isCurrentMonth
+				canGoNext={false}
+				workspaceSlug="acme"
+				report={report}
+				isLoading={false}
+				error={null}
+				onPrevMonth={() => {}}
+				onNextMonth={() => {}}
+				onEditOwnProviderCap={() => {}}
+				now={new Date("2026-07-10T12:00:00.000Z")}
+				{...props}
+			/>
+		),
+	});
+	const router = createRouter({
+		routeTree: rootRoute,
+		history: createMemoryHistory({ initialEntries: ["/"] }),
+	});
+	// biome-ignore lint/suspicious/noExplicitAny: the ad-hoc root-only tree isn't the app's route tree.
+	render(<RouterProvider router={router as any} />);
+	await screen.findByRole("heading", { name: "AI usage" });
+}
+
+describe("AdminLlmUsagePage", () => {
+	it("separates shared-model and provider spend in every rollup", async () => {
+		await renderPage();
+
+		expect(screen.getByText("Shared-model spend so far")).toBeTruthy();
+		expect(screen.getByText("Shared-model budget · set by your host")).toBeTruthy();
+		expect(screen.getByText("Your provider spend so far")).toBeTruthy();
+		expect(screen.getByText("Provider cap · set by you, billed by your provider")).toBeTruthy();
+
+		const byJobType = screen.getByRole("table", { name: "AI spend by run type" });
+		expect(within(byJobType).getByRole("columnheader", { name: "Shared models" })).toBeTruthy();
+		expect(within(byJobType).getByRole("columnheader", { name: "Your provider" })).toBeTruthy();
+		expect(within(byJobType).getByRole("columnheader", { name: "No price set" })).toBeTruthy();
+		expect(within(byJobType).getByText("$4.25")).toBeTruthy();
+		expect(within(byJobType).getByText("$1.75")).toBeTruthy();
+
+		const byDay = screen.getByRole("table", { name: "AI spend by day" });
+		expect(within(byDay).getByRole("columnheader", { name: "Shared models" })).toBeTruthy();
+		expect(within(byDay).getByRole("columnheader", { name: "Your provider" })).toBeTruthy();
+		expect(within(byDay).getByRole("columnheader", { name: "No price set" })).toBeTruthy();
+		expect(within(byDay).getByText("$4.25")).toBeTruthy();
+		expect(within(byDay).getByText("$1.75")).toBeTruthy();
+	});
+
+	it("gives each cap its own meter, named for whose money it is", async () => {
+		await renderPage();
+
+		expect(screen.getByRole("progressbar", { name: "Shared-model budget used" })).toBeTruthy();
+		expect(screen.getByRole("progressbar", { name: "Your provider cap used" })).toBeTruthy();
+	});
+
+	it("gives the right pricing owner an actionable no-price-set warning", async () => {
+		await renderPage();
+
+		expect(screen.getByText("2 runs aren't counted in these totals")).toBeTruthy();
+		expect(
+			screen.getByText(/Add prices for your own models in .*; for shared models, ask your host\./),
+		).toBeTruthy();
+	});
+
+	it("averages each purse over the run count on its own, never the two summed", async () => {
+		await renderPage();
+
+		const byJobType = screen.getByRole("table", { name: "AI spend by run type" });
+		expect(within(byJobType).getByRole("columnheader", { name: "Avg per run" })).toBeTruthy();
+		expect(within(byJobType).getByText("$0.85")).toBeTruthy();
+		expect(within(byJobType).getByText("shared models")).toBeTruthy();
+		expect(within(byJobType).getByText("$0.35")).toBeTruthy();
+		expect(within(byJobType).getByText("your provider")).toBeTruthy();
+	});
+
+	describe("pause banners", () => {
+		it.each<[string, Partial<WorkspaceLlmUsageReport>, string, string, string | null]>([
+			[
+				"a reached provider cap",
+				{
+					ownProviderPaused: true,
+					ownProviderBudgetVerdict: "EXHAUSTED",
+					ownProviderTotalCostUsd: 10,
+				},
+				"Your provider cap is reached",
+				"Paused until August 1 (UTC), or until you raise or remove the cap.",
+				null,
+			],
+			[
+				"an unenforceable provider cap",
+				{ ownProviderPaused: true, ownProviderBudgetVerdict: "UNVERIFIABLE" },
+				"Your provider cap can't be enforced",
+				"2 runs on your models have no price, so the cap can't be checked and your provider is paused. Add a price to resume, or remove the cap.",
+				"/w/acme/admin/models",
+			],
+			[
+				"an exhausted shared budget",
+				{ instancePaused: true, instanceBudgetVerdict: "EXHAUSTED", instanceTotalCostUsd: 25 },
+				"Shared-model budget reached",
+				"Paused until August 1 (UTC), or until your host raises the budget. Practice detection and Mentor can keep running on your own models.",
+				"/w/acme/admin/models",
+			],
+			[
+				"an unverifiable shared budget",
+				{ instancePaused: true, instanceBudgetVerdict: "UNVERIFIABLE" },
+				"Shared-model spend can't be verified",
+				"2 shared-model runs have no price, so the budget can't be checked and shared models are paused. Only your host can price them.",
+				null,
+			],
+		])("explains %s, and links to the fix only where the reader can apply it", async (_name, patch, title, body, href) => {
+			await renderPage({ ...baseReport, ...patch });
+
+			const banner = screen.getByText(title).closest("[role='alert']") as HTMLElement;
+			expect(banner).toBeTruthy();
+			expect(within(banner).getByText(body)).toBeTruthy();
+			expect(
+				within(banner).queryByRole("link", { name: "Open AI models" })?.getAttribute("href") ??
+					null,
+			).toBe(href);
+		});
+
+		it("puts the cap editor in the banner as a button, not a link away to another owner", async () => {
+			const onEditOwnProviderCap = vi.fn();
+			await renderPage(
+				{
+					...baseReport,
+					ownProviderPaused: true,
+					ownProviderBudgetVerdict: "EXHAUSTED",
+					ownProviderTotalCostUsd: 10,
+				},
+				{ onEditOwnProviderCap },
+			);
+
+			const banner = screen.getByText("Your provider cap is reached").closest("[role='alert']");
+			expect(banner).toBeTruthy();
+			const adjust = within(banner as HTMLElement).getByRole("button", { name: "Adjust cap" });
+
+			fireEvent.click(adjust);
+
+			expect(onEditOwnProviderCap).toHaveBeenCalledTimes(1);
+			expect(adjust.tagName).toBe("BUTTON");
+		});
+
+		it("shows no pause banner for a past month", async () => {
+			await renderPage(
+				{ ...baseReport, ownProviderPaused: true, ownProviderBudgetVerdict: "EXHAUSTED" },
+				{ month: "2026-06", isCurrentMonth: false },
+			);
+
+			expect(screen.queryByText("Your provider cap is reached")).toBeNull();
+		});
+	});
+
+	describe("approaching a cap", () => {
+		it.each<[string, Partial<WorkspaceLlmUsageReport>, Date, string | null]>([
+			[
+				"warns at 80% with the date the pace reaches the cap",
+				{ ownProviderTotalCostUsd: 8.4 },
+				new Date("2026-07-10T12:00:00.000Z"),
+				"You've used 84% of your provider cap$8.40 of $10. At this pace, the cap is reached around July 12.",
+			],
+			[
+				"keeps the warning but withholds a projection the month is too young to support",
+				{ ownProviderTotalCostUsd: 8.4 },
+				new Date("2026-07-02T12:00:00.000Z"),
+				"You've used 84% of your provider cap$8.40 of $10.",
+			],
+			["stays quiet below the threshold", {}, new Date("2026-07-10T12:00:00.000Z"), null],
+			[
+				"says nothing about a cap that is already paused, which the banner covers",
+				{
+					ownProviderTotalCostUsd: 10,
+					ownProviderPaused: true,
+					ownProviderBudgetVerdict: "EXHAUSTED",
+				},
+				new Date("2026-07-10T12:00:00.000Z"),
+				null,
+			],
+		])("%s", async (_name, patch, now, pace) => {
+			await renderPage({ ...baseReport, unpricedEventCount: 0, ...patch }, { now });
+
+			expect(screen.queryByRole("status")?.textContent ?? null).toBe(pace);
+		});
+	});
+
+	describe("provider card", () => {
+		it.each<[string, Partial<WorkspaceLlmUsageReport>, string | RegExp]>([
+			[
+				"nothing has run on it",
+				{ ownProviderTotalCostUsd: 0, byJobType: [], byDay: [] },
+				/Connect your own provider in/,
+			],
+			["there is uncapped spend", {}, "No provider cap set · billed to you by your provider"],
+		])("offers a cap when %s", async (_name, patch, copy) => {
+			const onEditOwnProviderCap = vi.fn();
+			await renderPage(
+				{ ...baseReport, ownProviderMonthlyBudgetUsd: undefined, ...patch },
+				{ onEditOwnProviderCap },
+			);
+
+			expect(screen.getByText(copy)).toBeTruthy();
+			fireEvent.click(screen.getByRole("button", { name: "Set cap" }));
+			expect(onEditOwnProviderCap).toHaveBeenCalled();
+		});
+
+		it.each<[string, Partial<WorkspaceLlmUsageReport>, string]>([
+			["a cap in force", {}, "Change cap"],
+			["no cap yet", { ownProviderMonthlyBudgetUsd: undefined }, "Set cap"],
+		])("withdraws the editor on a closed month and says where to change it, with %s", async (_name, patch, label) => {
+			await renderPage(
+				{ ...baseReport, month: "2026-06", ...patch },
+				{ month: "2026-06", isCurrentMonth: false },
+			);
+
+			expect(screen.queryByRole("button", { name: label })).toBeNull();
+			expect(
+				screen.getByText(
+					"A cap applies from the moment it is saved, not to the month you are reading. Step forward to this month to change it.",
+				),
+			).toBeTruthy();
+		});
+	});
+
+	describe("display currency", () => {
+		const eur: FxRateInfo = {
+			currencyCode: "EUR",
+			ratePerUsd: 0.878966,
+			rateDate: new Date("2026-07-24T00:00:00.000Z"),
+			source: "ECB",
+		};
+
+		const twoDaysWithATotalRow: WorkspaceLlmUsageReport["byDay"] = [
+			{
+				day: new Date("2026-07-05T00:00:00.000Z"),
+				instanceTotalCostUsd: 6.2,
+				ownProviderTotalCostUsd: 0,
+				unpricedEventCount: 0,
+				events: 2,
+			},
+			{
+				day: new Date("2026-07-06T00:00:00.000Z"),
+				instanceTotalCostUsd: 6.2,
+				ownProviderTotalCostUsd: 0,
+				unpricedEventCount: 0,
+				events: 2,
+			},
+		];
+
+		it.each<[string, WorkspaceLlmUsageReport["byDay"], number, string | null]>([
+			["only the table footers convert", twoDaysWithATotalRow, 12.4, "≈ €10.90"],
+			["nothing on the page converted", [], 0, null],
+		])("discloses the rate when %s", async (_name, byDay, instanceTotalCostUsd, footerText) => {
+			await renderPage({
+				...baseReport,
+				instanceMonthlyBudgetUsd: 0,
+				ownProviderMonthlyBudgetUsd: undefined,
+				instanceTotalCostUsd,
+				ownProviderTotalCostUsd: 0,
+				unpricedEventCount: 0,
+				byJobType: [],
+				byDay,
+				fx: eur,
+			});
+
+			if (footerText == null) {
+				expect(screen.queryByText(/reference rate published on/)).toBeNull();
+				return;
+			}
+			const table = screen.getByRole("table", { name: "AI spend by day" });
+			expect(within(table).getByRole("row", { name: /^Total/ }).textContent).toContain(footerText);
+			expect(screen.getByText(/reference rate published on/)).toBeTruthy();
+		});
+
+		it("stays silent under a cap that is set but converted nowhere on the page", async () => {
+			await renderPage({
+				...baseReport,
+				instanceMonthlyBudgetUsd: undefined,
+				ownProviderMonthlyBudgetUsd: 50,
+				instanceTotalCostUsd: 0,
+				ownProviderTotalCostUsd: 0,
+				unpricedEventCount: 0,
+				byJobType: [],
+				byDay: [],
+				fx: eur,
+			});
+
+			expect(screen.queryByText(/≈ €/)).toBeNull();
+			expect(screen.queryByText(/reference rate published on/)).toBeNull();
+		});
+
+		it("converts the projected month-end figure in the same breath as the spend it follows", async () => {
+			await renderPage(
+				{
+					...baseReport,
+					instanceMonthlyBudgetUsd: 50,
+					instanceTotalCostUsd: 43.9,
+					ownProviderMonthlyBudgetUsd: undefined,
+					ownProviderTotalCostUsd: 0,
+					unpricedEventCount: 0,
+					fx: eur,
+				},
+				{ now: new Date("2026-07-28T12:00:00.000Z") },
+			);
+
+			const alert = screen.getByText(/At this pace/);
+			expect(alert.textContent).toContain("≈ €38.59 of €44");
+			expect(alert.textContent).toMatch(/the month finishes around \$[\d.]+ \(≈ €[\d.]+\)\./);
+		});
+	});
+});

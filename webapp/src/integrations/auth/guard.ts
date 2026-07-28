@@ -6,10 +6,8 @@ import {
 import type { CurrentUserView, WorkspaceMembership } from "@/api/types.gen";
 
 /**
- * How the current user is fetched everywhere. The route guards and `AuthContext` share this so
- * both read one cache entry on one schedule.
- *
- * A 401 is a definitive "not signed in", not a transient error, so it is never retried.
+ * Shared by the route guards and `AuthContext` so both read one cache entry on one schedule. A 401
+ * is a definitive "not signed in", not a transient error, so it is never retried.
  */
 export function currentUserQueryOptions() {
 	return { ...getCurrentUserOptions(), retry: false, staleTime: 30_000 };
@@ -22,11 +20,9 @@ export function currentUserQueryOptions() {
  * with the in-app `useAuth` surface — this makes the first paint correct (no auth
  * flash) because the route blocks on the same query the rest of the app reads.
  *
- * `revalidateIfStale` serves the cached session immediately but refreshes it in the background
- * once past `staleTime`, so a revoked `appRole` reaches the gate on the next navigation instead
- * of never (plain `ensureQueryData` ignores `staleTime` and would serve it for the tab's life).
- * Blocking on a fetch here instead would be worse than the bug: this guard runs on EVERY
- * authenticated navigation, so one flaky request would bounce a signed-in user to /login.
+ * `revalidateIfStale` refreshes in the background rather than blocking, because this guard runs on
+ * EVERY authenticated navigation and one flaky request would bounce a signed-in user to /login.
+ * Without it `ensureQueryData` would serve a revoked `appRole` for the life of the tab.
  *
  * A 401/403 (or any fetch failure) resolves to `null` rather than throwing, so
  * guards can branch on authentication without try/catch noise at every call site.
@@ -57,38 +53,29 @@ export function isAppAdmin(
 	return user?.appRole === "APP_ADMIN";
 }
 
+/** A "not a member" answer, as opposed to a transport failure, which carries no status at all. */
+function isServerRefusal(error: unknown): boolean {
+	const status = (error as { status?: unknown } | null)?.status;
+	return typeof status === "number" && status >= 400 && status < 500;
+}
+
 /**
- * How the current user's workspace membership is fetched everywhere. The route guard and the
- * in-app `useWorkspaceAccess` hook share this object so both read one cache entry on one
- * schedule: without a matching `staleTime`, the hook's default of 0 would refetch the moment the
- * guard's fetch landed, costing a duplicate request on every admin navigation.
- *
+ * Shared by the route guard and `useWorkspaceAccess` so both read one cache entry on one schedule —
+ * the hook's default `staleTime` of 0 would otherwise refetch the moment the guard's fetch landed.
  * `staleTime` is therefore also the bound on how long a role change takes to reach the UI.
  */
 export function workspaceMembershipQueryOptions(workspaceSlug: string) {
 	return {
 		...getCurrentUserMembershipOptions({ path: { workspaceSlug } }),
 		staleTime: 30_000,
-		// A 4xx is the server answering "not a member" — the expected reply for everyone who is
-		// not one, so retrying it would stall their redirect by seconds. The status is advisory
-		// only: it rides on the problem+json body, which a transport failure has no room for, so
-		// anything unrecognised retries and then fails closed.
-		retry: (failureCount: number, error: unknown) => {
-			const status = (error as { status?: unknown } | null)?.status;
-			if (typeof status === "number" && status >= 400 && status < 500) return false;
-			return failureCount < 2;
-		},
+		// Retrying a refusal would stall the redirect of everyone who is legitimately not a member.
+		retry: (failureCount: number, error: unknown) => !isServerRefusal(error) && failureCount < 2,
 	};
 }
 
 /**
- * Resolve the current user's membership in a workspace for route `beforeLoad` guards.
- *
- * `fetchQuery`, not `ensureQueryData`: the latter ignores `staleTime` and serves whatever is
- * cached, so a revoked admin would keep the admin UI for the life of the tab.
- *
- * Any failure resolves to `null` so guards fail closed, matching `resolveCurrentUser`:
- * unverifiable never means allowed.
+ * `fetchQuery`, not `ensureQueryData`: the latter ignores `staleTime`, so a revoked admin would keep
+ * the admin UI for the life of the tab. Any failure resolves to `null` — unverifiable is not allowed.
  */
 export async function resolveWorkspaceMembership(
 	queryClient: QueryClient,

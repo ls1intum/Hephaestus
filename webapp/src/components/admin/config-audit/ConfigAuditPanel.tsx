@@ -9,10 +9,6 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import type { ConfigAuditEntryView, PageConfigAuditEntryView } from "@/api/types.gen";
 import { AuditDateFacet } from "@/components/admin/audit-shared/AuditDateFacet";
-import {
-	AuditFacetFilter,
-	type AuditFacetOption,
-} from "@/components/admin/audit-shared/AuditFacetFilter";
 import { AuditRefFilterPill } from "@/components/admin/audit-shared/AuditRefFilterPill";
 import { AuditToolbar } from "@/components/admin/audit-shared/AuditToolbar";
 import {
@@ -23,34 +19,32 @@ import {
 	narrowToEnum,
 	nonEmpty,
 	toDateRange,
-} from "@/components/admin/audit-shared/auditSearch";
-import { dedupeById } from "@/components/admin/audit-shared/dedupeById";
-import { nameForRef } from "@/components/admin/audit-shared/nameForRef";
-import { springPageParams } from "@/components/admin/audit-shared/springPage";
+} from "@/components/admin/audit-shared/audit-search";
+import { dedupeById } from "@/components/admin/audit-shared/dedupe-by-id";
+import { nameForRef } from "@/components/admin/audit-shared/name-for-ref";
+import { springPageParams } from "@/components/admin/audit-shared/spring-page";
 import { ConfigAuditTable } from "@/components/admin/config-audit/ConfigAuditTable";
 import {
 	ACTION_LABELS,
 	ENTITY_TYPE_LABELS,
-} from "@/components/admin/config-audit/configAuditFormat";
+} from "@/components/admin/config-audit/config-audit-format";
+import { FacetMultiSelect, type FacetOption } from "@/components/common/FacetMultiSelect";
 
 const PAGE_SIZE = 50;
 
 type EntityType = NonNullable<ConfigAuditEntryView["entityType"]>;
 type Action = NonNullable<ConfigAuditEntryView["action"]>;
 
-// Facet options come from the shared label maps, so a new server enum value reaches both the filter
-// and the table's labels in one edit. Object.entries keeps the maps' declaration order.
-const ENTITY_TYPE_OPTIONS: AuditFacetOption[] = Object.entries(ENTITY_TYPE_LABELS).map(
+const ENTITY_TYPE_OPTIONS: FacetOption[] = Object.entries(ENTITY_TYPE_LABELS).map(
 	([value, label]) => ({ value, label }),
 );
-const ACTION_OPTIONS: AuditFacetOption[] = Object.entries(ACTION_LABELS).map(([value, label]) => ({
+const ACTION_OPTIONS: FacetOption[] = Object.entries(ACTION_LABELS).map(([value, label]) => ({
 	value,
 	label,
 }));
 const ENTITY_TYPES = Object.keys(ENTITY_TYPE_LABELS) as EntityType[];
 const ACTIONS = Object.keys(ACTION_LABELS) as Action[];
 
-/** The wire filter both scopes share, built from URL state. */
 function toQuery(search: ConfigAuditSearch) {
 	const dateRange = toDateRange(search);
 	return {
@@ -69,7 +63,6 @@ export interface ConfigAuditPanelProps {
 	resolveWorkspaceName?: (id: number) => string | undefined;
 }
 
-/** The instance-wide settings trail, across every workspace. */
 export function AdminConfigAuditPanel({
 	search,
 	onSearchChange,
@@ -91,7 +84,6 @@ export function AdminConfigAuditPanel({
 	);
 }
 
-/** One workspace's own settings trail, for its workspace admins. */
 export function WorkspaceConfigAuditPanel({
 	workspaceSlug,
 	search,
@@ -108,14 +100,8 @@ export function WorkspaceConfigAuditPanel({
 	return <ConfigAuditView search={search} onSearchChange={onSearchChange} listQuery={listQuery} />;
 }
 
-/** What both scopes' queries return; the library's own type, so the two cannot silently diverge. */
 type ConfigAuditListQuery = UseInfiniteQueryResult<InfiniteData<PageConfigAuditEntryView>, Error>;
 
-/**
- * Toolbar plus table for the settings-change trail. Shared verbatim by the instance-admin "Settings
- * changes" tab and the per-workspace audit page, so the two present the same trail with the same
- * controls and differ only in scope.
- */
 function ConfigAuditView({
 	search,
 	onSearchChange,
@@ -127,16 +113,12 @@ function ConfigAuditView({
 	showWorkspace?: boolean;
 }) {
 	const dateRange = toDateRange(search);
-	// Deduped by id: pages are offsets over a DESC ordering, so a row written between two fetches
-	// shifts everything down and page N+1 re-serves rows already rendered — duplicate React keys on
-	// exactly the surface whose own subject matter is being written while you read it.
 	const entries: ConfigAuditEntryView[] = dedupeById(
 		listQuery.data?.pages.flatMap((p) => p.content ?? []) ?? [],
 	);
 	const total = listQuery.data?.pages[0]?.totalElements;
-	// Derived from the NARROWED query, not from raw search state: a stale link whose enum values no
-	// longer exist filters nothing, so offering "Reset" and claiming rows "match the current filters"
-	// would both be lies.
+	// From the narrowed query, not raw search: unrecognised enum values filter nothing, so they must
+	// not count as an active filter.
 	const query = toQuery(search);
 	const hasFilter = Boolean(
 		query.entityType || query.action || query.actorId !== undefined || query.from,
@@ -154,13 +136,13 @@ function ConfigAuditView({
 	return (
 		<div className="space-y-4">
 			<AuditToolbar hasFilter={hasFilter} onReset={reset}>
-				<AuditFacetFilter
+				<FacetMultiSelect
 					title="Setting"
 					options={ENTITY_TYPE_OPTIONS}
 					selected={search.entityType ?? []}
 					onChange={(values) => onSearchChange({ entityType: nonEmpty(values) })}
 				/>
-				<AuditFacetFilter
+				<FacetMultiSelect
 					title="Action"
 					options={ACTION_OPTIONS}
 					selected={search.action ?? []}
@@ -180,8 +162,7 @@ function ConfigAuditView({
 				)}
 			</AuditToolbar>
 
-			{/* A persistent live region announces the count; the visible line is conditional, because an
-			    empty <p> still collects the stack's margins and leaves a gap under the toolbar. */}
+			{/* The live region is always mounted, so a count that arrives later is announced. */}
 			<span role="status" aria-live="polite" className="sr-only">
 				{total === undefined
 					? ""

@@ -3,6 +3,7 @@ import {
 	BookUser,
 	Bot,
 	ChevronRight,
+	CircleDollarSign,
 	ClipboardCheck,
 	LayoutGridIcon,
 	ListChecks,
@@ -15,6 +16,7 @@ import {
 	Trophy,
 	Users,
 } from "lucide-react";
+import { ADMIN_NAV_LABELS } from "@/components/core/sidebar/admin-nav-labels";
 import { GithubIcon, GitlabIcon, OutlineIcon, SlackIcon } from "@/components/icons/brand";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
@@ -32,23 +34,16 @@ export interface NavAdminProps {
 	workspaceSlug: string;
 	achievementsEnabled?: boolean;
 	practicesEnabled?: boolean;
-	mentorEnabled?: boolean;
 	/** Drives the Integrations sub-item's label + icon (GitHub vs GitLab). Defaults to GitHub. */
 	scmProviderType?: "GITHUB" | "GITLAB";
 }
 
-// "Practices" nests as a collapsible sub-tree because it owns several surfaces (the catalog, review
-// settings, and the run log). "Models" is a separate item, shared with the mentor, rather than living
-// under Practices. Individual practices are not sidebar entries — there are dozens; the catalog is
-// their home and each drills down to its own detail page.
 export function NavAdmin({
 	workspaceSlug,
 	achievementsEnabled = true,
 	practicesEnabled = true,
-	mentorEnabled = false,
 	scmProviderType = "GITHUB",
 }: NavAdminProps) {
-	const modelsVisible = practicesEnabled || mentorEnabled;
 	const matchRoute = useMatchRoute();
 
 	const onSettings = Boolean(
@@ -83,39 +78,39 @@ export function NavAdmin({
 			<SidebarMenu>
 				<SidebarMenuItem>
 					<SidebarMenuButton
-						tooltip="Manage workspace"
+						tooltip="Workspace settings"
 						render={<Link to="/w/$workspaceSlug/admin/settings" params={{ workspaceSlug }} />}
 					>
 						<Settings2 />
-						<span>Manage workspace</span>
+						<span>Settings</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
 				<SidebarMenuItem>
 					<SidebarMenuButton
-						tooltip="Manage members"
+						tooltip="Members"
 						render={<Link to="/w/$workspaceSlug/admin/members" params={{ workspaceSlug }} />}
 					>
 						<BookUser />
-						<span>Manage members</span>
+						<span>Members</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
 				<SidebarMenuItem>
 					<SidebarMenuButton
-						tooltip="Manage teams"
+						tooltip="Teams"
 						render={<Link to="/w/$workspaceSlug/admin/teams" params={{ workspaceSlug }} />}
 					>
 						<Users />
-						<span>Manage teams</span>
+						<span>Teams</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
 				{achievementsEnabled && (
 					<SidebarMenuItem>
 						<SidebarMenuButton
-							tooltip="Manage achievements"
+							tooltip="Achievements"
 							render={<Link to="/w/$workspaceSlug/admin/achievements" params={{ workspaceSlug }} />}
 						>
 							<Trophy />
-							<span>Manage achievements</span>
+							<span>Achievements</span>
 						</SidebarMenuButton>
 					</SidebarMenuItem>
 				)}
@@ -267,19 +262,26 @@ export function NavAdmin({
 						</SidebarMenuSub>
 					</CollapsibleContent>
 				</Collapsible>
-				{modelsVisible && (
-					<SidebarMenuItem>
-						<SidebarMenuButton
-							tooltip="Models"
-							render={<Link to="/w/$workspaceSlug/admin/models" params={{ workspaceSlug }} />}
-						>
-							<Bot />
-							<span>Models</span>
-						</SidebarMenuButton>
-					</SidebarMenuItem>
-				)}
-				{/* Deliberately not feature-gated: a change history must stay reachable after a feature is
-				    turned off, since the record of past changes still exists. */}
+				{/* Not feature-gated: credentials and model bindings have to be configurable before the
+				    features that consume them are switched on, and after they are switched off again. */}
+				<SidebarMenuItem>
+					<SidebarMenuButton
+						tooltip={ADMIN_NAV_LABELS.models}
+						render={<Link to="/w/$workspaceSlug/admin/models" params={{ workspaceSlug }} />}
+					>
+						<Bot />
+						<span>{ADMIN_NAV_LABELS.models}</span>
+					</SidebarMenuButton>
+				</SidebarMenuItem>
+				<SidebarMenuItem>
+					<SidebarMenuButton
+						tooltip="What this workspace spent on AI"
+						render={<Link to="/w/$workspaceSlug/admin/usage" params={{ workspaceSlug }} />}
+					>
+						<CircleDollarSign />
+						<span>{ADMIN_NAV_LABELS.usage}</span>
+					</SidebarMenuButton>
+				</SidebarMenuItem>
 				<SidebarMenuItem>
 					<SidebarMenuButton
 						tooltip="Settings changes in this workspace"
@@ -288,7 +290,7 @@ export function NavAdmin({
 						}
 					>
 						<ScrollText />
-						<span>Audit log</span>
+						<span>{ADMIN_NAV_LABELS.audit}</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
 			</SidebarMenu>

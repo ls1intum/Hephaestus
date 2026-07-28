@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Dev-only REST endpoint for manually triggering PR/issue reviews without NATS.
+ * Dev-only REST endpoint for manually triggering PR/issue reviews.
  * Enabled by setting hephaestus.dev.trigger-enabled=true.
  *
  * <p>Two modes:
@@ -34,11 +34,10 @@ import org.springframework.web.bind.annotation.RestController;
  *       listeners.</li>
  * </ul>
  *
- * <p><strong>Transaction boundary:</strong> {@link AgentJobService#submit} contracts that it
- * must NOT run inside an outer transaction (each config gets its own transaction for isolation). The
- * session-bound work — loading the artifact, the gate's lazy {@code Workspace.reviewSettings} access, and
- * building the detached request — therefore runs inside an explicit {@link TransactionTemplate} block, and
- * {@link AgentJobService#submitPrepared} (which calls {@code submit}) runs only AFTER that block commits.
+ * <p><strong>Transaction boundary:</strong> {@link AgentJobService#submit} must NOT run inside an outer
+ * transaction, so the session-bound work (loading the artifact, the gate's lazy associations, building
+ * the detached request) is confined to an explicit {@link TransactionTemplate} block and
+ * {@link AgentJobService#submitPrepared} runs only after it commits.
  *
  * Usage:
  * <pre>

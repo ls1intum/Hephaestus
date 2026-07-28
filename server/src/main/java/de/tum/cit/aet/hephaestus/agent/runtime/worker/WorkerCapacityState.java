@@ -25,7 +25,7 @@ public final class WorkerCapacityState {
     }
 
     public void releaseReview() {
-        decrementIfPositive(inFlightReview, "review");
+        decrementIfPositive(inFlightReview);
     }
 
     /** Atomic; returns {@code false} when at capacity (caller rejects the session). */
@@ -42,7 +42,7 @@ public final class WorkerCapacityState {
     }
 
     public void releaseMentor() {
-        decrementIfPositive(inFlightMentor, "mentor");
+        decrementIfPositive(inFlightMentor);
     }
 
     public CapacityReport snapshot() {
@@ -71,7 +71,7 @@ public final class WorkerCapacityState {
      * paths fire from defensive code (e.g. {@code AgentJobExecutor.releaseCapacity}) that can't
      * tolerate an exception, and the early-shutdown / double-release window is real but harmless.
      */
-    private static void decrementIfPositive(AtomicInteger counter, String label) {
+    private static void decrementIfPositive(AtomicInteger counter) {
         while (true) {
             int current = counter.get();
             if (current <= 0) {

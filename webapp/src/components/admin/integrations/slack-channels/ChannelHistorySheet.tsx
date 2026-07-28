@@ -29,7 +29,7 @@ import {
 	SheetTitle,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import { asDate } from "../sync-format";
+import { asDate } from "@/lib/dates";
 import { ConsentStateBadge } from "./consent-terms";
 
 export interface ChannelHistorySheetProps {

@@ -54,7 +54,7 @@ export function AchievementHeader({
 					<Sparkles className="w-5 h-5 text-background" />
 				</div>
 				<div>
-					<h1 className="text-lg font-bold text-foreground">Contributor Journey</h1>
+					<h1 className="text-lg font-bold text-foreground">Contributor journey</h1>
 					<p className="text-xs text-muted-foreground">
 						{onReload
 							? "Designer Mode — Configure achievement layouts"

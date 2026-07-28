@@ -51,7 +51,6 @@ const defaults: RuntimeEnvVars = {
 
 const env = (key: keyof RuntimeEnvVars): string => window.__ENV__?.[key] ?? defaults[key] ?? "";
 
-// Deployment identity from SENTRY_ENVIRONMENT (production / staging / preview / local).
 const DEPLOYMENT_NAMES: Record<string, string> = {
 	production: "Production",
 	staging: "Staging",

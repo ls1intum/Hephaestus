@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { ReactFlowProvider } from "@xyflow/react";
 import { expect, within } from "storybook/test";
 import { AchievementSidebar } from "@/components/achievements/AchievementSidebar";
-import { mockUser, mythicAchievementsUI } from "@/components/achievements/storyMockData";
+import { mockUser, mythicAchievementsUI } from "@/components/achievements/story-mock-data";
 
 /**
  * The consolidated achievements sidebar showing stats, progress, recent unlocks,

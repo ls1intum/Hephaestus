@@ -6,10 +6,9 @@ import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.domain.JavaMethodCall;
 import de.tum.cit.aet.hephaestus.core.AuditExempt;
+import de.tum.cit.aet.hephaestus.core.AuditLedger;
 import de.tum.cit.aet.hephaestus.core.Audited;
-import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -48,7 +47,7 @@ class AuditByDefaultArchTest extends HephaestusArchitectureTest {
                 """
                 These admin mutation endpoints declare neither @Audited nor @AuditExempt. Decide: if the \
                 action changes configuration or access, record it on the audit trail and mark it \
-                @Audited("<entity type or ledger>"); if it genuinely should not be recorded, mark it \
+                @Audited(ledger = …, type = "…"); if it genuinely should not be recorded, mark it \
                 @AuditExempt(reason="…"). An undeclared admin action is how an audit trail silently \
                 develops holes."""
             )
@@ -56,13 +55,61 @@ class AuditByDefaultArchTest extends HephaestusArchitectureTest {
     }
 
     /**
+     * {@link Audited#type()} is a bare token, because no annotation member can have a type that depends
+     * on another member's value — so the compiler cannot check it. A typo would be read as "some row type
+     * we don't know", silently opting the endpoint out of {@link #auditDeclarationsMatchTheCallGraph()}.
+     */
+    @Test
+    void everyAuditedTypeIsAConstantOfItsLedgersVocabulary() {
+        List<String> malformed = classes
+            .stream()
+            .filter(AuditByDefaultArchTest::isController)
+            .flatMap(c -> c.getMethods().stream())
+            .flatMap(m ->
+                m
+                    .tryGetAnnotationOfType(Audited.class)
+                    .stream()
+                    .flatMap(a ->
+                        malformedReason(a.ledger(), a.type())
+                            .map(reason -> m.getOwner().getSimpleName() + "." + m.getName() + ": " + reason)
+                            .stream()
+                    )
+            )
+            .sorted()
+            .toList();
+
+        assertThat(malformed)
+            .as(
+                """
+                These @Audited declarations name a row type their ledger does not have. `type` must be a \
+                constant of the ledger's vocabulary (see AuditLedger), and is left off only for a ledger \
+                that has no vocabulary at all."""
+            )
+            .isEmpty();
+    }
+
+    private static Optional<String> malformedReason(AuditLedger ledger, String type) {
+        Set<String> vocabulary = ledger.vocabulary();
+        if (type.isEmpty()) {
+            return vocabulary.isEmpty()
+                ? Optional.empty()
+                : Optional.of(ledger + " rows are typed — name the constant, e.g. type = \"X\"");
+        }
+        if (vocabulary.isEmpty()) {
+            return Optional.of(ledger + " types its rows with a free string, so '" + type + "' names nothing");
+        }
+        return vocabulary.contains(type)
+            ? Optional.empty()
+            : Optional.of("'" + type + "' is not a constant of the " + ledger + " vocabulary");
+    }
+
+    /**
      * An {@code @Audited} endpoint that reaches no recorder is a promise nothing keeps; an
      * {@code @AuditExempt} one that records anyway invites the next reader to delete a working audit
      * call. Both of those shipped here before the build checked them.
      *
-     * <p>Only {@code @Audited("<ENTITY_TYPE>")} is checked — a value naming another ledger
-     * ({@code connection_audit}, {@code auth_event}) points outside this port and cannot be resolved
-     * from the call graph.
+     * <p>Only {@code config_audit} values are checked — the other two ledgers point outside
+     * {@link ConfigAuditPort} and cannot be resolved from the call graph.
      */
     @Test
     void auditDeclarationsMatchTheCallGraph() {
@@ -92,17 +139,13 @@ class AuditByDefaultArchTest extends HephaestusArchitectureTest {
         }
         boolean namesEntityType = method
             .tryGetAnnotationOfType(Audited.class)
-            .map(a -> ENTITY_TYPES.contains(a.value()))
+            .map(a -> a.ledger() == AuditLedger.CONFIG_AUDIT)
             .orElse(false);
         if (namesEntityType && !records) {
             return Optional.of(name + " is @Audited but reaches no recorder");
         }
         return Optional.empty();
     }
-
-    private static final Set<String> ENTITY_TYPES = Arrays.stream(ConfigAuditEntityType.values())
-        .map(Enum::name)
-        .collect(java.util.stream.Collectors.toUnmodifiableSet());
 
     /** Depth-bounded so a cyclic service graph terminates; audit writes sit shallow behind a handler. */
     private static boolean reachesRecorder(JavaMethod method, Set<String> seen, int depth) {
@@ -150,7 +193,7 @@ class AuditByDefaultArchTest extends HephaestusArchitectureTest {
 
     /**
      * Admin-gated = a workspace admin/owner gate or the instance-admin authority, on the method OR its
-     * controller. Class-level gates count: seven controllers declare the gate once on the class.
+     * controller. Class-level gates count, since some controllers declare the gate once on the class.
      */
     static boolean isAdminGated(JavaMethod method) {
         return (

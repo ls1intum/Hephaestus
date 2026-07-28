@@ -80,8 +80,8 @@ public class ConversationalFeedbackPreparer {
             )
             .collect(Collectors.toList());
 
-        // Every admitted observation now consumes a slot (raised or withheld), so the band is no longer
-        // bounded by the per-recipient cap. Overflowing it would collide with the next band and silently drop
+        // Every admitted observation consumes a slot (raised or withheld), so the band is not bounded by
+        // the per-recipient cap. Overflowing it would collide with the next band and silently drop
         // the very rows this records — fail loud instead; a job with this many admitted loci is pathological.
         if (ordered.size() > FeedbackLedgerRecorder.UNIT_ORDINAL_BAND_WIDTH) {
             throw new IllegalStateException(

@@ -204,3 +204,12 @@ export const Empty: Story = { args: { jobs: [] } };
 export const Paged: Story = {
 	args: { jobs, page: 1, totalPages: 4, onPageChange: fn() },
 };
+
+export const FirstPage: Story = {
+	args: { jobs, page: 0, totalPages: 4, onPageChange: fn() },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByRole("navigation", { name: "pagination" })).toBeInTheDocument();
+		await expect(canvas.queryByText(/Page \d+ of \d+/)).toBeNull();
+	},
+};

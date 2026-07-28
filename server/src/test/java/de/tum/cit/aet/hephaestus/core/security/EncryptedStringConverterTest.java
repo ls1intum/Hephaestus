@@ -69,12 +69,31 @@ class EncryptedStringConverterTest extends BaseUnitTest {
         assertThat(disabled.convertToDatabaseColumn("x")).isEqualTo("x");
     }
 
+    /**
+     * The operator this message has to serve counted 32 characters and still got rejected. Saying only
+     * "must be 32 bytes. Got: 64" sends them hunting for a length they already have, so the message
+     * must state both counts and say which one is wrong and why.
+     */
     @Test
-    void rejectsKeyThatIsNot32Bytes() {
+    void rejectsKeyThatIsNot32BytesAndExplainsTheCharacterCountItGotInstead() {
         // 32 CHARS but multibyte ⇒ >32 bytes ⇒ must fail fast at construction, not at first encrypt.
         String multibyte = "ä".repeat(32); // 32 chars, 64 UTF-8 bytes
         assertThatThrownBy(() -> new EncryptedStringConverter(multibyte, "test"))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("32 bytes");
+            .hasMessageContaining("32-byte")
+            .hasMessageContaining("Got 64 bytes from 32 characters")
+            .hasMessageContaining("non-ASCII")
+            .hasMessageContaining("openssl rand -base64 24 | cut -c1-32")
+            .as("never echo the key material itself")
+            .hasMessageNotContaining(multibyte);
+    }
+
+    /** An ASCII key of the wrong length is the ordinary case, and "32 characters" is true for it. */
+    @Test
+    void tellsAnAsciiKeyOfTheWrongLengthTheCountInCharacters() {
+        assertThatThrownBy(() -> new EncryptedStringConverter("tooshort", "test"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Got 8 bytes from 8 characters")
+            .hasMessageContaining("that is 32 characters");
     }
 }

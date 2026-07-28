@@ -26,10 +26,8 @@ export function useWorkspaceAccess() {
 		selectWorkspace,
 		role,
 		isAdmin: hasMinimumWorkspaceRole(role, "ADMIN"),
-		// The account's SCM identity FOR THIS workspace's provider (ADR 0017): a linked account resolves
-		// to its GitHub user in a GitHub workspace, its GitLab user in a GitLab workspace. Backed by the
-		// server's workspace-scoped current-user resolution, so callers should prefer these over the
-		// global `username` for in-workspace identity (profile link, displayed name).
+		// The account's SCM identity for THIS workspace's provider — its GitHub user in a GitHub
+		// workspace, its GitLab user in a GitLab one. Prefer these over the global `username`.
 		userLogin: membershipQuery.data?.userLogin,
 		userName: membershipQuery.data?.userName,
 		isLoading: workspacesLoading || membershipQuery.isLoading,

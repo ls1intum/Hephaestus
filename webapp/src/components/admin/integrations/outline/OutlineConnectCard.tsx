@@ -2,6 +2,7 @@ import { differenceInCalendarDays, format } from "date-fns";
 import { CheckIcon, CircleAlertIcon, KeyRoundIcon, TriangleAlertIcon } from "lucide-react";
 import { useState } from "react";
 import type { OutlineTokenStatus } from "@/api/types.gen";
+import { RelativeTime } from "@/components/common/RelativeTime";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
 	AlertDialog,
@@ -19,9 +20,9 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/c
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { asDate } from "@/lib/dates";
 import { IntegrationCardHeading } from "../IntegrationCardHeading";
-import { RelativeTime } from "../RelativeTime";
-import { asDate, CONNECTION_STATE_LABEL, type ConnectionState } from "../sync-format";
+import { CONNECTION_STATE_LABEL, type ConnectionState } from "../sync-format";
 
 export interface OutlineConnectInput {
 	serverUrl: string;

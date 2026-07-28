@@ -29,11 +29,11 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * cost for PR-only workspaces (no matching practices → skip before any agent-config / role work).
  *
  * <p>Same transaction + async contract as the PR listener ({@code @Async},
- * {@code @TransactionalEventListener(AFTER_COMMIT)}, {@code REQUIRES_NEW}). Only active when the NATS
- * submitter is available.
+ * {@code @TransactionalEventListener(AFTER_COMMIT)}, {@code REQUIRES_NEW}). Only active when the
+ * agent job queue is enabled.
  */
 @Component
-@ConditionalOnProperty(prefix = "hephaestus.agent.nats", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(prefix = "hephaestus.agent", name = "enabled", havingValue = "true")
 public class IssueAgentJobEventListener {
 
     private static final Logger log = LoggerFactory.getLogger(IssueAgentJobEventListener.class);
@@ -66,13 +66,6 @@ public class IssueAgentJobEventListener {
         handleIssueEvent(event.issue(), event.context(), TriggerEventNames.ISSUE_LABELED);
     }
 
-    /**
-     * RETROSPECTIVE trigger: an issue was closed. Unlike {@link #onIssueCreated}/{@link #onIssueLabeled},
-     * this handler runs <em>because</em> the issue is closed — CLOSED is its expected terminal state — so it
-     * routes through {@link #handleRetrospectiveIssueEvent}, which omits the closed-skip. Only
-     * ISSUE-focused practices carrying {@code IssueClosed} match in the gate, so PR-only / non-opted
-     * workspaces short-circuit at no cost.
-     */
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -81,11 +74,10 @@ public class IssueAgentJobEventListener {
     }
 
     private void handleIssueEvent(ScmEventPayload.IssueData issueData, EventContext context, String triggerEventName) {
-        // 1. Skip sync events — agent reviews are for real-time activity only.
+        // Agent reviews are for real-time activity only.
         if (context.isSync()) {
             return;
         }
-        // 2. Skip closed issues — event validity, not the gate's concern.
         if (issueData.state() == Issue.State.CLOSED) {
             return;
         }
@@ -93,10 +85,9 @@ public class IssueAgentJobEventListener {
     }
 
     /**
-     * Retrospective counterpart of {@link #handleIssueEvent}: routes a closed issue through the gate
-     * WITHOUT the closed-skip (CLOSED is this trigger's reason to run). Sync is still skipped so a history
-     * replay does not fire a retrospective review for every issue the repository ever closed; validate this
-     * path on a synced mirror via the dev-trigger {@code triggerEvent} param, which calls the gate directly.
+     * Retrospective counterpart of {@link #handleIssueEvent}, deliberately without its closed-skip: here
+     * CLOSED is the trigger's reason to run. Sync is still skipped so a history replay does not fire a
+     * retrospective review for every issue the repository ever closed.
      */
     private void handleRetrospectiveIssueEvent(
         ScmEventPayload.IssueData issueData,
@@ -106,13 +97,11 @@ public class IssueAgentJobEventListener {
         if (context.isSync()) {
             return;
         }
-        // NOTE: intentionally NO closed-state skip — the closed state is this trigger's reason to run.
         dispatchIssueEvent(issueData, triggerEventName);
     }
 
     private void dispatchIssueEvent(ScmEventPayload.IssueData issueData, String triggerEventName) {
         try {
-            // 3. Fetch the entity with the associations the gate needs (repository + assignees).
             Issue issue = issueRepository.findByIdWithRepositoryAndAssignees(issueData.id()).orElse(null);
             if (issue == null || issue.getRepository() == null) {
                 log.warn(
@@ -122,7 +111,6 @@ public class IssueAgentJobEventListener {
                 return;
             }
 
-            // 4. Evaluate the issue detection gate (workspace-aware business policy).
             switch (practiceReviewDetectionGate.evaluateIssue(issue, triggerEventName, TriggerMode.AUTO)) {
                 case GateDecision.Skip skip -> log.debug(
                     "Issue agent job skipped by practice gate: issueId={}, event={}, reason={}",

@@ -34,6 +34,18 @@ public interface FeedbackChannel {
     }
 
     /**
+     * Search the target's existing comments for one carrying {@code marker}, so a delivery-recovery retry
+     * after a crash can record the already-posted comment instead of posting a duplicate.
+     *
+     * <p>Only {@code ABSENT} licenses posting: a channel that cannot distinguish "searched everything,
+     * nothing matched" from "could not search" must answer {@code UNKNOWN} (the default), and the caller
+     * must then leave the delivery {@code PENDING} rather than risk a second summary.
+     */
+    default ExistingSummaryLookup findExistingSummary(FeedbackTarget target, String marker) {
+        return ExistingSummaryLookup.unknown();
+    }
+
+    /**
      * Format the vendor's external identifier for a pull request / merge request. GitHub
      * uses {@code repoFullName#prNumber}; GitLab uses {@code repoFullName!prNumber};
      * future kinds add their own. The {@code subjectExternalId} stored on the
@@ -64,6 +76,30 @@ public interface FeedbackChannel {
 
     /** Vendor-side post identifier recorded on {@code FeedbackPlacement.external_ref} for edit-in-place (ADR 0021 C6). */
     record SummaryHandle(String externalId) {}
+
+    record ExistingSummaryLookup(Kind kind, SummaryHandle handle) {
+        public enum Kind {
+            /** A comment carrying the marker was found. */
+            FOUND,
+            /** The channel searched everything it can and confirmed no comment carries the marker. */
+            ABSENT,
+            /** The channel could not determine either way (error, rate limit, or unsupported). */
+            UNKNOWN,
+        }
+
+        public static ExistingSummaryLookup found(SummaryHandle handle) {
+            Objects.requireNonNull(handle, "FOUND outcome requires a SummaryHandle");
+            return new ExistingSummaryLookup(Kind.FOUND, handle);
+        }
+
+        public static ExistingSummaryLookup absent() {
+            return new ExistingSummaryLookup(Kind.ABSENT, null);
+        }
+
+        public static ExistingSummaryLookup unknown() {
+            return new ExistingSummaryLookup(Kind.UNKNOWN, null);
+        }
+    }
 
     /**
      * The outcome of an {@link #updateSummary} attempt. {@code TRANSIENT} is the load-bearing case: the caller

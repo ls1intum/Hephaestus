@@ -6,9 +6,8 @@ import { adminListAuthEventsInfiniteOptions } from "@/api/@tanstack/react-query.
 import { adminExportAuthEvents } from "@/api/sdk.gen";
 import type { AuthEventView } from "@/api/types.gen";
 import { AdminAuditTable } from "@/components/admin/audit/AdminAuditTable";
-import { type AuthEventType, EVENT_TYPE_LABELS } from "@/components/admin/audit/auditFormat";
+import { type AuthEventType, EVENT_TYPE_LABELS } from "@/components/admin/audit/audit-format";
 import { AuditDateFacet } from "@/components/admin/audit-shared/AuditDateFacet";
-import { AuditFacetFilter } from "@/components/admin/audit-shared/AuditFacetFilter";
 import { AuditRefFilterPill } from "@/components/admin/audit-shared/AuditRefFilterPill";
 import { AuditToolbar } from "@/components/admin/audit-shared/AuditToolbar";
 import {
@@ -19,10 +18,11 @@ import {
 	narrowToEnum,
 	nonEmpty,
 	toDateRange,
-} from "@/components/admin/audit-shared/auditSearch";
-import { dedupeById } from "@/components/admin/audit-shared/dedupeById";
-import { nameForRef } from "@/components/admin/audit-shared/nameForRef";
-import { springPageParams } from "@/components/admin/audit-shared/springPage";
+} from "@/components/admin/audit-shared/audit-search";
+import { dedupeById } from "@/components/admin/audit-shared/dedupe-by-id";
+import { nameForRef } from "@/components/admin/audit-shared/name-for-ref";
+import { springPageParams } from "@/components/admin/audit-shared/spring-page";
+import { FacetMultiSelect } from "@/components/common/FacetMultiSelect";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -47,11 +47,6 @@ export interface AuthAuditPanelProps {
 	resolveWorkspaceName?: (id: number) => string | undefined;
 }
 
-/**
- * The sign-in and account trail: toolbar, CSV export, and table. Sibling of `ConfigAuditPanel` and
- * deliberately the same shape, so the two tabs of the audit log differ in content rather than in
- * how they are operated.
- */
 export function AuthAuditPanel({
 	search,
 	onSearchChange,
@@ -75,13 +70,12 @@ export function AuthAuditPanel({
 		...springPageParams,
 	});
 
-	// Deduped: offset pages over an append-only log re-serve rows written between fetches.
 	const events: AuthEventView[] = dedupeById(
 		listQuery.data?.pages.flatMap((p) => p.content ?? []) ?? [],
 	);
 	const total = listQuery.data?.pages[0]?.totalElements;
-	// From the NARROWED filter, not raw search: a stale link whose enum values no longer exist filters
-	// nothing, so "Reset" and "match the current filters" would both be lying.
+	// From the narrowed filter, not raw search: unrecognised enum values filter nothing, so they must
+	// not count as an active filter.
 	const hasFilter = Boolean(
 		filters.eventType ||
 			filters.result ||
@@ -141,13 +135,13 @@ export function AuthAuditPanel({
 					</Button>
 				}
 			>
-				<AuditFacetFilter
+				<FacetMultiSelect
 					title="Event"
 					options={EVENT_TYPE_OPTIONS}
 					selected={search.eventType ?? []}
 					onChange={(values) => onSearchChange({ eventType: nonEmpty(values) })}
 				/>
-				<AuditFacetFilter
+				<FacetMultiSelect
 					title="Result"
 					options={OUTCOME_OPTIONS}
 					selected={search.outcome ?? []}

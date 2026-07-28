@@ -8,9 +8,7 @@ import { routeTree } from "@/routeTree.gen";
 
 const WORKSPACE_HOME = "/w/acme";
 
-// `router.load()` lazily imports each matched route's module, so a case can pay the one-off cost of
-// transforming a heavy page (the achievement designer pulls in ReactFlow). Observed ~4s against the
-// 5s default, which is a flake waiting to happen on a loaded CI box.
+// `router.load()` lazily imports each matched route's module, so a case pays its transform cost.
 vi.setConfig({ testTimeout: 15_000 });
 
 function newRouter(url?: string) {
@@ -25,7 +23,6 @@ function newRouter(url?: string) {
 	});
 }
 
-/** Every admin URL, read from the generated tree so a new admin route is covered automatically. */
 const adminUrls = Object.values(newRouter().routesById)
 	.filter((route) => route.fullPath?.startsWith("/w/$workspaceSlug/admin/"))
 	.map((route) => route.fullPath.replace("$workspaceSlug", "acme"));
@@ -35,8 +32,7 @@ function mockMembership(role: WorkspaceRole | null) {
 		http.get("*/workspaces/:workspaceSlug/members/me", () =>
 			role
 				? HttpResponse.json({ role, userId: 1, userLogin: "ada", userName: "Ada" })
-				: // What the server actually sends a non-member: the membership lookup throws
-					// IllegalArgumentException, which the global advice renders as 400.
+				: // A non-member gets 400, not 403: the membership lookup throws IllegalArgumentException.
 					HttpResponse.json({ status: 400, title: "Bad Request" }, { status: 400 }),
 		),
 	);
@@ -48,22 +44,15 @@ async function land(url: string) {
 	return router.state.location.pathname;
 }
 
-/**
- * Drives admin URLs through the real router as each role. This is what makes the gate structural
- * rather than a convention: a route file that maps to an /admin URL without nesting under the
- * layout (a sibling of it, a dot-notation path, an `admin_` un-nesting suffix) skips the guard
- * silently, and `achievement-designer.tsx` shipped exactly that way.
- */
+/** Guards the bypass a route file cannot show: an /admin URL that does not nest under the gate. */
 describe("workspace-admin route gate", () => {
-	it("enumerates the admin routes", () => {
-		// A filter that matched nothing would leave every case below vacuously green, and one that
-		// matched a subset would quietly shrink the coverage this suite exists for.
-		expect(adminUrls.length).toBeGreaterThanOrEqual(14);
+	it("enumerates the admin routes rather than trusting a hand-written list", () => {
+		// A filter that matched nothing would leave every case below vacuously green.
+		expect(adminUrls.length).toBeGreaterThanOrEqual(19);
+		expect(adminUrls).toContain("/w/acme/admin/settings");
+		expect(adminUrls).toContain("/w/acme/admin/achievement-designer");
 	});
 
-	// Per route, because each route's nesting is a separate fact: an un-nested one fails only its
-	// own case. The allow path needs no such loop — an ungated route admits an ADMIN just as
-	// happily as a gated one, so it would prove nothing per route.
 	it.each(adminUrls)("redirects a MEMBER away from %s", async (url) => {
 		mockMembership("MEMBER");
 		expect(await land(url)).toBe(WORKSPACE_HOME);

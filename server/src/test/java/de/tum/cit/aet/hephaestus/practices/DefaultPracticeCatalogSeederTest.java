@@ -75,7 +75,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
 
         seeder(true).seed();
 
-        // The shipped catalog is twelve areas with thirty-five practices total, each bound to its area.
+        // Every practice in the shipped catalog is bound to its area; the counts below are the catalog's.
         verify(areaService).createArea(any(), eq("review-ready-work"), any());
         verify(areaService).createArea(any(), eq("acting-on-review-feedback"), any());
         verify(areaService).createArea(any(), eq("actionable-issue-authoring"), any());

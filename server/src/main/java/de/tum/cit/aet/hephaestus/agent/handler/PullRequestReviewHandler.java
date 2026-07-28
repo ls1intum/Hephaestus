@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.context.providers.GitDiffOperations;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
@@ -501,6 +502,15 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         feedbackService.deliverFeedback(job, delivery, deliveredKeys ->
             DeliveryComposer.recomposeMrNote(deliverable, WorkArtifact.PULL_REQUEST, whyBySlug, deliveredKeys)
         );
+    }
+
+    /**
+     * Guards only the summary comment. Inline diff notes are reconciled on every delivery attempt, so a
+     * recovery retry that falls through to {@link #deliver} cannot duplicate them.
+     */
+    @Override
+    public ExistingDeliveryLookup findExistingDelivery(AgentJob job) {
+        return feedbackService.findExistingDeliveryCommentId(job);
     }
 
     // Delivery-phase diff helpers (delegate to GitDiffOperations)

@@ -24,15 +24,22 @@ The stack you get:
 
 ## Requirements
 
-- **4 vCPUs, 8 GB RAM, 40 GB SSD** recommended. Absolute floor: 2 vCPUs / 4 GB RAM —
-  the stack runs **two JVMs** plus Postgres and NATS, so 4 GB means swap and slow starts.
+- **4 vCPUs, 8 GB RAM, 40 GB SSD** recommended. Absolute floor: 2 vCPUs / **8 GB RAM** — the two JVMs
+  ship with container memory limits of 5 GB (`application-server`) and 2 GB (`webhook-server`), so a
+  smaller host does not swap, it OOM-kills. On a host below that, lower both limits before the first
+  start: set `APPLICATION_SERVER_MEM_LIMIT` and `WEBHOOK_SERVER_MEM_LIMIT` in `.env` (each JVM sizes
+  its heap from its own limit, so lowering the limit lowers the heap with it).
 - **AI practice review adds real memory**: each concurrent review sandbox may use up to
   4 GiB. The default caps it at 1 concurrent sandbox; raise
   `SANDBOX_MAX_CONCURRENT` only with RAM to match.
 - 64-bit Linux with **Docker Engine ≥ 24** and **Docker Compose ≥ 2.24.4** (`docker compose version`), plus `git`.
 - A **DNS A record** for your hostname pointing at the host, with ports **80 and 443**
   reachable from the internet (Let's Encrypt HTTP-01, OAuth callbacks, webhooks).
-- Outbound HTTPS to `ghcr.io` (images), `github.com` (release pin) and `api.github.com`.
+- Outbound HTTPS to `ghcr.io` and `docker.io` (images — NATS and Traefik come from Docker Hub),
+  `github.com` (release pin), `api.github.com`, and `fulcio.sigstore.dev`, `rekor.sigstore.dev`,
+  `tuf-repo-cdn.sigstore.dev` (the `release-pin-fetcher` verifies the pin with keyless cosign, which
+  reaches Sigstore, not just GitHub). On an egress-filtered host, a missing Sigstore domain shows up
+  as the release-pin step failing even though `github.com` is reachable.
 
 ## 1. Get the files
 
@@ -48,8 +55,11 @@ cd /opt/hephaestus/docker/self-host
 cp .env.example .env
 ```
 
-Everything below runs from `/opt/hephaestus/docker/self-host`. Inspect the effective
-configuration at any time with `docker compose config`.
+Everything below runs from `/opt/hephaestus/docker/self-host`. Once step 2 has filled in every
+required value, `docker compose config` renders the effective configuration — it is the quickest way
+to confirm a variable landed where you expected. Before then it exits with the first
+`required variable … is missing a value`, which is also how every other `docker compose` subcommand
+behaves in this directory; see [Troubleshooting](#troubleshooting).
 
 ## 2. Configure `.env`
 
@@ -88,7 +98,7 @@ access — see [GitHub integration](./github-integration)):
    `GH_OAUTH_CLIENT_ID` / `GH_OAUTH_CLIENT_SECRET`.
 
 GitLab login works the same way and can be used instead of (or next to) GitHub — see the
-[GitLab section in Production Setup](./production-setup#gitlab-rollout-bundle).
+[GitLab rollout bundle](./production-setup#gitlab-rollout-bundle).
 
 ## 4. First admin — before first boot
 
@@ -136,8 +146,8 @@ Login alone syncs nothing. Two things make data flow, both covered step-by-step 
 ## 7. Optional integrations
 
 All off by default. The compose file already passes their variables through — enable them
-in `.env` and `docker compose up -d`. Each is documented in
-[Production Setup](./production-setup), which doubles as the variable reference:
+in `.env` and `docker compose up -d`. Each has its variable reference in
+[Integrations & Reference Deployment](./production-setup):
 
 | Add-on | What it gives you | Where |
 | --- | --- | --- |
@@ -145,12 +155,17 @@ in `.env` and `docker compose up -d`. Each is documented in
 | Slack | Mentor in Slack, channel ingestion, digests | [Slack app setup](./production-setup#slack-app-configuration) |
 | Outline | Wiki as a content source for reviews | [Outline integration](./production-setup#outline-integration) |
 | AI practice review | Automated PR feedback from the coding agent | [Practice review bundle](./production-setup#practice-review-rollout-bundle) |
+| An AI provider | The model everything AI runs on — required by the row above | [Connect an AI Provider](./ai-providers) |
 
 **AI practice review needs two things, not one:** the environment bundle above
-(`AGENT_NATS_ENABLED`, `GIT_CHECKOUT_ENABLED`, `PRACTICE_REVIEW_FOR_ALL` — set together, plus
-an `LLM_PROXY_*` upstream), **and** a model with an API key configured per workspace in the
-UI under **Workspace settings → AI**. With the flags on but no workspace model, nothing is
-reviewed and no error explains why.
+(`AGENT_ENABLED`, `GIT_CHECKOUT_ENABLED`, `PRACTICE_REVIEW_FOR_ALL` — set together; the job
+queue itself runs on PostgreSQL, no NATS setup needed for this bundle), **and** a model that the
+workspace can actually run on. Setting that model up — registering a provider connection, testing it,
+pricing the model, sharing it, and binding it to the **practice detection** purpose — is
+[Connect an AI Provider](./ai-providers), and nothing reviews anything until it is done. With the
+flags on but nothing bound, webhook-driven reviews are skipped with only a DEBUG log line, since an
+unbound workspace is a normal state and one line per event would be noise. The manual dev trigger
+answers with the reason, so use it to tell "unbound" apart from "broken".
 
 ## 8. Legal pages (public instances)
 
@@ -194,5 +209,5 @@ a backup instead. Set up [Backup & Restore](./backup-restore) **before** you hav
 | Signed in but not admin | `HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS` didn't match. On the account's **first** login the server logs (INFO) the exact `provider subject username` it saw — copy that into the allowlist and restart. (For an account that already existed, check that log line from its first sign-in, or use the numeric id.) |
 | GitHub webhook deliveries show `401` | `WEBHOOK_SECRET` on GitHub differs from `.env` — must be byte-identical. |
 | Data appears only ~hourly | No GitHub webhook configured (see step 6). |
-| `release-pin-fetcher` fails | `IMAGE_TAG` is not a published release (no signed pin asset), or the host can't reach `github.com`. Use a real release tag and check outbound HTTPS. |
+| `release-pin-fetcher` fails | `IMAGE_TAG` is not a published release (no signed pin asset), or the host can't reach `github.com` **or Sigstore**. Signature verification is keyless, so it needs `fulcio.sigstore.dev`, `rekor.sigstore.dev` and `tuf-repo-cdn.sigstore.dev` as well — an egress filter that allows only GitHub fails here with the release tag perfectly valid. Use a real release tag and check outbound HTTPS to all four. |
 | `docker compose down`/`logs` aborts with "variable is missing" | Required `.env` values are validated for every subcommand. Fill them (dummy values are fine) before teardown. |

@@ -16,13 +16,14 @@ starts** (so failed and cancelled runs keep their provenance too) or frozen at s
 | Dimension | Where it lives | Written when |
 | --- | --- | --- |
 | Pinned model id + version | `agent_job.config_snapshot` (JSONB, frozen `ConfigSnapshot`) and denormalised `agent_job.llm_model` / `llm_model_version` | snapshot at submit; denormalised columns at completion |
-| LLM provider, base URL, credential mode, timeout | `agent_job.config_snapshot` | submit |
+| Route + behaviour shape: wire API (`apiProtocol`), base URL, upstream model id, context window, max output tokens, reasoning support, connection scope + id, timeout, internet access | `agent_job.config_snapshot` (`ConfigSnapshot` v5) | submit |
+| Price snapshot (the per-token rates the run is billed at) | `agent_job.config_snapshot.priceSnapshot` | **claim**, not submit — `ConfigSnapshot.from` writes it null and `AgentJobExecutor` attaches it via `withPriceSnapshot` when the job is admitted (see below) |
 | Criteria / practice revision | `observation.practice_revision_id` → `practice_revision` (SCD-2 snapshot of `Practice.criteria`) | persist time, pinned **as of `agent_job.started_at`** (see §3) |
 | Prompt template version | `agent_job.prompt_digest` — SHA-256 root digest of the prompt scaffolding (`pi-orchestrator.md` + runner script + sidecar scripts), computed by `PiRuntimeFactory` | prepare, before sandbox start |
 | Input snapshot reference | `agent_job.inputs_digest` — SHA-256 root digest over **every** file materialised into the sandbox workspace (context files, practice criteria, precompute scripts, task envelope, prompt scaffolding, Pi settings), computed by `AgentJobExecutor` over the final merged file set | prepare, before sandbox start |
 | Per-file content hashes | `inputs/manifest.json` (`ContextManifestBuilder`) — per-file `sha256` for `inputs/context/*`, blobs stored in the content-addressed store, manifest persisted under the fabric's `jobs/{jobId}/` | prepare (best-effort; the DB root digest above is the authoritative record) |
 | Repository state | `agent_job.metadata.commit_sha` (head ref) — the read-only repo mount is **not** hashed; the commit SHA pins it | submit |
-| Usage outcomes | `agent_job.llm_total_*`, `llm_cache_*`, `llm_cost_usd` | completion |
+| Usage outcomes | `agent_job.llm_total_*`, `llm_cache_*` for the run's own token counts; `llm_usage_event.cost_usd` for what it cost | completion |
 
 Digest semantics (`ProvenanceDigest`): root digest = SHA-256 over the path-sorted sequence of
 `path NUL sha256(content) LF`. Two runs with equal `inputs_digest` consumed byte-identical inputs.
@@ -32,10 +33,13 @@ Digest semantics (`ProvenanceDigest`): root digest = SHA-256 over the path-sorte
 ### Sampling parameters
 
 Hephaestus does not set temperature, top_p, or max output tokens for detection runs — sampling is the
-provider default for the pinned `(provider, model, model_version)`. That triple, plus `prompt_digest`,
-IS the sampling provenance today. **Invariant:** if sampling knobs are ever introduced, they must be
-added to `AgentConfig` and carried through `ConfigSnapshot` (the per-job frozen config) — never set
-ad hoc in the runtime — so each run keeps its own record.
+provider default for the pinned route. What identifies that route is the frozen
+`(base URL, upstream model id, model_version)` — the provider is no longer a named enum, since every
+connection speaks an OpenAI-compatible wire API and the base URL is what actually distinguishes one
+endpoint from another. That triple, plus `prompt_digest`, IS the sampling provenance today.
+**Invariant:** if sampling knobs are ever introduced, they must be added to `WorkspaceAgentBinding`
+and carried through `ConfigSnapshot` (the per-job frozen config) — never set ad hoc in the runtime —
+so each run keeps its own record.
 
 ---
 
@@ -45,7 +49,14 @@ User reactions are only usable as labels if "the developer saw it" is a fact, no
 **prepared unit** — a composed review that reached the delivery layer — lands exactly one `feedback`
 row, in the state that says what became of it (`FeedbackDeliveryState`, defined in
 [practice-feedback-schema.md](./practice-feedback-schema.md)). Only `DELIVERED` counts as exposure;
-`SUPPRESSED` means policy withheld it and always carries a reason:
+`SUPPRESSED` means policy withheld it and always carries a reason.
+
+> **This table is the one home of the suppression-reason list.** It tracks the Java enum
+> `practices/feedback/FeedbackSuppressionReason` and the `chk_feedback_suppression_reason` CHECK
+> constraint, which must agree with it value-for-value. `practice-feedback-schema.md` § 3.9 and
+> ADR 0021 point here rather than repeating it — a second copy of an enum is a second thing to be
+> wrong. Adding a value means: enum constant, CHECK-constraint changeset, and a row below naming its
+> writer.
 
 | Reason | Written by | Granularity |
 | --- | --- | --- |

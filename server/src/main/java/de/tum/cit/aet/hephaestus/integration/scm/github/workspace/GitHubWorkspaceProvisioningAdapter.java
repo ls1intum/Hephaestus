@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.workspace;
 
+import static de.tum.cit.aet.hephaestus.core.TransactionCallbacks.afterCommit;
+
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener;
 import de.tum.cit.aet.hephaestus.integration.scm.github.lifecycle.GithubLifecycleListener;
@@ -14,8 +16,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Component
 public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener {
@@ -230,19 +230,7 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
             .findByInstallationId(installationId)
             .ifPresent(workspace -> {
                 Long workspaceId = workspace.getId();
-
-                if (TransactionSynchronizationManager.isSynchronizationActive()) {
-                    TransactionSynchronizationManager.registerSynchronization(
-                        new TransactionSynchronization() {
-                            @Override
-                            public void afterCommit() {
-                                triggerInitialSync(installationId, workspaceId);
-                            }
-                        }
-                    );
-                } else {
-                    triggerInitialSync(installationId, workspaceId);
-                }
+                afterCommit(() -> triggerInitialSync(installationId, workspaceId));
             });
 
         githubLifecycleListener.startNatsForInstallation(installationId);

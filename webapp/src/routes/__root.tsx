@@ -1,6 +1,7 @@
 import { type QueryClient, useQuery } from "@tanstack/react-query";
 import {
 	createRootRouteWithContext,
+	HeadContent,
 	Link,
 	Outlet,
 	useLocation,
@@ -22,8 +23,8 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { Toaster } from "@/components/ui/sonner";
 import environment from "@/environment";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
+import { useMentorChat } from "@/hooks/use-mentor-chat";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
-import { useMentorChat } from "@/hooks/useMentorChat";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
 import { FeatureFlagDevTools, useFeatureFlag } from "@/integrations/feature-flags";
 import { isPosthogEnabled } from "@/integrations/posthog/config";
@@ -36,6 +37,9 @@ interface MyRouterContext {
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
+	// Fallback tab title; the deepest match that sets its own `head` wins. The static <title> in
+	// index.html stays as the pre-hydration placeholder.
+	head: () => ({ meta: [{ title: "Hephaestus" }] }),
 	component: () => {
 		const { pathname } = useLocation();
 		const { isAuthenticated, isLoading } = useAuth();
@@ -77,6 +81,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 		if (isAuthRoute) {
 			return (
 				<>
+					<HeadContent />
 					<CookieConsentBanner />
 					<ProviderColorScope>
 						<Outlet />
@@ -88,6 +93,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 
 		return (
 			<>
+				<HeadContent />
 				{/* Rendered early so keyboard/AT users reach the consent region before the app chrome. */}
 				<CookieConsentBanner />
 				<ImpersonationBanner />

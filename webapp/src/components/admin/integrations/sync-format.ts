@@ -1,5 +1,7 @@
 import { formatDistanceToNow } from "date-fns";
 import type { ConnectionSyncStatus, IntegrationCatalogEntry, SyncJob } from "@/api/types.gen";
+import type { FreshnessTone } from "@/components/common/RelativeTime";
+import { asDate } from "@/lib/dates";
 
 /**
  * Poll cadence for sync status/resources/jobs queries. SSE hint invalidation is the primary live
@@ -20,12 +22,6 @@ export function syncPollInterval(
 ): number | false {
 	if (livePushUnavailable) return hasActiveJob ? 5_000 : 60_000;
 	return hasActiveJob ? 30_000 : false;
-}
-
-export function asDate(value: Date | string | undefined | null): Date | undefined {
-	if (value == null) return undefined;
-	const date = value instanceof Date ? value : new Date(value);
-	return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
 /**
@@ -168,16 +164,6 @@ export function phaseLabel(token: string): string {
 }
 
 /**
- * How a resource's freshness reads against the connection's cadence.
- *
- * - `never` — no `lastSyncedAt` at all; the mirror has never been populated.
- * - `unknown` — there is a timestamp but no known cadence, so no judgement is possible. This mirrors
- *   the server's own rollup, which reports `stale: 0` rather than guessing an interval.
- * - `fresh` / `stale` / `veryStale` — judged against the cadence.
- */
-export type FreshnessTone = "never" | "unknown" | "fresh" | "stale" | "veryStale";
-
-/**
  * A resource is legitimately "one cadence old" for the whole gap between two runs, so 1x would flag
  * the entire fleet right before every scheduled sync. 2x means a run was actually missed — the same
  * multiple `SyncStatusService.rollUp` uses, so a row tinted here is exactly a row counted in
@@ -199,15 +185,6 @@ export function freshnessTone(
 	if (ageSeconds > syncIntervalSeconds * STALE_CADENCE_MULTIPLE) return "stale";
 	return "fresh";
 }
-
-/** Text colour per tone. `fresh`/`unknown` stay muted — only a real judgement earns a colour. */
-export const FRESHNESS_CLASS: Record<FreshnessTone, string> = {
-	never: "text-muted-foreground",
-	unknown: "text-muted-foreground",
-	fresh: "text-muted-foreground",
-	stale: "text-warning",
-	veryStale: "text-destructive",
-};
 
 /**
  * "next run in about 4 hours" for the connection's `nextScheduledSyncAt`. A freshness reading is

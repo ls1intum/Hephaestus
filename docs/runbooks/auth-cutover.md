@@ -111,9 +111,10 @@ applies cleanly: the only new changesets are this branch's own, and there are no
 
 ## JWK rotation
 
-- Two active keys at a time. To rotate: call `JwtSigningKeyService.rotate()` (exposed via an
-  admin endpoint / scheduled task). It inserts a new active key; the previous key keeps
-  verifying for the JWT max-TTL window (15 min), then is swept.
+- **Rotation is not implemented.** There is no `rotate()` method, no admin endpoint, and no
+  scheduled task; the schema supports two active keys but nothing populates the second. The only
+  supported recovery is the "lost key" path below (clear `jwt_signing_key`, restart, everyone
+  re-authenticates). Treat zero-downtime rotation as an open item, not an operational procedure.
 - Each pod reloads its JWK cache from the DB at most once per minute, so after a rotation other
   pods pick up the new key within that TTL (a token signed by the still-valid previous key keeps
   verifying meanwhile). A NATS `auth.signing-key.rotated` push to make the cross-pod refresh

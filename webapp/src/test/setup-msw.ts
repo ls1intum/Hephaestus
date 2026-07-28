@@ -26,6 +26,21 @@ if (typeof globalThis.ResizeObserver === "undefined") {
 	};
 }
 
+// jsdom has no `matchMedia`; the toaster asks it for `prefers-reduced-motion` on mount.
+if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
+	window.matchMedia = (query: string) =>
+		({
+			matches: false,
+			media: query,
+			onchange: null,
+			addListener: () => {},
+			removeListener: () => {},
+			addEventListener: () => {},
+			removeEventListener: () => {},
+			dispatchEvent: () => false,
+		}) as MediaQueryList;
+}
+
 // jsdom has no scrollIntoView either; Base UI calls it to keep the highlighted option in view.
 if (typeof Element.prototype.scrollIntoView !== "function") {
 	Element.prototype.scrollIntoView = () => {};

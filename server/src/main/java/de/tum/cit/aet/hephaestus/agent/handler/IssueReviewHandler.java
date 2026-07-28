@@ -6,6 +6,7 @@ import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requ
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
@@ -210,6 +211,11 @@ public class IssueReviewHandler implements JobTypeHandler {
             whyBySlug
         );
         postIssueNote(job, delivery);
+    }
+
+    @Override
+    public ExistingDeliveryLookup findExistingDelivery(AgentJob job) {
+        return commentPoster.findExistingSummaryComment(job);
     }
 
     /**

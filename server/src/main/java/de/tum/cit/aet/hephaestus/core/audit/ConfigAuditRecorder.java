@@ -16,9 +16,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 /**
  * Writes {@link ConfigAuditEvent} rows. Sole implementation of {@link ConfigAuditPort}.
  *
- * <p>Not {@code @ConditionalOnServerRole}, unlike every bean in {@code core.auth.audit}: producers
- * will span the webhook/worker roles once the instance brake (#1355) and platform-event handlers are
- * audited, and those pods would fail to start on a missing bean.
+ * <p>Not {@code @ConditionalOnServerRole}, unlike every bean in {@code core.auth.audit}: a producer
+ * on the webhook or worker role would fail to start on a missing bean, and the trail is meant to
+ * accept writes from every role.
  */
 @Component
 @RequiredArgsConstructor

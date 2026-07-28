@@ -100,6 +100,16 @@ public final class SandboxLayout {
     /** Workspace-relative filename of the runner script copied from the classpath. */
     public static final String RUNNER_SCRIPT_FILENAME = ".run-pi.mjs";
 
+    /**
+     * Workspace-relative filename of the non-secret LLM-provider spec written by
+     * {@link PiRuntimeFactory#buildProviderConfigJson}: wire protocol, upstream model id, capability
+     * envelope. The proxy URL is not in it — that arrives as {@code $LLM_PROXY_URL}.
+     */
+    public static final String PROVIDER_CONFIG_FILENAME = "pi-provider.json";
+
+    /** Workspace-relative filename of the shared provider-registration ES module both runners import. */
+    public static final String PROVIDER_HELPER_FILENAME = "pi-provider.mjs";
+
     /** Workspace-relative filename of the orchestrator instructions loaded into Pi at runtime. */
     public static final String ORCHESTRATOR_FILENAME = "AGENTS.md";
 

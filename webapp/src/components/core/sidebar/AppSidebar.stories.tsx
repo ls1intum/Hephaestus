@@ -20,10 +20,6 @@ const mockWorkspace = {
 	leaguesEnabled: false,
 } as const;
 
-/**
- * Main sidebar component for the application, combining all navigation sections and
- * providing access to different areas of the application.
- */
 const meta = {
 	component: AppSidebar,
 	parameters: {
@@ -71,10 +67,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * MEMBER: the workspace-admin nav is hidden outright rather than shown disabled — a member cannot
- * become an admin by clicking, so a disabled control would be a dead end.
- */
+/** A member never sees the workspace-admin nav — hidden, not shown disabled. */
 export const RegularUser: Story = {
 	args: {
 		username: "johndoe",
@@ -89,10 +82,6 @@ export const RegularUser: Story = {
 	},
 };
 
-/**
- * ADMIN/OWNER of the workspace, without instance-admin rights — the two roles are separate axes,
- * so the workspace-admin nav appears while the instance-admin entry does not.
- */
 export const WorkspaceAdminUser: Story = {
 	args: {
 		username: "admin",
@@ -109,9 +98,6 @@ export const WorkspaceAdminUser: Story = {
 	},
 };
 
-/**
- * Admin user sidebar with both workspace-admin and instance-admin privileges.
- */
 export const AdminUser: Story = {
 	args: {
 		username: "admin",
@@ -127,10 +113,7 @@ export const AdminUser: Story = {
 	},
 };
 
-/**
- * The dedicated instance-admin shell (`context === "admin"`): its own "Back to app" header and
- * section nav, with the workspace switcher suppressed.
- */
+/** The dedicated instance-admin shell: its own header and section nav, no workspace switcher. */
 export const AdminContext: Story = {
 	args: {
 		username: "admin",
@@ -140,11 +123,7 @@ export const AdminContext: Story = {
 	},
 };
 
-/**
- * Instance-admin shell with ZERO workspaces — the regression guard for the day-one lockout: a
- * freshly bootstrapped APP_ADMIN must still reach /admin (the shell renders, not the NoWorkspace
- * empty state), because the admin context is rendered independent of any active workspace.
- */
+/** The day-one lockout guard: a freshly bootstrapped APP_ADMIN reaches /admin with no workspace. */
 export const AdminContextNoWorkspace: Story = {
 	args: {
 		username: "admin",
@@ -161,12 +140,7 @@ export const AdminContextNoWorkspace: Story = {
 	},
 };
 
-/**
- * Mentor sidebar context with sample threads.
- *
- * NavMentorThreads buckets these locally by createdAt (Today, Yesterday,
- * Last 7 days, etc.) since the server returns a flat list.
- */
+/** The server returns a flat list; `NavMentorThreads` buckets it locally by `createdAt`. */
 export const MentorContext: Story = {
 	args: {
 		username: "mentor",
@@ -194,9 +168,6 @@ export const MentorContext: Story = {
 	},
 };
 
-/**
- * Mentor sidebar with loading state.
- */
 export const MentorLoading: Story = {
 	args: {
 		username: "mentor",
@@ -207,9 +178,6 @@ export const MentorLoading: Story = {
 	},
 };
 
-/**
- * Sidebar when all features are disabled — only Profile and Teams are visible.
- */
 export const AllFeaturesDisabled: Story = {
 	args: {
 		activeWorkspace: {
@@ -227,9 +195,6 @@ export const AllFeaturesDisabled: Story = {
 	},
 };
 
-/**
- * Sidebar state when the user is not in any workspace.
- */
 export const NoWorkspace: Story = {
 	args: {
 		workspaces: [],
@@ -237,9 +202,6 @@ export const NoWorkspace: Story = {
 	},
 };
 
-/**
- * Sidebar while workspaces are being fetched (skeletons only).
- */
 export const LoadingWorkspaces: Story = {
 	args: {
 		workspaces: [],

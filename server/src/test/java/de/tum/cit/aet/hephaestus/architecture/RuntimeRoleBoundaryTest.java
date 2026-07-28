@@ -78,6 +78,39 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
             RuntimeRole.WORKER_PROPERTY
         ),
         Map.entry("de.tum.cit.aet.hephaestus.core.runtime.hub.HubConfiguration", RuntimeRole.SERVER_PROPERTY),
+        // Admin surfaces and the services behind them are server-only: the worker and webhook pods do
+        // not load core.auth, so an admin controller mapped there is a route with no authentication
+        // layer under it.
+        Map.entry("de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionAdminController", RuntimeRole.SERVER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionService", RuntimeRole.SERVER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.agent.catalog.LlmModelAdminController", RuntimeRole.SERVER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.agent.catalog.LlmModelService", RuntimeRole.SERVER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.agent.catalog.InstanceLlmSettingsController", RuntimeRole.SERVER_PROPERTY),
+        // NOT listed: InstanceLlmSettingsService. It is deliberately ungated — the workspace-scoped
+        // read of the instance policy goes through it too, and the gate belongs on the admin surface.
+        Map.entry("de.tum.cit.aet.hephaestus.agent.usage.LlmUsageAdminController", RuntimeRole.SERVER_PROPERTY),
+        // Server-only so the worker and webhook pods never acquire an outbound dependency on
+        // ecb.europa.eu — this fetcher is the only egress the display-currency feature has.
+        Map.entry("de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateFetchScheduler", RuntimeRole.SERVER_PROPERTY),
+        // ServerSchedulingConfig silences the @Scheduled tick off-server, but an ungated BEAN still
+        // registers its gauges — permanent zeros in agent.queue.* / mentor.in_flight.* from pods that
+        // never sample. Gate the bean, not just the tick.
+        Map.entry("de.tum.cit.aet.hephaestus.agent.job.AgentQueueHealthSampler", RuntimeRole.SERVER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.agent.job.AgentJobRetentionService", RuntimeRole.SERVER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorInFlightReaper", RuntimeRole.SERVER_PROPERTY),
+        // ADR 0006: the LLM proxy runs beside the sandbox on the WORKER, and only there.
+        Map.entry("de.tum.cit.aet.hephaestus.agent.proxy.LlmProxyController", RuntimeRole.WORKER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.agent.proxy.LlmProxySecurityConfig", RuntimeRole.WORKER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.agent.proxy.ProxyAccounting", RuntimeRole.WORKER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.agent.proxy.ProxyUsageAccumulator", RuntimeRole.WORKER_PROPERTY),
+        // The config-audit viewer and retention sweep are server-only; the recorder deliberately is
+        // not, because every role writes to the trail.
+        Map.entry("de.tum.cit.aet.hephaestus.core.audit.ConfigAuditRetentionJob", RuntimeRole.SERVER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.core.audit.web.AdminConfigAuditController", RuntimeRole.SERVER_PROPERTY),
+        Map.entry(
+            "de.tum.cit.aet.hephaestus.integration.slack.sync.status.SlackIntegrationSyncRunner",
+            RuntimeRole.SERVER_PROPERTY
+        ),
         Map.entry(
             "de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerTokenExchangeController",
             RuntimeRole.SERVER_PROPERTY
@@ -249,7 +282,7 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
      * {@code hephaestus.runtime.server.enabled=false}. {@link java.time.Clock} is the case that
      * actually bit: its only provider used to be the server-gated {@code AuthJwtConfig}, so the first
      * ungated consumer (the config-audit recorder, which must load on every role) broke both pods
-     * while all 4900 tests stayed green. Pin the provider ungated so it cannot regress.
+     * while the whole suite stayed green. Pin the provider ungated so it cannot regress.
      */
     @Test
     void clockBeanIsAvailableToEveryRuntimeRole() {
@@ -350,6 +383,17 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
             )
             .isEmpty();
     }
+
+    /*
+     * There is deliberately no blanket "every @Scheduled class carries a runtime-role gate" rule.
+     * @EnableScheduling lives on the SERVER-gated ServerSchedulingConfig, so off-server no @Scheduled
+     * method fires, gated or not; the gate protects bean-construction side effects (meter
+     * registration), not the tick. Every formulation of the rule was measured against the tree and
+     * needs an exemption list as long as EXPECTED_GATES: @Bean-built sandbox classes that Spring never
+     * evaluates @ConditionalOnProperty on, @Service classes whose schedule is secondary to their API
+     * (gating those deletes the service from pods that call its other methods), and the rate-limit
+     * trackers, which must observe limits on whichever role makes the API call.
+     */
 
     @Test
     void noBeanIsGatedOnTheRetiredSandboxEnabledFlag() {

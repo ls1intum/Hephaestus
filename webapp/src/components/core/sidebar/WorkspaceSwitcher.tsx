@@ -34,10 +34,7 @@ export function WorkspaceSwitcher({
 	onWorkspaceChange?: (workspace: WorkspaceListItem) => void;
 	onAddWorkspace?: () => void;
 	isLoading?: boolean;
-	/**
-	 * Instance admin, NOT workspace admin: this only gates the zero-workspace state, where there is
-	 * no workspace to hold a membership role — a workspace-role gate here is always false.
-	 */
+	/** Only gates the zero-workspace state, where no workspace exists to carry a membership role. */
 	isAppAdmin?: boolean;
 }) {
 	const { isMobile } = useSidebar();
@@ -94,7 +91,7 @@ export function WorkspaceSwitcher({
 								<Plus className="size-4" />
 							</div>
 							<div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-								<span className="truncate font-semibold">Create Workspace</span>
+								<span className="truncate font-semibold">Create workspace</span>
 							</div>
 						</SidebarMenuButton>
 					</SidebarMenuItem>
@@ -110,7 +107,7 @@ export function WorkspaceSwitcher({
 							<ChevronsUpDown className="size-4" />
 						</div>
 						<div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-							<span className="truncate font-semibold">No Workspace</span>
+							<span className="truncate font-semibold">No workspace</span>
 						</div>
 					</SidebarMenuButton>
 				</SidebarMenuItem>

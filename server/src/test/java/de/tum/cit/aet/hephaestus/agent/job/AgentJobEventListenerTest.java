@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import static de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent.TriggerEventNames;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -28,7 +29,7 @@ import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
-import de.tum.cit.aet.hephaestus.practices.spi.AgentConfigChecker;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeDetectionReadiness;
 import de.tum.cit.aet.hephaestus.practices.spi.UserRoleChecker;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -140,7 +141,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         );
     }
 
-    /** Sets up a valid PR mock and gate Detect decision for happy-path tests. */
     private PullRequest setupHappyPath() {
         PullRequest pr = mockPullRequest("abc123", "feature/test", "main");
         when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
@@ -152,6 +152,12 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.empty());
 
         return pr;
+    }
+
+    private PullRequestReviewSubmissionRequest captureSubmission(Long workspaceId) {
+        var captor = ArgumentCaptor.forClass(PullRequestReviewSubmissionRequest.class);
+        verify(agentJobService).submit(eq(workspaceId), eq(AgentJobType.PULL_REQUEST_REVIEW), captor.capture());
+        return captor.getValue();
     }
 
     // Test Groups
@@ -282,21 +288,18 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             var prData = createPrData(Issue.State.OPEN, false, false);
             var event = new ScmDomainEvent.PullRequestCreated(prData, webhookContext(99L));
 
-            PullRequest pr = setupHappyPath();
+            setupHappyPath();
 
             listener.onPullRequestCreated(event);
 
-            verify(agentJobService).submit(
-                eq(WORKSPACE_ID),
-                eq(AgentJobType.PULL_REQUEST_REVIEW),
-                any(PullRequestReviewSubmissionRequest.class)
+            assertThat(captureSubmission(WORKSPACE_ID).triggerEvent()).isEqualTo(
+                TriggerEventNames.PULL_REQUEST_CREATED
             );
         }
 
         @Test
         void shouldUseWorkspaceIdFromGateNotContext() {
             var prData = createPrData(Issue.State.OPEN, false, false);
-            // Context has scopeId=99, but gate resolves workspace with id=42
             var event = new ScmDomainEvent.PullRequestCreated(prData, webhookContext(99L));
 
             PullRequest pr = mockPullRequest("abc123", "feature/test", "main");
@@ -312,7 +315,13 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onPullRequestCreated(event);
 
-            verify(agentJobService).submit(eq(42L), eq(AgentJobType.PULL_REQUEST_REVIEW), any());
+            var workspaceIdCaptor = ArgumentCaptor.forClass(Long.class);
+            verify(agentJobService).submit(
+                workspaceIdCaptor.capture(),
+                eq(AgentJobType.PULL_REQUEST_REVIEW),
+                any(PullRequestReviewSubmissionRequest.class)
+            );
+            assertThat(workspaceIdCaptor.getValue()).isEqualTo(42L).isNotEqualTo(99L);
         }
 
         @Test
@@ -354,7 +363,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onPullRequestCreated(event);
 
-            // Gate was called (listener did not short-circuit on draft)
             verify(practiceReviewDetectionGate).evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED, TriggerMode.AUTO);
             verify(agentJobService, never()).submit(any(), any(), any());
         }
@@ -408,8 +416,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             ).thenReturn(new GateDecision.Detect(workspace, List.of()));
             when(agentJobService.submit(any(), any(), any())).thenThrow(new RuntimeException("DB error"));
 
-            // Should not throw
-            listener.onPullRequestCreated(event);
+            // Swallowing is the contract: this listener runs on the webhook consumer, and a thrown
+            // exception would NAK the delivery and redeliver the same doomed submission.
+            assertThatCode(() -> listener.onPullRequestCreated(event)).doesNotThrowAnyException();
         }
 
         @Test
@@ -442,10 +451,8 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onPullRequestSynchronized(event);
 
-            verify(agentJobService).submit(
-                eq(WORKSPACE_ID),
-                eq(AgentJobType.PULL_REQUEST_REVIEW),
-                any(PullRequestReviewSubmissionRequest.class)
+            assertThat(captureSubmission(WORKSPACE_ID).triggerEvent()).isEqualTo(
+                TriggerEventNames.PULL_REQUEST_SYNCHRONIZED
             );
         }
 
@@ -491,11 +498,13 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onReviewSubmitted(event);
 
-            verify(agentJobService).submit(
-                eq(WORKSPACE_ID),
-                eq(AgentJobType.PULL_REQUEST_REVIEW),
-                any(PullRequestReviewSubmissionRequest.class)
-            );
+            // A ReviewSubmitted event carries no PullRequestData, so the request is rebuilt from the
+            // entity via PullRequestData.from(pr). Assert the rebuilt payload, not just the call.
+            var request = captureSubmission(WORKSPACE_ID);
+            assertThat(request.triggerEvent()).isEqualTo(TriggerEventNames.REVIEW_SUBMITTED);
+            assertThat(request.pullRequest().number()).isEqualTo(PR_NUMBER);
+            assertThat(request.pullRequest().repository().nameWithOwner()).isEqualTo("owner/repo");
+            assertThat(request.headRefOid()).isEqualTo("abc123");
         }
 
         @Test
@@ -618,10 +627,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             when(
                 practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.REVIEW_SUBMITTED, TriggerMode.AUTO)
             ).thenReturn(new GateDecision.Detect(workspace, List.of()));
-            when(agentJobService.submit(any(), any(), any())).thenThrow(new RuntimeException("NATS error"));
+            when(agentJobService.submit(any(), any(), any())).thenThrow(new RuntimeException("submission failed"));
 
-            // Should not throw — inner submitJob catch handles it
-            listener.onReviewSubmitted(event);
+            assertThatCode(() -> listener.onReviewSubmitted(event)).doesNotThrowAnyException();
         }
 
         @Test
@@ -654,7 +662,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        void onPullRequestMerged_routesThroughGateDespiteMergedState() {
+        void onPullRequestMerged_routesThroughGateAndCarriesTheMergedTriggerOntoTheJob() {
             // The merged terminal state IS the reason this trigger runs — it must reach the gate, unlike the
             // live create/ready/sync handlers that short-circuit on merged.
             PullRequest pr = mergedPullRequest();
@@ -670,11 +678,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             listener.onPullRequestMerged(new ScmDomainEvent.PullRequestMerged(prData, webhookContext(1L)));
 
             verify(practiceReviewDetectionGate).evaluate(pr, TriggerEventNames.PULL_REQUEST_MERGED, TriggerMode.AUTO);
-            verify(agentJobService).submit(
-                eq(WORKSPACE_ID),
-                eq(AgentJobType.PULL_REQUEST_REVIEW),
-                any(PullRequestReviewSubmissionRequest.class)
-            );
+            assertThat(captureSubmission(WORKSPACE_ID).triggerEvent()).isEqualTo(TriggerEventNames.PULL_REQUEST_MERGED);
         }
 
         @Test
@@ -704,11 +708,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             listener.onPullRequestClosed(new ScmDomainEvent.PullRequestClosed(prData, false, webhookContext(1L)));
 
             verify(practiceReviewDetectionGate).evaluate(pr, TriggerEventNames.PULL_REQUEST_CLOSED, TriggerMode.AUTO);
-            verify(agentJobService).submit(
-                eq(WORKSPACE_ID),
-                eq(AgentJobType.PULL_REQUEST_REVIEW),
-                any(PullRequestReviewSubmissionRequest.class)
-            );
+            assertThat(captureSubmission(WORKSPACE_ID).triggerEvent()).isEqualTo(TriggerEventNames.PULL_REQUEST_CLOSED);
         }
 
         @Test
@@ -744,7 +744,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         private record CollaborationFixture(
             AgentJobEventListener listener,
             UserRoleChecker userRoleChecker,
-            AgentConfigChecker agentConfigChecker,
+            PracticeDetectionReadiness practiceDetectionReadiness,
             PracticeRepository practiceRepository,
             WorkspaceResolver workspaceResolver
         ) {
@@ -753,14 +753,14 @@ class AgentJobEventListenerTest extends BaseUnitTest {
                 PullRequestRepository pullRequestRepository
             ) {
                 var userRoleChecker = mock(UserRoleChecker.class);
-                var agentConfigChecker = mock(AgentConfigChecker.class);
+                var practiceDetectionReadiness = mock(PracticeDetectionReadiness.class);
                 var practiceRepository = mock(PracticeRepository.class);
                 var workspaceResolver = mock(WorkspaceResolver.class);
                 var properties = new PracticeReviewProperties(true, true, false, "", 15, false, false); // runForAllUsers=true
                 var realGate = new PracticeReviewDetectionGate(
                     properties,
                     userRoleChecker,
-                    agentConfigChecker,
+                    practiceDetectionReadiness,
                     practiceRepository,
                     workspaceResolver
                 );
@@ -768,16 +768,13 @@ class AgentJobEventListenerTest extends BaseUnitTest {
                 return new CollaborationFixture(
                     listener,
                     userRoleChecker,
-                    agentConfigChecker,
+                    practiceDetectionReadiness,
                     practiceRepository,
                     workspaceResolver
                 );
             }
         }
 
-        /**
-         * Creates a real PR for collaboration tests with the fields the gate reads set.
-         */
         private PullRequest setupCollaborationPR() {
             PullRequest pr = new PullRequest();
             pr.setId(PR_ID);
@@ -796,7 +793,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        void listenerWithRealGateSubmitsOnDetect() {
+        void listenerWithRealGateSubmitsOnDetectCarryingTheGatesTrigger() {
             var fixture = CollaborationFixture.create(agentJobService, pullRequestRepository);
 
             Workspace workspace = new Workspace();
@@ -804,7 +801,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             workspace.setWorkspaceSlug("test-workspace");
             workspace.getFeatures().setPracticesEnabled(true);
             when(fixture.workspaceResolver().resolveForRepository("owner/repo")).thenReturn(Optional.of(workspace));
-            when(fixture.agentConfigChecker().hasRunnablePracticeConfig(WORKSPACE_ID, null)).thenReturn(true);
+            when(fixture.practiceDetectionReadiness().hasRunnableAgent(WORKSPACE_ID)).thenReturn(true);
 
             Practice practice = new Practice();
             ArrayNode events = MAPPER.createArrayNode();
@@ -822,11 +819,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             var event = new ScmDomainEvent.PullRequestCreated(prData, webhookContext(1L));
             fixture.listener().onPullRequestCreated(event);
 
-            verify(agentJobService).submit(
-                eq(WORKSPACE_ID),
-                eq(AgentJobType.PULL_REQUEST_REVIEW),
-                any(PullRequestReviewSubmissionRequest.class)
-            );
+            var request = captureSubmission(WORKSPACE_ID);
+            assertThat(request.triggerEvent()).isEqualTo(TriggerEventNames.PULL_REQUEST_CREATED);
+            assertThat(request.pullRequest().repository().nameWithOwner()).isEqualTo("owner/repo");
         }
 
         @Test
@@ -837,7 +832,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             workspace.setId(WORKSPACE_ID);
             workspace.getFeatures().setPracticesEnabled(true);
             when(fixture.workspaceResolver().resolveForRepository("owner/repo")).thenReturn(Optional.of(workspace));
-            when(fixture.agentConfigChecker().hasRunnablePracticeConfig(WORKSPACE_ID, null)).thenReturn(true);
+            when(fixture.practiceDetectionReadiness().hasRunnableAgent(WORKSPACE_ID)).thenReturn(true);
 
             // Practice only matches ReviewSubmitted, not PullRequestCreated
             Practice practice = new Practice();

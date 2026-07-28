@@ -6,8 +6,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Marks an admin-gated mutation endpoint whose action is recorded on the audit trail (its service
- * delegates to {@link ConfigAuditPort}, or to a domain ledger named in {@link #value()}).
+ * Marks an admin-gated mutation endpoint whose action is recorded on the audit trail.
  *
  * <p>The counterpart to {@link AuditExempt}: {@code AuditByDefaultArchTest} requires every admin
  * mutation handler to carry exactly one of the two, so a new administrative action cannot reach main
@@ -17,6 +16,12 @@ import java.lang.annotation.Target;
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Audited {
-    /** Where the action is recorded — a config-audit entity type, or the name of a domain ledger. */
-    String value();
+    /** Which trail the action lands on. */
+    AuditLedger ledger();
+
+    /**
+     * Which row type within {@link #ledger()}'s {@link AuditLedger#vocabulary() vocabulary}. Empty only
+     * for a ledger that has no vocabulary; any other combination fails the architecture test.
+     */
+    String type() default "";
 }

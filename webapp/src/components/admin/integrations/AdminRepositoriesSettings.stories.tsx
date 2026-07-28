@@ -197,7 +197,10 @@ export const LoadError: Story = {
 	args: {
 		repositories: [],
 		isLoading: false,
-		error: new Error("The repositories service is unavailable."),
+		error: Object.assign(new Error("request failed"), {
+			status: 503,
+			detail: "The repositories service is unavailable.",
+		}),
 		onRetry: fn(),
 	},
 	play: async ({ args, canvasElement }) => {

@@ -32,10 +32,6 @@ hephaestus:
         nats:
             enabled: false
             server: nats://cds-training-placeholder:4222
-    agent:
-        nats:
-            enabled: false
-            server: nats://cds-training-placeholder:4222
     workspace:
         init-default: false
         init-gitlab-default: false

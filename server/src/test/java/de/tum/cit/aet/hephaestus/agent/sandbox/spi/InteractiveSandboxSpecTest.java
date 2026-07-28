@@ -25,7 +25,7 @@ class InteractiveSandboxSpecTest extends BaseUnitTest {
             "ghcr.io/example/agent:latest",
             List.of("node", "/run.mjs"),
             env,
-            new NetworkPolicy(true, null, null, null),
+            new NetworkPolicy(true, null, null),
             new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofMinutes(1)),
             SecurityProfile.DEFAULT,
             Map.of(),
@@ -69,7 +69,6 @@ class InteractiveSandboxSpecTest extends BaseUnitTest {
         Map<String, String> env = new HashMap<>();
         env.put("OK_KEY", "good");
         InteractiveSandboxSpec s = spec(env);
-        // Mutate caller's map after validation.
         env.put("LD_PRELOAD", "/tmp/evil.so");
         env.remove("OK_KEY");
         assertThat(s.environment()).containsEntry("OK_KEY", "good").doesNotContainKey("LD_PRELOAD");
@@ -85,7 +84,7 @@ class InteractiveSandboxSpecTest extends BaseUnitTest {
             "ghcr.io/example/agent:latest",
             cmd,
             Map.of(),
-            new NetworkPolicy(true, null, null, null),
+            new NetworkPolicy(true, null, null),
             new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofMinutes(1)),
             SecurityProfile.DEFAULT,
             Map.of(),

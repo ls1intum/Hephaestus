@@ -15,8 +15,8 @@ function toneFor(environmentName: string): EnvironmentTone {
 }
 
 /**
- * Production shows the release version linked to its notes; every other
- * environment shows its name, keeping the commit SHA out of the header.
+ * A version that is not semver (a commit SHA, `nightly`) has no release page to link to, so it
+ * falls through to the environment pill rather than producing a dead link.
  */
 export function resolveHeaderBadge(
 	version: string,

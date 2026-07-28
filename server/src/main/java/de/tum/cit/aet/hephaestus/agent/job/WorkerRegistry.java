@@ -10,10 +10,9 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Self-reported worker liveness for multi-replica orphan recovery (#1138). Each worker upserts its
- * own row and refreshes {@code last_heartbeat} on a timer, so staleness reflects the JVM that
- * actually executes jobs — not the WSS control channel, which can drop while a worker keeps running.
- * A worker whose heartbeat goes stale has its in-flight jobs requeued by {@link AgentJobZombieSweeper}.
+ * Self-reported worker liveness for multi-replica orphan recovery. Each worker upserts its own row on a
+ * timer, so staleness reflects the JVM that actually executes jobs, and a worker whose heartbeat goes
+ * stale has its in-flight jobs requeued by {@link AgentJobZombieSweeper}.
  */
 @Entity
 @Table(name = "worker_registry")

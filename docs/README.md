@@ -6,9 +6,19 @@
 
 This site is powered by [Docusaurus 3](https://docusaurus.io/) with Rspack, SWC, and LightningCSS for 2-4x faster builds. The content is split into three guides:
 
-- **User Guide** – End-user workflows (mentor sessions, leaderboard, workspace management)
-- **Contributor Guide** – Engineering guides, ERD + StarUML assets, and local development setup
-- **Admin Guide** – Production deployment runbooks
+- **User Guide** (`user/`) – End-user workflows (mentor sessions, leaderboard, workspace management)
+- **Contributor Guide** (`contributor/`) – Engineering guides, ERD + StarUML assets, and local development setup
+- **Admin Guide** (`admin/`) – Install, integrations, and production operations
+
+Those three directories are the whole site: each is one `@docusaurus/plugin-content-docs` instance in
+`docusaurus.config.ts`, and every page in them must be reachable from its sidebar.
+
+## What is deliberately *not* published
+
+`decisions/`, `runbooks/`, `auth-architecture.md` and `auth-glossary.md` are repo-only reference
+material — no plugin serves them, and they are read on GitHub. See
+[`decisions/README.md`](decisions/README.md) for why, and for the rule that a published page links
+into them by absolute GitHub URL rather than a relative path.
 
 ## Quick Start
 

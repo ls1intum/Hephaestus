@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
  * written into a snapshot cannot be edited out afterwards — the guard has to stop it at build time
  * rather than at review time.
  *
- * <p>This is what makes the next snapshot safe, not just today's: {@code AgentConfig.llmApiKey} is
+ * <p>This is what makes the next snapshot safe, not just today's: {@code LlmConnection.apiKey} is
  * encrypted at rest but its getter returns plaintext, so the obvious wrong implementation — snapshot
  * the field — is one line away and turns the build red here.
  */
@@ -38,7 +38,10 @@ class ConfigAuditSnapshotArchTest extends HephaestusArchitectureTest {
         // enum: PROXY | API_KEY — how credentials are supplied, not what they are
         "credentialMode",
         // boolean: whether a workspace SCM token is present, never the token itself
-        "tokenSet"
+        "tokenSet",
+        // Integer: the model's max *output tokens* capability (an LLM sizing parameter), not a
+        // credential — "token" here means the language-model unit, unrelated to auth tokens
+        "maxOutputTokens"
     );
 
     @Test

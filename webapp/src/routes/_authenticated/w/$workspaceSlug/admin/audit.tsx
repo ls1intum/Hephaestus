@@ -3,21 +3,18 @@ import { ScrollTextIcon } from "lucide-react";
 import {
 	type ConfigAuditSearch,
 	workspaceAuditSearchSchema,
-} from "@/components/admin/audit-shared/auditSearch";
+} from "@/components/admin/audit-shared/audit-search";
 import { WorkspaceConfigAuditPanel } from "@/components/admin/config-audit/ConfigAuditPanel";
+import { workspaceAdminHead } from "@/lib/page-title";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/audit")({
+	head: workspaceAdminHead("Audit log"),
 	component: WorkspaceAuditPage,
 	validateSearch: workspaceAuditSearchSchema,
 });
 
-/**
- * The workspace's own audit log. Sign-in events are instance-scoped and stay with the instance
- * admin, so this surface is the settings trail alone — rendered by the same panel the instance tab
- * uses, narrowed to this workspace.
- */
+/** The settings trail alone: sign-in events are instance-scoped and stay with the instance admin. */
 function WorkspaceAuditPage() {
-	// The slug is validated by the admin layout's beforeLoad, so it is always present here.
 	const { workspaceSlug } = Route.useParams();
 	const search = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });

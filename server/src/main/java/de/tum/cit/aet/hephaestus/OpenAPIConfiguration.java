@@ -17,9 +17,13 @@ import io.swagger.v3.oas.models.parameters.Parameter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springdoc.core.customizers.OpenApiCustomizer;
@@ -29,14 +33,34 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * OpenAPI configuration: processes server DTOs (strips the {@code DTO} suffix from schema
- * names and {@code $ref}s) and normalises paths (workspace-slug parameter, tag cleanup,
- * WorkspaceContext filtering).
+ * names and {@code $ref}s), normalises paths (workspace-slug parameter, tag cleanup,
+ * WorkspaceContext filtering) and declares exact decimals as such.
  */
 @Configuration
 @OpenAPIDefinition(
     info = @Info(
         title = "Hephaestus API",
-        description = "API documentation for the Hephaestus application server.",
+        description = "API documentation for the Hephaestus application server.\n\n" +
+            "### Money and exact decimals\n\n" +
+            "Every monetary amount and per-unit rate is a JSON number carrying `format: decimal`. It is an " +
+            "exact decimal on the server (`BigDecimal`, backed by a `NUMERIC` column) and MUST NOT be parsed " +
+            "into a binary floating-point type in a language that has an exact decimal one: bind it to " +
+            "`BigDecimal` / `decimal` / `Decimal`, not to `double`.\n\n" +
+            "JavaScript has no exact decimal type, so the generated TypeScript client necessarily binds these " +
+            "to `number` (IEEE-754 binary64). That is lossless for every value this API produces, and the " +
+            "margin is large: a binary64 round-trips any decimal of at most 15 significant digits exactly " +
+            "(`DBL_DIG`). Amounts are quantised to 6 decimal places, so they are exact below **$1,000,000,000**; " +
+            "per-1M-token rates are quantised to 8 places, so they are exact below **$10,000,000** per 1M " +
+            "tokens; budget caps are quantised to 2 places and their column tops out at $99,999,999.99. Every " +
+            "reachable value sits orders of magnitude inside those bounds.\n\n" +
+            "What that margin does NOT license is arithmetic. Totals, remaining budget and cap verdicts are " +
+            "computed on the server in exact decimal and shipped as fields; a client that re-derives them by " +
+            "summing rows is accumulating binary rounding error the server does not have. Read the totals, do " +
+            "not add them up.\n\n" +
+            "Amounts are USD throughout — the ledger, the caps and the gates all meter in USD, and the " +
+            "currency is therefore part of the field name (`...Usd`) rather than a per-amount field. Where a " +
+            "response also carries `FxRateInfo`, that is a display-only estimate in a second currency and is " +
+            "never an input to a budget decision.",
         version = "0.0.0-development",
         contact = @Contact(name = "Felix T.J. Dietrich", email = "felixtj.dietrich@tum.de"),
         license = @License(name = "MIT License", url = "https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE")
@@ -65,6 +89,14 @@ public class OpenAPIConfiguration {
      */
     private static final List<String> SAFE_DOMAIN_SUFFIXES = List.of("AchievementProgress");
 
+    /**
+     * Zalando's non-standard-but-conventional {@code format} for an exact decimal, which stops a client
+     * generator binding the value to {@code double}.
+     */
+    private static final String DECIMAL_FORMAT = "decimal";
+
+    private static final String NUMBER_TYPE = "number";
+
     @Bean
     public OpenApiCustomizer schemaCustomizer(
         AchievementRegistry registry,
@@ -74,6 +106,7 @@ public class OpenAPIConfiguration {
             openApi.getInfo().setVersion(appVersion);
             processApplicationServerSchemas(openApi);
             processAllPaths(openApi);
+            declareExactDecimals(openApi);
 
             // Inject AchievementId enum based on registry keys
             if (openApi.getComponents() != null) {
@@ -210,6 +243,60 @@ public class OpenAPIConfiguration {
         if (openApi.getComponents() != null && openApi.getComponents().getSchemas() != null) {
             openApi.getComponents().getSchemas().values().forEach(this::removeDtoSuffixFromRefs);
         }
+    }
+
+    /**
+     * Labels every {@code BigDecimal} on the API as an exact decimal. springdoc emits
+     * {@code format: double}/{@code float} for the binary types, so a bare formatless {@code type: number}
+     * can only have come from a {@code BigDecimal}.
+     */
+    private void declareExactDecimals(OpenAPI openApi) {
+        if (openApi.getComponents() == null || openApi.getComponents().getSchemas() == null) {
+            return;
+        }
+        openApi
+            .getComponents()
+            .getSchemas()
+            .values()
+            .forEach(schema -> declareExactDecimals(schema, new HashSet<>()));
+    }
+
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    private void declareExactDecimals(Schema schema, Set<Schema> seen) {
+        if (schema == null || !seen.add(schema)) {
+            return;
+        }
+
+        if (isFormatlessNumber(schema)) {
+            schema.setFormat(DECIMAL_FORMAT);
+        }
+
+        Map<String, Schema> props = schema.getProperties();
+        if (props != null) {
+            props.values().forEach(property -> declareExactDecimals(property, seen));
+        }
+        declareExactDecimals(schema.getItems(), seen);
+        declareExactDecimals(schema.getNot(), seen);
+        Stream.of(schema.getAllOf(), schema.getAnyOf(), schema.getOneOf())
+            .filter(Objects::nonNull)
+            .flatMap(List::stream)
+            .forEach(member -> declareExactDecimals((Schema) member, seen));
+        if (schema.getAdditionalProperties() instanceof Schema additionalSchema) {
+            declareExactDecimals(additionalSchema, seen);
+        }
+    }
+
+    /**
+     * OpenAPI 3.1 moved the type into the {@code types} set (a nullable number is {@code [number, null]})
+     * and leaves {@code getType()} populated only in the 3.0 shape, so both have to be read.
+     */
+    @SuppressWarnings("rawtypes")
+    private boolean isFormatlessNumber(Schema schema) {
+        if (schema.getFormat() != null) {
+            return false;
+        }
+        Set<String> types = schema.getTypes();
+        return NUMBER_TYPE.equals(schema.getType()) || (types != null && types.contains(NUMBER_TYPE));
     }
 
     private boolean isWorkspaceContextParam(Parameter param) {

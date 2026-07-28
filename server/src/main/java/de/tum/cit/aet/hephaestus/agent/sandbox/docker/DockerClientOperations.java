@@ -14,6 +14,7 @@ import com.github.dockerjava.api.model.HostConfig;
 import com.github.dockerjava.api.model.Network;
 import com.github.dockerjava.api.model.Ulimit;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
+import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxInfrastructureException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -112,7 +113,7 @@ public class DockerClientOperations
             log.debug("Created Docker network: name={}, id={}, internal={}", name, response.getId(), internal);
             return response.getId();
         } catch (DockerException e) {
-            throw new SandboxException("Failed to create network: " + name, e);
+            throw new SandboxInfrastructureException("Failed to create network: " + name, e);
         }
     }
 
@@ -151,7 +152,10 @@ public class DockerClientOperations
             log.debug("Connected container {} to network {}: ip={}", containerId, networkId, ipAddress);
             return ipAddress;
         } catch (DockerException e) {
-            throw new SandboxException("Failed to connect container " + containerId + " to network " + networkId, e);
+            throw new SandboxInfrastructureException(
+                "Failed to connect container " + containerId + " to network " + networkId,
+                e
+            );
         }
     }
 
@@ -168,7 +172,7 @@ public class DockerClientOperations
         } catch (NotFoundException | NotModifiedException e) {
             log.debug("Container {} already disconnected from network {}", containerId, networkId);
         } catch (DockerException e) {
-            throw new SandboxException(
+            throw new SandboxInfrastructureException(
                 "Failed to disconnect container " + containerId + " from network " + networkId,
                 e
             );
@@ -183,7 +187,7 @@ public class DockerClientOperations
         } catch (NotFoundException e) {
             log.debug("Network {} already removed", networkId);
         } catch (DockerException e) {
-            throw new SandboxException("Failed to remove network: " + networkId, e);
+            throw new SandboxInfrastructureException("Failed to remove network: " + networkId, e);
         }
     }
 
@@ -227,7 +231,7 @@ public class DockerClientOperations
             log.debug("Created container: image={}, id={}", spec.image(), containerId);
             return containerId;
         } catch (DockerException e) {
-            throw new SandboxException("Failed to create container from image: " + spec.image(), e);
+            throw new SandboxInfrastructureException("Failed to create container from image: " + spec.image(), e);
         }
     }
 
@@ -237,7 +241,7 @@ public class DockerClientOperations
             dockerClient.startContainerCmd(containerId).exec();
             log.debug("Started container: {}", containerId);
         } catch (DockerException e) {
-            throw new SandboxException("Failed to start container: " + containerId, e);
+            throw new SandboxInfrastructureException("Failed to start container: " + containerId, e);
         }
     }
 
@@ -257,12 +261,12 @@ public class DockerClientOperations
                 }
             }
         } catch (DockerException e) {
-            throw new SandboxException("Failed to wait for container: " + containerId, e);
+            throw new SandboxInfrastructureException("Failed to wait for container: " + containerId, e);
         } catch (Exception e) {
             if (e instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
             }
-            throw new SandboxException("Failed waiting for container: " + containerId, e);
+            throw new SandboxInfrastructureException("Failed waiting for container: " + containerId, e);
         }
     }
 
@@ -315,7 +319,7 @@ public class DockerClientOperations
                 .exec();
             log.debug("Copied host directory to container {}: {} -> {}", containerId, hostPath, remotePath);
         } catch (DockerException e) {
-            throw new SandboxException(
+            throw new SandboxInfrastructureException(
                 "Failed to copy directory to container " + containerId + ": " + hostPath + " -> " + remotePath,
                 e
             );
@@ -332,7 +336,10 @@ public class DockerClientOperations
                 .exec();
             log.debug("Copied archive to container {} at {}", containerId, remotePath);
         } catch (DockerException e) {
-            throw new SandboxException("Failed to copy archive to container " + containerId + " at " + remotePath, e);
+            throw new SandboxInfrastructureException(
+                "Failed to copy archive to container " + containerId + " at " + remotePath,
+                e
+            );
         }
     }
 
@@ -341,7 +348,10 @@ public class DockerClientOperations
         try {
             return dockerClient.copyArchiveFromContainerCmd(containerId, remotePath).exec();
         } catch (DockerException e) {
-            throw new SandboxException("Failed to copy archive from container " + containerId + " at " + remotePath, e);
+            throw new SandboxInfrastructureException(
+                "Failed to copy archive from container " + containerId + " at " + remotePath,
+                e
+            );
         }
     }
 
@@ -353,7 +363,7 @@ public class DockerClientOperations
         } catch (NotFoundException | NotModifiedException e) {
             log.debug("Container {} already stopped or removed", containerId);
         } catch (DockerException e) {
-            throw new SandboxException("Failed to stop container: " + containerId, e);
+            throw new SandboxInfrastructureException("Failed to stop container: " + containerId, e);
         }
     }
 
@@ -365,7 +375,7 @@ public class DockerClientOperations
         } catch (NotFoundException e) {
             log.debug("Container {} already removed", containerId);
         } catch (DockerException e) {
-            throw new SandboxException("Failed to remove container: " + containerId, e);
+            throw new SandboxInfrastructureException("Failed to remove container: " + containerId, e);
         }
     }
 
@@ -389,7 +399,10 @@ public class DockerClientOperations
                 )
                 .toList();
         } catch (DockerException e) {
-            throw new SandboxException("Failed to list containers by label: " + labelKey + "=" + labelValue, e);
+            throw new SandboxInfrastructureException(
+                "Failed to list containers by label: " + labelKey + "=" + labelValue,
+                e
+            );
         }
     }
 
@@ -402,7 +415,7 @@ public class DockerClientOperations
                 .map(n -> new DockerOperations.NetworkInfo(n.getId(), n.getName()))
                 .toList();
         } catch (DockerException e) {
-            throw new SandboxException("Failed to list networks with prefix: " + namePrefix, e);
+            throw new SandboxInfrastructureException("Failed to list networks with prefix: " + namePrefix, e);
         }
     }
 

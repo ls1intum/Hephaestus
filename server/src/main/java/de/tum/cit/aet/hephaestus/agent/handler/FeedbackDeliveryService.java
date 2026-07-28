@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.account.UserPreferencesRepository;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
@@ -18,6 +19,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewSettings;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
@@ -81,6 +83,11 @@ class FeedbackDeliveryService {
      */
     void deliverFeedback(AgentJob job, @Nullable DeliveryContent delivery) {
         deliverFeedback(job, delivery, null);
+    }
+
+    /** @see PullRequestCommentPoster#findExistingSummaryComment */
+    ExistingDeliveryLookup findExistingDeliveryCommentId(AgentJob job) {
+        return commentPoster.findExistingSummaryComment(job);
     }
 
     /**
@@ -486,7 +493,8 @@ class FeedbackDeliveryService {
 
     static String formatPracticeNote(String sanitizedBody, AgentJob job) {
         var sb = new StringBuilder(sanitizedBody.length() + 512);
-        sb.append("<!-- hephaestus:practice-review:").append(job.getId()).append(" -->\n");
+        // Via the shared helper, never a literal: the dedup scan must match what this posts.
+        sb.append(PullRequestCommentPoster.summaryMarkerFor(job)).append("\n");
         sb.append(sanitizedBody).append("\n\n");
         appendFooter(sb, job);
         return sb.toString();

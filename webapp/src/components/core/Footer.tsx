@@ -1,9 +1,9 @@
 import { ClockIcon, GitBranchIcon, GitCommitIcon } from "@primer/octicons-react";
 import { Link } from "@tanstack/react-router";
 
+import { RelativeTime } from "@/components/common/RelativeTime";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { optionalIntegrationsAvailable, requestConsentReopen } from "@/integrations/consent";
-import { formatRelativeTime } from "@/lib/relative-time";
 import { cn } from "@/lib/utils";
 
 export interface FooterProps {
@@ -147,15 +147,10 @@ export default function Footer({ className, isProduction, buildInfo }: FooterPro
 							)}
 
 							{buildInfo?.deployedAt && (
-								<Tooltip>
-									<TooltipTrigger className="flex items-center gap-1 cursor-help">
-										<ClockIcon size={12} />
-										<span>{formatRelativeTime(buildInfo.deployedAt)}</span>
-									</TooltipTrigger>
-									<TooltipContent>
-										Deployed {buildInfo.deployedAt.replace("T", " ").substring(0, 16)} UTC
-									</TooltipContent>
-								</Tooltip>
+								<span className="flex items-center gap-1">
+									<ClockIcon size={12} aria-hidden />
+									<RelativeTime value={buildInfo.deployedAt} />
+								</span>
 							)}
 						</div>
 					)}

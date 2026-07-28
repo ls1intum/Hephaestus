@@ -1,10 +1,15 @@
 /**
  * Extract a human-readable message from a thrown request error.
  *
- * The generated client (with `throwOnError`) throws the parsed response body on a
- * non-2xx. For RFC 9457 problem+json failures the server returns
- * `{ type, title, status, detail }`; we prefer `detail`, then `title`,
- * then the controller's legacy `{ error }` shape, then the caller's `fallback`.
+ * The generated client (with `throwOnError`) throws the parsed response body on a non-2xx. For
+ * RFC 9457 problem+json failures the server returns `{ type, title, status, detail }`; we prefer
+ * `detail`, then `title`, then the controller's legacy `{ error }` shape, then the caller's
+ * `fallback`.
+ *
+ * **`message` is deliberately not in that list**: a network rejection and a null-deref in our own
+ * code are both a thrown `TypeError`, so reading it would put runtime internals under a toast about
+ * saving a model. Only wording the server chose is ever shown. A caller that needs to say "no HTTP
+ * answer at all" gets that from {@link problemStatusOf} returning `undefined`.
  */
 export function problemDetailOf(
 	err: unknown,
@@ -15,15 +20,12 @@ export function problemDetailOf(
 	}
 	if (err && typeof err === "object") {
 		const record = err as Record<string, unknown>;
-		for (const key of ["detail", "title", "error", "message"] as const) {
+		for (const key of ["detail", "title", "error"] as const) {
 			const value = record[key];
 			if (typeof value === "string" && value.trim().length > 0) {
 				return value;
 			}
 		}
-	}
-	if (err instanceof Error && err.message) {
-		return err.message;
 	}
 	return fallback;
 }

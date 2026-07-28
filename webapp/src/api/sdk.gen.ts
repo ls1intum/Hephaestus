@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddLabelFilterData, AddLabelFilterErrors, AddLabelFilterResponses, AddLabelToTeamData, AddLabelToTeamResponses, AddRepositoryToMonitorData, AddRepositoryToMonitorResponses, AdminCreateLoginProviderData, AdminCreateLoginProviderResponses, AdminDeleteLoginProviderData, AdminDeleteLoginProviderResponses, AdminExportAuthEventsData, AdminExportAuthEventsResponses, AdminListAuthEventsData, AdminListAuthEventsResponses, AdminListConfigAuditEventsData, AdminListConfigAuditEventsResponses, AdminListLoginProvidersData, AdminListLoginProvidersResponses, AdminListUsersData, AdminListUsersResponses, AdminListWorkspacesData, AdminListWorkspacesResponses, AdminRevokeUserSessionsData, AdminRevokeUserSessionsResponses, AdminUpdateLoginProviderData, AdminUpdateLoginProviderResponses, AdminUpdateUserData, AdminUpdateUserResponses, AssignRoleData, AssignRoleResponses, AuditData, AuditResponses, BindAreaData, BindAreaErrors, BindAreaResponses, CallbackGetData, CallbackGetResponses, CallbackPostData, CallbackPostResponses, CancelJobData, CancelJobErrors, CancelJobResponses, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponses, CreateAreaData, CreateAreaErrors, CreateAreaResponses, CreateConfigData, CreateConfigErrors, CreateConfigResponses, CreatePracticeData, CreatePracticeErrors, CreatePracticeResponses, CreateWorkspaceData, CreateWorkspaceResponses, DeleteAreaData, DeleteAreaErrors, DeleteAreaResponses, DeleteConfigData, DeleteConfigErrors, DeleteConfigResponses, DeleteCurrentUserData, DeleteCurrentUserResponses, DeleteOutlineCollectionData, DeleteOutlineCollectionErrors, DeleteOutlineCollectionResponses, DeletePracticeData, DeletePracticeErrors, DeletePracticeResponses, DeleteThreadData, DeleteThreadErrors, DeleteThreadResponses, DownloadDataExportData, DownloadDataExportResponses, ExitImpersonationData, ExitImpersonationResponses, GetActivityMonitorData, GetActivityMonitorResponses, GetAiSettingsData, GetAiSettingsResponses, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponses, GetAllTeamsData, GetAllTeamsResponses, GetAreaData, GetAreaErrors, GetAreaResponses, GetConfigData, GetConfigErrors, GetConfigResponses, GetConfigsData, GetConfigsResponses, GetConnectionSyncStatusData, GetConnectionSyncStatusResponses, GetCurrentUserData, GetCurrentUserMembershipData, GetCurrentUserMembershipResponses, GetCurrentUserResponses, GetDataExportStatusData, GetDataExportStatusResponses, GetEngagementData, GetEngagementResponses, GetIntegrationCatalogData, GetIntegrationCatalogResponses, GetJobData, GetJobErrors, GetJobResponses, GetJwksData, GetJwksResponses, GetLabelFiltersData, GetLabelFiltersResponses, GetLatestReactionData, GetLatestReactionErrors, GetLatestReactionResponses, GetLeaderboardData, GetLeaderboardResponses, GetMemberData, GetMemberResponses, GetObservationData, GetObservationErrors, GetObservationResponses, GetObservationsForPullRequestData, GetObservationsForPullRequestResponses, GetOutlineCollectionData, GetOutlineCollectionErrors, GetOutlineCollectionResponses, GetOutlineTokenStatusData, GetOutlineTokenStatusErrors, GetOutlineTokenStatusResponses, GetPracticeData, GetPracticeErrors, GetPracticeResponses, GetProvidersData, GetProvidersResponses, GetReflectionData, GetReflectionResponses, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponses, GetRepositorySettingsData, GetRepositorySettingsResponses, GetSlackUserPreferencesData, GetSlackUserPreferencesResponses, GetSummaryData, GetSummaryResponses, GetTeamSettingsData, GetTeamSettingsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUserAchievementsData, GetUserAchievementsResponses, GetUserFeaturesData, GetUserFeaturesResponses, GetUserProfileData, GetUserProfileResponses, GetUserSettingsData, GetUserSettingsResponses, GetUsersWithTeamsData, GetUsersWithTeamsResponses, GetWorkspaceData, GetWorkspaceResponses, GitLabPreflightData, GitLabPreflightResponses, ImpersonateData, ImpersonateResponses, InitiateData, InitiateResponses, ListAreasData, ListAreasResponses, ListConnectionSyncJobsData, ListConnectionSyncJobsResponses, ListConnectionSyncResourcesData, ListConnectionSyncResourcesResponses, ListData, ListGitLabGroupsData, ListGitLabGroupsResponses, ListGlobalContributorsData, ListGlobalContributorsResponses, ListIdentityProvidersData, ListIdentityProvidersResponses, ListJobsData, ListJobsResponses, ListLearnerPracticesData, ListLearnerPracticesResponses, ListLinkedIdentitiesData, ListLinkedIdentitiesResponses, ListMembersData, ListMembersResponses, ListObservationsData, ListObservationsResponses, ListOutlineCollectionCandidatesData, ListOutlineCollectionCandidatesErrors, ListOutlineCollectionCandidatesResponses, ListOutlineCollectionsData, ListOutlineCollectionsErrors, ListOutlineCollectionsResponses, ListPracticesData, ListPracticesResponses, ListResponses, ListSessionsData, ListSessionsResponses, ListSlackChannelCandidatesData, ListSlackChannelCandidatesResponses, ListSlackChannelConsentEventsData, ListSlackChannelConsentEventsResponses, ListSlackChannelsData, ListSlackChannelsResponses, ListThreadsData, ListThreadsResponses, ListWorkspaceConfigAuditEventsData, ListWorkspaceConfigAuditEventsResponses, ListWorkspacesData, ListWorkspacesResponses, LogoutData, LogoutResponses, PurgeWorkspaceData, PurgeWorkspaceResponses, ReadData, ReadResponses, RecalculateUserAchievementsData, RecalculateUserAchievementsResponses, RefreshData, RefreshResponses, RegisterOutlineCollectionData, RegisterOutlineCollectionErrors, RegisterOutlineCollectionResponses, RegisterSlackChannelData, RegisterSlackChannelResponses, ReloadAchievementsData, ReloadAchievementsResponses, RemoveLabelFilterData, RemoveLabelFilterErrors, RemoveLabelFilterResponses, RemoveLabelFromTeamData, RemoveLabelFromTeamResponses, RemoveMemberData, RemoveMemberResponses, RemoveRepositoryToMonitorData, RemoveRepositoryToMonitorResponses, RemoveVoteData, RemoveVoteErrors, RemoveVoteResponses, RenameSlugData, RenameSlugResponses, ReorderAreasData, ReorderAreasErrors, ReorderAreasResponses, ReorderPracticesData, ReorderPracticesErrors, ReorderPracticesResponses, RequestDataExportData, RequestDataExportResponses, ResetAndRecalculateLeaguesData, ResetAndRecalculateLeaguesResponses, RetryDeliveryData, RetryDeliveryErrors, RetryDeliveryResponses, RevokeOtherSessionsData, RevokeOtherSessionsResponses, RevokeSessionData, RevokeSessionResponses, SendSlackTestMessageData, SendSlackTestMessageResponses, SetActiveData, SetActiveErrors, SetActiveResponses, SubmitReactionData, SubmitReactionErrors, SubmitReactionResponses, TriggerSyncJobData, TriggerSyncJobErrors, TriggerSyncJobResponses, UnlinkIdentityData, UnlinkIdentityErrors, UnlinkIdentityResponses, UpdateAreaData, UpdateAreaErrors, UpdateAreaResponses, UpdateConfigData, UpdateConfigErrors, UpdateConfigResponses, UpdateConnectionStatusData, UpdateConnectionStatusResponses, UpdateConnectionSyncJobData, UpdateConnectionSyncJobErrors, UpdateConnectionSyncJobResponses, UpdateFeaturesData, UpdateFeaturesResponses, UpdateLeaderboardDigestData, UpdateLeaderboardDigestResponses, UpdateMemberVisibilityData, UpdateMemberVisibilityResponses, UpdateMentorConfigData, UpdateMentorConfigErrors, UpdateMentorConfigResponses, UpdateNotificationsData, UpdateNotificationsResponses, UpdateOutlineCollectionStateData, UpdateOutlineCollectionStateErrors, UpdateOutlineCollectionStateResponses, UpdatePracticeConfigData, UpdatePracticeConfigErrors, UpdatePracticeConfigResponses, UpdatePracticeData, UpdatePracticeErrors, UpdatePracticeResponses, UpdatePracticeReviewSettingsData, UpdatePracticeReviewSettingsResponses, UpdatePublicVisibilityData, UpdatePublicVisibilityResponses, UpdateRepositorySettingsData, UpdateRepositorySettingsErrors, UpdateRepositorySettingsResponses, UpdateRepositoryVisibilityData, UpdateRepositoryVisibilityResponses, UpdateScheduleData, UpdateScheduleResponses, UpdateSlackChannelConsentData, UpdateSlackChannelConsentResponses, UpdateSlackUserPreferencesData, UpdateSlackUserPreferencesResponses, UpdateStatusData, UpdateStatusResponses, UpdateTeamSettingsData, UpdateTeamSettingsErrors, UpdateTeamSettingsResponses, UpdateTeamVisibilityData, UpdateTeamVisibilityResponses, UpdateTokenData, UpdateTokenResponses, UpdateUserSettingsData, UpdateUserSettingsResponses, VoteData, VoteErrors, VoteResponses } from './types.gen';
+import type { AddLabelFilterData, AddLabelFilterErrors, AddLabelFilterResponses, AddLabelToTeamData, AddLabelToTeamResponses, AddRepositoryToMonitorData, AddRepositoryToMonitorResponses, AdminCreateLlmConnectionData, AdminCreateLlmConnectionErrors, AdminCreateLlmConnectionResponses, AdminCreateLlmModelData, AdminCreateLlmModelErrors, AdminCreateLlmModelResponses, AdminCreateLoginProviderData, AdminCreateLoginProviderResponses, AdminDeleteLlmConnectionData, AdminDeleteLlmConnectionErrors, AdminDeleteLlmConnectionResponses, AdminDeleteLlmModelData, AdminDeleteLlmModelErrors, AdminDeleteLlmModelResponses, AdminDeleteLoginProviderData, AdminDeleteLoginProviderResponses, AdminExportAuthEventsData, AdminExportAuthEventsResponses, AdminGetLlmConnectionData, AdminGetLlmConnectionErrors, AdminGetLlmConnectionResponses, AdminGetLlmModelData, AdminGetLlmModelErrors, AdminGetLlmModelResponses, AdminGetLlmSettingsData, AdminGetLlmSettingsResponses, AdminGetLlmUsageReportData, AdminGetLlmUsageReportResponses, AdminListAuthEventsData, AdminListAuthEventsResponses, AdminListConfigAuditEventsData, AdminListConfigAuditEventsResponses, AdminListLlmConnectionsData, AdminListLlmConnectionsResponses, AdminListLlmModelsData, AdminListLlmModelsResponses, AdminListLoginProvidersData, AdminListLoginProvidersResponses, AdminListUsersData, AdminListUsersResponses, AdminListWorkspacesData, AdminListWorkspacesResponses, AdminProbeLlmConnectionData, AdminProbeLlmConnectionDraftData, AdminProbeLlmConnectionDraftResponses, AdminProbeLlmConnectionResponses, AdminRevokeUserSessionsData, AdminRevokeUserSessionsResponses, AdminUpdateLlmConnectionData, AdminUpdateLlmConnectionErrors, AdminUpdateLlmConnectionResponses, AdminUpdateLlmModelData, AdminUpdateLlmModelErrors, AdminUpdateLlmModelPriceData, AdminUpdateLlmModelPriceErrors, AdminUpdateLlmModelPriceResponses, AdminUpdateLlmModelResponses, AdminUpdateLlmModelSharingData, AdminUpdateLlmModelSharingErrors, AdminUpdateLlmModelSharingResponses, AdminUpdateLlmSettingsData, AdminUpdateLlmSettingsResponses, AdminUpdateLoginProviderData, AdminUpdateLoginProviderResponses, AdminUpdateUserData, AdminUpdateUserResponses, AdminUpdateWorkspaceLlmBudgetData, AdminUpdateWorkspaceLlmBudgetResponses, AssignRoleData, AssignRoleResponses, AuditData, AuditResponses, BindAreaData, BindAreaErrors, BindAreaResponses, CallbackGetData, CallbackGetResponses, CallbackPostData, CallbackPostResponses, CancelAgentJobData, CancelAgentJobErrors, CancelAgentJobResponses, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponses, ConfigureAgentData, ConfigureAgentErrors, ConfigureAgentResponses, CreateAreaData, CreateAreaErrors, CreateAreaResponses, CreatePracticeData, CreatePracticeErrors, CreatePracticeResponses, CreateWorkspaceData, CreateWorkspaceResponses, DeleteAgentData, DeleteAgentResponses, DeleteAreaData, DeleteAreaErrors, DeleteAreaResponses, DeleteCurrentUserData, DeleteCurrentUserResponses, DeleteOutlineCollectionData, DeleteOutlineCollectionErrors, DeleteOutlineCollectionResponses, DeletePracticeData, DeletePracticeErrors, DeletePracticeResponses, DeleteThreadData, DeleteThreadErrors, DeleteThreadResponses, DownloadDataExportData, DownloadDataExportResponses, ExitImpersonationData, ExitImpersonationResponses, GetActivityMonitorData, GetActivityMonitorResponses, GetAgentJobData, GetAgentJobErrors, GetAgentJobResponses, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponses, GetAllTeamsData, GetAllTeamsResponses, GetAreaData, GetAreaErrors, GetAreaResponses, GetConnectionSyncStatusData, GetConnectionSyncStatusResponses, GetCurrentUserData, GetCurrentUserMembershipData, GetCurrentUserMembershipResponses, GetCurrentUserResponses, GetDataExportStatusData, GetDataExportStatusResponses, GetEngagementData, GetEngagementResponses, GetIntegrationCatalogData, GetIntegrationCatalogResponses, GetJwksData, GetJwksResponses, GetLabelFiltersData, GetLabelFiltersResponses, GetLatestReactionData, GetLatestReactionErrors, GetLatestReactionResponses, GetLeaderboardData, GetLeaderboardResponses, GetLlmUsageReportData, GetLlmUsageReportResponses, GetMemberData, GetMemberResponses, GetObservationData, GetObservationErrors, GetObservationResponses, GetObservationsForPullRequestData, GetObservationsForPullRequestResponses, GetOutlineCollectionData, GetOutlineCollectionErrors, GetOutlineCollectionResponses, GetOutlineTokenStatusData, GetOutlineTokenStatusErrors, GetOutlineTokenStatusResponses, GetPracticeData, GetPracticeErrors, GetPracticeResponses, GetPracticeReviewSettingsData, GetPracticeReviewSettingsResponses, GetProvidersData, GetProvidersResponses, GetReflectionData, GetReflectionResponses, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponses, GetRepositorySettingsData, GetRepositorySettingsResponses, GetSlackUserPreferencesData, GetSlackUserPreferencesResponses, GetSummaryData, GetSummaryResponses, GetTeamSettingsData, GetTeamSettingsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUserAchievementsData, GetUserAchievementsResponses, GetUserFeaturesData, GetUserFeaturesResponses, GetUserProfileData, GetUserProfileResponses, GetUserSettingsData, GetUserSettingsResponses, GetUsersWithTeamsData, GetUsersWithTeamsResponses, GetWorkspaceData, GetWorkspaceResponses, GitLabPreflightData, GitLabPreflightResponses, ImpersonateData, ImpersonateResponses, InitiateData, InitiateResponses, ListAgentJobsData, ListAgentJobsResponses, ListAgentsData, ListAgentsResponses, ListAreasData, ListAreasResponses, ListConnectionSyncJobsData, ListConnectionSyncJobsResponses, ListConnectionSyncResourcesData, ListConnectionSyncResourcesResponses, ListData, ListGitLabGroupsData, ListGitLabGroupsResponses, ListGlobalContributorsData, ListGlobalContributorsResponses, ListIdentityProvidersData, ListIdentityProvidersResponses, ListLearnerPracticesData, ListLearnerPracticesResponses, ListLinkedIdentitiesData, ListLinkedIdentitiesResponses, ListMembersData, ListMembersResponses, ListObservationsData, ListObservationsResponses, ListOutlineCollectionCandidatesData, ListOutlineCollectionCandidatesErrors, ListOutlineCollectionCandidatesResponses, ListOutlineCollectionsData, ListOutlineCollectionsErrors, ListOutlineCollectionsResponses, ListPracticesData, ListPracticesResponses, ListResponses, ListSessionsData, ListSessionsResponses, ListSlackChannelCandidatesData, ListSlackChannelCandidatesResponses, ListSlackChannelConsentEventsData, ListSlackChannelConsentEventsResponses, ListSlackChannelsData, ListSlackChannelsResponses, ListThreadsData, ListThreadsResponses, ListWorkspaceConfigAuditEventsData, ListWorkspaceConfigAuditEventsResponses, ListWorkspacesData, ListWorkspacesResponses, LogoutData, LogoutResponses, PurgeWorkspaceData, PurgeWorkspaceResponses, ReadData, ReadResponses, RecalculateUserAchievementsData, RecalculateUserAchievementsResponses, RefreshData, RefreshResponses, RegisterOutlineCollectionData, RegisterOutlineCollectionErrors, RegisterOutlineCollectionResponses, RegisterSlackChannelData, RegisterSlackChannelResponses, ReloadAchievementsData, ReloadAchievementsResponses, RemoveLabelFilterData, RemoveLabelFilterErrors, RemoveLabelFilterResponses, RemoveLabelFromTeamData, RemoveLabelFromTeamResponses, RemoveMemberData, RemoveMemberResponses, RemoveRepositoryToMonitorData, RemoveRepositoryToMonitorResponses, RemoveVoteData, RemoveVoteErrors, RemoveVoteResponses, RenameSlugData, RenameSlugResponses, ReorderAreasData, ReorderAreasErrors, ReorderAreasResponses, ReorderPracticesData, ReorderPracticesErrors, ReorderPracticesResponses, RequestDataExportData, RequestDataExportResponses, ResetAndRecalculateLeaguesData, ResetAndRecalculateLeaguesResponses, RetryAgentJobDeliveryData, RetryAgentJobDeliveryErrors, RetryAgentJobDeliveryResponses, RevokeOtherSessionsData, RevokeOtherSessionsResponses, RevokeSessionData, RevokeSessionResponses, SendSlackTestMessageData, SendSlackTestMessageResponses, SetActiveData, SetActiveErrors, SetActiveResponses, SubmitReactionData, SubmitReactionErrors, SubmitReactionResponses, TriggerSyncJobData, TriggerSyncJobErrors, TriggerSyncJobResponses, UnlinkIdentityData, UnlinkIdentityErrors, UnlinkIdentityResponses, UpdateAreaData, UpdateAreaErrors, UpdateAreaResponses, UpdateConnectionStatusData, UpdateConnectionStatusResponses, UpdateConnectionSyncJobData, UpdateConnectionSyncJobErrors, UpdateConnectionSyncJobResponses, UpdateFeaturesData, UpdateFeaturesResponses, UpdateLeaderboardDigestData, UpdateLeaderboardDigestResponses, UpdateMemberVisibilityData, UpdateMemberVisibilityResponses, UpdateNotificationsData, UpdateNotificationsResponses, UpdateOutlineCollectionStateData, UpdateOutlineCollectionStateErrors, UpdateOutlineCollectionStateResponses, UpdatePracticeData, UpdatePracticeErrors, UpdatePracticeResponses, UpdatePracticeReviewSettingsData, UpdatePracticeReviewSettingsResponses, UpdatePublicVisibilityData, UpdatePublicVisibilityResponses, UpdateRepositorySettingsData, UpdateRepositorySettingsErrors, UpdateRepositorySettingsResponses, UpdateRepositoryVisibilityData, UpdateRepositoryVisibilityResponses, UpdateScheduleData, UpdateScheduleResponses, UpdateSlackChannelConsentData, UpdateSlackChannelConsentResponses, UpdateSlackUserPreferencesData, UpdateSlackUserPreferencesResponses, UpdateStatusData, UpdateStatusResponses, UpdateTeamSettingsData, UpdateTeamSettingsErrors, UpdateTeamSettingsResponses, UpdateTeamVisibilityData, UpdateTeamVisibilityResponses, UpdateTokenData, UpdateTokenResponses, UpdateUserSettingsData, UpdateUserSettingsResponses, UpdateWorkspaceLlmBudgetData, UpdateWorkspaceLlmBudgetResponses, VoteData, VoteErrors, VoteResponses, WorkspaceCreateLlmConnectionData, WorkspaceCreateLlmConnectionErrors, WorkspaceCreateLlmConnectionResponses, WorkspaceCreateLlmModelData, WorkspaceCreateLlmModelErrors, WorkspaceCreateLlmModelResponses, WorkspaceDeleteLlmConnectionData, WorkspaceDeleteLlmConnectionErrors, WorkspaceDeleteLlmConnectionResponses, WorkspaceDeleteLlmModelData, WorkspaceDeleteLlmModelErrors, WorkspaceDeleteLlmModelResponses, WorkspaceGetLlmConnectionData, WorkspaceGetLlmConnectionErrors, WorkspaceGetLlmConnectionResponses, WorkspaceGetLlmModelData, WorkspaceGetLlmModelErrors, WorkspaceGetLlmModelResponses, WorkspaceGetLlmSettingsData, WorkspaceGetLlmSettingsResponses, WorkspaceListAvailableLlmModelsData, WorkspaceListAvailableLlmModelsResponses, WorkspaceListLlmConnectionsData, WorkspaceListLlmConnectionsResponses, WorkspaceListLlmModelsData, WorkspaceListLlmModelsResponses, WorkspaceProbeLlmConnectionData, WorkspaceProbeLlmConnectionResponses, WorkspaceUpdateLlmConnectionData, WorkspaceUpdateLlmConnectionErrors, WorkspaceUpdateLlmConnectionResponses, WorkspaceUpdateLlmModelData, WorkspaceUpdateLlmModelErrors, WorkspaceUpdateLlmModelResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -51,6 +51,191 @@ export const adminExportAuthEvents = <ThrowOnError extends boolean = false>(opti
 export const adminListConfigAuditEvents = <ThrowOnError extends boolean = false>(options?: Options<AdminListConfigAuditEventsData, ThrowOnError>) => (options?.client ?? client).get<AdminListConfigAuditEventsResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admin/config-audit',
+    ...options
+});
+
+/**
+ * List LLM connections
+ */
+export const adminListLlmConnections = <ThrowOnError extends boolean = false>(options?: Options<AdminListLlmConnectionsData, ThrowOnError>) => (options?.client ?? client).get<AdminListLlmConnectionsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/llm/connections',
+    ...options
+});
+
+/**
+ * Create an LLM connection
+ */
+export const adminCreateLlmConnection = <ThrowOnError extends boolean = false>(options: Options<AdminCreateLlmConnectionData, ThrowOnError>) => (options.client ?? client).post<AdminCreateLlmConnectionResponses, AdminCreateLlmConnectionErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/llm/connections',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Test a draft connection and fetch its models
+ */
+export const adminProbeLlmConnectionDraft = <ThrowOnError extends boolean = false>(options: Options<AdminProbeLlmConnectionDraftData, ThrowOnError>) => (options.client ?? client).post<AdminProbeLlmConnectionDraftResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/llm/connections/probe',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Create a model on an LLM connection
+ */
+export const adminCreateLlmModel = <ThrowOnError extends boolean = false>(options: Options<AdminCreateLlmModelData, ThrowOnError>) => (options.client ?? client).post<AdminCreateLlmModelResponses, AdminCreateLlmModelErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/llm/connections/{connectionId}/models',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Delete an LLM connection
+ */
+export const adminDeleteLlmConnection = <ThrowOnError extends boolean = false>(options: Options<AdminDeleteLlmConnectionData, ThrowOnError>) => (options.client ?? client).delete<AdminDeleteLlmConnectionResponses, AdminDeleteLlmConnectionErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/llm/connections/{id}',
+    ...options
+});
+
+/**
+ * Get an LLM connection
+ */
+export const adminGetLlmConnection = <ThrowOnError extends boolean = false>(options: Options<AdminGetLlmConnectionData, ThrowOnError>) => (options.client ?? client).get<AdminGetLlmConnectionResponses, AdminGetLlmConnectionErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/llm/connections/{id}',
+    ...options
+});
+
+/**
+ * Update an LLM connection
+ */
+export const adminUpdateLlmConnection = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateLlmConnectionData, ThrowOnError>) => (options.client ?? client).patch<AdminUpdateLlmConnectionResponses, AdminUpdateLlmConnectionErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/llm/connections/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Test a stored connection and fetch its models
+ */
+export const adminProbeLlmConnection = <ThrowOnError extends boolean = false>(options: Options<AdminProbeLlmConnectionData, ThrowOnError>) => (options.client ?? client).post<AdminProbeLlmConnectionResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/llm/connections/{id}/probe',
+    ...options
+});
+
+/**
+ * List LLM catalog models
+ */
+export const adminListLlmModels = <ThrowOnError extends boolean = false>(options?: Options<AdminListLlmModelsData, ThrowOnError>) => (options?.client ?? client).get<AdminListLlmModelsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/llm/models',
+    ...options
+});
+
+/**
+ * Delete an LLM catalog model
+ */
+export const adminDeleteLlmModel = <ThrowOnError extends boolean = false>(options: Options<AdminDeleteLlmModelData, ThrowOnError>) => (options.client ?? client).delete<AdminDeleteLlmModelResponses, AdminDeleteLlmModelErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/llm/models/{id}',
+    ...options
+});
+
+/**
+ * Get an LLM catalog model
+ */
+export const adminGetLlmModel = <ThrowOnError extends boolean = false>(options: Options<AdminGetLlmModelData, ThrowOnError>) => (options.client ?? client).get<AdminGetLlmModelResponses, AdminGetLlmModelErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/llm/models/{id}',
+    ...options
+});
+
+/**
+ * Update a model's metadata
+ */
+export const adminUpdateLlmModel = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateLlmModelData, ThrowOnError>) => (options.client ?? client).patch<AdminUpdateLlmModelResponses, AdminUpdateLlmModelErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/llm/models/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Reprice a model
+ */
+export const adminUpdateLlmModelPrice = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateLlmModelPriceData, ThrowOnError>) => (options.client ?? client).put<AdminUpdateLlmModelPriceResponses, AdminUpdateLlmModelPriceErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/llm/models/{id}/price',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Share a model with all or selected workspaces
+ */
+export const adminUpdateLlmModelSharing = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateLlmModelSharingData, ThrowOnError>) => (options.client ?? client).put<AdminUpdateLlmModelSharingResponses, AdminUpdateLlmModelSharingErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/llm/models/{id}/sharing',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Get instance-wide LLM governance settings
+ */
+export const adminGetLlmSettings = <ThrowOnError extends boolean = false>(options?: Options<AdminGetLlmSettingsData, ThrowOnError>) => (options?.client ?? client).get<AdminGetLlmSettingsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/llm/settings',
+    ...options
+});
+
+/**
+ * Update instance-wide LLM governance settings
+ */
+export const adminUpdateLlmSettings = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateLlmSettingsData, ThrowOnError>) => (options.client ?? client).put<AdminUpdateLlmSettingsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/llm/settings',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Per-workspace LLM spend rollup for one month (all workspaces)
+ */
+export const adminGetLlmUsageReport = <ThrowOnError extends boolean = false>(options?: Options<AdminGetLlmUsageReportData, ThrowOnError>) => (options?.client ?? client).get<AdminGetLlmUsageReportResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/llm/usage',
     ...options
 });
 
@@ -136,6 +321,19 @@ export const adminListWorkspaces = <ThrowOnError extends boolean = false>(option
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admin/workspaces',
     ...options
+});
+
+/**
+ * Set or clear a workspace's monthly cap on host-funded LLM spend
+ */
+export const adminUpdateWorkspaceLlmBudget = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateWorkspaceLlmBudgetData, ThrowOnError>) => (options.client ?? client).put<AdminUpdateWorkspaceLlmBudgetResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/workspaces/{workspaceSlug}/llm/budget',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**
@@ -410,135 +608,65 @@ export const purgeWorkspace = <ThrowOnError extends boolean = false>(options: Op
 export const getWorkspace = <ThrowOnError extends boolean = false>(options: Options<GetWorkspaceData, ThrowOnError>) => (options.client ?? client).get<GetWorkspaceResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}', ...options });
 
 /**
- * List agent configurations for a workspace
+ * List the workspace's agents and how each is configured
  */
-export const getConfigs = <ThrowOnError extends boolean = false>(options: Options<GetConfigsData, ThrowOnError>) => (options.client ?? client).get<GetConfigsResponses, unknown, ThrowOnError>({
+export const listAgents = <ThrowOnError extends boolean = false>(options: Options<ListAgentsData, ThrowOnError>) => (options.client ?? client).get<ListAgentsResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/agent-configs',
+    url: '/workspaces/{workspaceSlug}/agents',
     ...options
-});
-
-/**
- * Create a new agent configuration
- */
-export const createConfig = <ThrowOnError extends boolean = false>(options: Options<CreateConfigData, ThrowOnError>) => (options.client ?? client).post<CreateConfigResponses, CreateConfigErrors, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/agent-configs',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Delete an agent configuration
- */
-export const deleteConfig = <ThrowOnError extends boolean = false>(options: Options<DeleteConfigData, ThrowOnError>) => (options.client ?? client).delete<DeleteConfigResponses, DeleteConfigErrors, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/agent-configs/{configId}',
-    ...options
-});
-
-/**
- * Get a specific agent configuration
- */
-export const getConfig = <ThrowOnError extends boolean = false>(options: Options<GetConfigData, ThrowOnError>) => (options.client ?? client).get<GetConfigResponses, GetConfigErrors, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/agent-configs/{configId}',
-    ...options
-});
-
-/**
- * Update an existing agent configuration
- */
-export const updateConfig = <ThrowOnError extends boolean = false>(options: Options<UpdateConfigData, ThrowOnError>) => (options.client ?? client).patch<UpdateConfigResponses, UpdateConfigErrors, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/agent-configs/{configId}',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
 });
 
 /**
  * List agent jobs for a workspace
  */
-export const listJobs = <ThrowOnError extends boolean = false>(options: Options<ListJobsData, ThrowOnError>) => (options.client ?? client).get<ListJobsResponses, unknown, ThrowOnError>({
+export const listAgentJobs = <ThrowOnError extends boolean = false>(options: Options<ListAgentJobsData, ThrowOnError>) => (options.client ?? client).get<ListAgentJobsResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/agent-jobs',
+    url: '/workspaces/{workspaceSlug}/agents/jobs',
     ...options
 });
 
 /**
  * Get agent job details
  */
-export const getJob = <ThrowOnError extends boolean = false>(options: Options<GetJobData, ThrowOnError>) => (options.client ?? client).get<GetJobResponses, GetJobErrors, ThrowOnError>({
+export const getAgentJob = <ThrowOnError extends boolean = false>(options: Options<GetAgentJobData, ThrowOnError>) => (options.client ?? client).get<GetAgentJobResponses, GetAgentJobErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/agent-jobs/{jobId}',
+    url: '/workspaces/{workspaceSlug}/agents/jobs/{jobId}',
     ...options
 });
 
 /**
  * Cancel an agent job
  */
-export const cancelJob = <ThrowOnError extends boolean = false>(options: Options<CancelJobData, ThrowOnError>) => (options.client ?? client).post<CancelJobResponses, CancelJobErrors, ThrowOnError>({
+export const cancelAgentJob = <ThrowOnError extends boolean = false>(options: Options<CancelAgentJobData, ThrowOnError>) => (options.client ?? client).post<CancelAgentJobResponses, CancelAgentJobErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/agent-jobs/{jobId}/cancel',
+    url: '/workspaces/{workspaceSlug}/agents/jobs/{jobId}/cancel',
     ...options
 });
 
 /**
  * Retry delivery for a completed agent job
  */
-export const retryDelivery = <ThrowOnError extends boolean = false>(options: Options<RetryDeliveryData, ThrowOnError>) => (options.client ?? client).post<RetryDeliveryResponses, RetryDeliveryErrors, ThrowOnError>({
+export const retryAgentJobDelivery = <ThrowOnError extends boolean = false>(options: Options<RetryAgentJobDeliveryData, ThrowOnError>) => (options.client ?? client).post<RetryAgentJobDeliveryResponses, RetryAgentJobDeliveryErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/agent-jobs/{jobId}/delivery/retry',
+    url: '/workspaces/{workspaceSlug}/agents/jobs/{jobId}/delivery/retry',
     ...options
 });
 
 /**
- * Get aggregate workspace AI settings
+ * Remove the agent for one purpose (turn it off)
  */
-export const getAiSettings = <ThrowOnError extends boolean = false>(options: Options<GetAiSettingsData, ThrowOnError>) => (options.client ?? client).get<GetAiSettingsResponses, unknown, ThrowOnError>({
+export const deleteAgent = <ThrowOnError extends boolean = false>(options: Options<DeleteAgentData, ThrowOnError>) => (options.client ?? client).delete<DeleteAgentResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/ai-settings',
+    url: '/workspaces/{workspaceSlug}/agents/{purpose}',
     ...options
 });
 
 /**
- * Bind (or unbind) the agent config that powers the mentor
+ * Configure the agent for one purpose
  */
-export const updateMentorConfig = <ThrowOnError extends boolean = false>(options: Options<UpdateMentorConfigData, ThrowOnError>) => (options.client ?? client).put<UpdateMentorConfigResponses, UpdateMentorConfigErrors, ThrowOnError>({
+export const configureAgent = <ThrowOnError extends boolean = false>(options: Options<ConfigureAgentData, ThrowOnError>) => (options.client ?? client).put<ConfigureAgentResponses, ConfigureAgentErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/ai-settings/mentor-config',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Bind (or unbind) the agent config that powers practice detection
- */
-export const updatePracticeConfig = <ThrowOnError extends boolean = false>(options: Options<UpdatePracticeConfigData, ThrowOnError>) => (options.client ?? client).put<UpdatePracticeConfigResponses, UpdatePracticeConfigErrors, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/ai-settings/practice-config',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Update per-workspace practice-review policy
- */
-export const updatePracticeReviewSettings = <ThrowOnError extends boolean = false>(options: Options<UpdatePracticeReviewSettingsData, ThrowOnError>) => (options.client ?? client).patch<UpdatePracticeReviewSettingsResponses, unknown, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/ai-settings/practice-review',
+    url: '/workspaces/{workspaceSlug}/agents/{purpose}',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -743,6 +871,161 @@ export const computeUserLeagueStats = <ThrowOnError extends boolean = false>(opt
 export const resetAndRecalculateLeagues = <ThrowOnError extends boolean = false>(options: Options<ResetAndRecalculateLeaguesData, ThrowOnError>) => (options.client ?? client).put<ResetAndRecalculateLeaguesResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/league/reset',
+    ...options
+});
+
+/**
+ * List models this workspace can bind a Task to (shared + your own)
+ */
+export const workspaceListAvailableLlmModels = <ThrowOnError extends boolean = false>(options: Options<WorkspaceListAvailableLlmModelsData, ThrowOnError>) => (options.client ?? client).get<WorkspaceListAvailableLlmModelsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/llm/available-models',
+    ...options
+});
+
+/**
+ * Set or clear this workspace's monthly cap on its own-provider LLM spend
+ */
+export const updateWorkspaceLlmBudget = <ThrowOnError extends boolean = false>(options: Options<UpdateWorkspaceLlmBudgetData, ThrowOnError>) => (options.client ?? client).put<UpdateWorkspaceLlmBudgetResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/llm/budget',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List your AI provider connections
+ */
+export const workspaceListLlmConnections = <ThrowOnError extends boolean = false>(options: Options<WorkspaceListLlmConnectionsData, ThrowOnError>) => (options.client ?? client).get<WorkspaceListLlmConnectionsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/llm/connections',
+    ...options
+});
+
+/**
+ * Connect your own AI provider
+ */
+export const workspaceCreateLlmConnection = <ThrowOnError extends boolean = false>(options: Options<WorkspaceCreateLlmConnectionData, ThrowOnError>) => (options.client ?? client).post<WorkspaceCreateLlmConnectionResponses, WorkspaceCreateLlmConnectionErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/llm/connections',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Create a model on your AI provider
+ */
+export const workspaceCreateLlmModel = <ThrowOnError extends boolean = false>(options: Options<WorkspaceCreateLlmModelData, ThrowOnError>) => (options.client ?? client).post<WorkspaceCreateLlmModelResponses, WorkspaceCreateLlmModelErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/llm/connections/{connectionId}/models',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Remove your AI provider connection
+ */
+export const workspaceDeleteLlmConnection = <ThrowOnError extends boolean = false>(options: Options<WorkspaceDeleteLlmConnectionData, ThrowOnError>) => (options.client ?? client).delete<WorkspaceDeleteLlmConnectionResponses, WorkspaceDeleteLlmConnectionErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/llm/connections/{id}',
+    ...options
+});
+
+/**
+ * Get one of your AI provider connections
+ */
+export const workspaceGetLlmConnection = <ThrowOnError extends boolean = false>(options: Options<WorkspaceGetLlmConnectionData, ThrowOnError>) => (options.client ?? client).get<WorkspaceGetLlmConnectionResponses, WorkspaceGetLlmConnectionErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/llm/connections/{id}',
+    ...options
+});
+
+/**
+ * Update your AI provider connection
+ */
+export const workspaceUpdateLlmConnection = <ThrowOnError extends boolean = false>(options: Options<WorkspaceUpdateLlmConnectionData, ThrowOnError>) => (options.client ?? client).patch<WorkspaceUpdateLlmConnectionResponses, WorkspaceUpdateLlmConnectionErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/llm/connections/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Test your AI provider connection
+ */
+export const workspaceProbeLlmConnection = <ThrowOnError extends boolean = false>(options: Options<WorkspaceProbeLlmConnectionData, ThrowOnError>) => (options.client ?? client).post<WorkspaceProbeLlmConnectionResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/llm/connections/{id}/probe',
+    ...options
+});
+
+/**
+ * List models on your AI provider
+ */
+export const workspaceListLlmModels = <ThrowOnError extends boolean = false>(options: Options<WorkspaceListLlmModelsData, ThrowOnError>) => (options.client ?? client).get<WorkspaceListLlmModelsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/llm/models',
+    ...options
+});
+
+/**
+ * Remove a model on your AI provider
+ */
+export const workspaceDeleteLlmModel = <ThrowOnError extends boolean = false>(options: Options<WorkspaceDeleteLlmModelData, ThrowOnError>) => (options.client ?? client).delete<WorkspaceDeleteLlmModelResponses, WorkspaceDeleteLlmModelErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/llm/models/{id}',
+    ...options
+});
+
+/**
+ * Get a model on your AI provider
+ */
+export const workspaceGetLlmModel = <ThrowOnError extends boolean = false>(options: Options<WorkspaceGetLlmModelData, ThrowOnError>) => (options.client ?? client).get<WorkspaceGetLlmModelResponses, WorkspaceGetLlmModelErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/llm/models/{id}',
+    ...options
+});
+
+/**
+ * Update a model on your AI provider
+ */
+export const workspaceUpdateLlmModel = <ThrowOnError extends boolean = false>(options: Options<WorkspaceUpdateLlmModelData, ThrowOnError>) => (options.client ?? client).patch<WorkspaceUpdateLlmModelResponses, WorkspaceUpdateLlmModelErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/llm/models/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Get the instance LLM policy as it applies to this workspace
+ */
+export const workspaceGetLlmSettings = <ThrowOnError extends boolean = false>(options: Options<WorkspaceGetLlmSettingsData, ThrowOnError>) => (options.client ?? client).get<WorkspaceGetLlmSettingsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/llm/settings',
+    ...options
+});
+
+/**
+ * Get the workspace's LLM usage report for one month
+ */
+export const getLlmUsageReport = <ThrowOnError extends boolean = false>(options: Options<GetLlmUsageReportData, ThrowOnError>) => (options.client ?? client).get<GetLlmUsageReportResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/llm/usage',
     ...options
 });
 
@@ -1110,6 +1393,28 @@ export const getObservation = <ThrowOnError extends boolean = false>(options: Op
 export const reorderPractices = <ThrowOnError extends boolean = false>(options: Options<ReorderPracticesData, ThrowOnError>) => (options.client ?? client).patch<ReorderPracticesResponses, ReorderPracticesErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practices/reorder',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Get the workspace's practice-review policy
+ */
+export const getPracticeReviewSettings = <ThrowOnError extends boolean = false>(options: Options<GetPracticeReviewSettingsData, ThrowOnError>) => (options.client ?? client).get<GetPracticeReviewSettingsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/practices/review-settings',
+    ...options
+});
+
+/**
+ * Update the workspace's practice-review policy
+ */
+export const updatePracticeReviewSettings = <ThrowOnError extends boolean = false>(options: Options<UpdatePracticeReviewSettingsData, ThrowOnError>) => (options.client ?? client).patch<UpdatePracticeReviewSettingsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/practices/review-settings',
     ...options,
     headers: {
         'Content-Type': 'application/json',

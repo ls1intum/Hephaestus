@@ -43,7 +43,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * </ul>
  */
 @Component
-@ConditionalOnProperty(prefix = "hephaestus.agent.nats", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(prefix = "hephaestus.agent", name = "enabled", havingValue = "true")
 public class BotCommandProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(BotCommandProcessor.class);
@@ -69,16 +69,10 @@ public class BotCommandProcessor {
         this.reactionSinks = map;
     }
 
-    /**
-     * Handle a bot command received event. Runs in a new transaction asynchronously.
-     *
-     * @param event the bot command event
-     */
     @Async
     @TransactionalEventListener
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onBotCommandReceived(BotCommandReceivedEvent event) {
-        // React with eyes emoji to acknowledge the command
         addEyesReaction(event);
 
         processCommand(event.repositoryId(), event.mrNumber(), event.noteBody(), event.noteAuthor());
@@ -102,7 +96,7 @@ public class BotCommandProcessor {
 
     private void handleReviewCommand(long repositoryId, int mrNumber, String noteAuthor) {
         try {
-            // 1. Find the PR entity, then re-fetch with full associations for the gate
+            // Found by (repo, number), then re-fetched with the association graph the gate needs.
             PullRequest stub = pullRequestRepository.findByRepositoryIdAndNumber(repositoryId, mrNumber).orElse(null);
             if (stub == null) {
                 log.warn(
@@ -120,7 +114,6 @@ public class BotCommandProcessor {
                 return;
             }
 
-            // 2. Validate branch info
             if (pr.getHeadRefOid() == null || pr.getHeadRefName() == null || pr.getBaseRefName() == null) {
                 log.warn(
                     "Bot command: missing branch info, prId={}, headRefOid={}, headRefName={}, baseRefName={}",
@@ -132,7 +125,6 @@ public class BotCommandProcessor {
                 return;
             }
 
-            // 3. Skip closed/merged PRs
             if (
                 pr.getState() == PullRequest.State.CLOSED || pr.getState() == PullRequest.State.MERGED || pr.isMerged()
             ) {
@@ -140,7 +132,7 @@ public class BotCommandProcessor {
                 return;
             }
 
-            // 4. Evaluate practice detection gate (uses PullRequestCreated to match broadest set)
+            // PullRequestCreated is used deliberately: it matches the broadest set of practices.
             GateDecision decision = practiceReviewDetectionGate.evaluate(
                 pr,
                 TriggerEventNames.PULL_REQUEST_CREATED,
@@ -178,7 +170,8 @@ public class BotCommandProcessor {
                                 ),
                             () ->
                                 log.warn(
-                                    "Bot command: no job created (no enabled agent config?), prId={}, mrNumber={}",
+                                    "Bot command: no job created (practice detection unbound/disabled, or the " +
+                                        "workspace's monthly LLM budget is exhausted), prId={}, mrNumber={}",
                                     pr.getId(),
                                     mrNumber
                                 )

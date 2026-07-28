@@ -9,7 +9,7 @@ import {
 	hermesSprint,
 	poseidonTrident,
 	zeusThunderbolt,
-} from "@/components/achievements/storyMockData";
+} from "@/components/achievements/story-mock-data";
 import type { UIAchievement } from "@/components/achievements/types";
 
 /**
