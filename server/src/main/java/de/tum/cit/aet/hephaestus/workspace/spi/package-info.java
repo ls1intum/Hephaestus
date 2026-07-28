@@ -1,7 +1,6 @@
 /**
- * Workspace lifecycle SPIs. Today contains {@link WorkspacePurgeContributor}: feature
- * modules implement it to delete their workspace-scoped data when a workspace is
- * purged; {@code WorkspaceLifecycleService} invokes the contributors in order.
+ * Workspace lifecycle SPIs. Feature modules provide guards for unsafe deletion and
+ * contributors that erase their workspace-scoped data.
  *
  * <p>Lifecycle EVENTS (e.g. {@code WorkspaceCreatedEvent}) live next door in
  * {@code workspace.events} — separate named interface so the {@code List<X>} SPI

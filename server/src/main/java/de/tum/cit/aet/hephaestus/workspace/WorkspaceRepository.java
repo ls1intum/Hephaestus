@@ -64,6 +64,12 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
         );
     }
 
+    default Optional<Workspace> findActiveByInstallationIdForUpdate(Long installationId) {
+        return findByInstallationIdForUpdate(installationId).filter(
+            workspace -> workspace.getStatus() == Workspace.WorkspaceStatus.ACTIVE
+        );
+    }
+
     @Query(
         """
         SELECT c.workspace

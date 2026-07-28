@@ -32,7 +32,7 @@ import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceLifecycleService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
-import de.tum.cit.aet.hephaestus.workspace.exception.WorkspaceLifecycleViolationException;
+import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeBlockedException;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -130,7 +130,7 @@ class AgentWorkspacePurgeIntegrationTest extends BaseIntegrationTest {
         jobRepository.save(job);
 
         assertThatThrownBy(() -> lifecycleService.purgeWorkspace(workspace.getWorkspaceSlug()))
-            .isInstanceOf(WorkspaceLifecycleViolationException.class)
+            .isInstanceOf(WorkspacePurgeBlockedException.class)
             .hasMessage(
                 "Workspace deletion is blocked while AI runs are queued, running, or awaiting feedback delivery. " +
                     "Cancel queued or running runs, and wait for pending feedback delivery to finish, then try again."

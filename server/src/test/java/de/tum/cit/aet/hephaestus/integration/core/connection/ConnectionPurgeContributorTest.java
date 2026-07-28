@@ -18,7 +18,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.exception.WorkspaceLifecycleViolationException;
+import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeBlockedException;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Optional;
@@ -106,7 +106,7 @@ class ConnectionPurgeContributorTest extends BaseUnitTest {
             .revokeProvider(erasureRef(connection));
 
         assertThatThrownBy(() -> contributor(List.of(connectionStrategy)).deleteWorkspaceData(WORKSPACE_ID))
-            .isInstanceOf(WorkspaceLifecycleViolationException.class)
+            .isInstanceOf(WorkspacePurgeBlockedException.class)
             .hasMessage(
                 "Could not confirm disconnecting GitHub. No local data was deleted; retry when the provider is available."
             );

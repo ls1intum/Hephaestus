@@ -274,9 +274,9 @@ public class WorkspaceRepositoryMonitorService {
             return Optional.empty();
         }
 
-        return findActiveInstallationForUpdate(installationId).flatMap(workspace ->
-            ensureRepositoryMonitorInternal(workspace, nameWithOwner, deferSync)
-        );
+        return workspaceRepository
+            .findActiveByInstallationIdForUpdate(installationId)
+            .flatMap(workspace -> ensureRepositoryMonitorInternal(workspace, nameWithOwner, deferSync));
     }
 
     /** Remove a repository monitor for a given installation id if it exists; no-op if missing. */
@@ -286,7 +286,7 @@ public class WorkspaceRepositoryMonitorService {
             return Optional.empty();
         }
 
-        var workspaceOpt = findActiveInstallationForUpdate(installationId);
+        var workspaceOpt = workspaceRepository.findActiveByInstallationIdForUpdate(installationId);
         if (workspaceOpt.isEmpty()) {
             return Optional.empty();
         }
@@ -316,7 +316,7 @@ public class WorkspaceRepositoryMonitorService {
      */
     @Transactional
     public Optional<Workspace> removeAllRepositoriesFromMonitor(long installationId, boolean deleteRepositories) {
-        var workspaceOpt = findActiveInstallationForUpdate(installationId);
+        var workspaceOpt = workspaceRepository.findActiveByInstallationIdForUpdate(installationId);
         workspaceOpt.ifPresent(workspace -> {
             List<RepositoryToMonitor> monitors = repositoryToMonitorRepository.findByWorkspaceId(workspace.getId());
             for (RepositoryToMonitor monitor : monitors) {
@@ -351,7 +351,7 @@ public class WorkspaceRepositoryMonitorService {
             return;
         }
 
-        var workspaceOpt = findActiveInstallationForUpdate(installationId);
+        var workspaceOpt = workspaceRepository.findActiveByInstallationIdForUpdate(installationId);
         if (workspaceOpt.isEmpty()) {
             return;
         }
@@ -398,7 +398,7 @@ public class WorkspaceRepositoryMonitorService {
             return;
         }
 
-        var workspaceOpt = findActiveInstallationForUpdate(installationId);
+        var workspaceOpt = workspaceRepository.findActiveByInstallationIdForUpdate(installationId);
         if (workspaceOpt.isEmpty()) {
             return;
         }
@@ -718,12 +718,6 @@ public class WorkspaceRepositoryMonitorService {
             throw new IllegalArgumentException("Workspace context slug must not be blank.");
         }
         return slug;
-    }
-
-    private Optional<Workspace> findActiveInstallationForUpdate(long installationId) {
-        return workspaceRepository
-            .findByInstallationIdForUpdate(installationId)
-            .filter(workspace -> workspace.getStatus() == Workspace.WorkspaceStatus.ACTIVE);
     }
 
     /**

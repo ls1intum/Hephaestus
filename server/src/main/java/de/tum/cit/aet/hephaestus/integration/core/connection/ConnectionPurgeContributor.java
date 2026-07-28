@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
-import de.tum.cit.aet.hephaestus.workspace.exception.WorkspaceLifecycleViolationException;
+import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeBlockedException;
 import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeContributor;
 import java.util.EnumMap;
 import java.util.List;
@@ -87,7 +87,7 @@ public class ConnectionPurgeContributor implements WorkspacePurgeContributor {
                 connection.getId(),
                 e.toString()
             );
-            throw new WorkspaceLifecycleViolationException(
+            throw new WorkspacePurgeBlockedException(
                 "Could not confirm disconnecting " +
                     providerName(connection.getKind()) +
                     ". No local data was deleted; retry when the provider is available."

@@ -48,7 +48,7 @@ import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
-import de.tum.cit.aet.hephaestus.workspace.exception.WorkspaceLifecycleViolationException;
+import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeBlockedException;
 import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeContributor;
 import java.sql.Timestamp;
 import java.time.Duration;
@@ -389,7 +389,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             syncJobRepository.saveAndFlush(job);
 
             assertThatThrownBy(() -> workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug()))
-                .isInstanceOf(WorkspaceLifecycleViolationException.class)
+                .isInstanceOf(WorkspacePurgeBlockedException.class)
                 .hasMessageContaining("active integration sync");
 
             assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getStatus()).isEqualTo(
@@ -408,7 +408,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             agentJobRepository.saveAndFlush(job);
 
             assertThatThrownBy(() -> workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug()))
-                .isInstanceOf(WorkspaceLifecycleViolationException.class)
+                .isInstanceOf(WorkspacePurgeBlockedException.class)
                 .hasMessageContaining("AI runs are queued");
 
             assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getStatus()).isEqualTo(
