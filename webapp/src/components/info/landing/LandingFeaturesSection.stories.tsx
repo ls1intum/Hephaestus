@@ -2,8 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { LandingFeaturesSection } from "./LandingFeaturesSection";
 
 /**
- * Features section component that showcases the key capabilities of Hephaestus
- * through visually appealing cards with icons and detailed descriptions.
+ * Features section for the two main ways developers receive feedback.
  */
 const meta = {
 	component: LandingFeaturesSection,
@@ -12,7 +11,7 @@ const meta = {
 		docs: {
 			description: {
 				component:
-					"The features section highlights the main capabilities of Hephaestus through a grid of feature cards, each focusing on a specific aspect of the platform.",
+					"The features section distinguishes practice feedback on development work from conversations with Heph.",
 			},
 		},
 	},
@@ -23,7 +22,6 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Default features section with two main feature cards:
- * Code Review Gamification and AI-Powered Mentorship.
+ * Default features section with cards for practice feedback and Heph.
  */
 export const Default: Story = {};

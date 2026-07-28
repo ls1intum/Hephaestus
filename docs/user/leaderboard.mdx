@@ -9,7 +9,7 @@ Hephaestus includes an optional weekly leaderboard that tracks review activity a
 
 ## Accessing the leaderboard
 
-Sign in with your GitHub account. When your workspace has the leaderboard enabled, it is the home page; select the Hephaestus logo in the top-left corner to return to it.
+Sign in and select a workspace. When that workspace has the leaderboard enabled, it is the workspace home page.
 
 <iframe height="450" width="600" src="https://live.rbg.tum.de/w/artemisintro/59981?video_only=1&t=0" title="Tour the weekly leaderboard" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen />
 
@@ -19,8 +19,7 @@ The overview card summarises your position on the current leaderboard:
 
 - Current rank within the selected leaderboard.
 - Time remaining until the week resets.
-- Projected **league point** adjustment based on your position.
-- Your league tier and progress towards the next tier.
+- When leagues are also enabled, your projected **league point** adjustment, current tier, and progress towards the next tier.
 
 ![Leaderboard overview card](./img/leaderboard/leaderboard-overview.png)
 
@@ -32,7 +31,7 @@ Selecting your rank in the overview card scrolls the table to highlight your ent
 
 The leaderboard table includes rank, contributor, leaderboard score, and activity summary. Selecting any reviewer opens a detailed drawer that shows:
 
-- Pull requests reviewed that week with direct GitHub links.
+- Pull requests or merge requests reviewed that week, with links to the source platform.
 - Key statistics such as additions, deletions, and review sentiment.
 - A **Copy** action that formats review highlights for sharing in standups or retrospectives.
 
@@ -46,10 +45,10 @@ The leaderboard table includes rank, contributor, leaderboard score, and activit
 
 ![Leaderboard filters](./img/leaderboard/leaderboard-filter.png)
 
-:::note League scoring
-Weekly points feed into the Elo-inspired league system. Consistent performance moves you through Bronze, Silver, and Gold leagues.
+:::note Optional league scoring
+When a workspace admin enables leagues, weekly points feed into the Elo-inspired league system. League information is hidden when the feature is off.
 :::
 
 ## Recognition and notifications
 
-Hephaestus automatically posts the top three reviewers to Slack every Monday with quick links to their highlighted pull requests. Enable notifications in **Settings → Integrations** to receive the digest. You can also opt in to email summaries that recap your personal activity.
+A workspace admin can configure a weekly Slack digest for a selected channel and team. The admin chooses the day, time, timezone, and destination under **Admin → Integrations → Slack**. Hephaestus does not send a leaderboard digest unless this option is enabled.

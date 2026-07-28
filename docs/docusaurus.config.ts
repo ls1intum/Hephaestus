@@ -6,7 +6,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
   title: 'Hephaestus Documentation',
-  tagline: 'Mentoring feedback, grounded in your work',
+  tagline: 'Feedback on how you work',
   favicon: 'img/favicon.ico',
 
   // Future flags and performance optimizations
@@ -149,7 +149,7 @@ const config: Config = {
       {
         name: 'description',
         content:
-          'Hephaestus gives developers mentoring feedback grounded in their actual work: AI practice feedback on pull requests and issues, plus a mentor chat that knows your repository activity.',
+          'Hephaestus gives developers feedback on engineering practices shown in pull and merge requests, issues, and reviews, plus a mentor chat for talking through their work.',
       },
       {name: 'keywords', content: 'Hephaestus, AI mentor, code review feedback, software engineering practices, TUM'},
       {name: 'twitter:card', content: 'summary_large_image'},
@@ -158,7 +158,7 @@ const config: Config = {
       {
         name: 'twitter:description',
         content:
-          'Hephaestus gives developers mentoring feedback grounded in their actual work: AI practice feedback on pull requests and issues, plus a mentor chat that knows your repository activity.',
+          'Hephaestus gives developers feedback on engineering practices shown in pull and merge requests, issues, and reviews, plus a mentor chat for talking through their work.',
       },
     ],
     navbar: {

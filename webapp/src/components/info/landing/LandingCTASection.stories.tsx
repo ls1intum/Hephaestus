@@ -3,8 +3,7 @@ import { fn } from "storybook/test";
 import { LandingCTASection } from "./LandingCTASection";
 
 /**
- * Call-to-Action section component that encourages users to sign in
- * with GitHub using an officially branded CTA button.
+ * Final sign-in or workspace action for landing-page visitors.
  */
 const meta = {
 	component: LandingCTASection,
@@ -13,7 +12,7 @@ const meta = {
 		docs: {
 			description: {
 				component:
-					"The CTA section provides a final opportunity to convert visitors into users through a prominent call-to-action button and compelling copy.",
+					"The CTA section directs signed-out visitors to sign in and signed-in visitors to their workspace.",
 			},
 		},
 	},

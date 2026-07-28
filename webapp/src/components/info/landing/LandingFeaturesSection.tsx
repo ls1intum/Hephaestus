@@ -12,11 +12,11 @@ export function LandingFeaturesSection() {
 						Key features
 					</Badge>
 					<h2 className="text-3xl font-bold tracking-tighter sm:text-4xl mb-4">
-						Feedback where you already work
+						Two ways to get feedback
 					</h2>
 					<p className="text-muted-foreground text-lg">
-						Hephaestus runs from the tools your team already uses, so nobody has to go looking for
-						feedback
+						Read practice feedback on GitHub or GitLab, then talk it through with Heph when you want
+						a broader view.
 					</p>
 				</div>
 
@@ -26,26 +26,22 @@ export function LandingFeaturesSection() {
 							<div className="flex items-center gap-2 mb-2">
 								<GitPullRequest className="h-5 w-5 text-primary" />
 							</div>
-							<CardTitle>Practice feedback on pull requests and issues</CardTitle>
-							<CardDescription>
-								Reviews your work against real engineering practices
-							</CardDescription>
+							<CardTitle>Practice feedback</CardTitle>
+							<CardDescription>Specific feedback on how the work was done</CardDescription>
 						</CardHeader>
 						<CardContent>
 							<ul className="space-y-2">
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Works with GitHub and GitLab repositories</span>
+									<span>Checks the engineering practices your workspace has chosen</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>
-										Highlights what you did well alongside what to improve, with a concrete fix
-									</span>
+									<span>Points to evidence and explains what worked or what could improve</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Posts feedback as comments right on the pull request or issue</span>
+									<span>Posts a comment with a practical next step</span>
 								</li>
 							</ul>
 						</CardContent>
@@ -56,22 +52,22 @@ export function LandingFeaturesSection() {
 							<div className="flex items-center gap-2 mb-2 text-muted-foreground">
 								<MentorIcon className="-m-2" size={32} pad={4} />
 							</div>
-							<CardTitle>Heph, your AI mentor</CardTitle>
-							<CardDescription>A mentor chat grounded in your repository activity</CardDescription>
+							<CardTitle>Chat with Heph</CardTitle>
+							<CardDescription>Talk through feedback and recent work</CardDescription>
 						</CardHeader>
 						<CardContent>
 							<ul className="space-y-2">
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Knows your recent issues, commits, reviews, and pull requests</span>
+									<span>Can use your recent work and delivered feedback as context</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Answers questions about your work and suggests next steps</span>
+									<span>Helps you reflect before deciding what to do next</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Also available in Slack, right where your team talks</span>
+									<span>Available in the web app and, when connected, in Slack</span>
 								</li>
 							</ul>
 						</CardContent>

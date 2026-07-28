@@ -6,13 +6,11 @@ export function AboutHeroSection() {
 			<div className="inline-flex items-center justify-center p-4 rounded-full bg-secondary text-primary">
 				<MentorIcon size={48} pad={4} />
 			</div>
-			<h1 className="text-4xl font-bold">
-				About <span className="text-provider-done-foreground">Heph</span>aestus
-			</h1>
+			<h1 className="text-4xl font-bold">About Hephaestus</h1>
 			<p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-				Hephaestus gives developers the mentoring feedback they would otherwise only get from a
-				mentor, so that every developer gets some. Heph, your AI mentor, grounds its guidance in
-				your actual work across issues, commits, reviews, and pull requests.
+				Hephaestus helps teams give more developers useful feedback on how they work. Practice
+				feedback appears on pull requests and issues; Heph is the conversational AI mentor for
+				talking it through.
 			</p>
 		</section>
 	);

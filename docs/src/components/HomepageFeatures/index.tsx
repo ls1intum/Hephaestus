@@ -15,40 +15,40 @@ type FeatureItem = {
 
 const FeatureList: FeatureItem[] = [
   {
-    title: 'Practice feedback on real work',
-    kicker: 'What was done well, what could be better, and a way to get there',
+    title: 'Practice feedback',
+    kicker: 'Specific feedback on how the work was done',
     description:
-      'Hephaestus reviews pull requests and issues against real engineering practices and posts its feedback right where the work happens.',
+      'Hephaestus reviews pull requests, merge requests, and issues against the practices your workspace has chosen.',
     bullets: [
-      'Works with GitHub and GitLab repositories',
-      'Feedback arrives as comments on the pull request or issue',
-      'Act on it, push back with a reason, or let it pass',
+      'Points to evidence in the work',
+      'Explains what worked or what could improve',
+      'Posts a comment with a practical next step',
     ],
-    cta: {label: 'See how reviews work', to: '/user/ai-code-review'},
+    cta: {label: 'How practice feedback works', to: '/user/ai-code-review'},
   },
   {
-    title: 'Heph, your AI mentor',
-    kicker: 'A mentor chat grounded in your repository activity',
+    title: 'Chat with Heph',
+    kicker: 'Talk through feedback and recent work',
     description:
-      'Heph knows your recent issues, commits, reviews, and pull requests, so its guidance starts from what you actually did.',
+      'Heph can use your recent issues, commits, reviews, pull or merge requests, and delivered feedback as context.',
     bullets: [
-      'Ask about your changes and get concrete next steps',
-      'Reflect on your week with real repo events at hand',
-      'Also available in Slack, right where your team talks',
+      'Ask a question about a recent change',
+      'Reflect on feedback before deciding what to do',
+      'Use the web app or a Slack direct message',
     ],
-    cta: {label: 'Work with the mentor', to: '/user/ai-mentor'},
+    cta: {label: 'How to chat with Heph', to: '/user/ai-mentor'},
   },
   {
-    title: 'Your workspace, your setup',
-    kicker: 'Runs from the tools the team already uses',
+    title: 'Workspace controls',
+    kicker: 'Your repositories, practices, and settings',
     description:
-      'Each workspace connects its own repositories and configures what the mentor checks for, plus optional recognition features.',
+      'Workspace admins choose the source repositories, practice catalog, AI model, and optional features.',
     bullets: [
-      'Connect GitHub and GitLab repositories per workspace',
-      'Teams and access sync from your source platform',
-      'Optional achievements and a weekly leaderboard, if your admin turns them on',
+      'Connect GitHub or GitLab',
+      'Manage members and teams',
+      'Optionally enable achievements and a leaderboard',
     ],
-    cta: {label: 'Set up a workspace', to: '/user/workspace'},
+    cta: {label: 'Understand workspaces', to: '/user/workspace'},
   },
 ];
 

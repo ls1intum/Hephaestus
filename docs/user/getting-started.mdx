@@ -1,48 +1,67 @@
 ---
 id: getting-started
 sidebar_position: 2
-title: Getting Started
-description: Sign in, connect repositories, and understand the core navigation before your first week on Hephaestus.
+title: Getting started
+description: Sign in, choose a workspace, and find the features available to you.
 ---
 
-## Requirements before you start
+## Before you start
 
-- A GitHub account that belongs to the organisation your course or team uses.
-- Access to [hephaestus.aet.cit.tum.de](https://hephaestus.aet.cit.tum.de) (course staff install the GitHub App for you).
-- A modern browser (Chrome, Firefox, Edge, Safari) with third-party cookies enabled for OAuth.
+You need:
 
-## First-time sign-in
+- an account with one of the sign-in providers offered by your Hephaestus deployment
+- access to at least one workspace
+- a current version of Chrome, Edge, Firefox, or Safari
 
-1. Navigate to [hephaestus.aet.cit.tum.de](https://hephaestus.aet.cit.tum.de).
-2. Choose **Continue with GitHub** and complete the authorisation flow. Hephaestus only requests the minimal scopes required to read pull requests in repositories authorised by your organisation.
-3. When the redirect completes you land in the single workspace associated with your organisation. There is no invite flow – the GitHub App handles membership automatically.
-4. Your GitHub teams and repository permissions sync in the background. Hephaestus mirrors them, so you will only see activity for the repos you already touch on GitHub.
+The public TUM deployment is available at [hephaestus.aet.cit.tum.de](https://hephaestus.aet.cit.tum.de). Other deployments can offer different sign-in providers and features.
 
-:::info Teams are GitHub-driven
-Need to change the team or repositories you appear under? Ask an organisation maintainer to update the GitHub team membership or App installation – Hephaestus refreshes automatically.
-:::
+## Sign in
 
-## Tour the main navigation
+1. Open your Hephaestus deployment.
+2. Select **Sign in**.
+3. Choose one of the available providers and complete its sign-in flow.
+4. Select a workspace from the workspace switcher.
 
-| Area | Why it matters |
+If you do not have a workspace, ask an instance admin to create one or add you. Some deployments also allow eligible users to select **Create workspace** from the workspace switcher.
+
+## Find your way around
+
+The navigation changes with the features enabled for your workspace.
+
+| Area | What you can do |
 | --- | --- |
-| **Dashboard** | Home base with your weekly objectives, mentoring reminders, and quick access to the mentor or leaderboard. |
-| **Mentor** | Launch Heph sessions for retrospectives, code review reflections, and standup prep. All conversations are stored as artifacts. |
-| **Leaderboard** | Real-time ranking of review activity. Filters for team and repository reflect the GitHub setup your organisation already maintains. |
-| **Artifacts** | Library of mentor-generated documents (summaries, action plans, standup tables). Share or export them as Markdown. |
-| **Settings** | Review your synced GitHub identity and personal preferences. Repository access and team membership remain read-only because they come from GitHub. |
+| **Profile** | View a developer's recent activity and, when enabled, progress and league information. |
+| **Teams** | Browse the teams and repositories synced into the workspace. |
+| **Achievements** | View earned achievements when the feature is enabled. |
+| **Leaderboard** | View the optional weekly ranking of review activity. |
+| **Heph** | Start a chat about your feedback and recent work when the mentor is enabled for you. |
+| **Admin** | Configure the workspace if you are a workspace admin. |
+| **Settings** | Manage your account, linked identities, sessions, and personal preferences. |
 
-## Gain traction in your first week
+Features that are off do not appear in the navigation.
 
-1. **Trigger your first mentor session.** Navigate to **Mentor → Start session** and pick the *Sprint retrospective* template. Heph will walk you through goal setting, PR highlights, and next steps.
-2. **Review leaderboard insights.** Switch to the **Leaderboard** tab to see how your activity compares with your team. Apply the repository filter if your organisation monitors multiple projects.
-3. **Pin follow-up actions.** From the session summary, pin the generated checklist to your dashboard. You will see progress indicators as you check off items during the week.
+## Try the core workflows
 
-## Staying informed
+### Read practice feedback
 
-- **Dashboard insights** surface outstanding mentor actions and highlight recent leaderboard changes.
-- **In-app notifications** appear when new artifacts are shared with you or when course staff post announcements.
-- **Slack**, when enabled by a workspace administrator, lets you use Hephaestus in DM and manage channel-message privacy from the Slack App Home or account settings. Channel monitoring starts only after a visible channel announcement.
-- **Outline**, when your workspace mirrors a team wiki, lets the reviewer read the design docs and decision records your work links to. Connect your Outline account under **Settings → Connected accounts** so the documents you wrote are recognised as yours. Linking is optional, and Outline can never be used to sign in to Hephaestus.
+When practice reviews are enabled, Hephaestus reviews eligible pull requests, merge requests, and issues in connected repositories. The comment explains the practice it found, points to evidence, and suggests a next step.
 
-Need help? Use the **Help & Feedback** button in the footer or join the [GitHub Discussions](https://github.com/ls1intum/Hephaestus/discussions) board for peer support.
+See [Practice feedback](./ai-code-review) for triggers, comment structure, and the personal comment-delivery setting.
+
+### Chat with Heph
+
+Open **Heph**, start a new chat, and ask about a piece of feedback or recent work. Heph can use your recent issues, commits, reviews, pull or merge requests, and delivered feedback as context.
+
+See [Chat with Heph](./ai-mentor) for examples and privacy notes.
+
+### Switch workspaces
+
+Use the workspace switcher at the top of the sidebar. Each workspace has its own repositories, members, practice catalog, integrations, and feature settings.
+
+## Connected services
+
+- **GitHub or GitLab** supplies the repository activity used by the workspace.
+- **Slack**, when connected, lets you chat with Heph in a direct message. Workspace admins can separately configure weekly leaderboard digests and monitored channels.
+- **Outline**, when connected, lets Hephaestus read selected team documents that are relevant to linked work. Connecting your own Outline account attributes documents you authored to you.
+
+Need help? Use **Help & feedback** in the footer or ask in [GitHub Discussions](https://github.com/ls1intum/Hephaestus/discussions).

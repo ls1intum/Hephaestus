@@ -13,7 +13,7 @@ FEATURE GUIDELINES:
 - Link mockups/designs when available—even rough sketches help
 
 GOOD USER STORIES:
-  ✓ As a workspace admin, I want to choose which repositories are synced so that feedback only covers active projects.
+  ✓ As a workspace admin, I want to add a repository to a token-managed workspace so that Hephaestus can review its activity.
   ✓ As a new user, I want to see an onboarding tour so that I understand the main features.
 
 BAD USER STORIES:
@@ -33,9 +33,9 @@ BAD USER STORIES:
      Write testable statements a reviewer can verify.
      
      Examples:
-     - [ ] Repository picker appears on the workspace settings page
-     - [ ] Deselected repositories stop syncing within one cycle
-     - [ ] The current selection is visible after a page reload
+     - [ ] The repository field accepts the `owner/name` format
+     - [ ] Selecting **Add** starts monitoring the repository
+     - [ ] The repository remains in the list after a page reload
 -->
 
 - [ ] 

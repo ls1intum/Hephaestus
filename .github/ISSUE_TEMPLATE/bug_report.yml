@@ -20,8 +20,8 @@ body:
       label: What's broken?
       description: Describe what happened vs. what you expected.
       placeholder: |
-        When I save the repository selection in workspace settings, the page shows a blank screen.
-        Expected: The repository list should update with my selection.
+        When I add "owner/name" to a token-managed workspace, the request finishes but the repository does not appear.
+        Expected: The repository should appear in the monitored repository list.
     validations:
       required: true
 
@@ -29,14 +29,13 @@ body:
     id: repro
     attributes:
       label: Steps to reproduce
-      description: Minimal steps so we can see the bug. No repro = low priority fix.
+      description: List the shortest steps you can. A minimal reproduction helps us investigate and prioritise the issue.
       placeholder: |
-        1. Open your workspace settings
-        2. Go to "Repositories"
-        3. Click the repository dropdown
-        4. Select any repository
-        5. Click "Save"
-        6. → Blank screen appears
+        1. Open a token-managed workspace
+        2. Go to "Admin" → "Integrations"
+        3. Enter "owner/name" under "Add a repository"
+        4. Select "Add"
+        5. The request finishes, but the repository is not listed
     validations:
       required: true
 

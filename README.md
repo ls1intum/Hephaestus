@@ -7,24 +7,24 @@
   [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/ls1intum/Hephaestus/blob/main/CONTRIBUTING.md)
 </div>
 
-# Hephaestus — mentoring feedback, grounded in your work
+# Hephaestus — feedback on how you work
 
-Hephaestus gives developers the mentoring feedback they would otherwise only get from a great mentor — so that every developer gets some. It reads the work a team already does on GitHub or GitLab (pull requests, issues, reviews) and tells each contributor what was done well, what could be better, and a way to get there. Developers can act on the feedback, push back with a reason, or let it pass. It does not replace mentors — it carries the routine feedback no one has time to give everyone, and it runs from the tools the team already uses.
+Hephaestus uses pull requests, issues, and reviews from connected GitHub and GitLab repositories to give developers feedback on their engineering practices. Each comment points to the work it is based on, explains what worked or what could improve, and suggests what to try next.
 
-The core loop: **gather** activity from connected repositories, **observe** engineering practices in it, **compose** feedback worth reading, **deliver** it where the work happens, and let the developer **respond**.
+Developers decide what to do with that feedback: act on it, push back with a reason, or let it pass. Hephaestus supports mentors, teachers, and maintainers by covering routine feedback. It does not replace their judgement or the relationships they build with developers.
 
-Hephaestus works well for university software engineering courses, open-source projects, and any team where contributors outnumber the people who can mentor them.
+The core loop is to **gather** a developer's work, **observe** the practices it shows, **compose** feedback worth acting on, and **deliver** it while the work is still fresh. The developer's **response** closes the loop.
 
-<img alt="Illustration of Hephaestus working alongside a software team" height="200px" src="./docs/user/img/overview/agile_hephaestus.png">
+Hephaestus is built for software engineering courses, open-source projects, and teams where mentors and maintainers cannot review every contribution themselves.
 
 The project is named after Hephaestus, the Greek god of blacksmiths and craftsmen.
 
 ## What Hephaestus does today
 
-- **AI practice feedback on pull requests and issues.** Hephaestus reviews activity in connected GitHub and GitLab repositories against a workspace-configurable catalogue of software engineering practices and posts feedback as comments — directly on the pull/merge request or issue.
-- **Heph, your AI mentor.** A chat grounded in your actual repository activity — issues, commits, reviews, and pull requests — for questions, reflection, and next steps. Available in the web app and, when connected, in Slack.
-- **Workspaces.** Each workspace connects its own repositories, picks its practice catalogue, connects an AI model (any OpenAI-compatible endpoint) under a monthly spend cap, and manages members and teams through an in-app settings UI.
-- **Slack integration.** Talk to Heph in Slack DMs, and optionally let the mentor use monitored team channels as context.
+- **Practice feedback.** Hephaestus uses AI to review pull requests, merge requests, and issues against the engineering practices configured for a workspace. It posts the feedback as comments on the work.
+- **Heph, the AI mentor.** Developers can talk with Heph about feedback and recent issues, commits, reviews, and pull or merge requests. Heph is available in the web app and, when connected, in Slack.
+- **Workspaces.** Each workspace connects its own repositories, chooses its practice catalog, connects an AI model through any OpenAI-compatible endpoint, sets a monthly spending cap, and manages its members and teams.
+- **Slack integration.** Developers can talk with Heph in a Slack direct message. Workspace admins can also allow Heph to use messages from selected, visibly monitored channels as context.
 - **Achievements and an optional weekly leaderboard.** Workspace admins can switch on recognition features, including achievements and a leaderboard of review activity, per workspace.
 
 ## Documentation
@@ -39,11 +39,6 @@ UI component docs: [Storybook](https://main--66a8981a27ced8fef3190d41.chromatic.
 
 ## Contributing
 
-We welcome contributions from both members of our organization and external contributors. To maintain transparency and trust:
+Contributions are welcome. Before you start, read [CONTRIBUTING.md](./CONTRIBUTING.md). It covers the development workflow, pull request requirements, and the project's identity requirements for contributors.
 
-- **Members**: Must use their full real names and upload a professional and authentic profile picture. Members can directly create branches and PRs in the repository.
-- **External Contributors**: Must adhere to our identity guidelines, using real names and authentic profile pictures. Contributions will only be considered if these guidelines are followed.
-
-We adhere to best practices as recommended by [GitHub's Open Source Guides](https://opensource.guide/) and their [Acceptable Use Policies](https://docs.github.com/en/site-policy/acceptable-use-policies). Thank you for helping us create a respectful and professional environment for everyone involved.
-
-We follow a pull request contribution model. For detailed guidelines, please refer to our [CONTRIBUTING.md](./CONTRIBUTING.md).
+The project follows a pull request contribution model and GitHub's [Acceptable Use Policies](https://docs.github.com/en/site-policy/acceptable-use-policies).

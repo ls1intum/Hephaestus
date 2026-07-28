@@ -28,10 +28,10 @@ export const Default: Story = {
 		feature: {
 			icon: Code,
 			badge: "Core feature",
-			title: "Practice feedback on your work",
-			description: "What was done well, what could be better, and a way to get there",
+			title: "Practice feedback",
+			description: "Specific feedback on how the work was done",
 			content:
-				"Hephaestus reviews pull requests and issues in your GitHub and GitLab repositories against real engineering practices and posts its feedback right where the work happens. You can act on it, push back with a reason, or let it pass.",
+				"Hephaestus reviews pull requests, merge requests, and issues against the practices a workspace has chosen. Each comment points to evidence in the work and suggests what to try next.",
 		},
 	},
 };
@@ -44,10 +44,10 @@ export const AIMentorship: Story = {
 		feature: {
 			icon: Sparkles,
 			badge: "Core feature",
-			title: "Heph, your AI mentor",
-			description: "A mentor chat grounded in your repository activity",
+			title: "Chat with Heph",
+			description: "Talk through feedback and recent work",
 			content:
-				"Heph knows your recent issues, commits, reviews, and pull requests, so its answers start from your actual work. Ask it about your changes, reflect on your week, or get a suggestion for what to do next, in the app or in Slack.",
+				"Heph can use recent issues, commits, reviews, pull or merge requests, and delivered feedback as context. Developers can chat in the web app or, when connected, in Slack.",
 		},
 	},
 };
@@ -61,7 +61,7 @@ export const SlackIntegration: Story = {
 			icon: MessageSquare,
 			badge: "Integration",
 			title: "Heph in Slack",
-			description: "Mentoring where your team already talks",
+			description: "Talk with Heph in a direct message",
 			content:
 				"Talk to Heph in a Slack DM, and let a workspace administrator decide whether monitored team channels are available as context. Channel monitoring starts only after a visible announcement in the channel.",
 		},
@@ -79,7 +79,7 @@ export const Recognition: Story = {
 			title: "Achievements and leaderboard",
 			description: "Recognition features a workspace can switch on",
 			content:
-				"Workspace administrators can enable achievements and a weekly leaderboard of review activity. Both are off by default, and neither affects the feedback Hephaestus gives you.",
+				"Workspace administrators can enable achievements and a weekly leaderboard of review activity. Neither feature affects the practice feedback Hephaestus gives developers.",
 		},
 	},
 };

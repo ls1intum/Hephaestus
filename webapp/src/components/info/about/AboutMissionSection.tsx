@@ -6,18 +6,18 @@ const FEATURES_DATA: FeatureData[] = [
 	{
 		icon: Code,
 		badge: "Core feature",
-		title: "Practice feedback on your work",
-		description: "What was done well, what could be better, and a way to get there",
+		title: "Practice feedback",
+		description: "Specific feedback on how the work was done",
 		content:
-			"Hephaestus reviews pull requests and issues in your GitHub and GitLab repositories against real engineering practices and posts its feedback right where the work happens. You can act on it, push back with a reason, or let it pass.",
+			"Hephaestus reviews pull requests, merge requests, and issues against the practices a workspace has chosen. Each comment points to evidence in the work and suggests what to try next.",
 	},
 	{
 		icon: Sparkles,
 		badge: "Core feature",
-		title: "Heph, your AI mentor",
-		description: "A mentor chat grounded in your repository activity",
+		title: "Chat with Heph",
+		description: "Talk through feedback and recent work",
 		content:
-			"Heph knows your recent issues, commits, reviews, and pull requests, so its answers start from your actual work. Ask it about your changes, reflect on your week, or get a suggestion for what to do next, in the app or in Slack.",
+			"Heph can use recent issues, commits, reviews, pull or merge requests, and delivered feedback as context. Developers can chat in the web app or, when connected, in Slack.",
 	},
 ];
 
@@ -32,16 +32,16 @@ export function AboutMissionSection() {
 
 				<div className="space-y-6">
 					<p className="text-lg leading-relaxed">
-						Good mentoring feedback helps developers grow, but few people ever get enough of it.
-						Hephaestus carries the routine feedback no one has time to give everyone, grounded in
-						the work you actually do. It supports mentors, teachers, and maintainers rather than
-						replacing them.
+						Developers learn engineering practices by doing the work and getting feedback on it.
+						Expert attention is limited, so many contributors get little or none. Hephaestus makes
+						routine practice feedback available more consistently while leaving human judgement and
+						mentoring relationships to people.
 					</p>
 
 					<div className="border-l-4 border-primary pl-6 py-2">
 						<p className="text-lg font-medium">
-							We believe every developer deserves thoughtful feedback on their work and a clear way
-							to get better.
+							Every developer should be able to see what worked, what could improve, and what to try
+							next.
 						</p>
 					</div>
 				</div>

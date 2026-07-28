@@ -15,7 +15,7 @@ const meta = {
 	argTypes: {
 		aiReviewEnabled: {
 			control: "boolean",
-			description: "Whether AI review comments are enabled",
+			description: "Whether practice-feedback comments are enabled",
 		},
 		onToggleAiReview: {
 			description: "Callback when AI review setting is changed",

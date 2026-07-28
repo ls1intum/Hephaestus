@@ -14,7 +14,7 @@ const PROJECT_MANAGER_DATA: ProjectManager = {
 	name: "Felix T.J. Dietrich",
 	title: "Project lead",
 	description:
-		"Felix started Hephaestus and leads its development as a doctoral researcher at TUM. He works on giving every developer the kind of mentoring feedback that usually only a few get.",
+		"Felix started Hephaestus as part of his doctoral research at TUM and leads the open-source project. His research studies how feedback on day-to-day software work can support developer learning.",
 	avatarUrl: "https://avatars.githubusercontent.com/u/5898705",
 	htmlUrl: "https://github.com/felixtjdietrich",
 	websiteUrl: "https://aet.cit.tum.de/people/dietrich/",

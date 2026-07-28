@@ -3,9 +3,7 @@ import { fn } from "storybook/test";
 import { LandingPage } from "./LandingPage";
 
 /**
- * A straightforward landing page that honestly presents Hephaestus with a clean hero section,
- * key features, and a real testimonial. The page adapts its content and actions based on
- * the user's authentication state while maintaining a truthful representation of the project.
+ * Public landing page for signed-out and signed-in visitors.
  */
 const meta = {
 	component: LandingPage,
@@ -15,7 +13,7 @@ const meta = {
 		docs: {
 			description: {
 				component:
-					"A simple, honest landing page that presents the Hephaestus platform features and benefits without exaggeration, focusing on the real value it provides to development teams.",
+					"The landing page explains practice feedback, conversations with Heph, and the role of workspace settings.",
 			},
 		},
 	},

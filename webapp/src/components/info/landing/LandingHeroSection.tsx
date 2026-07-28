@@ -22,11 +22,11 @@ export function LandingHeroSection({
 				<div className="flex flex-col items-center space-y-8 text-center">
 					<div className="space-y-4 max-w-3xl">
 						<h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl">
-							Mentoring feedback, grounded in your work
+							Feedback on how you work
 						</h1>
 						<p className="mx-auto max-w-[700px] text-xl text-muted-foreground">
-							Hephaestus reads your pull requests, issues, and reviews and tells you what was done
-							well, what could be better, and a way to get there.
+							Hephaestus reviews your pull requests and issues for the engineering practices they
+							show. See what worked, what could improve, and what to try next.
 						</p>
 					</div>
 					<div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
@@ -38,19 +38,16 @@ export function LandingHeroSection({
 							className="w-full sm:w-auto"
 						/>
 						<Button variant="outline" size="lg" onClick={onLearnMoreClick} className="gap-2">
-							Learn more <ChevronDown className="h-4 w-4" />
+							See how it works <ChevronDown className="h-4 w-4" />
 						</Button>
 					</div>
 					<div className="flex items-center gap-2 text-muted-foreground">
-						<MentorIcon size={36} className="text-primary" />
-						<span className="text-sm">
-							Powered by <span className="text-provider-done-foreground">Heph</span>, your AI mentor
-						</span>
+						<span className="text-sm">Works with GitHub and GitLab</span>
 					</div>
 				</div>
 			</div>
 
-			{/* Mentor feedback preview (decorative mock conversation, hidden from assistive tech) */}
+			{/* Practice feedback preview (decorative mock comment, hidden from assistive tech) */}
 			<div className="mx-auto max-w-2xl px-4 md:px-6">
 				<div
 					aria-hidden="true"
@@ -58,8 +55,8 @@ export function LandingHeroSection({
 				>
 					<div className="flex items-center gap-2 border-b border-muted px-4 py-3">
 						<MentorIcon size={24} className="text-primary" />
-						<span className="text-sm font-medium">Heph</span>
-						<span className="text-xs text-muted-foreground">on your pull request</span>
+						<span className="text-sm font-medium">Hephaestus</span>
+						<span className="text-xs text-muted-foreground">Practice feedback</span>
 					</div>
 					<div
 						className="space-y-3 px-4 py-4 text-sm pointer-events-none"
@@ -68,18 +65,17 @@ export function LandingHeroSection({
 						}}
 					>
 						<p className="rounded-md bg-muted/50 px-3 py-2">
-							Nice work keeping this change small and splitting the schema migration into its own
-							commit. That made the review quick to get through.
+							<span className="font-medium">What worked:</span> You kept this change small and put
+							the schema migration in its own commit. That made the change easier to review.
 						</p>
 						<p className="rounded-md bg-muted/50 px-3 py-2">
-							One thing to tighten up: the pull request description says what changed but not why. A
-							sentence linking it to the issue would help the next reader. Want a suggestion?
+							<span className="font-medium">Try next:</span> The description says what changed but
+							not why. Link the issue and add one sentence explaining the reason for the change.
 						</p>
-						<p className="rounded-md bg-primary/10 px-3 py-2 text-right">Yes, draft one for me.</p>
 					</div>
 				</div>
 				<p className="mt-3 text-center text-sm text-muted-foreground">
-					Act on the feedback, push back with a reason, or let it pass. You stay in charge.
+					The feedback is advisory. Act on it, push back with a reason, or let it pass.
 				</p>
 			</div>
 		</section>

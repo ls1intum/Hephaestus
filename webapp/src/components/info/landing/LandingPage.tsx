@@ -3,7 +3,6 @@ import { LandingCTASection } from "./LandingCTASection";
 import { LandingFAQSection } from "./LandingFAQSection";
 import { LandingFeaturesSection } from "./LandingFeaturesSection";
 import { LandingHeroSection } from "./LandingHeroSection";
-import { LandingTestimonialSection } from "./LandingTestimonialSection";
 import { LandingWhyChooseSection } from "./LandingWhyChooseSection";
 
 interface LandingPageProps {
@@ -38,7 +37,6 @@ export function LandingPage({ onSignIn, onGoToDashboard, isSignedIn = false }: L
 				onGoToDashboard={onGoToDashboard}
 				isSignedIn={isSignedIn}
 			/>
-			<LandingTestimonialSection />
 			<LandingFAQSection />
 			<LandingCTASection
 				onSignIn={onSignIn}

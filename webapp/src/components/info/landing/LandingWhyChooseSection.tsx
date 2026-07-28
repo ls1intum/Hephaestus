@@ -1,5 +1,4 @@
 import { Code, Hammer, Users } from "lucide-react";
-import agileHephaestus from "@/assets/agile_hephaestus.png";
 import { LandingSignInCTA } from "@/components/auth/LandingSignInCTA";
 import { Badge } from "@/components/ui/badge";
 
@@ -17,25 +16,18 @@ export function LandingWhyChooseSection({
 	return (
 		<section className="w-full py-8 md:py-16 bg-gradient-to-b from-background to-muted/30">
 			<div className="container px-4 md:px-6">
-				<div className="grid gap-10 lg:grid-cols-[1fr_500px] lg:gap-12">
-					<img
-						src={agileHephaestus}
-						alt="Illustration of Heph, the Hephaestus mentor, working alongside a software team"
-						width="500"
-						height="350"
-						className="mx-auto rounded-lg aspect-auto object-cover lg:order-last"
-					/>
+				<div className="mx-auto max-w-3xl">
 					<div className="flex flex-col justify-center space-y-5">
 						<Badge className="w-fit" variant="outline">
 							Our approach
 						</Badge>
 						<h2 className="text-3xl font-bold tracking-tighter sm:text-4xl">
-							Why choose Hephaestus?
+							Support for mentors, not a replacement
 						</h2>
 						<p className="text-lg text-muted-foreground">
-							Good mentors are rare and their time is scarce. Hephaestus carries the routine
-							feedback no one has time to give everyone, so that every developer gets some. It
-							supports mentors rather than replacing them.
+							Mentors, teachers, and maintainers cannot comment on every contribution. Hephaestus
+							helps with routine practice feedback and leaves judgement, context, and relationships
+							to people.
 						</p>
 
 						<ul className="grid gap-4 mt-4">
@@ -44,9 +36,9 @@ export function LandingWhyChooseSection({
 									<Hammer className="h-4 w-4 text-primary" />
 								</div>
 								<div>
-									<p className="font-medium">Grounded in real work</p>
+									<p className="font-medium">Based on the work</p>
 									<p className="text-sm text-muted-foreground">
-										Feedback comes from your actual pull requests, issues, and reviews
+										Each comment points to evidence in a pull request, merge request, or issue
 									</p>
 								</div>
 							</li>
@@ -55,9 +47,9 @@ export function LandingWhyChooseSection({
 									<Users className="h-4 w-4 text-primary" />
 								</div>
 								<div>
-									<p className="font-medium">You stay in charge</p>
+									<p className="font-medium">Your decision</p>
 									<p className="text-sm text-muted-foreground">
-										Feedback is advisory. You decide what to take up and what to skip
+										The feedback is advisory, and developers can disagree with it
 									</p>
 								</div>
 							</li>
@@ -66,10 +58,9 @@ export function LandingWhyChooseSection({
 									<Code className="h-4 w-4 text-primary" />
 								</div>
 								<div>
-									<p className="font-medium">Fits your team's setup</p>
+									<p className="font-medium">Configured by your workspace</p>
 									<p className="text-sm text-muted-foreground">
-										Workspaces connect GitHub, GitLab, and Slack, with optional features like
-										achievements and a weekly leaderboard
+										Admins choose the repositories, practices, AI model, and optional features
 									</p>
 								</div>
 							</li>

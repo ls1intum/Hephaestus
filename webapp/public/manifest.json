@@ -1,7 +1,7 @@
 {
   "short_name": "Hephaestus",
   "name": "Hephaestus",
-  "description": "An AI mentor for growing as a software engineer. Feedback grounded in your actual work.",
+  "description": "Hephaestus gives developers feedback on engineering practices shown in pull and merge requests, issues, and reviews, plus a mentor chat for talking through their work.",
   "icons": [
     {
       "src": "favicon.ico",

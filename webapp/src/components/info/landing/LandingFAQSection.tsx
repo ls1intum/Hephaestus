@@ -11,23 +11,23 @@ import { Button } from "@/components/ui/button";
 const faqItems = [
 	{
 		key: "faq-item-1",
-		q: "How does Hephaestus integrate with our existing workflow?",
-		a: "Hephaestus connects to your GitHub or GitLab repositories and reads the activity that is already there. Setup is a guided configuration in your workspace settings.",
+		q: "How does Hephaestus fit into my workflow?",
+		a: "You keep using pull requests, merge requests, reviews, and issues in GitHub or GitLab. A workspace admin connects the repositories and chooses the practices Hephaestus checks.",
 	},
 	{
 		key: "faq-item-2",
-		q: "Is Hephaestus suitable for small teams?",
-		a: "Yes. Hephaestus works for teams of any size, from small student projects to larger development teams and open-source projects.",
+		q: "What is practice feedback?",
+		a: "It is feedback on an observable way of working, such as keeping a change reviewable or explaining why it is needed. Each comment points to the work it is based on and suggests a next step.",
 	},
 	{
 		key: "faq-item-3",
-		q: "How does Heph work?",
-		a: "Heph reads your pull requests, issues, and reviews, then names your strongest habit and the one change that would help most. You can also chat with it about your work, in the app or in Slack.",
+		q: "What can I discuss with Heph?",
+		a: "Ask about feedback or recent work, or use the conversation to reflect on what to try next. Heph can use your recent issues, commits, reviews, pull or merge requests, and delivered feedback as context.",
 	},
 	{
 		key: "faq-item-4",
-		q: "Do we need to change how we work?",
-		a: "No. Hephaestus works alongside your existing GitHub or GitLab workflow without requiring any changes to how your team uses pull requests, reviews, or issues.",
+		q: "Do I have to follow the feedback?",
+		a: "No. Practice feedback is advisory. You can act on it, push back with a reason, or let it pass.",
 	},
 ];
 
