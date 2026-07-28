@@ -8,6 +8,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.function.Consumer;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -128,6 +130,23 @@ public final class ProxyStreamingUtils {
         HttpServletResponse response,
         int statusCode
     ) {
+        streamSseToResponse(dataFlux, respHeaders, response, statusCode, null);
+    }
+
+    /**
+     * As {@link #streamSseToResponse(Flux, HttpHeaders, HttpServletResponse, int)}, but also hands
+     * each chunk's bytes to {@code tap} as they go past. A tee, not a buffer: the tap runs after the
+     * chunk is flushed to the client, and a tap that throws is logged rather than failing the stream.
+     *
+     * @param tap receives a copy of each chunk's bytes; {@code null} to stream without observing
+     */
+    public static void streamSseToResponse(
+        Flux<DataBuffer> dataFlux,
+        HttpHeaders respHeaders,
+        HttpServletResponse response,
+        int statusCode,
+        @Nullable Consumer<byte[]> tap
+    ) {
         try {
             response.setStatus(statusCode);
             response.setContentType(MediaType.TEXT_EVENT_STREAM_VALUE);
@@ -167,6 +186,13 @@ public final class ProxyStreamingUtils {
                         buffer.read(bytes);
                         outputStream.write(bytes);
                         outputStream.flush();
+                        if (tap != null) {
+                            try {
+                                tap.accept(bytes);
+                            } catch (RuntimeException tapFailure) {
+                                log.warn("SSE tap failed; stream continues: {}", tapFailure.toString());
+                            }
+                        }
                     } catch (IOException e) {
                         log.debug("Client disconnected during SSE streaming: {}", e.getMessage());
                         throw new StreamingException("Client disconnected", e);

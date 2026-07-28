@@ -137,10 +137,10 @@ class LoginProviderAdminControllerIntegrationTest extends AbstractWorkspaceInteg
         var changes = authEventRepository
             .findAll()
             .stream()
-            .filter(e -> e.getEventType() == AuthEvent.EventType.LOGIN_PROVIDER_CHANGED)
+            .filter(e -> e.getEventType() == AuthEvent.EventType.LOGIN_PROVIDER_CREATED)
             .toList();
         assertThat(changes).hasSize(1);
         assertThat(changes.get(0).getActingAccountId()).isEqualTo(admin.getId());
-        assertThat(changes.get(0).getDetails()).contains("gitlab-actest").contains("CREATE");
+        assertThat(changes.get(0).getDetails()).contains("gitlab-actest");
     }
 }

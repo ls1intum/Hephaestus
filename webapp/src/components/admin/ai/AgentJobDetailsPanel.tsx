@@ -1,5 +1,7 @@
-import { formatDistanceToNow } from "date-fns";
 import type { AgentJob } from "@/api/types.gen";
+import { JOB_TYPE_LABELS } from "@/components/admin/usage/usage-utils";
+import { DetailRow } from "@/components/common/DetailRow";
+import { RelativeTime } from "@/components/common/RelativeTime";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -22,16 +24,17 @@ import {
 	SheetTitle,
 } from "@/components/ui/sheet";
 import {
-	configLabel,
 	DELIVERY_STATUS_LABELS,
 	deliveryBadgeVariant,
-	formatCostUsd,
 	formatTokens,
+	holdReasonCopy,
 	isCancellable,
 	isDeliveryRetryable,
+	jobWait,
+	modelLabel,
 	STATUS_LABELS,
 	statusBadgeVariant,
-} from "./jobUtils";
+} from "./job-utils";
 
 interface AgentJobDetailsPanelProps {
 	job: AgentJob | null;
@@ -41,15 +44,6 @@ interface AgentJobDetailsPanelProps {
 	isRetrying: boolean;
 	onCancel: (job: AgentJob) => void;
 	onRetryDelivery: (job: AgentJob) => void;
-}
-
-function Row({ label, value }: { label: string; value: React.ReactNode }) {
-	return (
-		<div className="flex items-baseline justify-between gap-4 py-1.5">
-			<span className="text-sm text-muted-foreground">{label}</span>
-			<span className="text-sm font-medium text-right">{value}</span>
-		</div>
-	);
 }
 
 function snapshotText(snapshot: unknown): string {
@@ -70,14 +64,27 @@ export function AgentJobDetailsPanel({
 	onCancel,
 	onRetryDelivery,
 }: AgentJobDetailsPanelProps) {
+	const wait = job ? jobWait(job) : null;
+	const hold = wait?.kind === "hold" ? holdReasonCopy(wait.reason) : null;
 	return (
 		<Sheet open={open} onOpenChange={onOpenChange}>
-			<SheetContent side="right" className="w-full sm:max-w-lg">
+			{/* The width overrides have to repeat `data-[side=right]:` to land at all. `SheetContent`'s own
+			    widths are written as `data-[side=right]:w-3/4` / `data-[side=right]:sm:max-w-sm`, which are
+			    attribute-qualified and so outrank a plain `w-full` / `sm:max-w-lg` on specificity —
+			    tailwind-merge only drops the base class when the variant chain matches exactly. Spelled
+			    this way the panel really is full-width on a phone (it was rendering at 75%, leaving the
+			    label/value rows ~240 px wide) and really is `lg` from `sm` up. */}
+			<SheetContent side="right" className="data-[side=right]:w-full data-[side=right]:sm:max-w-lg">
 				{job ? (
 					<>
 						<SheetHeader>
-							<SheetTitle>Job {job.id}</SheetTitle>
-							<SheetDescription>{job.jobType.replace(/_/g, " ").toLowerCase()}</SheetDescription>
+							<SheetTitle>Run details</SheetTitle>
+							<SheetDescription>
+								{JOB_TYPE_LABELS[job.jobType]} ·{" "}
+								{/* The "Created" row below carries the same instant with its absolute-time
+								    tooltip; a second hover target for one value would be noise. */}
+								<RelativeTime value={job.createdAt} tooltip={false} />
+							</SheetDescription>
 						</SheetHeader>
 
 						<ScrollArea className="flex-1 px-4">
@@ -86,45 +93,60 @@ export function AgentJobDetailsPanel({
 									<h3 className="mb-1 text-xs font-semibold uppercase text-muted-foreground">
 										Overview
 									</h3>
-									<div className="divide-y">
-										<Row
-											label="Status"
-											value={
-												<Badge variant={statusBadgeVariant(job.status)}>
-													{STATUS_LABELS[job.status]}
-												</Badge>
-											}
-										/>
-										<Row label="Model" value={configLabel(job)} />
-										<Row label="Model name" value={job.llmModel ?? job.llmModelVersion ?? "—"} />
-										<Row
-											label="Created"
-											value={formatDistanceToNow(new Date(job.createdAt), { addSuffix: true })}
-										/>
+									<dl className="divide-y">
+										<DetailRow label="Status">
+											<Badge variant={statusBadgeVariant(job.status)}>
+												{STATUS_LABELS[job.status]}
+											</Badge>
+										</DetailRow>
+										<DetailRow label="Model">{modelLabel(job)}</DetailRow>
+										<DetailRow label="Model name">
+											{job.llmModel ?? job.llmModelVersion ?? "—"}
+										</DetailRow>
+										<DetailRow label="Created">
+											<RelativeTime value={job.createdAt} />
+										</DetailRow>
 										{job.completedAt && (
-											<Row
-												label="Completed"
-												value={formatDistanceToNow(new Date(job.completedAt), {
-													addSuffix: true,
-												})}
-											/>
+											<DetailRow label="Completed">
+												<RelativeTime value={job.completedAt} />
+											</DetailRow>
 										)}
-										<Row
-											label="Delivery"
-											value={
-												job.deliveryStatus ? (
-													<Badge variant={deliveryBadgeVariant(job.deliveryStatus)}>
-														{DELIVERY_STATUS_LABELS[job.deliveryStatus]}
-													</Badge>
-												) : (
-													"—"
-												)
-											}
-										/>
-										{job.exitCode != null && <Row label="Exit code" value={job.exitCode} />}
-										{job.retryCount > 0 && <Row label="Retries" value={job.retryCount} />}
-									</div>
+										{/* Only for a run that is waiting on the clock. Every other run's `availableAt`
+										    is a claim time already in the past and tells the reader nothing. */}
+										{wait && (
+											<DetailRow label="Next attempt">
+												<RelativeTime value={job.availableAt} />
+											</DetailRow>
+										)}
+										<DetailRow label="Delivery">
+											{job.deliveryStatus ? (
+												<Badge variant={deliveryBadgeVariant(job.deliveryStatus)}>
+													{DELIVERY_STATUS_LABELS[job.deliveryStatus]}
+												</Badge>
+											) : (
+												"—"
+											)}
+										</DetailRow>
+										{job.exitCode != null && (
+											<DetailRow label="Exit code">{job.exitCode}</DetailRow>
+										)}
+										{job.retryCount > 0 && <DetailRow label="Retries">{job.retryCount}</DetailRow>}
+									</dl>
 								</section>
+
+								{/* Deliberately not the destructive treatment the Error block below uses: a hold has
+								    nothing to fix and nothing was lost. It is the amber of a cap that someone can
+								    raise, next to the "Next attempt" row that says when it lapses on its own. */}
+								{hold && (
+									<section>
+										<h3 className="mb-1 text-xs font-semibold uppercase text-muted-foreground">
+											On hold
+										</h3>
+										<p className="rounded-md bg-warning/10 p-3 text-sm">
+											<span className="font-medium">{hold.label}.</span> {hold.detail}
+										</p>
+									</section>
+								)}
 
 								{job.errorMessage && (
 									<section>
@@ -141,16 +163,18 @@ export function AgentJobDetailsPanel({
 									<h3 className="mb-1 text-xs font-semibold uppercase text-muted-foreground">
 										Usage
 									</h3>
-									<div className="divide-y">
-										<Row label="Input tokens" value={formatTokens(job.llmTotalInputTokens)} />
-										<Row label="Output tokens" value={formatTokens(job.llmTotalOutputTokens)} />
-										<Row
-											label="Reasoning tokens"
-											value={formatTokens(job.llmTotalReasoningTokens)}
-										/>
-										<Row label="LLM calls" value={formatTokens(job.llmTotalCalls)} />
-										<Row label="Cost" value={formatCostUsd(job.llmCostUsd)} />
-									</div>
+									<dl className="divide-y">
+										<DetailRow label="Input tokens">
+											{formatTokens(job.llmTotalInputTokens)}
+										</DetailRow>
+										<DetailRow label="Output tokens">
+											{formatTokens(job.llmTotalOutputTokens)}
+										</DetailRow>
+										<DetailRow label="Reasoning tokens">
+											{formatTokens(job.llmTotalReasoningTokens)}
+										</DetailRow>
+										<DetailRow label="Model calls">{formatTokens(job.llmTotalCalls)}</DetailRow>
+									</dl>
 								</section>
 
 								<section>
@@ -171,25 +195,26 @@ export function AgentJobDetailsPanel({
 										<AlertDialogTrigger
 											render={
 												<Button variant="outline" disabled={isCancelling}>
-													{isCancelling ? "Cancelling…" : "Cancel job"}
+													{isCancelling ? "Cancelling…" : "Cancel run"}
 												</Button>
 											}
 										/>
 										<AlertDialogContent>
 											<AlertDialogHeader>
-												<AlertDialogTitle>Cancel this job?</AlertDialogTitle>
+												<AlertDialogTitle>Cancel this run?</AlertDialogTitle>
 												<AlertDialogDescription>
-													The running container will be stopped. This cannot be undone.
+													The running container stops. This can't be undone.
 												</AlertDialogDescription>
 											</AlertDialogHeader>
 											<AlertDialogFooter>
-												<AlertDialogCancel disabled={isCancelling}>Keep running</AlertDialogCancel>
+												{/* Never disabled: both footer buttons out leaves no operable control (ADR 0027). */}
+												<AlertDialogCancel>Keep running</AlertDialogCancel>
 												<AlertDialogAction
 													variant="destructive"
 													disabled={isCancelling}
 													onClick={() => onCancel(job)}
 												>
-													Cancel job
+													Cancel run
 												</AlertDialogAction>
 											</AlertDialogFooter>
 										</AlertDialogContent>
@@ -213,7 +238,7 @@ export function AgentJobDetailsPanel({
 												</AlertDialogDescription>
 											</AlertDialogHeader>
 											<AlertDialogFooter>
-												<AlertDialogCancel disabled={isRetrying}>Cancel</AlertDialogCancel>
+												<AlertDialogCancel>Cancel</AlertDialogCancel>
 												<AlertDialogAction
 													disabled={isRetrying}
 													onClick={() => onRetryDelivery(job)}
@@ -230,7 +255,7 @@ export function AgentJobDetailsPanel({
 				) : (
 					// Always render a title so base-ui never warns about a titleless dialog.
 					<SheetHeader>
-						<SheetTitle className="sr-only">Job details</SheetTitle>
+						<SheetTitle className="sr-only">Run details</SheetTitle>
 					</SheetHeader>
 				)}
 			</SheetContent>

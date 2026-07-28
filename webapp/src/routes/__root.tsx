@@ -1,6 +1,7 @@
 import { type QueryClient, useQuery } from "@tanstack/react-query";
 import {
 	createRootRouteWithContext,
+	HeadContent,
 	Link,
 	Outlet,
 	useLocation,
@@ -8,7 +9,6 @@ import {
 	useRouter,
 } from "@tanstack/react-router";
 import type React from "react";
-import { Toaster } from "sonner";
 import { getUserSettingsOptions, listThreadsOptions } from "@/api/@tanstack/react-query.gen";
 import { ImpersonationBanner } from "@/components/auth/ImpersonationBanner";
 import { CookieConsentBanner } from "@/components/consent/CookieConsentBanner";
@@ -20,14 +20,14 @@ import { Copilot } from "@/components/mentor/Copilot";
 import { defaultPartRenderers } from "@/components/mentor/renderers";
 import { PostHogSurveyWidget } from "@/components/surveys/posthog-survey-widget";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { Toaster } from "@/components/ui/sonner";
 import environment from "@/environment";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
+import { useMentorChat } from "@/hooks/use-mentor-chat";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
-import { useMentorChat } from "@/hooks/useMentorChat";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
 import { FeatureFlagDevTools, useFeatureFlag } from "@/integrations/feature-flags";
 import { isPosthogEnabled } from "@/integrations/posthog/config";
-import { useTheme } from "@/integrations/theme";
 import { getProviderSlug } from "@/lib/provider";
 import type { ChatMessage } from "@/lib/types";
 
@@ -37,8 +37,10 @@ interface MyRouterContext {
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
+	// Fallback tab title; the deepest match that sets its own `head` wins. The static <title> in
+	// index.html stays as the pre-hydration placeholder.
+	head: () => ({ meta: [{ title: "Hephaestus" }] }),
 	component: () => {
-		const { theme } = useTheme();
 		const { pathname } = useLocation();
 		const { isAuthenticated, isLoading } = useAuth();
 		const { enabled: hasMentorAccess } = useFeatureFlag("MENTOR_ACCESS");
@@ -79,17 +81,19 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 		if (isAuthRoute) {
 			return (
 				<>
+					<HeadContent />
 					<CookieConsentBanner />
 					<ProviderColorScope>
 						<Outlet />
 					</ProviderColorScope>
-					<Toaster theme={theme} />
+					<Toaster />
 				</>
 			);
 		}
 
 		return (
 			<>
+				<HeadContent />
 				{/* Rendered early so keyboard/AT users reach the consent region before the app chrome. */}
 				<CookieConsentBanner />
 				<ImpersonationBanner />
@@ -102,12 +106,17 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 								<main className={isFullscreenRoute ? "" : "flex-1 p-4"}>
 									<Outlet />
 								</main>
-								{!isFullscreenRoute && <Footer buildInfo={environment.buildInfo} />}
+								{!isFullscreenRoute && (
+									<Footer
+										buildInfo={environment.buildInfo}
+										isProduction={environment.deployment.isProduction}
+									/>
+								)}
 							</div>
 						</SidebarInset>
 					</SidebarProvider>
 				</ProviderColorScope>
-				<Toaster theme={theme} />
+				<Toaster />
 				{showCopilot && <GlobalCopilot />}
 				{!isLoading && isAuthenticated && allowSurveys && <PostHogSurveyWidget />}
 				<FeatureFlagDevTools />
@@ -121,7 +130,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			<p className="text-muted-foreground mb-8">
 				The page you're looking for doesn't exist or you don't have permission to view it.
 			</p>
-			<Link to="/" className="text-blue-500 hover:underline font-medium">
+			<Link to="/" className="text-primary hover:underline font-medium">
 				Return to Home
 			</Link>
 		</div>
@@ -239,6 +248,8 @@ function HeaderContainer() {
 		<Header
 			sidebarTrigger={isAuthenticated && <SidebarTrigger className="-ml-1" />}
 			version={environment.version}
+			environmentName={environment.deployment.name}
+			isProduction={environment.deployment.isProduction}
 			isAuthenticated={isAuthenticated}
 			isLoading={isLoading}
 			name={effectiveName}

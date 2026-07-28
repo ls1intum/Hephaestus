@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.web;
 
+import de.tum.cit.aet.hephaestus.core.AuditLedger;
+import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderService;
@@ -79,6 +81,7 @@ public class LoginProviderAdminController {
     @PostMapping
     @Operation(summary = "Create a login provider", operationId = "adminCreateLoginProvider")
     @ApiResponse(responseCode = "201", description = "Login provider created; URL in the Location header")
+    @Audited(ledger = AuditLedger.AUTH_EVENT, type = "LOGIN_PROVIDER_CREATED")
     public ResponseEntity<LoginProviderViewDTO> create(@Valid @RequestBody CreateLoginProviderRequestDTO body) {
         LoginProvider created = loginProviderService.create(
             new LoginProviderService.Draft(
@@ -103,6 +106,7 @@ public class LoginProviderAdminController {
 
     @PatchMapping("/{registrationId}")
     @Operation(summary = "Update a login provider", operationId = "adminUpdateLoginProvider")
+    @Audited(ledger = AuditLedger.AUTH_EVENT, type = "LOGIN_PROVIDER_UPDATED")
     public ResponseEntity<LoginProviderViewDTO> update(
         @PathVariable String registrationId,
         @Valid @RequestBody UpdateLoginProviderRequestDTO body
@@ -125,6 +129,7 @@ public class LoginProviderAdminController {
 
     @DeleteMapping("/{registrationId}")
     @Operation(summary = "Delete a login provider", operationId = "adminDeleteLoginProvider")
+    @Audited(ledger = AuditLedger.AUTH_EVENT, type = "LOGIN_PROVIDER_DELETED")
     public ResponseEntity<Void> delete(@PathVariable String registrationId) {
         loginProviderService.delete(registrationId, CurrentAccount.requireId(), CurrentAccount.authTime());
         return ResponseEntity.noContent().build();

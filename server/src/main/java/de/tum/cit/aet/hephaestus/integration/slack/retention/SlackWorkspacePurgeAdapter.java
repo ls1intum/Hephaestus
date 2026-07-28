@@ -1,11 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.slack.retention;
 
-import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorSlackThreadRepository;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackParticipantConsentRepository;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
-import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure;
 import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeContributor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -25,15 +19,18 @@ import org.springframework.stereotype.Component;
  * after workspace teardown. Deleting content while the Connection is still intact keeps the purge
  * ordering auditable and avoids leaving orphaned content behind a torn-down Connection.
  *
- * <p>No {@code @Transactional} here: {@code WorkspaceLifecycleService#purgeWorkspace} already runs
- * the whole contributor chain inside one transaction, and each derived {@code deleteByWorkspaceId}
- * carries the {@code workspace_id} predicate the tenancy inspector requires.
+ * <p>No {@code @Transactional} on this contributor: {@code WorkspaceLifecycleService#purgeWorkspace} already runs
+ * the whole contributor chain inside one transaction; the delegate's {@code @Transactional(REQUIRED)} joins it.
  *
  * <p><b>Derived CONVERSATION rows.</b> Before dropping {@code slack_thread} (the artifact the derived rows point
- * at) this contributor erases the workspace's {@code CONVERSATION_THREAD} observations/feedback through the
- * practices {@link ConversationFeedbackErasure} port. The {@code PracticesWorkspacePurgeContributor} also clears
- * all practice rows for the workspace, but the two are ordering-independent: whichever runs first, the other's
- * call is an idempotent no-op. Making the call explicit here decouples correctness from that ordering.
+ * at) the erase drops the workspace's {@code CONVERSATION_THREAD} observations/feedback through the practices
+ * {@code ConversationFeedbackErasure} port. The {@code PracticesWorkspacePurgeContributor} also clears all
+ * practice rows for the workspace, but the two are ordering-independent: whichever runs first, the other's call
+ * is an idempotent no-op.
+ *
+ * <p>The row deletes live in {@link SlackWorkspaceContentEraser} — the shared choke point that
+ * connection-disconnect ({@code SlackConnectionStrategy#revoke}) also drives, so purge and disconnect erase the
+ * identical Slack-owned rows.
  */
 @Component
 @RequiredArgsConstructor
@@ -41,21 +38,11 @@ public class SlackWorkspacePurgeAdapter implements WorkspacePurgeContributor {
 
     static final int PURGE_ORDER = -200;
 
-    private final SlackMessageRepository slackMessageRepository;
-    private final SlackThreadRepository slackThreadRepository;
-    private final SlackMonitoredChannelRepository slackMonitoredChannelRepository;
-    private final MentorSlackThreadRepository mentorSlackThreadRepository;
-    private final SlackParticipantConsentRepository slackParticipantConsentRepository;
-    private final ConversationFeedbackErasure conversationFeedbackErasure;
+    private final SlackWorkspaceContentEraser contentEraser;
 
     @Override
     public void deleteWorkspaceData(Long workspaceId) {
-        conversationFeedbackErasure.eraseAllConversationForWorkspace(workspaceId);
-        slackMessageRepository.deleteByWorkspaceId(workspaceId);
-        slackThreadRepository.deleteByWorkspaceId(workspaceId);
-        slackMonitoredChannelRepository.deleteByWorkspaceId(workspaceId);
-        mentorSlackThreadRepository.deleteByWorkspaceId(workspaceId);
-        slackParticipantConsentRepository.deleteByWorkspaceId(workspaceId);
+        contentEraser.eraseWorkspace(workspaceId);
     }
 
     @Override

@@ -73,7 +73,7 @@ export function NavMentorThreads({
 	if (isLoading) {
 		return (
 			<SidebarGroup>
-				<SidebarGroupLabel>Chat History</SidebarGroupLabel>
+				<SidebarGroupLabel>Chat history</SidebarGroupLabel>
 				<SidebarGroupContent>
 					<div className="text-sm text-muted-foreground p-2">Loading...</div>
 				</SidebarGroupContent>
@@ -84,7 +84,7 @@ export function NavMentorThreads({
 	if (error) {
 		return (
 			<SidebarGroup>
-				<SidebarGroupLabel>Chat History</SidebarGroupLabel>
+				<SidebarGroupLabel>Chat history</SidebarGroupLabel>
 				<SidebarGroupContent>
 					<div className="text-sm text-destructive p-2">{error}</div>
 				</SidebarGroupContent>
@@ -95,7 +95,7 @@ export function NavMentorThreads({
 	if (threadGroups.length === 0) {
 		return (
 			<SidebarGroup>
-				<SidebarGroupLabel>Chat History</SidebarGroupLabel>
+				<SidebarGroupLabel>Chat history</SidebarGroupLabel>
 				<SidebarGroupContent>
 					<div className="text-sm text-muted-foreground p-2">No conversations yet</div>
 				</SidebarGroupContent>

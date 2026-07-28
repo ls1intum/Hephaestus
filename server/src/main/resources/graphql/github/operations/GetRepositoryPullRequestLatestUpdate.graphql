@@ -1,0 +1,27 @@
+# Lightweight probe query to check whether a repository has any pull request updated
+# since a given timestamp. Costs ~1 rate limit point vs ~59 for the full
+# GetRepositoryPullRequests query (which embeds reviews, threads and comments).
+#
+# GitHub's pullRequests connection has no server-side `since` filter (unlike issues),
+# so the probe instead asks for the single most-recently-updated PR and lets the caller
+# compare its updatedAt against the incremental cutoff. Ordering matches
+# GetRepositoryPullRequests (UPDATED_AT DESC) so the first node is the newest.
+#
+# Deliberately unfiltered by state: the sync it guards is also unfiltered, so the probe
+# must observe the same population.
+
+query GetRepositoryPullRequestLatestUpdate($owner: String!, $name: String!) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
+    repository(owner: $owner, name: $name) {
+        pullRequests(first: 1, orderBy: { field: UPDATED_AT, direction: DESC }) {
+            nodes {
+                updatedAt
+            }
+        }
+    }
+}

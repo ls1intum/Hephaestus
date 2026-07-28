@@ -5,7 +5,7 @@ import {
 	type CurrentUser,
 	csrfHeaders,
 	type UserProfile,
-} from "./authClient";
+} from "./auth-client";
 
 export {
 	type AuthContextType,

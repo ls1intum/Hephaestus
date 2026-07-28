@@ -7,8 +7,10 @@ import type { AdminWorkspaceView } from "@/api/types.gen";
 import { AdminWorkspacesTable } from "@/components/admin/workspaces/AdminWorkspacesTable";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { instanceAdminHead } from "@/lib/page-title";
 
 export const Route = createFileRoute("/_authenticated/admin/workspaces")({
+	head: instanceAdminHead("Workspaces"),
 	component: AdminWorkspacesPage,
 });
 

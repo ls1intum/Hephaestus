@@ -21,7 +21,7 @@ import org.springframework.context.SmartLifecycle;
 /**
  * SIGTERM-driven graceful shutdown for the worker. Runs at
  * {@link WebServerGracefulShutdownLifecycle#SMART_LIFECYCLE_PHASE} {@code - 1024} (after HTTP
- * server stop, before NATS / executor teardown). Liveness stays {@code CORRECT} — kubelet must
+ * server stop, before executor teardown). Liveness stays {@code CORRECT} — kubelet must
  * not kill the pod early; only readiness flips to {@code REFUSING_TRAFFIC}.
  *
  * <p>Sequence: readiness flip → final {@code Heartbeat{draining}} + capacity report with

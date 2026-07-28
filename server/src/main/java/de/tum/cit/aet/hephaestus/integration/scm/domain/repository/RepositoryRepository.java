@@ -105,6 +105,9 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
      * Finds all repositories that match the workspace's monitored repo names.
      * Uses nameWithOwner to join with RepositoryToMonitor entries,
      * ensuring subgroup repos are included (not just top-level group repos).
+     *
+     * <p>Ordered because callers scan a CAPPED prefix of the result into agent context: an arbitrary plan
+     * order would vary which repositories the detector sees between runs over identical work.
      */
     @Query(
         """
@@ -112,6 +115,7 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
         WHERE r.nameWithOwner IN (
             SELECT m.nameWithOwner FROM RepositoryToMonitor m WHERE m.workspace.id = :workspaceId
         )
+        ORDER BY r.nameWithOwner
         """
     )
     List<Repository> findAllByWorkspaceMonitors(@Param("workspaceId") Long workspaceId);

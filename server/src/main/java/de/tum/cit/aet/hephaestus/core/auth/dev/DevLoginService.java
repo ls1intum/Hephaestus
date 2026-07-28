@@ -16,7 +16,6 @@ import java.util.Locale;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpStatus;
@@ -59,7 +58,7 @@ public class DevLoginService {
         AccountRepository accountRepository,
         JwtPrincipalFactory principalFactory,
         HephaestusJwtIssuer jwtIssuer,
-        @Qualifier("authClock") Clock clock,
+        Clock clock,
         Environment environment
     ) {
         this.enabled = authProperties.devLoginEnabled();

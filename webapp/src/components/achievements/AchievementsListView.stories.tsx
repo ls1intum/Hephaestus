@@ -4,7 +4,7 @@ import {
 	asUI,
 	mythicAchievementsUI,
 	zeusThunderbolt,
-} from "@/components/achievements/storyMockData";
+} from "@/components/achievements/story-mock-data";
 
 /**
  * Tabular view for displaying achievement progression in an accessible format.

@@ -30,7 +30,13 @@ export const Route = createFileRoute("/_authenticated/integrations")({
 			window.sessionStorage.setItem("slack-connect-result", search.status);
 			if (search.reason) window.sessionStorage.setItem("slack-connect-reason", search.reason);
 		}
-		throw redirect({ to: "/w/$workspaceSlug/admin/settings", params: { workspaceSlug: slug } });
+		// Must land on the page that renders AdminSlackNotificationSettings — it is the sole
+		// consumer of the stashed keys above. Any other destination leaves them unread, so the
+		// admin gets no feedback here and a stale toast the next time they open this page.
+		throw redirect({
+			to: "/w/$workspaceSlug/admin/integrations/slack",
+			params: { workspaceSlug: slug },
+		});
 	},
 });
 
@@ -57,8 +63,7 @@ function IntegrationsCallback() {
 	const iconClass = failed
 		? "size-12 text-destructive"
 		: succeeded
-			? // no semantic success token in the kit
-				"size-12 text-green-600 dark:text-green-400"
+			? "size-12 text-success"
 			: "size-12 text-muted-foreground";
 	const title = failed
 		? "Connection failed"

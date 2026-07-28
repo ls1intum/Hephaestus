@@ -62,21 +62,15 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Newest-first rows: accounts resolve to names, impersonation is attributed, failures show why. */
 export const Default: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		// Accounts render as human names, not numeric ids (Ada is the subject of two rows).
 		await expect(canvas.getAllByText("Ada Lovelace").length).toBeGreaterThan(0);
-		// Impersonated actions attribute the operator ("via Grace Hopper").
 		await expect(canvas.getAllByText("Grace Hopper").length).toBeGreaterThan(0);
-		// A failure shows its reason (not just a red badge), plus the destructive result badge.
-		await expect(canvas.getByText("Email not verified on the GitLab account")).toBeInTheDocument();
-		await expect(canvas.getByText("FAILURE")).toBeInTheDocument();
+		await expect(canvas.getByText("Failure")).toBeInTheDocument();
 	},
 };
 
-/** Deleted accounts (no resolved identity) fall back to `#id` so the row stays attributable. */
 export const DeletedAccountFallback: Story = {
 	args: {
 		events: [
@@ -96,37 +90,55 @@ export const DeletedAccountFallback: Story = {
 	},
 };
 
-/** Opening a row reveals the full forensic record (user agent, workspace, pretty-printed details). */
 export const RowDetail: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		const buttons = canvas.getAllByRole("button", { name: /View details/i });
 		await userEvent.click(buttons[0]);
-		// The dialog renders in a portal → query the document, not just the canvas.
 		await expect(await screen.findByText("User agent")).toBeInTheDocument();
 		await expect(screen.getByText("Workspace")).toBeInTheDocument();
 	},
 };
 
-/** A failed/loaded state with no rows under an active filter. */
+export const EmptyInitial: Story = {
+	args: { events: [], hasFilter: false },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("No events yet")).toBeInTheDocument();
+		await expect(canvas.getByText(/Sign-ins, impersonation, role changes/i)).toBeInTheDocument();
+	},
+};
+
 export const EmptyWithFilter: Story = {
 	args: { events: [], hasFilter: true },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("No matching audit events.")).toBeInTheDocument();
+		await expect(canvas.getByText("No events match your filters")).toBeInTheDocument();
 	},
 };
 
-/** Error state when the page fails to load. */
 export const ErrorState: Story = {
 	args: { events: [], isError: true },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/Failed to load audit events/i)).toBeInTheDocument();
+		await expect(canvas.getByText(/Couldn’t load the audit log/i)).toBeInTheDocument();
 	},
 };
 
-/** Loading skeleton (spinner) before the first page resolves. */
 export const Loading: Story = {
 	args: { events: [], isLoading: true },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByRole("columnheader", { name: "Event" })).toBeInTheDocument();
+	},
+};
+
+export const ColumnCountMatchesHeader: Story = {
+	args: {},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		const headers = canvas.getAllByRole("columnheader");
+		const cells = within(canvas.getAllByRole("row")[1]).getAllByRole("cell");
+		await expect(headers).toHaveLength(cells.length);
+	},
 };

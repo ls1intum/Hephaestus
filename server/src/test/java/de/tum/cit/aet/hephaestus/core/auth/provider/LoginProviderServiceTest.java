@@ -10,6 +10,8 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
 import de.tum.cit.aet.hephaestus.core.auth.AuthPropertiesFixture;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventData;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventWriter;
 import de.tum.cit.aet.hephaestus.core.auth.stepup.StepUpPolicy;
@@ -24,6 +26,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Pins the env → seed contract: a configured login provider is seeded once when absent, never
@@ -38,13 +41,18 @@ class LoginProviderServiceTest extends BaseUnitTest {
         LoginProviderClientRegistrationRepository.class
     );
 
+    /** The real logger over a mocked writer: a mocked logger would assert nothing about what reaches the ledger. */
+    private final AuthEventWriter authEventWriter = mock(AuthEventWriter.class);
+    private final AuthEventLogger authEventLogger = new AuthEventLogger(authEventWriter);
+
     private LoginProviderService service(Map<String, AuthProperties.LoginProviderSeed> providers) {
         return new LoginProviderService(
             repository,
             registrationCache,
             AuthPropertiesFixture.withLoginProviders(providers),
-            mock(StepUpPolicy.class),
-            new AuthEventLogger(mock(AuthEventWriter.class))
+            authEventLogger,
+            new ObjectMapper(),
+            mock(StepUpPolicy.class)
         );
     }
 
@@ -555,6 +563,62 @@ class LoginProviderServiceTest extends BaseUnitTest {
         provider.setScopes("read");
         provider.setEnabled(true);
         return provider;
+    }
+
+    @Test
+    void adminMutationsLandOnTheAuthEventTrail() {
+        when(repository.existsByRegistrationId("gitlab-acme")).thenReturn(false);
+        when(repository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+        LoginProvider existing = gitlabProvider("gitlab-acme", "sealed");
+        when(repository.findByRegistrationId("gitlab-acme")).thenReturn(Optional.of(existing));
+        // Two enabled providers, so neither disable nor delete trips the last-provider lockout guard.
+        when(repository.findByEnabledTrueOrderByDisplayNameAsc()).thenReturn(
+            List.of(existing, gitlabProvider("gitlab-other", "sealed"))
+        );
+        LoginProviderService service = adminService();
+
+        service.create(gitlabDraft("gitlab-acme", "https://gitlab.acme.test", null), ADMIN_ID, Instant.now());
+        service.update(
+            "gitlab-acme",
+            new LoginProviderService.Patch(null, null, null, "rotated", null, false),
+            ADMIN_ID,
+            Instant.now()
+        );
+        service.delete("gitlab-acme", ADMIN_ID, Instant.now());
+
+        ArgumentCaptor<AuthEventData> captor = ArgumentCaptor.forClass(AuthEventData.class);
+        verify(authEventWriter, Mockito.times(3)).write(captor.capture());
+        assertThat(captor.getAllValues())
+            .extracting(AuthEventData::type)
+            .containsExactly(
+                AuthEvent.EventType.LOGIN_PROVIDER_CREATED,
+                AuthEvent.EventType.LOGIN_PROVIDER_UPDATED,
+                AuthEvent.EventType.LOGIN_PROVIDER_DELETED
+            );
+        assertThat(captor.getAllValues())
+            .extracting(AuthEventData::details)
+            .allSatisfy(details -> assertThat(details).contains("\"registrationId\":\"gitlab-acme\""));
+    }
+
+    @Test
+    void updateAuditNamesTheRotatedSecretWithoutRecordingIt() {
+        LoginProvider existing = gitlabProvider("gitlab-acme", "old-secret");
+        when(repository.findByRegistrationId("gitlab-acme")).thenReturn(Optional.of(existing));
+        when(repository.findByEnabledTrueOrderByDisplayNameAsc()).thenReturn(List.of(existing));
+        when(repository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        adminService().update(
+            "gitlab-acme",
+            new LoginProviderService.Patch("Renamed", null, null, "super-secret-value", null, null),
+            ADMIN_ID,
+            Instant.now()
+        );
+
+        ArgumentCaptor<AuthEventData> captor = ArgumentCaptor.forClass(AuthEventData.class);
+        verify(authEventWriter).write(captor.capture());
+        String details = captor.getValue().details();
+        assertThat(details).contains("\"changed\":[\"displayName\",\"clientSecret\"]");
+        assertThat(details).doesNotContain("super-secret-value").doesNotContain("old-secret");
     }
 
     private static LoginProvider gitlabProvider(String registrationId, String clientSecret) {

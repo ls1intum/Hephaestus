@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderTyp
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AuthMode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetTestBuilder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.Commit;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitAuthorResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
@@ -61,7 +62,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
     @SuppressWarnings("unchecked")
     @BeforeEach
     void setUp() {
-        // Make TransactionTemplate execute callbacks directly (no actual transaction)
+        // Execute TransactionTemplate callbacks directly, with no real transaction.
         lenient()
             .when(transactionTemplate.execute(any(TransactionCallback.class)))
             .thenAnswer(invocation -> {
@@ -79,32 +80,15 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
         );
     }
 
-    // Helpers
-
     private static SyncTarget createSyncTarget(AuthMode authMode) {
-        return new SyncTarget(
-            1L,
-            100L,
-            authMode == AuthMode.INSTALLATION_APP ? 42L : null,
-            authMode == AuthMode.PERSONAL_ACCESS_TOKEN ? "ghp_test_token" : null,
-            authMode,
-            "owner/repo",
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null
-        );
+        return SyncTargetTestBuilder.syncTarget()
+            .id(1L)
+            .scopeId(100L)
+            .installationId(authMode == AuthMode.INSTALLATION_APP ? 42L : null)
+            .personalAccessToken(authMode == AuthMode.PERSONAL_ACCESS_TOKEN ? "ghp_test_token" : null)
+            .authMode(authMode)
+            .repositoryNameWithOwner("owner/repo")
+            .build();
     }
 
     private static Repository createMockRepository(Long id, String nameWithOwner, String defaultBranch) {
@@ -151,8 +135,6 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
         commit.setRepository(TestEntities.repository(repoId, null));
         return commit;
     }
-
-    // Tests
 
     @Nested
     class SkipConditions {
@@ -237,10 +219,9 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             GitRepositoryManager.CommitInfo commitInfo = createCommitInfo("commit1", "First commit");
             when(gitRepositoryManager.walkCommits(1L, null, "head123")).thenReturn(List.of(commitInfo));
 
-            // Not already persisted
             when(commitRepository.existsByShaAndRepositoryId("commit1", 1L)).thenReturn(false);
 
-            // Mock the commit lookup after upsert for event publishing
+            // Lookup after upsert, for event publishing.
             Commit mockCommit = createMockCommit("commit1", 1L);
             when(commitRepository.findByShaAndRepositoryId("commit1", 1L)).thenReturn(Optional.of(mockCommit));
 
@@ -250,7 +231,6 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             int result = service.backfillCommits(target, repo, 100L);
 
             assertThat(result).isEqualTo(1);
-            // fromSha should be null (full walk)
             verify(gitRepositoryManager).walkCommits(1L, null, "head123");
             verify(commitRepository).upsertCommit(
                 eq("commit1"),
@@ -323,7 +303,6 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             int result = service.backfillCommits(target, repo, 100L);
 
             assertThat(result).isEqualTo(1);
-            // fromSha should be the latest known SHA
             verify(gitRepositoryManager).walkCommits(1L, "prev123", "head456");
         }
     }
@@ -341,7 +320,6 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             GitRepositoryManager.CommitInfo newCommit = createCommitInfo("newone", "New commit");
             when(gitRepositoryManager.walkCommits(1L, null, "head123")).thenReturn(List.of(existingCommit, newCommit));
 
-            // First commit already exists, second does not
             when(commitRepository.existsByShaAndRepositoryId("existing", 1L)).thenReturn(true);
             when(commitRepository.existsByShaAndRepositoryId("newone", 1L)).thenReturn(false);
 
@@ -354,7 +332,6 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             int result = service.backfillCommits(target, repo, 100L);
 
             assertThat(result).isEqualTo(1);
-            // Only the new commit should be upserted
             verify(commitRepository, times(1)).upsertCommit(
                 eq("newone"),
                 anyString(),
@@ -481,7 +458,6 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
             when(tokenService.isConfigured()).thenReturn(true);
             when(tokenService.getInstallationToken(42L)).thenThrow(new RuntimeException("Token error"));
-            // Should still proceed with null token (token failure is not fatal)
             when(gitRepositoryManager.resolveDefaultBranchHead(1L, "main")).thenReturn("head123");
             when(commitRepository.findLatestByRepositoryId(1L)).thenReturn(Optional.empty());
             when(gitRepositoryManager.walkCommits(1L, null, "head123")).thenReturn(List.of());
@@ -491,7 +467,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
 
             int result = service.backfillCommits(target, repo, 100L);
 
-            // Should succeed (token failure is logged, null token used)
+            // A token failure is not fatal: the backfill proceeds with a null token.
             assertThat(result).isEqualTo(0);
             verify(gitRepositoryManager).ensureRepository(1L, "https://github.com/owner/repo.git", null);
         }
@@ -604,7 +580,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
 
             service.backfillCommits(target, repo, 100L);
 
-            // Verify file change was attached via the real bidirectional wiring
+            // File change attached via the real bidirectional entity wiring.
             assertThat(persistedCommit.getFileChanges()).isNotEmpty();
             verify(commitRepository).save(persistedCommit);
         }

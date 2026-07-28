@@ -6,9 +6,12 @@ import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
 import de.tum.cit.aet.hephaestus.core.auth.stepup.StepUpPolicy;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.core.security.ServerUrlValidator;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -24,6 +27,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Owns the instance-scoped {@link LoginProvider} table: seeds the env-configured defaults on first
@@ -40,6 +44,9 @@ import org.springframework.web.server.ResponseStatusException;
  *
  * <p>Every mutation evicts the {@link LoginProviderClientRegistrationRepository} cache so an admin's
  * edit/enable/disable takes effect immediately rather than after the 60s TTL.
+ *
+ * <p>The three admin mutations write to the instance-scoped {@code auth_event} trail; env seeding does
+ * not, having no authenticated principal behind it.
  */
 @ConditionalOnServerRole
 @Service
@@ -65,46 +72,34 @@ public class LoginProviderService {
     private final LoginProviderRepository repository;
     private final LoginProviderClientRegistrationRepository registrationCache;
     private final AuthProperties authProperties;
-    private final StepUpPolicy stepUpPolicy;
     private final AuthEventLogger authEventLogger;
+    private final ObjectMapper objectMapper;
+    private final StepUpPolicy stepUpPolicy;
 
     public LoginProviderService(
         LoginProviderRepository repository,
         LoginProviderClientRegistrationRepository registrationCache,
         AuthProperties authProperties,
-        StepUpPolicy stepUpPolicy,
-        AuthEventLogger authEventLogger
+        AuthEventLogger authEventLogger,
+        ObjectMapper objectMapper,
+        StepUpPolicy stepUpPolicy
     ) {
         this.repository = repository;
         this.registrationCache = registrationCache;
         this.authProperties = authProperties;
-        this.stepUpPolicy = stepUpPolicy;
         this.authEventLogger = authEventLogger;
+        this.objectMapper = objectMapper;
+        this.stepUpPolicy = stepUpPolicy;
     }
 
     /**
      * Step-up gate for a provider mutation: it repoints the IdP this instance trusts for every identity
      * behind it (issue #1323). Called after the request is otherwise valid, so an audited denial always
      * reflects a request that would have succeeded — the ordering {@code ImpersonationService.begin} uses.
+     * The denial is audited on the same event type the success would carry, so both sit in one filter.
      */
-    private void requireStepUp(Long actingAccountId, @Nullable Instant actorAuthTime) {
-        stepUpPolicy.requireRecentAuthentication(
-            actorAuthTime,
-            AuthEvent.EventType.LOGIN_PROVIDER_CHANGED,
-            null,
-            actingAccountId
-        );
-    }
-
-    /** Audit a completed mutation. Called after persist so a rejected request never logs a SUCCESS. */
-    private void auditChange(Long actingAccountId, String registrationId, String action) {
-        // registrationId matches ^[a-z][a-z0-9-]{1,62}$ (validated on create, read back from the DB
-        // otherwise) and action is a literal, so the inline JSON is injection-safe.
-        authEventLogger
-            .event(AuthEvent.EventType.LOGIN_PROVIDER_CHANGED, AuthEvent.Result.SUCCESS)
-            .actingAccount(actingAccountId)
-            .details("{\"registrationId\":\"" + registrationId + "\",\"action\":\"" + action + "\"}")
-            .record();
+    private void requireStepUp(AuthEvent.EventType type, Long actingAccountId, @Nullable Instant actorAuthTime) {
+        stepUpPolicy.requireRecentAuthentication(actorAuthTime, type, null, actingAccountId);
     }
 
     /** Enabled providers for the login page / discovery, stable order. */
@@ -164,9 +159,10 @@ public class LoginProviderService {
         provider.setScopes(resolveScopes(draft.type(), draft.scopes()));
         provider.setEnabled(true);
         provider.setSeededFromEnv(false);
-        requireStepUp(actingAccountId, actorAuthTime); // last, so a denial reflects a would-succeed request
+        // Last, so a denial reflects a request that would otherwise have succeeded.
+        requireStepUp(AuthEvent.EventType.LOGIN_PROVIDER_CREATED, actingAccountId, actorAuthTime);
         LoginProvider saved = persist(provider);
-        auditChange(actingAccountId, registrationId, "CREATE");
+        audit(AuthEvent.EventType.LOGIN_PROVIDER_CREATED, saved, null);
         log.info("auth.login-provider: admin created '{}' ({})", registrationId, saved.getType());
         return saved;
     }
@@ -180,31 +176,41 @@ public class LoginProviderService {
         @Nullable Instant actorAuthTime
     ) {
         LoginProvider provider = require(registrationId);
+        // Field NAMES only — this list goes into the audit trail, so it must stay free of values.
+        List<String> changed = new ArrayList<>();
         if (patch.displayName() != null && !patch.displayName().isBlank()) {
             provider.setDisplayName(patch.displayName().trim());
+            changed.add("displayName");
         }
         if (patch.baseUrl() != null && !patch.baseUrl().isBlank()) {
             provider.setBaseUrl(resolveBaseUrl(provider.getType(), patch.baseUrl()));
+            changed.add("baseUrl");
         }
         if (patch.clientId() != null && !patch.clientId().isBlank()) {
             provider.setClientId(patch.clientId().trim());
+            changed.add("clientId");
         }
         // Write-only secret: a null/blank value leaves the sealed secret unchanged.
         if (patch.clientSecret() != null && !patch.clientSecret().isBlank()) {
             provider.setClientSecret(patch.clientSecret());
+            changed.add("clientSecret");
         }
         if (patch.scopes() != null && !patch.scopes().isBlank()) {
             provider.setScopes(sanitizeScopesOrThrow(provider.getType(), patch.scopes()));
+            changed.add("scopes");
         }
         if (patch.enabled() != null && !patch.enabled() && provider.isEnabled()) {
             requireNotLastEnabled(registrationId, "disable");
             provider.setEnabled(false);
+            changed.add("enabled");
         } else if (patch.enabled() != null && patch.enabled()) {
             provider.setEnabled(true);
+            changed.add("enabled");
         }
-        requireStepUp(actingAccountId, actorAuthTime); // last, so a denial reflects a would-succeed request
+        // Last, so a denial reflects a request that would otherwise have succeeded.
+        requireStepUp(AuthEvent.EventType.LOGIN_PROVIDER_UPDATED, actingAccountId, actorAuthTime);
         LoginProvider saved = persist(provider);
-        auditChange(actingAccountId, registrationId, "UPDATE");
+        audit(AuthEvent.EventType.LOGIN_PROVIDER_UPDATED, saved, changed);
         log.info("auth.login-provider: admin updated '{}' (enabled={})", registrationId, saved.isEnabled());
         return saved;
     }
@@ -216,11 +222,30 @@ public class LoginProviderService {
         if (provider.isEnabled()) {
             requireNotLastEnabled(registrationId, "delete");
         }
-        requireStepUp(actingAccountId, actorAuthTime);
+        requireStepUp(AuthEvent.EventType.LOGIN_PROVIDER_DELETED, actingAccountId, actorAuthTime);
         repository.delete(provider);
         registrationCache.evict(registrationId);
-        auditChange(actingAccountId, registrationId, "DELETE");
+        audit(AuthEvent.EventType.LOGIN_PROVIDER_DELETED, provider, null);
         log.info("auth.login-provider: admin deleted '{}'", registrationId);
+    }
+
+    /**
+     * Record an admin login-provider mutation on the {@code auth_event} trail. {@code changed} carries
+     * the field names a PATCH touched — never their values, so no secret can reach the trail.
+     */
+    private void audit(AuthEvent.EventType type, LoginProvider provider, @Nullable List<String> changed) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("registrationId", provider.getRegistrationId());
+        details.put("type", provider.getType().name());
+        details.put("enabled", provider.isEnabled());
+        if (changed != null) {
+            details.put("changed", changed);
+        }
+        authEventLogger
+            .event(type, AuthEvent.Result.SUCCESS)
+            .actingAccount(SecurityUtils.getCurrentAccountId().orElse(null))
+            .details(objectMapper.writeValueAsString(details))
+            .record();
     }
 
     /**

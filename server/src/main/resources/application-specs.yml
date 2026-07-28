@@ -65,7 +65,3 @@ hephaestus:
         nats:
             enabled: false
             server: "nats://localhost:4222"
-    agent:
-        nats:
-            enabled: false
-            server: "nats://localhost:4222"

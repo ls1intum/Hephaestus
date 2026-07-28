@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -9,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
+import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.integration.core.events.BotCommandReceivedEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -26,6 +28,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 
 @Tag("unit")
@@ -59,59 +64,32 @@ class BotCommandProcessorTest extends BaseUnitTest {
     @Nested
     class CommandMatching {
 
-        @Test
-        void exactReviewCommand_triggersReview() {
+        /**
+         * A null trigger event is what makes a manually requested review run the full focus-active
+         * practice set rather than one trigger's subset.
+         */
+        @ParameterizedTest(name = "{0} triggers a review")
+        @ValueSource(strings = { "/hephaestus review", "/hephaestus review please", "/Hephaestus Review" })
+        void anAcceptedReviewCommand_submitsAReviewForThatMergeRequest(String command) {
             PullRequest pr = createOpenPr();
             mockPrLookup(pr);
             mockGateDetect(pr);
             when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.of(new AgentJob()));
 
-            processor.onBotCommandReceived(event("/hephaestus review"));
+            processor.onBotCommandReceived(event(command));
 
-            verify(agentJobService).submit(eq(1L), eq(AgentJobType.PULL_REQUEST_REVIEW), any());
+            var captor = ArgumentCaptor.forClass(PullRequestReviewSubmissionRequest.class);
+            verify(agentJobService).submit(eq(1L), eq(AgentJobType.PULL_REQUEST_REVIEW), captor.capture());
+            PullRequestReviewSubmissionRequest request = captor.getValue();
+            assertThat(request.pullRequest().number()).isEqualTo(MR_NUMBER);
+            assertThat(request.headRefOid()).isEqualTo("abc123");
+            assertThat(request.triggerEvent()).isNull();
         }
 
-        @Test
-        void reviewCommandWithTrailingSpace_triggersReview() {
-            PullRequest pr = createOpenPr();
-            mockPrLookup(pr);
-            mockGateDetect(pr);
-            when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.of(new AgentJob()));
-
-            processor.onBotCommandReceived(event("/hephaestus review   "));
-
-            verify(agentJobService).submit(eq(1L), eq(AgentJobType.PULL_REQUEST_REVIEW), any());
-        }
-
-        @Test
-        void caseInsensitive_triggersReview() {
-            PullRequest pr = createOpenPr();
-            mockPrLookup(pr);
-            mockGateDetect(pr);
-            when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.of(new AgentJob()));
-
-            processor.onBotCommandReceived(event("/Hephaestus Review"));
-
-            verify(agentJobService).submit(eq(1L), eq(AgentJobType.PULL_REQUEST_REVIEW), any());
-        }
-
-        @Test
-        void reviewAllCommand_doesNotTrigger() {
-            processor.onBotCommandReceived(event("/hephaestus review-all"));
-
-            verify(pullRequestRepository, never()).findByRepositoryIdAndNumber(anyLong(), anyInt());
-        }
-
-        @Test
-        void reviewcodeCommand_doesNotTrigger() {
-            processor.onBotCommandReceived(event("/hephaestus reviewcode"));
-
-            verify(pullRequestRepository, never()).findByRepositoryIdAndNumber(anyLong(), anyInt());
-        }
-
-        @Test
-        void unknownCommand_silentlyIgnored() {
-            processor.onBotCommandReceived(event("/hephaestus deploy"));
+        @ParameterizedTest(name = "{0} is ignored")
+        @ValueSource(strings = { "/hephaestus review-all", "/hephaestus reviewcode", "/hephaestus deploy" })
+        void aCommandThatIsNotReview_isSilentlyIgnored(String command) {
+            processor.onBotCommandReceived(event(command));
 
             verify(pullRequestRepository, never()).findByRepositoryIdAndNumber(anyLong(), anyInt());
             verify(agentJobService, never()).submit(any(), any(), any());
@@ -182,18 +160,6 @@ class BotCommandProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        void gateDetect_submitsJob() {
-            PullRequest pr = createOpenPr();
-            mockPrLookup(pr);
-            mockGateDetect(pr);
-            when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.of(new AgentJob()));
-
-            processor.onBotCommandReceived(event("/hephaestus review"));
-
-            verify(agentJobService).submit(eq(1L), eq(AgentJobType.PULL_REQUEST_REVIEW), any());
-        }
-
-        @Test
         void gateReceivesManualTriggerMode() {
             PullRequest pr = createOpenPr();
             mockPrLookup(pr);
@@ -215,7 +181,6 @@ class BotCommandProcessorTest extends BaseUnitTest {
                 new RuntimeException("DB connection failed")
             );
 
-            // Should not throw
             processor.onBotCommandReceived(event("/hephaestus review"));
 
             verify(agentJobService, never()).submit(any(), any(), any());

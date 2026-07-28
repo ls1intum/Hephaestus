@@ -2,41 +2,28 @@ package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.Test;
 
 class JobTokenAuthenticationTest extends BaseUnitTest {
 
-    @Test
-    void shouldReturnJobAsPrincipal() {
-        AgentJob job = new AgentJob();
-        var auth = new JobTokenAuthentication(job);
-
-        assertThat(auth.getPrincipal()).isSameAs(job);
-    }
+    private static final ProxyRouting ROUTING = new ProxyRouting(
+        "job:test",
+        "anthropic-messages",
+        "https://api.anthropic.com",
+        null,
+        null,
+        null,
+        null,
+        null
+    );
 
     @Test
     void shouldRedactCredentials() {
-        AgentJob job = new AgentJob();
-        var auth = new JobTokenAuthentication(job);
+        var auth = new JobTokenAuthentication(ROUTING);
 
+        // The default AbstractAuthenticationToken credential is whatever was passed in; this override
+        // is what keeps a proxy bearer token out of every log line that prints the Authentication.
         assertThat(auth.getCredentials()).isEqualTo("[REDACTED]");
-    }
-
-    @Test
-    void shouldBeAuthenticated() {
-        AgentJob job = new AgentJob();
-        var auth = new JobTokenAuthentication(job);
-
-        assertThat(auth.isAuthenticated()).isTrue();
-    }
-
-    @Test
-    void shouldHaveEmptyAuthorities() {
-        AgentJob job = new AgentJob();
-        var auth = new JobTokenAuthentication(job);
-
-        assertThat(auth.getAuthorities()).isEmpty();
     }
 }

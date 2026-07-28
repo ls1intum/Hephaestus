@@ -16,8 +16,6 @@ import java.util.List;
  * methods concurrently from multiple sync threads.
  */
 public interface SyncTargetProvider extends SyncTimestampProvider, BackfillStateProvider {
-    // CORE SYNC TARGET OPERATIONS
-
     /**
      * Gets all active sync targets across all scopes — targets in active-status scopes with
      * at least one configured repository. Never null (may be empty).
@@ -51,8 +49,6 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
      */
     void removeSyncTarget(Long syncTargetId);
 
-    // SYNC SESSIONS
-
     /**
      * Gets sync sessions for batch synchronization, scoped to a single provider kind.
      * Each session contains all sync targets for a scope with its sync context.
@@ -69,8 +65,6 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
     default SyncStatistics getSyncStatistics() {
         return new SyncStatistics(0, 0, 0, 0, false);
     }
-
-    // RECORDS
 
     /**
      * A batch of sync targets for a single scope, used for parallel processing.
@@ -182,6 +176,13 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
      * @param issueSyncCursor                     pagination cursor for resuming issue sync
      * @param pullRequestSyncCursor               pagination cursor for resuming PR sync
      * @param discussionSyncCursor                pagination cursor for resuming discussion sync
+     * @param nativeId                            provider's stable numeric repository id (GitHub
+     *                                            {@code repository.id} / GitLab {@code project.id}), or
+     *                                            {@code null} for legacy/unresolved rows. Unlike
+     *                                            {@code repositoryNameWithOwner} it never changes across a
+     *                                            rename/transfer, so the sync engine uses it to re-key the
+     *                                            monitor and to decide that a name-404 is a rename (heal),
+     *                                            not a deletion (remove).
      */
     record SyncTarget(
         Long id,
@@ -204,7 +205,8 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
         Instant backfillLastRunAt,
         String issueSyncCursor,
         String pullRequestSyncCursor,
-        String discussionSyncCursor
+        String discussionSyncCursor,
+        @org.jspecify.annotations.Nullable Long nativeId
     ) {
         /** @return true if full sync has never run or is older than {@code staleThreshold} */
         public boolean needsFullSync(Instant staleThreshold) {

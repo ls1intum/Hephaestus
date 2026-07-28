@@ -8,7 +8,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { useAuth } from "@/integrations/auth/AuthContext";
-import { authClient } from "@/integrations/auth/authClient";
+import { authClient } from "@/integrations/auth/auth-client";
 
 export interface ConfirmAccessDialogProps {
 	open: boolean;

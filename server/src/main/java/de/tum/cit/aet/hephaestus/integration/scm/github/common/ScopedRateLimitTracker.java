@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.common;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.integration.core.spi.RateLimitSnapshot;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.RateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHRateLimit;
 import io.micrometer.core.instrument.Gauge;
@@ -48,42 +49,34 @@ import org.springframework.stereotype.Component;
 @Component
 @Slf4j
 @WorkspaceAgnostic("System-wide rate limit tracking - tracks GitHub API limits per-scope across all workspaces")
-public class ScopedRateLimitTracker implements RateLimitTracker {
+public class ScopedRateLimitTracker implements RateLimitTracker, RateLimitObservationSink {
 
     /**
-     * Default rate limit for GitHub App installations (5000 points/hour).
-     * Used when a scope has never been updated.
+     * Conservative assumed ceiling for an <em>unobserved</em> scope, used only by the throttle-decision
+     * APIs ({@link #getRemaining}, {@link #getLimit}, {@link #waitIfNeeded}, {@link #getRecommendedDelay}).
+     *
+     * <p>It is a guess, not a fact: GitHub's real GraphQL ceiling is 5,000 points/hour for a plain
+     * installation but scales to 12,500 for installations with more than 20 repositories and is 10,000 on
+     * Enterprise Cloud. It therefore must never reach {@link #snapshot} — see
+     * {@link RateLimitSnapshot} for the honesty rule. The seeded observation from REST
+     * {@code GET /rate_limit} (see {@link #updateFromRestRateLimit}) is what makes the true ceiling known
+     * before the first sync.
      */
     private static final int DEFAULT_LIMIT = 5000;
 
-    /**
-     * Low threshold below which we consider throttling (10% of default).
-     */
+    /** Low threshold below which we consider throttling (10% of default). */
     private static final int DEFAULT_LOW_THRESHOLD = 500;
 
-    /**
-     * Critical threshold below which we pause completely (2% of default).
-     */
+    /** Critical threshold below which we pause completely (2% of default). */
     private static final int CRITICAL_THRESHOLD = 100;
 
-    /**
-     * Maximum time to wait in a single blocking call.
-     */
     private static final Duration MAX_WAIT_DURATION = Duration.ofMinutes(5);
 
-    /**
-     * Minimum wait to avoid busy-waiting.
-     */
+    /** Avoids busy-waiting when no reset time is available. */
     private static final Duration MIN_WAIT_DURATION = Duration.ofSeconds(1);
 
-    /**
-     * Time after which inactive scope state is evicted (24 hours).
-     */
     private static final Duration EVICTION_THRESHOLD = Duration.ofHours(24);
 
-    /**
-     * Metric name prefix for rate limit gauges.
-     */
     private static final String METRIC_PREFIX = "github.graphql.ratelimit";
 
     private final MeterRegistry meterRegistry;
@@ -123,25 +116,7 @@ public class ScopedRateLimitTracker implements RateLimitTracker {
         if (state == null) {
             return DEFAULT_LIMIT;
         }
-        int remaining = state.remaining.get();
-        // Optimistic reset: if remaining is low and reset time has passed,
-        // reset remaining to full limit so callers don't stall on stale data.
-        if (remaining < DEFAULT_LOW_THRESHOLD) {
-            Instant resetAt = state.resetAt.get();
-            if (resetAt != null && !Instant.now().isBefore(resetAt)) {
-                int fullLimit = state.limit.get();
-                state.remaining.set(fullLimit);
-                log.info(
-                    "Rate limit reset time has passed, optimistically reset remaining: scopeId={}, oldRemaining={}, newRemaining={}, resetAt={}",
-                    scopeId,
-                    remaining,
-                    fullLimit,
-                    resetAt
-                );
-                return fullLimit;
-            }
-        }
-        return remaining;
+        return effectiveRemaining(state);
     }
 
     @Override
@@ -150,7 +125,34 @@ public class ScopedRateLimitTracker implements RateLimitTracker {
             return DEFAULT_LIMIT;
         }
         ScopeRateLimitState state = stateByScope.get(scopeId);
-        return state != null ? state.limit.get() : DEFAULT_LIMIT;
+        return state == null ? DEFAULT_LIMIT : limitOrDefault(state);
+    }
+
+    /**
+     * The remaining budget to <em>throttle against</em> — a pure computation, never a write. When the
+     * observed window has already closed, the measured {@code remaining} says nothing about the current
+     * window, so decisions assume a full budget rather than stalling on stale data. This must stay a
+     * return value: {@link ScopeRateLimitState#update} is the only writer of observed fields, so an
+     * invented "full" value can never reach {@link #snapshot}.
+     */
+    private static int effectiveRemaining(ScopeRateLimitState state) {
+        Integer observed = state.remaining.get();
+        if (observed == null) {
+            return limitOrDefault(state);
+        }
+        if (observed < DEFAULT_LOW_THRESHOLD) {
+            Instant resetAt = state.resetAt.get();
+            if (resetAt != null && !Instant.now().isBefore(resetAt)) {
+                return limitOrDefault(state);
+            }
+        }
+        return observed;
+    }
+
+    /** The observed ceiling, or the conservative assumption when GitHub has not reported one yet. */
+    private static int limitOrDefault(ScopeRateLimitState state) {
+        Integer limit = state.limit.get();
+        return limit == null ? DEFAULT_LIMIT : limit;
     }
 
     @Override
@@ -168,11 +170,10 @@ public class ScopedRateLimitTracker implements RateLimitTracker {
         int currentRemaining = getRemaining(scopeId);
 
         if (currentRemaining >= DEFAULT_LOW_THRESHOLD) {
-            return false; // No waiting needed
+            return false;
         }
 
         if (currentRemaining >= CRITICAL_THRESHOLD) {
-            // Low but not critical - log and continue
             log.info(
                 "Rate limit low but continuing: scopeId={}, remaining={}, threshold={}",
                 scopeId,
@@ -182,7 +183,6 @@ public class ScopedRateLimitTracker implements RateLimitTracker {
             return false;
         }
 
-        // Critical - need to wait
         Instant reset = getResetAt(scopeId);
         if (reset == null) {
             log.warn("Rate limit critical but no reset time available, waiting minimum duration: scopeId={}", scopeId);
@@ -192,23 +192,12 @@ public class ScopedRateLimitTracker implements RateLimitTracker {
 
         Duration waitTime = Duration.between(Instant.now(), reset);
 
-        // Clamp to reasonable bounds
         if (waitTime.isNegative() || waitTime.isZero()) {
-            // Reset time has passed — optimistically reset remaining to full limit.
-            // The next actual GraphQL call will update with the real remaining value.
-            ScopeRateLimitState state = stateByScope.get(scopeId);
-            if (state != null) {
-                int fullLimit = state.limit.get();
-                state.remaining.set(fullLimit);
-                log.info(
-                    "Rate limit reset time has passed, optimistically reset remaining: scopeId={}, remaining={}, resetAt={}",
-                    scopeId,
-                    fullLimit,
-                    reset
-                );
-            } else {
-                log.info("Rate limit reset time has passed, continuing: scopeId={}", scopeId);
-            }
+            // The observed window has closed, so there is nothing to wait for. This does not write a full
+            // budget back into the observed state: effectiveRemaining() already treats a closed window as
+            // "assume full" for decisions, and the next GraphQL response supplies the real number, so the
+            // admin-facing snapshot never sees an invented value.
+            log.info("Rate limit reset time has passed, continuing: scopeId={}, resetAt={}", scopeId, reset);
             return false;
         }
 
@@ -251,20 +240,17 @@ public class ScopedRateLimitTracker implements RateLimitTracker {
             return Duration.ZERO;
         }
 
-        // Calculate time until reset
         Duration timeUntilReset = Duration.between(Instant.now(), reset);
 
         if (currentRemaining <= 0) {
-            // No points left, wait for reset
             return timeUntilReset.compareTo(MAX_WAIT_DURATION) > 0 ? MAX_WAIT_DURATION : timeUntilReset;
         }
 
-        // Distribute remaining points evenly across remaining time
-        // Add a buffer to avoid hitting exactly zero
+        // Distribute remaining points evenly across remaining time; subtracting CRITICAL_THRESHOLD
+        // leaves a buffer so the delay doesn't shrink to zero right before the limit is exhausted.
         int effectiveRemaining = Math.max(1, currentRemaining - CRITICAL_THRESHOLD);
         long delayMillis = timeUntilReset.toMillis() / effectiveRemaining;
 
-        // Clamp to reasonable bounds
         delayMillis = Math.max(MIN_WAIT_DURATION.toMillis(), delayMillis);
         delayMillis = Math.min(MAX_WAIT_DURATION.toMillis(), delayMillis);
 
@@ -272,26 +258,99 @@ public class ScopedRateLimitTracker implements RateLimitTracker {
     }
 
     /**
-     * Gets the number of tracked scopes (for monitoring/debugging).
+     * Seeds a real observation from REST {@code GET /rate_limit}'s {@code resources.graphql} entry.
      *
-     * @return number of scopes with rate limit state
+     * <p>This exists so the <em>true</em> ceiling is known before the first GraphQL call of a process —
+     * see {@link GitHubRestRateLimitSeeder} for why GitHub's GraphQL ceiling is not a flat 5,000/hour and
+     * why probing this endpoint is free. The values fed here were measured, not guessed.
+     *
+     * <p>Applied only if it is <em>newer</em> than whatever is already recorded, so a seed that loses a
+     * race against a live GraphQL response cannot overwrite fresher data with staler data.
+     *
+     * @param scopeId    the scope the token belongs to
+     * @param limit      {@code resources.graphql.limit}
+     * @param remaining  {@code resources.graphql.remaining}
+     * @param resetAt    {@code resources.graphql.reset}, or {@code null} if absent
+     * @param observedAt when the REST response was received
      */
+    @Override
+    public void updateFromRestRateLimit(
+        Long scopeId,
+        int limit,
+        int remaining,
+        @Nullable Instant resetAt,
+        Instant observedAt
+    ) {
+        if (scopeId == null) {
+            return;
+        }
+        ScopeRateLimitState state = getOrCreateState(scopeId);
+        Instant lastUpdated = state.lastUpdated.get();
+        if (lastUpdated != null && !observedAt.isAfter(lastUpdated)) {
+            return; // a fresher observation already won the race
+        }
+        state.applyRest(limit, remaining, resetAt, observedAt);
+        log.debug(
+            "Seeded GitHub GraphQL rate limit from REST /rate_limit: scopeId={}, limit={}, remaining={}, resetAt={}",
+            scopeId,
+            limit,
+            remaining,
+            resetAt
+        );
+    }
+
+    @Override
+    public boolean hasObservation(Long scopeId) {
+        return snapshot(scopeId) != null;
+    }
+
+    /**
+     * Point-in-time rate-limit snapshot for a scope, for the sync-observability
+     * {@code ConnectionSyncStateProvider#describe} read model.
+     *
+     * <p>Every value here was measured. It deliberately does NOT fall back to the assumptions that
+     * {@link #getRemaining}/{@link #getLimit} return for an untracked scope: those exist so sync code has
+     * a safe "assume full budget" value to throttle against, but surfacing them to an admin as a real
+     * budget would misrepresent "nothing observed since the last restart" as "5000/5000 remaining". The
+     * window-expiry rule is applied centrally by {@link RateLimitSnapshot#observed}.
+     *
+     * @return the snapshot, or {@code null} if nothing has been observed for this scope yet
+     */
+    @Nullable
+    public RateLimitSnapshot snapshot(Long scopeId) {
+        if (scopeId == null) {
+            return null;
+        }
+        ScopeRateLimitState state = stateByScope.get(scopeId);
+        if (state == null) {
+            return null;
+        }
+        Instant observedAt = state.lastUpdated.get();
+        if (observedAt == null) {
+            return null;
+        }
+        return RateLimitSnapshot.observed(
+            state.limit.get(),
+            state.remaining.get(),
+            state.resetAt.get(),
+            observedAt,
+            // GitHub's secondary (abuse) limits are the only 429-style back-off signal it sends, and they
+            // surface on the REST/GraphQL transport rather than in the rateLimit field this tracker reads.
+            // Left null until GitHubExceptionClassifier's secondary-limit detection is wired through.
+            null
+        );
+    }
+
     public int getTrackedScopeCount() {
         return stateByScope.size();
     }
 
-    /**
-     * Scheduled eviction of stale scope state to prevent unbounded memory growth.
-     * <p>
-     * Runs every hour and removes entries that haven't been updated in 24 hours.
-     * Also deregisters the associated Micrometer metrics to prevent gauge leaks.
-     */
+    /** Also deregisters the associated Micrometer metrics to prevent gauge leaks. */
     @Scheduled(fixedRate = 3600000) // 1 hour in milliseconds
     public void evictStaleEntries() {
         Instant threshold = Instant.now().minus(EVICTION_THRESHOLD);
         List<Long> scopesToEvict = new ArrayList<>();
 
-        // Identify stale entries
         for (Map.Entry<Long, ScopeRateLimitState> entry : stateByScope.entrySet()) {
             Instant lastUpdated = entry.getValue().lastUpdated.get();
             if (lastUpdated != null && lastUpdated.isBefore(threshold)) {
@@ -304,7 +363,6 @@ public class ScopedRateLimitTracker implements RateLimitTracker {
             return;
         }
 
-        // Evict stale entries and their metrics
         for (Long scopeId : scopesToEvict) {
             stateByScope.remove(scopeId);
             deregisterMetrics(scopeId);
@@ -314,14 +372,10 @@ public class ScopedRateLimitTracker implements RateLimitTracker {
         log.info("Rate limit eviction completed: evicted={}, remaining={}", scopesToEvict.size(), stateByScope.size());
     }
 
-    /**
-     * Deregisters all Micrometer metrics for a scope.
-     */
     private void deregisterMetrics(Long scopeId) {
         String scopeTag = String.valueOf(scopeId);
         List<Meter.Id> toRemove = new ArrayList<>();
 
-        // Find all meters with this scope_id tag
         meterRegistry
             .getMeters()
             .forEach(meter -> {
@@ -334,7 +388,6 @@ public class ScopedRateLimitTracker implements RateLimitTracker {
                 }
             });
 
-        // Remove the meters
         for (Meter.Id meterId : toRemove) {
             meterRegistry.remove(meterId);
         }
@@ -354,12 +407,13 @@ public class ScopedRateLimitTracker implements RateLimitTracker {
     private void registerMetrics(Long scopeId, ScopeRateLimitState state) {
         Tags tags = Tags.of("scope_id", String.valueOf(scopeId));
 
-        Gauge.builder("github.graphql.ratelimit.points.remaining", state.remaining, AtomicInteger::get)
+        // NaN, not 0, while unobserved: a gauge is a measurement too, and 0 would read as "exhausted".
+        Gauge.builder("github.graphql.ratelimit.points.remaining", state, s -> asDouble(s.remaining.get()))
             .tags(tags)
             .description("GitHub GraphQL API rate limit points remaining")
             .register(meterRegistry);
 
-        Gauge.builder("github.graphql.ratelimit.points.limit", state.limit, AtomicInteger::get)
+        Gauge.builder("github.graphql.ratelimit.points.limit", state, s -> asDouble(s.limit.get()))
             .tags(tags)
             .description("GitHub GraphQL API rate limit total points per hour")
             .register(meterRegistry);
@@ -387,18 +441,35 @@ public class ScopedRateLimitTracker implements RateLimitTracker {
             .register(meterRegistry);
     }
 
+    /** Renders an unobserved value as NaN rather than a number that would be read as a measurement. */
+    private static double asDouble(@Nullable Integer value) {
+        return value == null ? Double.NaN : value.doubleValue();
+    }
+
     /**
-     * Encapsulates rate limit state for a single scope.
-     * All fields are atomic for thread-safe concurrent access.
+     * Rate limit state for a single scope. All fields are atomic for thread-safe concurrent access, and
+     * every observable field starts <b>null</b>: nothing here is a fact until GitHub reports one, so a
+     * caller can never observe a fabricated limit/remaining/resetAt.
      */
     private static class ScopeRateLimitState {
 
-        final AtomicInteger remaining = new AtomicInteger(DEFAULT_LIMIT);
-        final AtomicInteger limit = new AtomicInteger(DEFAULT_LIMIT);
+        final AtomicReference<Integer> remaining = new AtomicReference<>();
+        final AtomicReference<Integer> limit = new AtomicReference<>();
         final AtomicInteger used = new AtomicInteger(0);
         final AtomicInteger lastQueryCost = new AtomicInteger(0);
-        final AtomicReference<Instant> resetAt = new AtomicReference<>(Instant.now().plusSeconds(3600));
-        final AtomicReference<Instant> lastUpdated = new AtomicReference<>(Instant.now());
+        final AtomicReference<Instant> resetAt = new AtomicReference<>();
+        final AtomicReference<Instant> lastUpdated = new AtomicReference<>();
+
+        /** Records a REST {@code GET /rate_limit} observation of the {@code graphql} resource. */
+        void applyRest(int newLimit, int newRemaining, @Nullable Instant newResetAt, Instant observedAt) {
+            remaining.set(newRemaining);
+            limit.set(newLimit);
+            used.set(Math.max(0, newLimit - newRemaining));
+            if (newResetAt != null) {
+                resetAt.set(newResetAt);
+            }
+            lastUpdated.set(observedAt);
+        }
 
         void update(GHRateLimit rateLimit, Long scopeId) {
             int newRemaining = rateLimit.getRemaining();
@@ -406,23 +477,20 @@ public class ScopedRateLimitTracker implements RateLimitTracker {
             int newUsed = rateLimit.getUsed();
             int cost = rateLimit.getCost();
 
-            // Update atomic values
             remaining.set(newRemaining);
             limit.set(newLimit);
             used.set(newUsed);
             lastQueryCost.set(cost);
 
-            // Update reset time
             OffsetDateTime resetTime = rateLimit.getResetAt();
             if (resetTime != null) {
                 resetAt.set(resetTime.toInstant());
             }
             lastUpdated.set(Instant.now());
 
-            // Calculate actual used points (limit - remaining is more reliable)
+            // limit - remaining is more reliable than the reported used count
             int actualUsed = newLimit > 0 ? newLimit - newRemaining : 0;
 
-            // Log based on severity
             if (newRemaining < CRITICAL_THRESHOLD) {
                 log.error(
                     "CRITICAL: GitHub GraphQL rate limit nearly exhausted: scopeId={}, remaining={}, limit={}, used={}, cost={}, resetAt={}",

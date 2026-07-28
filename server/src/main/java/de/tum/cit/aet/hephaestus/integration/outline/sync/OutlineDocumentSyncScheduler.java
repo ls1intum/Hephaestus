@@ -2,11 +2,19 @@ package de.tum.cit.aet.hephaestus.integration.outline.sync;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineDocumentListResponse;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobConflictException;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRequest;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobTrigger;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocumentModel;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
 import java.util.List;
+import java.util.function.Consumer;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -36,15 +44,18 @@ public class OutlineDocumentSyncScheduler {
     private final ConnectionService connectionService;
     private final OutlineDocumentSyncService syncService;
     private final OutlineCollectionRepository collectionRepository;
+    private final SyncJobService syncJobService;
 
     public OutlineDocumentSyncScheduler(
         ConnectionService connectionService,
         OutlineDocumentSyncService syncService,
-        OutlineCollectionRepository collectionRepository
+        OutlineCollectionRepository collectionRepository,
+        SyncJobService syncJobService
     ) {
         this.connectionService = connectionService;
         this.syncService = syncService;
         this.collectionRepository = collectionRepository;
+        this.syncJobService = syncJobService;
     }
 
     @Scheduled(cron = "${hephaestus.integration.outline.sync.cron}")
@@ -56,7 +67,9 @@ public class OutlineDocumentSyncScheduler {
 
     /**
      * Catch-up tick: resume every collection still awaiting a clean pass (freshly registered, or a
-     * reconcile ran out of export budget). Workspaces without pending collections cost nothing.
+     * reconcile ran out of export budget). Workspaces without pending collections cost nothing — the
+     * fan-out enumeration itself is the "has pending work" check, so a workspace only ever appears here
+     * when a {@code RECONCILIATION}/{@code SYSTEM} job is warranted; nothing is recorded otherwise.
      */
     @Scheduled(fixedDelayString = "${hephaestus.integration.outline.sync.catch-up-delay}")
     @SchedulerLock(name = "outline-sync-catch-up", lockAtMostFor = "PT4M", lockAtLeastFor = "PT10S")
@@ -64,7 +77,12 @@ public class OutlineDocumentSyncScheduler {
     public void catchUp() {
         for (Long workspaceId : collectionRepository.findDistinctWorkspaceIdsWithPendingSync()) {
             try {
-                syncService.syncPendingCollections(workspaceId);
+                runReconcileJob(workspaceId, SyncJobTrigger.SYSTEM, handle -> {
+                    syncService.syncPendingCollections(workspaceId, handle);
+                    if (handle != null && handle.isCancellationRequested()) {
+                        handle.reportCancelled();
+                    }
+                });
             } catch (RuntimeException e) {
                 // Isolate a poisoned workspace — log and keep catching up the rest.
                 log.warn("outline.sync: catch-up failed for workspaceId={}: {}", workspaceId, e.toString());
@@ -83,7 +101,12 @@ public class OutlineDocumentSyncScheduler {
         List<Long> workspaceIds = connectionService.findWorkspaceIdsWithActiveConnection(IntegrationKind.OUTLINE);
         for (Long workspaceId : workspaceIds) {
             try {
-                syncService.syncWorkspace(workspaceId);
+                runReconcileJob(workspaceId, SyncJobTrigger.SCHEDULED, handle -> {
+                    syncService.syncWorkspace(workspaceId, handle, SyncJobType.RECONCILIATION);
+                    if (handle != null && handle.isCancellationRequested()) {
+                        handle.reportCancelled();
+                    }
+                });
             } catch (RuntimeException e) {
                 // Isolate a poisoned workspace — log and keep reconciling the rest.
                 log.warn("outline.sync: reconcile failed for workspaceId={}: {}", workspaceId, e.toString());
@@ -96,6 +119,46 @@ public class OutlineDocumentSyncScheduler {
     }
 
     /**
+     * Runs {@code body} for one workspace through the shared {@link SyncJobService} template, recording a
+     * {@code RECONCILIATION} job whose one-active-job-per-connection guard is this pass's dedup. A workspace
+     * whose ACTIVE connection vanished between enumeration and this call (deactivated concurrently) is
+     * silently skipped: nothing to record a job against. A connection that already has an active job is also
+     * skipped — the running job IS the record of this pass.
+     */
+    private void runReconcileJob(long workspaceId, SyncJobTrigger trigger, Consumer<SyncExecutionHandle> body) {
+        connectionService
+            .findActive(workspaceId, IntegrationKind.OUTLINE)
+            .ifPresent(connection -> runJob(workspaceId, connection, trigger, body));
+    }
+
+    private void runJob(
+        long workspaceId,
+        Connection connection,
+        SyncJobTrigger trigger,
+        Consumer<SyncExecutionHandle> body
+    ) {
+        try {
+            syncJobService.run(
+                new SyncJobRequest(
+                    workspaceId,
+                    connection.getId(),
+                    IntegrationKind.OUTLINE,
+                    SyncJobType.RECONCILIATION,
+                    trigger,
+                    null
+                ),
+                body
+            );
+        } catch (SyncJobConflictException e) {
+            log.debug(
+                "outline.sync: reconcile skipped for workspaceId={} — job {} already active",
+                workspaceId,
+                e.activeJob().getId()
+            );
+        }
+    }
+
+    /**
      * Full reconcile of a single workspace immediately — the entry point for webhook consumers and async
      * listeners, which reach the sync service through this bean. Explicitly workspace-SCOPED: it carries no
      * tenancy bypass, so {@code WorkspaceStatementInspector} stays armed for the whole call (see the class
@@ -103,6 +166,20 @@ public class OutlineDocumentSyncScheduler {
      */
     public void syncWorkspaceNow(long workspaceId) {
         syncService.syncWorkspace(workspaceId);
+    }
+
+    /**
+     * Same pass as {@link #syncWorkspaceNow(long)}, threading the job's {@link SyncExecutionHandle} so it
+     * sees per-collection progress and can cancel cooperatively — the shape the manual-trigger
+     * {@code OutlineIntegrationSyncRunner} uses. Workspace-scoped, no bypass — see
+     * {@link #syncWorkspaceNow(long)}.
+     *
+     * <p>{@code type} is forwarded rather than dropped, exactly as the SCM schedulers do: it decides whether
+     * a clean enumeration ends by tombstoning that collection's vanished documents. An {@code INITIAL} pass
+     * (connect-time) still populates the mirror in full but infers no deletions.
+     */
+    public void syncWorkspaceNow(long workspaceId, @Nullable SyncExecutionHandle handle, SyncJobType type) {
+        syncService.syncWorkspace(workspaceId, handle, type);
     }
 
     /** Targeted single-collection sync; workspace-scoped, no bypass — see {@link #syncWorkspaceNow}. */
@@ -124,7 +201,7 @@ public class OutlineDocumentSyncScheduler {
         long workspaceId,
         String eventName,
         String documentId,
-        OutlineDocumentListResponse.@Nullable Meta prefetchedMeta
+        @Nullable OutlineDocumentModel prefetchedMeta
     ) {
         syncService.refreshDocument(workspaceId, eventName, documentId, prefetchedMeta);
     }

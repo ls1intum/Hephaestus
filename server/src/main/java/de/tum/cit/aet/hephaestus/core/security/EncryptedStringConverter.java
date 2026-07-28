@@ -64,7 +64,8 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
 
     /**
      * Canonical constructor (also the unit-test seam): builds the cipher key directly from the
-     * raw inputs. Missing key fails fast in prod, warns elsewhere; a non-32-char key is rejected.
+     * raw inputs. Missing key fails fast in prod, warns elsewhere; a key that is not 32 bytes is
+     * rejected.
      */
     public EncryptedStringConverter(@Nullable String encryptionKey, @Nullable String activeProfiles) {
         if (encryptionKey == null || encryptionKey.isBlank()) {
@@ -85,8 +86,24 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
             // InvalidKeyException on the first encrypt. Fail fast at startup instead.
             byte[] keyBytes = encryptionKey.getBytes(StandardCharsets.UTF_8);
             if (keyBytes.length != 32) {
+                // Report BOTH counts. "32 bytes" alone sends an operator who pasted a 32-character
+                // passphrase with an umlaut in it looking for a 34-character key; "32 characters"
+                // alone is a lie for exactly that operator. Never echo the key itself.
+                int characters = encryptionKey.length();
+                String howToFix =
+                    keyBytes.length == characters
+                        ? "For ASCII, bytes and characters are the same, so that is 32 characters: "
+                        : "This key contains non-ASCII characters, and those cost more than one byte each. " +
+                          "Use ASCII only, exactly 32 characters: ";
                 throw new IllegalArgumentException(
-                    "Encryption key must be exactly 32 bytes (256 bits). Got: " + keyBytes.length
+                    "hephaestus.security.encryption-key (HEPHAESTUS_SECURITY_ENCRYPTION_KEY) must be a " +
+                        "32-byte AES-256 key. Got " +
+                        keyBytes.length +
+                        " bytes from " +
+                        characters +
+                        " characters. " +
+                        howToFix +
+                        "openssl rand -base64 24 | cut -c1-32"
                 );
             }
             this.secretKey = new SecretKeySpec(keyBytes, "AES");

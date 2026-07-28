@@ -13,10 +13,13 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialBundleCon
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
+import de.tum.cit.aet.hephaestus.integration.core.sync.api.ConnectionSyncStatusDTO;
+import de.tum.cit.aet.hephaestus.integration.core.sync.api.SyncResourceStateDTO;
+import de.tum.cit.aet.hephaestus.integration.core.sync.api.TriggerSyncJobRequestDTO;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiException;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineCollectionListResponse;
-import de.tum.cit.aet.hephaestus.integration.outline.connect.OutlineConnectionStatusDTO;
+import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineClientModels;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.MirrorState;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.SyncStatus;
@@ -93,14 +96,10 @@ class OutlineCollectionAdminControllerIntegrationTest extends AbstractWorkspaceI
         // uses the bounded (maxPages) overload, register/sync the plain one — stub both.
         lenient()
             .when(outlineApiClient.listCollections(anyString(), anyString()))
-            .thenReturn(
-                List.of(new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", "col1", null, null, null))
-            );
+            .thenReturn(List.of(OutlineClientModels.collection(COLLECTION_ID, "Design", "col1", null, null, null)));
         lenient()
             .when(outlineApiClient.listCollections(anyString(), anyString(), anyInt()))
-            .thenReturn(
-                List.of(new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", "col1", null, null, null))
-            );
+            .thenReturn(List.of(OutlineClientModels.collection(COLLECTION_ID, "Design", "col1", null, null, null)));
         lenient().when(outlineApiClient.listDocuments(anyString(), anyString(), anyString())).thenReturn(List.of());
         lenient()
             .when(outlineApiClient.listCollectionDocuments(anyString(), anyString(), anyString()))
@@ -134,17 +133,20 @@ class OutlineCollectionAdminControllerIntegrationTest extends AbstractWorkspaceI
             .exchange()
             .expectStatus()
             .isNotFound();
+        // The unified sync-observability endpoints 404 the same way once the connection row is gone.
         webTestClient
             .get()
-            .uri("/workspaces/{slug}/connections/outline/status", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/connections/{id}/sync", workspace.getWorkspaceSlug(), connectionId)
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
             .isNotFound();
         webTestClient
             .post()
-            .uri("/workspaces/{slug}/connections/outline/sync", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/connections/{id}/sync/jobs", workspace.getWorkspaceSlug(), connectionId)
             .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(new TriggerSyncJobRequestDTO(SyncJobType.RECONCILIATION))
             .exchange()
             .expectStatus()
             .isNotFound();
@@ -269,7 +271,7 @@ class OutlineCollectionAdminControllerIntegrationTest extends AbstractWorkspaceI
         assertThat(stored.getState()).isEqualTo(MirrorState.ENABLED);
         // After commit the kicked sync runs (empty catalog in this test) and reconverges the collection
         // to COMPLETE — proving the after-commit kick actually observes the ENABLED+PENDING row it is
-        // meant to sync, rather than racing the not-yet-committed transaction as the old in-tx kick did.
+        // meant to sync, rather than racing the not-yet-committed transaction.
         assertThat(stored.getSyncStatus()).isEqualTo(SyncStatus.COMPLETE);
 
         patchState("no-such-collection", MirrorState.PAUSED).expectStatus().isNotFound();
@@ -347,7 +349,10 @@ class OutlineCollectionAdminControllerIntegrationTest extends AbstractWorkspaceI
 
     @Test
     @WithAdminUser
-    @DisplayName("connection status reports webhook registration, live document count, and last clean pass")
+    @DisplayName(
+        "the unified sync API reports webhook registration, live document count, and per-collection state " +
+            "for Outline (absorbed status/sync endpoints)"
+    )
     void connectionStatusShape() {
         ensureAdminMembership(workspace);
         seedCollection(MirrorState.ENABLED, SyncStatus.COMPLETE);
@@ -356,30 +361,35 @@ class OutlineCollectionAdminControllerIntegrationTest extends AbstractWorkspaceI
         tombstoned.setDeletedAt(java.time.Instant.parse("2026-01-01T00:00:00Z"));
         documentRepository.save(tombstoned);
 
-        OutlineConnectionStatusDTO status = webTestClient
-            .get()
-            .uri("/workspaces/{slug}/connections/outline/status", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
+        ConnectionSyncStatusDTO status = syncStatusRequest()
             .expectStatus()
             .isOk()
-            .expectBody(OutlineConnectionStatusDTO.class)
+            .expectBody(ConnectionSyncStatusDTO.class)
             .returnResult()
             .getResponseBody();
 
         assertThat(status).isNotNull();
         // The seeded connection has no webhook subscription id → not registered.
         assertThat(status.webhookRegistered()).isFalse();
-        // Only the live row counts; the tombstone is excluded.
-        assertThat(status.documentCount()).isEqualTo(1L);
-        // No collection has finished a clean pass yet.
-        assertThat(status.lastSyncedAt()).isNull();
-        // No manual reconcile has been triggered, the seeded collection is ENABLED+COMPLETE, no error.
-        assertThat(status.syncRunning()).isFalse();
-        assertThat(status.pendingCollections()).isZero();
-        assertThat(status.erroredCollections()).isZero();
+        assertThat(status.resourceCounts().total()).isEqualTo(1L);
+        assertThat(status.resourceCounts().errored()).isZero();
 
-        // A pending collection and a sync error show up in the derived counters.
+        List<SyncResourceStateDTO> resources = syncResourcesRequest()
+            .expectStatus()
+            .isOk()
+            .expectBodyList(SyncResourceStateDTO.class)
+            .returnResult()
+            .getResponseBody();
+        assertThat(resources).hasSize(1);
+        SyncResourceStateDTO resource = resources.get(0);
+        // Only the live row counts; the tombstone is excluded.
+        assertThat(resource.itemCount()).isEqualTo(1L);
+        // No collection has finished a clean pass yet (documentsSyncedAt was never stamped by the seed).
+        assertThat(resource.lastSyncedAt()).isNull();
+        assertThat(resource.lastError()).isNull();
+        assertThat(resource.state()).isEqualTo(SyncStatus.COMPLETE.name());
+
+        // A pending collection and a sync error show up in the resource row.
         OutlineCollection stored = collectionRepository
             .findByWorkspaceIdAndConnectionIdAndCollectionId(workspace.getId(), connectionId, COLLECTION_ID)
             .orElseThrow();
@@ -387,30 +397,53 @@ class OutlineCollectionAdminControllerIntegrationTest extends AbstractWorkspaceI
         stored.setLastSyncError("Outline /api/documents.export failed (HTTP 500)");
         collectionRepository.save(stored);
 
-        OutlineConnectionStatusDTO withPending = webTestClient
-            .get()
-            .uri("/workspaces/{slug}/connections/outline/status", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
+        ConnectionSyncStatusDTO withPending = syncStatusRequest()
             .expectStatus()
             .isOk()
-            .expectBody(OutlineConnectionStatusDTO.class)
+            .expectBody(ConnectionSyncStatusDTO.class)
             .returnResult()
             .getResponseBody();
         assertThat(withPending).isNotNull();
-        assertThat(withPending.pendingCollections()).isEqualTo(1L);
-        assertThat(withPending.erroredCollections()).isEqualTo(1L);
+        assertThat(withPending.resourceCounts().errored()).isEqualTo(1L);
 
-        // The manual sync always answers 202 and points at the status monitor above.
+        List<SyncResourceStateDTO> resourcesWithPending = syncResourcesRequest()
+            .expectStatus()
+            .isOk()
+            .expectBodyList(SyncResourceStateDTO.class)
+            .returnResult()
+            .getResponseBody();
+        assertThat(resourcesWithPending).hasSize(1);
+        assertThat(resourcesWithPending.get(0).state()).isEqualTo(SyncStatus.PENDING.name());
+        assertThat(resourcesWithPending.get(0).lastError()).isEqualTo(
+            "Outline /api/documents.export failed (HTTP 500)"
+        );
+
+        // The manual trigger always answers 202.
         webTestClient
             .post()
-            .uri("/workspaces/{slug}/connections/outline/sync", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/connections/{id}/sync/jobs", workspace.getWorkspaceSlug(), connectionId)
             .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(new TriggerSyncJobRequestDTO(SyncJobType.RECONCILIATION))
             .exchange()
             .expectStatus()
-            .isAccepted()
-            .expectHeader()
-            .location("/workspaces/" + workspace.getWorkspaceSlug() + "/connections/outline/status");
+            .isAccepted();
+    }
+
+    private WebTestClient.ResponseSpec syncStatusRequest() {
+        return webTestClient
+            .get()
+            .uri("/workspaces/{slug}/connections/{id}/sync", workspace.getWorkspaceSlug(), connectionId)
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange();
+    }
+
+    private WebTestClient.ResponseSpec syncResourcesRequest() {
+        return webTestClient
+            .get()
+            .uri("/workspaces/{slug}/connections/{id}/sync/resources", workspace.getWorkspaceSlug(), connectionId)
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange();
     }
 
     // --- helpers ---

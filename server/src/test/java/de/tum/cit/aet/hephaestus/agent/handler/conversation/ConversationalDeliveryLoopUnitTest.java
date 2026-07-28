@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.handler.conversation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -12,6 +14,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.handler.FeedbackLedgerRecorder;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
@@ -19,6 +22,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepositor
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacement;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
@@ -135,16 +139,42 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
 
         int prepared = preparer().prepare(job, WS, admitted);
 
+        // Three are raised; the two over the cap are withheld — and a withheld locus the router admitted still
+        // gets a row, or it would read as feedback the developer saw and ignored.
         assertThat(prepared).isEqualTo(3);
         ArgumentCaptor<Feedback> saved = ArgumentCaptor.forClass(Feedback.class);
-        verify(feedbackRepository, times(3)).save(saved.capture());
+        verify(feedbackRepository, times(5)).save(saved.capture());
         assertThat(saved.getAllValues()).allSatisfy(f -> {
             assertThat(f.getChannel()).isEqualTo(FeedbackChannel.CONVERSATION);
-            assertThat(f.getDeliveryState()).isEqualTo(FeedbackDeliveryState.PREPARED);
             assertThat(f.getBody()).isNull();
             assertThat(f.getRecipientUserId()).isEqualTo(RECIPIENT);
         });
-        assertThat(saved.getAllValues()).extracting(Feedback::getPosition).containsExactly(3000, 3001, 3002);
+        assertThat(saved.getAllValues())
+            .extracting(Feedback::getDeliveryState, Feedback::getSuppressionReason, Feedback::getPosition)
+            .containsExactly(
+                tuple(FeedbackDeliveryState.PREPARED, null, 3000),
+                tuple(FeedbackDeliveryState.PREPARED, null, 3001),
+                tuple(FeedbackDeliveryState.PREPARED, null, 3002),
+                tuple(FeedbackDeliveryState.SUPPRESSED, FeedbackSuppressionReason.VOLUME_CAPPED, 3003),
+                tuple(FeedbackDeliveryState.SUPPRESSED, FeedbackSuppressionReason.VOLUME_CAPPED, 3004)
+            );
+    }
+
+    @Test
+    void preparerFailsLoud_ratherThanOverflowItsOrdinalBand() {
+        // Every admitted observation takes a slot now, so a pathological job could run the band into the next
+        // one — where the (agent_job_id, position) guard would read a foreign row as "already recorded" and
+        // drop the write. That is the silent drop this whole ledger exists to prevent, so it must be loud.
+        UUID job = UUID.randomUUID();
+        List<Observation> admitted = new ArrayList<>();
+        for (int i = 0; i < FeedbackLedgerRecorder.UNIT_ORDINAL_BAND_WIDTH + 1; i++) {
+            admitted.add(problem(null, null, 0.5f));
+        }
+
+        assertThatThrownBy(() -> preparer().prepare(job, WS, admitted))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("ordinal band");
+        verify(feedbackRepository, never()).save(any());
     }
 
     @Test

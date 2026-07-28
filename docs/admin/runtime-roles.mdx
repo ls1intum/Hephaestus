@@ -48,23 +48,78 @@ Split the webhook receiver out when:
 
 Each role ships with a Spring profile YAML that flips the other two flags off and prunes the bean graph:
 
-- `application-worker.yml` — `runtime.server=false`, `runtime.webhook=false`, `web-application-type=none`, OAuth2 autoconfigure excluded, JPA still enabled.
-- `application-webhook.yml` — `runtime.server=false`, `runtime.worker=false`, sync NATS enabled, agent NATS disabled.
+- `application-worker.yml` — `runtime.server=false`, `runtime.webhook=false`, OAuth2 autoconfigure excluded, JPA still enabled. The servlet container stays on (`web-application-type=servlet`) with a real `server.port`: the internal LLM proxy (`/internal/llm/**`, the only credential path a sandbox has) is served with the worker/sandbox capability, and no `ports:`/Traefik mapping exposes it externally.
+- `application-webhook.yml` — `runtime.server=false`, `runtime.worker=false`, sync NATS enabled, agent job queue disabled (webhook pods never claim jobs).
 - No `application-server.yml` — the monolith default _is_ the server profile.
 
 To deploy a worker pod set `SPRING_PROFILES_ACTIVE=prod,worker` and point `HEPHAESTUS_HUB_URL` at the app pod's WSS endpoint. See `docker/compose.app.yaml` for a working compose template.
 
 ## Configuration cheatsheet
 
-| Property | Server | Worker | Webhook |
-| --- | --- | --- | --- |
-| `hephaestus.runtime.{role}.enabled` | true | true | true |
-| `hephaestus.workspace.init-default` | true | false | false |
-| `hephaestus.git.enabled` | true | true | false |
-| `hephaestus.sync.nats.enabled` | true | false | true |
-| `hephaestus.agent.nats.enabled` | true | true | false |
-| `hephaestus.sandbox.enabled` | true | true | false |
-| Needs user-auth wiring | yes | no | no |
+Each cell is the value a pod boots with when the operator sets **no** env var for it — the profile
+overlay's value where the overlay pins one, otherwise the base default.
+
+| Property | Server | Worker | Webhook | Set by |
+| --- | --- | --- | --- | --- |
+| `hephaestus.runtime.server.enabled` | true | **false** | **false** | profile overlay |
+| `hephaestus.runtime.worker.enabled` | true | true | **false** | profile overlay |
+| `hephaestus.runtime.webhook.enabled` | true | **false** | true | profile overlay |
+| `hephaestus.workspace.init-default` | false | false | false | `prod` profile |
+| `hephaestus.git.enabled` | false | false | false | env default |
+| `hephaestus.sync.nats.enabled` | false | **false** | **true** | env default / profile overlay |
+| `hephaestus.agent.enabled` | false | false | false | env default |
+| Needs user-auth wiring | yes | no | no | role gating |
+
+Bolded cells are pinned by that role's profile overlay and are not the base default. Reading the
+three `runtime.*` rows down a column gives that pod's role set: the `worker` overlay turns the server
+and webhook roles off, the `webhook` overlay turns server and worker off, and the monolith (no
+overlay) runs all three.
+
+Four rows are **not** role-differentiated — they are instance-wide defaults, shown per role only
+because operators ask per role: `init-default` is `false` in the `prod` profile for every role, and
+`git.enabled` (`GIT_CHECKOUT_ENABLED`), `agent.enabled` (`AGENT_ENABLED`) and `Needs user-auth wiring`
+are unaffected by which overlay is active. The two env-var flags in particular default `false` on
+**every** role until the operator sets the variable — no profile turns work on for you. There is no
+`hephaestus.sandbox.enabled`: that flag was
+retired (an arch test now forbids reintroducing it) because the Docker sandbox IS the worker
+capability — it follows `hephaestus.runtime.worker.enabled`.
+
+One row reads differently from what a bare `docker compose up` produces, because the shipped compose
+file sets the env var the base default leaves off:
+
+- `sync.nats.enabled` is `${NATS_ENABLED:false}` in `application-prod.yml`, but `docker/compose.app.yaml`
+  passes `NATS_ENABLED: ${NATS_ENABLED:-true}` to `application-server` — so the compose server pod runs
+  with NATS **on**. The `webhook` overlay pins it `true` regardless (it needs the shared `Connection`
+  bean); the `worker` overlay pins it `false` (the job queue is PostgreSQL, ADR 0025).
+
+`hephaestus.agent.enabled` (`AGENT_ENABLED`) gates three things that must agree, or a split
+deployment silently does half its job. They do **not** share a gate:
+
+- **Submission** (`AgentJobEventListener` / `IssueAgentJobEventListener` / `BotCommandProcessor`,
+  which turn PR/issue/bot events into `agent_job` rows) needs only this flag. It wires on *any* pod
+  where the flag is `true`, including a `prod,worker` pod — a worker with the flag on submits as well
+  as executes.
+- **Orphan recovery** (`AgentJobZombieSweeper`, which reclaims a dead worker's stuck jobs) needs this
+  flag **and** the server role (`@ConditionalOnServerRole`), so it does not double-run on a
+  dedicated worker pod.
+- **Execution** (`AgentJobExecutor`, the poll loop that claims and runs jobs) needs this flag **and**
+  the worker role.
+
+`AGENT_ENABLED` is `false` on every role until you set it, however the pod is started. Set it to
+`true` on **every** pod that needs any of the three — in the split-pod topology that is both
+`application-server` (submission + recovery) and `application-worker` (execution). A pod you never set
+it on claims nothing and spends nothing.
+
+Interactive mentor turns are different from queued practice-review jobs: the HTTP/SSE request and
+its reusable sandbox live on the **application-server replica that accepted the request**. Keep the
+worker capability and Docker access enabled on application-server even in a split deployment. A
+dedicated `application-worker` adds queue capacity but does not receive mentor HTTP turns; when
+`AGENT_ENABLED=true`, every worker-capable replica may claim queued practice jobs.
+`AGENT_ENABLED=false` may disable practice jobs without disabling mentor's sandbox or LLM proxy.
+The compose topology keeps sticky workspace affinity so consecutive turns can reuse the same warm
+sandbox. A change to its model, upstream route, image, prompt/runtime files, or security limits
+closes that sandbox and creates a compatible replacement instead of silently reusing stale runtime
+state; per-turn context is refreshed through the runner callback without restarting it.
 
 ## Worker pod env vars
 
@@ -74,13 +129,31 @@ The bare minimum to boot a worker against a remote hub:
 SPRING_PROFILES_ACTIVE=prod,worker
 HEPHAESTUS_HUB_URL=wss://app.example.com/api/workers/connect
 HEPHAESTUS_WORKER_REGISTRATION_TOKEN=<shared bootstrap secret>
-HEPHAESTUS_WORKER_HUB_SIGNING_KEY=<RSA-2048 PEM>     # only on the app pod
-HEPHAESTUS_WORKER_LLM_BASE_URL=https://gpu.example.com
-HEPHAESTUS_WORKER_LLM_API_KEY=<llm provider key>
 HEPHAESTUS_WORKER_DRAIN_TIMEOUT=5m
+AGENT_ENABLED=true
 ```
 
-Capacity (`HEPHAESTUS_WORKER_REVIEW_MAX`, `HEPHAESTUS_WORKER_MENTOR_MAX`) defaults to `auto` and auto-sizes from `Runtime.availableProcessors()`. Override only if the host is noisy.
+Drop the last line for a drain-only or standby pod: without it the worker boots, registers, and claims
+nothing.
+
+No LLM env vars are needed: the LLM proxy runs in-process on this pod (it follows the worker/sandbox
+capability, not `AGENT_ENABLED`) and reads providers
+from the same instance/workspace catalog as the app pod. Register providers at runtime under
+Instance admin → AI models, or per-workspace under that workspace's own AI models page — never via
+env var.
+
+Capacity defaults to `auto` and auto-sizes from `Runtime.availableProcessors()`. Override only if the
+host is noisy — and mind the name: the JVM binds
+`HEPHAESTUS_WORKER_CAPACITY_REVIEW_MAX` / `HEPHAESTUS_WORKER_CAPACITY_MENTOR_MAX`. The shorter
+`HEPHAESTUS_WORKER_REVIEW_MAX` / `_MENTOR_MAX` are **compose-file aliases only**
+(`docker/compose.app.yaml` translates them); set them on a K8s or systemd deployment and they are
+silently ignored.
+
+The app pod signs worker tokens from a key *ring*, not a single value:
+`hephaestus.worker.hub.token.keys[0].kid` + `.private-key` and
+`hephaestus.worker.hub.token.active-kid`. Indexed list binding has no single env-var form, so
+configure it through a mounted YAML/config-tree rather than a flat variable; unset, the app logs a
+warning and generates an ephemeral key that invalidates every worker token on restart.
 
 ## Graceful drain
 
@@ -88,14 +161,21 @@ On SIGTERM the worker:
 
 1. Sends `Heartbeat{draining=true}` to the hub so the dispatcher stops claiming new jobs for it.
 2. Waits up to `hephaestus.worker.drain.timeout` (default 5 min) for in-flight jobs to finish.
-3. Cancels remaining jobs cleanly — the NATS consumer redelivers via MaxDeliver.
+3. Stops the containers of whatever is still running and hands each job back to the queue — a
+   worker-fenced requeue (`RUNNING → QUEUED`, retry-capped), not a plain cancel, so another worker's
+   poll picks it back up, bounded by `AGENT_MAX_RETRIES`. Only a job that has already exhausted its
+   retry budget (or lost the fence to a concurrent user-cancel) ends up terminally
+   cancelled/failed instead. `timeout=0` (immediate drain) skips step 2 and applies this same
+   requeue-first behaviour right away.
 
 The compose template pins `stop_grace_period: 6m` to give the JVM 60s of headroom before Docker SIGKILLs.
 
 ## See also
 
-The full design rationale lives in the architecture decision records under `docs/decisions/`:
+The full design rationale lives in the architecture decision records, which are kept in the
+repository rather than on this site:
 
-- **ADR 0005** — `0005-two-role-runtime-via-conditional-on-property.md`. Original two-role design.
-- **ADR 0008** — `0008-webhook-runtime-role.md`. Webhook role rationale.
-- **ADR 0009** — `0009-worker-runtime-substrate-wss-control-channel.md`. Worker substrate + WSS.
+- [**ADR 0005**](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0005-two-role-runtime-via-conditional-on-property.md) — original two-role design.
+- [**ADR 0008**](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0008-webhook-runtime-role.md) — webhook role rationale.
+- [**ADR 0009**](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0009-worker-runtime-substrate-wss-control-channel.md) — worker substrate + WSS control channel.
+- [**ADR 0025**](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0025-agent-job-queue-on-postgresql.md) — agent job queue moved off NATS onto PostgreSQL.

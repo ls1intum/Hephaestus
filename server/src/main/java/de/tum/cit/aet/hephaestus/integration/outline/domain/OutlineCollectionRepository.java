@@ -21,6 +21,9 @@ public interface OutlineCollectionRepository extends JpaRepository<OutlineCollec
 
     List<OutlineCollection> findByWorkspaceIdOrderByCreatedAtAsc(Long workspaceId);
 
+    /** One connection's registered collections — the unified sync-observability resource rows. */
+    List<OutlineCollection> findByWorkspaceIdAndConnectionId(Long workspaceId, Long connectionId);
+
     Optional<OutlineCollection> findByWorkspaceIdAndConnectionIdAndCollectionId(
         Long workspaceId,
         Long connectionId,

@@ -16,7 +16,7 @@ deployment — distinct from a **workspace admin**, whose powers are scoped to a
   (`app_admin`/`admin`) that might arrive via a grantable `account_feature` row, so an
   `/admin/users`-granted flag can never escalate to instance admin.
 - First-admin bootstrap (no DB seed required) is covered separately in the
-  `docs/runbooks/auth-cutover.md` runbook.
+  [auth-cutover runbook](https://github.com/ls1intum/Hephaestus/blob/main/docs/runbooks/auth-cutover.md#first-instance-admin-bootstrap).
 
 ## The shell
 
@@ -38,9 +38,15 @@ All under `/admin`, all gated by `hasAuthority('app_admin')`:
 | `PATCH /admin/users/{id}` (`adminUpdateUser`) | Change an account's app role (last-admin guard; can't self-demote; **step-up gated**) |
 | `DELETE /admin/users/{id}/sessions` (`adminRevokeUserSessions`) | **Force sign-out**: revoke all of an account's active sessions. Because an impersonation token carries the target's account id as its subject, this also ends any in-flight impersonation **of** that account. Audited as `JWT_REVOKED`. |
 | `POST /auth/impersonate` (`impersonate`) | Begin impersonating an account (mandatory reason; no self / no admin→admin; read-only by default via `ImpersonationGuard`; **step-up gated**) |
-| `POST|PATCH|DELETE /admin/login-providers[/{id}]` | Manage the instance's sign-in providers. **Step-up gated** and audited as `LOGIN_PROVIDER_CHANGED` — a provider's `baseUrl` is the IdP this instance trusts. |
+| `POST|PATCH|DELETE /admin/login-providers[/{id}]` | Manage the instance's sign-in providers. **Step-up gated** and audited as `LOGIN_PROVIDER_CREATED` / `_UPDATED` / `_DELETED` — a provider's `baseUrl` is the IdP this instance trusts. |
 | `GET /admin/workspaces` (`adminListWorkspaces`) | **Metadata-only** overview of every workspace (slug, status, provider, owner login, member count, created-at). Cross-tenant via `@WorkspaceAgnostic`; **no tenant content** — reaching content is the audited impersonation path. |
 | `GET /admin/audit` (`adminListAuthEvents`) | Read-only viewer over the append-only `auth_event` log (logins, impersonation, role changes, deletions). Paged, newest-first, filterable by event type; surfaces the `(account_id, acting_account_id)` pair so impersonated actions stay attributable. |
+| `GET /admin/config-audit` (`adminListConfigAuditEvents`) | Read-only viewer over `config_audit_event` — who changed which workspace setting, when, and from what to what. Rows are immutable inside the retention window (DB trigger); `ConfigAuditRetentionJob` is the only way one leaves. |
+| `/admin/llm/connections*` (`adminListLlmConnections`, `adminCreateLlmConnection`, `adminGetLlmConnection`, `adminUpdateLlmConnection`, `adminDeleteLlmConnection`, `adminProbeLlmConnection`, `adminProbeLlmConnectionDraft`) | The instance LLM connection catalog. Routing identity (base URL, wire API, auth mode) is immutable after create; probe tests a saved or draft connection before anything is enabled. |
+| `/admin/llm/models*` (`adminListLlmModels`, `adminCreateLlmModel`, `adminGetLlmModel`, `adminUpdateLlmModel`, `adminDeleteLlmModel`, `adminUpdateLlmModelPrice`, `adminUpdateLlmModelSharing`) | Models under a connection, their prices (temporal supersede-on-insert into `llm_model_price`), and who may use them — public, or granted per workspace. |
+| `GET`/`PUT /admin/llm/settings` (`adminGetLlmSettings`, `adminUpdateLlmSettings`) | The instance LLM settings singleton: egress host allowlist and `allowWorkspaceConnections`, the switch that lets workspaces register their own provider connections. |
+| `GET /admin/llm/usage` (`adminGetLlmUsageReport`) | Cross-workspace monthly LLM usage and budget report, split by purse (shared models vs each workspace's own provider). |
+| `PUT /admin/workspaces/{workspaceSlug}/llm/budget` (`adminUpdateWorkspaceLlmBudget`) | Set **or clear** a workspace's monthly cap on **shared-model** spend — clearing is `PUT` with `monthlyBudgetUsd: null`, not `DELETE` (there is no `DELETE` mapping; it returns 405). The workspace's cap on its own provider is a different endpoint under `/workspaces/**`, set by the workspace's own admin. |
 
 ## Step-up re-auth gate (issue #1323)
 
@@ -120,7 +126,11 @@ per-request log of what they did. Reaching tenant *content* attributably is the 
   countdown in `ImpersonationBanner` is a UX nicety).
 - **`APP_AUDITOR`** read-only tier: cut as YAGNI for a single-operator instance; the enum + authority
   design makes later reintroduction ~1 day.
-- **Instance-provided LLM resources (BYO vs pooled)**: deferred. The needed invariants (PROXY mode,
-  no-internet `NetworkPolicy`, server-side key injection, operator-global override) already ship;
-  per-workspace budgets should be **bought** via self-hosted LiteLLM virtual keys behind the existing
-  proxy, not built as a bespoke entity/precedence/metering subsystem.
+- ~~**Instance-provided LLM resources (BYO vs pooled)**~~: **shipped** (#1368). The plan recorded here
+  was to buy per-workspace budgets via self-hosted LiteLLM virtual keys rather than build a metering
+  subsystem; that was reversed. An instance admin now registers connections and models under
+  `/admin/llm/*`, prices them, and grants them to workspaces; workspaces may add their own connection
+  when instance settings permit it. Usage is metered into `llm_usage_event` and capped by two
+  independent monthly budgets — the instance's cap on shared-model spend and the workspace's cap on
+  its own provider — which are never summed. See
+  [ADR 0026](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0026-per-purpose-agent-bindings-and-llm-governance.md).

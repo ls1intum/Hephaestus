@@ -20,7 +20,10 @@ import org.springframework.context.annotation.Import;
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(name = RuntimeRole.WEBHOOK_PROPERTY, havingValue = "true", matchIfMissing = true)
-@ConditionalOnBean(Connection.class)
+// Gate on the specifically-named webhook/sync connection, NOT any Connection: matching an arbitrary
+// Connection bean would activate these producers while `WebhookProducerBeans` still requires
+// @Qualifier("natsConnection"), failing the whole context.
+@ConditionalOnBean(name = "natsConnection")
 @Import(WebhookProducerBeans.class)
 public class WebhookConfiguration {
 

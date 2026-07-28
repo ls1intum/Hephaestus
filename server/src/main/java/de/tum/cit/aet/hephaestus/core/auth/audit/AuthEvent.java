@@ -115,8 +115,20 @@ public class AuthEvent {
         RESEARCH_CONSENT_REVOKED,
         /** An instance admin reached a workspace via elevation, not membership. De-duplicated per window. */
         WORKSPACE_ELEVATION,
-        /** An instance admin created / updated / deleted a {@code login_provider}. */
-        LOGIN_PROVIDER_CHANGED,
+        // Instance LLM catalog: GLOBAL, so config_audit_event cannot carry it (workspace_id is NOT NULL).
+        LLM_CONNECTION_CREATED,
+        LLM_CONNECTION_UPDATED,
+        LLM_CONNECTION_DELETED,
+        LLM_MODEL_CREATED,
+        LLM_MODEL_UPDATED,
+        LLM_MODEL_DELETED,
+        LLM_MODEL_PRICE_CHANGED,
+        LLM_MODEL_SHARING_CHANGED,
+        LLM_SETTINGS_CHANGED,
+        // Instance login providers: GLOBAL, and they change how everyone signs in to this instance.
+        LOGIN_PROVIDER_CREATED,
+        LOGIN_PROVIDER_UPDATED,
+        LOGIN_PROVIDER_DELETED,
     }
 
     public enum Result {

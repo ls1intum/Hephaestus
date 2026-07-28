@@ -1,0 +1,69 @@
+---
+id: backup-restore
+sidebar_position: 3
+title: Backup & Restore
+description: What to back up on a self-hosted instance, and how to restore it.
+---
+
+For the [self-host compose stack](./install). The database holds irreplaceable derived data
+(observations, the feedback ledger); everything else is re-creatable.
+
+## What to back up
+
+| Data | Where | Priority |
+| --- | --- | --- |
+| PostgreSQL database | `postgresql-data` volume | **Everything.** Accounts, workspaces, observations, feedback, encrypted provider tokens, JWT signing keys. |
+| `.env` | `/opt/hephaestus/docker/self-host/.env` | **Equal priority.** `HEPHAESTUS_SECURITY_ENCRYPTION_KEY` encrypts the tokens *inside* the database backup — a database backup without the key is partially unreadable (all stored provider credentials are lost, and all sessions invalidate). |
+| TLS certificates | `./letsencrypt/` | Optional — Let's Encrypt re-issues on first boot (rate limits permitting). |
+| Git checkout cache | `git-repos` volume | Skip — re-cloned on demand. |
+| NATS JetStream | `nats-data` volume | Skip — a transient event buffer, not a source of truth. |
+
+## Backup
+
+Logical dump while everything runs (safe — Postgres MVCC gives a consistent snapshot):
+
+```bash
+cd /opt/hephaestus/docker/self-host
+docker compose exec -T postgres pg_dump -U root -Fc hephaestus \
+  > hephaestus-$(date +%F).dump
+cp .env hephaestus-$(date +%F).env
+```
+
+Ship both files **off the host**, encrypted. Cron it daily; test-restore it at least once (below).
+
+## Restore
+
+On a fresh host, complete install steps 1–2 first, restoring the saved `.env` (same
+`POSTGRES_PASSWORD`, same `HEPHAESTUS_SECURITY_ENCRYPTION_KEY` — non-negotiable). Then:
+
+```bash
+cd /opt/hephaestus/docker/self-host
+docker compose up -d postgres                      # database only
+docker compose stop application-server webhook-server 2>/dev/null || true
+
+docker compose exec -T postgres dropdb   -U root --if-exists hephaestus
+docker compose exec -T postgres createdb -U root hephaestus
+docker compose exec -T postgres pg_restore -U root -d hephaestus --no-owner \
+  < hephaestus-YYYY-MM-DD.dump
+
+docker compose up -d                               # full stack
+```
+
+Verify: sign in, open a workspace, check recent activity is present up to the backup
+timestamp.
+
+### After a point-in-time restore
+
+- **Sessions:** users signed in after the backup was taken must sign in again. If the
+  restored `jwt_signing_key` table is unusable, truncate it and restart — a fresh key is
+  auto-seeded and everyone re-logs-in. No data loss beyond sessions.
+- **NATS JetStream:** the stream on `nats-data` may hold events the restored database has
+  already processed (or never saw). Webhook ingest deduplicates by delivery id and
+  idempotency keys, so replays are absorbed on ingest; the end-to-end redelivery-safety
+  drill (including whether to reset consumers after a restore) is part of
+  [#1370](https://github.com/ls1intum/Hephaestus/issues/1370). The conservative option
+  after a restore from an old backup: `docker compose down`,
+  `docker volume rm hephaestus_nats-data`, `docker compose up -d` — events in the gap are
+  re-fetched by the scheduled sync.
+- **Restore into an older app version:** don't. Restore with the same `IMAGE_TAG` the
+  backup was taken from, then upgrade.

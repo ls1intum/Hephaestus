@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.List;
@@ -144,13 +145,38 @@ class IssueReviewHandlerTest extends BaseUnitTest {
         }
 
         private DeliveryContent note() {
-            return new DeliveryContent("One thing to tighten: add acceptance criteria.", List.of());
+            return new DeliveryContent("One thing to tighten: add acceptance criteria.", List.of(), List.of());
         }
 
         @Test
         void closedIssue_isSuppressed_neverPosts() {
-            handler.postIssueNote(issueJob("CLOSED"), note());
+            AgentJob job = issueJob("CLOSED");
+            DeliveryContent delivery = note();
+
+            handler.postIssueNote(job, delivery);
+
             verify(commentPoster, never()).postIssueFormattedBody(any(), any());
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                eq(job),
+                eq(delivery),
+                eq(FeedbackSuppressionReason.ARTIFACT_CLOSED)
+            );
+        }
+
+        @Test
+        void blankAfterSanitize_isSuppressed_withEmptyAfterSanitizeReason() {
+            // Issues have no inline lane: a body that sanitises to blank means nothing reached the developer.
+            AgentJob job = issueJob("OPEN");
+            DeliveryContent delivery = new DeliveryContent("", List.of(), List.of());
+
+            handler.postIssueNote(job, delivery);
+
+            verify(commentPoster, never()).postIssueFormattedBody(any(), any());
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                eq(job),
+                eq(delivery),
+                eq(FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE)
+            );
         }
 
         @Test

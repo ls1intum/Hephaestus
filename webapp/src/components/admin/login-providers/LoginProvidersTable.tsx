@@ -46,8 +46,7 @@ interface LoginProvidersTableProps {
 	error?: unknown;
 	/** Refetch the provider list after a failure. */
 	onRetry?: () => void;
-	/** Registration id of the row with a mutation in flight (toggle / edit / delete). */
-	mutatingId: string | null;
+	mutatingIds: ReadonlySet<string>;
 	onEdit: (provider: LoginProviderView) => void;
 	onToggleEnabled: (provider: LoginProviderView, enabled: boolean) => void;
 	onDelete: (provider: LoginProviderView) => void;
@@ -63,7 +62,7 @@ export function LoginProvidersTable({
 	isError,
 	error,
 	onRetry,
-	mutatingId,
+	mutatingIds,
 	onEdit,
 	onToggleEnabled,
 	onDelete,
@@ -72,7 +71,7 @@ export function LoginProvidersTable({
 	// ONE delete dialog for the whole table, driven by the row it targets — a dialog per row means N
 	// portals mounted for a single, rare action.
 	const [deleting, setDeleting] = useState<LoginProviderView | null>(null);
-	const isDeletePending = deleting != null && mutatingId === deleting.registrationId;
+	const isDeletePending = deleting != null && mutatingIds.has(deleting.registrationId);
 
 	// The delete succeeded exactly when the row leaves the list; close on that, so a *failed* delete
 	// (row still present, mutation settled) keeps the dialog open to retry.
@@ -142,7 +141,7 @@ export function LoginProvidersTable({
 				</TableHeader>
 				<TableBody>
 					{providers.map((provider) => {
-						const busy = mutatingId === provider.registrationId;
+						const busy = mutatingIds.has(provider.registrationId);
 						const redirectInputId = `lp-redirect-${provider.registrationId}`;
 						return (
 							<TableRow key={provider.registrationId}>
@@ -230,8 +229,9 @@ export function LoginProvidersTable({
 
 			<AlertDialog
 				open={deleting != null}
+				// Dismissal is allowed even while the DELETE is in flight (ADR 0027).
 				onOpenChange={(open) => {
-					if (!open && !isDeletePending) setDeleting(null);
+					if (!open) setDeleting(null);
 				}}
 			>
 				<AlertDialogContent>
@@ -243,7 +243,7 @@ export function LoginProvidersTable({
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
-						<AlertDialogCancel disabled={isDeletePending}>Cancel</AlertDialogCancel>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
 						<AlertDialogAction
 							variant="destructive"
 							disabled={isDeletePending}

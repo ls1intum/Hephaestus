@@ -22,85 +22,54 @@ public interface RateLimitTracker {
     /**
      * Updates rate limit state from a GraphQL response for a specific scope.
      *
-     * @param scopeId the scope that made the API call
-     * @param response the GraphQL response containing rate limit data
      * @return the extracted rate limit info, or null if not present
      */
     @Nullable
     GHRateLimit updateFromResponse(Long scopeId, @Nullable ClientGraphQlResponse response);
 
     /**
-     * Gets the remaining rate limit points for a scope.
+     * Gets the remaining rate limit points to throttle against for a scope.
      *
-     * <p>Returns a default value (5000) if the scope has never been updated,
-     * which is safe for first-sync scenarios.
+     * <p>This is a <b>decision</b> API, not a reporting one. It falls back to a conservative assumed
+     * ceiling when the scope has never been observed, and treats a closed window as "assume full budget"
+     * so sync does not stall on stale data. Neither assumption may be displayed — see
+     * {@link de.tum.cit.aet.hephaestus.integration.core.spi.RateLimitSnapshot} for the honesty rule that
+     * governs the reporting path.
      *
-     * @param scopeId the scope to check
-     * @return remaining points, or default if unknown
+     * @return remaining points, or the assumed value if unknown
      */
     int getRemaining(Long scopeId);
 
     /**
-     * Gets the total rate limit for a scope.
+     * Falls back to the assumed ceiling when unobserved. A decision API — see {@link #getRemaining} on
+     * why its fallback must never be displayed.
      *
-     * @param scopeId the scope to check
      * @return total limit points per hour
      */
     int getLimit(Long scopeId);
 
-    /**
-     * Checks if the rate limit is critically low for a scope.
-     *
-     * <p>Critical means we should stop making requests immediately
-     * to avoid exhausting the limit entirely.
-     *
-     * @param scopeId the scope to check
-     * @return true if remaining points are below critical threshold
-     */
+    /** Critical means requests should stop immediately to avoid exhausting the limit entirely. */
     boolean isCritical(Long scopeId);
 
-    /**
-     * Checks if the rate limit is below the low threshold for a scope.
-     *
-     * <p>Low means we should consider throttling or skipping non-essential
-     * operations like backfill.
-     *
-     * @param scopeId the scope to check
-     * @return true if remaining points are below low threshold
-     */
+    /** Low means callers should consider throttling or skipping non-essential operations like backfill. */
     boolean isLow(Long scopeId);
 
     /**
-     * Waits if the rate limit is critical, using the scope's reset time.
+     * Blocks the calling thread until either the rate limit resets or the maximum wait duration
+     * (5 minutes) is reached.
      *
-     * <p>This blocks the calling thread until either:
-     * <ul>
-     *   <li>The rate limit resets</li>
-     *   <li>The maximum wait duration (5 minutes) is reached</li>
-     * </ul>
-     *
-     * @param scopeId the scope to check
      * @return true if waited, false if no wait was needed
      * @throws InterruptedException if interrupted while waiting
      */
     boolean waitIfNeeded(Long scopeId) throws InterruptedException;
 
-    /**
-     * Gets the reset time for a scope's rate limit.
-     *
-     * @param scopeId the scope to check
-     * @return reset time, or null if unknown
-     */
     @Nullable
     Instant getResetAt(Long scopeId);
 
     /**
-     * Gets recommended delay based on rate limit state for a scope.
+     * When rate limit is low, provides adaptive throttling that distributes remaining points evenly
+     * until reset.
      *
-     * <p>When rate limit is low, this provides adaptive throttling that
-     * distributes remaining points evenly until reset.
-     *
-     * @param scopeId the scope to check
      * @return recommended delay, or Duration.ZERO if no throttling needed
      */
     Duration getRecommendedDelay(Long scopeId);

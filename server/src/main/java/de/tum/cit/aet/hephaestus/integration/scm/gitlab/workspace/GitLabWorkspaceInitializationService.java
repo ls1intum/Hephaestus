@@ -23,7 +23,6 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContextHolder;
-import de.tum.cit.aet.hephaestus.workspace.events.WorkspaceCreatedEvent;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -33,12 +32,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.context.event.EventListener;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -93,6 +92,7 @@ public class GitLabWorkspaceInitializationService {
     private final ObjectProvider<GitLabSyncServiceHolder> gitLabSyncServiceHolderProvider;
     private final ObjectProvider<GitLabWebhookService> gitLabWebhookServiceProvider;
     private final ObjectProvider<GitLabRateLimitTracker> rateLimitTrackerProvider;
+    private final ObjectProvider<GitLabWorkspaceDataSyncTrigger> dataSyncTriggerProvider;
 
     // Authoritative source for per-workspace integration config (server URL, PAT presence).
     private final ConnectionService connectionService;
@@ -112,6 +112,7 @@ public class GitLabWorkspaceInitializationService {
         ObjectProvider<GitLabSyncServiceHolder> gitLabSyncServiceHolderProvider,
         ObjectProvider<GitLabWebhookService> gitLabWebhookServiceProvider,
         ObjectProvider<GitLabRateLimitTracker> rateLimitTrackerProvider,
+        ObjectProvider<GitLabWorkspaceDataSyncTrigger> dataSyncTriggerProvider,
         ConnectionService connectionService,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
@@ -126,16 +127,9 @@ public class GitLabWorkspaceInitializationService {
         this.gitLabSyncServiceHolderProvider = gitLabSyncServiceHolderProvider;
         this.gitLabWebhookServiceProvider = gitLabWebhookServiceProvider;
         this.rateLimitTrackerProvider = rateLimitTrackerProvider;
+        this.dataSyncTriggerProvider = dataSyncTriggerProvider;
         this.connectionService = connectionService;
         this.monitoringExecutor = monitoringExecutor;
-    }
-
-    /** Subscribes to workspace-creation events and dispatches GitLab-side init for GITLAB rows. */
-    @EventListener
-    public void onWorkspaceCreated(WorkspaceCreatedEvent event) {
-        if (event.kind() == IntegrationKind.GITLAB) {
-            initializeAsync(event.workspaceId());
-        }
     }
 
     /**
@@ -165,8 +159,7 @@ public class GitLabWorkspaceInitializationService {
                 );
                 WorkspaceContextHolder.setContext(context);
                 try {
-                    initialize(workspace);
-                    syncFullData(workspace);
+                    dataSyncTriggerProvider.getObject().syncAllRepositories(workspaceId);
                     startNatsConsumer(workspace);
                 } finally {
                     WorkspaceContextHolder.clearContext();
@@ -310,10 +303,9 @@ public class GitLabWorkspaceInitializationService {
         }
 
         try {
-            // Pass workspace.serverUrl so per-instance repos get stamped with the matching
-            // git_provider row instead of falling back to the global default (which silently
-            // fuses cross-instance identities under gitlab.com). Live-run finding 2026-05-25.
-            // The server URL now lives on the GitLab Connection's config, not on Workspace.
+            // Pass the connection's server URL so per-instance repos get stamped with the matching
+            // git_provider row instead of falling back to the global default (which silently fuses
+            // cross-instance identities under gitlab.com).
             String serverUrl = connectionService
                 .findActiveGitLabConfig(workspace.getId())
                 .map(ConnectionConfig.GitLabConfig::serverUrl)
@@ -437,6 +429,18 @@ public class GitLabWorkspaceInitializationService {
      * startup (from {@link WorkspaceActivationService#activateWorkspace}).
      */
     public void syncFullData(Workspace workspace) {
+        syncFullData(workspace, () -> false);
+    }
+
+    /**
+     * Same as {@link #syncFullData(Workspace)}, but cooperatively cancellable — used by
+     * {@code GitlabIntegrationSyncRunner} so a {@code SyncJob} cancel request can stop the pass
+     * between repositories rather than running to completion. {@code cancelled} is polled at the
+     * top of the per-repository loop in {@link #syncGitLabRepositories}, which dominates the
+     * runtime of a full sync; the membership/issue-type/teams phases that bookend the loop are
+     * comparatively cheap and are not individually cancellable.
+     */
+    public void syncFullData(Workspace workspace, BooleanSupplier cancelled) {
         var gitLabServices = gitLabSyncServiceHolderProvider.getIfAvailable();
         if (gitLabServices == null) {
             log.debug(
@@ -522,9 +526,9 @@ public class GitLabWorkspaceInitializationService {
 
             // Build a snapshot of commit→MR linker work to perform in a second pass, so a
             // commit whose SHA appears on an MR in a sibling repo can still be linked after
-            // all repos have finished syncing (Gap #1: cross-repo MR/commit relationships).
+            // all repos have finished syncing.
             List<Repository> commitLinkTargets = new ArrayList<>();
-            syncGitLabRepositories(workspace, gitLabServices, repos, commitLinkTargets);
+            syncGitLabRepositories(workspace, gitLabServices, repos, commitLinkTargets, cancelled);
 
             // Second pass: link commits to MRs now that every repo has populated its commits
             // and every MR-targeted repo has populated its MRs.
@@ -575,12 +579,16 @@ public class GitLabWorkspaceInitializationService {
      * if a repository was synced within {@code syncSchedulerProperties.cooldownMinutes()},
      * these entities are skipped. Issues and MRs always sync incrementally via
      * {@code updatedAfter}.
+     *
+     * <p>{@code cancelled} is polled at the top of every iteration — cooperative cancellation,
+     * best-effort: a repository already in progress always finishes its own phases.
      */
     private void syncGitLabRepositories(
         Workspace workspace,
         GitLabSyncServiceHolder gitLabServices,
         List<Repository> repos,
-        List<Repository> commitLinkTargets
+        List<Repository> commitLinkTargets,
+        BooleanSupplier cancelled
     ) {
         var labelSyncService = gitLabServices.getLabelSyncService();
         var milestoneSyncService = gitLabServices.getMilestoneSyncService();
@@ -610,6 +618,16 @@ public class GitLabWorkspaceInitializationService {
         int skippedCooldown = 0;
 
         for (Repository repo : repos) {
+            if (cancelled.getAsBoolean()) {
+                log.info(
+                    "GitLab repo sync cancelled: workspaceId={}, reposDone={}, reposTotal={}",
+                    workspace.getId(),
+                    commitLinkTargets.size(),
+                    repos.size()
+                );
+                break;
+            }
+
             // Rate limit gate: block if remaining budget is critical
             if (rateLimitTracker != null && rateLimitTracker.isCritical(workspace.getId())) {
                 log.info(
@@ -749,10 +767,8 @@ public class GitLabWorkspaceInitializationService {
                 }
             }
 
-            // Record this repo for the second-pass commit→MR linker. Running the linker in a
-            // second pass lets commits whose SHAs appear on MRs in sibling repos be linked
-            // correctly — in the previous single-pass version those links were lost because
-            // the target MR repo had not yet synced its MRs.
+            // Record this repo for the second-pass commit→MR linker, which lets commits whose SHAs
+            // appear on MRs in sibling repos be linked once every repo has synced its MRs.
             commitLinkTargets.add(repo);
 
             boolean allDone = (issueSyncService == null || issuesDone) && (mrSyncService == null || mrsDone);

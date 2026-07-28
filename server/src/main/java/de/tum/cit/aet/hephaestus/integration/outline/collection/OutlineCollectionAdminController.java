@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.outline.collection;
 
+import de.tum.cit.aet.hephaestus.core.AuditExempt;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.outline.collection.OutlineCollectionAdminService.RegistrationOutcome;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
@@ -143,6 +144,9 @@ public class OutlineCollectionAdminController {
         description = "Outline does not know the requested collection id",
         content = @Content(schema = @Schema(hidden = true))
     )
+    @AuditExempt(
+        reason = "content-ingestion scope; the collection row carries its own state and no history is recorded yet"
+    )
     public ResponseEntity<OutlineCollectionDTO> registerOutlineCollection(
         WorkspaceContext workspace,
         @Valid @RequestBody RegisterOutlineCollectionRequestDTO request
@@ -170,6 +174,9 @@ public class OutlineCollectionAdminController {
         description = "The collection is not registered for this workspace, or the workspace has no ACTIVE Outline connection",
         content = @Content(schema = @Schema(hidden = true))
     )
+    @AuditExempt(
+        reason = "content-ingestion scope; the collection row carries its own state and no history is recorded yet"
+    )
     public ResponseEntity<OutlineCollectionDTO> updateOutlineCollectionState(
         WorkspaceContext workspace,
         @PathVariable String collectionId,
@@ -188,6 +195,9 @@ public class OutlineCollectionAdminController {
         responseCode = "404",
         description = "The collection is not registered for this workspace, or the workspace has no ACTIVE Outline connection",
         content = @Content(schema = @Schema(hidden = true))
+    )
+    @AuditExempt(
+        reason = "content-ingestion scope; the collection row carries its own state and no history is recorded yet"
     )
     public ResponseEntity<Void> deleteOutlineCollection(WorkspaceContext workspace, @PathVariable String collectionId) {
         adminService.delete(workspace.id(), collectionId);

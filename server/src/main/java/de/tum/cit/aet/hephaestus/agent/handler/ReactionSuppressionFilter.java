@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionReposito
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -86,23 +87,26 @@ class ReactionSuppressionFilter {
         Observation any = persisted.get(0);
         long aboutUserId = any.getAboutUserId();
 
-        Map<String, Observation> persistedByKey = new HashMap<>();
+        // A reaction targets a LOCUS, so the lookup is keyed on recurrence_key — but the row a suppression is
+        // recorded against is ONE observation, so the observation index is keyed on occurrence_key. Indexing
+        // observations by locus would collapse same-locus siblings onto whichever arrived first: the sibling
+        // would be withheld with no row of its own, and then read as delivered.
+        Map<String, Observation> persistedByOccurrence = new HashMap<>();
+        Set<String> recurrenceKeys = new HashSet<>();
         for (Observation f : persisted) {
+            persistedByOccurrence.put(f.getOccurrenceKey(), f);
             if (f.getRecurrenceKey() != null) {
-                persistedByKey.putIfAbsent(f.getRecurrenceKey(), f);
+                recurrenceKeys.add(f.getRecurrenceKey());
             }
         }
         // Every persisted observation may carry a null recurrence_key (pre-C2 rows / a detector that emitted
         // no locatable findings). The reaction lookup is a native query whose `IN (:recurrenceKeys)` would
         // render as `IN ()` and crash on Postgres — short-circuit with no suppression when there are no keys.
-        if (persistedByKey.isEmpty()) {
+        if (recurrenceKeys.isEmpty()) {
             return new ReactionDecision(scopedFindings, 0);
         }
         Map<String, ReactionAction> actionByKey = new HashMap<>();
-        for (Reaction r : reactionRepository.findLatestByRecurrenceKeysAndReactor(
-            persistedByKey.keySet(),
-            aboutUserId
-        )) {
+        for (Reaction r : reactionRepository.findLatestByRecurrenceKeysAndReactor(recurrenceKeys, aboutUserId)) {
             actionByKey.put(r.getRecurrenceKey(), r.getAction());
         }
         if (actionByKey.isEmpty()) {
@@ -127,7 +131,7 @@ class ReactionSuppressionFilter {
             boolean unsuppressableSecret =
                 UNSUPPRESSABLE_SECRET_SLUGS.contains(vf.practiceSlug()) && vf.assessment() == Assessment.BAD;
             if (!unsuppressableSecret && action != null && SUPPRESS_ACTIONS.contains(action)) {
-                Observation pf = persistedByKey.get(key);
+                Observation pf = persistedByOccurrence.get(vf.occurrenceKey());
                 if (pf != null) {
                     try {
                         feedbackLedgerRecorder.recordSuppressed(job, pf, reasonFor(action), suppressedIndex++);
@@ -173,7 +177,7 @@ class ReactionSuppressionFilter {
             reasoning,
             vf.guidance(),
             vf.suggestedDiffNotes(),
-            vf.recurrenceKey()
+            vf.keys()
         );
     }
 

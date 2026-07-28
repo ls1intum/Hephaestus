@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionAudit;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionBusyException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService.TransitionRequest;
@@ -38,6 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -293,7 +295,10 @@ class ConnectionControllerTest extends BaseUnitTest {
         long workspaceId = 42L;
         Connection c = newConnection(7L, workspaceId, IntegrationKind.GITHUB, "100", IntegrationState.ACTIVE);
         when(admin.findInWorkspaceOrThrow(workspaceId, 7L)).thenReturn(c);
-        when(connectionService.transition(any(Connection.class), any(TransitionRequest.class))).thenAnswer(inv -> {
+        when(
+            connectionService.disconnect(any(Connection.class), any(TransitionRequest.class), any(Runnable.class))
+        ).thenAnswer(inv -> {
+            inv.<Runnable>getArgument(2).run();
             Connection conn = inv.getArgument(0);
             conn.setState(IntegrationState.UNINSTALLED);
             return conn;
@@ -312,18 +317,35 @@ class ConnectionControllerTest extends BaseUnitTest {
         assertThat(githubStrategy.revokeCalls).isEqualTo(1);
 
         ArgumentCaptor<TransitionRequest> req = ArgumentCaptor.forClass(TransitionRequest.class);
-        verify(connectionService).transition(any(Connection.class), req.capture());
+        verify(connectionService).disconnect(any(Connection.class), req.capture(), any(Runnable.class));
+        verify(connectionService, never()).transition(any(Connection.class), any(TransitionRequest.class));
         assertThat(req.getValue().next()).isEqualTo(IntegrationState.UNINSTALLED);
         assertThat(req.getValue().eventType()).isEqualTo("DISCONNECT");
     }
 
+    /**
+     * The controller must NOT swallow a revoke failure itself — swallowing it inside the callback
+     * leaves the surrounding transaction rollback-only and turns "proceed locally" into a 500 at
+     * commit. It lets the exception out of the callback and {@code ConnectionService} absorbs it on
+     * the far side of its own transaction; the stub below mimics that real behaviour.
+     */
     @Test
-    void updateStatus_uninstalledRevokeThrows_stillTransitions() {
+    void updateStatus_uninstalledRevokeThrows_isNotSwallowedInTheCallbackButStillTransitions() {
         long workspaceId = 42L;
         Connection c = newConnection(7L, workspaceId, IntegrationKind.GITHUB, "100", IntegrationState.ACTIVE);
         when(admin.findInWorkspaceOrThrow(workspaceId, 7L)).thenReturn(c);
         githubStrategy.revokeThrows = true;
-        when(connectionService.transition(any(Connection.class), any(TransitionRequest.class))).thenAnswer(inv -> {
+        AtomicReference<RuntimeException> escaped = new AtomicReference<>();
+        when(
+            connectionService.disconnect(any(Connection.class), any(TransitionRequest.class), any(Runnable.class))
+        ).thenAnswer(inv -> {
+            // Stands in for ConnectionService#runRevokeIsolated: run the callback on its own
+            // transaction, absorb whatever escapes, then commit the local transition anyway.
+            try {
+                inv.<Runnable>getArgument(2).run();
+            } catch (RuntimeException e) {
+                escaped.set(e);
+            }
             Connection conn = inv.getArgument(0);
             conn.setState(IntegrationState.UNINSTALLED);
             return conn;
@@ -338,7 +360,24 @@ class ConnectionControllerTest extends BaseUnitTest {
         );
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
-        verify(connectionService, times(1)).transition(any(Connection.class), any(TransitionRequest.class));
+        assertThat(response.getBody().state()).isEqualTo(IntegrationState.UNINSTALLED);
+        assertThat(githubStrategy.revokeCalls).isEqualTo(1);
+        // The failure must reach the service — the only layer that can absorb it without poisoning
+        // the lifecycle transaction.
+        assertThat(escaped.get()).as("revoke failure must escape the controller callback").isNotNull();
+        verify(connectionService, times(1)).disconnect(
+            any(Connection.class),
+            any(TransitionRequest.class),
+            any(Runnable.class)
+        );
+    }
+
+    @Test
+    void busyConnection_isMappedToConflictWithActiveJobId() {
+        ProblemDetail problem = controller.handleBusyConnection(new ConnectionBusyException(7L, 99L));
+
+        assertThat(problem.getStatus()).isEqualTo(409);
+        assertThat(problem.getProperties()).containsEntry("connectionId", 7L).containsEntry("jobId", 99L);
     }
 
     @Test

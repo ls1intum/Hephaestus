@@ -3,11 +3,13 @@ package de.tum.cit.aet.hephaestus.agent.mentor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
+import de.tum.cit.aet.hephaestus.agent.config.AgentBindingLimits;
+import de.tum.cit.aet.hephaestus.agent.proxy.MentorProxyCredentialRegistry;
+import de.tum.cit.aet.hephaestus.agent.proxy.ProxyRouting;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentImageProperties;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiPlanSpec;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiRuntimeFactory;
@@ -27,7 +29,7 @@ import org.mockito.Mock;
 
 /**
  * Unit coverage for {@link MentorPiAdapter#buildSandboxSpec}: the genuinely error-prone branches the
- * orchestration-level {@code MentorChatServiceTest} stubs over — context-key validation, base-URL precedence,
+ * orchestration-level {@code MentorChatServiceTest} stubs over — context-key validation, resolved routing,
  * session-restore injection, and the always-present system prompt. {@link PiRuntimeFactory} is mocked so the
  * captured {@link PiPlanSpec} can be asserted on directly.
  */
@@ -38,6 +40,7 @@ class MentorPiAdapterTest extends BaseUnitTest {
     @Mock
     private PiRuntimeFactory runtimeFactory;
 
+    private MentorProxyCredentialRegistry proxyRegistry;
     private MentorPiAdapter adapter;
 
     @BeforeEach
@@ -47,23 +50,44 @@ class MentorPiAdapterTest extends BaseUnitTest {
             List.of("sh", "-c", "true"),
             Map.of(),
             Map.of(),
-            new NetworkPolicy(true, null, null, null)
+            new NetworkPolicy(true, null, null),
+            "0".repeat(64)
         );
         when(runtimeFactory.build(any())).thenReturn(plan);
-        adapter = newAdapter("");
+        proxyRegistry = new MentorProxyCredentialRegistry();
+        adapter = newAdapter();
     }
 
-    private MentorPiAdapter newAdapter(String propertyBaseUrl) {
-        return new MentorPiAdapter(
-            runtimeFactory,
-            new MentorAgentProperties(100000, propertyBaseUrl),
-            new AgentImageProperties("test-image:latest", null)
+    private MentorPiAdapter newAdapter() {
+        return new MentorPiAdapter(runtimeFactory, new AgentImageProperties("test-image:latest", null), proxyRegistry);
+    }
+
+    private static MentorLlmConfig llmConfig(String rawBaseUrl) {
+        return llmConfig(rawBaseUrl, false);
+    }
+
+    private static MentorLlmConfig llmConfig(String rawBaseUrl, boolean allowInternet) {
+        return llmConfig(rawBaseUrl, allowInternet, 120);
+    }
+
+    private static MentorLlmConfig llmConfig(String rawBaseUrl, boolean allowInternet, int timeoutSeconds) {
+        String resolvedBaseUrl =
+            rawBaseUrl != null && !rawBaseUrl.isBlank() ? rawBaseUrl.trim() : "https://api.openai.com";
+        return new MentorLlmConfig(
+            "openai-completions",
+            resolvedBaseUrl,
+            "gpt-5.4",
+            null,
+            null,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            allowInternet,
+            timeoutSeconds
         );
-    }
-
-    /** API_KEY mode so {@link PiPlanSpec} validates (the mentor path passes no jobToken, which PROXY requires). */
-    private static MentorLlmConfig llmConfig(String baseUrl) {
-        return new MentorLlmConfig(LlmProvider.OPENAI, CredentialMode.API_KEY, "sk-test-key", "gpt-5.4", baseUrl, 120);
     }
 
     private PiPlanSpec capturePlanSpec(MentorLlmConfig config, Map<String, byte[]> contexts, SessionRestore restore) {
@@ -71,6 +95,10 @@ class MentorPiAdapterTest extends BaseUnitTest {
         ArgumentCaptor<PiPlanSpec> captor = ArgumentCaptor.forClass(PiPlanSpec.class);
         verify(runtimeFactory).build(captor.capture());
         return captor.getValue();
+    }
+
+    private ProxyRouting routingFor(PiPlanSpec spec) {
+        return proxyRegistry.validate(spec.jobToken()).orElseThrow();
     }
 
     @Test
@@ -98,26 +126,63 @@ class MentorPiAdapterTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("llmConfig base URL overrides the instance property")
-    void llmConfigBaseUrlWins() {
-        adapter = newAdapter("https://property.example");
+    @DisplayName("a binding stored above the ceiling still produces a turn bounded by the ceiling")
+    void turnBudgetIsClampedDownToTheConfigurableCeiling() {
+        PiPlanSpec spec = capturePlanSpec(
+            llmConfig(null, false, AgentBindingLimits.MAX_TIMEOUT_SECONDS * 2),
+            Map.of(),
+            null
+        );
+
+        assertThat(spec.timeoutSeconds()).isEqualTo(AgentBindingLimits.MAX_TIMEOUT_SECONDS);
+    }
+
+    /**
+     * The binding API floor sits below {@link PiPlanSpec}'s runtime floor, so a legitimately persisted
+     * 30-60s binding would otherwise throw building the spec and reach the mentee as an ERROR instead of an answer.
+     */
+    @Test
+    @DisplayName("a binding at the configurable floor still yields a buildable sandbox")
+    void turnBudgetIsClampedUpToTheSmallestBuildableBudget() {
+        PiPlanSpec spec = capturePlanSpec(
+            llmConfig(null, false, AgentBindingLimits.MIN_TIMEOUT_SECONDS),
+            Map.of(),
+            null
+        );
+
+        assertThat(spec.timeoutSeconds()).isEqualTo(PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS + 1);
+    }
+
+    @Test
+    @DisplayName("the resolved catalog base URL is carried into proxy routing")
+    void resolvedCatalogBaseUrlIsUsed() {
         PiPlanSpec spec = capturePlanSpec(llmConfig("https://config.example"), Map.of(), null);
-        assertThat(spec.baseUrl()).isEqualTo("https://config.example");
+        assertThat(routingFor(spec).baseUrl()).isEqualTo("https://config.example");
     }
 
     @Test
-    @DisplayName("a blank instance base URL property yields a null baseUrl when the config has none")
-    void blankPropertyYieldsNullBaseUrl() {
+    @DisplayName("a blank instance base URL property yields the resolver default when the config has none")
+    void blankPropertyYieldsResolverDefault() {
         PiPlanSpec spec = capturePlanSpec(llmConfig(null), Map.of(), null);
-        assertThat(spec.baseUrl()).isNull();
+        assertThat(routingFor(spec).baseUrl()).isEqualTo("https://api.openai.com");
     }
 
     @Test
-    @DisplayName("a blank config base URL falls through to the instance property")
-    void blankConfigBaseUrlFallsBackToProperty() {
-        adapter = newAdapter("https://property.example");
-        PiPlanSpec spec = capturePlanSpec(llmConfig("   "), Map.of(), null);
-        assertThat(spec.baseUrl()).isEqualTo("https://property.example");
+    @DisplayName("every sandbox build mints a fresh, non-blank proxy token")
+    void mintsProxyToken() {
+        PiPlanSpec spec = capturePlanSpec(llmConfig(null), Map.of(), null);
+        assertThat(spec.jobToken()).isNotBlank();
+        assertThat(proxyRegistry.validate(spec.jobToken())).isPresent();
+    }
+
+    @Test
+    void carriesConfiguredInternetPolicyIntoTheRuntimePlan() {
+        adapter.buildSandboxSpec(REQUEST, llmConfig(null, true), Map.of(), null);
+        adapter.buildSandboxSpec(REQUEST, llmConfig(null, false), Map.of(), null);
+
+        ArgumentCaptor<PiPlanSpec> captor = ArgumentCaptor.forClass(PiPlanSpec.class);
+        verify(runtimeFactory, times(2)).build(captor.capture());
+        assertThat(captor.getAllValues()).extracting(PiPlanSpec::allowInternet).containsExactly(true, false);
     }
 
     @Test

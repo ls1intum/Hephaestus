@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.exception;
 
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditUnavailableException;
 import de.tum.cit.aet.hephaestus.core.tenancy.TenancyViolationException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
@@ -71,6 +72,18 @@ public class GlobalControllerAdvice {
     ProblemDetail handleIllegalState(IllegalStateException exception) {
         log.warn("Handled illegal state exception: message={}", exception.getMessage());
         return problem(HttpStatus.CONFLICT, "Invalid state", exception.getMessage());
+    }
+
+    @ExceptionHandler(ConfigAuditUnavailableException.class)
+    ProblemDetail handleConfigAuditUnavailable(ConfigAuditUnavailableException exception) {
+        // 500, not 4xx: the caller did nothing wrong, and a 4xx would keep this out of the error budget
+        // that makes a fail-closed audit trail's failure visible. The specific cause stays server-side.
+        log.error("Config audit unavailable, change refused: message={}", exception.getMessage());
+        return problem(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "Change not recorded",
+            "The change was refused because it could not be written to the audit log."
+        );
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

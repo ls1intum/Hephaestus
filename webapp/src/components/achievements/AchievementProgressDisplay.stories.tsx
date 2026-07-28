@@ -8,7 +8,7 @@ import {
 	dionysusDeploy,
 	hermesSprint,
 	prometheusLongName,
-} from "@/components/achievements/storyMockData";
+} from "@/components/achievements/story-mock-data";
 
 /**
  * Component for showcasing achievement progress indicators.

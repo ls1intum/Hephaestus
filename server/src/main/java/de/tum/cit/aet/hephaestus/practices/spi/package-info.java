@@ -1,7 +1,7 @@
 /**
  * Service Provider Interfaces for the {@code practices} module.
  *
- * <p><strong>Required (outbound) ports</strong> — {@code UserRoleChecker}, {@code AgentConfigChecker}:
+ * <p><strong>Required (outbound) ports</strong> — {@code UserRoleChecker}, {@code PracticeDetectionReadiness}:
  * implemented outside the module (in {@code notification}, {@code agent}) and called by the practices internals.
  *
  * <p><strong>Provided (inbound) ports</strong> — {@code ConversationFeedbackErasure}: implemented INSIDE the

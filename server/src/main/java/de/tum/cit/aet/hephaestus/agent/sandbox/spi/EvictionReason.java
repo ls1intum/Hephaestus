@@ -9,6 +9,7 @@ public enum EvictionReason {
     /** Reserved for a future absolute-lifetime cap. */
     MAX_LIFETIME("max_lifetime"),
     MANUAL("manual"),
+    RUNTIME_CHANGED("runtime_changed"),
     ERROR("error"),
     NATURAL_EXIT("natural_exit"),
     DAEMON_UNHEALTHY("daemon_unhealthy");

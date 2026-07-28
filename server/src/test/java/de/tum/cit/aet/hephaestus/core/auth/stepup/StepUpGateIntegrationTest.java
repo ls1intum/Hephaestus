@@ -20,6 +20,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -46,6 +47,13 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers
 @Tag("integration")
 class StepUpGateIntegrationTest {
+
+    /** Every event type a login-provider mutation can land on — the gate covers all three. */
+    private static final Set<AuthEvent.EventType> LOGIN_PROVIDER_EVENTS = Set.of(
+        AuthEvent.EventType.LOGIN_PROVIDER_CREATED,
+        AuthEvent.EventType.LOGIN_PROVIDER_UPDATED,
+        AuthEvent.EventType.LOGIN_PROVIDER_DELETED
+    );
 
     @Autowired
     private WebTestClient webTestClient;
@@ -213,14 +221,14 @@ class StepUpGateIntegrationTest {
             authEventRepository
                 .findAll()
                 .stream()
-                .noneMatch(e -> e.getEventType() == AuthEvent.EventType.LOGIN_PROVIDER_CHANGED)
+                .noneMatch(e -> LOGIN_PROVIDER_EVENTS.contains(e.getEventType()))
         ).isTrue();
     }
 
     @Test
     void freshAuthAdminCanCreateThenDeleteAProviderAndBothAreAudited() {
         // The happy path: proves the gate does not block a fresh-auth admin, AND that CREATE + DELETE
-        // each write their LOGIN_PROVIDER_CHANGED row — so dropping the audit from either path fails here.
+        // each write their own audit row — so dropping the audit from either path fails here.
         Account admin = persist("Fresh Admin", Account.AppRole.APP_ADMIN);
         String token = freshAuthToken(admin);
         // A second enabled provider so deleting the one under test isn't refused as the last sign-in path.
@@ -239,12 +247,14 @@ class StepUpGateIntegrationTest {
         var actions = authEventRepository
             .findAll()
             .stream()
-            .filter(e -> e.getEventType() == AuthEvent.EventType.LOGIN_PROVIDER_CHANGED)
-            .map(e -> e.getDetails())
+            .filter(e -> LOGIN_PROVIDER_EVENTS.contains(e.getEventType()))
+            .filter(e -> e.getDetails() != null && e.getDetails().contains("gitlab-fresh"))
+            .map(AuthEvent::getEventType)
             .toList();
-        assertThat(actions)
-            .anyMatch(d -> d.contains("gitlab-fresh") && d.contains("CREATE"))
-            .anyMatch(d -> d.contains("gitlab-fresh") && d.contains("DELETE"));
+        assertThat(actions).contains(
+            AuthEvent.EventType.LOGIN_PROVIDER_CREATED,
+            AuthEvent.EventType.LOGIN_PROVIDER_DELETED
+        );
     }
 
     private void createProvider(String bearer, String registrationId, String baseUrl) {

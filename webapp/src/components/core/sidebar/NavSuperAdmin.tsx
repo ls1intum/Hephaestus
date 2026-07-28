@@ -1,5 +1,14 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Building2, ChevronLeft, KeyRound, ScrollText, Users } from "lucide-react";
+import {
+	BrainCircuit,
+	Building2,
+	ChevronLeft,
+	CircleDollarSign,
+	KeyRound,
+	ScrollText,
+	Users,
+} from "lucide-react";
+import { ADMIN_NAV_LABELS } from "@/components/core/sidebar/admin-nav-labels";
 import {
 	SidebarGroup,
 	SidebarGroupLabel,
@@ -24,7 +33,24 @@ const ADMIN_SECTIONS = [
 		icon: KeyRound,
 		tooltip: "Sign-in options",
 	},
-	{ to: "/admin/audit", label: "Audit log", icon: ScrollText, tooltip: "Auth audit events" },
+	{
+		to: "/admin/models",
+		label: ADMIN_NAV_LABELS.models,
+		icon: BrainCircuit,
+		tooltip: "Providers and shared models",
+	},
+	{
+		to: "/admin/usage",
+		label: ADMIN_NAV_LABELS.usage,
+		icon: CircleDollarSign,
+		tooltip: "AI spend and budget caps",
+	},
+	{
+		to: "/admin/audit",
+		label: ADMIN_NAV_LABELS.audit,
+		icon: ScrollText,
+		tooltip: "Who did what, and when",
+	},
 ] as const;
 
 export function NavSuperAdmin() {
