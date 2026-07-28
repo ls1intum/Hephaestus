@@ -956,11 +956,22 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         }
 
         private void insert(String key, UUID jobId, long artifactId, String presence, Instant at) {
+            insert(key, jobId, practice, artifactId, presence, at);
+        }
+
+        private void insert(
+            String key,
+            UUID jobId,
+            Practice targetPractice,
+            long artifactId,
+            String presence,
+            Instant at
+        ) {
             observationRepository.insertIfAbsent(
                 UUID.randomUUID(),
                 key,
                 jobId,
-                practice.getId(),
+                targetPractice.getId(),
                 null,
                 "PULL_REQUEST",
                 artifactId,
@@ -977,16 +988,16 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             );
         }
 
-        /**
-         * Two runs sharing an identical {@code observed_at} on the same target: without the
-         * {@code agent_job_id DESC} tiebreak the latest-run subquery's {@code LIMIT 1} pick is
-         * plan-dependent, so the surfaced counts could flip between reads. The higher
-         * {@code agent_job_id} (Postgres compares UUIDs as unsigned bytes — equal to hex-string
-         * order, NOT Java's signed {@code UUID.compareTo}) must win on every dedup query.
-         */
         @Test
         @DisplayName("equal observed_at timestamps tiebreak on agent_job_id, deterministically")
         void tiebreaksEqualTimestampsByAgentJobId() {
+            PracticeArea area = new PracticeArea();
+            area.setWorkspace(workspace);
+            area.setSlug("tie-area");
+            area.setName("Tie area");
+            practice.setArea(practiceAreaRepository.save(area));
+            practice = practiceRepository.save(practice);
+
             AgentJob jobA = anotherJob();
             AgentJob jobB = anotherJob();
             AgentJob winner = jobA.getId().toString().compareTo(jobB.getId().toString()) > 0 ? jobA : jobB;
@@ -1005,7 +1016,29 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             assertThat(summary.get(0).getGoodCount()).isEqualTo(1L);
             assertThat(summary.get(0).getBadCount()).isEqualTo(0L);
 
-            // The sibling histogram query must agree on which run is "latest".
+            List<DeveloperPracticeSummary> practiceSummary = observationRepository.findDeveloperPracticeSummary(
+                aboutUser.getId(),
+                workspace.getId()
+            );
+            assertThat(practiceSummary).hasSize(1);
+            assertThat(practiceSummary.get(0).getCount()).isEqualTo(1L);
+
+            List<Observation> recent = observationRepository.findRecentByDeveloperAndWorkspace(
+                aboutUser.getId(),
+                workspace.getId(),
+                Instant.parse("2026-01-01T00:00:00Z"),
+                PageRequest.of(0, 10)
+            );
+            assertThat(recent).extracting(Observation::getPresence).containsExactly(Presence.PRESENT);
+
+            List<SeverityCount> severities = observationRepository.countBySeverityForDeveloper(
+                aboutUser.getId(),
+                workspace.getId(),
+                Instant.parse("2026-01-01T00:00:00Z")
+            );
+            assertThat(severities).hasSize(1);
+            assertThat(severities.get(0).getCount()).isEqualTo(1L);
+
             List<PresenceCount> presences = observationRepository.countByPresenceForDeveloper(
                 aboutUser.getId(),
                 workspace.getId(),
@@ -1014,19 +1047,60 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             assertThat(presences).hasSize(1);
             assertThat(presences.get(0).getPresence()).isEqualTo(Presence.PRESENT);
             assertThat(presences.get(0).getCount()).isEqualTo(1L);
+
+            List<AreaStandingRow> standing = observationRepository.findAreaStandingByDeveloperAndWorkspace(
+                aboutUser.getId(),
+                workspace.getId(),
+                Instant.parse("2026-01-01T00:00:00Z"),
+                Instant.parse("2026-01-01T00:00:00Z")
+            );
+            assertThat(standing).hasSize(1);
+            assertThat(standing.get(0).getCount()).isEqualTo(1L);
+        }
+
+        @Test
+        @DisplayName("latest runs are selected within the requested workspace")
+        void scopesLatestRunToWorkspace() {
+            long artifactId = 42L;
+            insert("workspace-a", agentJob.getId(), artifactId, "PRESENT", Instant.parse("2026-03-20T10:00:00Z"));
+
+            Workspace otherWorkspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("finding-other"));
+            Practice otherPractice = new Practice();
+            otherPractice.setWorkspace(otherWorkspace);
+            otherPractice.setSlug("other-practice");
+            otherPractice.setName("Other Practice");
+            otherPractice.setCriteria("Other criteria");
+            otherPractice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
+            otherPractice = practiceRepository.save(otherPractice);
+
+            AgentJob otherJob = new AgentJob();
+            otherJob.setWorkspace(otherWorkspace);
+            otherJob.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
+            otherJob.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
+            otherJob = agentJobRepository.save(otherJob);
+            insert(
+                "workspace-b",
+                otherJob.getId(),
+                otherPractice,
+                artifactId,
+                "ABSENT",
+                Instant.parse("2026-03-20T11:00:00Z")
+            );
+
+            List<DeveloperPracticeSummaryProjection> summary = observationRepository.findSummaryByDeveloperAndWorkspace(
+                aboutUser.getId(),
+                workspace.getId()
+            );
+
+            assertThat(summary).hasSize(1);
+            assertThat(summary.get(0).getGoodCount()).isEqualTo(1L);
+            assertThat(summary.get(0).getBadCount()).isZero();
         }
     }
 
     @Nested
     class HiddenRepositoryExclusionTests {
 
-        /**
-         * Every observation-serving AGGREGATE must exclude observations whose artifact lives in a
-         * repository that any team's settings mark {@code hidden_from_contributions} (fail-closed:
-         * these queries carry no viewing-team context, so hidden for one team means hidden for
-         * everyone — see {@code findSummaryByDeveloperAndWorkspace}). One BAD observation on a
-         * visible-repo PR and one on a hidden-repo PR: only the visible one may reach the aggregates.
-         */
         @Test
         @DisplayName("observations on hidden-repository artifacts are excluded from all aggregate serving queries")
         void excludesHiddenRepositoryObservationsOnAggregateServingQueries() {

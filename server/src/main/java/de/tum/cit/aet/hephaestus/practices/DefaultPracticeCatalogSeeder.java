@@ -18,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.task.TaskExecutionAutoConfiguration;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.task.AsyncTaskExecutor;
@@ -26,20 +27,11 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Seeds a grounded default practice catalog (process-level areas + their practices) into a workspace so its
- * practices exist the moment it does. It seeds at TWO points: the default (lowest-id) workspace once
- * workspaces exist at startup ({@link WorkspacesInitializedEvent}), AND every newly-created workspace
- * ({@link WorkspaceCreatedEvent}) — otherwise a workspace created at runtime (via the API/UI, after boot)
- * would have no practices at all, and the practice catalog is a prerequisite for detection (a runnable agent
- * config must additionally be attached before detection actually runs). The catalog lives as data in
- * {@code resources/practices/default-catalog.json} so it stays editable without code changes, and every
- * row remains fully configurable afterwards through the normal practice/area CRUD endpoints.
+ * Seeds {@code practices/default-catalog.json} into every workspace at startup and when a workspace is
+ * created.
  *
- * <p>Idempotent: rows that already exist are skipped and never updated, so re-running (startup, after an
- * admin edit, or a create-event that races the startup seed) never overwrites configured state — existing
- * criteria are NOT refreshed on boot; a concurrent double-seed is caught by the
- * {@code uk_practice_workspace_slug} unique constraint and self-heals. Failures are isolated from the rest of
- * startup/creation, mirroring {@code DefaultAgentConfigSeeder}.
+ * <p>Existing practice fields are not overwritten. Unbound defaults are reattached so interrupted seeds
+ * can recover.
  */
 @Component
 class DefaultPracticeCatalogSeeder {
@@ -55,7 +47,7 @@ class DefaultPracticeCatalogSeeder {
     private final PracticeAreaRepository areaRepository;
     private final PracticeRepository practiceRepository;
     private final WorkspaceRepository workspaceRepository;
-    private final AsyncTaskExecutor monitoringExecutor;
+    private final AsyncTaskExecutor taskExecutor;
 
     DefaultPracticeCatalogSeeder(
         @Value("${hephaestus.practices.seed-default-catalog:true}") boolean enabled,
@@ -65,7 +57,7 @@ class DefaultPracticeCatalogSeeder {
         PracticeAreaRepository areaRepository,
         PracticeRepository practiceRepository,
         WorkspaceRepository workspaceRepository,
-        @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
+        @Qualifier(TaskExecutionAutoConfiguration.APPLICATION_TASK_EXECUTOR_BEAN_NAME) AsyncTaskExecutor taskExecutor
     ) {
         this.enabled = enabled;
         this.objectMapper = objectMapper;
@@ -74,7 +66,7 @@ class DefaultPracticeCatalogSeeder {
         this.areaRepository = areaRepository;
         this.practiceRepository = practiceRepository;
         this.workspaceRepository = workspaceRepository;
-        this.monitoringExecutor = monitoringExecutor;
+        this.taskExecutor = taskExecutor;
     }
 
     @EventListener(WorkspacesInitializedEvent.class)
@@ -82,55 +74,45 @@ class DefaultPracticeCatalogSeeder {
         if (!enabled) {
             return;
         }
-        // The whole body is guarded, including the workspace lookup: this listener runs inside the startup
-        // provisioning flow, and a transient DB failure here must degrade to a missing catalog — never abort
-        // workspace activation for the boot.
         try {
-            // Deterministic target: the lowest-id workspace. findAll() has no ORDER BY, so without this sort
-            // the seeded workspace would be whatever row Postgres returned first — arbitrary and inconsistent
-            // across restarts when multiple workspaces exist (the startup listener bootstraps several).
-            Workspace workspace = workspaceRepository
+            workspaceRepository
                 .findAll()
                 .stream()
-                .min(Comparator.comparing(Workspace::getId, Comparator.nullsLast(Long::compareTo)))
-                .orElse(null);
-            if (workspace == null) {
-                log.warn("Default practice catalog enabled but no workspace exists yet; skipping.");
-                return;
-            }
-            seedCatalog(workspace);
+                .sorted(Comparator.comparing(Workspace::getId, Comparator.nullsLast(Long::compareTo)))
+                .forEach(this::seedCatalogSafely);
         } catch (RuntimeException e) {
-            log.error("Default practice catalog seeding failed (startup); continuing.", e);
+            log.error("Could not load workspaces for default practice catalog reconciliation", e);
         }
     }
 
-    /**
-     * Seed the catalog into a workspace the moment it is created at runtime (after boot), so its practices
-     * exist without waiting for a restart. Fired post-commit ({@link WorkspaceCreatedEvent}), so the workspace
-     * row is visible; idempotent against the startup seed if the two ever race.
-     *
-     * <p>Runs OFF the request thread on {@code monitoringExecutor}: {@code WorkspaceCreatedEvent}'s contract is
-     * fire-and-forget (the HTTP response is already sent), and seeding is ~75 sequential sub-transactions —
-     * far too much to block workspace creation on. This mirrors the sibling listeners on the same event
-     * ({@code GitLabWorkspaceInitializationService}, {@code WorkspaceActivationService}). The startup
-     * {@link #seed()} path stays synchronous — it must complete during boot before any request traffic.
-     *
-     * <p>Dispatched via {@code execute} (not {@code submit}) and guarded inside the task: the executor's
-     * outcome is discarded, so any failure — including the workspace lookup itself — must be caught and
-     * logged in the task or it would vanish silently.
-     */
     @EventListener(WorkspaceCreatedEvent.class)
     public void onWorkspaceCreated(WorkspaceCreatedEvent event) {
         if (!enabled) {
             return;
         }
-        monitoringExecutor.execute(() -> {
-            try {
-                workspaceRepository.findById(event.workspaceId()).ifPresent(this::seedCatalog);
-            } catch (RuntimeException e) {
-                log.error("Default practice catalog seeding failed (workspace-created); continuing.", e);
-            }
-        });
+        try {
+            taskExecutor.execute(() -> {
+                try {
+                    workspaceRepository.findById(event.workspaceId()).ifPresent(this::seedCatalogSafely);
+                } catch (RuntimeException e) {
+                    log.error(
+                        "Could not load workspace {} for default practice catalog seeding",
+                        event.workspaceId(),
+                        e
+                    );
+                }
+            });
+        } catch (RuntimeException e) {
+            log.error("Could not schedule default practice catalog seeding: workspaceId={}", event.workspaceId(), e);
+        }
+    }
+
+    private void seedCatalogSafely(Workspace workspace) {
+        try {
+            seedCatalog(workspace);
+        } catch (RuntimeException e) {
+            log.error("Default practice catalog seeding failed: workspaceId={}", workspace.getId(), e);
+        }
     }
 
     private void seedCatalog(Workspace workspace) {
@@ -141,8 +123,7 @@ class DefaultPracticeCatalogSeeder {
         int seededPractices = 0;
         for (JsonNode areaNode : catalog.path("areas")) {
             String areaSlug = areaNode.path("slug").asString();
-            // Per-ROW idempotency (not per-area): always walk the practices even when the area exists,
-            // otherwise a mid-area failure would permanently leave the remaining practices unseeded.
+            // Walk existing areas too so an interrupted seed can add missing practices.
             if (!areaRepository.existsByWorkspaceIdAndSlug(ctx.id(), areaSlug)) {
                 areaService.createArea(
                     ctx,
@@ -160,7 +141,6 @@ class DefaultPracticeCatalogSeeder {
 
             for (JsonNode practiceNode : areaNode.path("practices")) {
                 String practiceSlug = practiceNode.path("slug").asString();
-                // One malformed catalog entry must skip only that row, not abort the rest of the catalog.
                 try {
                     if (seedPractice(ctx, catalog, areaSlug, practiceNode, practiceSlug)) {
                         seededPractices++;
@@ -180,13 +160,7 @@ class DefaultPracticeCatalogSeeder {
         }
     }
 
-    /**
-     * Seed a single practice row idempotently; returns {@code true} when it created or (re-)bound a practice.
-     *
-     * <p>Create + bind run in separate transactions, so a mid-seed failure can strand a practice that exists
-     * but is unbound (area=NULL). Binding only when the area is still null lets such a row self-heal on the
-     * next boot without ever overwriting an admin's intentional (un)binding.
-     */
+    /** Returns whether the practice was created or an unbound default was reattached. */
     private boolean seedPractice(
         WorkspaceContext ctx,
         JsonNode catalog,
@@ -200,7 +174,6 @@ class DefaultPracticeCatalogSeeder {
                 areaService.bindPractice(ctx, practiceSlug, areaSlug);
                 return true;
             }
-            // Otherwise already bound — respect any admin edits and do not overwrite.
             return false;
         }
         practiceService.createPractice(ctx, toCreateRequest(catalog, practiceNode));

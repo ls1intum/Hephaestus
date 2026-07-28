@@ -32,6 +32,8 @@ dependencies:
     - any-glob-to-any-file:
       - "**/package.json"
       - "**/pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".npmrc"
       - "**/pom.xml"
       - "renovate.json"
 

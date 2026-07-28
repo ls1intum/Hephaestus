@@ -45,6 +45,8 @@ jobs:
               - 'webapp/**'
               - 'package.json'
               - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - '.npmrc'
               - '.node-version'
             application-server:
               - 'server/**'

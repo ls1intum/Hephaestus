@@ -424,19 +424,11 @@ public class PullRequestContentSource implements ContentSource {
         String headSha = metadata.has("commit_sha") ? metadata.get("commit_sha").asString() : null;
         String targetBranch = requireText(metadata, "target_branch");
         String sourceBranch = requireText(metadata, "source_branch");
-        if (headSha == null || headSha.isBlank()) {
-            // Fail closed: a PR review without a head SHA has no diff to judge. Proceeding would hand
-            // the model a repo mount with no diff.patch, and it can fabricate findings about changes
-            // that do not exist (observed live on a zero-commit MR).
-            throw new JobPreparationException("No commit_sha in metadata — nothing to review");
-        }
         Path repoPath = gitRepositoryManager.getRepositoryPath(repositoryId);
 
         try {
             String[] range = gitDiffOperations.resolveDiffRange(repoPath, targetBranch, sourceBranch, headSha);
             if (range == null) {
-                // Fail closed (same fabrication risk as a missing commit_sha): without a resolvable
-                // range there is no diff.patch, and the review must not run against a bare repo mount.
                 String reason = headVerified
                     ? "all resolution strategies failed"
                     : "the pinned head commit is unavailable after repository refresh";
@@ -493,8 +485,6 @@ public class PullRequestContentSource implements ContentSource {
         } catch (JobPreparationException e) {
             throw e;
         } catch (Exception e) {
-            // Fail closed on unexpected git errors too: a job that reaches the sandbox without
-            // diff.patch reviews a phantom change. Preparation failures are retryable and loud.
             throw new JobPreparationException("Failed to pre-compute diff: " + e.getMessage(), e);
         }
     }

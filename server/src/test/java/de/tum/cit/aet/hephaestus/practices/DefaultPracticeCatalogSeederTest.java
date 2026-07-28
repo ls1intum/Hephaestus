@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -46,11 +47,13 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     @Mock
     private WorkspaceRepository workspaceRepository;
 
-    // Executes tasks inline so the create-event path is deterministic under test. In production this is
-    // the shared monitoringExecutor.
     private final AsyncTaskExecutor directExecutor = Runnable::run;
 
     private DefaultPracticeCatalogSeeder seeder(boolean enabled) {
+        return seeder(enabled, directExecutor);
+    }
+
+    private DefaultPracticeCatalogSeeder seeder(boolean enabled, AsyncTaskExecutor executor) {
         return new DefaultPracticeCatalogSeeder(
             enabled,
             JsonMapper.builder().build(),
@@ -59,7 +62,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
             areaRepository,
             practiceRepository,
             workspaceRepository,
-            directExecutor
+            executor
         );
     }
 
@@ -126,6 +129,21 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
             };
             assertThat(preamble).containsIgnoringCase(expectedFocusWord);
         }
+    }
+
+    @Test
+    void startup_reconcilesEveryWorkspace() {
+        Workspace first = new Workspace();
+        first.setId(1L);
+        Workspace second = new Workspace();
+        second.setId(2L);
+        when(workspaceRepository.findAll()).thenReturn(List.of(second, first));
+        when(areaRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(false);
+
+        seeder(true).seed();
+
+        verify(areaService, times(24)).createArea(any(), any(), any());
+        verify(practiceService, times(74)).createPractice(any(), any());
     }
 
     @Test
@@ -199,14 +217,20 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     }
 
     @Test
-    void onWorkspaceCreated_seedsTheNewWorkspaceOffTheRequestThread() {
+    void onWorkspaceCreated_dispatchesCatalogSeeding() {
+        AsyncTaskExecutor executor = org.mockito.Mockito.mock(AsyncTaskExecutor.class);
         when(workspaceRepository.findById(7L)).thenReturn(Optional.of(new Workspace()));
         when(areaRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(false);
         when(practiceRepository.findByWorkspaceIdAndSlug(any(), any())).thenReturn(Optional.empty());
 
-        seeder(true).onWorkspaceCreated(new WorkspaceCreatedEvent(7L, IntegrationKind.GITLAB));
+        seeder(true, executor).onWorkspaceCreated(new WorkspaceCreatedEvent(7L, IntegrationKind.GITLAB));
 
-        // A runtime-created workspace gets the full catalog (mirrors the boot path), dispatched via the executor.
+        var task = ArgumentCaptor.forClass(Runnable.class);
+        verify(executor).execute(task.capture());
+        verifyNoInteractions(workspaceRepository, areaService, practiceService);
+
+        task.getValue().run();
+
         verify(areaService, times(12)).createArea(any(), any(), any());
         verify(practiceService, times(37)).createPractice(any(), any());
         verify(areaService, times(37)).bindPractice(any(), any(), any());
@@ -230,6 +254,16 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     }
 
     @Test
+    void onWorkspaceCreated_containsExecutorRejection() {
+        AsyncTaskExecutor executor = org.mockito.Mockito.mock(AsyncTaskExecutor.class);
+        doThrow(new RuntimeException("queue full")).when(executor).execute(any());
+
+        assertThatCode(() ->
+            seeder(true, executor).onWorkspaceCreated(new WorkspaceCreatedEvent(7L, IntegrationKind.GITLAB))
+        ).doesNotThrowAnyException();
+    }
+
+    @Test
     void seedingFailure_isIsolatedAndDoesNotThrow() {
         when(workspaceRepository.findAll()).thenReturn(List.of(new Workspace()));
         when(areaRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(false);
@@ -240,8 +274,6 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
 
     @Test
     void workspaceLookupFailureAtBoot_isIsolatedAndDoesNotThrow() {
-        // The startup listener runs inside workspace provisioning: even the workspace lookup itself failing
-        // must degrade to a missing catalog, never abort workspace activation for the boot.
         when(workspaceRepository.findAll()).thenThrow(new RuntimeException("db down"));
 
         assertThatCode(() -> seeder(true).seed()).doesNotThrowAnyException();
@@ -249,8 +281,6 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
 
     @Test
     void onWorkspaceCreated_lookupFailure_isContainedInsideTheTask() {
-        // The executor's outcome is discarded, so the task must contain its own failures — a throwing
-        // lookup may not propagate to (and kill) the executor thread unlogged.
         when(workspaceRepository.findById(any())).thenThrow(new RuntimeException("db down"));
 
         assertThatCode(() ->
