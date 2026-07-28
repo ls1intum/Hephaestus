@@ -9,7 +9,7 @@
 
 # Hephaestus — feedback on how you work
 
-Hephaestus gives developers feedback on the engineering practices they use in software projects. It draws on evidence from tools the team already uses, including GitHub and GitLab, to explain what worked, what could improve, and what to try next.
+Hephaestus gives developers feedback on the engineering practices they use in software projects. It draws on evidence from tools the team already uses — including GitHub or GitLab activity, selected Slack channels, and Outline documents — to explain what worked, what could improve, and what to try next.
 
 Developers decide what to do with that feedback: act on it, push back with a reason, or let it pass. Hephaestus supports mentors, teachers, and maintainers by covering routine feedback. It does not replace their judgement or the relationships they build with developers.
 
@@ -22,17 +22,23 @@ The project is named after Hephaestus, the Greek god of blacksmiths and craftsme
 > [!IMPORTANT]
 > **Hephaestus is still pre-1.0.** Until 1.0, a minor release can change configuration or APIs in ways that require action. If you self-host it, use the [latest release](https://github.com/ls1intum/Hephaestus/releases/latest), read its release notes and the [migration guide](./MIGRATION.md), and test upgrades in staging.
 >
-> We are targeting **v1.0.0 for 30 September 2026**. Version 1.0 is a compatibility promise, not a claim that development is finished. It will establish a [stable operator contract](./docs/admin/compatibility-policy.mdx) for upgrades, configuration, Docker Compose, and the REST API.
+> We are aiming for a stable **v1.0.0 in mid-September 2026**. Here, stable means [predictable rules](./docs/admin/compatibility-policy.mdx) for upgrades, configuration, Docker Compose, and the REST API — not that development stops.
 >
-> The v1.0 plan brings together four complementary ways to use feedback: comments alongside project work, a private reflection view, conversations with Heph, and facilitator views that help people support developers. Release gates take priority over the date. Follow the [v1.0 milestone](https://github.com/ls1intum/Hephaestus/milestone/5) and [release plan](https://github.com/ls1intum/Hephaestus/issues/1377) for current scope and progress.
+> For v1.0, the plan brings project context and feedback delivery together:
+>
+> - **Project context:** draw on work in GitHub and GitLab, selected Slack channels, and selected Outline documents.
+> - **Alongside the work:** add feedback in GitHub or GitLab while the work is still active.
+> - **In a personal view:** let developers review feedback across their work when they choose.
+> - **In conversation:** let developers talk it through with Heph in the web app or Slack.
+>
+> Release gates take priority over the date. Follow the [v1.0 milestone](https://github.com/ls1intum/Hephaestus/milestone/5) and [release plan](https://github.com/ls1intum/Hephaestus/issues/1377) for current scope and progress.
 
 ## What Hephaestus does today
 
 - **Practice feedback.** Hephaestus uses AI to review pull requests, merge requests, and issues against the engineering practices configured for a workspace. It posts the feedback as comments on the work.
 - **Heph, the AI mentor.** Developers can talk with Heph about feedback and recent issues, commits, reviews, and pull or merge requests. Heph is available in the web app and, when connected, in Slack.
+- **Project context.** Workspace admins can let Hephaestus use messages from selected, visibly monitored Slack channels and documents from selected Outline collections. Outline is a source of context; Hephaestus does not write to it.
 - **Workspaces.** Each workspace connects its own repositories, chooses its practice catalog, connects an AI model through any OpenAI-compatible endpoint, sets a monthly spending cap, and manages its members and teams.
-- **Slack integration.** Developers can talk with Heph in a Slack direct message. Workspace admins can also allow Heph to use messages from selected, visibly monitored channels as context.
-- **Achievements and an optional weekly leaderboard.** Workspace admins can switch on recognition features, including achievements and a leaderboard of review activity, per workspace.
 
 ## Documentation
 

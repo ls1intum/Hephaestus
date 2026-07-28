@@ -11,8 +11,8 @@ import { Button } from "@/components/ui/button";
 const faqItems = [
 	{
 		key: "faq-item-1",
-		q: "How does Hephaestus fit into my workflow?",
-		a: "You keep using pull requests, merge requests, reviews, and issues in GitHub or GitLab. A workspace admin connects the repositories and chooses the practices Hephaestus checks.",
+		q: "What project context can Hephaestus use?",
+		a: "It can use activity from connected GitHub or GitLab repositories. Workspace admins can also add selected Slack channels and Outline documents. You keep working in the same tools.",
 	},
 	{
 		key: "faq-item-2",
@@ -22,7 +22,7 @@ const faqItems = [
 	{
 		key: "faq-item-3",
 		q: "What can I discuss with Heph?",
-		a: "Ask about feedback or recent work, or use the conversation to reflect on what to try next. Heph can use your recent issues, commits, reviews, pull or merge requests, and delivered feedback as context.",
+		a: "Ask about feedback or recent work, or use the conversation to reflect on what to try next. Heph can use recent project activity, delivered feedback, and selected Slack messages or Outline documents as context.",
 	},
 	{
 		key: "faq-item-4",

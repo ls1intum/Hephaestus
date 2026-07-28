@@ -42,11 +42,11 @@ const FeatureList: FeatureItem[] = [
     title: 'Workspace controls',
     kicker: 'Your repositories, practices, and settings',
     description:
-      'Workspace admins choose the source repositories, practice catalog, AI model, and optional features.',
+      'Workspace admins choose the source repositories, project context, practice catalog, and AI model.',
     bullets: [
       'Connect GitHub or GitLab',
+      'Add selected Slack channels and Outline documents as context',
       'Manage members and teams',
-      'Optionally enable achievements and a leaderboard',
     ],
     cta: {label: 'Understand workspaces', to: '/user/workspace'},
   },

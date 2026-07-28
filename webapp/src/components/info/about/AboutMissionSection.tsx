@@ -17,7 +17,7 @@ const FEATURES_DATA: FeatureData[] = [
 		title: "Chat with Heph",
 		description: "Talk through feedback and recent work",
 		content:
-			"Heph can use recent issues, commits, reviews, pull or merge requests, and delivered feedback as context. Developers can chat in the web app or, when connected, in Slack.",
+			"Heph can use recent project activity, delivered feedback, and selected Slack messages or Outline documents as context. Developers can chat in the web app or, when connected, in Slack.",
 	},
 ];
 
