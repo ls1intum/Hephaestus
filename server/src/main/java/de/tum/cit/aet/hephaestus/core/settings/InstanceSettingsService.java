@@ -8,10 +8,10 @@ import de.tum.cit.aet.hephaestus.core.settings.spi.SilentModeQuery;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
@@ -22,9 +22,9 @@ import tools.jackson.databind.ObjectMapper;
  * {@link SilentModeQuery} on every outbound delivery.
  *
  * <p>Because this bean boots on every role, it must not hard-require a server-only collaborator —
- * {@link AuthEventLogger} is {@code @ConditionalOnServerRole}, so it is resolved lazily and is absent
- * on a worker-only pod. Only {@link #updateSilentMode} needs it, and that runs behind the admin API,
- * which exists solely on the server.
+ * {@link AuthEventLogger} is {@code @ConditionalOnServerRole} and is therefore absent on a worker-only
+ * pod. Only {@link #updateSilentMode} needs it, and that runs behind the admin API, which exists solely
+ * on the server.
  */
 @Service
 @WorkspaceAgnostic("Singleton instance-wide settings row — no tenant dimension exists")
@@ -33,12 +33,12 @@ public class InstanceSettingsService implements SilentModeQuery {
     private static final Logger log = LoggerFactory.getLogger(InstanceSettingsService.class);
 
     private final InstanceSettingsRepository repository;
-    private final ObjectProvider<AuthEventLogger> authEventLogger;
+    private final Optional<AuthEventLogger> authEventLogger;
     private final ObjectMapper objectMapper;
 
     InstanceSettingsService(
         InstanceSettingsRepository repository,
-        ObjectProvider<AuthEventLogger> authEventLogger,
+        Optional<AuthEventLogger> authEventLogger,
         ObjectMapper objectMapper
     ) {
         this.repository = repository;
@@ -101,12 +101,13 @@ public class InstanceSettingsService implements SilentModeQuery {
         if (trimmedReason != null) {
             details.put("reason", trimmedReason);
         }
-        authEventLogger
-            .getObject()
-            .event(AuthEvent.EventType.SILENT_MODE_CHANGED, AuthEvent.Result.SUCCESS)
-            .actingAccount(SecurityUtils.getCurrentAccountId().orElse(null))
-            .details(objectMapper.writeValueAsString(details))
-            .record();
+        authEventLogger.ifPresent(logger ->
+            logger
+                .event(AuthEvent.EventType.SILENT_MODE_CHANGED, AuthEvent.Result.SUCCESS)
+                .actingAccount(SecurityUtils.getCurrentAccountId().orElse(null))
+                .details(objectMapper.writeValueAsString(details))
+                .record()
+        );
         return settings;
     }
 }
