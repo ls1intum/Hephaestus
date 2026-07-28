@@ -1,11 +1,11 @@
 ---
 id: ai-code-review
 sidebar_position: 2
-title: AI Code Review Pipeline
-description: Architecture and internals of the practice-based automated code review system.
+title: Practice review pipeline
+description: Architecture and internals of the automated practice review system.
 ---
 
-Hephaestus runs an AI-powered code review pipeline that evaluates merge requests against configurable software engineering practices. When a student opens a non-draft MR (or uses `/hephaestus review`), the system detects relevant practices, runs an LLM agent inside a sandboxed container, parses the structured output, and posts findings as MR comments and inline diff notes.
+Hephaestus reviews pull requests and merge requests against configurable engineering practices. When a developer opens an eligible, non-draft change request or uses `/hephaestus review`, the system detects relevant practices, runs an LLM agent inside a sandboxed container, parses the structured output, and posts feedback as a summary comment and inline comments.
 
 ## Pipeline overview
 
@@ -151,7 +151,7 @@ After the agent returns findings, the server runs a 6-step delivery pipeline in 
 4. **Compose** -- `DeliveryComposer` partitions findings into:
    - **Inlinable** (have file locations, not in internal paths like `inputs/context/`, practice not in `NON_INLINABLE_PRACTICES`) -- compact list in MR summary, full detail in diff notes
    - **Non-inlinable** (PR-description / commit-discipline practices such as `describe-what-and-why` and `commits-are-atomic-and-cohesive`, or no file location) -- full detail in MR summary
-   - When all findings are `GOOD` strengths, composes a short approval comment naming the top strengths
+   - When all findings are `GOOD` strengths, composes a short positive comment naming the top strengths
 
 5. **Validate positions** -- `DiffHunkValidator` parses the unified diff to extract valid new-side line numbers per file. Invalid positions are snapped to the nearest valid line (`TreeSet.floor`/`ceiling`).
 
@@ -159,7 +159,7 @@ After the agent returns findings, the server runs a 6-step delivery pipeline in 
 
 ## Bot command
 
-Students can type `/hephaestus review` in an MR comment to retrigger a review. The flow:
+Developers can type `/hephaestus review` in a change-request comment to retrigger a review. The flow:
 
 1. `GitLabNoteMessageHandler` detects the command prefix and publishes a `BotCommandReceivedEvent`
 2. `BotCommandProcessor` listens asynchronously, validates the PR state, evaluates the detection gate, and submits a new review job

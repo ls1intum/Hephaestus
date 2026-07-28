@@ -13,7 +13,7 @@ FEATURE GUIDELINES:
 - Link mockups/designs when available—even rough sketches help
 
 GOOD USER STORIES:
-  ✓ As a team lead, I want to export leaderboard data as CSV so that I can share metrics in presentations.
+  ✓ As a workspace admin, I want to add a repository to a token-managed workspace so that Hephaestus can review its activity.
   ✓ As a new user, I want to see an onboarding tour so that I understand the main features.
 
 BAD USER STORIES:
@@ -33,9 +33,9 @@ BAD USER STORIES:
      Write testable statements a reviewer can verify.
      
      Examples:
-     - [ ] CSV download button appears on leaderboard page
-     - [ ] Downloaded file includes all visible columns
-     - [ ] File name includes the current date
+     - [ ] The repository field accepts the `owner/name` format
+     - [ ] Selecting **Add** starts monitoring the repository
+     - [ ] The repository remains in the list after a page reload
 -->
 
 - [ ] 

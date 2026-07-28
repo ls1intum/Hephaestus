@@ -113,7 +113,7 @@ write good changesets, and what a version number promises all live in the
 - `mentor`: AI mentor (Heph)
 - `notifications`: Email/notification system
 - `profile`: User profiles
-- `teams`: Team competitions
+- `teams`: Team and membership management
 - `workspace`: Workspace management
 
 ### Examples

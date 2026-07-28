@@ -6,13 +6,12 @@ export function AboutCallToActionSection() {
 	return (
 		<section className="mt-20 mb-8 bg-gradient-to-br from-background to-muted/30 rounded-lg p-8 text-center border border-muted/50">
 			<Badge className="mb-4" variant="outline">
-				Get Involved
+				Get involved
 			</Badge>
-			<h2 className="text-3xl font-bold mb-4">Ready to Forge Something Great?</h2>
+			<h2 className="text-3xl font-bold mb-4">Contribute to Hephaestus</h2>
 			<p className="text-muted-foreground max-w-2xl mx-auto mb-8">
-				Hephaestus thrives on community contributions from developers of all skill levels. Whether
-				you're fixing bugs, adding features, or improving documentation, your expertise helps shape
-				our platform.
+				Fix a bug, improve the documentation, or propose a feature. Start with the repository or
+				read the contributor guide.
 			</p>
 			<div className="flex flex-col sm:flex-row gap-4 justify-center">
 				<Button
@@ -28,7 +27,7 @@ export function AboutCallToActionSection() {
 					}
 				>
 					<Github className="h-4 w-4" />
-					<span>GitHub Repository</span>
+					<span>View on GitHub</span>
 				</Button>
 				<Button
 					variant="outline"
@@ -41,7 +40,7 @@ export function AboutCallToActionSection() {
 						/>
 					}
 				>
-					<span>View Documentation</span>
+					<span>Read the contributor guide</span>
 				</Button>
 			</div>
 		</section>

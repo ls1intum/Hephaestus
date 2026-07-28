@@ -1,100 +1,113 @@
 ---
 id: ai-code-review
 sidebar_position: 4
-title: Automated Code Review
-description: How Hephaestus reviews your merge requests and provides practice-based feedback.
+title: Practice feedback
+description: How Hephaestus reviews pull requests, merge requests, and issues for engineering practices.
 ---
 
-Hephaestus automatically reviews your merge requests and gives you feedback on software engineering practices. When you open a non-draft merge request, the system analyzes your changes and posts comments highlighting what you did well and where you can improve.
+Practice feedback is feedback on an observable way of working, such as keeping a change reviewable, explaining why it is needed, or responding constructively to a reviewer.
 
-## How it works
+When practice reviews are enabled, Hephaestus uses AI to review eligible pull requests, merge requests, and issues against the practices configured for your workspace. It posts the resulting feedback as a comment on the work.
 
-1. **You open an MR** -- Create a merge request (non-draft)
-2. **Hephaestus analyzes** -- An AI agent reads your diff and evaluates it against the practices configured for your workspace
-3. **You get feedback** -- Hephaestus posts a summary comment on your MR. If issues are found, you also get inline notes on specific lines
+The feedback is advisory. It does not approve a change for merge, grade the developer, or replace human review.
 
-To re-run the review after pushing new commits, use the [`/hephaestus review`](#retriggering-a-review) command.
+## Pull requests and merge requests
 
-The review typically completes within 2--5 minutes, though large MRs may take longer.
+In this guide, **change request** means a GitHub pull request or a GitLab merge request.
 
-## Understanding the feedback
+### What happens
 
-### MR summary comment
+1. You open an eligible, non-draft change request.
+2. Hephaestus reads the change, its description, commits, and relevant discussion.
+3. It checks the work against the practices enabled for the workspace.
+4. It posts a summary comment. Feedback tied to a specific changed line can also appear as an inline comment.
 
-A summary comment appears at the top of your MR's discussion. When everything looks good, it posts a short approval. When issues are found, it contains:
+Reviews usually complete within 2 to 5 minutes. Large changes can take longer.
 
-- A count of blocking issues and improvements found
-- Named positive practices you demonstrated well (up to 2)
-- Detailed explanations for any issues that could not be pinpointed to a specific line (e.g., MR description quality, commit messages)
+### Read the summary
 
-A compact list of line-specific issues is also included, showing the file location where each inline note was posted.
+The summary can include:
 
-### Inline diff notes
+- a practice the work demonstrated well
+- a concern that applies to the whole change, such as a missing explanation or an unfocused set of commits
+- links to inline comments on specific changed lines
+- an explanation of why the practice matters and what to try next
 
-For issues tied to specific code locations, Hephaestus posts inline notes directly on the relevant lines. Each note includes:
+When Hephaestus finds a clear positive practice, the summary can name it. This is feedback on the practice, not an approval of the change.
 
-- What the issue is
-- Why it matters
-- How to fix it (often with a code suggestion)
+### Read inline comments
 
-### Severities
+For feedback tied to a changed line, an inline comment can explain:
 
-| Severity     | Meaning                                                |
-| ------------ | ------------------------------------------------------ |
-| **CRITICAL** | Security vulnerability, data loss, or production crash |
-| **MAJOR**    | Functional bug or missing safety mechanism             |
-| **MINOR**    | Style, naming, or minor readability concern            |
-| **INFO**     | Observation with no direct quality impact              |
+- what Hephaestus noticed
+- why it matters
+- what you could change
 
-## Retriggering a review
+Some comments include a suggested code change. Check it before applying it.
 
-If you want Hephaestus to re-analyze your MR (for example, after pushing new commits), post this as a comment on your MR:
+### Run the review again
+
+After you push new commits, add this comment at the start of a change-request comment:
 
 ```text
 /hephaestus review
 ```
 
-Hephaestus will run a fresh analysis and post updated feedback.
+The command is case-insensitive. Text before the command prevents it from being detected.
 
-:::note
-The command is case-insensitive (`/Hephaestus Review` works too) but must be at the **start** of the comment body. Text before the command (e.g., "Please /hephaestus review") will not be detected.
-:::
+The command is ignored for closed change requests. Whether manual review commands and reviews of merged requests are allowed depends on the workspace settings.
 
-:::caution
-Reviews are not triggered for closed or merged MRs, and the `/hephaestus review` command is ignored for them.
-:::
+### What code is reviewed
 
-## What gets reviewed
+Hephaestus evaluates lines added by the change request. Existing code can be used as context but is not reported as a new concern.
 
-Hephaestus evaluates the **lines you added** in the MR diff. Pre-existing code is used as context for understanding your changes but is never flagged. Some practices (like MR description quality and commit discipline) evaluate MR metadata rather than code.
+Some practices use change-request metadata instead of code, including the description, commit history, and review discussion.
 
-The specific practices evaluated depend on your workspace configuration. Common practices include:
+## Issues
 
-- **Security** -- Hardcoded secrets
-- **Reliability** -- Crash risks (`fatal-error-crash`), silent failures, error handling
-- **Design** -- View decomposition, logic separation, state ownership, preview quality, accessibility
-- **Code quality** -- Meaningful naming, code hygiene
-- **Process** -- MR description quality, commit discipline
+Hephaestus can also give practice feedback on issues. Depending on the practices configured for the workspace, a review can run when an issue is created, labeled, or closed.
 
-### Documentation the reviewer can read
+Issue feedback appears as a single comment. It can cover practices such as:
 
-If your workspace connects a team wiki ([Outline](https://www.getoutline.com/)), the reviewer can read the
-documents your work points at. Link an architecture decision record or design doc from the MR description or
-an issue and the reviewer reads that document rather than guessing at it, so feedback on practices like
-*"records significant decisions with rationale"* is grounded in what you actually wrote.
+- stating the observed and expected behaviour
+- giving enough information to reproduce a problem
+- keeping the issue focused on one concern
+- recording the reason for closing an issue
 
-Only the collections an administrator chose to mirror are ever read, the reviewer never writes anything back
-to the wiki, and a document that is deleted upstream is dropped from Hephaestus too. Connecting your own
-Outline account under **Settings → Connected accounts** lets the documents you authored be attributed to you.
+Closed issues do not receive a new feedback comment.
 
-## Opting out
+## Practices and severity
 
-You can suppress review **comments** in your user settings. Navigate to **Settings** in the Hephaestus web app and disable the **Practice review comments** toggle under **AI Review**. Each review comment also has a link to this setting in its footer.
+The exact practices depend on your workspace. Common areas include:
 
-:::info
-The preference suppresses comment delivery only. The review still runs and findings are stored in the database for instructor visibility.
-:::
+- packaging work for review
+- writing actionable issues
+- acting on review feedback
+- testing changes
+- maintainable code
+- security and reliability habits
 
-### Draft MRs
+Feedback can carry one of four severity labels:
 
-By default, draft (WIP) merge requests are not reviewed. After marking a draft MR as ready, use `/hephaestus review` to trigger a review.
+| Severity | Meaning |
+| --- | --- |
+| **CRITICAL** | A security vulnerability, data-loss risk, or production crash |
+| **MAJOR** | A functional problem or missing safety mechanism |
+| **MINOR** | A smaller maintainability, readability, or workflow concern |
+| **INFO** | An observation with no direct quality impact |
+
+Severity helps order the feedback. It is not a grade or merge decision.
+
+## Linked documentation
+
+If your workspace connects an [Outline](https://www.getoutline.com/) team wiki, Hephaestus can read selected documents linked from a change request or issue. This can help it use an architecture decision or design document instead of guessing at the missing context.
+
+Hephaestus only reads collections a workspace admin chose to mirror. It does not write to Outline. Connecting your own Outline account under **Settings → Connected accounts** lets Hephaestus attribute documents you wrote to you.
+
+## Stop receiving comments
+
+Open **Settings → Practice feedback** and turn off **Pull request comments** to stop Hephaestus from posting new practice-feedback comments on your pull requests or merge requests.
+
+This setting controls delivery only. Reviews can still run, and their findings are still stored and may be visible to workspace admins. It does not delete earlier comments or findings.
+
+Draft change requests are skipped when the workspace's **Skip drafts** setting is on. Marking a draft ready does not always start a review by itself; use `/hephaestus review` when manual review commands are enabled.

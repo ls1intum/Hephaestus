@@ -6,9 +6,9 @@ const projectManager: ProjectManager = {
 	id: 5898705,
 	login: "felixtjdietrich",
 	name: "Felix T.J. Dietrich",
-	title: "Project Architect & Vision Lead",
+	title: "Project lead",
 	description:
-		"Forging Hephaestus from concept to reality, Felix combines technical mastery with a passion for creating tools that empower software teams to achieve their full potential through data-driven insights and collaborative learning.",
+		"Felix started Hephaestus as part of his doctoral research at TUM and leads the open-source project. His research studies how feedback on day-to-day software work can support developer learning.",
 	avatarUrl: "https://avatars.githubusercontent.com/u/5898705",
 	htmlUrl: "https://github.com/felixtjdietrich",
 	websiteUrl: "https://aet.cit.tum.de/people/dietrich/",
@@ -76,7 +76,7 @@ const mockContributors = [
 
 /**
  * About page component that showcases the Hephaestus project, highlighting its mission and team.
- * Features a clean hero section, focused feature cards, engaging testimonials, and team information.
+ * Features a hero section, a product overview, and team information.
  * Gracefully handles loading and error states with appropriate visual feedback.
  */
 const meta = {
@@ -120,7 +120,7 @@ type Story = StoryObj<typeof meta>;
 
 /**
  * The showcase view displays the full About page with mission statement, features,
- * testimonials, and a complete list of contributors.
+ * and a complete list of contributors.
  */
 export const Showcase: Story = {
 	args: {

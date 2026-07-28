@@ -19,9 +19,9 @@ export function AboutTeamSection({
 	return (
 		<section>
 			<Badge className="mb-4" variant="outline">
-				Our People
+				Our people
 			</Badge>
-			<h2 className="text-3xl font-bold mb-10">The Team</h2>
+			<h2 className="text-3xl font-bold mb-10">The team</h2>
 			<ProjectManagerCard projectManager={projectManager} />
 			<ContributorSection
 				contributors={contributors}

@@ -3,7 +3,7 @@ import { Switch } from "@/components/ui/switch";
 
 export interface AiReviewSectionProps {
 	/**
-	 * Whether the user has AI review comments enabled
+	 * Whether the user receives practice-feedback comments
 	 */
 	aiReviewEnabled: boolean;
 	/**
@@ -31,18 +31,21 @@ export function AiReviewSection({
 		<section className="space-y-4" aria-labelledby="ai-review-heading">
 			<div className="space-y-1">
 				<h2 id="ai-review-heading" className="text-xl font-semibold">
-					AI Review
+					Practice feedback
 				</h2>
-				<p className="text-sm text-muted-foreground">Configure AI-powered feedback on your code</p>
+				<p className="text-sm text-muted-foreground">
+					Choose whether Hephaestus posts AI-generated feedback on your change requests
+				</p>
 			</div>
 
 			<div className="flex items-start justify-between gap-6 py-4">
 				<div className="space-y-1 flex-1">
 					<Label htmlFor="ai-review-comments" className="text-base font-medium cursor-pointer">
-						Practice review comments
+						Pull request comments
 					</Label>
 					<p className="text-sm text-muted-foreground leading-relaxed">
-						Receive AI-generated practice review comments on your pull requests.
+						Turn off new comments on your pull requests and merge requests. Reviews still run, and
+						their findings remain available to workspace admins.
 					</p>
 				</div>
 				<Switch
@@ -52,7 +55,7 @@ export function AiReviewSection({
 					onCheckedChange={onToggleAiReview}
 					disabled={pending}
 					aria-busy={pending}
-					aria-label="Toggle AI review comments"
+					aria-label="Toggle practice feedback comments"
 				/>
 			</div>
 		</section>

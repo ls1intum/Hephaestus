@@ -123,6 +123,12 @@ jobs:
               pnpm exec playwright install chromium --with-deps
               # Bound browser-runner deadlocks without coupling CI to the current suite duration.
               timeout --kill-after=30s 15m pnpm run test:storybook
+              pnpm run export:readme-assets
+              if [[ -n "$(git status --porcelain --untracked-files=all -- ../docs/images/readme)" ]]; then
+                echo "::error::README images are stale. Run 'pnpm --filter webapp run export:readme-assets' and commit the result."
+                git status --short --untracked-files=all -- ../docs/images/readme
+                exit 1
+              fi
               ;;
             "webapp-visual")
               pnpm run build-storybook

@@ -2,45 +2,62 @@
 id: workspace
 sidebar_position: 3
 title: Workspace basics
-description: Understand how the default Hephaestus workspace mirrors your GitHub organisation today.
+description: Understand how workspaces separate repositories, members, practices, integrations, and settings.
 ---
 
-Hephaestus currently operates with a single workspace per deployment. When the GitHub App is installed for your organisation, that workspace is provisioned automatically and mirrors the repositories and teams already defined in GitHub. There is no separate invite flow or manual workspace maintenance inside the app.
+A workspace contains the repositories, members, teams, practice catalog, integrations, and feature settings for one group. A Hephaestus deployment can host more than one workspace, and a person can belong to several.
 
-:::info Who controls access?
-GitHub organisation owners manage access by deciding which repositories the Hephaestus GitHub App can read and by assigning members to GitHub teams. Those changes sync into Hephaestus within a few minutes.
-:::
+Use the workspace switcher at the top of the sidebar to move between the workspaces you can access.
 
-## Repository coverage
+## Create a workspace
 
-Hephaestus syncs activity from every repository the GitHub App installation has been granted. To adjust which projects appear:
+Who can create workspaces depends on the deployment. The default policy limits creation to instance admins.
 
-1. Open your organisation settings in GitHub.
-2. Review the **Installed GitHub Apps** section and locate **Hephaestus**.
-3. Update the repository access (all repositories or a curated subset).
-4. Save the changes – Hephaestus picks them up automatically during the next sync cycle.
+When creation is available:
 
-Expect the first sync to take several minutes depending on repository history. Subsequent updates arrive within a few minutes of GitHub activity.
+- **GitHub:** install the Hephaestus GitHub App on an organisation. Hephaestus creates the workspace from the installation.
+- **GitLab:** connect a supported GitLab instance with an access token, choose a group, and finish the creation wizard.
 
-:::tip Need to exclude a repository quickly?
-Temporarily remove it from the GitHub App installation. There is currently no in-app toggle inside Hephaestus.
-:::
+If **Create workspace** is not available to you, ask an instance admin.
 
-## Teams and membership
+## Repositories
 
-Leaderboard filters and mentoring cohorts are sourced from GitHub teams. If you need to change who appears in a team or which repositories the team owns:
+How repository access is managed depends on the connection:
 
-1. Manage the team directly in GitHub (add or remove members, adjust repositories, or rename the team).
-2. Hephaestus will mirror those changes automatically – no additional confirmation is required.
+- For a **GitHub App** workspace, change repository access in the app installation on GitHub. Hephaestus mirrors the repositories granted to the app.
+- For a **token-managed** workspace, a workspace admin can open **Admin → Integrations**, enter a repository as `owner/name`, and select **Add**. Removing a monitored repository permanently deletes the data Hephaestus mirrored from it; the upstream repository is not changed.
 
-Because teams are read-only inside Hephaestus today, any inconsistencies need to be resolved in GitHub or by contacting your organisation maintainer.
+Initial sync time depends on the size and history of the connected repositories. Later changes are picked up by webhooks and scheduled reconciliation.
 
-:::tip Keep data focused
-If you organise large classes or multi-team projects, continue to use GitHub labels alongside teams. Hephaestus will inherit both, letting you filter analytics without extra configuration steps.
-:::
+## Members and teams
+
+Members and teams are scoped to one workspace.
+
+- GitHub App workspaces mirror organisation members, teams, and repository access from GitHub.
+- GitLab workspaces mirror the connected group and its projects.
+- Workspace admins can review membership and role information in **Admin**.
+
+If source-managed membership is wrong, correct it in GitHub or GitLab and wait for the next sync.
+
+## Practices and AI
+
+Workspace admins choose:
+
+- which engineering practices are active
+- whether practice reviews run automatically or can be triggered manually
+- whether Heph is available
+- which connected AI model powers practice reviews and Heph
+- the monthly AI spending cap
+
+These settings apply only to that workspace.
+
+## Optional features
+
+Workspace admins can separately enable achievements, the leaderboard, progression, leagues, and Slack. A feature that is off does not appear in the member navigation.
 
 ## Troubleshooting
 
-- **Repository missing?** Confirm the GitHub organisation owner granted the Hephaestus app access to the repository.
-- **Team not visible in filters?** Ensure the GitHub team contains at least one repository and one member.
-- **Need to migrate workspace data?** Contact the Hephaestus support team with the workspace ID so they can assist.
+- **Workspace missing?** Confirm that you are signed in with an identity linked to a workspace member.
+- **Repository missing?** Check the GitHub App installation or the monitored repository list, depending on the connection type.
+- **Team missing?** Confirm that the team exists in the connected source platform and has synced.
+- **Feature missing?** Ask a workspace admin whether it is enabled and whether your account has access.
