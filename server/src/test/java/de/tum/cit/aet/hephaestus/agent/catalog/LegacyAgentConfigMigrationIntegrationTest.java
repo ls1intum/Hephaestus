@@ -68,7 +68,7 @@ class LegacyAgentConfigMigrationIntegrationTest {
     @BeforeAll
     static void migrateAcrossSeededLegacyData() throws Exception {
         assertThat(updateUpToTheReleaseChangelog())
-            .as("the release changelog must still be the tail of master.xml for this test to mean anything")
+            .as("the release changelog must still contribute unrun changesets for this test to mean anything")
             .isPositive();
         try (Liquibase liquibase = liquibase()) {
             liquibase.tag(PRE_RELEASE_TAG);
@@ -361,11 +361,20 @@ class LegacyAgentConfigMigrationIntegrationTest {
     private static int updateUpToTheReleaseChangelog() throws Exception {
         try (Liquibase liquibase = liquibase()) {
             List<ChangeSet> pending = liquibase.listUnrunChangeSets(contexts(), new LabelExpression());
+            // Count the changesets that come BEFORE the release changelog by position, not as
+            // (total - release): master.xml is append-only, so every later branch adds changelogs
+            // after this one. The subtraction would then apply that many changesets too MANY —
+            // pushing the first release changeset in ahead of PRE_RELEASE_TAG, so the tag lands on a
+            // release row that @Order(90) later deletes and the rollback cannot find its tag.
+            int before = 0;
+            while (before < pending.size() && !pending.get(before).getFilePath().endsWith(RELEASE_CHANGELOG)) {
+                before++;
+            }
             long release = pending
                 .stream()
                 .filter(cs -> cs.getFilePath().endsWith(RELEASE_CHANGELOG))
                 .count();
-            liquibase.update((int) (pending.size() - release), contexts(), new LabelExpression());
+            liquibase.update(before, contexts(), new LabelExpression());
             return (int) release;
         }
     }
