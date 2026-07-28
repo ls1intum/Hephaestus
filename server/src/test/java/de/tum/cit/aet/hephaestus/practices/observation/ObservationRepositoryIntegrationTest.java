@@ -8,6 +8,12 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
@@ -17,14 +23,19 @@ import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
+import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.AreaStandingRow;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.PresenceCount;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.SeverityCount;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryProjection;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamRepositorySettings;
+import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamRepositorySettingsRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -61,6 +72,18 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private IdentityProviderRepository gitProviderRepository;
+
+    @Autowired
+    private RepositoryRepository repositoryRepository;
+
+    @Autowired
+    private TeamRepository teamRepository;
+
+    @Autowired
+    private WorkspaceTeamRepositorySettingsRepository workspaceTeamRepositorySettingsRepository;
+
+    @Autowired
+    private PullRequestRepository pullRequestRepository;
 
     private Workspace workspace;
     private Practice practice;
@@ -918,6 +941,298 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 at
             );
+        }
+    }
+
+    @Nested
+    class LatestRunTiebreakTests {
+
+        private AgentJob anotherJob() {
+            AgentJob job = new AgentJob();
+            job.setWorkspace(workspace);
+            job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
+            job.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
+            return agentJobRepository.save(job);
+        }
+
+        private void insert(String key, UUID jobId, long artifactId, String presence, Instant at) {
+            insert(key, jobId, practice, artifactId, presence, at);
+        }
+
+        private void insert(
+            String key,
+            UUID jobId,
+            Practice targetPractice,
+            long artifactId,
+            String presence,
+            Instant at
+        ) {
+            observationRepository.insertIfAbsent(
+                UUID.randomUUID(),
+                key,
+                jobId,
+                targetPractice.getId(),
+                null,
+                "PULL_REQUEST",
+                artifactId,
+                aboutUser.getId(),
+                "Tiebreak observation",
+                presence,
+                "PRESENT".equals(presence) ? "GOOD" : "BAD",
+                "INFO",
+                0.9f,
+                null,
+                null,
+                null,
+                at
+            );
+        }
+
+        @Test
+        @DisplayName("equal observed_at timestamps tiebreak on agent_job_id, deterministically")
+        void tiebreaksEqualTimestampsByAgentJobId() {
+            PracticeArea area = new PracticeArea();
+            area.setWorkspace(workspace);
+            area.setSlug("tie-area");
+            area.setName("Tie area");
+            practice.setArea(practiceAreaRepository.save(area));
+            practice = practiceRepository.save(practice);
+
+            AgentJob jobA = anotherJob();
+            AgentJob jobB = anotherJob();
+            AgentJob winner = jobA.getId().toString().compareTo(jobB.getId().toString()) > 0 ? jobA : jobB;
+            AgentJob loser = winner == jobA ? jobB : jobA;
+
+            Instant sameInstant = Instant.parse("2026-03-20T10:00:00Z");
+            insert("tb-loser", loser.getId(), 42L, "ABSENT", sameInstant);
+            insert("tb-winner", winner.getId(), 42L, "PRESENT", sameInstant);
+
+            List<DeveloperPracticeSummaryProjection> summary = observationRepository.findSummaryByDeveloperAndWorkspace(
+                aboutUser.getId(),
+                workspace.getId()
+            );
+            assertThat(summary).hasSize(1);
+            assertThat(summary.get(0).getTotalObservations()).isEqualTo(1L);
+            assertThat(summary.get(0).getGoodCount()).isEqualTo(1L);
+            assertThat(summary.get(0).getBadCount()).isEqualTo(0L);
+
+            List<DeveloperPracticeSummary> practiceSummary = observationRepository.findDeveloperPracticeSummary(
+                aboutUser.getId(),
+                workspace.getId()
+            );
+            assertThat(practiceSummary).hasSize(1);
+            assertThat(practiceSummary.get(0).getCount()).isEqualTo(1L);
+
+            List<Observation> recent = observationRepository.findRecentByDeveloperAndWorkspace(
+                aboutUser.getId(),
+                workspace.getId(),
+                Instant.parse("2026-01-01T00:00:00Z"),
+                PageRequest.of(0, 10)
+            );
+            assertThat(recent).extracting(Observation::getPresence).containsExactly(Presence.PRESENT);
+
+            List<SeverityCount> severities = observationRepository.countBySeverityForDeveloper(
+                aboutUser.getId(),
+                workspace.getId(),
+                Instant.parse("2026-01-01T00:00:00Z")
+            );
+            assertThat(severities).hasSize(1);
+            assertThat(severities.get(0).getCount()).isEqualTo(1L);
+
+            List<PresenceCount> presences = observationRepository.countByPresenceForDeveloper(
+                aboutUser.getId(),
+                workspace.getId(),
+                Instant.parse("2026-01-01T00:00:00Z")
+            );
+            assertThat(presences).hasSize(1);
+            assertThat(presences.get(0).getPresence()).isEqualTo(Presence.PRESENT);
+            assertThat(presences.get(0).getCount()).isEqualTo(1L);
+
+            List<AreaStandingRow> standing = observationRepository.findAreaStandingByDeveloperAndWorkspace(
+                aboutUser.getId(),
+                workspace.getId(),
+                Instant.parse("2026-01-01T00:00:00Z"),
+                Instant.parse("2026-01-01T00:00:00Z")
+            );
+            assertThat(standing).hasSize(1);
+            assertThat(standing.get(0).getCount()).isEqualTo(1L);
+        }
+
+        @Test
+        @DisplayName("latest runs are selected within the requested workspace")
+        void scopesLatestRunToWorkspace() {
+            long artifactId = 42L;
+            insert("workspace-a", agentJob.getId(), artifactId, "PRESENT", Instant.parse("2026-03-20T10:00:00Z"));
+
+            Workspace otherWorkspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("finding-other"));
+            Practice otherPractice = new Practice();
+            otherPractice.setWorkspace(otherWorkspace);
+            otherPractice.setSlug("other-practice");
+            otherPractice.setName("Other Practice");
+            otherPractice.setCriteria("Other criteria");
+            otherPractice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
+            otherPractice = practiceRepository.save(otherPractice);
+
+            AgentJob otherJob = new AgentJob();
+            otherJob.setWorkspace(otherWorkspace);
+            otherJob.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
+            otherJob.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
+            otherJob = agentJobRepository.save(otherJob);
+            insert(
+                "workspace-b",
+                otherJob.getId(),
+                otherPractice,
+                artifactId,
+                "ABSENT",
+                Instant.parse("2026-03-20T11:00:00Z")
+            );
+
+            List<DeveloperPracticeSummaryProjection> summary = observationRepository.findSummaryByDeveloperAndWorkspace(
+                aboutUser.getId(),
+                workspace.getId()
+            );
+
+            assertThat(summary).hasSize(1);
+            assertThat(summary.get(0).getGoodCount()).isEqualTo(1L);
+            assertThat(summary.get(0).getBadCount()).isZero();
+        }
+    }
+
+    @Nested
+    class HiddenRepositoryExclusionTests {
+
+        @Test
+        @DisplayName("observations on hidden-repository artifacts are excluded from all aggregate serving queries")
+        void excludesHiddenRepositoryObservationsOnAggregateServingQueries() {
+            PracticeArea area = new PracticeArea();
+            area.setWorkspace(workspace);
+            area.setSlug("robust-error-handling");
+            area.setName("Handling failure robustly");
+            area = practiceAreaRepository.save(area);
+            practice.setArea(area);
+            practice = practiceRepository.save(practice);
+
+            PullRequest visiblePr = persistPullRequest("test-org/visible-repo", 201L, false);
+            PullRequest hiddenPr = persistPullRequest("test-org/hidden-repo", 202L, true);
+            insertBad("visible-repo-bad", visiblePr.getId(), Instant.parse("2026-03-20T10:00:00Z"));
+            insertBad("hidden-repo-bad", hiddenPr.getId(), Instant.parse("2026-03-20T11:00:00Z"));
+
+            Instant since = Instant.parse("2026-01-01T00:00:00Z");
+
+            List<DeveloperPracticeSummaryProjection> summary = observationRepository.findSummaryByDeveloperAndWorkspace(
+                aboutUser.getId(),
+                workspace.getId()
+            );
+            assertThat(summary).hasSize(1);
+            assertThat(summary.get(0).getTotalObservations()).isEqualTo(1L);
+            assertThat(summary.get(0).getLastObservedAt()).isEqualTo(Instant.parse("2026-03-20T10:00:00Z"));
+
+            List<DeveloperPracticeSummary> practiceSummary = observationRepository.findDeveloperPracticeSummary(
+                aboutUser.getId(),
+                workspace.getId()
+            );
+            assertThat(practiceSummary).hasSize(1);
+            assertThat(practiceSummary.get(0).getCount()).isEqualTo(1L);
+
+            List<Observation> recent = observationRepository.findRecentByDeveloperAndWorkspace(
+                aboutUser.getId(),
+                workspace.getId(),
+                since,
+                PageRequest.of(0, 50)
+            );
+            assertThat(recent).extracting(Observation::getArtifactId).containsExactly(visiblePr.getId());
+
+            List<SeverityCount> severities = observationRepository.countBySeverityForDeveloper(
+                aboutUser.getId(),
+                workspace.getId(),
+                since
+            );
+            assertThat(severities).hasSize(1);
+            assertThat(severities.get(0).getSeverity()).isEqualTo(Severity.MAJOR);
+            assertThat(severities.get(0).getCount()).isEqualTo(1L);
+
+            List<PresenceCount> presences = observationRepository.countByPresenceForDeveloper(
+                aboutUser.getId(),
+                workspace.getId(),
+                since
+            );
+            assertThat(presences).hasSize(1);
+            assertThat(presences.get(0).getCount()).isEqualTo(1L);
+
+            List<AreaStandingRow> standing = observationRepository.findAreaStandingByDeveloperAndWorkspace(
+                aboutUser.getId(),
+                workspace.getId(),
+                since,
+                since
+            );
+            assertThat(standing).hasSize(1);
+            assertThat(standing.get(0).getCount()).isEqualTo(1L);
+            assertThat(standing.get(0).getDistinctTargets()).isEqualTo(1L);
+        }
+
+        private void insertBad(String key, long artifactId, Instant at) {
+            observationRepository.insertIfAbsent(
+                UUID.randomUUID(),
+                key,
+                agentJob.getId(),
+                practice.getId(),
+                null,
+                "PULL_REQUEST",
+                artifactId,
+                aboutUser.getId(),
+                "Hidden-repo exclusion observation",
+                "ABSENT",
+                "BAD",
+                "MAJOR",
+                0.9f,
+                null,
+                null,
+                null,
+                at
+            );
+        }
+
+        private PullRequest persistPullRequest(String nameWithOwner, long nativeId, boolean hiddenFromContributions) {
+            IdentityProvider provider = gitProviderRepository
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseThrow();
+
+            Repository repo = new Repository();
+            repo.setNativeId(nativeId);
+            repo.setProvider(provider);
+            repo.setName(nameWithOwner.substring(nameWithOwner.indexOf('/') + 1));
+            repo.setNameWithOwner(nameWithOwner);
+            repo.setHtmlUrl("https://github.com/" + nameWithOwner);
+            repo.setDefaultBranch("main");
+            repo.setCreatedAt(Instant.now());
+            repo.setUpdatedAt(Instant.now());
+            repo.setPushedAt(Instant.now());
+            repo = repositoryRepository.save(repo);
+
+            if (hiddenFromContributions) {
+                Team team = new Team();
+                team.setNativeId(nativeId);
+                team.setProvider(provider);
+                team.setName("team-" + nativeId);
+                team.setSlug("team-" + nativeId);
+                team.setPrivacy(Team.Privacy.VISIBLE);
+                team = teamRepository.save(team);
+
+                WorkspaceTeamRepositorySettings settings = new WorkspaceTeamRepositorySettings(workspace, team, repo);
+                settings.setHiddenFromContributions(true);
+                workspaceTeamRepositorySettingsRepository.save(settings);
+            }
+
+            PullRequest pr = new PullRequest();
+            pr.setNativeId(nativeId);
+            pr.setProvider(provider);
+            pr.setNumber((int) nativeId);
+            pr.setTitle("PR " + nativeId);
+            pr.setState(PullRequest.State.OPEN);
+            pr.setRepository(repo);
+            pr.setCreatedAt(Instant.now());
+            pr.setUpdatedAt(Instant.now());
+            return pullRequestRepository.save(pr);
         }
     }
 }

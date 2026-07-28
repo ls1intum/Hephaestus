@@ -1,10 +1,7 @@
 #!/usr/bin/env bash
 #
-# e2e-setup.sh — one command to make a running local stack ready for an authentic practice-detection
-# review against a REAL GitLab/GitHub repo + a REAL LLM. Given credentials through environment
-# variables, it does the rest
-# through the dev-login API: connect the workspace, wire the LLM runtime, create the practices, and
-# print the trigger. Idempotent — safe to re-run.
+# Configures a running local stack for a live practice-detection review against an SCM repository and
+# an OpenAI-compatible model. Idempotent; credentials are accepted only through environment variables.
 #
 # Prereq: the app booted with the `local,e2e` profiles (dev-login + cookie-secure=false +
 # gitlab-workspace-creation + dev-trigger — all on in the `e2e` profile; see application-e2e.yml) and
@@ -28,7 +25,7 @@ LLM_PRICING_MODE="${E2E_LLM_PRICING_MODE:-}"; LLM_INPUT_USD="${E2E_LLM_INPUT_USD
 LLM_OUTPUT_USD="${E2E_LLM_OUTPUT_USD:-}"; LLM_PRICE_NOTE="${E2E_LLM_PRICE_NOTE:-}"
 WS_SLUG="${E2E_WS_SLUG:-e2e}"; ACCOUNT_LOGIN="${E2E_ACCOUNT_LOGIN:-}"; ACCOUNT_TYPE="${E2E_ACCOUNT_TYPE:-ORG}"
 USERNAME="${E2E_USERNAME:-e2e}"; REPO="${E2E_REPO:-}"; PR_ID="${E2E_PR_ID:-}"
-APP_URL="${E2E_APP_URL:-http://localhost:38080}"
+APP_URL="${E2E_APP_URL:-http://localhost:8080}"
 DB_URL="${E2E_DB_URL:-postgresql://root:root@localhost:5432/hephaestus}"
 while [ $# -gt 0 ]; do case "$1" in
   --provider) PROVIDER="$2"; shift 2;;
@@ -52,6 +49,7 @@ for c in curl jq psql python3; do command -v "$c" >/dev/null || die "missing dep
 # on every exit; files are readable only by this user.
 SECRET_DIR="$(mktemp -d)"; chmod 700 "$SECRET_DIR"; trap 'rm -rf "$SECRET_DIR"' EXIT
 AUTH_HEADER_FILE="$SECRET_DIR/app-auth-header"; SCM_HEADER_FILE="$SECRET_DIR/scm-auth-header"
+LLM_HEADER_FILE="$SECRET_DIR/llm-auth-header"
 PG_SERVICE_FILE="$SECRET_DIR/pg_service.conf"
 E2E_PRIVATE_DB_URL="$DB_URL" python3 >"$PG_SERVICE_FILE" <<'PY'
 import os
@@ -60,6 +58,8 @@ from urllib.parse import parse_qs, unquote, urlparse
 url = urlparse(os.environ["E2E_PRIVATE_DB_URL"])
 if url.scheme not in {"postgres", "postgresql"} or not url.hostname or not url.path.strip("/"):
     raise SystemExit("E2E_DB_URL must be a postgresql:// URL")
+if url.hostname not in {"localhost", "127.0.0.1", "::1"}:
+    raise SystemExit("E2E_DB_URL must target a loopback database")
 
 def service_value(value: str) -> str:
     if "\n" in value or "\r" in value:
@@ -103,6 +103,15 @@ case "$APP_URL" in
   http://localhost:*|http://127.0.0.1:*|http://\[::1\]:*) ;;
   *) die "E2E_APP_URL must be a loopback URL; never expose the passwordless e2e profile publicly" ;;
 esac
+if [ "$LLM_AUTH_MODE" = API_KEY ]; then
+  printf 'api-key: %s\n' "$LLM_KEY" >"$LLM_HEADER_FILE"
+else
+  printf 'authorization: Bearer %s\n' "$LLM_KEY" >"$LLM_HEADER_FILE"
+fi
+chmod 600 "$LLM_HEADER_FILE"
+curl -fsS -m10 -H @"$LLM_HEADER_FILE" "${LLM_BASE_URL%/}/models" |
+  jq -e --arg model "$MODEL" 'any(.data[]?; .id == $model)' >/dev/null ||
+  die "the configured model is not listed by the LLM provider"
 curl -fsS -m5 "$APP_URL/identity-providers" >/dev/null || die "app not reachable at $APP_URL (run the app with the 'local' profile first)"
 
 # ---- 1. dev-login → bearer JWT (cookie value is the JWT; Bearer is CSRF-exempt) --
@@ -112,8 +121,12 @@ set_jwt() { JWT="$1"; printf 'authorization: Bearer %s\n' "$JWT" >"$AUTH_HEADER_
 set_jwt "$(login)"; [ -n "$JWT" ] || die "dev-login failed (is dev-login-enabled on? need the 'local' profile)"
 api() { local m="$1" p="$2"; shift 2; curl -fsS -m30 -X "$m" "$APP_URL$p" -H @"$AUTH_HEADER_FILE" "$@"; }
 ACCOUNT_ID="$(api GET /user | jq -r '.id')"; say "dev-login OK (app-admin)"
+[[ "$ACCOUNT_ID" =~ ^[0-9]+$ ]] || die "dev-login returned an invalid account id"
+DB_ACCOUNT_EXISTS="$(psql_e2e -tAqc "SELECT EXISTS (SELECT 1 FROM account WHERE id = $ACCOUNT_ID)")"
+[ "$DB_ACCOUNT_EXISTS" = t ] ||
+  die "E2E_APP_URL and E2E_DB_URL do not point to the same application database"
 
-# ---- 2. resolve the REAL SCM user behind the PAT ---------------------------
+# ---- 2. resolve the SCM user behind the PAT --------------------------------
 if [ "$PROVIDER" = github ]; then
   printf 'authorization: Bearer %s\n' "$PAT" >"$SCM_HEADER_FILE"; chmod 600 "$SCM_HEADER_FILE"
   SCM_JSON="$(curl -fsS -m10 -H @"$SCM_HEADER_FILE" https://api.github.com/user)"
@@ -136,9 +149,7 @@ say "resolved the SCM user behind the PAT"
 q() { psql_e2e -v ON_ERROR_STOP=1 -tAqc "$1"; }   # one statement, fail closed, value-only output
 PROVIDER_ID="$(q "INSERT INTO identity_provider (type, server_url, created_at) VALUES ('$KIND','$PROVIDER_ORIGIN',now()) ON CONFLICT (type, server_url) DO UPDATE SET server_url=EXCLUDED.server_url RETURNING id")"
 USER_ID="$(q "INSERT INTO \"user\" (native_id, provider_id, login, type, avatar_url, html_url, created_at, updated_at) VALUES ($SCM_ID,$PROVIDER_ID,'$SCM_LOGIN','USER','','$PROVIDER_ORIGIN/$SCM_LOGIN',now(),now()) ON CONFLICT (provider_id, native_id) DO UPDATE SET login=EXCLUDED.login RETURNING id")"
-# Target the account-scoped unique index so a same-account re-run is idempotent, while a *cross-account*
-# collision on (git_provider_id, subject) — a genuine misconfig — still surfaces loudly via the other
-# unique index (matching identity_link's uq_identity_link_active_per_provider, added in 1780825201546).
+# Keep same-account reruns idempotent while surfacing cross-account identity collisions.
 q "INSERT INTO identity_link (account_id, provider_id, subject, linked_at, linked_via, external_actor_id, username_at_signup) VALUES ($ACCOUNT_ID,$PROVIDER_ID,'$SCM_ID',now(),'OAUTH_LOGIN',$USER_ID,'$SCM_LOGIN') ON CONFLICT (account_id, provider_id, COALESCE(team_id, '')) WHERE disabled_at IS NULL DO NOTHING" >/dev/null
 # Mentor access is an account-scoped authorization flag, not implied by app-admin. Grant it only to
 # this disposable E2E account, then re-issue the JWT so the authority is present immediately.
@@ -185,10 +196,12 @@ say "target workspace is ready and the disposable account is an admin member"
 # API-created workspaces default practices OFF — enable it (+ auto/manual triggers) so detection runs.
 api PATCH "/workspaces/$WS_SLUG/features" -H 'content-type: application/json' \
   -d '{"practicesEnabled":true,"mentorEnabled":true,"practiceReviewAutoTriggerEnabled":true,"practiceReviewManualTriggerEnabled":true}' >/dev/null
+api PATCH "/workspaces/$WS_SLUG/practices/review-settings" -H 'content-type: application/json' \
+  -d '{"cooldownMinutes":0}' >/dev/null
 say "practice detection and mentor enabled on the workspace"
 
 # ---- 5. OpenAI-compatible catalog + runtime bindings ----------------------
-# Keep the real key in the connection catalog. It never enters an agent binding, SQL, or a sandbox.
+# The provider key stays in the connection catalog and never enters the sandbox.
 SETTINGS="$(api GET /admin/llm/settings)"
 if [ "$(echo "$SETTINGS" | jq -r '.allowWorkspaceConnections')" != true ]; then
   api PUT /admin/llm/settings -H 'content-type: application/json' \
@@ -237,8 +250,7 @@ fi
 api PATCH "/workspaces/$WS_SLUG/llm/connections/$CONNECTION_ID" -H 'content-type: application/json' -d '{"enabled":true}' >/dev/null
 api PATCH "/workspaces/$WS_SLUG/llm/models/$MODEL_ID" -H 'content-type: application/json' -d '{"enabled":true}' >/dev/null
 
-# One binding per purpose (#1368): the binding IS the configuration — there is no named config to
-# create first and point at afterwards. PUT is an upsert, so re-running this script re-binds in place.
+# PUT is an upsert, so re-running the script refreshes both purpose bindings.
 BINDING_BODY="$(jq -nc --argjson m "$MODEL_ID" \
   '{workspaceModelId:$m,enabled:true,timeoutSeconds:1200,maxConcurrentJobs:1,allowInternet:true}')"
 for PURPOSE in PRACTICE_DETECTION MENTOR; do
@@ -264,6 +276,10 @@ practice() { local slug="$1" name="$2" trig="$3" crit="$4" body
     -H 'content-type: application/json' -d '{"active":true}' >/dev/null
 }
 PRACTICES="$(api GET "/workspaces/$WS_SLUG/practices")"
+while IFS= read -r slug; do
+  api PATCH "/workspaces/$WS_SLUG/practices/$slug/active" \
+    -H 'content-type: application/json' -d '{"active":false}' >/dev/null
+done < <(echo "$PRACTICES" | jq -r '.[] | select(.active) | .slug')
 practice submit-reviewable-work "Submit reviewable work" '["PullRequestCreated","PullRequestReady","PullRequestSynchronized"]' \
   "The MR is appropriately scoped, has a clear description, passes CI, and is not a draft dump. Flag oversized/unfocused MRs and missing descriptions."
 practice act-on-feedback "Act on feedback" '["ReviewSubmitted","PullRequestSynchronized"]' \

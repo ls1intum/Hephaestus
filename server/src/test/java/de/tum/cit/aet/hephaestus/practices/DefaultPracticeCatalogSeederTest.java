@@ -4,12 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
@@ -17,12 +19,14 @@ import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import de.tum.cit.aet.hephaestus.workspace.events.WorkspaceCreatedEvent;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.springframework.core.task.AsyncTaskExecutor;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -43,7 +47,13 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     @Mock
     private WorkspaceRepository workspaceRepository;
 
+    private final AsyncTaskExecutor directExecutor = Runnable::run;
+
     private DefaultPracticeCatalogSeeder seeder(boolean enabled) {
+        return seeder(enabled, directExecutor);
+    }
+
+    private DefaultPracticeCatalogSeeder seeder(boolean enabled, AsyncTaskExecutor executor) {
         return new DefaultPracticeCatalogSeeder(
             enabled,
             JsonMapper.builder().build(),
@@ -51,7 +61,8 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
             practiceService,
             areaRepository,
             practiceRepository,
-            workspaceRepository
+            workspaceRepository,
+            executor
         );
     }
 
@@ -118,6 +129,21 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
             };
             assertThat(preamble).containsIgnoringCase(expectedFocusWord);
         }
+    }
+
+    @Test
+    void startup_reconcilesEveryWorkspace() {
+        Workspace first = new Workspace();
+        first.setId(1L);
+        Workspace second = new Workspace();
+        second.setId(2L);
+        when(workspaceRepository.findAll()).thenReturn(List.of(second, first));
+        when(areaRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(false);
+
+        seeder(true).seed();
+
+        verify(areaService, times(24)).createArea(any(), any(), any());
+        verify(practiceService, times(74)).createPractice(any(), any());
     }
 
     @Test
@@ -191,12 +217,75 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     }
 
     @Test
+    void onWorkspaceCreated_dispatchesCatalogSeeding() {
+        AsyncTaskExecutor executor = org.mockito.Mockito.mock(AsyncTaskExecutor.class);
+        when(workspaceRepository.findById(7L)).thenReturn(Optional.of(new Workspace()));
+        when(areaRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(false);
+        when(practiceRepository.findByWorkspaceIdAndSlug(any(), any())).thenReturn(Optional.empty());
+
+        seeder(true, executor).onWorkspaceCreated(new WorkspaceCreatedEvent(7L, IntegrationKind.GITLAB));
+
+        var task = ArgumentCaptor.forClass(Runnable.class);
+        verify(executor).execute(task.capture());
+        verifyNoInteractions(workspaceRepository, areaService, practiceService);
+
+        task.getValue().run();
+
+        verify(areaService, times(12)).createArea(any(), any(), any());
+        verify(practiceService, times(37)).createPractice(any(), any());
+        verify(areaService, times(37)).bindPractice(any(), any(), any());
+    }
+
+    @Test
+    void onWorkspaceCreated_noOpsWhenWorkspaceRowIsGone() {
+        when(workspaceRepository.findById(any())).thenReturn(Optional.empty());
+
+        seeder(true).onWorkspaceCreated(new WorkspaceCreatedEvent(99L, IntegrationKind.GITLAB));
+
+        verify(areaService, never()).createArea(any(), any(), any());
+        verify(practiceService, never()).createPractice(any(), any());
+    }
+
+    @Test
+    void onWorkspaceCreated_noOpsWhenDisabled() {
+        seeder(false).onWorkspaceCreated(new WorkspaceCreatedEvent(7L, IntegrationKind.GITLAB));
+
+        verifyNoInteractions(workspaceRepository, areaService, practiceService);
+    }
+
+    @Test
+    void onWorkspaceCreated_containsExecutorRejection() {
+        AsyncTaskExecutor executor = org.mockito.Mockito.mock(AsyncTaskExecutor.class);
+        doThrow(new RuntimeException("queue full")).when(executor).execute(any());
+
+        assertThatCode(() ->
+            seeder(true, executor).onWorkspaceCreated(new WorkspaceCreatedEvent(7L, IntegrationKind.GITLAB))
+        ).doesNotThrowAnyException();
+    }
+
+    @Test
     void seedingFailure_isIsolatedAndDoesNotThrow() {
         when(workspaceRepository.findAll()).thenReturn(List.of(new Workspace()));
         when(areaRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(false);
         when(areaService.createArea(any(), any(), any())).thenThrow(new RuntimeException("boom"));
 
         assertThatCode(() -> seeder(true).seed()).doesNotThrowAnyException();
+    }
+
+    @Test
+    void workspaceLookupFailureAtBoot_isIsolatedAndDoesNotThrow() {
+        when(workspaceRepository.findAll()).thenThrow(new RuntimeException("db down"));
+
+        assertThatCode(() -> seeder(true).seed()).doesNotThrowAnyException();
+    }
+
+    @Test
+    void onWorkspaceCreated_lookupFailure_isContainedInsideTheTask() {
+        when(workspaceRepository.findById(any())).thenThrow(new RuntimeException("db down"));
+
+        assertThatCode(() ->
+            seeder(true).onWorkspaceCreated(new WorkspaceCreatedEvent(7L, IntegrationKind.GITLAB))
+        ).doesNotThrowAnyException();
     }
 
     @Test
