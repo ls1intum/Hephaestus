@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { LandingSignInCTA } from "@/components/auth/LandingSignInCTA";
+import { GithubIcon, GitlabIcon } from "@/components/icons/brand";
 import { MentorIcon } from "@/components/mentor/MentorIcon";
 import { Button } from "@/components/ui/button";
 
@@ -118,7 +119,7 @@ export function LandingFeedbackPreview({ staticMode = false }: LandingFeedbackPr
 				animate={{ opacity: 1, x: 0, rotate: 0 }}
 				transition={{ ...entranceTransition, delay: 0.3 }}
 				whileHover={shouldReduceMotion ? undefined : { y: -4, scale: 1.01 }}
-				className="absolute left-0 top-8 w-[48%] rounded-2xl border border-border/70 bg-background/90 p-3 shadow-[0_18px_45px_-24px_rgb(15_23_42_/_0.45)] backdrop-blur-md sm:left-5 sm:top-12 sm:w-[220px] sm:p-4 dark:bg-secondary/70 dark:shadow-black/50"
+				className="absolute left-0 top-8 w-[48%] rounded-2xl border border-border/70 bg-background p-3 shadow-[0_18px_45px_-24px_rgb(15_23_42_/_0.45)] sm:left-5 sm:top-12 sm:w-[220px] sm:p-4 dark:shadow-black/50"
 			>
 				<div className="mb-2 flex items-center gap-2">
 					<div className="flex size-8 items-center justify-center rounded-xl bg-provider-accent text-provider-accent-foreground">
@@ -147,7 +148,7 @@ export function LandingFeedbackPreview({ staticMode = false }: LandingFeedbackPr
 				animate={{ opacity: 1, x: 0, rotate: 0 }}
 				transition={{ ...entranceTransition, delay: 0.4 }}
 				whileHover={shouldReduceMotion ? undefined : { y: -4, scale: 1.01 }}
-				className="absolute right-0 top-[60px] w-[51%] rounded-2xl border border-provider-success/40 bg-background/95 p-3 shadow-[0_18px_45px_-24px_rgb(15_23_42_/_0.45)] backdrop-blur-md sm:right-2 sm:top-12 sm:w-[250px] sm:p-4 dark:bg-secondary/70 dark:shadow-black/50"
+				className="absolute right-0 top-[60px] w-[51%] rounded-2xl border border-provider-success/40 bg-background p-3 shadow-[0_18px_45px_-24px_rgb(15_23_42_/_0.45)] sm:right-2 sm:top-12 sm:w-[250px] sm:p-4 dark:shadow-black/50"
 			>
 				<div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.12em] text-provider-success-foreground uppercase sm:text-xs">
 					<Check className="size-3.5" />
@@ -172,14 +173,8 @@ export function LandingFeedbackPreview({ staticMode = false }: LandingFeedbackPr
 				whileHover={shouldReduceMotion ? undefined : { scale: 1.06, rotate: -4 }}
 				className="absolute left-1/2 top-[210px] z-20 -translate-x-1/2 min-[370px]:top-[195px] sm:top-[186px]"
 			>
-				<div className="relative flex size-28 flex-col items-center justify-center sm:size-36">
-					<div className="flex size-20 items-center justify-center rounded-full border border-mentor/25 bg-background/95 text-mentor shadow-[0_18px_48px_-18px_var(--color-mentor)] backdrop-blur-xl sm:size-28 dark:bg-secondary">
-						<Hammer className="size-9 sm:size-12" strokeWidth={1.7} />
-					</div>
-					<div className="mt-1 rounded-lg bg-background/90 px-2 py-1 text-center backdrop-blur-sm dark:bg-secondary/90">
-						<p className="text-sm font-semibold">Hephaestus</p>
-						<p className="text-[11px] text-muted-foreground">Reviews the work</p>
-					</div>
+				<div className="flex size-20 items-center justify-center rounded-full border border-mentor/25 bg-background text-mentor shadow-[0_18px_48px_-18px_var(--color-mentor)] sm:size-28 dark:bg-secondary">
+					<Hammer className="size-9 sm:size-12" strokeWidth={1.7} />
 				</div>
 			</motion.div>
 
@@ -188,7 +183,7 @@ export function LandingFeedbackPreview({ staticMode = false }: LandingFeedbackPr
 				animate={{ opacity: 1, x: 0, rotate: 0 }}
 				transition={{ ...entranceTransition, delay: 0.6 }}
 				whileHover={shouldReduceMotion ? undefined : { y: -4, scale: 1.01 }}
-				className="absolute bottom-[32px] left-0 w-[48%] rounded-2xl border border-warning/35 bg-background/95 p-3 shadow-[0_18px_45px_-24px_rgb(15_23_42_/_0.45)] backdrop-blur-md sm:bottom-9 sm:left-5 sm:w-[250px] sm:p-4 dark:bg-secondary/70 dark:shadow-black/50"
+				className="absolute bottom-[32px] left-0 w-[48%] rounded-2xl border border-warning/35 bg-background p-3 shadow-[0_18px_45px_-24px_rgb(15_23_42_/_0.45)] sm:bottom-9 sm:left-5 sm:w-[250px] sm:p-4 dark:shadow-black/50"
 			>
 				<div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.12em] text-warning uppercase sm:text-xs">
 					<Lightbulb className="size-3.5" />
@@ -204,7 +199,7 @@ export function LandingFeedbackPreview({ staticMode = false }: LandingFeedbackPr
 				animate={{ opacity: 1, x: 0, rotate: 0 }}
 				transition={{ ...entranceTransition, delay: 0.7 }}
 				whileHover={shouldReduceMotion ? undefined : { y: -4, scale: 1.01 }}
-				className="absolute bottom-0 right-0 w-[48%] rounded-2xl border border-mentor/25 bg-background/95 p-3 shadow-[0_18px_45px_-24px_rgb(15_23_42_/_0.45)] backdrop-blur-md sm:bottom-6 sm:right-3 sm:w-[240px] sm:p-4 dark:bg-secondary/70 dark:shadow-black/50"
+				className="absolute bottom-0 right-0 w-[48%] rounded-2xl border border-mentor/25 bg-background p-3 shadow-[0_18px_45px_-24px_rgb(15_23_42_/_0.45)] sm:bottom-6 sm:right-3 sm:w-[240px] sm:p-4 dark:shadow-black/50"
 			>
 				<div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.12em] text-mentor uppercase sm:text-xs">
 					<MentorIcon size={20} pad={3} />
@@ -212,26 +207,26 @@ export function LandingFeedbackPreview({ staticMode = false }: LandingFeedbackPr
 				</div>
 				<div className="space-y-1.5 text-[11px] sm:text-xs">
 					<motion.div
-						initial={shouldReduceMotion ? false : { opacity: 0, x: -8 }}
-						animate={{ opacity: 1, x: 0 }}
-						transition={{ duration: 0.4, delay: 0.9 }}
-						className="mr-3 rounded-xl rounded-bl-sm bg-mentor/10 px-2.5 py-1.5"
-					>
-						<span className="mb-0.5 block text-[9px] font-semibold tracking-wide text-mentor uppercase">
-							Heph
-						</span>
-						Want help drafting that sentence?
-					</motion.div>
-					<motion.div
 						initial={shouldReduceMotion ? false : { opacity: 0, x: 8 }}
 						animate={{ opacity: 1, x: 0 }}
-						transition={{ duration: 0.4, delay: 1.05 }}
-						className="ml-5 rounded-xl rounded-br-sm bg-muted px-2.5 py-1.5"
+						transition={{ duration: 0.4, delay: 0.9 }}
+						className="ml-4 rounded-xl rounded-br-sm bg-muted px-2.5 py-1.5"
 					>
 						<span className="mb-0.5 block text-[9px] font-semibold tracking-wide text-muted-foreground uppercase">
 							You
 						</span>
-						Yes—keep it short.
+						What should that sentence say?
+					</motion.div>
+					<motion.div
+						initial={shouldReduceMotion ? false : { opacity: 0, x: -8 }}
+						animate={{ opacity: 1, x: 0 }}
+						transition={{ duration: 0.4, delay: 1.05 }}
+						className="mr-2 rounded-xl rounded-bl-sm bg-mentor/10 px-2.5 py-1.5"
+					>
+						<span className="mb-0.5 block text-[9px] font-semibold tracking-wide text-mentor uppercase">
+							Heph
+						</span>
+						Name the impact: “This keeps sessions active while people work.”
 					</motion.div>
 				</div>
 			</motion.div>
@@ -249,7 +244,7 @@ export function LandingHeroSection({
 
 	return (
 		<section className="relative w-full overflow-hidden bg-background pb-12 pt-8 text-foreground sm:pb-20 sm:pt-16 lg:pb-24 lg:pt-20">
-			<div className="pointer-events-none absolute inset-0 -z-0">
+			<div className="pointer-events-none absolute inset-0 z-0">
 				<div className="absolute left-1/2 top-0 h-[520px] w-[900px] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,var(--color-mentor)_0%,transparent_68%)] opacity-[0.055]" />
 				<div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
 			</div>
@@ -286,7 +281,27 @@ export function LandingHeroSection({
 						}}
 						className="text-balance text-4xl font-bold tracking-[-0.04em] sm:text-5xl md:text-6xl lg:text-[3.6rem] xl:text-6xl"
 					>
-						Learn from the work you're already doing
+						Learn from the work you're{" "}
+						<span className="relative inline-block whitespace-nowrap">
+							<span className="relative z-10">already doing</span>
+							<motion.svg
+								aria-hidden="true"
+								className="absolute -bottom-[0.08em] left-[-0.08em] -z-0 h-[0.34em] w-[calc(100%+0.16em)] overflow-visible text-mentor/30"
+								viewBox="0 0 180 20"
+								preserveAspectRatio="none"
+							>
+								<motion.path
+									d="M4 13C42 7 83 10 116 7C140 5 160 7 176 4"
+									fill="none"
+									stroke="currentColor"
+									strokeWidth="10"
+									strokeLinecap="round"
+									initial={shouldReduceMotion ? false : { pathLength: 0, opacity: 0 }}
+									animate={{ pathLength: 1, opacity: 1 }}
+									transition={{ duration: 0.7, delay: 0.75, ease: [0.22, 1, 0.36, 1] }}
+								/>
+							</motion.svg>
+						</span>
 					</motion.h1>
 
 					<motion.p
@@ -324,15 +339,23 @@ export function LandingHeroSection({
 						</Button>
 					</motion.div>
 
-					<motion.p
+					<motion.div
 						variants={{
 							hidden: { opacity: 0 },
 							visible: { opacity: 1, transition: { duration: 0.5, delay: 0.25 } },
 						}}
-						className="mt-4 text-sm text-muted-foreground sm:mt-5"
+						className="mt-4 flex flex-wrap items-center justify-center gap-2 text-sm text-muted-foreground sm:mt-5 lg:justify-start"
 					>
-						Works with projects on GitHub and GitLab
-					</motion.p>
+						<span>Works with projects on</span>
+						<span className="inline-flex items-center gap-1.5 rounded-full border border-foreground/15 bg-foreground px-2.5 py-1 font-medium text-background shadow-sm">
+							<GithubIcon className="size-3.5" aria-hidden="true" />
+							GitHub
+						</span>
+						<span className="inline-flex items-center gap-1.5 rounded-full border border-[#fc6d26]/30 bg-[#fc6d26]/10 px-2.5 py-1 font-medium text-foreground shadow-sm">
+							<GitlabIcon className="size-3.5 text-[#e24329]" aria-hidden="true" />
+							GitLab
+						</span>
+					</motion.div>
 				</motion.div>
 
 				<LandingFeedbackPreview />

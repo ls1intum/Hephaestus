@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "storybook/test";
 import { LandingWhyChooseSection } from "./LandingWhyChooseSection";
 
 /**
@@ -18,45 +17,10 @@ const meta = {
 		},
 	},
 	tags: ["autodocs"],
-	argTypes: {
-		onSignIn: {
-			description: "Callback function triggered when the sign-in button is clicked",
-			action: "signed in",
-		},
-		onGoToDashboard: {
-			description: "Callback function triggered when the 'Go to dashboard' button is clicked",
-			action: "go to dashboard",
-		},
-		isSignedIn: {
-			description: "Whether the user is currently signed in",
-			control: "boolean",
-		},
-	},
-	args: {
-		onSignIn: fn(),
-		onGoToDashboard: fn(),
-	},
 } satisfies Meta<typeof LandingWhyChooseSection>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Default Why Choose section for first-time visitors.
- * Features the "Sign in" CTA and benefit highlights.
- */
-export const Default: Story = {
-	args: {
-		isSignedIn: false,
-	},
-};
-
-/**
- * Why Choose section for authenticated users.
- * "Sign in" button is replaced with "Go to dashboard".
- */
-export const SignedIn: Story = {
-	args: {
-		isSignedIn: true,
-	},
-};
+/** The supporting principles without another competing call to action. */
+export const Default: Story = {};

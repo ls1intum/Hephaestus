@@ -1,5 +1,4 @@
 import type {ReactNode} from 'react';
-import clsx from 'clsx';
 import Heading from '@theme/Heading';
 import Link from '@docusaurus/Link';
 
@@ -18,11 +17,11 @@ const FeatureList: FeatureItem[] = [
     title: 'Practice feedback',
     kicker: 'Specific feedback on how the work was done',
     description:
-      'Hephaestus reviews pull requests, merge requests, and issues against the practices your workspace has chosen.',
+      'Hephaestus reviews evidence from project work against the practices your workspace has chosen.',
     bullets: [
       'Points to evidence in the work',
       'Explains what worked or what could improve',
-      'Posts a comment with a practical next step',
+      'Suggests a practical next step when useful',
     ],
     cta: {label: 'How practice feedback works', to: '/user/ai-code-review'},
   },
@@ -30,7 +29,7 @@ const FeatureList: FeatureItem[] = [
     title: 'Chat with Heph',
     kicker: 'Talk through feedback and recent work',
     description:
-      'Heph can use your recent issues, commits, reviews, pull or merge requests, and feedback you have received as context.',
+      'Heph can use recent project activity and feedback you have received as context.',
     bullets: [
       'Ask a question about a recent change',
       'Reflect on feedback before deciding what to do',
@@ -54,7 +53,7 @@ const FeatureList: FeatureItem[] = [
 
 function Feature({title, kicker, description, bullets, cta}: FeatureItem) {
   return (
-    <div className={clsx('col col--4', styles.featureColumn)}>
+    <div className={styles.featureColumn}>
       <div className={styles.featureCard}>
         <p className={styles.kicker}>{kicker}</p>
         <Heading as="h3">{title}</Heading>
@@ -76,7 +75,7 @@ export default function HomepageFeatures(): ReactNode {
   return (
     <section className={styles.features}>
       <div className="container">
-        <div className={clsx('row', styles.featureRow)}>
+        <div className={styles.featureRow}>
           {FeatureList.map((feature) => (
             <Feature key={feature.title} {...feature} />
           ))}

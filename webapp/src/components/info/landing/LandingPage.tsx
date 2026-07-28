@@ -32,11 +32,7 @@ export function LandingPage({ onSignIn, onGoToDashboard, isSignedIn = false }: L
 			<div ref={learnMoreRef}>
 				<LandingFeaturesSection />
 			</div>
-			<LandingWhyChooseSection
-				onSignIn={onSignIn}
-				onGoToDashboard={onGoToDashboard}
-				isSignedIn={isSignedIn}
-			/>
+			<LandingWhyChooseSection />
 			<LandingFAQSection />
 			<LandingCTASection
 				onSignIn={onSignIn}

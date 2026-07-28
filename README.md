@@ -29,7 +29,7 @@ Hephaestus gives developers feedback on the engineering practices they use in so
     <source media="(max-width: 520px) and (prefers-color-scheme: light)" srcset="./docs/images/readme/landing-feedback-preview-mobile-light.png">
     <source media="(prefers-color-scheme: dark)" srcset="./docs/images/readme/landing-feedback-preview-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="./docs/images/readme/landing-feedback-preview-light.png">
-    <img alt="Example practice feedback on a focused change: Hephaestus notes that the change is easy to review and suggests explaining why it matters; Heph then offers to help draft that explanation." src="./docs/images/readme/landing-feedback-preview-light.png" width="744">
+    <img alt="Example practice feedback on a focused change: Hephaestus notes that the change is easy to review and suggests explaining why it matters; the developer asks what to write, and Heph suggests a concise sentence." src="./docs/images/readme/landing-feedback-preview-light.png" width="744">
   </picture>
   <p><sub>One example of practice feedback and a follow-up with Heph.</sub></p>
 </div>

@@ -25,10 +25,42 @@ interface StageNumberProps {
 }
 
 function StageNumber({ number }: StageNumberProps) {
+	const shouldReduceMotion = useReducedMotion();
+	const pulseDelay = (number - 1) * 0.55;
+
 	return (
-		<span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-mentor text-xs font-bold text-white">
+		<motion.span
+			className="relative flex size-8 shrink-0 items-center justify-center rounded-full bg-mentor text-xs font-bold text-white"
+			animate={shouldReduceMotion ? undefined : { scale: [1, 1.14, 1] }}
+			transition={{
+				duration: 4.8,
+				times: [0, 0.08, 0.18],
+				delay: pulseDelay,
+				repeat: Number.POSITIVE_INFINITY,
+				ease: [0.22, 1, 0.36, 1],
+			}}
+		>
+			<motion.span
+				aria-hidden="true"
+				className="absolute inset-0 rounded-full border border-mentor"
+				animate={
+					shouldReduceMotion
+						? undefined
+						: {
+								opacity: [0, 0.55, 0],
+								scale: [1, 1.08, 1.65],
+							}
+				}
+				transition={{
+					duration: 4.8,
+					times: [0, 0.08, 0.2],
+					delay: pulseDelay,
+					repeat: Number.POSITIVE_INFINITY,
+					ease: [0.22, 1, 0.36, 1],
+				}}
+			/>
 			{number}
-		</span>
+		</motion.span>
 	);
 }
 
@@ -36,9 +68,10 @@ interface StageProps {
 	children: React.ReactNode;
 	className: string;
 	delay: number;
+	style?: React.CSSProperties;
 }
 
-function Stage({ children, className, delay }: StageProps) {
+function Stage({ children, className, delay, style }: StageProps) {
 	const shouldReduceMotion = useReducedMotion();
 
 	return (
@@ -48,6 +81,7 @@ function Stage({ children, className, delay }: StageProps) {
 			viewport={{ once: true, amount: 0.45 }}
 			transition={{ ...enter, delay }}
 			className={className}
+			style={style}
 		>
 			{children}
 		</motion.article>
@@ -60,16 +94,10 @@ function ProjectWorkStage({ mobile = false }: { mobile?: boolean }) {
 			delay={0.05}
 			className={
 				mobile
-					? "relative rounded-3xl border border-border bg-background p-4 shadow-sm sm:p-5 dark:bg-secondary/70"
-					: "absolute left-0 top-[72px] z-10 h-[250px] w-[270px] rounded-3xl border border-border bg-background p-6 shadow-[0_20px_50px_-30px_rgb(15_23_42_/_0.45)] dark:bg-secondary/80 dark:shadow-black/50"
+					? "relative rounded-3xl border border-border bg-background p-4 shadow-sm sm:p-5"
+					: "absolute left-0 top-[64px] z-10 w-[285px] rounded-3xl border border-border bg-background p-6 shadow-[0_20px_50px_-30px_rgb(15_23_42_/_0.45)] dark:shadow-black/50"
 			}
 		>
-			{!mobile && (
-				<>
-					<div className="absolute -right-3 -top-3 -z-20 size-full rounded-3xl border border-mentor/15 bg-mentor/[0.035]" />
-					<div className="absolute -right-1.5 -top-1.5 -z-10 size-full rounded-3xl border border-mentor/20 bg-background dark:bg-secondary" />
-				</>
-			)}
 			<div className="flex items-center gap-3">
 				<StageNumber number={1} />
 				<div>
@@ -82,7 +110,7 @@ function ProjectWorkStage({ mobile = false }: { mobile?: boolean }) {
 			<p className="mt-4 text-sm leading-relaxed text-muted-foreground">
 				Work and context already available in the tools your team uses.
 			</p>
-			<div className="mt-5 grid grid-cols-4 gap-2">
+			<div className={mobile ? "mt-5 grid grid-cols-4 gap-2" : "mt-5 grid grid-cols-2 gap-2"}>
 				{[
 					{ icon: Code2, label: "Code" },
 					{ icon: ClipboardCheck, label: "Tasks" },
@@ -91,7 +119,11 @@ function ProjectWorkStage({ mobile = false }: { mobile?: boolean }) {
 				].map(({ icon: Icon, label }) => (
 					<div
 						key={label}
-						className="flex flex-col items-center gap-1.5 rounded-xl border border-border/70 bg-muted/30 px-1 py-2.5 text-[10px] text-muted-foreground"
+						className={
+							mobile
+								? "flex min-w-0 flex-col items-center gap-1.5 rounded-xl border border-border/70 bg-muted/30 px-1 py-2.5 text-[10px] text-muted-foreground"
+								: "flex items-center gap-2 rounded-xl border border-border/70 bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground"
+						}
 					>
 						<Icon className="size-4 text-mentor" strokeWidth={1.7} />
 						{label}
@@ -108,8 +140,8 @@ function ReviewStage({ mobile = false }: { mobile?: boolean }) {
 			delay={0.15}
 			className={
 				mobile
-					? "rounded-3xl border border-border bg-background p-4 shadow-sm sm:p-5 dark:bg-secondary/70"
-					: "absolute left-[315px] top-[86px] z-10 h-[250px] w-[300px] rounded-3xl border border-border bg-background p-6 shadow-[0_20px_50px_-30px_rgb(15_23_42_/_0.45)] dark:bg-secondary/80 dark:shadow-black/50"
+					? "rounded-3xl border border-border bg-background p-4 shadow-sm sm:p-5"
+					: "absolute left-[325px] top-[70px] z-10 w-[300px] rounded-3xl border border-border bg-background p-6 shadow-[0_20px_50px_-30px_rgb(15_23_42_/_0.45)] dark:shadow-black/50"
 			}
 		>
 			<div className="flex items-center gap-3">
@@ -144,9 +176,12 @@ function FeedbackStage({ mobile = false }: { mobile?: boolean }) {
 			delay={0.25}
 			className={
 				mobile
-					? "rounded-3xl border border-mentor/35 bg-mentor/[0.045] p-4 shadow-[0_24px_60px_-38px_var(--color-mentor)] sm:p-5"
-					: "absolute right-0 top-[36px] z-10 h-[360px] w-[500px] rounded-3xl border border-mentor/35 bg-mentor/[0.045] p-7 shadow-[0_28px_70px_-40px_var(--color-mentor)]"
+					? "rounded-3xl border border-mentor/55 p-4 shadow-[0_24px_60px_-32px_var(--color-mentor)] sm:p-5"
+					: "absolute right-0 top-[32px] z-10 w-[500px] rounded-3xl border border-mentor/55 p-6 shadow-[0_28px_70px_-34px_var(--color-mentor)]"
 			}
+			style={{
+				backgroundColor: "color-mix(in oklch, var(--background) 92%, var(--mentor))",
+			}}
 		>
 			<div className="flex items-center gap-3">
 				<StageNumber number={3} />
@@ -198,8 +233,8 @@ function ChoiceStage({ mobile = false }: { mobile?: boolean }) {
 			delay={0.35}
 			className={
 				mobile
-					? "rounded-3xl border border-mentor/35 bg-background p-4 shadow-sm sm:p-5 dark:bg-secondary/70"
-					: "absolute bottom-[26px] left-[405px] z-10 h-[142px] w-[650px] rounded-3xl border border-mentor/35 bg-background p-6 shadow-[0_20px_50px_-30px_rgb(15_23_42_/_0.45)] dark:bg-secondary/80 dark:shadow-black/50"
+					? "rounded-3xl border border-mentor/35 bg-background p-4 shadow-sm sm:p-5"
+					: "absolute bottom-[50px] left-[400px] z-10 w-[650px] rounded-3xl border border-mentor/35 bg-background p-5 shadow-[0_20px_50px_-30px_rgb(15_23_42_/_0.45)] dark:shadow-black/50"
 			}
 		>
 			<div
@@ -245,14 +280,14 @@ function DesktopFeedbackLoop({ forceVisible = false }: { forceVisible?: boolean 
 		<div
 			className={
 				forceVisible
-					? "relative mx-auto h-[620px] max-w-[1160px]"
-					: "relative mx-auto mt-14 hidden h-[620px] max-w-[1160px] xl:block"
+					? "relative mx-auto h-[590px] max-w-[1160px]"
+					: "relative mx-auto mt-14 hidden h-[590px] max-w-[1160px] xl:block"
 			}
 		>
 			<svg
 				aria-hidden="true"
 				className="absolute inset-0 size-full"
-				viewBox="0 0 1160 620"
+				viewBox="0 0 1160 590"
 				fill="none"
 			>
 				<defs>
@@ -276,10 +311,10 @@ function DesktopFeedbackLoop({ forceVisible = false }: { forceVisible?: boolean 
 					</marker>
 				</defs>
 				{[
-					{ d: "M270 188H315", delay: 0.2 },
-					{ d: "M615 188H660", delay: 0.35 },
-					{ d: "M1130 396C1180 430 1155 485 1055 500", delay: 0.5 },
-					{ d: "M405 522C265 606 42 588 34 336", delay: 0.65 },
+					{ d: "M285 188H325", delay: 0.2 },
+					{ d: "M625 188H660", delay: 0.35 },
+					{ d: "M1130 365C1180 405 1150 460 1050 475", delay: 0.5 },
+					{ d: "M400 500C250 582 42 560 34 330", delay: 0.65 },
 				].map(({ d, delay }) => (
 					<motion.path
 						key={d}
@@ -302,17 +337,14 @@ function DesktopFeedbackLoop({ forceVisible = false }: { forceVisible?: boolean 
 			<FeedbackStage />
 			<ChoiceStage />
 
-			<div className="absolute bottom-0 left-28 flex items-center gap-2 bg-muted/15 px-3 text-xs font-semibold tracking-[0.12em] text-mentor uppercase">
-				<RotateCcw className="size-3.5" />
-				Next project work
-			</div>
+			<RepeatLabel className="absolute bottom-0 left-28 bg-muted/15 px-3" />
 		</div>
 	);
 }
 
 function TabletFeedbackLoop() {
 	return (
-		<div className="mx-auto mt-12 hidden max-w-4xl md:block xl:hidden">
+		<div className="mx-auto mt-12 hidden max-w-4xl sm:block xl:hidden">
 			<div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4">
 				<ProjectWorkStage mobile />
 				<ArrowRight className="size-6 text-mentor/70" strokeWidth={1.8} aria-hidden="true" />
@@ -333,7 +365,7 @@ function MobileFeedbackLoop({ forceVisible = false }: { forceVisible?: boolean }
 	return (
 		<div
 			className={
-				forceVisible ? "relative mx-auto max-w-md" : "relative mx-auto mt-12 max-w-md md:hidden"
+				forceVisible ? "relative mx-auto max-w-md" : "relative mx-auto mt-12 max-w-md sm:hidden"
 			}
 		>
 			<ProjectWorkStage mobile />
@@ -386,11 +418,33 @@ function CycleReturn() {
 					transition={{ duration: 0.2, delay: 0.5 }}
 				/>
 			</svg>
-			<div className="absolute bottom-0 left-2 flex items-center gap-2 bg-muted/15 pr-3 text-xs font-semibold tracking-[0.12em] text-mentor uppercase">
-				<RotateCcw className="size-3.5" strokeWidth={1.8} />
-				Next project work
-			</div>
+			<RepeatLabel className="absolute bottom-0 left-2 bg-muted/15 pr-3" />
 		</motion.div>
+	);
+}
+
+function RepeatLabel({ className }: { className: string }) {
+	const shouldReduceMotion = useReducedMotion();
+
+	return (
+		<div
+			className={`flex items-center gap-2 text-xs font-semibold tracking-[0.12em] text-mentor uppercase ${className}`}
+		>
+			<motion.span
+				className="inline-flex"
+				animate={shouldReduceMotion ? undefined : { rotate: [0, -35, 0] }}
+				transition={{
+					duration: 4.8,
+					times: [0, 0.1, 0.22],
+					delay: 2.15,
+					repeat: Number.POSITIVE_INFINITY,
+					ease: [0.22, 1, 0.36, 1],
+				}}
+			>
+				<RotateCcw className="size-3.5" strokeWidth={1.8} />
+			</motion.span>
+			Next project work
+		</div>
 	);
 }
 

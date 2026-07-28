@@ -3,7 +3,9 @@ import Link from '@docusaurus/Link';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import Layout from '@theme/Layout';
 import Heading from '@theme/Heading';
-import HomepageFeatures from '@site/src/components/HomepageFeatures';
+import feedbackPreviewDark from '../../images/readme/landing-feedback-preview-dark.png';
+import feedbackPreviewLight from '../../images/readme/landing-feedback-preview-light.png';
+import HomepageFeatures from '../components/HomepageFeatures';
 
 import styles from './index.module.css';
 
@@ -29,20 +31,36 @@ function HomepageHeader() {
   return (
     <header className={styles.heroSection}>
       <div className="container">
-        <div className={styles.heroCopy}>
-          <Heading as="h1" className={styles.heroTitle}>
-            Feedback on how you work
-          </Heading>
-          <p className={styles.heroSubtitle}>
-            Hephaestus draws on project activity already recorded in your team&apos;s tools to give feedback on engineering practices. See what worked, what could improve, and what to try next.
-          </p>
-          <div className={styles.heroActions}>
-            <Link className="button button--primary button--lg" to="/user/overview">
-              Read the user guide
-            </Link>
-            <Link className="button button--link button--lg" href="https://hephaestus.aet.cit.tum.de">
-              Open Hephaestus
-            </Link>
+        <div className={styles.heroGrid}>
+          <div className={styles.heroCopy}>
+            <span className={styles.heroKicker}>Practice feedback for software teams</span>
+            <Heading as="h1" className={styles.heroTitle}>
+              Learn from the work you&apos;re <span className={styles.heroHighlight}>already doing</span>
+            </Heading>
+            <p className={styles.heroSubtitle}>
+              Hephaestus turns project activity already recorded in your team&apos;s tools into feedback on engineering practices. See what worked, what could improve, and what to try next.
+            </p>
+            <div className={styles.heroActions}>
+              <Link className="button button--primary button--lg" to="/user/overview">
+                Read the user guide
+              </Link>
+              <Link className="button button--link button--lg" href="https://hephaestus.aet.cit.tum.de">
+                Open Hephaestus
+              </Link>
+            </div>
+          </div>
+          <div className={styles.heroVisual}>
+            <img
+              className={styles.heroVisualLight}
+              src={feedbackPreviewLight}
+              alt="An example of practice feedback and a question answered by Heph."
+            />
+            <img
+              className={styles.heroVisualDark}
+              src={feedbackPreviewDark}
+              alt="An example of practice feedback and a question answered by Heph."
+            />
+            <p>Practice feedback, followed by a conversation with Heph</p>
           </div>
         </div>
       </div>
