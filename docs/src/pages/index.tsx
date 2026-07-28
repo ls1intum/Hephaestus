@@ -34,7 +34,7 @@ function HomepageHeader() {
             Feedback on how you work
           </Heading>
           <p className={styles.heroSubtitle}>
-            Hephaestus reviews pull requests, issues, and reviews for the engineering practices they show. Developers see what worked, what could improve, and what to try next.
+            Hephaestus draws on project activity already recorded in your team&apos;s tools to give feedback on engineering practices. See what worked, what could improve, and what to try next.
           </p>
           <div className={styles.heroActions}>
             <Link className="button button--primary button--lg" to="/user/overview">
@@ -81,7 +81,7 @@ export default function Home(): ReactNode {
   return (
     <Layout
       title={siteConfig.title}
-      description="Hephaestus gives developers feedback on engineering practices shown in pull and merge requests, issues, and reviews, plus a mentor chat for talking through their work.">
+      description="Hephaestus gives developers practice feedback on software project work, plus an AI mentor for talking through feedback and next steps.">
       <HomepageHeader />
       <main>
         <HomepageFeatures />

@@ -38,7 +38,7 @@ export function LandingWhyChooseSection({
 								<div>
 									<p className="font-medium">Based on the work</p>
 									<p className="text-sm text-muted-foreground">
-										Each comment points to evidence in a pull request, merge request, or issue
+										Each comment points to evidence in the project work it is based on
 									</p>
 								</div>
 							</li>

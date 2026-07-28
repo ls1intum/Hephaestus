@@ -8,9 +8,8 @@ export function AboutHeroSection() {
 			</div>
 			<h1 className="text-4xl font-bold">About Hephaestus</h1>
 			<p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-				Hephaestus helps teams give more developers useful feedback on how they work. Practice
-				feedback appears on pull requests and issues; Heph is the conversational AI mentor for
-				talking it through.
+				Hephaestus helps teams give more developers useful feedback on the engineering practices
+				they use in project work. Heph is the conversational AI mentor for talking it through.
 			</p>
 		</section>
 	);

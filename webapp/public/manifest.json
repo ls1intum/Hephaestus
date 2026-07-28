@@ -1,7 +1,7 @@
 {
   "short_name": "Hephaestus",
   "name": "Hephaestus",
-  "description": "Hephaestus gives developers feedback on engineering practices shown in pull and merge requests, issues, and reviews, plus a mentor chat for talking through their work.",
+  "description": "Hephaestus gives developers practice feedback on software project work, plus an AI mentor for talking through feedback and next steps.",
   "icons": [
     {
       "src": "favicon.ico",

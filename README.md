@@ -9,7 +9,7 @@
 
 # Hephaestus — feedback on how you work
 
-Hephaestus uses pull requests, issues, and reviews from connected GitHub and GitLab repositories to give developers feedback on their engineering practices. Each comment points to the work it is based on, explains what worked or what could improve, and suggests what to try next.
+Hephaestus gives developers feedback on the engineering practices they use in software projects. It draws on evidence from tools the team already uses, including GitHub and GitLab, to explain what worked, what could improve, and what to try next.
 
 Developers decide what to do with that feedback: act on it, push back with a reason, or let it pass. Hephaestus supports mentors, teachers, and maintainers by covering routine feedback. It does not replace their judgement or the relationships they build with developers.
 

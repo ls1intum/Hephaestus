@@ -149,7 +149,7 @@ const config: Config = {
       {
         name: 'description',
         content:
-          'Hephaestus gives developers feedback on engineering practices shown in pull and merge requests, issues, and reviews, plus a mentor chat for talking through their work.',
+          'Hephaestus gives developers practice feedback on software project work, plus an AI mentor for talking through feedback and next steps.',
       },
       {name: 'keywords', content: 'Hephaestus, AI mentor, code review feedback, software engineering practices, TUM'},
       {name: 'twitter:card', content: 'summary_large_image'},
@@ -158,7 +158,7 @@ const config: Config = {
       {
         name: 'twitter:description',
         content:
-          'Hephaestus gives developers feedback on engineering practices shown in pull and merge requests, issues, and reviews, plus a mentor chat for talking through their work.',
+          'Hephaestus gives developers practice feedback on software project work, plus an AI mentor for talking through feedback and next steps.',
       },
     ],
     navbar: {

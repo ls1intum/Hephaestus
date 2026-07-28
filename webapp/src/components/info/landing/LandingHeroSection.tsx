@@ -25,8 +25,9 @@ export function LandingHeroSection({
 							Feedback on how you work
 						</h1>
 						<p className="mx-auto max-w-[700px] text-xl text-muted-foreground">
-							Hephaestus reviews your pull requests and issues for the engineering practices they
-							show. See what worked, what could improve, and what to try next.
+							Hephaestus draws on project activity already recorded in your team's tools to give
+							feedback on engineering practices. See what worked, what could improve, and what to
+							try next.
 						</p>
 					</div>
 					<div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
