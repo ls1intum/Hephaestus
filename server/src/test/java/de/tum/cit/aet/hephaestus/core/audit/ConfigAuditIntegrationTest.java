@@ -5,9 +5,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.CreateWorkspaceLlmConnectionRequestDTO;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmAuthMode;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditAction;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditActorKind;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -90,6 +92,93 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(row.getWorkspaceId()).isEqualTo(workspace.getId());
         assertThat(row.changedKeyList()).contains("mentorEnabled");
         assertThat(row.getNewValue()).contains("\"mentorEnabled\":true");
+    }
+
+    @Test
+    @WithAdminUser
+    void practiceDefinitionLifecycleIsRecordedWithoutPersistingDetectionContent() {
+        Workspace workspace = setupWorkspace("audit-practice");
+
+        PracticeDTO practice = webTestClient
+            .post()
+            .uri("/workspaces/{slug}/practices", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(
+                Map.of(
+                    "slug",
+                    "focused-reviews",
+                    "name",
+                    "Focused reviews",
+                    "triggerEvents",
+                    List.of("PullRequestCreated"),
+                    "criteria",
+                    "Initial private criteria",
+                    "precomputeScript",
+                    "return { hints: [] };"
+                )
+            )
+            .exchange()
+            .expectStatus()
+            .isCreated()
+            .expectBody(PracticeDTO.class)
+            .returnResult()
+            .getResponseBody();
+        assertThat(practice).isNotNull();
+
+        webTestClient
+            .patch()
+            .uri("/workspaces/{slug}/practices/{practiceSlug}", workspace.getWorkspaceSlug(), practice.slug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(
+                Map.of(
+                    "name",
+                    "Focused code reviews",
+                    "criteria",
+                    "Updated private criteria",
+                    "precomputeScript",
+                    "return { hints: ['updated'] };"
+                )
+            )
+            .exchange()
+            .expectStatus()
+            .isOk();
+
+        webTestClient
+            .delete()
+            .uri("/workspaces/{slug}/practices/{practiceSlug}", workspace.getWorkspaceSlug(), practice.slug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isNoContent();
+
+        List<ConfigAuditEvent> rows = configAuditEventRepository
+            .findAll()
+            .stream()
+            .filter(row -> row.getWorkspaceId().equals(workspace.getId()))
+            .filter(row -> row.getEntityType() == ConfigAuditEntityType.PRACTICE_DEFINITION)
+            .filter(row -> row.getEntityId().equals(String.valueOf(practice.id())))
+            .sorted(java.util.Comparator.comparing(ConfigAuditEvent::getId))
+            .toList();
+
+        assertThat(rows)
+            .extracting(ConfigAuditEvent::getAction)
+            .containsExactly(ConfigAuditAction.CREATED, ConfigAuditAction.UPDATED, ConfigAuditAction.DELETED);
+        assertThat(rows.get(0).getNewValue())
+            .contains("\"criteriaRevision\":1", "\"criteriaSha256\"", "\"precomputeScriptSha256\"")
+            .doesNotContain("Initial private criteria", "return { hints");
+        assertThat(rows.get(1).changedKeyList()).containsExactlyInAnyOrder(
+            "name",
+            "criteriaRevision",
+            "criteriaSha256",
+            "precomputeScriptSha256"
+        );
+        assertThat(rows.get(1).getNewValue())
+            .contains("\"criteriaRevision\":2", "\"name\":\"Focused code reviews\"")
+            .doesNotContain("Updated private criteria", "return { hints");
+        assertThat(rows.get(2).getNewValue()).isNull();
+        assertThat(rows.get(2).getOldValue()).contains("\"criteriaRevision\":2");
     }
 
     @Test

@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { listAgentsQueryKey } from "@/api/@tanstack/react-query.gen";
 import type { AgentBinding } from "@/api/types.gen";
 import { server } from "@/mocks/server";
-import { renderRouteAt, TRANSFORM_WAIT } from "@/test/router-harness";
+import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
 
 // Mounting the real route pulls in the whole admin layout and its lazy modules.
 vi.setConfig({ testTimeout: 20_000 });
@@ -93,8 +93,8 @@ function slowBindingsRefetch(bindings: () => AgentBinding[]) {
 async function renderModelsRoute(bindings: () => AgentBinding[]) {
 	mockModelsRoute(bindings);
 	const queryClient = renderRouteAt("/w/acme/admin/models");
-	await screen.findByRole("heading", { name: "AI models" }, TRANSFORM_WAIT);
-	await screen.findByLabelText("Practice detection runs on", undefined, TRANSFORM_WAIT);
+	await screen.findByRole("heading", { name: "AI models" }, ROUTE_RENDER_WAIT);
+	await screen.findByLabelText("Practice feedback runs on", undefined, ROUTE_RENDER_WAIT);
 	return queryClient;
 }
 
@@ -128,15 +128,15 @@ describe("workspace AI models route", () => {
 
 		await renderModelsRoute(() => [binding("PRACTICE_DETECTION", 20), binding("MENTOR", 20)]);
 
-		fireEvent.click(saveButton("Practice detection runs on"));
+		fireEvent.click(saveButton("Practice feedback runs on"));
 		await waitFor(() => expect(detectionSaves).toBe(1));
 		fireEvent.click(saveButton("Mentor runs on"));
 
 		await waitFor(() => expect(saveButton("Mentor runs on").disabled).toBe(false));
-		expect(saveButton("Practice detection runs on").disabled).toBe(true);
+		expect(saveButton("Practice feedback runs on").disabled).toBe(true);
 
 		releaseSlowSave?.();
-		await waitFor(() => expect(saveButton("Practice detection runs on").disabled).toBe(false));
+		await waitFor(() => expect(saveButton("Practice feedback runs on").disabled).toBe(false));
 		expect(detectionSaves).toBe(1);
 	});
 
@@ -144,7 +144,7 @@ describe("workspace AI models route", () => {
 		let bindings = [binding("PRACTICE_DETECTION", 20)];
 		const queryClient = await renderModelsRoute(() => bindings);
 
-		const detection = card("Practice detection runs on");
+		const detection = card("Practice feedback runs on");
 		fireEvent.click(within(detection).getByRole("button", { name: "Advanced" }));
 		const timeout = within(detection).getByLabelText("Timeout (seconds)") as HTMLInputElement;
 		fireEvent.change(timeout, { target: { value: "900" } });
@@ -155,13 +155,11 @@ describe("workspace AI models route", () => {
 		await queryClient.invalidateQueries({
 			queryKey: listAgentsQueryKey({ path: { workspaceSlug: "acme" } }),
 		});
-		await waitFor(() =>
-			expect(within(card("Practice detection runs on")).getByText("Not ready")).toBeTruthy(),
-		);
+		await waitFor(() => within(card("Practice feedback runs on")).getByText("Not ready"));
 
 		expect(
 			(
-				within(card("Practice detection runs on")).getByLabelText(
+				within(card("Practice feedback runs on")).getByLabelText(
 					"Timeout (seconds)",
 				) as HTMLInputElement
 			).value,
@@ -185,7 +183,7 @@ describe("workspace AI models route", () => {
 			}),
 		);
 
-		const detection = card("Practice detection runs on");
+		const detection = card("Practice feedback runs on");
 		fireEvent.click(within(detection).getByRole("button", { name: "Advanced" }));
 		fireEvent.change(within(detection).getByLabelText("Timeout (seconds)"), {
 			target: { value: "900" },
@@ -194,12 +192,10 @@ describe("workspace AI models route", () => {
 		await userEvent.click(within(detection).getByRole("combobox"));
 		await userEvent.click(await screen.findByRole("option", { name: /GPT Other/ }));
 
-		fireEvent.click(saveButton("Practice detection runs on"));
-		await waitFor(() =>
-			expect(within(card("Practice detection runs on")).getByText("Not ready")).toBeTruthy(),
-		);
+		fireEvent.click(saveButton("Practice feedback runs on"));
+		await waitFor(() => within(card("Practice feedback runs on")).getByText("Not ready"));
 
-		const saved = card("Practice detection runs on");
+		const saved = card("Practice feedback runs on");
 		expect(within(saved).getByRole("combobox").textContent).toContain("GPT Other");
 		// Reseeding remounts the card, closing the disclosure with it.
 		fireEvent.click(within(saved).getByRole("button", { name: "Advanced" }));
@@ -219,7 +215,7 @@ describe("workspace AI models route", () => {
 			}),
 		);
 
-		const detection = card("Practice detection runs on");
+		const detection = card("Practice feedback runs on");
 		fireEvent.click(within(detection).getByRole("button", { name: "Advanced" }));
 		expect((within(detection).getByLabelText("Timeout (seconds)") as HTMLInputElement).value).toBe(
 			"900",
@@ -229,10 +225,10 @@ describe("workspace AI models route", () => {
 
 		await waitFor(() =>
 			expect(
-				within(card("Practice detection runs on")).queryByRole("button", { name: "Turn off" }),
+				within(card("Practice feedback runs on")).queryByRole("button", { name: "Turn off" }),
 			).toBeNull(),
 		);
-		const reset = card("Practice detection runs on");
+		const reset = card("Practice feedback runs on");
 		fireEvent.click(within(reset).getByRole("button", { name: "Advanced" }));
 		expect((within(reset).getByLabelText("Timeout (seconds)") as HTMLInputElement).value).toBe(
 			"600",

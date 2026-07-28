@@ -1,13 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { toast } from "sonner";
 import {
 	computeUserLeagueStatsQueryKey,
 	getLeaderboardQueryKey,
 	getWorkspaceOptions,
-	listWorkspacesQueryKey,
 	resetAndRecalculateLeaguesMutation,
-	updateFeaturesMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { Options } from "@/api/sdk.gen";
 import type { ComputeUserLeagueStatsData, GetLeaderboardData } from "@/api/types.gen";
@@ -15,6 +12,7 @@ import type { FeatureKey } from "@/components/admin/AdminFeaturesSettings";
 import { AdminSettingsPage } from "@/components/admin/AdminSettingsPage";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
+import { useUpdateWorkspaceFeatures } from "@/hooks/use-update-workspace-features";
 import { workspaceAdminHead } from "@/lib/page-title";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/settings")({
@@ -53,23 +51,9 @@ function AdminSettings() {
 		},
 	});
 
-	const updateFeatures = useMutation({
-		...updateFeaturesMutation(),
-		onSuccess: () => {
-			if (!workspaceSlug) {
-				return;
-			}
-			queryClient.invalidateQueries({
-				queryKey: workspaceQueryOptions.queryKey,
-			});
-			queryClient.invalidateQueries({
-				queryKey: listWorkspacesQueryKey(),
-			});
-			toast.success("Feature settings updated");
-		},
-		onError: () => {
-			toast.error("Failed to update feature settings");
-		},
+	const updateFeatures = useUpdateWorkspaceFeatures(workspaceSlug ?? "", {
+		success: "Feature settings updated",
+		error: "Failed to update feature settings",
 	});
 
 	if (!workspaceSlug && !isWorkspaceLoading) {

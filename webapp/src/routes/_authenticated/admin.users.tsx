@@ -156,7 +156,7 @@ function AdminUsersPage() {
 	};
 
 	return (
-		<div className="mx-auto w-full max-w-6xl space-y-6 py-6">
+		<div className="mx-auto w-full max-w-6xl space-y-6">
 			<header className="space-y-1">
 				<div className="flex items-center gap-2">
 					<UserCog className="size-6 text-muted-foreground" aria-hidden />

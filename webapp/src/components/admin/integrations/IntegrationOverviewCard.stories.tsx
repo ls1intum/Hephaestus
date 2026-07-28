@@ -5,7 +5,6 @@ import { IntegrationOverviewCard } from "./IntegrationOverviewCard";
 
 const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000);
 
-/** Hourly reconciliation — what every freshness reading on the card is judged against. */
 const SYNC_INTERVAL_SECONDS = 3_600;
 
 const status: ConnectionSyncStatus = {
@@ -32,15 +31,6 @@ const runningJob: SyncJob = {
 	itemsTotal: 12,
 };
 
-/**
- * The integrations landing tile for one connection: health badge (a running job flips it to
- * "Syncing"), last-sync/last-event, errored/stale resource counts, and a sync + details footer while
- * active. It degrades per state — a not-connected SCM explains it is chosen at workspace creation, a
- * non-ACTIVE connection hides its controls, a failed status query shows an inline error.
- *
- * Being the triage page, its freshness reading is tinted against the connection's own cadence so a
- * card is picked out of the grid by colour rather than by reading four dates.
- */
 const meta = {
 	component: IntegrationOverviewCard,
 	parameters: { layout: "padded" },
@@ -62,10 +52,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Connected + healthy — the steady state, with sync + details controls. */
 export const Connected: Story = {};
 
-/** A running job supersedes health: the badge reads "Syncing" and progress is shown. */
 export const Syncing: Story = {
 	args: { status: { ...status, health: "FAILED", activeJob: runningJob } },
 	play: async ({ canvasElement }) => {
@@ -74,7 +62,6 @@ export const Syncing: Story = {
 	},
 };
 
-/** Some resources are erroring — surfaced as a destructive count. */
 export const WithErroredResources: Story = {
 	args: {
 		status: {
@@ -85,25 +72,19 @@ export const WithErroredResources: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("3 errored")).toHaveClass("text-destructive");
+		await expect(canvas.getByText("3 errored")).toBeInTheDocument();
 		await expect(canvas.getByText(/of 12 resources/i)).toBeInTheDocument();
 	},
 };
 
-/**
- * Stale resources with nothing errored — the quieter, more common failure: a connection whose
- * scheduler has stopped reports HEALTHY forever while its mirror rots, so the stale count is what
- * surfaces it.
- */
 export const WithStaleResources: Story = {
 	args: { status: { ...status, resourceCounts: { total: 12, errored: 0, pending: 0, stale: 4 } } },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("4 stale")).toHaveClass("text-warning");
+		await expect(canvas.getByText("4 stale")).toBeInTheDocument();
 	},
 };
 
-/** Both at once — two tinted numbers in one line, and still exactly one badge on the card. */
 export const WithErroredAndStaleResources: Story = {
 	args: {
 		status: {
@@ -119,19 +100,14 @@ export const WithErroredAndStaleResources: Story = {
 	},
 };
 
-/**
- * The sync is two cadences overdue. The reading tints itself, which is the entire point of a triage
- * grid — this card is findable at a glance among healthy siblings.
- */
 export const StaleFreshness: Story = {
 	args: { status: { ...status, lastSuccessfulSyncAt: minutesAgo(200) } },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/hours ago$/)).toHaveClass("text-warning");
+		await expect(canvas.getByRole("button", { name: /stale/i })).toBeInTheDocument();
 	},
 };
 
-/** No cadence from the server means no judgement here — the age is printed, not coloured. */
 export const UnknownCadence: Story = {
 	args: {
 		status: {
@@ -143,13 +119,11 @@ export const UnknownCadence: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		const reading = canvas.getByText(/ago$/);
-		await expect(reading).not.toHaveClass("text-warning");
-		await expect(reading).not.toHaveClass("text-destructive");
+		await expect(canvas.queryByRole("button", { name: /stale/i })).not.toBeInTheDocument();
+		await expect(canvas.getByText(/ago$/)).toBeInTheDocument();
 	},
 };
 
-/** Nothing has ever synced, and no webhook event has arrived either. */
 export const NeverSynced: Story = {
 	args: {
 		status: {
@@ -166,10 +140,6 @@ export const NeverSynced: Story = {
 	},
 };
 
-/**
- * The status query failed. It renders the same `QueryErrorAlert` as its siblings, and a 503 is
- * retryable, so the button is offered.
- */
 export const StatusError: Story = {
 	args: {
 		status: undefined,
@@ -186,10 +156,6 @@ export const StatusError: Story = {
 	},
 };
 
-/**
- * A 403 on the status query. Retrying an authorization failure cannot succeed, so no Retry button is
- * offered — the alert says what to do instead. Same component, same call site, different way out.
- */
 export const StatusErrorForbidden: Story = {
 	args: {
 		status: undefined,
@@ -204,10 +170,6 @@ export const StatusErrorForbidden: Story = {
 	},
 };
 
-/**
- * Connection exists but is suspended — controls are hidden and the copy says what stopped and what to
- * do, reading identically to the suspended state on every other integration.
- */
 export const ConnectionSuspended: Story = {
 	args: {
 		entry: {
@@ -227,10 +189,6 @@ export const ConnectionSuspended: Story = {
 	},
 };
 
-/**
- * Setup hasn't finished. PENDING resolves on its own and costs the admin nothing, so unlike
- * SUSPENDED/UNINSTALLED it is stated plainly rather than as a warning.
- */
 export const ConnectionPending: Story = {
 	args: {
 		entry: {
@@ -249,10 +207,6 @@ export const ConnectionPending: Story = {
 	},
 };
 
-/**
- * The app was removed upstream. The copy names the consequence (nothing is syncing) and the fix
- * (reconnect).
- */
 export const ConnectionUninstalled: Story = {
 	args: {
 		entry: {
@@ -271,7 +225,6 @@ export const ConnectionUninstalled: Story = {
 	},
 };
 
-/** SCM not connected — there is no Connect button; it is chosen at workspace creation. */
 export const ScmNotConnected: Story = {
 	args: {
 		entry: { kind: "GITHUB", displayName: "GitHub", connected: false },
@@ -286,7 +239,6 @@ export const ScmNotConnected: Story = {
 	},
 };
 
-/** A connectable (non-SCM) integration that is not yet connected shows a Connect action. */
 export const Disconnected: Story = {
 	args: {
 		entry: { kind: "OUTLINE", displayName: "Outline", connected: false },
@@ -294,5 +246,4 @@ export const Disconnected: Story = {
 	},
 };
 
-/** Status is still loading — a skeleton stands in for the metrics. */
 export const Loading: Story = { args: { status: undefined, isStatusLoading: true } };

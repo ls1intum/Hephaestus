@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import type { LeaderboardEntry } from "@/api/types.gen";
+import { withStandardPage } from "@/stories/decorators";
+import { expectNoPageOverflow, expectTablesScrollInPlace } from "@/test/reflow";
 import { LeaderboardPage } from "./LeaderboardPage";
 
 const reviewedPullRequestsPool = [
@@ -178,6 +180,7 @@ const meta: Meta<typeof LeaderboardPage> = {
 	parameters: {
 		layout: "fullscreen",
 	},
+	decorators: [withStandardPage],
 	tags: ["autodocs"],
 };
 
@@ -235,5 +238,17 @@ export const EmptyLeaderboard: Story = {
 		selectedTeam: "all",
 		selectedSort: "SCORE",
 		selectedMode: "INDIVIDUAL",
+	},
+};
+
+export const MobileReflow: Story = {
+	...Default,
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320] },
+	},
+	play: async () => {
+		await expectNoPageOverflow();
+		await expectTablesScrollInPlace();
 	},
 };

@@ -1,11 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import Footer from "./Footer";
 
-/**
- * Minimal footer with navigation links and attribution.
- * Shows build info (branch, commit, deployed at) only for preview deployments.
- * Version is NOT shown here - it's displayed in the Header.
- */
 const meta = {
 	component: Footer,
 	parameters: {
@@ -24,18 +19,12 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Default production/local state - clean footer with no build info.
- */
 export const Default: Story = {
 	args: {
 		buildInfo: undefined,
 	},
 };
 
-/**
- * Preview deployment with full build metadata for debugging.
- */
 export const Preview: Story = {
 	args: {
 		buildInfo: {
@@ -46,9 +35,6 @@ export const Preview: Story = {
 	},
 };
 
-/**
- * Preview with only branch and commit (no deployment time).
- */
 export const PreviewNoTime: Story = {
 	args: {
 		buildInfo: {
@@ -58,9 +44,6 @@ export const PreviewNoTime: Story = {
 	},
 };
 
-/**
- * Mobile layout - build info hidden on small screens.
- */
 export const Mobile: Story = {
 	args: {
 		buildInfo: {

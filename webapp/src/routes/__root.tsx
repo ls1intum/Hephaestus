@@ -5,6 +5,7 @@ import {
 	Link,
 	Outlet,
 	useLocation,
+	useMatches,
 	useNavigate,
 	useRouter,
 } from "@tanstack/react-router";
@@ -14,6 +15,7 @@ import { ImpersonationBanner } from "@/components/auth/ImpersonationBanner";
 import { CookieConsentBanner } from "@/components/consent/CookieConsentBanner";
 import Footer from "@/components/core/Footer";
 import Header from "@/components/core/Header";
+import { StandardPageSurface } from "@/components/core/StandardPageSurface";
 import { AppSidebar, type SidebarContext } from "@/components/core/sidebar/AppSidebar";
 import { Chat } from "@/components/mentor/Chat";
 import { Copilot } from "@/components/mentor/Copilot";
@@ -28,6 +30,7 @@ import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
 import { FeatureFlagDevTools, useFeatureFlag } from "@/integrations/feature-flags";
 import { isPosthogEnabled } from "@/integrations/posthog/config";
+import { isCopilotExcludedRoute } from "@/lib/copilot-route";
 import { getProviderSlug } from "@/lib/provider";
 import type { ChatMessage } from "@/lib/types";
 
@@ -36,12 +39,27 @@ interface MyRouterContext {
 	auth: AuthContextType | undefined;
 }
 
+declare module "@tanstack/react-router" {
+	interface StaticDataRouteOption {
+		surface?: "standard" | "bleed" | "fullscreen" | "auth";
+	}
+}
+
 export const Route = createRootRouteWithContext<MyRouterContext>()({
 	// Fallback tab title; the deepest match that sets its own `head` wins. The static <title> in
 	// index.html stays as the pre-hydration placeholder.
 	head: () => ({ meta: [{ title: "Hephaestus" }] }),
 	component: () => {
 		const { pathname } = useLocation();
+		const surface = useMatches({
+			select: (matches) => {
+				for (let index = matches.length - 1; index >= 0; index -= 1) {
+					const matchSurface = matches[index]?.staticData.surface;
+					if (matchSurface) return matchSurface;
+				}
+				return "standard";
+			},
+		});
 		const { isAuthenticated, isLoading } = useAuth();
 		const { enabled: hasMentorAccess } = useFeatureFlag("MENTOR_ACCESS");
 		const { data: userSettings, isError: userSettingsError } = useQuery({
@@ -51,40 +69,18 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 		});
 		const allowSurveys =
 			isPosthogEnabled && !userSettingsError && (userSettings?.participateInResearch ?? true);
-		const isMentorRoute = pathname === "/mentor" || /^\/w\/[^/]+\/mentor/.test(pathname);
-		const isAchievementsRoute =
-			/^\/w\/[^/]+\/achievements/.test(pathname) ||
-			/^\/w\/[^/]+\/user\/[^/]+\/achievements/.test(pathname);
-		// Routes that use full-height layouts without padding or footer
-		const isFullscreenRoute = isMentorRoute || isAchievementsRoute;
+		const showCopilot =
+			!isLoading && isAuthenticated && hasMentorAccess && !isCopilotExcludedRoute(pathname);
 
-		// Exclude routes where Copilot should not appear
-		const isExcludedRoute =
-			isMentorRoute ||
-			pathname.startsWith("/admin") ||
-			pathname.startsWith("/settings") ||
-			pathname.startsWith("/legal") ||
-			pathname === "/imprint" ||
-			pathname === "/privacy";
-
-		const showCopilot = !isLoading && isAuthenticated && hasMentorAccess && !isExcludedRoute;
-
-		// Auth screens (/login, /w/<slug>/login, /auth/*) render on a focused, full-viewport canvas with
-		// NO app chrome — no header (which otherwise duplicates the sign-in buttons), no footer, no
-		// sidebar. The page owns the whole viewport, so it can center cleanly without subtracting header/
-		// footer height.
-		const isAuthRoute =
-			pathname === "/login" ||
-			pathname.startsWith("/auth/") ||
-			/^\/w\/[^/]+\/login\/?$/.test(pathname);
-
-		if (isAuthRoute) {
+		if (surface === "auth") {
 			return (
 				<>
 					<HeadContent />
 					<CookieConsentBanner />
 					<ProviderColorScope>
-						<Outlet />
+						<main>
+							<Outlet />
+						</main>
 					</ProviderColorScope>
 					<Toaster />
 				</>
@@ -100,13 +96,26 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 				<ProviderColorScope>
 					<SidebarProvider>
 						<AppSidebarContainer />
-						<SidebarInset style={{ marginRight: "var(--right-sidebar-width, 0)" }}>
+						<SidebarInset
+							className="min-w-0"
+							style={{ marginRight: "var(--right-sidebar-width, 0)" }}
+						>
 							<HeaderContainer />
-							<div className="flex min-h-[calc(100dvh-4rem)] flex-col">
-								<main className={isFullscreenRoute ? "" : "flex-1 p-4"}>
-									<Outlet />
-								</main>
-								{!isFullscreenRoute && (
+							<div className="flex min-h-0 flex-1 flex-col">
+								{surface === "standard" ? (
+									<StandardPageSurface className="flex-1">
+										<Outlet />
+									</StandardPageSurface>
+								) : (
+									<div
+										className={
+											surface === "fullscreen" ? "flex min-h-0 min-w-0 flex-1 flex-col" : "flex-1"
+										}
+									>
+										<Outlet />
+									</div>
+								)}
+								{surface !== "fullscreen" && (
 									<Footer
 										buildInfo={environment.buildInfo}
 										isProduction={environment.deployment.isProduction}
@@ -123,9 +132,8 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			</>
 		);
 	},
-	// Add notFoundComponent to handle route not found errors
 	notFoundComponent: () => (
-		<div className="container py-16 flex flex-col items-center justify-center text-center">
+		<div className="mx-auto flex w-full max-w-2xl flex-col items-center justify-center py-16 text-center">
 			<h2 className="text-3xl font-bold mb-4">Page Not Found</h2>
 			<p className="text-muted-foreground mb-8">
 				The page you're looking for doesn't exist or you don't have permission to view it.
@@ -138,7 +146,6 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 });
 
 function GlobalCopilot() {
-	// Independent chat state for the copilot widget
 	const mentorChat = useMentorChat({
 		onError: (error: Error) => {
 			console.error("Copilot chat error:", error);
@@ -159,14 +166,10 @@ function GlobalCopilot() {
 		mentorChat.voteMessage(messageId, isUpvote);
 	};
 
-	// Edit a previous message: discard that message and all following locally, then send the edited content
 	const handleMessageEdit = (messageId: string, content: string) => {
-		const idx = mentorChat.messages.findIndex((m) => m.id === messageId);
-		if (idx === -1) return;
-		// Keep everything before the edited message
-		mentorChat.setMessages(mentorChat.messages.slice(0, idx));
-		// Send the edited content as a new message; the server resolves the parent from the
-		// trimmed history (we only ship the new user message, not previousMessageId).
+		const messageIndex = mentorChat.messages.findIndex((message) => message.id === messageId);
+		if (messageIndex === -1) return;
+		mentorChat.setMessages(mentorChat.messages.slice(0, messageIndex));
 		mentorChat.sendMessage(content);
 	};
 
@@ -184,7 +187,6 @@ function GlobalCopilot() {
 		<Copilot
 			hasMessages={(mentorChat.messages?.length ?? 0) > 0}
 			onNewChat={() => {
-				// Reset to a fresh session by clearing messages; useMentorChat will keep a new id.
 				mentorChat.setMessages([]);
 			}}
 			onOpenFullChat={() => {
@@ -212,7 +214,7 @@ function GlobalCopilot() {
 				onCopy={handleCopy}
 				onVote={handleVote}
 				inputPlaceholder="Ask me anything..."
-				disableAttachments={true}
+				disableAttachments
 				className="h-full max-h-none"
 				partRenderers={defaultPartRenderers}
 			/>

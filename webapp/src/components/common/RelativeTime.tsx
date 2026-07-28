@@ -1,4 +1,5 @@
 import { format, formatDistance } from "date-fns";
+import { ClockAlertIcon, TriangleAlertIcon } from "lucide-react";
 import { useSyncExternalStore } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { asDate } from "@/lib/dates";
@@ -54,6 +55,11 @@ const FRESHNESS_CLASS: Record<FreshnessTone, string> = {
 	veryStale: "text-destructive",
 };
 
+const FRESHNESS_LABEL = {
+	stale: "Stale",
+	veryStale: "Very stale",
+} as const;
+
 export interface RelativeTimeProps {
 	value?: Date | string | null;
 	tone?: FreshnessTone;
@@ -84,9 +90,19 @@ export function RelativeTime({
 
 	const toneClass = tone ? FRESHNESS_CLASS[tone] : undefined;
 	const text = formatDistance(date, currentNow, { addSuffix: true });
+	const adverseTone = tone === "stale" || tone === "veryStale" ? tone : undefined;
+	const statusLabel = adverseTone ? FRESHNESS_LABEL[adverseTone] : undefined;
+	const StatusIcon = adverseTone === "veryStale" ? TriangleAlertIcon : ClockAlertIcon;
+	const reading = (
+		<span className={cn("inline-flex items-center gap-1", toneClass, className)}>
+			{adverseTone && <StatusIcon className="size-3.5 shrink-0" aria-hidden />}
+			<span>{text}</span>
+			{statusLabel && <span className="sr-only">, {statusLabel}</span>}
+		</span>
+	);
 
 	if (!tooltip) {
-		return <span className={cn(toneClass, className)}>{text}</span>;
+		return reading;
 	}
 
 	return (
@@ -94,13 +110,12 @@ export function RelativeTime({
 			<TooltipTrigger
 				className={cn(
 					"cursor-help underline decoration-dotted decoration-muted-foreground/40 underline-offset-4",
-					toneClass,
-					className,
 				)}
 			>
-				{text}
+				{reading}
 			</TooltipTrigger>
 			<TooltipContent>
+				{statusLabel && <>{statusLabel} · </>}
 				<span className="tabular-nums">{format(date, "d MMM yyyy, HH:mm:ss")}</span>
 			</TooltipContent>
 		</Tooltip>

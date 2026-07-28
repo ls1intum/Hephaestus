@@ -1,4 +1,5 @@
 import type { Decorator } from "@storybook/react";
+import { StandardPageSurface } from "@/components/core/StandardPageSurface";
 import { getProviderSlug, type ProviderType } from "@/lib/provider";
 
 /**
@@ -14,3 +15,15 @@ export function withProvider(provider: ProviderType): Decorator {
 		);
 	};
 }
+
+export const withStandardPage: Decorator = (Story) => (
+	<StandardPageSurface>
+		<Story />
+	</StandardPageSurface>
+);
+
+export const withWidePage: Decorator = (Story) => (
+	<div className="mx-auto w-full max-w-6xl">
+		<Story />
+	</div>
+);

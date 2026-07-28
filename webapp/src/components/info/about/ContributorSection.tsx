@@ -27,7 +27,7 @@ export function ContributorSection({ contributors, isLoading, isError }: Contrib
 			/>
 
 			{isError && (
-				<div className="bg-gradient-to-br from-background to-muted/30 rounded-lg p-8 text-center border border-muted">
+				<div className="rounded-lg border border-muted bg-gradient-to-br from-background to-muted/30 p-6 text-center sm:p-8">
 					<AlertCircle className="h-8 w-8 text-destructive mx-auto mb-4" />
 					<h4 className="text-lg font-medium mb-2">Contributor data unavailable</h4>
 					<p className="text-muted-foreground">

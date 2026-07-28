@@ -23,16 +23,10 @@ import org.springframework.context.event.EventListener;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionOperations;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Seeds {@code practices/default-catalog.json} into every workspace at startup and when a workspace is
- * created.
- *
- * <p>Existing practice fields are not overwritten. Unbound defaults are reattached so interrupted seeds
- * can recover.
- */
 @Component
 class DefaultPracticeCatalogSeeder {
 
@@ -46,8 +40,10 @@ class DefaultPracticeCatalogSeeder {
     private final PracticeService practiceService;
     private final PracticeAreaRepository areaRepository;
     private final PracticeRepository practiceRepository;
+    private final PracticeCatalogInstallationRepository installationRepository;
     private final WorkspaceRepository workspaceRepository;
     private final AsyncTaskExecutor taskExecutor;
+    private final TransactionOperations transactionOperations;
 
     DefaultPracticeCatalogSeeder(
         @Value("${hephaestus.practices.seed-default-catalog:true}") boolean enabled,
@@ -56,8 +52,10 @@ class DefaultPracticeCatalogSeeder {
         PracticeService practiceService,
         PracticeAreaRepository areaRepository,
         PracticeRepository practiceRepository,
+        PracticeCatalogInstallationRepository installationRepository,
         WorkspaceRepository workspaceRepository,
-        @Qualifier(TaskExecutionAutoConfiguration.APPLICATION_TASK_EXECUTOR_BEAN_NAME) AsyncTaskExecutor taskExecutor
+        @Qualifier(TaskExecutionAutoConfiguration.APPLICATION_TASK_EXECUTOR_BEAN_NAME) AsyncTaskExecutor taskExecutor,
+        TransactionOperations transactionOperations
     ) {
         this.enabled = enabled;
         this.objectMapper = objectMapper;
@@ -65,8 +63,10 @@ class DefaultPracticeCatalogSeeder {
         this.practiceService = practiceService;
         this.areaRepository = areaRepository;
         this.practiceRepository = practiceRepository;
+        this.installationRepository = installationRepository;
         this.workspaceRepository = workspaceRepository;
         this.taskExecutor = taskExecutor;
+        this.transactionOperations = transactionOperations;
     }
 
     @EventListener(WorkspacesInitializedEvent.class)
@@ -81,7 +81,7 @@ class DefaultPracticeCatalogSeeder {
                 .sorted(Comparator.comparing(Workspace::getId, Comparator.nullsLast(Long::compareTo)))
                 .forEach(this::seedCatalogSafely);
         } catch (RuntimeException e) {
-            log.error("Could not load workspaces for default practice catalog reconciliation", e);
+            log.error("Could not load workspaces for default practice catalog installation", e);
         }
     }
 
@@ -109,21 +109,24 @@ class DefaultPracticeCatalogSeeder {
 
     private void seedCatalogSafely(Workspace workspace) {
         try {
-            seedCatalog(workspace);
+            transactionOperations.executeWithoutResult(ignored -> seedCatalog(workspace));
         } catch (RuntimeException e) {
             log.error("Default practice catalog seeding failed: workspaceId={}", workspace.getId(), e);
         }
     }
 
     private void seedCatalog(Workspace workspace) {
-        WorkspaceContext ctx = WorkspaceContext.fromWorkspace(workspace, Set.of(), null);
+        Workspace lockedWorkspace = workspaceRepository.findByIdForUpdate(workspace.getId()).orElse(null);
+        if (lockedWorkspace == null || installationRepository.existsById(lockedWorkspace.getId())) {
+            return;
+        }
+        WorkspaceContext ctx = WorkspaceContext.fromWorkspace(lockedWorkspace, Set.of(), null);
 
         JsonNode catalog = readCatalog();
         int seededAreas = 0;
         int seededPractices = 0;
         for (JsonNode areaNode : catalog.path("areas")) {
             String areaSlug = areaNode.path("slug").asString();
-            // Walk existing areas too so an interrupted seed can add missing practices.
             if (!areaRepository.existsByWorkspaceIdAndSlug(ctx.id(), areaSlug)) {
                 areaService.createArea(
                     ctx,
@@ -141,26 +144,22 @@ class DefaultPracticeCatalogSeeder {
 
             for (JsonNode practiceNode : areaNode.path("practices")) {
                 String practiceSlug = practiceNode.path("slug").asString();
-                try {
-                    if (seedPractice(ctx, catalog, areaSlug, practiceNode, practiceSlug)) {
-                        seededPractices++;
-                    }
-                } catch (RuntimeException e) {
-                    log.error("Skipping malformed catalog practice '{}': {}", practiceSlug, e.getMessage());
+                if (seedPractice(ctx, catalog, areaSlug, practiceNode, practiceSlug)) {
+                    seededPractices++;
                 }
             }
         }
+        installationRepository.save(new PracticeCatalogInstallation(lockedWorkspace.getId()));
         if (seededAreas > 0 || seededPractices > 0) {
             log.info(
                 "Seeded default practice catalog: {} areas, {} practices into workspace {}",
                 seededAreas,
                 seededPractices,
-                workspace.getId()
+                lockedWorkspace.getId()
             );
         }
     }
 
-    /** Returns whether the practice was created or an unbound default was reattached. */
     private boolean seedPractice(
         WorkspaceContext ctx,
         JsonNode catalog,
@@ -168,24 +167,17 @@ class DefaultPracticeCatalogSeeder {
         JsonNode practiceNode,
         String practiceSlug
     ) {
-        var existing = practiceRepository.findByWorkspaceIdAndSlug(ctx.id(), practiceSlug);
-        if (existing.isPresent()) {
-            if (existing.get().getArea() == null) {
-                areaService.bindPractice(ctx, practiceSlug, areaSlug);
-                return true;
-            }
+        if (practiceRepository.findByWorkspaceIdAndSlug(ctx.id(), practiceSlug).isPresent()) {
             return false;
         }
-        practiceService.createPractice(ctx, toCreateRequest(catalog, practiceNode));
-        areaService.bindPractice(ctx, practiceSlug, areaSlug);
+        practiceService.createPractice(ctx, toCreateRequest(catalog, practiceNode, areaSlug));
         return true;
     }
 
-    private CreatePracticeRequestDTO toCreateRequest(JsonNode catalog, JsonNode practiceNode) {
+    private CreatePracticeRequestDTO toCreateRequest(JsonNode catalog, JsonNode practiceNode, String areaSlug) {
         List<String> triggerEvents = new ArrayList<>();
         practiceNode.path("triggerEvents").forEach(t -> triggerEvents.add(t.asString()));
         WorkArtifact focus = WorkArtifact.valueOf(practiceNode.path("artifactType").asString());
-        // A practice may opt into a non-default preamble via a "preamble" key; otherwise the focus name is the key.
         String preambleKey = text(practiceNode, "preamble");
         if (preambleKey == null) {
             preambleKey = focus.name();
@@ -199,15 +191,11 @@ class DefaultPracticeCatalogSeeder {
             loadPrecomputeScript(slug),
             focus,
             text(practiceNode, "whyItMatters"),
-            text(practiceNode, "whatGoodLooksLike")
+            text(practiceNode, "whatGoodLooksLike"),
+            areaSlug
         );
     }
 
-    /**
-     * Loads the optional per-practice precompute script from {@code practices/precompute/<slug>.ts} on the
-     * classpath; {@code null} when a practice has no script (the common case). The script emits
-     * hints/metrics, never an observation — the LLM still does the heavy lifting.
-     */
     @Nullable
     private String loadPrecomputeScript(String slug) {
         var resource = new ClassPathResource("practices/precompute/" + slug + ".ts");
@@ -222,12 +210,6 @@ class DefaultPracticeCatalogSeeder {
         }
     }
 
-    /**
-     * Prepends the shared evidence-contract preamble ({@code criteriaPreambles.<KEY>}) to the
-     * practice-specific criteria so every practice of a focus inherits the same artifact contract without
-     * restating it. The preamble defers to the inline criteria, so composition never weakens the validated
-     * detection logic. When no preamble is configured the criteria is stored verbatim.
-     */
     private static String composeCriteria(JsonNode catalog, String preambleKey, String criteria) {
         String preamble = text(catalog.path("criteriaPreambles"), preambleKey);
         if (preamble == null || preamble.isBlank()) {

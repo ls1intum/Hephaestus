@@ -8,22 +8,18 @@ import { useAuth } from "@/integrations/auth/AuthContext";
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/user/$username/achievements",
 )({
+	staticData: { surface: "fullscreen" },
 	component: UserAchievementsPage,
 });
 
-/**
- * Parameterized route for viewing any user's achievements.
- * Renders the same skill tree / list view but with the target user's data.
- */
 function UserAchievementsPage() {
 	const { workspaceSlug, username } = Route.useParams();
 	const { isCurrentUser } = useAuth();
 	const navigate = useNavigate();
-	const { achievementsEnabled, isLoading } = useWorkspaceFeatures();
+	const { achievementsEnabled, isLoading } = useWorkspaceFeatures(workspaceSlug);
 
 	useEffect(() => {
 		if (!isLoading && !achievementsEnabled && workspaceSlug && username) {
-			// Silent redirect — UI elements are already hidden when disabled
 			navigate({
 				to: "/w/$workspaceSlug/user/$username",
 				params: { workspaceSlug, username },
@@ -34,7 +30,7 @@ function UserAchievementsPage() {
 
 	if (isLoading || !achievementsEnabled) {
 		return (
-			<div className="flex items-center justify-center h-96">
+			<div className="flex min-h-0 flex-1 items-center justify-center">
 				<Spinner className="size-8" />
 			</div>
 		);

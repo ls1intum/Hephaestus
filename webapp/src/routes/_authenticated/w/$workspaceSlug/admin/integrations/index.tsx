@@ -32,7 +32,7 @@ function IntegrationsOverview() {
 	});
 
 	return (
-		<div className="container mx-auto max-w-5xl space-y-6 py-6">
+		<div className="mx-auto w-full max-w-5xl space-y-6">
 			<IntegrationPageHeader
 				title="Integrations"
 				description="Connection health, sync activity and quick actions for every integration this workspace can use. Open one for its full detail — resources, controls and job history."

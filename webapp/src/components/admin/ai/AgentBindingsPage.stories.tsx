@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent, type within } from "storybook/test";
 import type { AgentBinding } from "@/api/types.gen";
-import { expectControlOnScreen, expectPageReflows } from "@/test/reflow";
+import { withStandardPage } from "@/stories/decorators";
+import { expectControlOnScreen, expectNoPageOverflow } from "@/test/reflow";
 import { AgentBindingsPage } from "./AgentBindingsPage";
 import { mockAvailableModels } from "./story-mock-data";
 
@@ -21,13 +22,10 @@ const detectionBinding: AgentBinding = {
 	allowInternet: false,
 };
 
-/**
- * The workspace's AI models page: one card per agent purpose, each binding a model and — behind an
- * "Advanced" disclosure — the run limits that binding runs under.
- */
 const meta = {
 	component: AgentBindingsPage,
 	parameters: { layout: "fullscreen" },
+	decorators: [withStandardPage],
 	tags: ["autodocs"],
 	args: {
 		workspaceSlug: "acme",
@@ -57,15 +55,13 @@ export const Loading: Story = {
 export const NoModelsAvailable: Story = {
 	args: { bindings: [], availableModels: [] },
 	play: async ({ canvas }) => {
-		await expect(await canvas.findAllByText(/No models are available yet/)).toBeTruthy();
+		await canvas.findAllByText(/No models are available yet/);
 	},
 };
 
 export const LoadForbidden: Story = {
 	args: {
 		isError: true,
-		// The generated client throws the RFC 9457 body verbatim, so `status` lives in the body — that
-		// is where the alert reads it to decide a 403 cannot be retried away.
 		loadError: {
 			type: "about:blank",
 			title: "Forbidden",
@@ -105,7 +101,6 @@ export const AdvancedDisclosure: Story = {
 	},
 };
 
-/** A cleared run limit explains itself at the field, never as a toast that pulls the eye away. */
 export const InvalidRunLimit: Story = {
 	play: async ({ canvas }) => {
 		await openAdvancedOnFirstCard(canvas);
@@ -118,7 +113,6 @@ export const InvalidRunLimit: Story = {
 	},
 };
 
-/** WCAG 2.2 SC 1.4.10 at 320 px: nothing here is tabular, so nothing may scroll sideways. */
 export const MobileReflow: Story = {
 	parameters: {
 		layout: "fullscreen",
@@ -126,8 +120,8 @@ export const MobileReflow: Story = {
 		chromatic: { viewports: [320, 375, 768] },
 	},
 	play: async ({ canvas }) => {
-		await canvas.findByText("Practice detection");
-		await expectPageReflows();
+		await canvas.findByText("Practice feedback");
+		await expectNoPageOverflow();
 		await expectControlOnScreen(canvas.getAllByRole("button", { name: "Save" })[0]);
 	},
 };

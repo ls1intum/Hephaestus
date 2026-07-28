@@ -97,11 +97,11 @@ class AgentJobRetentionServiceTest extends BaseUnitTest {
         @DisplayName("a single partial batch deletes once and stops")
         void singlePartialBatchStopsAfterOnePass() {
             lenient().when(jobRepository.stripTerminalPayloads(any(), anyInt())).thenReturn(0);
-            when(jobRepository.deleteTerminalRowsOlderThan(any(), anyInt())).thenReturn(12);
+            when(jobRepository.deleteUnreferencedTerminalRowsOlderThan(any(), anyInt())).thenReturn(12);
 
             service.runRetention();
 
-            verify(jobRepository, times(1)).deleteTerminalRowsOlderThan(
+            verify(jobRepository, times(1)).deleteUnreferencedTerminalRowsOlderThan(
                 any(),
                 org.mockito.ArgumentMatchers.eq(BATCH_SIZE)
             );
@@ -112,11 +112,11 @@ class AgentJobRetentionServiceTest extends BaseUnitTest {
         @DisplayName("a full batch loops again; stops once a batch returns fewer rows than the batch size")
         void loopsUntilBatchIsPartial() {
             lenient().when(jobRepository.stripTerminalPayloads(any(), anyInt())).thenReturn(0);
-            when(jobRepository.deleteTerminalRowsOlderThan(any(), anyInt())).thenReturn(BATCH_SIZE, 5);
+            when(jobRepository.deleteUnreferencedTerminalRowsOlderThan(any(), anyInt())).thenReturn(BATCH_SIZE, 5);
 
             service.runRetention();
 
-            verify(jobRepository, times(2)).deleteTerminalRowsOlderThan(
+            verify(jobRepository, times(2)).deleteUnreferencedTerminalRowsOlderThan(
                 any(),
                 org.mockito.ArgumentMatchers.eq(BATCH_SIZE)
             );

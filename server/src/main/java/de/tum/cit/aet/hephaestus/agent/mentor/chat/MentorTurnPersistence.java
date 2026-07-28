@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageJobType;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder.LlmUsageSample;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
+import de.tum.cit.aet.hephaestus.core.exception.DataIntegrityViolationConstraints;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
@@ -23,7 +24,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-import org.hibernate.exception.ConstraintViolationException;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -190,23 +190,11 @@ public class MentorTurnPersistence {
      * the expected race from other integrity violations.
      */
     private static boolean isInFlightUniqueViolation(DataIntegrityViolationException ex) {
-        return hasConstraintName(ex, "ux_chat_message_in_flight_v2");
+        return DataIntegrityViolationConstraints.hasName(ex, "ux_chat_message_in_flight_v2");
     }
 
     private static boolean isDuplicateMessageIdViolation(DataIntegrityViolationException ex) {
-        return hasConstraintName(ex, "chat_message_pkey");
-    }
-
-    private static boolean hasConstraintName(DataIntegrityViolationException ex, String expectedName) {
-        Throwable cur = ex;
-        while (cur != null) {
-            if (cur instanceof ConstraintViolationException cve) {
-                String name = cve.getConstraintName();
-                return name != null && name.equalsIgnoreCase(expectedName);
-            }
-            cur = cur.getCause();
-        }
-        return false;
+        return DataIntegrityViolationConstraints.hasName(ex, "chat_message_pkey");
     }
 
     /**

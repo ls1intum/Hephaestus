@@ -96,7 +96,7 @@ function AdminLoginProvidersPage() {
 	};
 
 	return (
-		<div className="mx-auto w-full max-w-5xl space-y-6 py-6">
+		<div className="mx-auto w-full max-w-5xl space-y-6">
 			<header className="flex flex-wrap items-start justify-between gap-3">
 				<div className="space-y-1">
 					<div className="flex items-center gap-2">

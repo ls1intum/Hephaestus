@@ -32,8 +32,9 @@ Digest semantics (`ProvenanceDigest`): root digest = SHA-256 over the path-sorte
 
 ### Sampling parameters
 
-Hephaestus does not set temperature, top_p, or max output tokens for detection runs — sampling is the
-provider default for the pinned route. What identifies that route is the frozen
+Hephaestus does not set temperature or top_p for detection runs. The configured maximum output-token
+limit is frozen in the job's `ConfigSnapshot` and applied by the runtime. What identifies the route is
+the frozen
 `(base URL, upstream model id, model_version)` — the provider is no longer a named enum, since every
 connection speaks an OpenAI-compatible wire API and the base URL is what actually distinguishes one
 endpoint from another. That triple, plus `prompt_digest`, IS the sampling provenance today.
@@ -45,11 +46,12 @@ so each run keeps its own record.
 
 ## 2. The feedback ledger: delivered vs withheld
 
-User reactions are only usable as labels if "the developer saw it" is a fact, not a guess. Every
+User reactions are only usable as labels when the feedback reached a developer-facing surface. Every
 **prepared unit** — a composed review that reached the delivery layer — lands exactly one `feedback`
 row, in the state that says what became of it (`FeedbackDeliveryState`, defined in
-[practice-feedback-schema.md](./practice-feedback-schema.md)). Only `DELIVERED` counts as exposure;
-`SUPPRESSED` means policy withheld it and always carries a reason.
+[practice-feedback-schema.md](./practice-feedback-schema.md)). `DELIVERED` and `SUPERSEDED` prove
+placement; neither proves that a person read it. `SUPPRESSED` means policy withheld it and always
+carries a reason.
 
 > **This table is the one home of the suppression-reason list.** It tracks the Java enum
 > `practices/feedback/FeedbackSuppressionReason` and the `chk_feedback_suppression_reason` CHECK
@@ -67,7 +69,7 @@ row, in the state that says what became of it (`FeedbackDeliveryState`, defined 
 | `VOLUME_CAPPED` (conversation) | `ConversationalFeedbackPreparer` — over the per-recipient cap for a mentor turn | per observation |
 | `ARTIFACT_GONE` / `ARTIFACT_CLOSED` / `ARTIFACT_MERGED` / `ARTIFACT_DRAFT` | whole-review delivery gates in `FeedbackDeliveryService` / `IssueReviewHandler` | one unit per job (ordinal 5000) |
 | `RECIPIENT_OPTED_OUT` | author disabled AI review | one unit per job |
-| `EMPTY_AFTER_SANITIZE` | composed body sanitised to blank and no inline note landed — nothing reached the developer | one unit per job |
+| `EMPTY_AFTER_SANITIZE` | composed body sanitised to blank and no inline note was placed | one unit per job |
 
 Unit ordinal bases on `(agent_job_id, position)`: `0` live in-context unit, `1000+` reaction
 suppression, `2000+` composer-withheld, `3000+` conversational, `4000` failed, `5000` gate-suppressed.
@@ -75,9 +77,8 @@ suppression, `2000+` composer-withheld, `3000+` conversational, `4000` failed, `
 **Invariant:** any new decision point that can withhold a prepared unit — a gate, cap, dedup, filter —
 MUST write a `SUPPRESSED` row with a reason (add the enum value + its `chk_feedback_suppression_reason`
 entry). A silent drop reopens the gap: an evaluator can no longer tell "model missed" from "policy
-withheld" from "delivered and ignored". The converse holds too — every reason above names a live writer;
-reviewer-audience routing (ADR-0021-C2) will add its own when it lands, rather than keeping an unwritten
-value on the books.
+withheld" from "placed without a recorded reaction". The converse holds too — every reason above names
+a live writer.
 
 ---
 
@@ -86,20 +87,20 @@ value on the books.
 - **Observation → what produced it:** `observation.agent_job_id` → `agent_job`
   (`config_snapshot`, `prompt_digest`, `inputs_digest`, `metadata.commit_sha`) and
   `observation.practice_revision_id` → `practice_revision.criteria`.
-- **Observation → was it seen:** `feedback_observation` → `feedback.delivery_state`
-  (+ `suppression_reason`). An observation bound to a `DELIVERED` unit was rendered (BAD as
-  `PRIMARY`; GOOD strengths bind `SUPPORTING` but may render abridged — see §4). An observation
-  bound only to `SUPPRESSED`/`FAILED` units was never seen.
-- **Reaction → label:** `reaction.feedback_id` → `feedback` (reactions require
-  `delivery_state = DELIVERED`, so a reaction is always a label on real exposure) →
-  `feedback_observation` → observations. The posted surface is recoverable via
+- **Observation → did it reach a delivery surface:** `feedback_observation` →
+  `feedback.delivery_state` (+ `suppression_reason`). An observation bound to a `DELIVERED` or
+  `SUPERSEDED` unit was rendered (BAD as `PRIMARY`; GOOD strengths bind `SUPPORTING` but may render
+  abridged — see §4). An observation bound only to `PREPARED`/`SUPPRESSED`/`FAILED` units was not
+  placed. No linked unit means no feedback was composed and is distinct from a `SUPPRESSED` unit.
+- **Reaction → label:** `ReactionService` accepts a reaction only while its feedback unit is
+  `DELIVERED`, so a reaction labels a unit known to have been placed. A later delivery may mark that
+  unit `SUPERSEDED`. `reaction.feedback_id` → `feedback` → `feedback_observation` → observations. The
+  posted surface is recoverable via
   `feedback_placement.posted_comment_ref` / `chat_message_id`.
 
 Criteria-revision pinning is **as-of `agent_job.started_at`**: `started_at` is stamped at claim,
-immediately before the catalog injector reads `Practice.criteria` into the sandbox, so a revision an
-admin appends while the sandbox runs is a rubric the detector never saw and is not pinned. (Residual
-race: an edit landing in the few milliseconds between claim and injection can pin one revision early
-— negligible next to the minutes-long sandbox window this closes.)
+before the catalog injector reads `Practice.criteria` into the sandbox. A revision appended after
+that timestamp is not pinned, including one written between the claim and criteria materialisation.
 
 ---
 
@@ -111,7 +112,7 @@ race: an edit landing in the few milliseconds between claim and injection can pi
 - **`NOT_APPLICABLE` abstentions** persist as observations but are never delivered and get no
   ledger row — they are abstentions, not withheld findings.
 - **GOOD strengths** bound `SUPPORTING` to a `DELIVERED` unit may have been rendered only as a
-  brief acknowledgement line, not verbatim. Exposure for strengths is coarser than for problems;
+  brief acknowledgement line, not verbatim. Placement evidence for strengths is coarser than for problems;
   precision evaluation should score BAD observations.
 - **The repo mount is not part of `inputs_digest`** — `metadata.commit_sha` pins it. A replay must
   check out that SHA.

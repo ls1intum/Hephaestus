@@ -73,6 +73,7 @@
 		"@playwright/test": "1.60.0",
 		"@primer/primitives": "11.9.0",
 		"@rolldown/plugin-babel": "0.2.3",
+		"@storybook/addon-a11y": "10.4.0",
 		"@storybook/addon-docs": "10.4.0",
 		"@storybook/addon-onboarding": "10.4.0",
 		"@storybook/addon-themes": "10.4.0",

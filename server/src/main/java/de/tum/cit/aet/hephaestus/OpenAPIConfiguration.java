@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus;
 
 import de.tum.cit.aet.hephaestus.achievement.AchievementRegistry;
+import io.swagger.v3.core.converter.ModelConverters;
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
 import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
 import io.swagger.v3.oas.annotations.info.Contact;
@@ -30,6 +31,7 @@ import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.web.PagedModel;
 
 /**
  * OpenAPI configuration: processes server DTOs (strips the {@code DTO} suffix from schema
@@ -83,7 +85,12 @@ public class OpenAPIConfiguration {
     /**
      * Domain objects to include even without DTO suffix
      */
-    private static final List<String> ALLOWED_DOMAIN_OBJECTS = List.of("PageableObject", "SortObject", "ProblemDetail");
+    private static final List<String> ALLOWED_DOMAIN_OBJECTS = List.of(
+        "PageableObject",
+        "SortObject",
+        "ProblemDetail",
+        "PageMetadata"
+    );
     /**
      * Domain objects to include by specific suffix (like AchievementProgress records)
      */
@@ -104,6 +111,7 @@ public class OpenAPIConfiguration {
     ) {
         return openApi -> {
             openApi.getInfo().setVersion(appVersion);
+            includeSpringDataPageMetadata(openApi);
             processApplicationServerSchemas(openApi);
             processAllPaths(openApi);
             declareExactDecimals(openApi);
@@ -126,6 +134,12 @@ public class OpenAPIConfiguration {
                 openApi.getComponents().addSchemas("AchievementId", idSchema);
             }
         };
+    }
+
+    private void includeSpringDataPageMetadata(OpenAPI openApi) {
+        ModelConverters.getInstance()
+            .read(PagedModel.PageMetadata.class)
+            .forEach((name, schema) -> openApi.getComponents().addSchemas(name, schema));
     }
 
     /**
@@ -290,7 +304,7 @@ public class OpenAPIConfiguration {
      * OpenAPI 3.1 moved the type into the {@code types} set (a nullable number is {@code [number, null]})
      * and leaves {@code getType()} populated only in the 3.0 shape, so both have to be read.
      */
-    @SuppressWarnings("rawtypes")
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     private boolean isFormatlessNumber(Schema schema) {
         if (schema.getFormat() != null) {
             return false;

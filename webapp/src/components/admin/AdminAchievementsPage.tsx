@@ -112,19 +112,20 @@ export function AdminAchievementsPage({
 	};
 
 	return (
-		<div className="container mx-auto py-6">
-			<div className="flex items-center justify-between mb-6">
-				<div>
+		<div className="mx-auto w-full max-w-6xl space-y-6">
+			<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+				<div className="min-w-0">
 					<h1 className="text-3xl font-bold tracking-tight">Achievements</h1>
 					<p className="text-muted-foreground">
 						Recalculate achievements for users in this workspace.
 					</p>
 				</div>
-				<div className="flex items-center gap-2">
+				<div className="flex flex-col gap-2 sm:flex-row">
 					<Button
 						variant="outline"
 						onClick={handleReload}
 						disabled={isLoading || reloadMutation.isPending}
+						className="w-full sm:w-auto"
 					>
 						{reloadMutation.isPending ? (
 							<>
@@ -141,6 +142,7 @@ export function AdminAchievementsPage({
 					<Button
 						onClick={handleRecalculateAll}
 						disabled={isLoading || isRecalculatingAll || users.length === 0}
+						className="w-full sm:w-auto"
 					>
 						{isRecalculatingAll ? (
 							<>

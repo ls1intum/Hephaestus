@@ -1,7 +1,7 @@
 import { Globe } from "lucide-react";
 import { Github } from "@/components/icons/brand";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 
 export interface ProjectManager {
 	id: number;
@@ -20,7 +20,7 @@ interface ProjectManagerCardProps {
 
 export function ProjectManagerCard({ projectManager }: ProjectManagerCardProps) {
 	return (
-		<div className="bg-gradient-to-br from-background to-muted/30 rounded-lg p-8 mb-16 border border-muted">
+		<div className="mb-16 rounded-lg border border-muted bg-gradient-to-br from-background to-muted/30 p-6 sm:p-8">
 			<div className="flex flex-col md:flex-row gap-8 items-center md:items-start">
 				<Avatar className="h-32 w-32 border-4 border-background">
 					<AvatarImage src={projectManager.avatarUrl} alt={`${projectManager.login}'s avatar`} />
@@ -38,23 +38,23 @@ export function ProjectManagerCard({ projectManager }: ProjectManagerCardProps) 
 					</div>
 					<p className="text-muted-foreground">{projectManager.description}</p>
 					<div className="flex items-center gap-2 pt-2 justify-center md:justify-start">
-						<Button
-							variant="outline"
-							size="sm"
-							render={<a href={projectManager.htmlUrl} target="_blank" rel="noopener noreferrer" />}
+						<a
+							href={projectManager.htmlUrl}
+							target="_blank"
+							rel="noopener noreferrer"
+							className={buttonVariants({ variant: "outline", size: "sm" })}
 						>
 							<Github className="h-5 w-5" /> GitHub
-						</Button>
-						<Button
-							variant="outline"
-							size="sm"
-							render={
-								<a href={projectManager.websiteUrl} target="_blank" rel="noopener noreferrer" />
-							}
+						</a>
+						<a
+							href={projectManager.websiteUrl}
+							target="_blank"
+							rel="noopener noreferrer"
+							className={buttonVariants({ variant: "outline", size: "sm" })}
 						>
 							<Globe className="h-5 w-5" />
 							Website
-						</Button>
+						</a>
 					</div>
 				</div>
 			</div>

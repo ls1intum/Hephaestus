@@ -30,10 +30,10 @@ function IntegrationsLayout() {
 
 	return (
 		<SyncLivenessProvider livePushUnavailable={livePushUnavailable}>
-			{/* Offline outranks live-push-lost: while offline TanStack pauses queries rather than failing
-			    them, so the polling this banner would otherwise promise isn't happening either. */}
-			<SyncFreshnessBanner />
-			<Outlet />
+			<div className="space-y-6">
+				<SyncFreshnessBanner />
+				<Outlet />
+			</div>
 		</SyncLivenessProvider>
 	);
 }

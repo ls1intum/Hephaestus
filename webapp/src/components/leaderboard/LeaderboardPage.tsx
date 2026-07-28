@@ -63,7 +63,6 @@ export function LeaderboardPage({
 	onTeamClick,
 	leaguesEnabled = true,
 }: LeaderboardPageProps) {
-	// Add formatted property to the leaderboardSchedule object if it exists
 	const formattedSchedule = leaderboardSchedule
 		? {
 				...leaderboardSchedule,
@@ -72,11 +71,11 @@ export function LeaderboardPage({
 		: undefined;
 
 	return (
-		<div className="flex flex-col items-center">
-			<div className="w-full">
+		<div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col items-center">
+			<div className="min-w-0 w-full">
 				<h1 className="text-3xl font-bold mb-4">Code Review Leaderboard</h1>
-				<div className="grid grid-cols-1 xl:grid-cols-4 gap-y-4 xl:gap-4">
-					<div className="space-y-4 col-span-1">
+				<div className="grid min-w-0 grid-cols-1 gap-y-4 xl:grid-cols-4 xl:gap-4">
+					<div className="col-span-1 min-w-0 space-y-4">
 						<div className="xl:sticky xl:top-4 xl:self-start xl:max-h-[calc(100vh-2rem)] xl:overflow-auto">
 							<LeaderboardFilter
 								selectedMode={selectedMode}
@@ -95,7 +94,7 @@ export function LeaderboardPage({
 						</div>
 					</div>
 
-					<div className="col-span-2 space-y-4">
+					<div className="col-span-2 min-w-0 space-y-4">
 						{currentUserEntry && leaguePoints !== undefined && (
 							<LeaderboardOverview
 								leaderboardEntry={currentUserEntry}
@@ -121,7 +120,7 @@ export function LeaderboardPage({
 						</div>
 					</div>
 
-					<div className="col-span-1 xl:sticky xl:top-4 xl:self-start xl:max-h-[calc(100vh-2rem)] xl:overflow-auto">
+					<div className="col-span-1 min-w-0 xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:self-start xl:overflow-auto">
 						<LeaderboardLegend providerType={providerType} />
 					</div>
 				</div>

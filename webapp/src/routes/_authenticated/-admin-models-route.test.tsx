@@ -3,7 +3,7 @@ import { HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import type { LlmConnection, LlmModel } from "@/api/types.gen";
 import { server } from "@/mocks/server";
-import { renderRouteAt, TRANSFORM_WAIT } from "@/test/router-harness";
+import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
 
 // Mounting the real route pulls in the whole admin layout and its lazy modules.
 vi.setConfig({ testTimeout: 20_000 });
@@ -22,7 +22,7 @@ function mockPage(connections: LlmConnection[] = [], models: LlmModel[] = []) {
 
 async function renderModelsRoute() {
 	renderRouteAt("/admin/models");
-	return screen.findByRole("heading", { name: "AI models" }, TRANSFORM_WAIT);
+	return screen.findByRole("heading", { name: "AI models" }, ROUTE_RENDER_WAIT);
 }
 
 /** A connection with no models on it turns off without a confirm, so every fixture here has one. */
@@ -87,7 +87,7 @@ describe("instance AI models route", () => {
 		await renderModelsRoute();
 
 		const confirmTurnOff = async (name: string) => {
-			fireEvent.click(await screen.findByRole("switch", { name }, TRANSFORM_WAIT));
+			fireEvent.click(await screen.findByRole("switch", { name }, ROUTE_RENDER_WAIT));
 			const dialog = await screen.findByRole("alertdialog");
 			fireEvent.click(within(dialog).getByRole("button", { name: "Turn off connection" }));
 			await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
@@ -138,7 +138,7 @@ describe("instance AI models route", () => {
 		await renderModelsRoute();
 
 		fireEvent.click(
-			await screen.findByRole("button", { name: "Manage access for GPT Test" }, TRANSFORM_WAIT),
+			await screen.findByRole("button", { name: "Manage access for GPT Test" }, ROUTE_RENDER_WAIT),
 		);
 		const dialog = await screen.findByRole("dialog");
 		fireEvent.click(within(dialog).getByRole("button", { name: "Save access" }));

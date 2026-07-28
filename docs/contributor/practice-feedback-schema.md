@@ -4,8 +4,10 @@
 > `server/src/main/java/de/tum/cit/aet/hephaestus/practices/**`). Grounded in ADR 0021
 > (`docs/decisions/0021-findings-feedback-synthesis-seam.md`) and ADR 0022
 > (`docs/decisions/0022-observation-presence-assessment-and-schema-cleanup.md`), which retires
-> "finding" for **observation** (`presence` × `assessment`). Uses the **canonical vocabulary**
-> throughout — *area*, never *goal* — one word per concept across code, schema, API, and UI.
+> "finding" for **observation** (`presence` × `assessment`). Uses the canonical domain vocabulary
+> throughout — *area*, never *goal* — across code, schema, and API. The
+> [product-language guide](./practice-feedback-language.md) maps those precise domain terms to
+> reader-friendly interface copy.
 > The run-level provenance contract (what each detection run persists, delivered-vs-suppressed
 > ledger semantics, and the join chains an evaluation uses) lives in
 > [`evaluation-provenance.md`](./evaluation-provenance.md).
@@ -22,9 +24,10 @@ naive review tools fuse: the **raw observation** (an `Observation`, audience-neu
 deduplicated by a stable cross-run recurrence key), the **synthesised delivery** of one or more of those
 observations to one person (a `Feedback` unit, with its own provenance and delivery lifecycle), and
 the **rule metadata** that gives an observation meaning (a `Practice`, carrying its criteria and
-trigger events, optionally rolled up into a `PracticeArea` learning bucket). Everything is
-append-only so the temporal record of *what a student was shown, and how they reacted* survives
-re-runs and supersession — the substrate the longitudinal research question depends on.
+trigger events, optionally grouped into a `PracticeArea`). Observations are immutable, criteria edits
+append revisions, and the feedback ledger retains delivery outcomes. Together these records preserve
+what was detected, what reached a developer-facing surface, and how recipients reacted across re-runs
+and supersession.
 
 The vocabulary is deliberately aligned with finding-interchange standards (SARIF, SonarQube,
 GitHub code-scanning) where one exists, and with learning-analytics standards (xAPI, Caliper) for the
@@ -51,12 +54,14 @@ The full literature rationale lives in ADR 0021
 
 ---
 
-## 2. Ubiquitous language — one canonical name per concept
+## 2. Domain language — one canonical name per concept
 
-This is the **single source of truth for naming**. Each concept has exactly one canonical name; the
-"Legacy term it replaced" column names the spelling that must no longer appear in new code. Per the
-DDD *Ubiquitous Language* principle, model, code, schema, API and UI share one word per concept
-([Fowler, *UbiquitousLanguage*](https://martinfowler.com/bliki/UbiquitousLanguage.html); Evans, *DDD*).
+This is the source of truth for names in the domain model, code, schema, and API. Each concept has
+one canonical domain name; the "Legacy term it replaced" column names spellings that must not return
+to those layers. Product copy uses the corresponding audience term from the
+[product-language guide](./practice-feedback-language.md), such as **finding** for an observation
+shown to an administrator. This keeps the model precise without exposing storage vocabulary to
+readers.
 
 > The evaluation model is the `presence` × `assessment` split of
 > [ADR 0022](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0022-observation-presence-assessment-and-schema-cleanup.md): `presence`
@@ -126,8 +131,9 @@ recomputed from the observation, not fixed on the practice.
 | workspace | Workspace (`@ManyToOne`) | `workspace_id` | no | Owning workspace (FK `fk_practice_workspace`). | SQL-layer multi-tenancy (`core/tenancy`). |
 | slug | String(64) | `slug` | no | Stable machine key, unique per workspace (`uk_practice_workspace_slug`). | Survives a `name` rename; the routing/catalog key. |
 | name | String(128) | `name` | no | Display label. | Human-readable in dashboards/feedback. |
-| artifactType | WorkArtifact | `artifact_type` | no (default `PULL_REQUEST`) | Routes trigger gate, context builder, `AgentJobType`/handler, and delivery surface. | Single pipeline discriminator; default keeps existing rows behaviour-preserving. SARIF has no analogue — it is a file format, not a pipeline router. |
-| **area** | PracticeArea (`@ManyToOne`) | `practice_area_id` | yes | Optional roll-up bucket (NULL = ungrouped); 1:N. FK `fk_practice_area`, index `idx_practice_practice_area`. | Single owning bucket keeps per-area progress denominator unambiguous. SARIF `taxa`-style grouping. |
+| artifactType | WorkArtifact | `applies_to` | no (default `PULL_REQUEST`) | Routes trigger gate, context builder, `AgentJobType`/handler, and delivery surface. | Single pipeline discriminator; default keeps existing rows behaviour-preserving. SARIF has no analogue — it is a file format, not a pipeline router. |
+| **area** | PracticeArea (`@ManyToOne`) | `practice_area_id` | yes | Optional grouping (NULL = **Unassigned**); 1:N. FK `fk_practice_area`, index `idx_practice_practice_area`. | A practice has one catalog location. |
+| displayOrder | int | `display_order` | no (default 0) | Position within its area or **Unassigned**. API-created practices append to that group. | Deterministic catalog ordering. |
 | triggerEvents | JsonNode (jsonb) | `trigger_events` | no | Which domain events activate detection. | JSONB keeps the event set open without schema churn. |
 | criteria | String (TEXT) | `criteria` | no | NL spec passed to the detection agent. | The rule body the LLM evaluates against. Detector/admin **reference** register — never delivered to a learner (§3a). |
 | whyItMatters | String (TEXT) | `why_it_matters` | yes | Admin-authored learner-facing *explanation* — why this practice matters. Seeded for all 37 default practices; editable in the practices admin form. | Developer-facing Layer 1 (Nicol & Macfarlane-Dick 2006 P1 feed-up; Diátaxis *explanation*). Surfaced via `LearnerPracticeDTO` (§3a), never the detector. |
@@ -139,10 +145,9 @@ recomputed from the observation, not fixed on the practice.
 
 ### 3.2 `PracticeArea` — table `practice_area`
 
-Workspace-scoped **read-model / organising** concept that groups practices into a configurable learning
-bucket. A practice belongs to at most one area; the 1:N binding is load-bearing for the per-area
-acted-on/total progress denominator. An area never enters `trigger_events`, `criteria`, the detector,
-or the observation schema — practices remain the unit of detection.
+Workspace-scoped grouping for related practices. A practice belongs to at most one area. An area
+never enters `trigger_events`, `criteria`, the detector, or the observation schema — practices remain
+the unit of detection.
 
 | Field | Type | Column | Nullable | Description | Justification |
 | --- | --- | --- | --- | --- | --- |
@@ -152,9 +157,20 @@ or the observation schema — practices remain the unit of detection.
 | name | String(128) | `name` | no | Admin-renameable display label. | Dashboard label. |
 | description | String (TEXT) | `description` | yes | Optional blurb on the area card. | Context for the bucket. |
 | active | boolean | `is_active` | no (default true) | Cohort-level visibility toggle; independent of `Practice.active`. | Surface/hide on dashboards without touching detection. |
-| displayOrder | int | `display_order` | no (default 0) | Admin dashboard ordering. | Deterministic UI sequence. |
+| displayOrder | int | `display_order` | no (default 0) | Catalog ordering; API-created areas append when no position is supplied. | Deterministic UI sequence. |
 | createdAt | Instant | `created_at` | no (immutable) | Insert timestamp. | Audit trail. |
 | updatedAt | Instant | `updated_at` | yes | Last-update timestamp. | Audit trail. |
+
+#### Default catalog installation
+
+`practice_catalog_installation` prevents the bundled default template from being applied more than once.
+The migration marks existing workspaces without changing their catalogs. New workspaces are marked in the
+same transaction as template installation, so later admin moves, unassignments, and deletions persist.
+
+| Field | Type | Column | Nullable | Description |
+| --- | --- | --- | --- | --- |
+| workspaceId | Long | `workspace_id` | no | Workspace PK and FK (`ON DELETE CASCADE`). |
+| installedAt | Instant | `installed_at` | no | Completion time for the one-time installation. |
 
 ### 3.3 `Observation` — table `observation`
 
@@ -328,10 +344,9 @@ revision in force when it was detected, making *which criteria version fired thi
 The schema encodes two orthogonal axes that the display layer must keep separate:
 
 - **Actor axis** = the observation's `about_user_id` — *who* the practice evaluates. Already encoded.
-- **Audience axis** = *who reads the analytic*. The display model adds this. Every feedback unit is
-  developer-facing — observations, outcomes and aggregates go to the developer, never to a mentor, instructor,
-  or grader. The only non-developer reader is the researcher analysing **anonymised** study data and the
-  workspace admin who edits the catalog (criteria, area labels); neither receives a developer's feedback.
+- **Audience axis** = *who reads the analytic*. The display model adds this. Delivered feedback goes
+  to its developer; workspace admins can inspect workspace-wide findings, messages, and delivery outcomes
+  through the practice-feedback admin surface. Research exports remain anonymised.
 
 **Field-by-audience matrix — enforce server-side, never in the webapp.** "Developer" and "Reviewer" are
 the *same human*; the column that applies is selected by the **observation's `about_user_id`**, not a static
@@ -339,17 +354,17 @@ user role, so reviewer-craft never leaks to the author. The `whyItMatters` / `wh
 learner-layer columns are **implemented** — admin-authored `Practice` columns served to learners through
 `LearnerPracticeDTO` (`GET /practices/learner`), which carries no `criteria` field by construction.
 
-| Field | Developer / Learner | Reviewer (observation about the reviewer) | Researcher / Admin |
-| --- | --- | --- | --- |
-| `name` | yes | yes | yes |
-| `whyItMatters` | yes — Layer 1 | yes | yes |
-| `whatGoodLooksLike` | yes — Layer 2 (on request) | yes | yes |
-| area / area progress | yes — own | yes — own | yes — anonymised |
-| per-observation `Feedback` (task-framed) | yes — own only | yes — own only | yes — anonymised |
-| **`criteria`** | **NEVER** | **NEVER** | yes — edit (admin) |
-| `precomputeScript`, `triggerEvents` | no | no | yes — edit (admin) |
-| raw `presence` / `assessment` label | no — delivered as task-framed feedback | no | yes — anonymised |
-| reaction `NOT_APPLICABLE` (validity signal) | own — scope signal, **not** uptake | n/a | yes — anonymised |
+| Field | Developer / Learner | Reviewer (observation about the reviewer) | Workspace admin | Researcher |
+| --- | --- | --- | --- | --- |
+| `name` | yes | yes | yes | yes |
+| `whyItMatters` | yes — Layer 1 | yes | yes | yes |
+| `whatGoodLooksLike` | yes — Layer 2 (on request) | yes | yes | yes |
+| area | yes — own | yes — own | yes | yes — anonymised |
+| per-observation `Feedback` (task-framed) | yes — own only | yes — own only | yes — workspace-wide | yes — anonymised |
+| **`criteria`** | **NEVER** | **NEVER** | yes — edit | no |
+| `precomputeScript`, `triggerEvents` | no | no | yes — edit | no |
+| raw `presence` / `assessment` label | no — delivered as task-framed feedback | no | yes — workspace-wide | yes — anonymised |
+| reaction `NOT_APPLICABLE` (validity signal) | own — scope signal, **not** uptake | n/a | no | yes — anonymised |
 
 **Two hard rules from theory (not UX taste):**
 
@@ -363,8 +378,9 @@ learner-layer columns are **implemented** — admin-authored `Practice` columns 
    `.qhelp` from the `.ql` query metadata. An authoring guard additionally rejects detector
    vocabulary (`PRESENT`/`ABSENT`/`NOT_APPLICABLE`, `GOOD`/`BAD`) in `whatGoodLooksLike`, keeping the rubric out
    of the learner copy at the source.
-2. **Visibility keys off the *observation's* `about_user_id`, not a static user role.** Reviewer-craft feedback
-   must not leak to the author — a known prior bug class in this codebase.
+2. **Developer-facing visibility keys off the *observation's* `about_user_id`, not a static user role.**
+   Reviewer-craft feedback must not leak to the author. The workspace-admin read surface is explicitly
+   workspace-wide.
 
 **Within-learner progressive disclosure (NN/g, Nielsen 1995):** Layer 1 = `name` + `whyItMatters` + this
 finding's feed-forward (what most learners need most of the time); Layer 2 (on request) =

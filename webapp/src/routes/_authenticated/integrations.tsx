@@ -71,13 +71,15 @@ function IntegrationsCallback() {
 			? "Integration connected"
 			: "Nothing to show here";
 	return (
-		<div className="mx-auto max-w-md py-12">
+		<div className="mx-auto w-full max-w-md">
 			<Card>
 				<CardContent className="flex flex-col items-center gap-4 py-8">
 					<Icon className={iconClass} />
 					<div className="text-center">
 						<h1 className="text-xl font-semibold">{title}</h1>
-						{failed && reason && <p className="mt-2 text-sm text-muted-foreground">{reason}</p>}
+						{failed && reason && (
+							<p className="mt-2 wrap-anywhere text-sm text-muted-foreground">{reason}</p>
+						)}
 					</div>
 					<Button onClick={() => navigate({ to: "/" })}>Return to dashboard</Button>
 				</CardContent>

@@ -3,7 +3,7 @@ import { TriangleAlert } from "lucide-react";
 import type { WorkspaceLlmUsageReport } from "@/api";
 import { budgetResetDayLabel, currentMonthUtc } from "@/components/admin/usage/usage-utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 
 type BudgetVerdict = WorkspaceLlmUsageReport["ownProviderBudgetVerdict"];
 
@@ -125,26 +125,25 @@ function PauseAction({
 	if (scope === "own") {
 		if (context === "models") {
 			return (
-				<Button
-					variant="outline"
-					size="sm"
-					className="mt-2"
-					render={<Link to="/w/$workspaceSlug/admin/usage" params={{ workspaceSlug }} />}
+				<Link
+					to="/w/$workspaceSlug/admin/usage"
+					params={{ workspaceSlug }}
+					className={buttonVariants({ variant: "outline", size: "sm", className: "mt-2" })}
 				>
 					Adjust cap
-				</Button>
+				</Link>
 			);
 		}
 		return (
 			<div className="mt-2 flex flex-wrap gap-2">
 				{noPriceSet && (
-					<Button
-						variant="outline"
-						size="sm"
-						render={<Link to="/w/$workspaceSlug/admin/models" params={{ workspaceSlug }} />}
+					<Link
+						to="/w/$workspaceSlug/admin/models"
+						params={{ workspaceSlug }}
+						className={buttonVariants({ variant: "outline", size: "sm" })}
 					>
 						Open AI models
-					</Button>
+					</Link>
 				)}
 				<Button variant="outline" size="sm" onClick={onEditOwnProviderCap}>
 					Adjust cap
@@ -158,13 +157,12 @@ function PauseAction({
 		return null;
 	}
 	return (
-		<Button
-			variant="outline"
-			size="sm"
-			className="mt-2"
-			render={<Link to="/w/$workspaceSlug/admin/models" params={{ workspaceSlug }} />}
+		<Link
+			to="/w/$workspaceSlug/admin/models"
+			params={{ workspaceSlug }}
+			className={buttonVariants({ variant: "outline", size: "sm", className: "mt-2" })}
 		>
 			Open AI models
-		</Button>
+		</Link>
 	);
 }

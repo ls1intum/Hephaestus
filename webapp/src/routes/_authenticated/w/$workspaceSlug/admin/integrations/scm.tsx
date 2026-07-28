@@ -30,7 +30,7 @@ import {
 import { SyncStatusHeader } from "@/components/admin/integrations/SyncStatusHeader";
 import { syncPollInterval } from "@/components/admin/integrations/sync-format";
 import { GithubIcon, GitlabIcon } from "@/components/icons/brand";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useLivePushUnavailable } from "@/hooks/use-sync-liveness";
@@ -208,7 +208,7 @@ function ScmIntegrationPage() {
 			: null;
 
 	return (
-		<div className="container mx-auto max-w-5xl space-y-8 py-6">
+		<div className="mx-auto w-full max-w-5xl space-y-8">
 			<IntegrationPageHeader
 				icon={
 					kind === "GITLAB" ? (
@@ -238,21 +238,15 @@ function ScmIntegrationPage() {
 				triggeringType={triggeringType}
 				actions={
 					isAppInstallationWorkspace && (
-						<Button
-							variant="outline"
-							size="sm"
-							nativeButton={false}
-							render={
-								<a
-									href="https://github.com/settings/installations"
-									target="_blank"
-									rel="noreferrer"
-								/>
-							}
+						<a
+							href="https://github.com/settings/installations"
+							target="_blank"
+							rel="noreferrer"
+							className={buttonVariants({ variant: "outline", size: "sm" })}
 						>
 							Manage installation on GitHub
 							<ExternalLinkIcon className="size-3.5" />
-						</Button>
+						</a>
 					)
 				}
 				isCancelling={cancelJob.isPending}

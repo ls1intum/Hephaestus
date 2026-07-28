@@ -73,7 +73,9 @@ class IssueReviewHandlerTest extends BaseUnitTest {
             "Add dark mode",
             "Users want a dark theme toggle in settings.",
             "OPEN",
-            java.time.Instant.ofEpochMilli(1_700_000_000_000L)
+            "https://github.com/owner/repo/issues/12",
+            java.time.Instant.ofEpochMilli(1_700_000_000_000L),
+            null
         );
     }
 
@@ -101,6 +103,7 @@ class IssueReviewHandlerTest extends BaseUnitTest {
             assertThat(metadata.get("issue_number").asInt()).isEqualTo(12);
             assertThat(metadata.get("title").asString()).isEqualTo("Add dark mode");
             assertThat(metadata.get("state").asString()).isEqualTo("OPEN");
+            assertThat(metadata.get("issue_url").asString()).isEqualTo("https://github.com/owner/repo/issues/12");
         }
 
         @Test

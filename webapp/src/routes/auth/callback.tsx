@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { safeReturnTo } from "@/integrations/auth/guard";
@@ -15,6 +15,7 @@ interface CallbackSearch {
  * known auth state instead of flashing the unauthenticated view.
  */
 export const Route = createFileRoute("/auth/callback")({
+	staticData: { surface: "auth" },
 	validateSearch: (search): CallbackSearch => ({
 		returnTo: typeof search.returnTo === "string" ? search.returnTo : undefined,
 	}),
@@ -57,9 +58,9 @@ function AuthCallbackPage() {
 			{timedOut && (
 				<div className="flex flex-col items-center gap-2 text-center" role="status">
 					<p className="text-sm text-muted-foreground">This is taking longer than expected.</p>
-					<Button variant="outline" size="sm" render={<Link to="/login" />}>
+					<Link to="/login" className={buttonVariants({ variant: "outline", size: "sm" })}>
 						Back to sign in
-					</Button>
+					</Link>
 				</div>
 			)}
 		</div>

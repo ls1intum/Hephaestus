@@ -1,11 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { expect, userEvent, within } from "storybook/test";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { NavAdmin } from "./NavAdmin";
 
-/**
- * Navigation component for administrative features, providing access to user
- * management and workspace settings.
- */
 const meta = {
 	component: NavAdmin,
 	parameters: {
@@ -49,26 +46,27 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Default view of the administration navigation sidebar with all features enabled.
- */
 export const Default: Story = {};
 
-/** Admin navigation with achievements feature disabled. */
 export const AchievementsDisabled: Story = {
 	args: {
 		achievementsEnabled: false,
 	},
 };
 
-/** Admin navigation with practices feature disabled. */
 export const PracticesDisabled: Story = {
 	args: {
 		practicesEnabled: false,
 	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await userEvent.click(canvas.getByRole("button", { name: "Practices" }));
+		await expect(canvas.getByRole("link", { name: "Catalog" })).toBeInTheDocument();
+		await expect(canvas.getByRole("link", { name: "Practice feedback" })).toBeInTheDocument();
+		await expect(canvas.queryByRole("link", { name: "Review settings" })).not.toBeInTheDocument();
+	},
 };
 
-/** Admin navigation with all optional features disabled. */
 export const AllFeaturesDisabled: Story = {
 	args: {
 		achievementsEnabled: false,
@@ -76,7 +74,6 @@ export const AllFeaturesDisabled: Story = {
 	},
 };
 
-/** A GitLab-backed workspace — the Integrations sub-item is labeled and iconed for GitLab. */
 export const GitLabWorkspace: Story = {
 	args: {
 		scmProviderType: "GITLAB",

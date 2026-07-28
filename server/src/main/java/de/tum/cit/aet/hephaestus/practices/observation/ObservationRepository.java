@@ -46,6 +46,32 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     @Query("SELECT f FROM Observation f WHERE f.agentJobId = :agentJobId ORDER BY f.id ASC")
     List<Observation> findByAgentJobId(@Param("agentJobId") UUID agentJobId);
 
+    @Query(
+        value = """
+        SELECT o.agent_job_id AS "jobId",
+               COUNT(*) FILTER (WHERE o.assessment = 'GOOD') AS "strengths",
+               COUNT(*) FILTER (WHERE o.assessment = 'BAD') AS "problems",
+               COUNT(*) FILTER (WHERE o.presence = 'NOT_APPLICABLE') AS "notApplicable"
+        FROM observation o
+        JOIN practice p ON p.id = o.practice_id
+        WHERE p.workspace_id = :workspaceId
+          AND o.agent_job_id IN :jobIds
+        GROUP BY o.agent_job_id
+        """,
+        nativeQuery = true
+    )
+    List<ReviewFindingCounts> summarizeReviewFindings(
+        @Param("workspaceId") Long workspaceId,
+        @Param("jobIds") Collection<UUID> jobIds
+    );
+
+    interface ReviewFindingCounts {
+        UUID getJobId();
+        Long getStrengths();
+        Long getProblems();
+        Long getNotApplicable();
+    }
+
     /**
      * Atomically inserts a practice finding if absent (race-condition safe).
      *
@@ -610,6 +636,131 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     interface PresenceCount {
         Presence getPresence();
         Long getCount();
+    }
+
+    String OPERATOR_PREDICATES = """
+          AND (CAST(:#{#f.practiceSlugArray()} AS text[]) IS NULL OR p.slug = ANY(CAST(:#{#f.practiceSlugArray()} AS text[])))
+          AND (CAST(:#{#f.areaSlugArray()} AS text[]) IS NULL OR pa.slug = ANY(CAST(:#{#f.areaSlugArray()} AS text[])))
+          AND (CAST(:#{#f.presenceNames()} AS text[]) IS NULL OR o.presence = ANY(CAST(:#{#f.presenceNames()} AS text[])))
+          AND (CAST(:#{#f.assessmentNames()} AS text[]) IS NULL OR o.assessment = ANY(CAST(:#{#f.assessmentNames()} AS text[])))
+          AND (CAST(:#{#f.severityNames()} AS text[]) IS NULL OR o.severity = ANY(CAST(:#{#f.severityNames()} AS text[])))
+          AND (CAST(:#{#f.agentJobId()} AS uuid) IS NULL OR o.agent_job_id = CAST(:#{#f.agentJobId()} AS uuid))
+          AND (CAST(:#{#f.artifactTypeName()} AS text) IS NULL OR o.artifact_type = CAST(:#{#f.artifactTypeName()} AS text))
+          AND (CAST(:#{#f.artifactId()} AS bigint) IS NULL OR o.artifact_id = CAST(:#{#f.artifactId()} AS bigint))
+          AND (CAST(:#{#f.aboutUserId()} AS bigint) IS NULL OR o.about_user_id = CAST(:#{#f.aboutUserId()} AS bigint))
+          AND (CAST(:#{#f.from()} AS timestamptz) IS NULL OR o.observed_at >= CAST(:#{#f.from()} AS timestamptz))
+          AND (CAST(:#{#f.to()} AS timestamptz) IS NULL OR o.observed_at < CAST(:#{#f.to()} AS timestamptz))
+        """;
+
+    @Query(
+        value = """
+            SELECT o.id AS "id",
+                   o.agent_job_id AS "agentJobId",
+                   p.slug AS "practiceSlug",
+                   p.name AS "practiceName",
+                   pa.slug AS "areaSlug",
+                   pa.name AS "areaName",
+                   pa.icon AS "areaIcon",
+                   pa.color AS "areaColor",
+                   o.artifact_type AS "artifactType",
+                   o.artifact_id AS "artifactId",
+                   o.about_user_id AS "aboutUserId",
+                   o.title AS "title",
+                   o.presence AS "presence",
+                   o.assessment AS "assessment",
+                   o.severity AS "severity",
+                   o.confidence AS "confidence",
+                   o.recurrence_key AS "recurrenceKey",
+                   o.observed_at AS "observedAt"
+            FROM observation o
+            JOIN practice p ON p.id = o.practice_id
+            LEFT JOIN practice_area pa ON pa.id = p.practice_area_id
+            WHERE p.workspace_id = :workspaceId
+            """ +
+            OPERATOR_PREDICATES +
+            """
+             ORDER BY
+               CASE WHEN :prioritizeActionable THEN
+                 CASE o.assessment WHEN 'BAD' THEN 0 WHEN 'GOOD' THEN 1 ELSE 2 END
+               ELSE 0 END,
+               CASE WHEN :prioritizeActionable AND o.assessment = 'BAD' THEN
+                 CASE o.severity
+                   WHEN 'CRITICAL' THEN 0
+                   WHEN 'MAJOR' THEN 1
+                   WHEN 'MINOR' THEN 2
+                   WHEN 'INFO' THEN 3
+                   ELSE 4
+                 END
+               ELSE 0 END,
+               o.observed_at DESC,
+               o.id DESC
+            """,
+        countQuery = """
+            SELECT count(*)
+            FROM observation o
+            JOIN practice p ON p.id = o.practice_id
+            LEFT JOIN practice_area pa ON pa.id = p.practice_area_id
+            WHERE p.workspace_id = :workspaceId
+            """ +
+            OPERATOR_PREDICATES,
+        nativeQuery = true
+    )
+    Page<OperatorObservationRow> findForWorkspace(
+        @Param("workspaceId") Long workspaceId,
+        @Param("f") ObservationQueryFilter filter,
+        @Param("prioritizeActionable") boolean prioritizeActionable,
+        Pageable pageable
+    );
+
+    interface OperatorObservationRow {
+        UUID getId();
+        UUID getAgentJobId();
+        String getPracticeSlug();
+        String getPracticeName();
+        String getAreaSlug();
+        String getAreaName();
+        String getAreaIcon();
+        String getAreaColor();
+        WorkArtifact getArtifactType();
+        Long getArtifactId();
+        Long getAboutUserId();
+        String getTitle();
+        Presence getPresence();
+        Assessment getAssessment();
+        Severity getSeverity();
+        Float getConfidence();
+        String getRecurrenceKey();
+        Instant getObservedAt();
+    }
+
+    @Query(
+        value = """
+        SELECT fo.observation_id AS "observationId",
+               COUNT(*) FILTER (WHERE f.delivery_state = 'PREPARED') AS "prepared",
+               COUNT(*) FILTER (WHERE f.delivery_state = 'DELIVERED') AS "delivered",
+               COUNT(*) FILTER (WHERE f.delivery_state = 'SUPERSEDED') AS "superseded",
+               COUNT(*) FILTER (WHERE f.delivery_state = 'SUPPRESSED') AS "suppressed",
+               COUNT(*) FILTER (WHERE f.delivery_state = 'FAILED') AS "failed"
+        FROM feedback_observation fo
+        JOIN feedback f ON f.id = fo.feedback_id
+        WHERE fo.observation_id IN :observationIds
+          AND f.workspace_id = :workspaceId
+        GROUP BY fo.observation_id
+        """,
+        nativeQuery = true
+    )
+    List<ObservationFeedbackDisposition> findFeedbackDispositions(
+        @Param("workspaceId") Long workspaceId,
+        @Param("observationIds") Collection<UUID> observationIds
+    );
+
+    interface ObservationFeedbackDisposition {
+        UUID getObservationId();
+        Long getPrepared();
+        Long getDelivered();
+        Long getSuperseded();
+        Long getSuppressed();
+        Long getFailed();
     }
 
     /**

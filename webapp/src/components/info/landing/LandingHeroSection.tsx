@@ -249,7 +249,7 @@ export function LandingHeroSection({
 				<div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
 			</div>
 
-			<div className="container relative z-10 mx-auto grid max-w-7xl items-center gap-8 px-4 md:px-6 sm:gap-14 lg:grid-cols-[0.82fr_1.18fr] lg:gap-8 xl:gap-14">
+			<div className="relative z-10 mx-auto grid w-full max-w-7xl items-center gap-8 px-4 md:px-6 sm:gap-14 lg:grid-cols-[0.82fr_1.18fr] lg:gap-8 xl:gap-14">
 				<motion.div
 					initial={shouldReduceMotion ? false : "hidden"}
 					animate="visible"

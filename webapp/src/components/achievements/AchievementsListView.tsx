@@ -77,7 +77,7 @@ export function AchievementsListView({ achievements }: AchievementListViewProps)
 
 	return (
 		<div
-			className="flex-1 overflow-auto p-6 min-h-0 h-full"
+			className="h-full min-h-0 flex-1 overflow-auto p-4 sm:p-6"
 			role="region"
 			aria-label="Achievement list"
 		>

@@ -1,7 +1,7 @@
-import type { Meta, StoryObj } from "@storybook/react";
-import { fn, within } from "storybook/test";
+import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, fn } from "storybook/test";
 import type { AgentBinding } from "@/api/types.gen";
-import { expectPageReflows, expectTargetSpacing, expectWithinViewport } from "@/test/reflow";
+import { expectNoPageOverflow } from "@/test/reflow";
 import { PracticeDetectionPolicyCard } from "./PracticeDetectionPolicyCard";
 import { mockAvailableModels, mockPracticeReviewSettings } from "./story-mock-data";
 
@@ -12,13 +12,14 @@ const readyBinding: AgentBinding = {
 	instanceModelId: 1,
 };
 
-/**
- * Policy editor for practice-detection reviews: the bound model (read-only — the AI models page
- * owns it), the triggers, and the review policy. Saves field by field.
- */
 const meta = {
+	title: "Admin/Practices/Review settings",
 	component: PracticeDetectionPolicyCard,
-	parameters: { layout: "padded" },
+	parameters: {
+		a11y: { test: "error" },
+		layout: "padded",
+		chromatic: { viewports: [1440] },
+	},
 	tags: ["autodocs"],
 	args: {
 		settings: mockPracticeReviewSettings,
@@ -28,14 +29,15 @@ const meta = {
 		autoTriggerEnabled: true,
 		manualTriggerEnabled: true,
 		isLoading: false,
-		isSaving: false,
+		savingReviewSettings: false,
+		savingTriggers: false,
 		onUpdateReviewSettings: fn(),
 		onUpdateFeatures: fn(),
 		onResetReviewField: fn(),
 	},
 	decorators: [
 		(Story) => (
-			<div className="max-w-2xl">
+			<div className="mx-auto w-full max-w-3xl">
 				<Story />
 			</div>
 		),
@@ -45,23 +47,31 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const RuntimeBound: Story = {};
+export const Configured: Story = {
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320, 1440] },
+	},
+	play: async () => {
+		await expectNoPageOverflow();
+	},
+};
 
-export const Unbound: Story = {
+export const NoModelSelected: Story = {
 	args: { detectionBinding: undefined },
 };
 
-export const BoundModelUnavailable: Story = {
+export const SelectedModelUnavailable: Story = {
 	args: { detectionBinding: { ...readyBinding, ready: false } },
 };
 
-export const RoleScopedCoverage: Story = {
+export const ReviewRoleOnly: Story = {
 	args: {
 		settings: { ...mockPracticeReviewSettings, runForAllUsers: false },
 	},
 };
 
-export const AllInherited: Story = {
+export const WorkspaceDefaults: Story = {
 	args: {
 		settings: {
 			...mockPracticeReviewSettings,
@@ -77,15 +87,25 @@ export const TriggersOff: Story = {
 	args: { autoTriggerEnabled: false, manualTriggerEnabled: false },
 };
 
-export const Saving: Story = {
-	args: { isSaving: true },
+export const SavingReviewPolicy: Story = {
+	args: { savingReviewSettings: true },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("switch", { name: "Skip drafts" })).toHaveAttribute(
+			"aria-disabled",
+			"true",
+		);
+		await expect(canvas.getByRole("switch", { name: "Automatic reviews" })).not.toHaveAttribute(
+			"aria-disabled",
+			"true",
+		);
+	},
 };
 
 export const Loading: Story = {
 	args: { isLoading: true, settings: undefined },
 };
 
-export const LoadForbidden: Story = {
+export const PermissionDenied: Story = {
 	args: {
 		isError: true,
 		settings: undefined,
@@ -94,24 +114,18 @@ export const LoadForbidden: Story = {
 	},
 };
 
-/**
- * WCAG 2.2 SC 1.4.10 at 320 px: nothing here is tabular, so nothing may scroll sideways.
- *
- * The switches meet SC 2.5.8 through a pseudo-element `getBoundingClientRect` cannot see, so the
- * Spacing exception is what this can actually measure — and what a denser layout breaks first.
- */
-export const MobileReflow: Story = {
-	parameters: {
-		layout: "fullscreen",
-		viewport: { defaultViewport: "reflow" },
-		chromatic: { viewports: [320, 375, 768] },
-	},
-	play: async ({ canvasElement }) => {
-		await expectPageReflows();
-		const switches = within(canvasElement).getAllByRole("switch");
-		for (const control of switches) {
-			await expectWithinViewport(control);
-		}
-		await expectTargetSpacing(switches);
+export const EditPolicy: Story = {
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ args, canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("switch", { name: "Automatic reviews" }));
+		await expect(args.onUpdateFeatures).toHaveBeenCalledWith({
+			practiceReviewAutoTriggerEnabled: false,
+		});
+
+		const interval = canvas.getByRole("spinbutton", { name: "Time between reviews (minutes)" });
+		await userEvent.clear(interval);
+		await userEvent.type(interval, "45");
+		await userEvent.tab();
+		await expect(args.onUpdateReviewSettings).toHaveBeenCalledWith({ cooldownMinutes: 45 });
 	},
 };

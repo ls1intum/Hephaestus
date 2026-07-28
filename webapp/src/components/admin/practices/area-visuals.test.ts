@@ -2,8 +2,6 @@ import { Folder, Package, Rocket } from "lucide-react";
 import { describe, expect, it } from "vitest";
 import { getAreaVisual, ICON_NAMES, iconSearchText, PILL, SEEDED_AREA_SLUGS } from "./area-visuals";
 
-/** Mirrors the server's `practices/default-catalog.json`: a slug renamed there without updating the
- * seed map silently drops the area's icon and colour. */
 const EXPECTED_SLUGS = [
 	"review-ready-work",
 	"acting-on-review-feedback",
@@ -50,7 +48,7 @@ describe("areaVisuals", () => {
 			"NotAnIcon",
 			"chartreuse",
 		);
-		expect(visual.Icon).toBe(Package); // the seeded icon for review-ready-work
+		expect(visual.Icon).toBe(Package);
 		expect(visual.pill).toBe(PILL.sky);
 	});
 

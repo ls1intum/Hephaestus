@@ -6,7 +6,7 @@ import {
 	AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 
 const faqItems = [
 	{
@@ -34,7 +34,7 @@ const faqItems = [
 export function LandingFAQSection() {
 	return (
 		<section id="faq" className="w-full py-8 md:py-16 bg-gradient-to-b from-background to-muted/30">
-			<div className="container px-4 md:px-6">
+			<div className="mx-auto w-full max-w-7xl px-4 md:px-6">
 				<div className="mb-10 text-center max-w-3xl mx-auto">
 					<Badge className="mb-4" variant="outline">
 						FAQ
@@ -60,20 +60,15 @@ export function LandingFAQSection() {
 
 					<div className="mt-8 p-6 bg-muted/50 border border-muted rounded-lg text-center">
 						<p className="mb-4">Have more questions?</p>
-						<Button
-							variant="outline"
-							render={
-								<a
-									href="https://github.com/ls1intum/Hephaestus/discussions"
-									target="_blank"
-									rel="noopener noreferrer"
-									className="gap-2"
-								/>
-							}
+						<a
+							href="https://github.com/ls1intum/Hephaestus/discussions"
+							target="_blank"
+							rel="noopener noreferrer"
+							className={buttonVariants({ variant: "outline" })}
 						>
 							<Github className="h-4 w-4" />
 							<span>Ask the community</span>
-						</Button>
+						</a>
 					</div>
 				</div>
 			</div>

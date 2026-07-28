@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { StandardPageSurface } from "@/components/core/StandardPageSurface";
 import { LandingPage } from "@/components/info/landing/LandingPage";
 import { RedirectToWorkspace } from "@/components/workspace/RedirectToWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
@@ -12,6 +13,7 @@ import { resolveCurrentUser } from "@/integrations/auth/guard";
  * the wrong audience.
  */
 export const Route = createFileRoute("/")({
+	staticData: { surface: "bleed" },
 	beforeLoad: async ({ context }) => {
 		await resolveCurrentUser(context.queryClient);
 	},
@@ -20,7 +22,13 @@ export const Route = createFileRoute("/")({
 
 function IndexPage() {
 	const { isAuthenticated } = useAuth();
-	return isAuthenticated ? <RedirectToWorkspace /> : <LandingContainer />;
+	return isAuthenticated ? (
+		<StandardPageSurface className="h-full">
+			<RedirectToWorkspace />
+		</StandardPageSurface>
+	) : (
+		<LandingContainer />
+	);
 }
 
 function LandingContainer() {
@@ -36,13 +44,10 @@ function LandingContainer() {
 	};
 
 	return (
-		// Cancel the `p-4` the root layout applies to <main> so the landing sections bleed full-width.
-		<div className="-m-4">
-			<LandingPage
-				onSignIn={(idpHint) => login(idpHint, "/")}
-				onGoToDashboard={handleGoToDashboard}
-				isSignedIn={isAuthenticated}
-			/>
-		</div>
+		<LandingPage
+			onSignIn={(idpHint) => login(idpHint, "/")}
+			onGoToDashboard={handleGoToDashboard}
+			isSignedIn={isAuthenticated}
+		/>
 	);
 }

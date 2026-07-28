@@ -63,7 +63,8 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/user/$use
 function UserProfile() {
 	const { username, workspaceSlug } = Route.useParams();
 	const { isCurrentUser } = useAuth();
-	const { achievementsEnabled, progressionEnabled, leaguesEnabled } = useWorkspaceFeatures();
+	const { achievementsEnabled, progressionEnabled, leaguesEnabled } =
+		useWorkspaceFeatures(workspaceSlug);
 	const { after, before, monitorRepositories, monitorLimit } = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 

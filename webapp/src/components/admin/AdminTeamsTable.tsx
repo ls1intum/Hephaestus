@@ -28,14 +28,12 @@ export function AdminTeamsTable({
 }: TeamsTableProps) {
 	const [teamSearch, setTeamSearch] = useState("");
 
-	// Build full team map (do NOT exclude hidden in admin view)
 	const allTeamsById = useMemo(() => {
 		const map = new Map<number, TeamInfo>();
 		for (const t of teams) map.set(t.id, t);
 		return map;
 	}, [teams]);
 
-	// Build children map using plain parentId relationships
 	const childrenMap = useMemo(() => {
 		const map = new Map<number, TeamInfo[]>();
 		for (const t of teams) {
@@ -46,7 +44,6 @@ export function AdminTeamsTable({
 				map.set(pid, arr);
 			}
 		}
-		// sort children
 		for (const [k, arr] of map.entries()) {
 			arr.sort((a, b) => a.name.localeCompare(b.name));
 			map.set(k, arr);
@@ -54,7 +51,6 @@ export function AdminTeamsTable({
 		return map;
 	}, [teams, allTeamsById]);
 
-	// Roots are teams without a valid parent in our dataset
 	const rootsAll = useMemo(
 		() =>
 			[...teams]
@@ -63,7 +59,6 @@ export function AdminTeamsTable({
 		[teams, allTeamsById],
 	);
 
-	// Compute display set based on name search: include a node if it or any descendant matches
 	const displaySet = useMemo(() => {
 		const search = teamSearch.trim().toLowerCase();
 		if (!search) return new Set<number>(teams.map((t) => t.id));
@@ -99,10 +94,8 @@ export function AdminTeamsTable({
 		return result;
 	}, [teamSearch, teams, childrenMap, rootsAll]);
 
-	// Repository-wide label catalog by repoId, using repository.labels provided in RepositoryInfoDTO
 	const repoLabelCatalog = useMemo(() => {
-		// Deduplicate by normalized label name, not by id, since the same repo appears under multiple teams
-		// and backend DTOs might produce different ids for identical labels.
+		// The same repository can appear under several teams, so labels are unique by name, not row ID.
 		const map = new Map<number, Map<string, LabelInfo>>();
 		for (const t of teams) {
 			for (const repo of t.repositories ?? []) {
@@ -135,7 +128,7 @@ export function AdminTeamsTable({
 
 	if (isLoading) {
 		return (
-			<div className="space-y-6">
+			<div className="mx-auto w-full max-w-6xl space-y-6">
 				{heading}
 				<div className="flex items-center justify-between">
 					<Skeleton className="h-10 w-64" />
@@ -151,7 +144,7 @@ export function AdminTeamsTable({
 	}
 
 	return (
-		<div className="space-y-6">
+		<div className="mx-auto w-full max-w-6xl space-y-6">
 			{heading}
 			<div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
 				<div className="relative w-full sm:max-w-md">

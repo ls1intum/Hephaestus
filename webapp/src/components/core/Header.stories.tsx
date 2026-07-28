@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { expectNoPageOverflow } from "@/test/reflow";
 import Header from "./Header";
 
-/** Fully presentational. The version badge links to GitHub releases in production only. */
 const meta = {
 	component: Header,
 	parameters: {
@@ -111,7 +111,6 @@ export const Loading: Story = {
 	},
 };
 
-/** With no active workspace the logo links to the landing page. */
 export const NoWorkspace: Story = {
 	args: {
 		isAuthenticated: true,
@@ -125,10 +124,9 @@ export const Mobile: Story = {
 		isAuthenticated: true,
 		isLoading: false,
 	},
-	globals: {
-		viewport: {
-			value: "mobile1",
-			isRotated: false,
-		},
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320] },
 	},
+	play: expectNoPageOverflow,
 };

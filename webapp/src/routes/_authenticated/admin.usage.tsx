@@ -113,7 +113,7 @@ function AdminInstanceUsagePage() {
 	};
 
 	return (
-		<div className="mx-auto w-full max-w-6xl space-y-6 py-6">
+		<div className="mx-auto w-full max-w-6xl space-y-6">
 			<div className="flex flex-wrap items-center justify-between gap-4">
 				<header className="space-y-1">
 					<div className="flex items-center gap-2">

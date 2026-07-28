@@ -56,7 +56,7 @@ function OutlineIntegrationPage() {
 	});
 
 	return (
-		<div className="container mx-auto max-w-5xl space-y-8 py-6">
+		<div className="mx-auto w-full max-w-5xl space-y-8">
 			<IntegrationPageHeader
 				icon={<OutlineIcon className="size-6" />}
 				title="Outline"

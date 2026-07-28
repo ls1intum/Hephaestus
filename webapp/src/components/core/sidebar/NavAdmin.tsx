@@ -8,7 +8,7 @@ import {
 	LayoutGridIcon,
 	ListChecks,
 	Map as MapIcon,
-	PlayCircle,
+	MessageSquareText,
 	PlugZapIcon,
 	ScrollText,
 	Settings2,
@@ -34,7 +34,6 @@ export interface NavAdminProps {
 	workspaceSlug: string;
 	achievementsEnabled?: boolean;
 	practicesEnabled?: boolean;
-	/** Drives the Integrations sub-item's label + icon (GitHub vs GitLab). Defaults to GitHub. */
 	scmProviderType?: "GITHUB" | "GITLAB";
 }
 
@@ -49,11 +48,15 @@ export function NavAdmin({
 	const onSettings = Boolean(
 		matchRoute({ to: "/w/$workspaceSlug/admin/practices/settings", fuzzy: true }),
 	);
-	const onRuns = Boolean(matchRoute({ to: "/w/$workspaceSlug/admin/practices/runs", fuzzy: true }));
+	const onReviews = Boolean(
+		matchRoute({ to: "/w/$workspaceSlug/admin/practices/reviews", fuzzy: true }),
+	);
 	const onSection = Boolean(matchRoute({ to: "/w/$workspaceSlug/admin/practices", fuzzy: true }));
-	// Catalog is the section's index; a practice's detail page drills down under it, so anything in the
-	// section that isn't Review settings or Runs counts as Catalog.
-	const onCatalog = onSection && !onSettings && !onRuns;
+	const onCatalog = Boolean(
+		matchRoute({ to: "/w/$workspaceSlug/admin/practices", fuzzy: false }) ||
+			matchRoute({ to: "/w/$workspaceSlug/admin/practices/new", fuzzy: false }) ||
+			matchRoute({ to: "/w/$workspaceSlug/admin/practices/$practiceSlug", fuzzy: false }),
+	);
 
 	const onIntegrationsScm = Boolean(
 		matchRoute({ to: "/w/$workspaceSlug/admin/integrations/scm", fuzzy: true }),
@@ -130,34 +133,48 @@ export function NavAdmin({
 						</SidebarMenuButton>
 					</SidebarMenuItem>
 				)}
-				{practicesEnabled && (
-					<Collapsible defaultOpen={onSection} render={<SidebarMenuItem />}>
-						<CollapsibleTrigger
-							render={
-								<SidebarMenuButton
-									tooltip="Practices"
-									isActive={onSection}
-									className="group/collapsible"
+				<Collapsible defaultOpen={onSection} render={<SidebarMenuItem />}>
+					<CollapsibleTrigger
+						render={
+							<SidebarMenuButton
+								tooltip="Practices"
+								isActive={onSection}
+								className="group/collapsible"
+							>
+								<ClipboardCheck />
+								<span>Practices</span>
+								<ChevronRight className="ml-auto transition-transform group-aria-expanded/collapsible:rotate-90" />
+							</SidebarMenuButton>
+						}
+					/>
+					<CollapsibleContent>
+						<SidebarMenuSub>
+							<SidebarMenuSubItem>
+								<SidebarMenuSubButton
+									isActive={onCatalog}
+									render={
+										<Link to="/w/$workspaceSlug/admin/practices" params={{ workspaceSlug }} />
+									}
 								>
-									<ClipboardCheck />
-									<span>Practices</span>
-									<ChevronRight className="ml-auto transition-transform group-aria-expanded/collapsible:rotate-90" />
-								</SidebarMenuButton>
-							}
-						/>
-						<CollapsibleContent>
-							<SidebarMenuSub>
-								<SidebarMenuSubItem>
-									<SidebarMenuSubButton
-										isActive={onCatalog}
-										render={
-											<Link to="/w/$workspaceSlug/admin/practices" params={{ workspaceSlug }} />
-										}
-									>
-										<ListChecks />
-										<span>Catalog</span>
-									</SidebarMenuSubButton>
-								</SidebarMenuSubItem>
+									<ListChecks />
+									<span>Catalog</span>
+								</SidebarMenuSubButton>
+							</SidebarMenuSubItem>
+							<SidebarMenuSubItem>
+								<SidebarMenuSubButton
+									isActive={onReviews}
+									render={
+										<Link
+											to="/w/$workspaceSlug/admin/practices/reviews"
+											params={{ workspaceSlug }}
+										/>
+									}
+								>
+									<MessageSquareText />
+									<span>Practice feedback</span>
+								</SidebarMenuSubButton>
+							</SidebarMenuSubItem>
+							{practicesEnabled && (
 								<SidebarMenuSubItem>
 									<SidebarMenuSubButton
 										isActive={onSettings}
@@ -172,24 +189,10 @@ export function NavAdmin({
 										<span>Review settings</span>
 									</SidebarMenuSubButton>
 								</SidebarMenuSubItem>
-								<SidebarMenuSubItem>
-									<SidebarMenuSubButton
-										isActive={onRuns}
-										render={
-											<Link
-												to="/w/$workspaceSlug/admin/practices/runs"
-												params={{ workspaceSlug }}
-											/>
-										}
-									>
-										<PlayCircle />
-										<span>Runs</span>
-									</SidebarMenuSubButton>
-								</SidebarMenuSubItem>
-							</SidebarMenuSub>
-						</CollapsibleContent>
-					</Collapsible>
-				)}
+							)}
+						</SidebarMenuSub>
+					</CollapsibleContent>
+				</Collapsible>
 				<Collapsible defaultOpen={onIntegrationsSection} render={<SidebarMenuItem />}>
 					<CollapsibleTrigger
 						render={
@@ -262,8 +265,6 @@ export function NavAdmin({
 						</SidebarMenuSub>
 					</CollapsibleContent>
 				</Collapsible>
-				{/* Not feature-gated: credentials and model bindings have to be configurable before the
-				    features that consume them are switched on, and after they are switched off again. */}
 				<SidebarMenuItem>
 					<SidebarMenuButton
 						tooltip={ADMIN_NAV_LABELS.models}

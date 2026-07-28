@@ -1,40 +1,24 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
+import { AuthProvider } from "@/integrations/auth/AuthContext";
+import { withStandardPage } from "@/stories/decorators";
+import { expectNoPageOverflow } from "@/test/reflow";
 import { SettingsPage } from "./SettingsPage";
 
-/**
- * SettingsPage component for the user settings page
- * Combines AI review, research, and account management sections
- */
 const meta = {
 	component: SettingsPage,
 	parameters: {
-		layout: "centered",
+		layout: "fullscreen",
 	},
+	decorators: [
+		withStandardPage,
+		(Story) => (
+			<AuthProvider>
+				<Story />
+			</AuthProvider>
+		),
+	],
 	tags: ["autodocs"],
-	argTypes: {
-		aiReviewProps: {
-			description: "Props for the AiReviewSection component",
-		},
-		showAiReviewSection: {
-			control: "boolean",
-			description: "Whether to show the AI review section (feature-flagged)",
-		},
-		showResearchSection: {
-			control: "boolean",
-			description: "Whether to show the research participation section",
-		},
-		researchProps: {
-			description: "Props for the ResearchParticipationSection component",
-		},
-		onAccountDeleted: {
-			description: "Called after the account is deleted (logout + redirect)",
-		},
-		isLoading: {
-			control: "boolean",
-			description: "Whether the settings are still loading",
-		},
-	},
 } satisfies Meta<typeof SettingsPage>;
 
 export default meta;
@@ -78,9 +62,6 @@ const defaultSlackPreferencesProps = {
 	onToggleChannelMessages: fn(),
 };
 
-/**
- * Default view with all settings enabled
- */
 export const Default: Story = {
 	args: {
 		aiReviewProps: {
@@ -100,9 +81,6 @@ export const Default: Story = {
 	},
 };
 
-/**
- * View with all toggles disabled
- */
 export const AllTogglesDisabled: Story = {
 	args: {
 		aiReviewProps: {
@@ -122,9 +100,6 @@ export const AllTogglesDisabled: Story = {
 	},
 };
 
-/**
- * Loading state while settings are being fetched
- */
 export const Loading: Story = {
 	args: {
 		aiReviewProps: {
@@ -144,9 +119,6 @@ export const Loading: Story = {
 	},
 };
 
-/**
- * View without AI review section (user lacks run_practice_review role)
- */
 export const AiReviewHidden: Story = {
 	args: {
 		aiReviewProps: {
@@ -166,9 +138,6 @@ export const AiReviewHidden: Story = {
 	},
 };
 
-/**
- * View without research section (PostHog not configured)
- */
 export const ResearchHidden: Story = {
 	args: {
 		aiReviewProps: {
@@ -186,4 +155,13 @@ export const ResearchHidden: Story = {
 		onAccountDeleted: fn(),
 		isLoading: false,
 	},
+};
+
+export const MobileReflow: Story = {
+	...Default,
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320] },
+	},
+	play: expectNoPageOverflow,
 };

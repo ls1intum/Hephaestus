@@ -22,22 +22,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
-/**
- * Workspace-scoped <b>practice area</b> — a configurable learning objective that groups practices,
- * naming a development behaviour expected of developers (e.g. "effective review communication").
- *
- * <p>An area is a <b>read-model / organizing</b> concept only. Practices remain the unit of detection;
- * an area never enters {@code trigger_events}, {@code criteria}, the detector, or the
- * {@link Observation} schema. Areas organise a developer's own findings on their Reflection dashboard.
- *
- * <p>A practice belongs to at most one area (see {@link Practice#getArea()}): the 1:N binding is
- * load-bearing for the per-area acted-on/total progress denominator — do not loosen it to a many-to-many
- * join without also switching progress math to per-(area, practice) rows. Deleting an area unbinds its
- * practices rather than deleting them ({@code fk_practice_area} ON DELETE SET NULL).
- *
- * <p>See ADR 0021 / ADR 0022 (PracticeArea is the SARIF-{@code taxon}-style grouping, deliberately
- * <em>not</em> a "goal" — it is a neutral bucket, not a target state to reach).
- */
 @Entity
 @Table(
     name = "practice_area",

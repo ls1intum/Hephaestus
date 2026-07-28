@@ -5,7 +5,7 @@ import type { ProfileXpRecord, RepositoryInfo, UserInfo } from "@/api/types.gen"
 import { LeagueIcon } from "@/components/leaderboard/LeagueIcon";
 import { getLeagueColor, getLeagueTier } from "@/components/leaderboard/utils.ts";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getInitials } from "@/lib/avatar";
@@ -19,7 +19,6 @@ export interface ProfileHeaderProps {
 	leaguePoints?: number;
 	userXpRecord?: ProfileXpRecord;
 	isLoading: boolean;
-	/** Workspace slug for routing to achievement page. */
 	workspaceSlug: string;
 	achievementsEnabled?: boolean;
 	progressionEnabled?: boolean;
@@ -37,10 +36,8 @@ export function ProfileHeader({
 	progressionEnabled = true,
 	leaguesEnabled = true,
 }: ProfileHeaderProps) {
-	// Unpack XP data
 	const { currentLevel: level, currentLevelXP: currentXp, xpNeeded, totalXP } = userXpRecord;
 
-	// Format the first contribution date if available
 	const formattedFirstContribution = firstContribution
 		? format(firstContribution, "MMMM yyyy")
 		: undefined;
@@ -49,12 +46,9 @@ export function ProfileHeader({
 	const leagueTier = rawTier === "none" ? "bronze" : rawTier;
 
 	return (
-		<div className="flex items-start justify-between gap-6 mx-8">
-			{/* Left section: Avatar + User Info + XP */}
-			<div className="flex flex-col gap-4 w-full max-w-xl">
-				{/* Row 1: Avatar + Name + GitHub Link */}
-				<div className="flex items-center gap-4">
-					{/* Avatar with Level Badge */}
+		<div className="flex min-w-0 flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+			<div className="flex min-w-0 w-full max-w-xl flex-col gap-4">
+				<div className="flex min-w-0 items-center gap-4">
 					<div className="relative shrink-0">
 						{isLoading ? (
 							<Avatar className="size-16">
@@ -67,7 +61,6 @@ export function ProfileHeader({
 							</Avatar>
 						)}
 
-						{/* Level Badge */}
 						{isLoading ? (
 							<Skeleton className="absolute -bottom-1 -right-1 size-7 rounded-full" />
 						) : (
@@ -91,18 +84,19 @@ export function ProfileHeader({
 						)}
 					</div>
 
-					{/* Name + GitHub Link */}
 					{isLoading ? (
-						<div className="flex flex-col gap-1.5">
+						<div className="flex min-w-0 flex-col gap-1.5">
 							<Skeleton className="h-7 w-40" />
 							<Skeleton className="h-5 w-48" />
 						</div>
 					) : user ? (
-						<div className="flex flex-col gap-0.5">
-							<h1 className="text-xl md:text-2xl font-bold leading-tight">{user.name}</h1>
-							<div className="flex items-center gap-3">
+						<div className="flex min-w-0 flex-col gap-0.5">
+							<h1 className="break-words text-xl font-bold leading-tight md:text-2xl">
+								{user.name}
+							</h1>
+							<div className="flex min-w-0 flex-wrap items-center gap-2">
 								<a
-									className="text-sm md:text-base text-muted-foreground hover:text-primary transition-colors"
+									className="min-w-0 break-all text-sm text-muted-foreground transition-colors hover:text-primary md:text-base"
 									href={user.htmlUrl}
 									target="_blank"
 									rel="noopener noreferrer"
@@ -110,27 +104,24 @@ export function ProfileHeader({
 									{user.htmlUrl ? new URL(user.htmlUrl).host : ""}/{user.login}
 								</a>
 								{achievementsEnabled && (
-									<Button
-										variant="ghost"
-										size="sm"
-										className="h-7 gap-1.5 text-muted-foreground hover:text-foreground"
-										render={
-											<Link
-												to="/w/$workspaceSlug/user/$username/achievements"
-												params={{ workspaceSlug, username: user.login ?? "" }}
-											/>
-										}
+									<Link
+										to="/w/$workspaceSlug/user/$username/achievements"
+										params={{ workspaceSlug, username: user.login ?? "" }}
+										className={buttonVariants({
+											variant: "ghost",
+											size: "sm",
+											className: "h-7 gap-1.5 text-muted-foreground hover:text-foreground",
+										})}
 									>
 										<Sparkles className="w-3.5 h-3.5" />
 										<span className="text-xs">Achievements</span>
-									</Button>
+									</Link>
 								)}
 							</div>
 						</div>
 					) : null}
 				</div>
 
-				{/* Row 2: XP Progress Bar with Contributing Since */}
 				{progressionEnabled &&
 					(isLoading ? (
 						<div className="flex flex-col gap-2">
@@ -150,7 +141,6 @@ export function ProfileHeader({
 					))}
 			</div>
 
-			{/* Right section: League Icon + Points */}
 			{leaguesEnabled && (
 				<div className="flex flex-col items-center gap-1 shrink-0">
 					{isLoading ? (

@@ -46,7 +46,12 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Practices & Feedback',
-      items: ['practice-catalogue', 'practice-feedback-schema', 'evaluation-provenance'],
+      items: [
+        'practice-feedback-language',
+        'practice-catalogue',
+        'practice-feedback-schema',
+        'evaluation-provenance',
+      ],
     },
   ],
 };

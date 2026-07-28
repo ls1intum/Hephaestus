@@ -24,8 +24,8 @@ export function AdminSettingsPage({
 	workspaceSlug,
 }: AdminSettingsPageProps) {
 	return (
-		<div className="container mx-auto py-6 max-w-4xl">
-			<h1 className="text-3xl font-bold mb-8">Workspace settings</h1>
+		<div className="mx-auto w-full max-w-4xl space-y-8">
+			<h1 className="text-3xl font-bold tracking-tight">Workspace settings</h1>
 
 			<div className="space-y-10">
 				<AdminFeaturesSettings

@@ -4,7 +4,6 @@ import {
 	dayEndIso,
 	dayStartIso,
 	fromDayParam,
-	narrowToEnum,
 	toDateRange,
 } from "./audit-search";
 
@@ -39,22 +38,6 @@ describe("toDateRange", () => {
 
 	it("is undefined when neither bound is usable", () => {
 		expect(toDateRange({ from: undefined, to: undefined })).toBeUndefined();
-	});
-});
-
-describe("narrowToEnum", () => {
-	const allowed = ["CREATED", "UPDATED"] as const;
-
-	it("drops values the API would reject", () => {
-		expect(narrowToEnum(["CREATED", "RETIRED"], allowed)).toEqual(["CREATED"]);
-	});
-
-	it("returns undefined when every value is unknown, so the query is unfiltered rather than empty", () => {
-		expect(narrowToEnum(["RETIRED"], allowed)).toBeUndefined();
-	});
-
-	it("treats an empty selection as no selection", () => {
-		expect(narrowToEnum([], allowed)).toBeUndefined();
 	});
 });
 

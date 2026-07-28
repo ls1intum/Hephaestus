@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Folders, PlusIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import {
 	Empty,
 	EmptyDescription,
@@ -19,10 +19,10 @@ export function NoWorkspace() {
 				<EmptyTitle>No workspace</EmptyTitle>
 				<EmptyDescription>You&apos;re not a member of any workspace yet.</EmptyDescription>
 			</EmptyHeader>
-			<Button render={<Link to="/workspaces/new" />}>
+			<Link to="/workspaces/new" className={buttonVariants()}>
 				<PlusIcon className="mr-2 size-4" />
 				Create Workspace
-			</Button>
+			</Link>
 		</Empty>
 	);
 }

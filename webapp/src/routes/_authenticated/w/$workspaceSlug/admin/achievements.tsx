@@ -22,7 +22,7 @@ function AdminAchievementsContainer() {
 		isLoading: isWorkspaceLoading,
 		error: workspaceError,
 	} = useActiveWorkspaceSlug();
-	const { achievementsEnabled, isLoading: featuresLoading } = useWorkspaceFeatures();
+	const { achievementsEnabled, isLoading: featuresLoading } = useWorkspaceFeatures(workspaceSlug);
 
 	const usersQueryOptions = getUsersWithTeamsOptions({
 		path: { workspaceSlug: workspaceSlug ?? "" },

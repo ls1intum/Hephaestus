@@ -6,7 +6,7 @@ import {
 	getLeaderboardQueryKey,
 } from "@/api/@tanstack/react-query.gen";
 import { server } from "@/mocks/server";
-import { renderRouteAt, TRANSFORM_WAIT, testQueryClient } from "@/test/router-harness";
+import { ROUTE_RENDER_WAIT, renderRouteAt, testQueryClient } from "@/test/router-harness";
 
 // Mounting the real route pulls in the whole admin layout and its lazy modules.
 vi.setConfig({ testTimeout: 15_000 });
@@ -68,7 +68,7 @@ async function renderSettingsRoute() {
 	}
 
 	renderRouteAt("/w/acme/admin/settings", queryClient);
-	await screen.findByRole("button", { name: "Reset and Recalculate Leagues" }, TRANSFORM_WAIT);
+	await screen.findByRole("button", { name: "Reset and Recalculate Leagues" }, ROUTE_RENDER_WAIT);
 	return { queryClient, resetCalls: () => resetCalls };
 }
 

@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.time.Instant;
@@ -153,6 +155,73 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         @Param("recipientUserId") Long recipientUserId,
         Pageable pageable
     );
+
+    @Query(
+        """
+        SELECT fo.observation.id AS observationId, fo.role AS role, fo.ordinal AS ordinal,
+               p.slug AS practiceSlug, p.name AS practiceName, o.title AS title,
+               pa.slug AS areaSlug, pa.name AS areaName, pa.icon AS areaIcon, pa.color AS areaColor,
+               o.presence AS presence, o.assessment AS assessment, o.severity AS severity,
+               o.confidence AS confidence, o.observedAt AS observedAt
+        FROM FeedbackObservation fo
+        JOIN fo.observation o
+        JOIN o.practice p
+        LEFT JOIN p.area pa
+        WHERE fo.feedback.id = :feedbackId
+          AND fo.feedback.workspaceId = :workspaceId
+          AND p.workspace.id = :workspaceId
+        ORDER BY fo.ordinal ASC
+        """
+    )
+    List<BoundObservation> findBoundObservations(
+        @Param("workspaceId") Long workspaceId,
+        @Param("feedbackId") UUID feedbackId
+    );
+
+    @Query(
+        """
+        SELECT fo.feedback.id AS feedbackId, fo.role AS role,
+               fo.feedback.agentJobId AS agentJobId, fo.feedback.channel AS channel,
+               fo.feedback.deliveryState AS deliveryState, fo.feedback.suppressionReason AS suppressionReason,
+               fo.feedback.createdAt AS createdAt, fo.feedback.deliveredAt AS deliveredAt
+        FROM FeedbackObservation fo
+        WHERE fo.observation.id = :observationId AND fo.feedback.workspaceId = :workspaceId
+        ORDER BY fo.feedback.createdAt DESC, fo.feedback.id DESC
+        """
+    )
+    List<BoundFeedbackUnit> findBoundFeedbackUnits(
+        @Param("workspaceId") Long workspaceId,
+        @Param("observationId") UUID observationId
+    );
+
+    interface BoundObservation {
+        UUID getObservationId();
+        EvidenceRole getRole();
+        Integer getOrdinal();
+        String getPracticeSlug();
+        String getPracticeName();
+        String getAreaSlug();
+        String getAreaName();
+        String getAreaIcon();
+        String getAreaColor();
+        String getTitle();
+        Presence getPresence();
+        Assessment getAssessment();
+        Severity getSeverity();
+        Float getConfidence();
+        Instant getObservedAt();
+    }
+
+    interface BoundFeedbackUnit {
+        UUID getFeedbackId();
+        EvidenceRole getRole();
+        UUID getAgentJobId();
+        FeedbackChannel getChannel();
+        FeedbackDeliveryState getDeliveryState();
+        FeedbackSuppressionReason getSuppressionReason();
+        Instant getCreatedAt();
+        Instant getDeliveredAt();
+    }
 
     /** Projection: facts + practice for one PREPARED conversational unit (no body - composed at delivery). */
     interface PreparedConversationFact {

@@ -4,10 +4,6 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
  * The withholding-rationale axis of a {@link Feedback} unit: why it was withheld instead of delivered. Set iff the
  * unit's {@link FeedbackDeliveryState} is {@code SUPPRESSED}; NULL otherwise. Constrained at the DB by
  * {@code chk_feedback_suppression_reason}.
- *
- * <p><b>Evaluation contract:</b> every prepared unit the pipeline withholds MUST land a SUPPRESSED row with one
- * of these reasons, or an evaluator cannot tell "model missed" from "policy withheld". A gate added without a
- * reason value reopens that gap — see {@code docs/contributor/evaluation-provenance.md}.
  */
 public enum FeedbackSuppressionReason {
     /** Dropped by the per-run volume cap on the non-blocking improvement tail ({@code DeliveryComposer}). */
@@ -30,6 +26,6 @@ public enum FeedbackSuppressionReason {
     ARTIFACT_DRAFT,
     /** The recipient opted out of AI review feedback. */
     RECIPIENT_OPTED_OUT,
-    /** The composed body sanitised to blank and no inline note landed — nothing reached the developer. */
+    /** The composed body sanitised to blank and no inline note was placed. */
     EMPTY_AFTER_SANITIZE,
 }

@@ -15,6 +15,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ForeignKey;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
@@ -47,6 +48,7 @@ import tools.jackson.databind.JsonNode;
 @Entity
 @Table(
     name = "agent_job",
+    indexes = @Index(name = "idx_agent_job_workspace_created", columnList = "workspace_id, created_at DESC, id DESC"),
     uniqueConstraints = @UniqueConstraint(name = "uk_agent_job_token", columnNames = { "job_token" })
 )
 @Getter

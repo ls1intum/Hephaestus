@@ -33,7 +33,6 @@ const settings: PracticeReviewSettings = {
 	cooldownMinutes: 15,
 };
 
-/** The card renders TanStack `Link`s to the AI models page, so it needs a router in scope. */
 function renderCard(props: Partial<React.ComponentProps<typeof PracticeDetectionPolicyCard>> = {}) {
 	const rootRoute = createRootRoute({
 		component: () => (
@@ -45,7 +44,8 @@ function renderCard(props: Partial<React.ComponentProps<typeof PracticeDetection
 				autoTriggerEnabled
 				manualTriggerEnabled
 				isLoading={false}
-				isSaving={false}
+				savingReviewSettings={false}
+				savingTriggers={false}
 				onUpdateReviewSettings={vi.fn()}
 				onUpdateFeatures={vi.fn()}
 				onResetReviewField={vi.fn()}
@@ -65,22 +65,28 @@ describe("PracticeDetectionPolicyCard model binding", () => {
 	it("reports the model detection runs on, and points at the page that owns the binding", async () => {
 		renderCard();
 
-		expect(await screen.findByText("GPT Test")).toBeTruthy();
-		expect(screen.getByRole("link", { name: "AI models page" })).toBeTruthy();
+		await screen.findByText("GPT Test");
+		expect(screen.getByRole("link", { name: "AI models page" }).getAttribute("href")).toBe(
+			"/w/acme/admin/models",
+		);
 	});
 
 	it("explains that reviews are paused when the bound model can no longer run", async () => {
 		renderCard({ detectionBinding: { ...readyBinding, ready: false } });
 
-		expect(await screen.findByText("Practice detection's model is unavailable")).toBeTruthy();
-		expect(screen.getByRole("link", { name: "Open AI models" })).toBeTruthy();
+		await screen.findByText("The practice feedback model is unavailable");
+		expect(screen.getByRole("link", { name: "Open AI models" }).getAttribute("href")).toBe(
+			"/w/acme/admin/models",
+		);
 	});
 
 	it("explains that reviews cannot run at all when no model is bound", async () => {
 		renderCard({ detectionBinding: undefined });
 
-		expect(await screen.findByText("Practice detection has no model")).toBeTruthy();
-		expect(screen.getByRole("link", { name: "Open AI models" })).toBeTruthy();
+		await screen.findByText("Practice feedback has no model");
+		expect(screen.getByRole("link", { name: "Open AI models" }).getAttribute("href")).toBe(
+			"/w/acme/admin/models",
+		);
 	});
 
 	it("reports a load failure with the server's reason and no Retry when one cannot help", async () => {
@@ -91,15 +97,15 @@ describe("PracticeDetectionPolicyCard model binding", () => {
 			onRetry: vi.fn(),
 		});
 
-		expect(await screen.findByText("Couldn't load the review policy")).toBeTruthy();
-		expect(screen.getByText(/You are not an admin of this workspace/)).toBeTruthy();
+		await screen.findByText("Couldn't load the review policy");
+		screen.getByText(/You are not an admin of this workspace/);
 		expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
 	});
 
 	it("offers a Retry when the failure is transient", async () => {
 		renderCard({ isError: true, settings: undefined, error: { status: 503 }, onRetry: vi.fn() });
 
-		expect(await screen.findByRole("button", { name: "Retry" })).toBeTruthy();
+		await screen.findByRole("button", { name: "Retry" });
 	});
 
 	it("puts the triggers out of reach, not merely grey, while nothing can run", async () => {

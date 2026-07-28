@@ -1,7 +1,8 @@
-// Cleaned up duplicate content; single coherent story below
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
 import type { TeamInfo } from "@/api/types.gen";
+import { withStandardPage } from "@/stories/decorators";
+import { expectNoPageOverflow } from "@/test/reflow";
 import { AdminTeamsTable } from "./AdminTeamsTable";
 
 const repos = [
@@ -107,7 +108,8 @@ const teams: TeamInfo[] = [
 
 const meta = {
 	component: AdminTeamsTable,
-	parameters: { layout: "centered" },
+	parameters: { layout: "fullscreen" },
+	decorators: [withStandardPage],
 	tags: ["autodocs"],
 	argTypes: {
 		teams: { control: false },
@@ -131,3 +133,11 @@ export type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 export const Loading: Story = { args: { isLoading: true, teams: [] } };
+
+export const MobileReflow: Story = {
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320] },
+	},
+	play: expectNoPageOverflow,
+};

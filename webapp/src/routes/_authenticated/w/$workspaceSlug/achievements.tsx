@@ -7,23 +7,19 @@ import { useAuth } from "@/integrations/auth/AuthContext";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/achievements")({
+	staticData: { surface: "fullscreen" },
 	component: AchievementsPage,
 });
 
-/**
- * Shortcut route for viewing the current user's own achievements.
- * Delegates to the shared AchievementsView component.
- */
 function AchievementsPage() {
 	const { userProfile, getUserProfilePictureUrl, username } = useAuth();
 	const selectedSlug = useWorkspaceStore((state) => state.selectedSlug);
 	const { workspaceSlug } = Route.useParams();
 	const navigate = useNavigate();
-	const { achievementsEnabled, isLoading } = useWorkspaceFeatures();
+	const { achievementsEnabled, isLoading } = useWorkspaceFeatures(workspaceSlug);
 
 	useEffect(() => {
 		if (!isLoading && !achievementsEnabled && workspaceSlug && username) {
-			// Silent redirect — UI elements are already hidden when disabled
 			navigate({
 				to: "/w/$workspaceSlug/user/$username",
 				params: { workspaceSlug, username },
@@ -34,7 +30,7 @@ function AchievementsPage() {
 
 	if (isLoading || !achievementsEnabled) {
 		return (
-			<div className="flex items-center justify-center h-96">
+			<div className="flex min-h-0 flex-1 items-center justify-center">
 				<Spinner className="size-8" />
 			</div>
 		);

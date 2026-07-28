@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils";
 
 export interface FooterProps {
 	className?: string;
-	/** Whether this is the production deployment (hides the build strip). */
 	isProduction?: boolean;
 	buildInfo?: {
 		branch?: string;
@@ -17,19 +16,14 @@ export interface FooterProps {
 	};
 }
 
-/**
- * Footer with navigation, attribution, and — outside production — a strip
- * identifying the running build (branch, commit, deploy time).
- */
 export default function Footer({ className, isProduction, buildInfo }: FooterProps) {
 	const showBuildInfo =
 		!isProduction && (buildInfo?.branch || buildInfo?.commit || buildInfo?.deployedAt);
 
 	return (
-		<footer className={cn("border-t border-sidebar-border bg-sidebar py-2 md:px-8", className)}>
-			<div className="flex flex-col items-center justify-between gap-2 px-4 md:flex-row md:px-0">
-				{/* Attribution */}
-				<p className="text-sm text-muted-foreground text-center md:text-left">
+		<footer className={cn("border-t border-sidebar-border bg-sidebar py-2", className)}>
+			<div className="flex flex-col items-center justify-between gap-2 px-4 xl:flex-row">
+				<p className="text-center text-sm text-muted-foreground xl:text-left">
 					Built by{" "}
 					<a
 						href="https://github.com/ls1intum"
@@ -60,9 +54,8 @@ export default function Footer({ className, isProduction, buildInfo }: FooterPro
 					.
 				</p>
 
-				{/* Navigation + Build Info */}
-				<div className="flex items-center gap-4">
-					<nav className="flex gap-4 sm:gap-6">
+				<div className="flex min-w-0 flex-wrap items-center justify-center gap-4">
+					<nav className="flex flex-wrap justify-center gap-4 sm:gap-6">
 						<Link
 							to="/about"
 							className="text-sm text-muted-foreground hover:text-foreground hover:underline underline-offset-4"
@@ -89,10 +82,6 @@ export default function Footer({ className, isProduction, buildInfo }: FooterPro
 						>
 							Imprint
 						</Link>
-						{/* Consent control (GDPR Art. 7(3)): re-opens the banner (pre-seeded, cancelable) so a
-						    choice can be changed or withdrawn from anywhere. Shown only when an optional,
-						    consent-gated integration is configured — with essential cookies alone there is no
-						    choice to make, so the link would be a dead end. */}
 						{optionalIntegrationsAvailable && (
 							<button
 								type="button"
@@ -105,7 +94,7 @@ export default function Footer({ className, isProduction, buildInfo }: FooterPro
 					</nav>
 
 					{showBuildInfo && (
-						<div className="hidden sm:flex items-center gap-2 border-l border-sidebar-border pl-4 text-xs text-muted-foreground/60 font-mono">
+						<div className="hidden items-center gap-2 border-l border-sidebar-border pl-4 font-mono text-xs text-muted-foreground/60 xl:flex">
 							{buildInfo?.branch && (
 								<Tooltip>
 									<TooltipTrigger

@@ -37,14 +37,12 @@ code {
   --secondary: oklch(0.967 0.001 286.375);
   --secondary-foreground: oklch(0.21 0.006 285.885);
   --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
+  --muted-foreground: oklch(0.535 0.016 285.938);
   --accent: oklch(0.967 0.001 286.375);
   --accent-foreground: oklch(0.21 0.006 285.885);
-  --destructive: oklch(0.577 0.245 27.325);
+  --destructive: oklch(0.53 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
-  /* Darkened from the palette default: at stock lightness `text-success` / `text-warning` miss
-     WCAG 2.2 SC 1.4.3 (4.5:1) against --card. */
-  --success: oklch(0.52 0.145 163.225);
+  --success: oklch(0.49 0.145 163.225);
   --success-foreground: oklch(0.985 0 0);
   --warning: oklch(0.54 0.153 70.08);
   --warning-foreground: oklch(0.985 0 0);
@@ -387,14 +385,6 @@ code {
   }
 }
 
-@utility container {
-  margin-inline: auto;
-  @apply p-8;
-
-  @variant 2xl {
-    max-width: 1400px;
-  }
-}
 
 .shiki {
   @apply text-sm bg-card text-card-foreground rounded-xl border p-4;
@@ -583,4 +573,3 @@ code {
   clip-path: polygon(50% 0%, 93.301% 25%, 93.301% 75%, 50% 100%, 6.699% 75%, 6.699% 25%);
   z-index: -1;
 }
-

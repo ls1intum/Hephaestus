@@ -1,0 +1,61 @@
+package de.tum.cit.aet.hephaestus.practices.observation;
+
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
+import de.tum.cit.aet.hephaestus.practices.model.Severity;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import org.jspecify.annotations.Nullable;
+
+public record ObservationQueryFilter(
+    @Nullable List<String> practiceSlugs,
+    @Nullable List<String> areaSlugs,
+    @Nullable List<Presence> presences,
+    @Nullable List<Assessment> assessments,
+    @Nullable List<Severity> severities,
+    @Nullable UUID agentJobId,
+    @Nullable WorkArtifact artifactType,
+    @Nullable Long artifactId,
+    @Nullable Long aboutUserId,
+    @Nullable Instant from,
+    @Nullable Instant to
+) {
+    public String@Nullable [] practiceSlugArray() {
+        if (practiceSlugs == null || practiceSlugs.isEmpty()) {
+            return null;
+        }
+        return practiceSlugs.toArray(String[]::new);
+    }
+
+    public String@Nullable [] areaSlugArray() {
+        if (areaSlugs == null || areaSlugs.isEmpty()) {
+            return null;
+        }
+        return areaSlugs.toArray(String[]::new);
+    }
+
+    public String@Nullable [] presenceNames() {
+        return names(presences);
+    }
+
+    public String@Nullable [] assessmentNames() {
+        return names(assessments);
+    }
+
+    public String@Nullable [] severityNames() {
+        return names(severities);
+    }
+
+    public @Nullable String artifactTypeName() {
+        return artifactType == null ? null : artifactType.name();
+    }
+
+    private static String@Nullable [] names(@Nullable List<? extends Enum<?>> values) {
+        if (values == null || values.isEmpty()) {
+            return null;
+        }
+        return values.stream().map(Enum::name).toArray(String[]::new);
+    }
+}

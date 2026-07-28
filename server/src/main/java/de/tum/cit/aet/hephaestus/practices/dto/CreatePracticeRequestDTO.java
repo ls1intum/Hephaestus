@@ -9,9 +9,6 @@ import jakarta.validation.constraints.Size;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Request DTO for creating a new practice definition.
- */
 @Schema(description = "Request to create a new practice definition")
 public record CreatePracticeRequestDTO(
     @NotBlank(message = "Slug is required")
@@ -60,7 +57,11 @@ public record CreatePracticeRequestDTO(
     String whyItMatters,
 
     @Size(max = 2000, message = "What-good-looks-like must be at most 2000 characters")
-    @Schema(description = "Developer-facing exemplar (learner layer); a concrete instance, not the rubric")
+    @Schema(description = "Developer-facing exemplar; a concrete instance, not the assessment criteria")
     @Nullable
-    String whatGoodLooksLike
+    String whatGoodLooksLike,
+
+    @Schema(description = "Practice area to add the practice to. Omit or set to null for Unassigned.", nullable = true)
+    @Nullable
+    String areaSlug
 ) {}

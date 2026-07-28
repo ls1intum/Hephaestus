@@ -37,7 +37,7 @@ interface PurposeMeta {
 const PURPOSES: PurposeMeta[] = [
 	{
 		purpose: "PRACTICE_DETECTION",
-		title: "Practice detection",
+		title: "Practice feedback",
 		description: "Reviews pull requests, issues, and conversations.",
 	},
 	{
@@ -144,7 +144,7 @@ export function AgentBindingsPage({
 		purpose === "MENTOR" ? mentorEnabled : practicesEnabled;
 
 	return (
-		<div className="container mx-auto max-w-4xl py-6">
+		<div className="mx-auto w-full max-w-4xl">
 			<div className="mb-6">
 				<h1 className="text-3xl font-bold tracking-tight">AI models</h1>
 			</div>

@@ -109,7 +109,7 @@ public class AgentJobRetentionService {
         int batchDeleted;
         do {
             Integer result = transactionTemplate.execute(status ->
-                jobRepository.deleteTerminalRowsOlderThan(cutoff, BATCH_SIZE)
+                jobRepository.deleteUnreferencedTerminalRowsOlderThan(cutoff, BATCH_SIZE)
             );
             batchDeleted = result != null ? result : 0;
             total += batchDeleted;

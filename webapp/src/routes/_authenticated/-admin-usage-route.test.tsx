@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { AdminWorkspaceLlmUsage, WorkspaceLlmUsageReport } from "@/api/types.gen";
 import { currentMonthUtc, formatMonthLabel } from "@/components/admin/usage/usage-utils";
 import { server } from "@/mocks/server";
-import { renderRouteAt, TRANSFORM_WAIT } from "@/test/router-harness";
+import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
 
 // Mounting the real route pulls in the whole admin layout and its lazy modules.
 vi.setConfig({ testTimeout: 20_000 });
@@ -75,8 +75,8 @@ function mockUsageRoutes(options: {
 
 async function renderUsageRoute(url = "/admin/usage") {
 	renderRouteAt(url);
-	await screen.findByRole("heading", { name: "AI usage" }, TRANSFORM_WAIT);
-	return screen.findByRole("button", { name: /Set budget for Acme/ }, TRANSFORM_WAIT);
+	await screen.findByRole("heading", { name: "AI usage" }, ROUTE_RENDER_WAIT);
+	return screen.findByRole("button", { name: /Set budget for Acme/ }, ROUTE_RENDER_WAIT);
 }
 
 async function saveBudget(amount: string) {

@@ -1,14 +1,11 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { AgentActivityPage } from "@/components/admin/ai/AgentActivityPage";
-import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
-import { workspaceAdminHead } from "@/lib/page-title";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/runs")({
-	head: workspaceAdminHead("Practice runs"),
-	component: RunsContainer,
+	beforeLoad: ({ params }) => {
+		throw redirect({
+			to: "/w/$workspaceSlug/admin/practices/reviews",
+			params,
+			search: {},
+		});
+	},
 });
-
-function RunsContainer() {
-	const { workspaceSlug } = useActiveWorkspaceSlug();
-	return <AgentActivityPage workspaceSlug={workspaceSlug ?? ""} />;
-}

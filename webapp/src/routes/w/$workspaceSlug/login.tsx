@@ -10,6 +10,7 @@ interface WorkspaceLoginSearch {
 }
 
 export const Route = createFileRoute("/w/$workspaceSlug/login")({
+	staticData: { surface: "auth" },
 	validateSearch: (search): WorkspaceLoginSearch => ({
 		error: typeof search.error === "string" ? search.error : undefined,
 	}),

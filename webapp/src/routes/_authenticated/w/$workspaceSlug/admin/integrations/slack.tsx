@@ -238,7 +238,7 @@ function SlackIntegrationPage() {
 	const routeError = workspaceQuery.error ?? catalogQuery.error;
 
 	return (
-		<div className="container mx-auto max-w-5xl space-y-8 py-6">
+		<div className="mx-auto w-full max-w-5xl space-y-8">
 			<IntegrationPageHeader
 				icon={<SlackIcon className="size-6" />}
 				title="Slack"

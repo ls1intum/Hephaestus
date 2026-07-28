@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { HttpResponse, http } from "msw";
 import { expect, fn, within } from "storybook/test";
+import { withStandardPage } from "@/stories/decorators";
 import type { FeatureValues } from "./AdminFeaturesSettings";
 import { AdminSettingsPage } from "./AdminSettingsPage";
 
@@ -24,10 +25,11 @@ const membershipRead = [
 const meta = {
 	component: AdminSettingsPage,
 	parameters: {
-		layout: "padded",
+		layout: "fullscreen",
 		msw: { handlers: membershipRead },
 		chromatic: { viewports: [320, 1440] },
 	},
+	decorators: [withStandardPage],
 	tags: ["autodocs"],
 	args: {
 		isResettingLeagues: false,

@@ -46,8 +46,7 @@ export const mockPractices: Practice[] = [
 	},
 ];
 
-/** A minimal active practice with no precompute script. */
-export const mockPracticeNoCategory: Practice = {
+export const mockUnassignedPractice: Practice = {
 	id: 5,
 	slug: "error-state-handling",
 	name: "Error State Handling",
@@ -61,7 +60,6 @@ export const mockPracticeNoCategory: Practice = {
 	updatedAt: new Date("2025-06-17"),
 };
 
-/** Practice with an extremely long name and verbose criteria — tests text overflow. */
 export const mockPracticeLongText: Practice = {
 	id: 6,
 	slug: "very-long-practice-name-to-test-overflow-in-card-layouts",

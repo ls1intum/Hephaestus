@@ -922,13 +922,21 @@ export type UpdatePracticeReviewSettingsRequest = {
 };
 
 /**
- * Request to update an existing practice definition (PATCH — only non-null fields applied)
+ * Request to update a practice; omitted fields remain unchanged
  */
 export type UpdatePracticeRequest = {
+    /**
+     * Catalog placement to apply with the definition update; omit to leave unchanged
+     */
+    area?: BindPracticeAreaRequest;
     /**
      * Artifact this practice evaluates
      */
     artifactType?: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    /**
+     * Optional fields to clear before applying supplied values
+     */
+    clear?: Array<'PRECOMPUTE_SCRIPT' | 'WHY_IT_MATTERS' | 'WHAT_GOOD_LOOKS_LIKE'>;
     /**
      * Practice evaluation criteria
      */
@@ -953,6 +961,16 @@ export type UpdatePracticeRequest = {
      * Developer-facing rationale (learner layer); plain language, never the detection rubric
      */
     whyItMatters?: string;
+};
+
+/**
+ * Request to move a practice to an area or Unassigned
+ */
+export type BindPracticeAreaRequest = {
+    /**
+     * Destination area slug; omit or set to null for Unassigned
+     */
+    areaSlug?: string | null;
 };
 
 /**
@@ -1589,6 +1607,428 @@ export type SessionView = {
 
 export type RevokeSessionsResult = {
     revoked?: number;
+};
+
+export type ReviewSubject = {
+    avatarUrl?: string;
+    id: number;
+    /**
+     * Login on the source provider
+     */
+    login: string;
+    /**
+     * Display name, when known
+     */
+    name?: string;
+};
+
+/**
+ * Work reviewed by an agent job
+ */
+export type ReviewRunTarget = {
+    channelName?: string;
+    /**
+     * Internal artifact entity ID, when recorded
+     */
+    id?: number;
+    /**
+     * Provider-visible issue or pull-request number
+     */
+    number?: number;
+    provider?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
+    repositoryName?: string;
+    title: string;
+    type: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    url?: string;
+};
+
+/**
+ * A review run with finding and feedback outcome counts
+ */
+export type ReviewRunSummary = {
+    createdAt: Date;
+    feedback: ReviewFeedbackCounts;
+    findings: ReviewFindingCounts;
+    id: string;
+    status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
+    target: ReviewRunTarget;
+};
+
+/**
+ * Counts of findings by assessment
+ */
+export type ReviewFindingCounts = {
+    notApplicable: number;
+    problems: number;
+    strengths: number;
+};
+
+/**
+ * Counts of feedback by delivery state
+ */
+export type ReviewFeedbackCounts = {
+    delivered: number;
+    failed: number;
+    prepared: number;
+    superseded: number;
+    suppressed: number;
+};
+
+export type ReviewPracticeArea = {
+    /**
+     * Optional palette colour key
+     */
+    color?: string;
+    /**
+     * Optional lucide icon name
+     */
+    icon?: string;
+    name: string;
+    slug: string;
+};
+
+/**
+ * A recorded placement of feedback on a delivery surface
+ */
+export type ReviewPlacement = {
+    /**
+     * Last anchored line (1-based)
+     */
+    anchorEndLine?: number;
+    /**
+     * Anchor granularity; null for non-inline placements
+     */
+    anchorKind?: 'LINE' | 'RANGE' | 'FILE' | 'IMAGE';
+    /**
+     * Head-side path of the anchored file
+     */
+    anchorPath?: string;
+    /**
+     * Diff side of the anchor
+     */
+    anchorSide?: 'OLD' | 'NEW';
+    /**
+     * First anchored line (1-based)
+     */
+    anchorStartLine?: number;
+    /**
+     * Mentor chat-message identifier
+     */
+    chatMessageId?: string;
+    id: string;
+    placementType: 'SUMMARY' | 'INLINE' | 'CONVERSATION_TURN';
+    /**
+     * Provider-native comment identifier
+     */
+    postedCommentRef?: string;
+};
+
+/**
+ * A finding with evidence and linked feedback
+ */
+export type ReviewFindingDetail = {
+    agentJobId: string;
+    /**
+     * Practice area; null when the practice is Unassigned
+     */
+    area?: ReviewPracticeArea;
+    artifact: ReviewArtifact;
+    /**
+     * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
+     */
+    assessment?: 'GOOD' | 'BAD';
+    /**
+     * Detector confidence (0.0-1.0)
+     */
+    confidence: number;
+    /**
+     * Detector evidence
+     */
+    evidence?: unknown;
+    /**
+     * Linked feedback, newest first
+     */
+    feedback: Array<ReviewBoundFeedback>;
+    id: string;
+    observedAt: Date;
+    practiceName: string;
+    /**
+     * Criteria revision selected as of job start, when available
+     */
+    practiceRevisionId?: number;
+    practiceSlug: string;
+    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
+    /**
+     * Detector reasoning behind the finding
+     */
+    reasoning?: string;
+    /**
+     * Cross-run locus key; null for findings predating fingerprinting
+     */
+    recurrenceKey?: string;
+    /**
+     * Severity band (null unless assessment is BAD)
+     */
+    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    /**
+     * Whose work the finding is about; null when the identity is no longer resolvable
+     */
+    subject?: ReviewSubject;
+    title: string;
+};
+
+/**
+ * A feedback unit composed from a finding
+ */
+export type ReviewBoundFeedback = {
+    agentJobId: string;
+    channel: 'IN_CONTEXT' | 'CONVERSATION' | 'PROFILE';
+    createdAt: Date;
+    /**
+     * When the feedback was placed; null if it never reached a delivery surface
+     */
+    deliveredAt?: Date;
+    deliveryState: 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED';
+    feedbackId: string;
+    /**
+     * Whether the finding led the unit or reinforced it
+     */
+    role: 'PRIMARY' | 'SUPPORTING';
+    /**
+     * Why the unit was withheld; null unless the state is SUPPRESSED
+     */
+    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE';
+};
+
+export type ReviewArtifact = {
+    /**
+     * Slack channel name for conversation artifacts
+     */
+    channelName?: string;
+    /**
+     * Internal artifact entity ID
+     */
+    id: number;
+    /**
+     * Provider-visible issue or pull-request number
+     */
+    number?: number;
+    /**
+     * Source provider, when recorded
+     */
+    provider?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
+    /**
+     * Repository owner/name for SCM artifacts
+     */
+    repositoryName?: string;
+    title: string;
+    type: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    /**
+     * Provider URL, when one is available
+     */
+    url?: string;
+};
+
+/**
+ * A practice review finding with its linked feedback outcomes
+ */
+export type ReviewFinding = {
+    agentJobId: string;
+    /**
+     * Practice area; null when the practice is Unassigned
+     */
+    area?: ReviewPracticeArea;
+    artifact: ReviewArtifact;
+    /**
+     * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
+     */
+    assessment?: 'GOOD' | 'BAD';
+    /**
+     * Detector confidence (0.0-1.0)
+     */
+    confidence: number;
+    /**
+     * Counts of linked feedback units by delivery state
+     */
+    feedbackDisposition: ReviewFeedbackDisposition;
+    id: string;
+    observedAt: Date;
+    practiceName: string;
+    practiceSlug: string;
+    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
+    /**
+     * Cross-run locus key; null for findings predating fingerprinting
+     */
+    recurrenceKey?: string;
+    /**
+     * Severity band (null unless assessment is BAD)
+     */
+    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    /**
+     * Whose work the finding is about; null when the identity is no longer resolvable
+     */
+    subject?: ReviewSubject;
+    title: string;
+};
+
+/**
+ * Counts of feedback by delivery state
+ */
+export type ReviewFeedbackDisposition = {
+    /**
+     * Linked feedback units delivered to a surface
+     */
+    delivered: number;
+    /**
+     * Linked feedback units whose delivery failed
+     */
+    failed: number;
+    /**
+     * Linked feedback units awaiting delivery
+     */
+    prepared: number;
+    /**
+     * Linked feedback units delivered and later replaced
+     */
+    superseded: number;
+    /**
+     * Linked feedback units withheld by policy
+     */
+    suppressed: number;
+};
+
+/**
+ * Full feedback detail including the stored composed body
+ */
+export type ReviewFeedbackDetail = {
+    agentJobId: string;
+    /**
+     * Work item the unit targets; null for an unanchored unit
+     */
+    artifact?: ReviewArtifact;
+    /**
+     * Stored composed body; null when none was produced
+     */
+    body?: string;
+    channel: 'IN_CONTEXT' | 'CONVERSATION' | 'PROFILE';
+    createdAt: Date;
+    /**
+     * When the feedback was placed; null if it never reached a delivery surface
+     */
+    deliveredAt?: Date;
+    deliveryState: 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED';
+    /**
+     * Source findings in render order
+     */
+    findings: Array<ReviewBoundFinding>;
+    id: string;
+    /**
+     * Recorded placements; empty when none
+     */
+    placements: Array<ReviewPlacement>;
+    /**
+     * Who the unit is addressed to; null when the identity is no longer resolvable
+     */
+    recipient?: ReviewSubject;
+    /**
+     * The unit this one replaced on its continuity line; null on a first delivery
+     */
+    replacesId?: string;
+    /**
+     * Whose work the message addresses; may equal the recipient
+     */
+    subject?: ReviewSubject;
+    /**
+     * Why the unit was withheld; null unless the state is SUPPRESSED
+     */
+    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE';
+    /**
+     * Cross-run continuity key tying successive deliveries together
+     */
+    threadKey?: string;
+};
+
+/**
+ * A finding that contributed to a feedback unit
+ */
+export type ReviewBoundFinding = {
+    /**
+     * Practice area; null when the practice is Unassigned
+     */
+    area?: ReviewPracticeArea;
+    /**
+     * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
+     */
+    assessment?: 'GOOD' | 'BAD';
+    /**
+     * Detector confidence (0.0-1.0)
+     */
+    confidence: number;
+    findingId: string;
+    observedAt: Date;
+    /**
+     * Render order within the unit (lower renders earlier)
+     */
+    ordinal: number;
+    practiceName: string;
+    practiceSlug: string;
+    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
+    /**
+     * Whether the finding leads the unit or reinforces it
+     */
+    role: 'PRIMARY' | 'SUPPORTING';
+    /**
+     * Severity band (null unless assessment is BAD)
+     */
+    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    title: string;
+};
+
+/**
+ * A composed feedback unit with its delivery disposition
+ */
+export type ReviewFeedback = {
+    agentJobId: string;
+    /**
+     * Work item the unit targets; null for an unanchored unit
+     */
+    artifact?: ReviewArtifact;
+    /**
+     * Leading characters of the composed body; null when the unit carries no body
+     */
+    bodyPreview?: string;
+    /**
+     * Whether the stored body is longer than the preview
+     */
+    bodyTruncated: boolean;
+    channel: 'IN_CONTEXT' | 'CONVERSATION' | 'PROFILE';
+    createdAt: Date;
+    /**
+     * When the feedback was placed; null if it never reached a delivery surface
+     */
+    deliveredAt?: Date;
+    deliveryState: 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED';
+    /**
+     * Number of findings used to compose the unit
+     */
+    findingCount: number;
+    id: string;
+    /**
+     * Who the unit is addressed to; null when the identity is no longer resolvable
+     */
+    recipient?: ReviewSubject;
+    /**
+     * The unit this one replaced on its continuity line; null on a first delivery
+     */
+    replacesId?: string;
+    /**
+     * Whose work the message addresses; may equal the recipient
+     */
+    subject?: ReviewSubject;
+    /**
+     * Why the unit was withheld; null unless the state is SUPPRESSED
+     */
+    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE';
 };
 
 /**
@@ -2286,6 +2726,42 @@ export type Practice = {
     whyItMatters?: string;
 };
 
+/**
+ * A practice's position in the catalog
+ */
+export type PlacePracticeRequest = {
+    /**
+     * Destination area slug; omit to place the practice in Unassigned
+     */
+    areaSlug?: string;
+    /**
+     * Zero-based position in the destination
+     */
+    position: number;
+};
+
+export type PagedModelReviewRunSummary = {
+    content?: Array<ReviewRunSummary>;
+    page?: PageMetadata;
+};
+
+export type PageMetadata = {
+    number?: number;
+    size?: number;
+    totalElements?: number;
+    totalPages?: number;
+};
+
+export type PagedModelReviewFinding = {
+    content?: Array<ReviewFinding>;
+    page?: PageMetadata;
+};
+
+export type PagedModelReviewFeedback = {
+    content?: Array<ReviewFeedback>;
+    page?: PageMetadata;
+};
+
 export type PageableObject = {
     offset?: number;
     pageNumber?: number;
@@ -2425,7 +2901,7 @@ export type ConfigAuditEntryView = {
      */
     changedKeys?: Array<string>;
     entityId?: string;
-    entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL';
+    entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_DEFINITION' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL';
     id?: number;
     newValue?: string;
     occurredAt?: Date;
@@ -2593,6 +3069,10 @@ export type AgentJob = {
      * Current job status
      */
     status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
+    /**
+     * Work item reviewed by this job
+     */
+    target: ReviewRunTarget;
 };
 
 /**
@@ -3548,6 +4028,10 @@ export type CreateReaction = {
  */
 export type CreatePracticeRequest = {
     /**
+     * Practice area to add the practice to. Omit or set to null for Unassigned.
+     */
+    areaSlug?: string | null;
+    /**
      * Artifact this practice evaluates. Defaults to PULL_REQUEST when omitted.
      */
     artifactType?: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
@@ -3572,7 +4056,7 @@ export type CreatePracticeRequest = {
      */
     triggerEvents: Array<string>;
     /**
-     * Developer-facing exemplar (learner layer); a concrete instance, not the rubric
+     * Developer-facing exemplar; a concrete instance, not the assessment criteria
      */
     whatGoodLooksLike?: string;
     /**
@@ -3594,7 +4078,7 @@ export type CreatePracticeAreaRequest = {
      */
     description?: string;
     /**
-     * Sort order within the workspace. Defaults to 0 when omitted.
+     * Sort order within the workspace. Appended when omitted.
      */
     displayOrder?: number;
     /**
@@ -3941,16 +4425,6 @@ export type ChatMessageVote = {
 };
 
 /**
- * Request to bind a practice to an area, or unbind it when areaSlug is null
- */
-export type BindPracticeAreaRequest = {
-    /**
-     * Slug of the area to bind to, or null to unbind
-     */
-    areaSlug?: string;
-};
-
-/**
  * Binary progress indicating unlocked state
  */
 export type BinaryAchievementProgress = Omit<AchievementProgress, 'type'> & {
@@ -4266,7 +4740,7 @@ export type AdminListConfigAuditEventsData = {
         workspaceId?: number;
         page?: number;
         size?: number;
-        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
+        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_DEFINITION' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
         entityId?: string;
         changedKey?: string;
         action?: Array<'CREATED' | 'UPDATED' | 'DELETED'>;
@@ -5531,7 +6005,7 @@ export type ListWorkspaceConfigAuditEventsData = {
     query?: {
         page?: number;
         size?: number;
-        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
+        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_DEFINITION' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
         entityId?: string;
         changedKey?: string;
         action?: Array<'CREATED' | 'UPDATED' | 'DELETED'>;
@@ -7139,6 +7613,10 @@ export type CreatePracticeData = {
 
 export type CreatePracticeErrors = {
     /**
+     * Practice area not found
+     */
+    404: unknown;
+    /**
      * Practice slug already exists in this workspace
      */
     409: unknown;
@@ -7460,6 +7938,210 @@ export type UpdatePracticeReviewSettingsResponses = {
 
 export type UpdatePracticeReviewSettingsResponse = UpdatePracticeReviewSettingsResponses[keyof UpdatePracticeReviewSettingsResponses];
 
+export type ListPracticeReviewsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        status?: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
+        page?: number;
+        size?: number;
+    };
+    url: '/workspaces/{workspaceSlug}/practices/reviews';
+};
+
+export type ListPracticeReviewsErrors = {
+    /**
+     * Invalid filter or pagination
+     */
+    400: ProblemDetail;
+};
+
+export type ListPracticeReviewsError = ListPracticeReviewsErrors[keyof ListPracticeReviewsErrors];
+
+export type ListPracticeReviewsResponses = {
+    /**
+     * Paginated review summaries returned
+     */
+    200: PagedModelReviewRunSummary;
+};
+
+export type ListPracticeReviewsResponse = ListPracticeReviewsResponses[keyof ListPracticeReviewsResponses];
+
+export type ListPracticeReviewFeedbackData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        page?: number;
+        size?: number;
+        deliveryState?: Array<'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED'>;
+        suppressionReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE'>;
+        channel?: Array<'IN_CONTEXT' | 'CONVERSATION' | 'PROFILE'>;
+        agentJobId?: string;
+        artifactType?: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+        /**
+         * Artifact ID; requires artifactType
+         */
+        artifactId?: number;
+        recipientUserId?: number;
+        /**
+         * Inclusive lower bound
+         */
+        from?: Date;
+        /**
+         * Exclusive upper bound
+         */
+        to?: Date;
+    };
+    url: '/workspaces/{workspaceSlug}/practices/reviews/feedback';
+};
+
+export type ListPracticeReviewFeedbackErrors = {
+    /**
+     * Invalid filter or pagination
+     */
+    400: ProblemDetail;
+};
+
+export type ListPracticeReviewFeedbackError = ListPracticeReviewFeedbackErrors[keyof ListPracticeReviewFeedbackErrors];
+
+export type ListPracticeReviewFeedbackResponses = {
+    /**
+     * Paginated feedback units returned
+     */
+    200: PagedModelReviewFeedback;
+};
+
+export type ListPracticeReviewFeedbackResponse = ListPracticeReviewFeedbackResponses[keyof ListPracticeReviewFeedbackResponses];
+
+export type GetPracticeReviewFeedbackData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        feedbackId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/reviews/feedback/{feedbackId}';
+};
+
+export type GetPracticeReviewFeedbackErrors = {
+    /**
+     * Feedback not found in this workspace
+     */
+    404: ProblemDetail;
+};
+
+export type GetPracticeReviewFeedbackError = GetPracticeReviewFeedbackErrors[keyof GetPracticeReviewFeedbackErrors];
+
+export type GetPracticeReviewFeedbackResponses = {
+    /**
+     * Feedback unit detail returned
+     */
+    200: ReviewFeedbackDetail;
+};
+
+export type GetPracticeReviewFeedbackResponse = GetPracticeReviewFeedbackResponses[keyof GetPracticeReviewFeedbackResponses];
+
+export type ListPracticeReviewFindingsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        page?: number;
+        size?: number;
+        /**
+         * Sorting strategy. ACTIONABILITY orders problems from CRITICAL to INFO, then strengths, then not-applicable findings; ties are newest first.
+         */
+        sort?: 'NEWEST' | 'ACTIONABILITY';
+        practiceSlug?: Array<string>;
+        areaSlug?: Array<string>;
+        presence?: Array<'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE'>;
+        assessment?: Array<'GOOD' | 'BAD'>;
+        severity?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO'>;
+        agentJobId?: string;
+        artifactType?: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+        /**
+         * Artifact ID; requires artifactType
+         */
+        artifactId?: number;
+        subjectUserId?: number;
+        /**
+         * Inclusive lower bound
+         */
+        from?: Date;
+        /**
+         * Exclusive upper bound
+         */
+        to?: Date;
+    };
+    url: '/workspaces/{workspaceSlug}/practices/reviews/findings';
+};
+
+export type ListPracticeReviewFindingsErrors = {
+    /**
+     * Invalid filter or pagination
+     */
+    400: ProblemDetail;
+};
+
+export type ListPracticeReviewFindingsError = ListPracticeReviewFindingsErrors[keyof ListPracticeReviewFindingsErrors];
+
+export type ListPracticeReviewFindingsResponses = {
+    /**
+     * Paginated findings returned
+     */
+    200: PagedModelReviewFinding;
+};
+
+export type ListPracticeReviewFindingsResponse = ListPracticeReviewFindingsResponses[keyof ListPracticeReviewFindingsResponses];
+
+export type GetPracticeReviewFindingData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        findingId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/reviews/findings/{findingId}';
+};
+
+export type GetPracticeReviewFindingErrors = {
+    /**
+     * Finding not found in this workspace
+     */
+    404: ProblemDetail;
+};
+
+export type GetPracticeReviewFindingError = GetPracticeReviewFindingErrors[keyof GetPracticeReviewFindingErrors];
+
+export type GetPracticeReviewFindingResponses = {
+    /**
+     * Finding detail returned
+     */
+    200: ReviewFindingDetail;
+};
+
+export type GetPracticeReviewFindingResponse = GetPracticeReviewFindingResponses[keyof GetPracticeReviewFindingResponses];
+
 export type DeletePracticeData = {
     body?: never;
     path: {
@@ -7533,7 +8215,7 @@ export type UpdatePracticeData = {
 
 export type UpdatePracticeErrors = {
     /**
-     * Practice not found
+     * Practice or practice area not found
      */
     404: unknown;
 };
@@ -7598,12 +8280,45 @@ export type BindAreaErrors = {
 
 export type BindAreaResponses = {
     /**
-     * Binding updated
+     * Practice moved
      */
     200: Practice;
 };
 
 export type BindAreaResponse = BindAreaResponses[keyof BindAreaResponses];
+
+export type PlacePracticeData = {
+    body: PlacePracticeRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        practiceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/placement';
+};
+
+export type PlacePracticeErrors = {
+    /**
+     * position is missing, negative, or beyond the destination
+     */
+    400: unknown;
+    /**
+     * Practice or area not found
+     */
+    404: unknown;
+};
+
+export type PlacePracticeResponses = {
+    /**
+     * Practice placed; the full updated practice list is returned
+     */
+    200: Array<Practice>;
+};
+
+export type PlacePracticeResponse = PlacePracticeResponses[keyof PlacePracticeResponses];
 
 export type GetUserProfileData = {
     body?: never;

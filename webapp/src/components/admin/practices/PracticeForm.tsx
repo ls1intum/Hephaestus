@@ -1,4 +1,5 @@
-import { ArrowLeft, ChevronDown, ChevronRight, RotateCcw, Telescope } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { ArrowLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import type {
 	CreatePracticeRequest,
@@ -7,8 +8,9 @@ import type {
 	UpdatePracticeRequest,
 } from "@/api/types.gen";
 import { CodeEditor } from "@/components/shared/CodeEditor";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -21,6 +23,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import {
 	FOCUS_ARTIFACT_OPTIONS,
 	generateSlug,
@@ -30,12 +33,11 @@ import {
 	type WorkArtifact,
 } from "./constants";
 
-/** Sentinel for the "not bound to any area" option (shadcn SelectItem cannot use an empty value). */
 const NO_AREA = "__none__";
 
 interface PracticeFormCreateProps {
 	mode: "create";
-	/** Areas offered in the binding picker. Binding is a separate mutation the container runs after create. */
+	workspaceSlug: string;
 	areas: PracticeArea[];
 	onSubmit: (data: CreatePracticeRequest, areaSlug: string | null) => void;
 	onCancel: () => void;
@@ -45,6 +47,7 @@ interface PracticeFormCreateProps {
 
 interface PracticeFormEditProps {
 	mode: "edit";
+	workspaceSlug: string;
 	initialData: Practice;
 	areas: PracticeArea[];
 	onSubmit: (slug: string, data: UpdatePracticeRequest, areaSlug: string | null) => void;
@@ -95,6 +98,7 @@ function getInitialState(mode: "create" | "edit", initialData?: Practice): FormS
 
 export function PracticeForm({
 	mode,
+	workspaceSlug,
 	areas,
 	onSubmit,
 	onCancel,
@@ -103,8 +107,6 @@ export function PracticeForm({
 }: PracticeFormProps) {
 	const [form, setForm] = useState<FormState>(() => getInitialState(mode, initialData));
 	const [submitted, setSubmitted] = useState(false);
-	// Precompute is optional support — the LLM does the heavy lifting — so it stays collapsed unless the
-	// practice already has a script, keeping the criteria (the product) the focus of the form.
 	const [showAdvanced, setShowAdvanced] = useState(() => Boolean(initialData?.precomputeScript));
 
 	const handleNameChange = (name: string) => {
@@ -130,7 +132,7 @@ export function PracticeForm({
 	};
 
 	const nameError =
-		submitted && form.name.length < 3 ? "Name must be at least 3 characters" : undefined;
+		submitted && form.name.trim().length < 3 ? "Name must be at least 3 characters" : undefined;
 	const slugError =
 		submitted && mode === "create" && !isValidSlug(form.slug)
 			? "Slug must be 3-64 lowercase alphanumeric characters separated by hyphens"
@@ -143,7 +145,7 @@ export function PracticeForm({
 			: undefined;
 
 	const isValid =
-		form.name.length >= 3 &&
+		form.name.trim().length >= 3 &&
 		form.criteria.trim().length >= 3 &&
 		form.triggerEvents.length > 0 &&
 		(mode === "edit" || isValidSlug(form.slug));
@@ -153,11 +155,12 @@ export function PracticeForm({
 		setSubmitted(true);
 		if (!isValid) return;
 
+		const name = form.name.trim();
 		const areaSlug = form.areaSlug === NO_AREA ? null : form.areaSlug;
 
 		if (mode === "create") {
 			const data: CreatePracticeRequest = {
-				name: form.name,
+				name,
 				slug: form.slug,
 				criteria: form.criteria.trim(),
 				triggerEvents: form.triggerEvents,
@@ -170,50 +173,55 @@ export function PracticeForm({
 			};
 			onSubmit(data, areaSlug);
 		} else {
+			const clear: NonNullable<UpdatePracticeRequest["clear"]> = [];
+			if (!form.precomputeScript.trim()) clear.push("PRECOMPUTE_SCRIPT");
+			if (!form.whyItMatters.trim()) clear.push("WHY_IT_MATTERS");
+			if (!form.whatGoodLooksLike.trim()) clear.push("WHAT_GOOD_LOOKS_LIKE");
 			const data: UpdatePracticeRequest = {
-				name: form.name,
+				name,
 				criteria: form.criteria.trim(),
 				triggerEvents: form.triggerEvents,
 				artifactType: form.focusArtifact,
 				whyItMatters: form.whyItMatters.trim() || undefined,
 				whatGoodLooksLike: form.whatGoodLooksLike.trim() || undefined,
 				precomputeScript: form.precomputeScript.trim() || undefined,
+				clear: clear.length > 0 ? clear : undefined,
 			};
 			onSubmit(initialData.slug, data, areaSlug);
 		}
 	};
 
 	return (
-		<form onSubmit={handleSubmit} className="flex flex-col h-full">
-			<div className="flex-1 overflow-y-auto pb-24">
-				<div className="container mx-auto max-w-3xl py-6">
+		<form onSubmit={handleSubmit} noValidate className="flex flex-col gap-8">
+			<div>
+				<div className="mx-auto w-full max-w-3xl">
 					<div className="mb-8">
-						<button
+						<Button
 							type="button"
+							variant="ghost"
+							size="sm"
 							onClick={onCancel}
-							className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors"
+							className="-ml-3 mb-4"
 						>
 							<ArrowLeft className="size-4" />
-							Back to practices
-						</button>
-						<h1 className="text-3xl font-bold tracking-tight">
+							Back to catalog
+						</Button>
+						<h1 className="break-words text-3xl font-bold tracking-tight">
 							{mode === "create" ? "Create practice" : `Edit: ${initialData?.name}`}
 						</h1>
-						<p className="text-muted-foreground mt-1">
-							{mode === "create"
-								? "Define a new practice for evaluating developer contributions."
-								: "Update this practice definition."}
+						{mode === "create" && (
+							<p className="mt-1 text-muted-foreground">
+								Define what Hephaestus should look for in reviewed work.
+							</p>
+						)}
+						<p className="mt-3 text-sm text-muted-foreground">
+							Fields marked <span aria-hidden>*</span> are required.
 						</p>
 					</div>
 
 					<div className="space-y-8">
 						<section className="space-y-4">
-							<div>
-								<h2 className="text-lg font-semibold">General</h2>
-								<p className="text-sm text-muted-foreground">
-									Basic practice information and identification.
-								</p>
-							</div>
+							<h2 className="text-lg font-semibold">General</h2>
 
 							<div className="grid gap-4">
 								<div className="grid gap-2">
@@ -223,6 +231,8 @@ export function PracticeForm({
 										placeholder="e.g. PR Description Quality"
 										value={form.name}
 										onChange={(e) => handleNameChange(e.target.value)}
+										required
+										minLength={3}
 										aria-invalid={!!nameError}
 										aria-describedby={nameError ? "name-error" : undefined}
 									/>
@@ -242,6 +252,8 @@ export function PracticeForm({
 											value={form.slug}
 											onChange={(e) => setForm((prev) => ({ ...prev, slug: e.target.value }))}
 											disabled={mode === "edit"}
+											required={mode === "create"}
+											minLength={3}
 											aria-invalid={!!slugError}
 											aria-describedby={slugError ? "slug-error" : undefined}
 										/>
@@ -279,8 +291,6 @@ export function PracticeForm({
 											onValueChange={(value) =>
 												setForm((prev) => {
 													const focusArtifact = value as WorkArtifact;
-													// Drop any selected triggers that don't belong to the new focus —
-													// the server rejects cross-focus combinations.
 													const allowed = triggerEventsForFocus(focusArtifact);
 													return {
 														...prev,
@@ -312,7 +322,7 @@ export function PracticeForm({
 									</div>
 
 									<div className="grid gap-2">
-										<Label htmlFor="practice-area">Practice Area</Label>
+										<Label htmlFor="practice-area">Practice area</Label>
 										<Select
 											value={form.areaSlug}
 											onValueChange={(value) =>
@@ -320,14 +330,14 @@ export function PracticeForm({
 											}
 										>
 											<SelectTrigger id="practice-area">
-												<SelectValue placeholder="Not assigned">
+												<SelectValue placeholder="Unassigned">
 													{form.areaSlug === NO_AREA
 														? undefined
 														: areas.find((g) => g.slug === form.areaSlug)?.name}
 												</SelectValue>
 											</SelectTrigger>
 											<SelectContent>
-												<SelectItem value={NO_AREA}>Not assigned</SelectItem>
+												<SelectItem value={NO_AREA}>Unassigned</SelectItem>
 												{areas.map((area) => (
 													<SelectItem key={area.slug} value={area.slug}>
 														{area.name}
@@ -336,7 +346,7 @@ export function PracticeForm({
 											</SelectContent>
 										</Select>
 										<p className="text-xs text-muted-foreground">
-											The learning objective this practice rolls up to.
+											Group this practice under an area.
 										</p>
 									</div>
 								</div>
@@ -351,12 +361,9 @@ export function PracticeForm({
 								aria-invalid={!!triggerError}
 								aria-describedby={triggerError ? "trigger-error" : undefined}
 							>
-								<legend className="text-lg font-semibold">Run this practice when… *</legend>
-								<p className="text-sm text-muted-foreground">
-									Pick the {form.focusArtifact === "ISSUE" ? "issue" : "pull request"} activity that
-									should trigger an evaluation.
-								</p>
-								<div className="grid grid-cols-2 gap-3">
+								<legend className="text-lg font-semibold">Start a review when… *</legend>
+								<p className="text-sm text-muted-foreground">Choose one or more events.</p>
+								<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
 									{TRIGGER_EVENTS_BY_FOCUS[form.focusArtifact].map((option) => (
 										<Label
 											key={option.value}
@@ -385,11 +392,14 @@ export function PracticeForm({
 						<Separator />
 
 						<section className="space-y-4">
-							<div>
-								<h2 className="text-lg font-semibold">Evaluation Criteria *</h2>
+							<div className="space-y-1">
+								<h2>
+									<Label htmlFor="practice-criteria" className="text-lg font-semibold">
+										Evaluation criteria *
+									</Label>
+								</h2>
 								<p className="text-sm text-muted-foreground">
-									Markdown-formatted criteria used by the AI agent during code review. This is the
-									single source of truth for what this practice evaluates.
+									Instructions Hephaestus uses to assess this practice. Supports Markdown.
 								</p>
 							</div>
 							<Textarea
@@ -398,6 +408,8 @@ export function PracticeForm({
 								value={form.criteria}
 								onChange={(e) => setForm((prev) => ({ ...prev, criteria: e.target.value }))}
 								className="min-h-64 font-mono text-sm"
+								required
+								minLength={3}
 								aria-invalid={!!criteriaError}
 								aria-describedby={criteriaError ? "criteria-error" : undefined}
 							/>
@@ -412,10 +424,9 @@ export function PracticeForm({
 
 						<section className="space-y-4">
 							<div>
-								<h2 className="text-lg font-semibold">Learner guidance</h2>
+								<h2 className="text-lg font-semibold">Developer guidance</h2>
 								<p className="text-sm text-muted-foreground">
-									Optional plain-language context shown to learners. These never influence
-									detection.
+									Optional guidance shown to developers. It does not affect the assessment.
 								</p>
 							</div>
 
@@ -428,9 +439,6 @@ export function PracticeForm({
 									onChange={(e) => setForm((prev) => ({ ...prev, whyItMatters: e.target.value }))}
 									className="min-h-24"
 								/>
-								<p className="text-xs text-muted-foreground">
-									Developer-facing — shown to learners, never the detection criteria.
-								</p>
 							</div>
 
 							<div className="grid gap-2">
@@ -444,69 +452,56 @@ export function PracticeForm({
 									}
 									className="min-h-24"
 								/>
-								<p className="text-xs text-muted-foreground">
-									Developer-facing — shown to learners, never the detection criteria.
-								</p>
 							</div>
 						</section>
 
 						<Separator />
 
-						<section className="space-y-4">
-							<button
-								type="button"
-								onClick={() => setShowAdvanced((open) => !open)}
-								className="flex items-center gap-1.5 text-lg font-semibold"
-								aria-expanded={showAdvanced}
-							>
-								{showAdvanced ? (
-									<ChevronDown className="size-4" />
-								) : (
-									<ChevronRight className="size-4" />
-								)}
-								Advanced
-								<span className="text-sm font-normal text-muted-foreground">
-									— precompute script (optional)
-								</span>
-							</button>
-							{showAdvanced && (
-								<>
-									<p className="text-sm text-muted-foreground">
-										An optional TypeScript/Bun script that runs static analysis before the AI review
-										and feeds it structured hints. Most practices need none — the AI evaluates the
-										criteria directly.
-									</p>
-									<CodeEditor
-										value={form.precomputeScript}
-										onChange={(val) => setForm((prev) => ({ ...prev, precomputeScript: val }))}
-										language="typescript"
-										className="h-[400px]"
+						<Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+							<CollapsibleTrigger
+								render={
+									<Button
+										type="button"
+										variant="ghost"
+										className="group -ml-3 text-lg font-semibold"
 									/>
-								</>
-							)}
-						</section>
+								}
+							>
+								<ChevronRight className="size-4 transition-transform group-aria-expanded:rotate-90" />
+								Precompute script
+							</CollapsibleTrigger>
+							<CollapsibleContent className="mt-4 space-y-4">
+								<p className="text-sm text-muted-foreground">
+									Optional TypeScript that runs static analysis before a review and provides
+									structured context.
+								</p>
+								<CodeEditor
+									value={form.precomputeScript}
+									onChange={(val) => setForm((prev) => ({ ...prev, precomputeScript: val }))}
+									language="typescript"
+									className="h-[400px]"
+								/>
+							</CollapsibleContent>
+						</Collapsible>
 
-						{/* Activity summary placeholder — no aggregate observation/feedback endpoint yet
-						    (ls1intum/Hephaestus#1339). */}
 						{mode === "edit" && (
 							<>
 								<Separator />
 								<section className="space-y-4">
 									<div>
-										<h2 className="text-lg font-semibold">Observations &amp; feedback</h2>
+										<h2 className="text-lg font-semibold">Review results</h2>
 										<p className="text-sm text-muted-foreground">
-											What this practice has produced across the workspace.
+											View every finding this practice produced across the workspace.
 										</p>
 									</div>
-									<div className="rounded-lg border border-dashed bg-muted/30 px-6 py-10 text-center">
-										<Telescope className="mx-auto mb-3 size-6 text-muted-foreground" />
-										<p className="text-sm font-medium">Activity will surface here</p>
-										<p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-											Once this practice is evaluated, the observations it records — and the
-											feedback delivered from them — will appear on this page, with how often it
-											fires and how developers respond. Feedback itself stays developer-facing.
-										</p>
-									</div>
+									<Link
+										to="/w/$workspaceSlug/admin/practices/reviews/findings"
+										params={{ workspaceSlug }}
+										search={{ practiceSlug: [form.slug] }}
+										className={cn(buttonVariants({ variant: "outline" }), "w-full sm:w-auto")}
+									>
+										View findings
+									</Link>
 								</section>
 							</>
 						)}
@@ -514,8 +509,8 @@ export function PracticeForm({
 				</div>
 			</div>
 
-			<div className="sticky bottom-0 border-t bg-background px-6 py-4 z-10">
-				<div className="container mx-auto max-w-3xl flex justify-between">
+			<div className="border-t pt-4">
+				<div className="mx-auto flex w-full max-w-3xl justify-between">
 					<Button type="button" variant="outline" onClick={onCancel}>
 						Cancel
 					</Button>
@@ -523,7 +518,7 @@ export function PracticeForm({
 						{isPending ? (
 							<>
 								<Spinner className="mr-2 size-4" />
-								{mode === "create" ? "Creating..." : "Saving..."}
+								{mode === "create" ? "Creating…" : "Saving…"}
 							</>
 						) : mode === "create" ? (
 							"Create practice"

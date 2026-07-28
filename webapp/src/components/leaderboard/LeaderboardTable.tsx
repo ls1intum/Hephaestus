@@ -50,7 +50,7 @@ export function LeaderboardTable({
 
 	if (leaderboard.length === 0) {
 		return (
-			<div className="flex flex-col items-center justify-center p-8 text-center">
+			<div className="flex flex-col items-center justify-center px-4 py-8 text-center">
 				<NoEntryIcon className="h-12 w-12 text-provider-danger-foreground mb-2" />
 				<h3 className="text-lg font-medium">No entries found</h3>
 				<p className="text-muted-foreground">There are no leaderboard entries available.</p>

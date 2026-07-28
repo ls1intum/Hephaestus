@@ -5,7 +5,7 @@ import type { WorkspaceLlmUsageReport } from "@/api/types.gen";
 import { BudgetExhaustedAlert } from "@/components/admin/ai/BudgetExhaustedAlert";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -101,7 +101,7 @@ export function AdminLlmUsagePage({
 		spendConversion(providerSpend, fx) != null;
 
 	return (
-		<div className="mx-auto w-full max-w-6xl space-y-6 py-6">
+		<div className="mx-auto w-full max-w-6xl space-y-6">
 			<div className="flex flex-wrap items-center justify-between gap-4">
 				<header className="space-y-1">
 					<div className="flex items-center gap-2">
@@ -244,13 +244,13 @@ export function AdminLlmUsagePage({
 								<EmptyTitle>No AI usage in {formatMonthLabel(month)}</EmptyTitle>
 							</EmptyHeader>
 							<EmptyContent>
-								<Button
-									variant="outline"
-									size="sm"
-									render={<Link to="/w/$workspaceSlug/admin/models" params={{ workspaceSlug }} />}
+								<Link
+									to="/w/$workspaceSlug/admin/models"
+									params={{ workspaceSlug }}
+									className={buttonVariants({ variant: "outline", size: "sm" })}
 								>
 									Open AI models
-								</Button>
+								</Link>
 							</EmptyContent>
 						</Empty>
 					) : (
