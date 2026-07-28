@@ -108,7 +108,7 @@ write good changesets, and what a version number promises all live in the
 
 - `auth`: Authentication / identity (Account, IdentityLink, JWT, oauth2Login)
 - `integration`: Cross-cutting integration framework (webhook, oauth, registry, SPI)
-- `scm`: Source-control management (GitHub, GitLab)
+- `scm`: Source-control management (GitHub, GitLab) — formerly `gitprovider`
 - `leaderboard`: Leaderboard and rankings
 - `mentor`: AI mentor (Heph)
 - `notifications`: Email/notification system

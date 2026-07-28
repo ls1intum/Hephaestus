@@ -23,7 +23,7 @@ The project is named after Hephaestus, the Greek god of blacksmiths and craftsme
 
 - **AI practice feedback on pull requests and issues.** Hephaestus reviews activity in connected GitHub and GitLab repositories against a workspace-configurable catalogue of software engineering practices and posts feedback as comments — directly on the pull/merge request or issue.
 - **Heph, your AI mentor.** A chat grounded in your actual repository activity — issues, commits, reviews, and pull requests — for questions, reflection, and next steps. Available in the web app and, when connected, in Slack.
-- **Workspaces.** Each workspace connects its own repositories, chooses its practice catalogue and LLM provider, and manages members and teams through an in-app settings UI.
+- **Workspaces.** Each workspace connects its own repositories, picks its practice catalogue, connects an AI model (any OpenAI-compatible endpoint) under a monthly spend cap, and manages members and teams through an in-app settings UI.
 - **Slack integration.** Talk to Heph in Slack DMs, and optionally let the mentor use monitored team channels as context.
 - **Achievements and an optional weekly leaderboard.** Workspace admins can switch on recognition features, including achievements and a leaderboard of review activity, per workspace.
 

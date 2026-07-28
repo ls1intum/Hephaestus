@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { Code, Sparkles, Users, Zap } from "lucide-react";
+import { Code, MessageSquare, Sparkles, Trophy } from "lucide-react";
 import { FeatureCard } from "./FeatureCard";
 
 /**
@@ -21,65 +21,65 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Default feature card showcasing code review gamification.
+ * Default feature card, as used on the about page for practice feedback.
  */
 export const Default: Story = {
 	args: {
 		feature: {
 			icon: Code,
-			badge: "Core Feature",
-			title: "Code Review Gamification",
-			description: "Turning technical work into team growth",
+			badge: "Core feature",
+			title: "Practice feedback on your work",
+			description: "What was done well, what could be better, and a way to get there",
 			content:
-				"Transform code reviews into engaging experiences with dynamic leaderboards, team competitions, and a structured league system that recognizes excellence and encourages participation from developers at all skill levels.",
+				"Hephaestus reviews pull requests and issues in your GitHub and GitLab repositories against real engineering practices and posts its feedback right where the work happens. You can act on it, push back with a reason, or let it pass.",
 		},
 	},
 };
 
 /**
- * AI mentorship feature with sparkles icon.
+ * The mentor feature, as used on the about page.
  */
 export const AIMentorship: Story = {
 	args: {
 		feature: {
 			icon: Sparkles,
-			badge: "Core Feature",
-			title: "AI-Powered Mentorship",
-			description: "Your team's personalized guide",
+			badge: "Core feature",
+			title: "Heph, your AI mentor",
+			description: "A mentor chat grounded in your repository activity",
 			content:
-				"Receive contextual guidance through our AI mentor that provides personalized feedback, identifies growth opportunities, and helps team members develop their skills with practical insights that lead to measurable improvement.",
+				"Heph knows your recent issues, commits, reviews, and pull requests, so its answers start from your actual work. Ask it about your changes, reflect on your week, or get a suggestion for what to do next, in the app or in Slack.",
 		},
 	},
 };
 
 /**
- * Team collaboration feature with a different badge style.
+ * A shipped integration, showing how a non-core badge reads.
  */
-export const TeamCollaboration: Story = {
+export const SlackIntegration: Story = {
 	args: {
 		feature: {
-			icon: Users,
-			badge: "New Feature",
-			title: "Team Collaboration Hub",
-			description: "Connect and grow together",
+			icon: MessageSquare,
+			badge: "Integration",
+			title: "Heph in Slack",
+			description: "Mentoring where your team already talks",
 			content:
-				"Foster meaningful connections within your development team through shared challenges, peer mentoring opportunities, and collaborative learning experiences that strengthen both individual skills and team cohesion.",
+				"Talk to Heph in a Slack DM, and let a workspace administrator decide whether monitored team channels are available as context. Channel monitoring starts only after a visible announcement in the channel.",
 		},
 	},
 };
 
 /**
- * Performance analytics with lightning icon.
+ * An optional feature, showing a longer badge and a warm icon.
  */
-export const PerformanceAnalytics: Story = {
+export const Recognition: Story = {
 	args: {
 		feature: {
-			icon: Zap,
-			badge: "Analytics",
-			title: "Performance Insights",
-			description: "Data-driven development insights",
+			icon: Trophy,
+			badge: "Optional",
+			title: "Achievements and leaderboard",
+			description: "Recognition features a workspace can switch on",
 			content:
-				"Gain deep visibility into your team's development patterns, identify bottlenecks, and discover optimization opportunities through comprehensive analytics and intelligent reporting.",
+				"Workspace administrators can enable achievements and a weekly leaderboard of review activity. Both are off by default, and neither affects the feedback Hephaestus gives you.",
 		},
 	},
 };
