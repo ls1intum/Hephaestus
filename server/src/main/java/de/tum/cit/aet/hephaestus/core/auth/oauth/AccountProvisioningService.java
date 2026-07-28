@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderRepository;
+import de.tum.cit.aet.hephaestus.core.auth.spi.ExternalActorQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.time.Clock;
@@ -40,6 +41,7 @@ public class AccountProvisioningService {
     private final VerifiedEmailResolver verifiedEmailResolver;
     private final AccountJitCreator accountJitCreator;
     private final AdminBootstrapPolicy adminBootstrapPolicy;
+    private final ExternalActorQuery externalActorQuery;
     private final Clock clock;
 
     public AccountProvisioningService(
@@ -50,6 +52,7 @@ public class AccountProvisioningService {
         VerifiedEmailResolver verifiedEmailResolver,
         AccountJitCreator accountJitCreator,
         AdminBootstrapPolicy adminBootstrapPolicy,
+        ExternalActorQuery externalActorQuery,
         Clock clock
     ) {
         this.accountRepository = accountRepository;
@@ -59,6 +62,7 @@ public class AccountProvisioningService {
         this.verifiedEmailResolver = verifiedEmailResolver;
         this.accountJitCreator = accountJitCreator;
         this.adminBootstrapPolicy = adminBootstrapPolicy;
+        this.externalActorQuery = externalActorQuery;
         this.clock = clock;
     }
 
@@ -90,6 +94,7 @@ public class AccountProvisioningService {
         if (provider.getType().isLinkOnly() && mode != AuthIntentCookie.Intent.Mode.LINK) {
             throw new LinkOnlyProviderLoginException(registrationId);
         }
+        boolean bindScmActor = !provider.getType().isLinkOnly();
         String teamId = teamIdOf(principal);
         // Both link-only providers are multi-tenant: a Slack U… / Outline user UUID is only unique within
         // its team, so a null teamId would alias identities across tenants — fail closed.
@@ -138,7 +143,7 @@ public class AccountProvisioningService {
                 .orElseThrow(() ->
                     new IllegalStateException("auth.link: linkingAccountId=" + intent.linkingAccountId() + " not found")
                 );
-            IdentityLink linked = newIdentityLink(account, providerId, subject, teamId, principal);
+            IdentityLink linked = newIdentityLink(account, providerId, subject, teamId, principal, bindScmActor);
             linked.setLinkedVia(IdentityLink.LinkedVia.MANUAL_LINK);
             identityLinkRepository.save(linked);
             log.info("auth.success: linked provider={} to existing accountId={}", registrationId, account.getId());
@@ -154,7 +159,7 @@ public class AccountProvisioningService {
         if (resolvedEmail.verified()) {
             account.setPrimaryEmailVerifiedAt(clock.instant());
         }
-        IdentityLink newLink = newIdentityLink(account, providerId, subject, teamId, principal);
+        IdentityLink newLink = newIdentityLink(account, providerId, subject, teamId, principal, bindScmActor);
         try {
             // The insert runs in AccountJitCreator's REQUIRES_NEW transaction so a unique-constraint
             // loss rolls back ONLY that inner tx — this (the caller's) tx stays usable for the
@@ -252,19 +257,35 @@ public class AccountProvisioningService {
         return stringAttr(principal, "login", "preferred_username", "username");
     }
 
+    /**
+     * Builds a new identity link, binding the SCM actor mirror when one can be resolved unambiguously.
+     *
+     * <p>The bind is best-effort: leaving {@code externalActorId} null keeps the existing lazy-bind
+     * behaviour, so nothing regresses when the actor has not been synced yet.
+     *
+     * @param bindScmActor whether this provider has an SCM actor to point at. False for a link-only provider
+     *                     (Slack, Outline), where the question is meaningless rather than merely fruitless.
+     */
     private IdentityLink newIdentityLink(
         Account account,
         long providerId,
         String subject,
         String teamId,
-        OAuth2User principal
+        OAuth2User principal,
+        boolean bindScmActor
     ) {
         IdentityLink link = new IdentityLink();
         link.setAccount(account);
         link.setProviderId(providerId);
         link.setSubject(subject);
         link.setTeamId(teamId);
-        link.setUsernameAtSignup(stringAttr(principal, "login", "preferred_username", "username"));
+        String usernameAtSignup = stringAttr(principal, "login", "preferred_username", "username");
+        if (bindScmActor) {
+            externalActorQuery
+                .findExternalActorId(providerId, subject, usernameAtSignup)
+                .ifPresent(link::setExternalActorId);
+        }
+        link.setUsernameAtSignup(usernameAtSignup);
         link.setEmailAtSignup(email(principal));
         link.setDisplayName(stringAttr(principal, "name", "display_name"));
         link.setAvatarUrl(stringAttr(principal, "avatar_url", "picture"));

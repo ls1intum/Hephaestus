@@ -10,6 +10,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,10 +40,16 @@ public class CurrentAccountUsers {
 
     private final AccountIdentityQuery accountIdentityQuery;
     private final UserRepository userRepository;
+    private final WorkspaceMembershipRepository membershipRepository;
 
-    public CurrentAccountUsers(AccountIdentityQuery accountIdentityQuery, UserRepository userRepository) {
+    public CurrentAccountUsers(
+        AccountIdentityQuery accountIdentityQuery,
+        UserRepository userRepository,
+        WorkspaceMembershipRepository membershipRepository
+    ) {
         this.accountIdentityQuery = accountIdentityQuery;
         this.userRepository = userRepository;
+        this.membershipRepository = membershipRepository;
     }
 
     /**
@@ -65,6 +73,38 @@ public class CurrentAccountUsers {
                 .ifPresent(user -> byId.putIfAbsent(user.getId(), user));
         }
         return new ArrayList<>(byId.values());
+    }
+
+    /**
+     * The current account's SCM user that holds membership in {@code workspaceId} — the identity this
+     * workspace knows the caller as.
+     *
+     * <p>This, not {@code UserRepository.getCurrentUser()}, is what a surface serving "my own data" must
+     * resolve the subject with. {@code getCurrentUser()} answers from the request's pinned login, which the
+     * context filter sets only when the account is a member; on a publicly-readable workspace, or for an
+     * elevated instance admin who is not a member, it falls back to the JWT's {@code preferred_username} and
+     * resolves by login across providers. {@code user} uniqueness is provider-scoped, so the same login on
+     * another provider is a different person — and serving them a report would be a cross-provider
+     * disclosure, the exact hazard {@link #resolve()} exists to close.
+     *
+     * <p>Empty means "this account is not a member here", which callers must treat as a refusal, never as
+     * "no data".
+     */
+    @Transactional(readOnly = true)
+    public Optional<User> resolveMemberOf(Long workspaceId) {
+        List<User> users = resolve();
+        if (users.isEmpty()) {
+            return Optional.empty();
+        }
+        Set<Long> memberUserIds = membershipRepository
+            .findByWorkspace_IdAndUser_IdIn(workspaceId, users.stream().map(User::getId).toList())
+            .stream()
+            .map(membership -> membership.getUser().getId())
+            .collect(Collectors.toSet());
+        return users
+            .stream()
+            .filter(user -> memberUserIds.contains(user.getId()))
+            .findFirst();
     }
 
     /**

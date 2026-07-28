@@ -110,12 +110,16 @@ public class ObservationHistoryContentSource implements ContentSource {
         User user = userRepository
             .findById(developerId)
             .orElseThrow(() -> new EntityNotFoundException("User", developerId.toString()));
-        Instant since = Instant.now().minus(LOOKBACK_DAYS, ChronoUnit.DAYS);
+        Instant now = Instant.now();
+        Instant since = now.minus(LOOKBACK_DAYS, ChronoUnit.DAYS);
 
         List<Observation> recent = observationRepository.findRecentByDeveloperAndWorkspace(
             developerId,
             workspaceId,
             since,
+            // The mentor wants everything up to this moment; the upper bound exists for the report windows,
+            // which compare two adjacent spans and must not let the earlier one resolve a later run.
+            now,
             PageRequest.of(0, MAX_RECENT_OBSERVATIONS)
         );
         List<PresenceCount> byPresence = observationRepository.countByPresenceForDeveloper(

@@ -104,7 +104,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                     "",
                     15,
                     false,
-                    false
+                    false,
+                    28
                 )
             )
         );

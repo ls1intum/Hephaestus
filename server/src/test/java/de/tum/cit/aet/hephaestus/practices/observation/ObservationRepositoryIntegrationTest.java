@@ -763,6 +763,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 aboutUser.getId(),
                 workspace.getId(),
                 Instant.parse("2026-01-01T00:00:00Z"),
+                Instant.now(),
                 PageRequest.of(0, 50)
             );
 

@@ -68,7 +68,7 @@ class LegacyAgentConfigMigrationIntegrationTest {
     @BeforeAll
     static void migrateAcrossSeededLegacyData() throws Exception {
         assertThat(updateUpToTheReleaseChangelog())
-            .as("the release changelog must still be the tail of master.xml for this test to mean anything")
+            .as("the release changelog must still be in master.xml for this test to mean anything")
             .isPositive();
         try (Liquibase liquibase = liquibase()) {
             liquibase.tag(PRE_RELEASE_TAG);
@@ -358,15 +358,29 @@ class LegacyAgentConfigMigrationIntegrationTest {
     // ── migration driver ────────────────────────────────────────────────────────────────────────
 
     /** @return how many changesets the release changelog contributes, i.e. how many were NOT applied. */
+    /**
+     * Applies every changeSet that precedes the release changelog, and stops there.
+     *
+     * <p>Counts forward to the release changelog's FIRST changeSet rather than backward from the end of
+     * master.xml. Backward only works while the release changelog is the last file in the list, which it
+     * stopped being the moment a later branch appended one — and the failure is silent: the cutoff lands
+     * inside the newer changelog, the pre-release tag is written after the release has already run, and
+     * the rollback test then cannot find its own tag.
+     *
+     * @return the number of changeSets left pending, i.e. the release and everything after it
+     */
     private static int updateUpToTheReleaseChangelog() throws Exception {
         try (Liquibase liquibase = liquibase()) {
             List<ChangeSet> pending = liquibase.listUnrunChangeSets(contexts(), new LabelExpression());
-            long release = pending
-                .stream()
-                .filter(cs -> cs.getFilePath().endsWith(RELEASE_CHANGELOG))
-                .count();
-            liquibase.update((int) (pending.size() - release), contexts(), new LabelExpression());
-            return (int) release;
+            int firstReleaseChangeSet = 0;
+            while (
+                firstReleaseChangeSet < pending.size() &&
+                !pending.get(firstReleaseChangeSet).getFilePath().endsWith(RELEASE_CHANGELOG)
+            ) {
+                firstReleaseChangeSet++;
+            }
+            liquibase.update(firstReleaseChangeSet, contexts(), new LabelExpression());
+            return pending.size() - firstReleaseChangeSet;
         }
     }
 

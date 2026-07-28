@@ -3,10 +3,16 @@ package de.tum.cit.aet.hephaestus.core.auth;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountWorkspaceMembershipQuery;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,15 +35,29 @@ public class AccountPurger {
 
     private final AccountRepository accountRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final NamedParameterJdbcTemplate namedJdbcTemplate;
+    private final AccountWorkspaceMembershipQuery workspaceMembershipQuery;
 
-    public AccountPurger(AccountRepository accountRepository, JdbcTemplate jdbcTemplate) {
+    public AccountPurger(
+        AccountRepository accountRepository,
+        JdbcTemplate jdbcTemplate,
+        NamedParameterJdbcTemplate namedJdbcTemplate,
+        AccountWorkspaceMembershipQuery workspaceMembershipQuery
+    ) {
         this.accountRepository = accountRepository;
         this.jdbcTemplate = jdbcTemplate;
+        this.namedJdbcTemplate = namedJdbcTemplate;
+        this.workspaceMembershipQuery = workspaceMembershipQuery;
     }
 
     /** Purge one account in its OWN transaction. Throws on failure so the caller can isolate it. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void purge(Long accountId) {
+        // Resolve the SCM actors BEFORE identity_link is deleted below — that table is the only edge from the
+        // account to the actor ids the disclosure trail is keyed on. Both sources are needed:
+        // external_actor_id is a best-effort bind that is often NULL, so the membership hop off the signup
+        // login is what covers those accounts (the GDPR export unions the same two).
+        Set<Long> scmActorIds = resolveScmActorIds(accountId);
         // Children carry ON DELETE CASCADE on account_id, but we keep the account tombstone, so the
         // cascade is not triggered — delete the personal/auth child rows explicitly.
         jdbcTemplate.update("DELETE FROM account_feature WHERE account_id = ?", accountId);
@@ -45,6 +65,7 @@ public class AccountPurger {
         jdbcTemplate.update("DELETE FROM issued_jwt WHERE account_id = ?", accountId);
         jdbcTemplate.update("DELETE FROM account_export WHERE account_id = ?", accountId);
         anonymizeAuditRows(accountId);
+        anonymizeDataAccessRows(accountId, scmActorIds);
 
         Account account = accountRepository.findById(accountId).orElse(null);
         if (account == null) {
@@ -95,6 +116,59 @@ public class AccountPurger {
                 unlinked,
                 accountId
             );
+        }
+    }
+
+    /**
+     * The SCM actors this account resolves to: the eagerly-bound {@code external_actor_id} where one exists,
+     * plus the actors its workspace memberships hang off. The bind is best-effort and frequently NULL, so the
+     * membership hop is not redundant — without it an erased account keeps its name on the disclosure trail.
+     */
+    private Set<Long> resolveScmActorIds(Long accountId) {
+        Set<Long> actorIds = new LinkedHashSet<>(
+            jdbcTemplate.queryForList(
+                "SELECT external_actor_id FROM identity_link WHERE account_id = ? AND external_actor_id IS NOT NULL",
+                Long.class,
+                accountId
+            )
+        );
+        Set<String> logins = Set.copyOf(
+            jdbcTemplate.queryForList(
+                "SELECT username_at_signup FROM identity_link WHERE account_id = ? AND username_at_signup IS NOT NULL",
+                String.class,
+                accountId
+            )
+        );
+        workspaceMembershipQuery
+            .membershipsForLogins(logins)
+            .stream()
+            .map(AccountWorkspaceMembershipQuery.WorkspaceMembershipView::memberId)
+            .filter(Objects::nonNull)
+            .forEach(actorIds::add);
+        return actorIds;
+    }
+
+    /**
+     * The same Art. 17 unlink for the disclosure trail, which is keyed on the SCM actor rather than the
+     * account. Both roles are cleared: the erased person may appear as the viewer or as the person whose
+     * report was viewed. The rows stay — that a disclosure happened is the Art. 30 record, who it was about
+     * is the personal data, and only that is removed.
+     */
+    private void anonymizeDataAccessRows(Long accountId, Set<Long> scmActorIds) {
+        if (scmActorIds.isEmpty()) {
+            return;
+        }
+        int unlinked = namedJdbcTemplate.update(
+            """
+            UPDATE data_access_event
+               SET actor_user_id   = CASE WHEN actor_user_id   IN (:ids) THEN NULL ELSE actor_user_id   END,
+                   subject_user_id = CASE WHEN subject_user_id IN (:ids) THEN NULL ELSE subject_user_id END
+             WHERE actor_user_id IN (:ids) OR subject_user_id IN (:ids)
+            """,
+            Map.of("ids", scmActorIds)
+        );
+        if (unlinked > 0) {
+            log.info("auth.account: unlinked {} data_access_event row(s) for erased accountId={}", unlinked, accountId);
         }
     }
 }

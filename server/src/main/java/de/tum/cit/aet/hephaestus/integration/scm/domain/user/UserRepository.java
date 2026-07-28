@@ -174,6 +174,26 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByNativeIdAndProviderId(Long nativeId, Long providerId);
 
     /**
+     * Every actor with EXACTLY this login (case-insensitive) under one provider.
+     *
+     * <p>Returns a list, not an Optional, because the caller has to be able to tell "one match" from
+     * "several": {@code uk_user_provider_login} should make this at most one row, but a bind that persists
+     * onto {@code identity_link.external_actor_id} must not depend on that holding — an ambiguous login has
+     * to resolve to nothing rather than to whichever row sorted first. Ordered by id so any diagnostic that
+     * does print them is deterministic.
+     */
+    @Query(
+        """
+            SELECT u
+            FROM User u
+            WHERE lower(u.login) = lower(:login)
+              AND u.provider.id = :providerId
+            ORDER BY u.id
+        """
+    )
+    List<User> findAllByExactLoginAndProviderId(@Param("login") String login, @Param("providerId") Long providerId);
+
+    /**
      * Try to acquire a transaction-scoped advisory lock on the given login.
      * <p>
      * The lock key is derived from {@code hashtext(providerId || ':' || LOWER(login))}, so only

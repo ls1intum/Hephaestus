@@ -1,6 +1,6 @@
 Privacy Statement for Hephaestus in accordance with Art. 13 and 14 GDPR.
 
-_Last updated: 2026-05-07._
+_Last updated: 2026-07-28._
 
 The Technical University of Munich (TUM), through the Research Group for Applied Education Technologies (AET), operates Hephaestus at https://hephaestus.aet.cit.tum.de. This statement explains what personal data the platform processes, why, on what legal basis, who receives it, how long it is kept, and the rights you have. Personal data is processed under the GDPR, the Bavarian Data Protection Act (BayDSG), the Bavarian Higher Education Innovation Act (BayHIG), and the German Telecommunications Digital Services Data Protection Act (TDDDG).
 
@@ -59,6 +59,10 @@ Hephaestus uses only technically necessary browser-side storage: the session coo
 ## 5. Recipients
 
 Within Hephaestus your data is visible to AET operators (platform administration and support) and, depending on the workspace, to other workspace members (your username, avatar, the findings attached to pull/merge requests you authored, per-practice summaries of your activity, and recognition signals where the workspace has enabled them). Workspaces marked publicly viewable by their administrator can be read by anyone on the open web; the upstream open-source contributor list at `/contributors` is also public.
+
+You can see your own practice report at any time: the feedback described in section 3, reorganised per practice, showing where you stand against each practice's stated standard. Workspace administrators and owners can also open your report, to support mentoring. It is the same report you see — there is no separate version about you — and neither it nor the roster it sits on ranks contributors against each other. Every time an administrator or owner is shown the roster or an individual report, Hephaestus writes an append-only record of which account accessed it, whose report, and when. These records are kept for 12 months for accountability, are deleted when the workspace is deleted, and the references to you are removed if you have your account erased. **You can read them yourself:** the data export you can request at any time from your account settings includes them, showing when each access happened, in which workspace, and who did it (Art. 15(1)(c)). Nobody other than you and platform administrators can query them — there is no view anywhere in the product that shows what a given administrator has been reading.
+
+Where the workspace administrator enables it, members can additionally see an aggregated view of how the workspace as a whole is doing per practice area. It names nobody, and its counts are withheld whenever showing them could single out an individual — when fewer than five contributors were active in that area, or when a status applies to almost nobody or almost everyone in it.
 
 External recipients, all engaged under data-processing agreements (Auftragsverarbeitungsverträge) at the appropriate level:
 

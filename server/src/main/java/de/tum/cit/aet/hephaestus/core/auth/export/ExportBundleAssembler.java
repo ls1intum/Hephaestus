@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.core.auth.export;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.audit.access.DataAccessEvent;
+import de.tum.cit.aet.hephaestus.core.audit.access.DataAccessEventRepository;
 import de.tum.cit.aet.hephaestus.core.auth.AccountService;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventRepository;
@@ -9,20 +11,29 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.AccountFeatureRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountWorkspaceMembershipQuery;
+import de.tum.cit.aet.hephaestus.core.auth.spi.ExternalActorQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Assembles the {@link ExportBundle} for one account by aggregating data the principal owns from
- * five sources:
+ * six sources:
  *
  * <ol>
  *   <li><b>account profile</b> + <b>own identity links</b> — {@link AccountService} ({@code core.auth} domain)</li>
@@ -30,6 +41,9 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li><b>auth events (last 12 months)</b> — {@link AuthEventRepository} ({@code core.auth} audit)</li>
  *   <li><b>workspace memberships</b> — {@link AccountWorkspaceMembershipQuery} (auth-spi → {@code workspace})</li>
  *   <li><b>account preferences</b> — {@link AccountPreferencesQuery} (auth-spi → {@code account})</li>
+ *   <li><b>disclosures of their practice data</b> — {@link DataAccessEventRepository}
+ *       ({@code core.audit.access}), with recipient names resolved through {@link ExternalActorQuery}
+ *       (auth-spi → {@code integration})</li>
  * </ol>
  *
  * <p>The two cross-module sources are reached only through the {@code core.auth.spi} named
@@ -39,16 +53,25 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <h2>Disclosure discipline</h2>
  * Only the fields enumerated in {@link ExportBundle} are emitted. Tokens, encrypted credential
- * blobs, JWT signing keys, password-equivalents (there are none in this system), and any other
- * account's data are structurally excluded — there is no code path here that reads them.
+ * blobs, JWT signing keys, and password-equivalents (there are none in this system) are structurally
+ * excluded — there is no code path here that reads them.
+ *
+ * <p>Another account's data is excluded too, with one reasoned exception: the recipient login on a
+ * {@link ExportBundle.DataDisclosure}. See that record, and note the contrast with
+ * {@link #isImpersonationEvent} — the two look similar and are decided differently on purpose.
  */
 @ConditionalOnServerRole
 @Component
 @WorkspaceAgnostic("GDPR export aggregates an account's own data across workspaces; not workspace-scoped")
 public class ExportBundleAssembler {
 
+    private static final Logger log = LoggerFactory.getLogger(ExportBundleAssembler.class);
+
     /** GDPR Art. 20 auth-event window. */
     private static final int AUTH_EVENT_WINDOW_MONTHS = 12;
+
+    /** Page cap on the disclosure section; the table's 365-day retention already bounds the horizon. */
+    private static final int MAX_DISCLOSURES = 1000;
 
     private final AccountService accountService;
     private final AccountFeatureRepository accountFeatureRepository;
@@ -56,6 +79,8 @@ public class ExportBundleAssembler {
     private final AccountWorkspaceMembershipQuery workspaceMembershipQuery;
     private final AccountPreferencesQuery preferencesQuery;
     private final GitProviderRegistry gitProviderRegistry;
+    private final DataAccessEventRepository dataAccessEventRepository;
+    private final ExternalActorQuery externalActorQuery;
     private final Clock clock;
 
     public ExportBundleAssembler(
@@ -65,6 +90,8 @@ public class ExportBundleAssembler {
         AccountWorkspaceMembershipQuery workspaceMembershipQuery,
         AccountPreferencesQuery preferencesQuery,
         GitProviderRegistry gitProviderRegistry,
+        DataAccessEventRepository dataAccessEventRepository,
+        ExternalActorQuery externalActorQuery,
         Clock clock
     ) {
         this.accountService = accountService;
@@ -73,6 +100,8 @@ public class ExportBundleAssembler {
         this.workspaceMembershipQuery = workspaceMembershipQuery;
         this.preferencesQuery = preferencesQuery;
         this.gitProviderRegistry = gitProviderRegistry;
+        this.dataAccessEventRepository = dataAccessEventRepository;
+        this.externalActorQuery = externalActorQuery;
         this.clock = clock;
     }
 
@@ -99,8 +128,9 @@ public class ExportBundleAssembler {
 
         List<ExportBundle.Identity> identityViews = identities.stream().map(this::toIdentity).toList();
 
-        List<ExportBundle.WorkspaceMembership> memberships = workspaceMembershipQuery
-            .membershipsForLogins(logins)
+        List<AccountWorkspaceMembershipQuery.WorkspaceMembershipView> membershipViews =
+            workspaceMembershipQuery.membershipsForLogins(logins);
+        List<ExportBundle.WorkspaceMembership> memberships = membershipViews
             .stream()
             .map(m -> new ExportBundle.WorkspaceMembership(m.workspaceSlug(), m.workspaceName(), m.role()))
             .toList();
@@ -139,8 +169,75 @@ public class ExportBundleAssembler {
             memberships,
             featureFlags,
             preferences,
-            authEvents
+            authEvents,
+            dataDisclosures(identities, membershipViews)
         );
+    }
+
+    /**
+     * The disclosures of this subject's practice data, newest first — the Art. 15(1)(c) section.
+     *
+     * <p>The subject is every SCM actor they resolve to: the actor bound on an identity link plus the actor
+     * each membership hangs off. Neither alone is complete — a link created before the actor synced carries
+     * no actor id, and a membership exists only where the subject joined.
+     *
+     * <p>Fail-soft, like the membership source above: an empty section is visible in the bundle, a failed
+     * export is not.
+     */
+    private List<ExportBundle.DataDisclosure> dataDisclosures(
+        List<IdentityLink> identities,
+        List<AccountWorkspaceMembershipQuery.WorkspaceMembershipView> memberships
+    ) {
+        Set<Long> subjectActorIds = new LinkedHashSet<>();
+        for (IdentityLink link : identities) {
+            if (link.getExternalActorId() != null) {
+                subjectActorIds.add(link.getExternalActorId());
+            }
+        }
+        Map<Long, String> slugByWorkspaceId = new LinkedHashMap<>();
+        for (AccountWorkspaceMembershipQuery.WorkspaceMembershipView membership : memberships) {
+            if (membership.memberId() != null) {
+                subjectActorIds.add(membership.memberId());
+            }
+            if (membership.workspaceId() != null) {
+                slugByWorkspaceId.put(membership.workspaceId(), membership.workspaceSlug());
+            }
+        }
+        if (subjectActorIds.isEmpty() && slugByWorkspaceId.isEmpty()) {
+            return List.of();
+        }
+
+        try {
+            List<DataAccessEvent> events = dataAccessEventRepository.findForSubject(
+                subjectActorIds,
+                slugByWorkspaceId.keySet(),
+                PageRequest.of(0, MAX_DISCLOSURES)
+            );
+            if (events.isEmpty()) {
+                return List.of();
+            }
+            Set<Long> recipientIds = events
+                .stream()
+                .map(DataAccessEvent::getActorUserId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+            Map<Long, String> recipientLogins = externalActorQuery.loginsByActorIds(recipientIds);
+
+            return events
+                .stream()
+                .map(event ->
+                    new ExportBundle.DataDisclosure(
+                        event.getOccurredAt(),
+                        slugByWorkspaceId.get(event.getWorkspaceId()),
+                        event.getResourceType().name(),
+                        event.getActorUserId() == null ? null : recipientLogins.get(event.getActorUserId())
+                    )
+                )
+                .toList();
+        } catch (RuntimeException e) {
+            log.error("auth.export: disclosure lookup failed for {} actor id(s)", subjectActorIds.size(), e);
+            return List.of();
+        }
     }
 
     private ExportBundle.Identity toIdentity(IdentityLink il) {

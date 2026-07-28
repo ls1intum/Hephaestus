@@ -10,6 +10,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.audit.access.DataAccessEventRepository;
 import de.tum.cit.aet.hephaestus.core.auth.AccountService;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
@@ -20,6 +21,7 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountWorkspaceMembershipQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountWorkspaceMembershipQuery.WorkspaceMembershipView;
+import de.tum.cit.aet.hephaestus.core.auth.spi.ExternalActorQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Clock;
@@ -58,6 +60,8 @@ class AccountExportServiceTest extends BaseUnitTest {
         AccountWorkspaceMembershipQuery membershipQuery = mock(AccountWorkspaceMembershipQuery.class);
         AccountPreferencesQuery preferencesQuery = mock(AccountPreferencesQuery.class);
         GitProviderRegistry gitProviderRegistry = mock(GitProviderRegistry.class);
+        DataAccessEventRepository dataAccessEventRepository = mock(DataAccessEventRepository.class);
+        ExternalActorQuery externalActorQuery = mock(ExternalActorQuery.class);
 
         Account account = new Account("Ada Lovelace");
         setId(account, ACCOUNT_ID);
@@ -91,6 +95,8 @@ class AccountExportServiceTest extends BaseUnitTest {
             membershipQuery,
             preferencesQuery,
             gitProviderRegistry,
+            dataAccessEventRepository,
+            externalActorQuery,
             clock
         );
 

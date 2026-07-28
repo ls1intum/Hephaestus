@@ -22,10 +22,16 @@ public record ExportBundle(
     List<WorkspaceMembership> workspaceMemberships,
     List<String> featureFlags,
     @Nullable Preferences preferences,
-    List<AuthEvent> authEvents
+    List<AuthEvent> authEvents,
+    List<DataDisclosure> dataDisclosures
 ) {
-    /** Current export schema version. Bump on any breaking shape change. */
-    public static final String SCHEMA_VERSION = "1.0";
+    /**
+     * Current export schema version. Bump on any breaking shape change.
+     *
+     * <p>1.1 added {@code dataDisclosures}. Additive, so a 1.0 reader still parses a 1.1 document — the bump
+     * is how such a reader learns there is now something it is not showing the subject.
+     */
+    public static final String SCHEMA_VERSION = "1.1";
 
     public record Profile(
         Long id,
@@ -58,5 +64,27 @@ public record ExportBundle(
         String result,
         @Nullable String ip,
         @Nullable String userAgent
+    ) {}
+
+    /**
+     * One occasion on which someone was shown this subject's practice data.
+     *
+     * <p>The only place this bundle names another person, and deliberately so: {@code authEvents} drops
+     * impersonation rows under Art. 20(4) because portability covers data the subject provided, whereas this
+     * section answers Art. 15(1)(c), which the CJEU held in C-154/21 entitles a subject to the recipients'
+     * <em>identity</em> rather than their category.
+     *
+     * @param workspaceSlug  null once the subject has left that workspace — the disclosure outlives the
+     *                       membership that names it
+     * @param resourceType   {@code PRACTICE_REPORT} for this subject's own report; {@code PRACTICE_ROSTER}
+     *                       for a list of the workspace's recently active developers, which named the subject
+     *                       if they were active in that window
+     * @param recipientLogin null once that person has been erased
+     */
+    public record DataDisclosure(
+        Instant occurredAt,
+        @Nullable String workspaceSlug,
+        String resourceType,
+        @Nullable String recipientLogin
     ) {}
 }

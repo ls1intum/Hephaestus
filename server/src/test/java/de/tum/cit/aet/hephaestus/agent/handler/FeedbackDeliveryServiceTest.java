@@ -85,7 +85,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             /* appBaseUrl */ APP_BASE_URL,
             /* cooldownMinutes */ 15,
             /* progressFooter */ false,
-            /* reactionSuppression */ false
+            /* reactionSuppression */ false,
+            28
         );
         service = new FeedbackDeliveryService(
             commentPoster,
@@ -699,7 +700,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             /* appBaseUrl */ APP_BASE_URL,
             /* cooldownMinutes */ 15,
             /* progressFooter */ true,
-            /* reactionSuppression */ false
+            /* reactionSuppression */ false,
+            28
         );
         return new FeedbackDeliveryService(
             commentPoster,

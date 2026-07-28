@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.core.auth.oauth;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -16,6 +17,7 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderRepository;
+import de.tum.cit.aet.hephaestus.core.auth.spi.ExternalActorQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Clock;
@@ -48,6 +50,7 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
     private VerifiedEmailResolver verifiedEmailResolver;
     private AccountJitCreator accountJitCreator;
     private AdminBootstrapPolicy adminBootstrapPolicy;
+    private ExternalActorQuery externalActorQuery;
     private LoginProviderRepository loginProviderRepository;
     private AccountProvisioningService service;
 
@@ -72,6 +75,8 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
         lenient()
             .when(accountJitCreator.create(any(), any()))
             .thenAnswer(inv -> inv.getArgument(0));
+        externalActorQuery = mock(ExternalActorQuery.class);
+        lenient().when(externalActorQuery.findExternalActorId(anyLong(), any(), any())).thenReturn(Optional.empty());
         service = new AccountProvisioningService(
             accountRepository,
             identityLinkRepository,
@@ -80,6 +85,7 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
             verifiedEmailResolver,
             accountJitCreator,
             adminBootstrapPolicy,
+            externalActorQuery,
             Clock.fixed(NOW, ZoneOffset.UTC)
         );
     }

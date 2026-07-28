@@ -67,7 +67,13 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
         user.setLogin("octo");
         when(userRepository.findById(eq(2L))).thenReturn(Optional.of(user));
         when(
-            findingRepository.findRecentByDeveloperAndWorkspace(eq(2L), eq(1L), any(Instant.class), any(Pageable.class))
+            findingRepository.findRecentByDeveloperAndWorkspace(
+                eq(2L),
+                eq(1L),
+                any(Instant.class),
+                any(Instant.class),
+                any(Pageable.class)
+            )
         ).thenReturn(List.of());
         when(findingRepository.countByPresenceForDeveloper(eq(2L), eq(1L), any(Instant.class))).thenReturn(List.of());
         when(findingRepository.countBySeverityForDeveloper(eq(2L), eq(1L), any(Instant.class))).thenReturn(List.of());
@@ -101,7 +107,13 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
         user.setLogin("octo");
         when(userRepository.findById(eq(2L))).thenReturn(Optional.of(user));
         when(
-            findingRepository.findRecentByDeveloperAndWorkspace(eq(2L), eq(1L), any(Instant.class), any(Pageable.class))
+            findingRepository.findRecentByDeveloperAndWorkspace(
+                eq(2L),
+                eq(1L),
+                any(Instant.class),
+                any(Instant.class),
+                any(Pageable.class)
+            )
         ).thenReturn(List.of());
         PresenceCount positive = mockObservationCount(Presence.PRESENT, 3L);
         PresenceCount negative = mockObservationCount(Presence.ABSENT, 1L);
@@ -152,7 +164,13 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
             .build();
 
         when(
-            findingRepository.findRecentByDeveloperAndWorkspace(eq(2L), eq(1L), any(Instant.class), any(Pageable.class))
+            findingRepository.findRecentByDeveloperAndWorkspace(
+                eq(2L),
+                eq(1L),
+                any(Instant.class),
+                any(Instant.class),
+                any(Pageable.class)
+            )
         ).thenReturn(List.of(observation));
         when(findingRepository.countByPresenceForDeveloper(eq(2L), eq(1L), any(Instant.class))).thenReturn(List.of());
         when(findingRepository.countBySeverityForDeveloper(eq(2L), eq(1L), any(Instant.class))).thenReturn(List.of());
@@ -218,7 +236,13 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
             .build();
 
         when(
-            findingRepository.findRecentByDeveloperAndWorkspace(eq(2L), eq(1L), any(Instant.class), any(Pageable.class))
+            findingRepository.findRecentByDeveloperAndWorkspace(
+                eq(2L),
+                eq(1L),
+                any(Instant.class),
+                any(Instant.class),
+                any(Pageable.class)
+            )
         ).thenReturn(List.of(badObservation, naObservation));
         when(findingRepository.countByPresenceForDeveloper(eq(2L), eq(1L), any(Instant.class))).thenReturn(List.of());
         when(findingRepository.countBySeverityForDeveloper(eq(2L), eq(1L), any(Instant.class))).thenReturn(List.of());
