@@ -126,7 +126,7 @@ class GithubConnectionStrategyTest extends BaseUnitTest {
         when(connection.getConfig()).thenReturn(new ConnectionConfig.GitHubAppConfig(4242L, null, null, Set.of()));
         doThrow(new RuntimeException("github unavailable")).when(appTokenService).deleteInstallation(4242L);
 
-        assertThatThrownBy(() -> strategy().revoke(ref)).isInstanceOf(RuntimeException.class);
+        strategy().revoke(ref);
 
         verify(contentEraser).eraseWorkspaceScmMirror(7L);
     }

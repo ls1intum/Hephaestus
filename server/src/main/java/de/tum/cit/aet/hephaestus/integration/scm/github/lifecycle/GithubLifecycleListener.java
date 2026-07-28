@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionPropert
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationService;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
@@ -507,7 +508,28 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             return Optional.empty();
         }
 
-        Workspace purged = workspaceLifecycleService.purgeWorkspace(workspaceOpt.get().getWorkspaceSlug());
+        Workspace workspace = workspaceOpt.get();
+        IntegrationRef ref = new IntegrationRef(
+            IntegrationKind.GITHUB,
+            workspace.getId(),
+            Long.toString(installationId)
+        );
+        connectionService
+            .findReferenced(ref)
+            .ifPresent(connection ->
+                connectionService.transition(
+                    connection,
+                    new ConnectionService.TransitionRequest(
+                        IntegrationState.UNINSTALLED,
+                        "PROVIDER_UNINSTALLED",
+                        "PROVIDER",
+                        IntegrationKind.GITHUB.name(),
+                        "provider-uninstall-github-" + installationId,
+                        "GitHub reported the installation was deleted"
+                    )
+                )
+            );
+        Workspace purged = workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug());
         log.info(
             "Purged workspace after vendor-side uninstall: installationId={}, workspaceId={}",
             installationId,

@@ -208,13 +208,20 @@ public class ConnectionService {
         return connectionRepository.findByIdAndWorkspaceId(connectionId, workspaceId);
     }
 
-    /** Resolves an explicit connection id regardless of state, or otherwise the active connection. */
+    /** Resolves by connection id, then instance key, then active connection. */
     @Transactional(readOnly = true)
     public Optional<Connection> findReferenced(IntegrationRef ref) {
-        if (ref.connectionId() == null) {
-            return findActive(ref.workspaceId(), ref.kind());
+        if (ref.connectionId() != null) {
+            return findInWorkspace(ref.workspaceId(), ref.connectionId()).filter(c -> c.getKind() == ref.kind());
         }
-        return findInWorkspace(ref.workspaceId(), ref.connectionId()).filter(c -> c.getKind() == ref.kind());
+        if (ref.instanceKey() != null) {
+            return connectionRepository.findByWorkspaceIdAndKindAndInstanceKey(
+                ref.workspaceId(),
+                ref.kind(),
+                ref.instanceKey()
+            );
+        }
+        return findActive(ref.workspaceId(), ref.kind());
     }
 
     @Transactional(readOnly = true)

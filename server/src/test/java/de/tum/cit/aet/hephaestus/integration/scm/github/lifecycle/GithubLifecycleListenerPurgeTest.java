@@ -2,11 +2,15 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.lifecycle;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationLifecycleListener.AccountKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
@@ -35,6 +39,12 @@ class GithubLifecycleListenerPurgeTest extends BaseUnitTest {
     @Mock
     private GitHubAppTokenService gitHubAppTokenService;
 
+    @Mock
+    private ConnectionService connectionService;
+
+    @Mock
+    private Connection connection;
+
     private GithubLifecycleListener listener;
 
     @BeforeEach
@@ -51,7 +61,7 @@ class GithubLifecycleListenerPurgeTest extends BaseUnitTest {
             null,
             gitHubAppTokenService,
             null,
-            null,
+            connectionService,
             workspaceLifecycleService
         );
     }
@@ -60,10 +70,14 @@ class GithubLifecycleListenerPurgeTest extends BaseUnitTest {
     @DisplayName("purgeWorkspaceForInstallation delegates to the canonical purge")
     void purgeWorkspaceForInstallation_delegatesToWorkspaceLifecycleService() {
         Workspace workspace = workspace(11L, "acme");
+        IntegrationRef ref = new IntegrationRef(IntegrationKind.GITHUB, 11L, Long.toString(INSTALLATION_ID));
         when(workspaceRepository.findByInstallationIdForUpdate(INSTALLATION_ID)).thenReturn(Optional.of(workspace));
+        when(connectionService.findReferenced(ref)).thenReturn(Optional.of(connection));
         when(workspaceLifecycleService.purgeWorkspace("acme")).thenReturn(workspace);
 
         assertThat(listener.purgeWorkspaceForInstallation(INSTALLATION_ID)).contains(workspace);
+
+        verify(connectionService).transition(eq(connection), any(ConnectionService.TransitionRequest.class));
     }
 
     @Test

@@ -14,6 +14,8 @@ import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -22,6 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 @ConditionalOnServerRole
 @Component
 public class GithubConnectionStrategy implements ConnectionStrategy {
+
+    private static final Logger log = LoggerFactory.getLogger(GithubConnectionStrategy.class);
 
     private static final String CALLBACK_PARAM_INSTALLATION_ID = "installation_id";
     private static final String CALLBACK_PARAM_STATE = "state";
@@ -98,9 +102,10 @@ public class GithubConnectionStrategy implements ConnectionStrategy {
         }
         try {
             revokeProvider(ref);
-        } finally {
-            contentEraser.eraseWorkspaceScmMirror(ref.workspaceId());
+        } catch (RuntimeException e) {
+            log.warn("GitHub uninstall failed during disconnect: ref={}, error={}", ref, e.toString());
         }
+        contentEraser.eraseWorkspaceScmMirror(ref.workspaceId());
     }
 
     @Override
