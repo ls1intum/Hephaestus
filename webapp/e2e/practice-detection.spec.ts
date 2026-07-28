@@ -1,12 +1,6 @@
 import { expect, loginAsDevAdmin, test } from "./fixtures";
 
-/**
- * Drives the workspace practices admin UI end to end over plain http://localhost: passwordless dev
- * sign-in → the Review settings page renders → a policy mutation round-trips (which also proves the
- * CSRF double-submit works over http).
- *
- * Requires the seeded `e2e` workspace + a signed-in account that is a member (see e2e/seed.sql).
- */
+/** Requires the seeded `e2e` workspace and a member account to sign in as — see e2e/seed.sql. */
 test("dev-login then configure practice review settings (read + mutate over http)", async ({
 	page,
 }) => {
@@ -14,16 +8,16 @@ test("dev-login then configure practice review settings (read + mutate over http
 
 	await page.goto("/w/e2e/admin/practices/settings");
 	await expect(page.getByRole("heading", { name: "Review settings" })).toBeVisible();
-	// `exact` so the "AI model" binding-card title is not confused with any longer label.
-	await expect(page.getByText("AI model", { exact: true })).toBeVisible();
-	await expect(page.getByText("Review policy")).toBeVisible();
+	// Card titles are `<div>`s, not headings, and "Model" needs `exact` or it also takes "AI models".
+	await expect(page.getByText("Model", { exact: true })).toBeVisible();
+	await expect(page.getByText("Review policy", { exact: true })).toBeVisible();
 
-	// Toggle "Skip drafts" — the PATCH proves CSRF double-submit works over plain http.
+	// The PATCH proves the CSRF double-submit works over plain http.
 	const skipDrafts = page.getByRole("switch", { name: /skip drafts/i });
 	const before = await skipDrafts.getAttribute("aria-checked");
 	const [response] = await Promise.all([
 		page.waitForResponse(
-			(r) => r.url().includes("/ai-settings/practice-review") && r.request().method() === "PATCH",
+			(r) => r.url().includes("/practices/review-settings") && r.request().method() === "PATCH",
 		),
 		skipDrafts.click(),
 	]);

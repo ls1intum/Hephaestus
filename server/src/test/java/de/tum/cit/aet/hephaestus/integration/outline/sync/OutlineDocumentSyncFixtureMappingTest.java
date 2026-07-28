@@ -13,9 +13,10 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.Bear
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.outline.OutlineProperties;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineCollectionDocumentsResponse;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineCollectionListResponse;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineDocumentListResponse;
+import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineEnvelope;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollectionModel;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocumentModel;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineNavigationNode;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.MirrorState;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.SyncStatus;
@@ -35,6 +36,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -60,7 +62,12 @@ class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
     private static final String ADMIN_SUBJECT = "99bdd8e2-176a-42fa-ba0c-4f9c4ce6caa9";
     private static final String ADMIN_NAME = "Felix Admin";
 
-    private static final JsonMapper MAPPER = JsonMapper.builder().build();
+    // The exact tolerant policy the running Outline client uses (unknown fields + unknown enum values),
+    // so the fixture round-trip exercises production deserialization, not a lax bespoke mapper.
+    private static final JsonMapper MAPPER =
+        de.tum.cit.aet.hephaestus.integration.outline.client.OutlineClientConfig.tolerantMapper(
+            JsonMapper.builder().build()
+        );
 
     @Mock
     private ConnectionService connectionService;
@@ -88,6 +95,9 @@ class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
             new OutlineProperties.Cache(200),
             Duration.ofDays(30)
         );
+        OutlineMirrorWriter mirrorWriter = new OutlineMirrorWriter(
+            new OutlineMirrorTransactions(documentRepository, collectionRepository)
+        );
         return new OutlineDocumentSyncService(
             connectionService,
             outlineApiClient,
@@ -95,7 +105,8 @@ class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
             collectionRepository,
             webhookRegistrar,
             properties,
-            new OutlineMirrorWriter(new OutlineMirrorTransactions(documentRepository, collectionRepository))
+            mirrorWriter,
+            new OutlineMirrorRetentionService(documentRepository, mirrorWriter, properties)
         );
     }
 
@@ -147,29 +158,29 @@ class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
 
         // --- wire the mocked client's return values off the real captured fixtures ---
 
-        OutlineCollectionListResponse collectionsList = readFixture(
+        OutlineEnvelope<List<OutlineCollectionModel>> collectionsList = readFixture(
             "/outline-api/collections.list.json",
-            OutlineCollectionListResponse.class
+            new TypeReference<>() {}
         );
-        OutlineCollectionListResponse.Collection engineeringDocs = collectionsList
+        OutlineCollectionModel engineeringDocs = collectionsList
             .data()
             .stream()
-            .filter(c -> COLLECTION_ID.equals(c.id()))
+            .filter(c -> COLLECTION_ID.equals(c.getId()))
             .findFirst()
             .orElseThrow();
         lenient().when(outlineApiClient.listCollections(SERVER_URL, "token")).thenReturn(List.of(engineeringDocs));
 
-        OutlineDocumentListResponse documentsList = readFixture(
+        OutlineEnvelope<List<OutlineDocumentModel>> documentsList = readFixture(
             "/outline-api/documents.list.json",
-            OutlineDocumentListResponse.class
+            new TypeReference<>() {}
         );
         lenient()
             .when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID))
             .thenReturn(documentsList.data());
 
-        OutlineCollectionDocumentsResponse tree = readFixture(
+        OutlineEnvelope<List<OutlineNavigationNode>> tree = readFixture(
             "/outline-api/collections.documents.json",
-            OutlineCollectionDocumentsResponse.class
+            new TypeReference<>() {}
         );
         lenient()
             .when(outlineApiClient.listCollectionDocuments(SERVER_URL, "token", COLLECTION_ID))
@@ -245,7 +256,7 @@ class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
             .orElseThrow(() -> new AssertionError("document " + documentId + " was never saved"));
     }
 
-    private static <T> T readFixture(String classpath, Class<T> type) throws IOException {
+    private static <T> T readFixture(String classpath, TypeReference<T> type) throws IOException {
         try (InputStream in = OutlineDocumentSyncFixtureMappingTest.class.getResourceAsStream(classpath)) {
             assertThat(in).as("fixture %s must be on the classpath", classpath).isNotNull();
             return MAPPER.readValue(in.readAllBytes(), type);

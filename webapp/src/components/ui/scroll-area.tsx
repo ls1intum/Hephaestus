@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 
 function ScrollArea({
 	className,
+	viewportClassName,
 	children,
 	viewportRef,
 	...props
@@ -12,6 +13,14 @@ function ScrollArea({
 	/** Ref to the scrolling Viewport (the element that actually overflows) — needed for scroll-position
 	 * logic like auto-scroll/scroll-to-bottom. A ref on Root would never observe scroll events. */
 	viewportRef?: Ref<HTMLDivElement>;
+	/**
+	 * Classes for the Viewport — the element that actually overflows. This is where a bounding height
+	 * belongs: the Viewport defaults to `size-full` (height: 100%), which only resolves against an
+	 * ancestor with a *definite* height, so a `max-h-*` on the Root (or a `max-h` flex column around it)
+	 * never clips and the content renders full-height. A `max-h-*` here caps the Viewport's own box, so
+	 * it grows to content and then scrolls — no fixed-height ancestor required.
+	 */
+	viewportClassName?: string;
 }) {
 	return (
 		<ScrollAreaPrimitive.Root
@@ -22,7 +31,10 @@ function ScrollArea({
 			<ScrollAreaPrimitive.Viewport
 				ref={viewportRef}
 				data-slot="scroll-area-viewport"
-				className="focus-visible:ring-ring/50 size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:outline-1"
+				className={cn(
+					"focus-visible:ring-ring/50 size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:outline-1",
+					viewportClassName,
+				)}
 			>
 				{children}
 			</ScrollAreaPrimitive.Viewport>

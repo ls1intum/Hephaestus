@@ -80,8 +80,10 @@ public class GitHubIssueMessageHandler extends AbstractIntegrationMessageHandler
                 GitHubEventAction.Issue.PINNED,
                 GitHubEventAction.Issue.UNPINNED,
                 GitHubEventAction.Issue.LOCKED,
-                GitHubEventAction.Issue.UNLOCKED,
-                GitHubEventAction.Issue.TRANSFERRED -> issueProcessor.process(issueDto, context);
+                GitHubEventAction.Issue.UNLOCKED -> issueProcessor.process(issueDto, context);
+            // A transfer moves the issue OUT of this repository. Upserting it here would recreate
+            // the phantom the deletion sweep exists to retire.
+            case GitHubEventAction.Issue.TRANSFERRED -> issueProcessor.processTransferred(issueDto, context);
             case GitHubEventAction.Issue.CLOSED -> issueProcessor.processClosed(issueDto, context);
             case GitHubEventAction.Issue.REOPENED -> issueProcessor.processReopened(issueDto, context);
             case GitHubEventAction.Issue.DELETED -> issueProcessor.processDeleted(issueDto, context);
@@ -104,10 +106,10 @@ public class GitHubIssueMessageHandler extends AbstractIntegrationMessageHandler
                 issueProcessor.processTyped(issueDto, event.issueType(), orgLogin, context);
             }
             case GitHubEventAction.Issue.UNTYPED -> issueProcessor.processUntyped(issueDto, context);
-            default -> {
-                log.debug("Skipped issue event: reason=unhandledAction, action={}", event.action());
-                issueProcessor.process(issueDto, context);
-            }
+            // Unknown/unmapped actions SKIP rather than upsert. Falling through to process() would
+            // silently re-create the issue if a future action means "removed". The explicit cases
+            // above already cover every real upsert action, so the safe default is to ack and ignore.
+            default -> log.debug("Skipped issue event: reason=unhandledAction, action={}", event.action());
         }
     }
 }

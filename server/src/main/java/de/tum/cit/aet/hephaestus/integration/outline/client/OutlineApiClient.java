@@ -1,16 +1,14 @@
 package de.tum.cit.aet.hephaestus.integration.outline.client;
 
-import de.tum.cit.aet.hephaestus.core.WebClientConnectors;
 import de.tum.cit.aet.hephaestus.core.security.ServerUrlValidator;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineApiKeyListResponse;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineAuthInfoResponse;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineCollectionDocumentsResponse;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineCollectionListResponse;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineDocumentInfoResponse;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineDocumentListResponse;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineExportResponse;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineWebhookSubscriptionListResponse;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineWebhookSubscriptionResponse;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineApiKey;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineAuth;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollectionModel;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocumentModel;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineNavigationNode;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineTeam;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineUser;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineWebhookSubscription;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.retry.Retry;
@@ -26,6 +24,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -33,15 +32,22 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 
 /**
  * Thin client for the Outline API. Outline is RPC-over-POST: every call is
- * {@code POST {serverUrl}/api/<resource>.<action>} with a JSON body and a bearer token.
+ * {@code POST {serverUrl}/api/<resource>.<action>} with a JSON request body and a bearer token, answering
+ * with the uniform {@link OutlineEnvelope} wrapper around a vendor model.
  *
- * <p>The server URL is admin-supplied, so every request goes through the SSRF-guarded connector
- * ({@link WebClientConnectors#ssrfGuarded()}, which blocks private-range resolution and closes the
- * DNS-rebind bypass) and is validated up front with {@link ServerUrlValidator}.
+ * <p><b>Spec-driven models, hand-written transport.</b> The response payloads are the vendor models generated
+ * from Outline's maintained OpenAPI spec ({@code integration.outline.client.model}); this class hand-writes
+ * only transport policy. Request bodies stay explicit {@link Map}s here — they are few, stable, and should
+ * fail loud — while every response type is a generated model, so a field Outline renames surfaces as a
+ * compile break the next time the vendored spec is refreshed rather than a silent {@code null}.
  *
- * <p>Calls run through the {@code outlineRestApi} circuit breaker wrapped in the {@code outlineRestApiRetry}
- * decorator (retries 5xx/transport/429 with bounded backoff, honoring {@code Retry-After}); a 429 that
- * survives surfaces as {@link OutlineRateLimitedException} so the sync pauses and resumes next cycle.
+ * <p>The server URL is admin-supplied, so every request goes through the SSRF-guarded, tolerant-decoding
+ * {@code outlineWebClient} ({@link OutlineClientConfig}) and is validated up front with
+ * {@link ServerUrlValidator}. Calls run through the {@code outlineRestApi} circuit breaker wrapped in the
+ * {@code outlineRestApiRetry} decorator (retries 5xx/transport/429 with bounded backoff, honoring
+ * {@code Retry-After}); a 429 that survives surfaces as {@link OutlineRateLimitedException} so the sync pauses
+ * and resumes next cycle. Rate-limit headers are captured by the WebClient's exchange filter into
+ * {@link OutlineRateLimitTracker}, independent of this retry path.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
@@ -56,6 +62,30 @@ public class OutlineApiClient {
     /** Guards against a malformed {@code pagination} block looping forever. */
     private static final int MAX_PAGES = 1000;
 
+    // Envelope shapes, one per call. Explicit ParameterizedTypeReferences because the {data,pagination}
+    // wrapper is generic — the generated models describe only the inner data payload.
+    private static final ParameterizedTypeReference<OutlineEnvelope<OutlineAuth>> AUTH_INFO =
+        new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<OutlineEnvelope<List<OutlineApiKey>>> API_KEY_LIST =
+        new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<OutlineEnvelope<List<OutlineCollectionModel>>> COLLECTION_LIST =
+        new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<OutlineEnvelope<List<OutlineNavigationNode>>> COLLECTION_DOCUMENTS =
+        new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<OutlineEnvelope<List<OutlineDocumentModel>>> DOCUMENT_LIST =
+        new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<OutlineEnvelope<OutlineDocumentModel>> DOCUMENT_INFO =
+        new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<OutlineEnvelope<String>> EXPORT =
+        new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<
+        OutlineEnvelope<List<OutlineWebhookSubscription>>
+    > WEBHOOK_SUBSCRIPTION_LIST = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<OutlineEnvelope<OutlineWebhookSubscription>> WEBHOOK_SUBSCRIPTION =
+        new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<OutlineEnvelope<Void>> EMPTY =
+        new ParameterizedTypeReference<>() {};
+
     private final WebClient webClient;
     private final CircuitBreaker circuitBreaker;
     private final Retry retry;
@@ -63,13 +93,9 @@ public class OutlineApiClient {
     @Autowired
     public OutlineApiClient(
         @Qualifier("outlineRestApiCircuitBreaker") CircuitBreaker circuitBreaker,
-        @Qualifier("outlineRestApiRetry") Retry retry
+        @Qualifier("outlineRestApiRetry") Retry retry,
+        @Qualifier("outlineWebClient") WebClient webClient
     ) {
-        this(circuitBreaker, retry, WebClient.builder().clientConnector(WebClientConnectors.ssrfGuarded()).build());
-    }
-
-    /** Test seam: inject a WebClient with a stubbed exchange function (the guarded connector needs a real host). */
-    OutlineApiClient(CircuitBreaker circuitBreaker, Retry retry, WebClient webClient) {
         this.webClient = webClient;
         this.circuitBreaker = circuitBreaker;
         this.retry = retry;
@@ -84,24 +110,18 @@ public class OutlineApiClient {
      */
     public OutlineIdentity validateToken(String serverUrl, String token) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
-        OutlineAuthInfoResponse response = post(
-            resolvedUrl,
-            token,
-            "/api/auth.info",
-            Map.of(),
-            OutlineAuthInfoResponse.class
-        );
+        OutlineEnvelope<OutlineAuth> response = post(resolvedUrl, token, "/api/auth.info", Map.of(), AUTH_INFO);
         if (
             response == null ||
             response.data() == null ||
-            response.data().team() == null ||
-            response.data().team().id() == null
+            response.data().getTeam() == null ||
+            response.data().getTeam().getId() == null
         ) {
             throw new OutlineApiException("Outline auth.info returned no team for this token");
         }
-        OutlineAuthInfoResponse.Team team = response.data().team();
-        OutlineAuthInfoResponse.User user = response.data().user();
-        return new OutlineIdentity(team.id(), team.name(), user == null ? null : user.id());
+        OutlineTeam team = response.data().getTeam();
+        OutlineUser user = response.data().getUser();
+        return new OutlineIdentity(team.getId(), team.getName(), user == null ? null : user.getId());
     }
 
     public record OutlineTokenDescription(String name, String last4, Instant expiresAt, Instant lastActiveAt) {}
@@ -113,15 +133,9 @@ public class OutlineApiClient {
      */
     public Optional<OutlineTokenDescription> describeToken(String serverUrl, String token) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
-        OutlineApiKeyListResponse response;
+        OutlineEnvelope<List<OutlineApiKey>> response;
         try {
-            response = post(
-                resolvedUrl,
-                token,
-                "/api/apiKeys.list",
-                Map.of("limit", PAGE_LIMIT),
-                OutlineApiKeyListResponse.class
-            );
+            response = post(resolvedUrl, token, "/api/apiKeys.list", Map.of("limit", PAGE_LIMIT), API_KEY_LIST);
         } catch (OutlineApiException e) {
             if (isForbidden(e)) {
                 log.debug("Outline apiKeys.list is not in this token's scope — token metadata unavailable");
@@ -136,13 +150,15 @@ public class OutlineApiClient {
         return response
             .data()
             .stream()
-            .filter(key -> suffix.equals(key.last4()))
+            .filter(key -> suffix.equals(key.getLast4()))
             .findFirst()
-            .map(key -> new OutlineTokenDescription(key.name(), key.last4(), key.expiresAt(), key.lastActiveAt()));
+            .map(key ->
+                new OutlineTokenDescription(key.getName(), key.getLast4(), key.getExpiresAt(), key.getLastActiveAt())
+            );
     }
 
     /** Lists the collections the token can see ({@code collections.list}); the catalog pass refreshes mirrored-collection metadata. */
-    public List<OutlineCollectionListResponse.Collection> listCollections(String serverUrl, String token) {
+    public List<OutlineCollectionModel> listCollections(String serverUrl, String token) {
         return listCollections(serverUrl, token, MAX_PAGES);
     }
 
@@ -150,22 +166,18 @@ public class OutlineApiClient {
      * {@link #listCollections(String, String)} under an explicit page cap — interactive admin paths pass a
      * small cap so a pathological instance cannot stall a request thread; a hit cap logs and returns partial.
      */
-    public List<OutlineCollectionListResponse.Collection> listCollections(
-        String serverUrl,
-        String token,
-        int maxPages
-    ) {
+    public List<OutlineCollectionModel> listCollections(String serverUrl, String token, int maxPages) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
-        List<OutlineCollectionListResponse.Collection> all = new ArrayList<>();
+        List<OutlineCollectionModel> all = new ArrayList<>();
         for (int page = 0, offset = 0; page < maxPages; page++, offset += PAGE_LIMIT) {
-            OutlineCollectionListResponse body = post(
+            OutlineEnvelope<List<OutlineCollectionModel>> body = post(
                 resolvedUrl,
                 token,
                 "/api/collections.list",
                 Map.of("offset", offset, "limit", PAGE_LIMIT),
-                OutlineCollectionListResponse.class
+                COLLECTION_LIST
             );
-            List<OutlineCollectionListResponse.Collection> pageData = body == null ? null : body.data();
+            List<OutlineCollectionModel> pageData = body == null ? null : body.data();
             if (pageData == null || pageData.isEmpty()) {
                 return all;
             }
@@ -187,20 +199,16 @@ public class OutlineApiClient {
      * Fetches a collection's document tree ({@code collections.documents}); {@code children} carry the
      * nesting the sync flattens into parent relationships.
      */
-    public List<OutlineCollectionDocumentsResponse.Node> listCollectionDocuments(
-        String serverUrl,
-        String token,
-        String collectionId
-    ) {
+    public List<OutlineNavigationNode> listCollectionDocuments(String serverUrl, String token, String collectionId) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
-        OutlineCollectionDocumentsResponse body = post(
+        OutlineEnvelope<List<OutlineNavigationNode>> body = post(
             resolvedUrl,
             token,
             "/api/collections.documents",
             Map.of("id", collectionId),
-            OutlineCollectionDocumentsResponse.class
+            COLLECTION_DOCUMENTS
         );
-        List<OutlineCollectionDocumentsResponse.Node> data = body == null ? null : body.data();
+        List<OutlineNavigationNode> data = body == null ? null : body.data();
         return data == null ? List.of() : data;
     }
 
@@ -208,11 +216,11 @@ public class OutlineApiClient {
      * Lists per-document metadata ({@code documents.list}, newest-{@code updatedAt} first). Ordering matters:
      * the sync spends its bounded export budget front-to-back, and {@code updatedAt} is the incremental cursor.
      */
-    public List<OutlineDocumentListResponse.Meta> listDocuments(String serverUrl, String token, String collectionId) {
+    public List<OutlineDocumentModel> listDocuments(String serverUrl, String token, String collectionId) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
-        List<OutlineDocumentListResponse.Meta> all = new ArrayList<>();
+        List<OutlineDocumentModel> all = new ArrayList<>();
         for (int page = 0, offset = 0; page < MAX_PAGES; page++, offset += PAGE_LIMIT) {
-            OutlineDocumentListResponse body = post(
+            OutlineEnvelope<List<OutlineDocumentModel>> body = post(
                 resolvedUrl,
                 token,
                 "/api/documents.list",
@@ -228,9 +236,9 @@ public class OutlineApiClient {
                     "direction",
                     "DESC"
                 ),
-                OutlineDocumentListResponse.class
+                DOCUMENT_LIST
             );
-            List<OutlineDocumentListResponse.Meta> pageData = requirePage(body, "documents.list", collectionId);
+            List<OutlineDocumentModel> pageData = requirePage(body, "documents.list", collectionId);
             if (pageData.isEmpty()) {
                 return all;
             }
@@ -246,47 +254,18 @@ public class OutlineApiClient {
      * Fetches one document's metadata ({@code documents.info}); empty on HTTP 404 (the webhook refresh treats
      * that as a tombstone), rethrows every other failure.
      */
-    public Optional<OutlineDocumentListResponse.Meta> getDocumentInfo(
-        String serverUrl,
-        String token,
-        String documentId
-    ) {
+    public Optional<OutlineDocumentModel> getDocumentInfo(String serverUrl, String token, String documentId) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
-        OutlineDocumentInfoResponse body;
+        OutlineEnvelope<OutlineDocumentModel> body;
         try {
-            body = post(
-                resolvedUrl,
-                token,
-                "/api/documents.info",
-                Map.of("id", documentId),
-                OutlineDocumentInfoResponse.class
-            );
+            body = post(resolvedUrl, token, "/api/documents.info", Map.of("id", documentId), DOCUMENT_INFO);
         } catch (OutlineApiException e) {
             if (isNotFound(e)) {
                 return Optional.empty();
             }
             throw e;
         }
-        OutlineDocumentInfoResponse.Data data = body == null ? null : body.data();
-        if (data == null) {
-            return Optional.empty();
-        }
-        return Optional.of(
-            new OutlineDocumentListResponse.Meta(
-                data.id(),
-                data.url(),
-                data.title(),
-                data.createdAt(),
-                data.updatedAt(),
-                data.urlId(),
-                data.parentDocumentId(),
-                data.collectionId(),
-                data.createdBy(),
-                data.updatedBy(),
-                data.collaboratorIds(),
-                data.archivedAt()
-            )
-        );
+        return Optional.ofNullable(body == null ? null : body.data());
     }
 
     /**
@@ -294,15 +273,11 @@ public class OutlineApiClient {
      * Outline's default listing excludes archived documents, so without this call the tombstone-by-absence
      * sweep would wipe an archived (soft-deleted, recoverable) document as a permanent delete.
      */
-    public List<OutlineDocumentListResponse.Meta> listArchivedDocuments(
-        String serverUrl,
-        String token,
-        String collectionId
-    ) {
+    public List<OutlineDocumentModel> listArchivedDocuments(String serverUrl, String token, String collectionId) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
-        List<OutlineDocumentListResponse.Meta> all = new ArrayList<>();
+        List<OutlineDocumentModel> all = new ArrayList<>();
         for (int page = 0, offset = 0; page < MAX_PAGES; page++, offset += PAGE_LIMIT) {
-            OutlineDocumentListResponse body = post(
+            OutlineEnvelope<List<OutlineDocumentModel>> body = post(
                 resolvedUrl,
                 token,
                 "/api/documents.list",
@@ -320,13 +295,9 @@ public class OutlineApiClient {
                     "statusFilter",
                     List.of("archived")
                 ),
-                OutlineDocumentListResponse.class
+                DOCUMENT_LIST
             );
-            List<OutlineDocumentListResponse.Meta> pageData = requirePage(
-                body,
-                "documents.list[archived]",
-                collectionId
-            );
+            List<OutlineDocumentModel> pageData = requirePage(body, "documents.list[archived]", collectionId);
             if (pageData.isEmpty()) {
                 return all;
             }
@@ -345,12 +316,12 @@ public class OutlineApiClient {
      * the tombstone-by-absence sweep then deletes every mirrored document past the truncated tail. Failing the
      * call skips the sweep, leaving the mirror intact.
      */
-    private static List<OutlineDocumentListResponse.Meta> requirePage(
-        OutlineDocumentListResponse body,
+    private static List<OutlineDocumentModel> requirePage(
+        OutlineEnvelope<List<OutlineDocumentModel>> body,
         String call,
         String collectionId
     ) {
-        List<OutlineDocumentListResponse.Meta> pageData = body == null ? null : body.data();
+        List<OutlineDocumentModel> pageData = body == null ? null : body.data();
         if (pageData == null) {
             throw new OutlineApiException(
                 "Outline " +
@@ -382,21 +353,18 @@ public class OutlineApiClient {
      * Lists the change-notification subscriptions the token owns ({@code webhookSubscriptions.list}). The
      * registrar's self-heal pass diffs its stored subscription id against this.
      */
-    public List<OutlineWebhookSubscriptionListResponse.Subscription> listWebhookSubscriptions(
-        String serverUrl,
-        String token
-    ) {
+    public List<OutlineWebhookSubscription> listWebhookSubscriptions(String serverUrl, String token) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
-        List<OutlineWebhookSubscriptionListResponse.Subscription> all = new ArrayList<>();
+        List<OutlineWebhookSubscription> all = new ArrayList<>();
         for (int page = 0, offset = 0; page < MAX_PAGES; page++, offset += PAGE_LIMIT) {
-            OutlineWebhookSubscriptionListResponse body = post(
+            OutlineEnvelope<List<OutlineWebhookSubscription>> body = post(
                 resolvedUrl,
                 token,
                 "/api/webhookSubscriptions.list",
                 Map.of("offset", offset, "limit", PAGE_LIMIT),
-                OutlineWebhookSubscriptionListResponse.class
+                WEBHOOK_SUBSCRIPTION_LIST
             );
-            List<OutlineWebhookSubscriptionListResponse.Subscription> pageData = body == null ? null : body.data();
+            List<OutlineWebhookSubscription> pageData = body == null ? null : body.data();
             if (pageData == null || pageData.isEmpty()) {
                 break;
             }
@@ -421,12 +389,12 @@ public class OutlineApiClient {
     /** Exports a document's body as Markdown ({@code documents.export}); {@code null} when Outline responds without a body. */
     public String exportDocument(String serverUrl, String token, String documentId) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
-        OutlineExportResponse body = post(
+        OutlineEnvelope<String> body = post(
             resolvedUrl,
             token,
             "/api/documents.export",
             Map.of("id", documentId),
-            OutlineExportResponse.class
+            EXPORT
         );
         return body == null ? null : body.data();
     }
@@ -444,23 +412,29 @@ public class OutlineApiClient {
         List<String> events
     ) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
-        OutlineWebhookSubscriptionResponse body = post(
+        OutlineEnvelope<OutlineWebhookSubscription> body = post(
             resolvedUrl,
             token,
             "/api/webhookSubscriptions.create",
             Map.of("name", name, "url", deliveryUrl, "secret", signingSecret, "events", events),
-            OutlineWebhookSubscriptionResponse.class
+            WEBHOOK_SUBSCRIPTION
         );
-        return body == null || body.data() == null ? null : body.data().id();
+        return body == null || body.data() == null ? null : body.data().getId();
     }
 
     public void deleteWebhookSubscription(String serverUrl, String token, String subscriptionId) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
-        post(resolvedUrl, token, "/api/webhookSubscriptions.delete", Map.of("id", subscriptionId), Void.class);
+        post(resolvedUrl, token, "/api/webhookSubscriptions.delete", Map.of("id", subscriptionId), EMPTY);
     }
 
     /** One {@code POST} through the retry decorator; each attempt goes through the circuit breaker so every failure counts toward the rate. */
-    private <T> T post(String resolvedUrl, String token, String path, Object requestBody, Class<T> responseType) {
+    private <T> T post(
+        String resolvedUrl,
+        String token,
+        String path,
+        Object requestBody,
+        ParameterizedTypeReference<T> responseType
+    ) {
         return retry.executeSupplier(() -> executeOnce(resolvedUrl, token, path, requestBody, responseType));
     }
 
@@ -475,7 +449,7 @@ public class OutlineApiClient {
         String token,
         String path,
         Object requestBody,
-        Class<T> responseType
+        ParameterizedTypeReference<T> responseType
     ) {
         Supplier<T> call = () ->
             webClient

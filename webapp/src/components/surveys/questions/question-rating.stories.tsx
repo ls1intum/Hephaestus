@@ -2,7 +2,7 @@
  * Rating survey question capturing scaled feedback with number or emoji display.
  */
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "storybook/test";
+import { expect, fn, within } from "storybook/test";
 import { QuestionRating } from "./question-rating";
 
 const meta = {
@@ -43,9 +43,20 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Standard five-point number scale with descriptive bounds.
+ * Standard five-point number scale with descriptive bounds. The selected rating (4)
+ * must be visibly highlighted: Base UI's ToggleGroupItem emits `data-pressed`, which the
+ * component's `data-pressed:*` classes style (a Radix-style `data-[state=on]` selector
+ * would have matched nothing and left the selection invisible).
  */
-export const Default: Story = {};
+export const Default: Story = {
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		const selected = canvas.getByRole("button", { name: "Rating 4 out of 5" });
+		await expect(selected).toHaveAttribute("data-pressed");
+		const unselected = canvas.getByRole("button", { name: "Rating 3 out of 5" });
+		await expect(unselected).not.toHaveAttribute("data-pressed");
+	},
+};
 
 /**
  * Emoji display with three-point scale for rapid sentiment capture.

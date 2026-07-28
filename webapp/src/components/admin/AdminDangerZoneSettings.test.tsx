@@ -10,7 +10,7 @@ import { listWorkspacesQueryKey } from "@/api/@tanstack/react-query.gen";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { server } from "@/mocks/server";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import { renderWithRouter } from "@/test/router";
+import { renderWithRouter } from "@/test/router-harness";
 import { AdminDangerZoneSettings } from "./AdminDangerZoneSettings";
 
 vi.mock("sonner", () => ({

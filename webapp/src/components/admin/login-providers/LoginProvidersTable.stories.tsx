@@ -50,7 +50,7 @@ const meta = {
 		providers,
 		isLoading: false,
 		isError: false,
-		mutatingId: null,
+		mutatingIds: new Set<string>(),
 		onEdit: fn(),
 		onToggleEnabled: fn(),
 		onDelete: fn(),
@@ -86,7 +86,7 @@ export const Default: Story = {
 
 /** A row mid-mutation disables its own toggle/edit/delete so concurrent edits can't race. */
 export const RowBusy: Story = {
-	args: { mutatingId: "github" },
+	args: { mutatingIds: new Set(["github"]) },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByRole("button", { name: /Edit GitHub/i })).toBeDisabled();
@@ -103,8 +103,10 @@ export const ConfirmDelete: Story = {
 	play: async ({ args, canvasElement }) => {
 		const canvas = within(canvasElement);
 		await userEvent.click(canvas.getByRole("button", { name: /Delete ACME Outline/i }));
-		// The dialog renders in a portal → query the document.
-		const confirm = await screen.findByRole("button", { name: "Delete" });
+		const dialog = await screen.findByRole("alertdialog");
+		await expect(within(dialog).getByRole("heading")).toHaveTextContent("Delete “ACME Outline”?");
+
+		const confirm = within(dialog).getByRole("button", { name: "Delete" });
 		await userEvent.click(confirm);
 		await expect(args.onDelete).toHaveBeenCalledWith(
 			expect.objectContaining({ registrationId: "outline-acme" }),
@@ -114,7 +116,7 @@ export const ConfirmDelete: Story = {
 
 /** While the delete is in flight the confirm button is disabled and states what is happening. */
 export const DeletePending: Story = {
-	args: { mutatingId: "outline-acme" },
+	args: { mutatingIds: new Set(["outline-acme"]) },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		// The row's delete trigger is disabled mid-mutation, so open the dialog on a quiet row and

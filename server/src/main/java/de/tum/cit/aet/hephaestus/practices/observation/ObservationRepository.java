@@ -154,6 +154,34 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     int deleteAllConversationThreadObservations(@Param("workspaceId") Long workspaceId);
 
     /**
+     * Hard-delete every {@code PULL_REQUEST} / {@code ISSUE} observation for a workspace — the
+     * SCM-derived counterpart of {@link #deleteAllConversationThreadObservations}, invoked when the
+     * workspace's SCM mirror is erased on connection-disconnect or workspace-purge. The
+     * {@code evidence} jsonb quotes mirrored diff/comment content verbatim and {@code artifact_id} is
+     * a soft reference (no FK to {@code issue}/{@code pull_request}), so these rows would otherwise
+     * outlive the artifacts they describe. Workspace is scoped through the {@code Practice.workspace}
+     * relationship (this repo is {@code @WorkspaceAgnostic}); the {@code artifactType} predicate keeps
+     * {@code CONVERSATION_THREAD} observations and other tenants' rows untouched. DB
+     * {@code ON DELETE CASCADE} clears any bound {@code feedback_observation} / {@code reaction}
+     * children. Idempotent.
+     *
+     * @return the number of observations deleted
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        """
+        DELETE FROM Observation o
+        WHERE o.artifactType IN (
+            de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST,
+            de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.ISSUE
+          )
+          AND o.practice.id IN (SELECT p.id FROM Practice p WHERE p.workspace.id = :workspaceId)
+        """
+    )
+    int deleteAllScmArtifactObservations(@Param("workspaceId") Long workspaceId);
+
+    /**
      * Hard-delete the {@code CONVERSATION_THREAD} observations a single person is the <em>subject</em> of
      * ({@code about_user_id = :aboutUserId}) within a workspace — the derived-content half of a person opt-out /
      * account hard-delete, invoked through

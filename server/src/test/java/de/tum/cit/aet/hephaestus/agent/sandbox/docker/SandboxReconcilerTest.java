@@ -19,7 +19,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 
 class SandboxReconcilerTest extends BaseUnitTest {
@@ -38,8 +37,6 @@ class SandboxReconcilerTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        // The reconciler only exists when the worker role is active (DockerSandboxConfiguration is
-        // worker-role-gated); there is no longer a property-level disable, so no SandboxProperties.
         meterRegistry = new SimpleMeterRegistry();
         reconciler = new SandboxReconciler(jobRepository, containerManager, networkManager, meterRegistry);
     }
@@ -48,37 +45,27 @@ class SandboxReconcilerTest extends BaseUnitTest {
     class StartupReconciliation {
 
         @Test
-        void shouldMarkOrphanedJobsAsFailed() {
+        void missingLocalContainerNeverChangesRunningJobState() {
             UUID jobId = UUID.randomUUID();
-            AgentJob orphanedJob = new AgentJob();
-            orphanedJob.setId(jobId);
-            orphanedJob.setStatus(AgentJobStatus.RUNNING);
-            // containerId intentionally NOT set — matches real-world behavior where
-            // DockerSandboxAdapter.execute() never persists it to the entity.
+            AgentJob runningJob = new AgentJob();
+            runningJob.setId(jobId);
+            runningJob.setStatus(AgentJobStatus.RUNNING);
 
-            when(jobRepository.findByStatus(AgentJobStatus.RUNNING)).thenReturn(List.of(orphanedJob));
-            when(containerManager.listManagedContainers()).thenReturn(List.of()); // No containers running
-            // After marking jobs, startup also runs Docker cleanup
-            when(jobRepository.findByStatusIn(any())).thenReturn(List.of());
+            when(containerManager.listManagedContainers()).thenReturn(List.of());
+            when(jobRepository.findByStatusIn(any())).thenReturn(List.of(runningJob));
             when(networkManager.listOrphanedNetworks()).thenReturn(List.of());
 
             reconciler.onStartup();
 
-            ArgumentCaptor<AgentJob> captor = ArgumentCaptor.forClass(AgentJob.class);
-            verify(jobRepository).save(captor.capture());
-            AgentJob saved = captor.getValue();
-            assertThat(saved.getStatus()).isEqualTo(AgentJobStatus.FAILED);
-            assertThat(saved.getErrorMessage()).contains("Orphaned");
-            assertThat(saved.getCompletedAt()).isNotNull();
-            assertThat(meterRegistry.counter("sandbox.reconciler.orphaned", "resource", "job").count()).isEqualTo(1.0);
+            assertThat(runningJob.getStatus()).isEqualTo(AgentJobStatus.RUNNING);
+            verify(jobRepository, never()).save(any());
+            verify(jobRepository, never()).findByStatus(AgentJobStatus.RUNNING);
         }
 
         @Test
         void shouldCleanupDockerResourcesDuringStartup() {
             UUID orphanedJobId = UUID.randomUUID();
 
-            when(jobRepository.findByStatus(AgentJobStatus.RUNNING)).thenReturn(List.of());
-            // No RUNNING jobs, but orphaned Docker resources exist from a previous crash
             when(jobRepository.findByStatusIn(any())).thenReturn(List.of());
             when(containerManager.listManagedContainers()).thenReturn(
                 List.of(
@@ -108,7 +95,6 @@ class SandboxReconcilerTest extends BaseUnitTest {
             activeJob.setStatus(AgentJobStatus.RUNNING);
             // containerId NOT set — label-based matching should still find the container
 
-            when(jobRepository.findByStatus(AgentJobStatus.RUNNING)).thenReturn(List.of(activeJob));
             when(containerManager.listManagedContainers()).thenReturn(
                 List.of(
                     new DockerOperations.ContainerInfo(
@@ -119,7 +105,6 @@ class SandboxReconcilerTest extends BaseUnitTest {
                     )
                 )
             );
-            // Startup Docker cleanup stubs
             when(jobRepository.findByStatusIn(any())).thenReturn(List.of(activeJob));
             when(networkManager.listOrphanedNetworks()).thenReturn(List.of());
 
@@ -129,9 +114,7 @@ class SandboxReconcilerTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldDoNothingWithNoRunningJobs() {
-            when(jobRepository.findByStatus(AgentJobStatus.RUNNING)).thenReturn(List.of());
-            // Startup always runs Docker resource cleanup
+        void shouldDoNothingWithNoManagedResources() {
             when(jobRepository.findByStatusIn(any())).thenReturn(List.of());
             when(containerManager.listManagedContainers()).thenReturn(List.of());
             when(networkManager.listOrphanedNetworks()).thenReturn(List.of());
@@ -150,7 +133,7 @@ class SandboxReconcilerTest extends BaseUnitTest {
             UUID orphanedJobId = UUID.randomUUID();
             String orphanedContainerId = "orphaned-container";
 
-            when(jobRepository.findByStatusIn(any())).thenReturn(List.of()); // No active jobs
+            when(jobRepository.findByStatusIn(any())).thenReturn(List.of());
 
             when(containerManager.listManagedContainers()).thenReturn(
                 List.of(
@@ -207,7 +190,7 @@ class SandboxReconcilerTest extends BaseUnitTest {
             UUID orphanedJobId = UUID.randomUUID();
             String networkId = "net-orphaned";
 
-            when(jobRepository.findByStatusIn(any())).thenReturn(List.of()); // No active jobs
+            when(jobRepository.findByStatusIn(any())).thenReturn(List.of());
 
             when(containerManager.listManagedContainers()).thenReturn(List.of());
 
@@ -252,10 +235,8 @@ class SandboxReconcilerTest extends BaseUnitTest {
 
             when(networkManager.listOrphanedNetworks()).thenReturn(List.of());
 
-            // Should not throw despite first container cleanup failure
             reconciler.periodicReconciliation();
 
-            // Second container should still be cleaned up
             verify(containerManager).forceRemove("ctr-2");
         }
 
@@ -271,18 +252,15 @@ class SandboxReconcilerTest extends BaseUnitTest {
                 List.of(new DockerOperations.NetworkInfo("net-1", "agent-net-" + orphanedJobId))
             );
 
-            // Should not throw
             reconciler.periodicReconciliation();
 
-            // Network cleanup should still proceed
             verify(networkManager).removeNetwork("net-1");
         }
 
         @Test
-        void shouldCleanupAllWhenDbQueryFails() {
+        void shouldRemoveEvenRunningContainersWhenTheDbQueryFails() {
             UUID orphanedJobId = UUID.randomUUID();
 
-            // DB is down — findByStatusIn throws
             when(jobRepository.findByStatusIn(any())).thenThrow(new RuntimeException("DB unreachable"));
 
             when(containerManager.listManagedContainers()).thenReturn(
@@ -300,10 +278,8 @@ class SandboxReconcilerTest extends BaseUnitTest {
                 List.of(new DockerOperations.NetworkInfo("net-1", "agent-net-" + orphanedJobId))
             );
 
-            // Should not throw — treats all resources as orphaned when DB is down
             reconciler.periodicReconciliation();
 
-            // Both container and network should be cleaned up
             verify(containerManager).forceRemove("ctr-1");
             verify(networkManager).removeNetwork("net-1");
         }

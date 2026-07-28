@@ -19,9 +19,10 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.Bear
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineCollectionDocumentsResponse;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineCollectionListResponse;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineDocumentListResponse;
+import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineClientModels;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocumentModel;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineNavigationNode;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineUser;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.MirrorState;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.SyncStatus;
@@ -62,10 +63,7 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
     private static final Instant T0 = Instant.parse("2025-12-01T00:00:00Z");
     private static final Instant T1 = Instant.parse("2026-01-01T00:00:00Z");
     private static final Instant T2 = Instant.parse("2026-02-01T00:00:00Z");
-    private static final OutlineDocumentListResponse.OutlineUser AUTHOR = new OutlineDocumentListResponse.OutlineUser(
-        "user-1",
-        "Ada Lovelace"
-    );
+    private static final OutlineUser AUTHOR = OutlineClientModels.user("user-1", "Ada Lovelace");
 
     @MockitoBean
     private OutlineApiClient outlineApiClient;
@@ -119,39 +117,23 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
         lenient()
             .when(outlineApiClient.listCollections(anyString(), anyString()))
             .thenReturn(
-                List.of(
-                    new OutlineCollectionListResponse.Collection(
-                        COLLECTION_ID,
-                        "Design",
-                        "col1",
-                        null,
-                        null,
-                        "Design docs"
-                    )
-                )
+                List.of(OutlineClientModels.collection(COLLECTION_ID, "Design", "col1", null, null, "Design docs"))
             );
         lenient().when(outlineApiClient.exportDocument(anyString(), anyString(), eq(DOC_ONE))).thenReturn("# Alpha");
         lenient().when(outlineApiClient.exportDocument(anyString(), anyString(), eq(DOC_TWO))).thenReturn("# Beta");
     }
 
     private void stubCollection(List<String> docIds, Instant docOneUpdatedAt, Instant docTwoUpdatedAt) {
-        List<OutlineCollectionDocumentsResponse.Node> tree = docIds
+        List<OutlineNavigationNode> tree = docIds
             .stream()
-            .map(id ->
-                new OutlineCollectionDocumentsResponse.Node(
-                    id,
-                    id.toUpperCase(java.util.Locale.ROOT),
-                    "/doc/" + id,
-                    List.of()
-                )
-            )
+            .map(id -> OutlineClientModels.node(id, id.toUpperCase(java.util.Locale.ROOT), "/doc/" + id, List.of()))
             .toList();
         when(outlineApiClient.listCollectionDocuments(anyString(), anyString(), eq(COLLECTION_ID))).thenReturn(tree);
 
-        List<OutlineDocumentListResponse.Meta> metas = docIds
+        List<OutlineDocumentModel> metas = docIds
             .stream()
             .map(id ->
-                new OutlineDocumentListResponse.Meta(
+                OutlineClientModels.document(
                     id,
                     "/doc/" + id,
                     id,
@@ -200,7 +182,6 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
         assertThat(collection.getName()).isEqualTo("Design");
         assertThat(collection.getUrlId()).isEqualTo("col1");
         assertThat(collection.getDescription()).isEqualTo("Design docs");
-        // Coverage counters: everything upstream mirrored, nothing skipped.
         assertThat(collection.getDocumentsUpstream()).isEqualTo(2);
         assertThat(collection.getExportsSkippedForBudget()).isZero();
     }
@@ -257,12 +238,12 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
 
         // doc-2 is archived upstream (soft, recoverable): it vanishes from documents.list/collections.documents
         // (Outline's default listing excludes archived docs) but is enumerated separately via
-        // listArchivedDocuments — the second call the reconcile now makes per collection.
+        // listArchivedDocuments — the second per-collection call the reconcile makes.
         stubCollection(List.of(DOC_ONE), T1, T1);
         Instant archivedAt = Instant.parse("2026-03-01T00:00:00Z");
         when(outlineApiClient.listArchivedDocuments(anyString(), anyString(), eq(COLLECTION_ID))).thenReturn(
             List.of(
-                new OutlineDocumentListResponse.Meta(
+                OutlineClientModels.document(
                     DOC_TWO,
                     "/doc/" + DOC_TWO,
                     DOC_TWO.toUpperCase(java.util.Locale.ROOT),

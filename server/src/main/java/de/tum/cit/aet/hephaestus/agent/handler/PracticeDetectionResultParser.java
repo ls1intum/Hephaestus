@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
@@ -561,10 +562,9 @@ public class PracticeDetectionResultParser {
     }
 
     /**
-     * @param recurrenceKey the stable cross-run {@link de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint}
-     *     identity, stamped by {@code PullRequestReviewHandler} from the value
-     *     {@code PracticeDetectionDeliveryService.deliver} already computed (never recomputed downstream, so it
-     *     cannot drift from the persisted finding). {@code null} until stamped — the parser leaves it unset.
+     * @param keys the identities {@code PracticeDetectionDeliveryService.deliver} persisted for this finding,
+     *     stamped by the handler rather than recomputed downstream so they cannot drift from the stored
+     *     observation. {@code null} until stamped — the parser leaves it unset.
      */
     public record ValidatedFinding(
         String practiceSlug,
@@ -577,9 +577,9 @@ public class PracticeDetectionResultParser {
         String reasoning,
         String guidance,
         List<DiffNote> suggestedDiffNotes,
-        @Nullable String recurrenceKey
+        @Nullable ObservationKeys keys
     ) {
-        /** Pre-correlation compatibility shape: a finding with no correlation key yet (the parser's output). */
+        /** The parser's output shape: a finding not yet stamped with its persisted identities. */
         public ValidatedFinding(
             String practiceSlug,
             String title,
@@ -607,8 +607,8 @@ public class PracticeDetectionResultParser {
             );
         }
 
-        /** Returns a copy stamped with {@code key}; all other components are preserved by reference. */
-        public ValidatedFinding withRecurrenceKey(@Nullable String key) {
+        /** Returns a copy stamped with {@code keys}; all other components are preserved by reference. */
+        public ValidatedFinding withKeys(@Nullable ObservationKeys keys) {
             return new ValidatedFinding(
                 practiceSlug,
                 title,
@@ -620,8 +620,18 @@ public class PracticeDetectionResultParser {
                 reasoning,
                 guidance,
                 suggestedDiffNotes,
-                key
+                keys
             );
+        }
+
+        /** The cross-run locus identity, or {@code null} when unstamped. */
+        public @Nullable String recurrenceKey() {
+            return keys == null ? null : keys.recurrenceKey();
+        }
+
+        /** The per-observation identity, or {@code null} when unstamped. */
+        public @Nullable String occurrenceKey() {
+            return keys == null ? null : keys.occurrenceKey();
         }
 
         /**
@@ -685,7 +695,7 @@ public class PracticeDetectionResultParser {
                 r,
                 guidance,
                 suggestedDiffNotes,
-                recurrenceKey
+                keys
             );
         }
     }
@@ -716,8 +726,21 @@ public class PracticeDetectionResultParser {
      *
      * @param mrNote  markdown summary for the PR/MR comment (null if agent didn't produce one)
      * @param diffNotes inline diff comments with file locations
+     * @param withheld the findings the composer chose not to render, for the ledger to record as SUPPRESSED
      */
-    public record DeliveryContent(@Nullable String mrNote, List<DiffNote> diffNotes) {}
+    public record DeliveryContent(@Nullable String mrNote, List<DiffNote> diffNotes, List<WithheldFinding> withheld) {
+        /** Returns a copy carrying {@code notes}; the withheld report is preserved. */
+        public DeliveryContent withDiffNotes(List<DiffNote> notes) {
+            return new DeliveryContent(mrNote, notes, withheld);
+        }
+    }
+
+    /**
+     * A finding the {@link DeliveryComposer} withheld from the rendered delivery, identified by the
+     * {@code occurrenceKey} of the observation it was persisted as — a per-observation identity, so a
+     * withheld finding is never confused with another at the same locus.
+     */
+    public record WithheldFinding(String occurrenceKey, FeedbackSuppressionReason reason) {}
 
     /**
      * An inline diff note targeting a specific file and line range.
@@ -740,11 +763,6 @@ public class PracticeDetectionResultParser {
         /** Pre-correlation compatibility shape: a note with no correlation key yet (the parser's output). */
         public DiffNote(String filePath, int startLine, @Nullable Integer endLine, String body) {
             this(filePath, startLine, endLine, body, null);
-        }
-
-        /** Returns a copy stamped with {@code key}; all other components are preserved. */
-        public DiffNote withRecurrenceKey(@Nullable String key) {
-            return new DiffNote(filePath, startLine, endLine, body, key);
         }
     }
 }

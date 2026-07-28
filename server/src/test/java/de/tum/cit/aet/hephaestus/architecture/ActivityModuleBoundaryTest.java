@@ -36,13 +36,6 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
     @Nested
     class ActivityModuleIsolationTests {
 
-        /**
-         * Activity module should not depend on leaderboard internals.
-         *
-         * <p>Activity and leaderboard are peer modules. Activity generates events
-         * that leaderboard may consume, but should not have direct dependencies
-         * on leaderboard's service layer.
-         */
         @Test
         void activityDoesNotDependOnLeaderboardServices() {
             ArchRule rule = noClasses()
@@ -60,12 +53,6 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
 
-        /**
-         * Activity module should not depend on mentor module.
-         *
-         * <p>Activity tracks user actions; mentor provides AI feedback.
-         * These are orthogonal concerns.
-         */
         @Test
         void activityDoesNotDependOnMentor() {
             ArchRule rule = noClasses()
@@ -78,12 +65,6 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
 
-        /**
-         * Activity module should not depend on notification module.
-         *
-         * <p>Notifications are triggered by activity events through the event system,
-         * not through direct dependencies.
-         */
         @Test
         void activityDoesNotDependOnNotification() {
             ArchRule rule = noClasses()
@@ -96,12 +77,6 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
 
-        /**
-         * Activity module should not depend on profile module.
-         *
-         * <p>Profile is a read-only view module that aggregates data from activity,
-         * not the other way around.
-         */
         @Test
         void activityDoesNotDependOnProfile() {
             ArchRule rule = noClasses()
@@ -114,9 +89,6 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
 
-        /**
-         * Activity module should not depend on contributors module.
-         */
         @Test
         void activityDoesNotDependOnContributors() {
             ArchRule rule = noClasses()
@@ -135,13 +107,6 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
     @Nested
     class PracticesModuleTests {
 
-        /**
-         * practices.model package (persistence) should not depend on practices.review (logic).
-         *
-         * <p>The practices.model package contains entities and repositories.
-         * The practices.review package contains agent-based detection gate and delivery.
-         * Model/persistence layer should not depend on detection logic.
-         */
         @Test
         void practicesModelDoesNotDependOnReview() {
             ArchRule rule = noClasses()
@@ -161,12 +126,6 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
     @DisplayName("Activity Scoring Isolation")
     class ScoringSubmoduleTests {
 
-        /**
-         * Scoring package should be pure calculation logic.
-         *
-         * <p>The scoring package calculates XP - it should not have
-         * direct dependencies on external services or controllers.
-         */
         @Test
         void scoringDoesNotDependOnControllers() {
             ArchRule rule = noClasses()
@@ -179,9 +138,6 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
 
-        /**
-         * Scoring should not depend on external feature modules.
-         */
         @Test
         void scoringHasMinimalExternalDependencies() {
             ArchRule rule = noClasses()
@@ -201,9 +157,9 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
     class PracticesControllerTests {
 
         /**
-         * Only PracticeCatalogController (practice CRUD), PracticeAreaController (goal CRUD + binding),
-         * ObservationController (contributor findings API), and ReactionController
-         * (contributor reactions) are allowed as REST entry points in the practices module.
+         * Allowlist: PracticeCatalogController (practice CRUD), PracticeAreaController (goal CRUD +
+         * binding), ObservationController (contributor findings API), ReactionController (contributor
+         * reactions), PracticeReviewSettingsController (per-workspace review policy).
          */
         @Test
         void practicesHasDedicatedController() {
@@ -220,9 +176,11 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
                 .haveSimpleName("ObservationController")
                 .orShould()
                 .haveSimpleName("ReactionController")
+                .orShould()
+                .haveSimpleName("PracticeReviewSettingsController")
                 .because(
-                    "Only PracticeCatalogController, PracticeAreaController, ObservationController, and " +
-                        "ReactionController are allowed REST entry points"
+                    "Only PracticeCatalogController, PracticeAreaController, ObservationController, " +
+                        "ReactionController, and PracticeReviewSettingsController are allowed REST entry points"
                 );
             rule.check(classes);
         }

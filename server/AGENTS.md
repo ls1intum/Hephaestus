@@ -62,7 +62,7 @@ pnpm run generate:api:application-server:client
 
 ### Always
 
-- Run `./mvnw test` before committing
+- Run `./mvnw test -P'!quick'` before committing. The `quick` profile is active by default and skips surefire entirely, so a bare `./mvnw test` prints BUILD SUCCESS having run **zero** tests — see the root `AGENTS.md` for the four test tiers.
 - Use constructor injection (via `@RequiredArgsConstructor`)
 - Return `ResponseEntity` with proper status codes
 - Tag tests appropriately (`@Tag("unit")`, etc.)
@@ -86,7 +86,16 @@ pnpm run generate:api:application-server:client
 src/main/java/de/tum/cit/aet/hephaestus/
 ├── Application.java              # Entry point (@SpringBootApplication)
 ├── config/                       # @Configuration beans
+├── core/                         # Cross-cutting substrate (security, tenancy, runtime roles, auth)
 ├── workspace/                    # Multi-tenant workspace management
+├── agent/                        # Agent jobs, LLM catalog + proxy, usage ledger, sandboxes
+│   ├── catalog/                  # Instance + workspace LLM connections, models, pricing
+│   ├── config/                   # Per-purpose agent bindings (workspace × purpose → model)
+│   ├── job/                      # agent_job queue: submit, poll/claim, execute, sweep, retain
+│   ├── proxy/                    # In-app LLM proxy — the only credential path a sandbox has
+│   ├── sandbox/                  # Docker sandbox runtime + SPI
+│   └── usage/                    # llm_usage_event ledger, budget caps, admission, FX
+├── practices/                    # Practice catalogue, detection settings, feedback
 ├── integration/                  # Unified integration framework
 │   ├── core/                     # Vendor-agnostic substrate (webhook, consumer, oauth, …)
 │   │   └── webhook/              # Shared inbound webhook substrate (all kinds)
@@ -277,18 +286,23 @@ public class SyncService {
 
 Migrations live in `src/main/resources/db/changelog/`.
 
+> **Two unrelated things are called "changeset" here.** This section is about Liquibase `<changeSet>`s (schema deltas). A schema change *also* needs a **release changeset** (`.changeset/*.md`, user-facing summary — the release notes flag the migration automatically) — see root `AGENTS.md` §10. Touching `db/changelog/` without touching `.changeset/` is always wrong.
+
 ### Adding Schema Changes
 
 1. Modify JPA entities
 2. Run `pnpm run db:draft-changelog`
 3. Review and prune the generated changelog to minimal deltas
-4. Rename to `<timestamp>_<description>.xml`
+4. Rename to `<epoch-ms-timestamp>_changelog.xml` — a real millisecond timestamp, no descriptive suffix (root `AGENTS.md` §5)
 5. Run `pnpm run db:generate-erd-docs` to update ERD
+6. Add a release changeset (`pnpm changeset`) with a user-facing summary
 
 ### Changelog Format
 
+`changeSet` ids follow `<timestamp>-1`, `<timestamp>-2`, … (root `AGENTS.md` §5):
+
 ```xml
-<changeSet id="1234567890123_add_user_email" author="developer">
+<changeSet id="1234567890123-1" author="developer">
     <addColumn tableName="users">
         <column name="email" type="varchar(255)"/>
     </addColumn>

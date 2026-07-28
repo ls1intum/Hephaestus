@@ -8,6 +8,7 @@ import {
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 import { useTheme } from "@/integrations/theme";
 
+/** Every toast announces politely, `toast.error` included: sonner exposes no assertive path. */
 const Toaster = ({ ...props }: ToasterProps) => {
 	const { theme = "system" } = useTheme();
 
@@ -30,11 +31,6 @@ const Toaster = ({ ...props }: ToasterProps) => {
 					"--border-radius": "var(--radius)",
 				} as React.CSSProperties
 			}
-			toastOptions={{
-				classNames: {
-					toast: "cn-toast",
-				},
-			}}
 			{...props}
 		/>
 	);

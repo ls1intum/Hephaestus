@@ -1,14 +1,23 @@
+import { Link } from "@tanstack/react-router";
 import { AlertCircle } from "lucide-react";
 import type {
-	AgentConfig,
-	AiSettingsView,
-	UpdatePracticeReviewSettings,
+	AgentBinding,
+	AvailableLlmModel,
+	PracticeReviewSettings,
+	UpdatePracticeReviewSettingsRequest,
 	UpdateWorkspaceFeaturesRequest,
 } from "@/api/types.gen";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/ui/field";
+import {
+	Field,
+	FieldContent,
+	FieldDescription,
+	FieldLabel,
+	FieldTitle,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
 	Select,
@@ -21,9 +30,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 
 /** The resettable policy fields — derived from the generated client so it stays in sync. */
-export type PracticeReviewField = NonNullable<UpdatePracticeReviewSettings["reset"]>[number];
+export type PracticeReviewField = NonNullable<UpdatePracticeReviewSettingsRequest["reset"]>[number];
 
-const FANOUT = "__fanout__";
 const COVERAGE_ALL = "all";
 const COVERAGE_ROLE = "role";
 
@@ -33,15 +41,21 @@ const COVERAGE_ITEMS = [
 ];
 
 export interface PracticeDetectionPolicyCardProps {
-	settings?: AiSettingsView;
-	configs: AgentConfig[];
+	settings?: PracticeReviewSettings;
+	/** This workspace's PRACTICE_DETECTION binding, or undefined when the purpose is unbound. */
+	detectionBinding?: AgentBinding;
+	availableModels: AvailableLlmModel[];
+	/** Links to the AI models page, where the model binding is owned and edited. */
+	workspaceSlug: string;
 	autoTriggerEnabled: boolean;
 	manualTriggerEnabled: boolean;
 	isLoading: boolean;
 	isError?: boolean;
+	/** The failure behind `isError`; its ProblemDetail and status decide the wording and whether a
+	 * Retry is offered at all (a 403 cannot be retried away). */
+	error?: unknown;
 	isSaving: boolean;
-	onBindConfig: (configId: number | null) => void;
-	onUpdateReviewSettings: (settings: UpdatePracticeReviewSettings) => void;
+	onUpdateReviewSettings: (settings: UpdatePracticeReviewSettingsRequest) => void;
 	onUpdateFeatures: (features: UpdateWorkspaceFeaturesRequest) => void;
 	onResetReviewField: (field: PracticeReviewField) => void;
 	onRetry?: () => void;
@@ -49,13 +63,15 @@ export interface PracticeDetectionPolicyCardProps {
 
 export function PracticeDetectionPolicyCard({
 	settings,
-	configs,
+	detectionBinding,
+	availableModels,
+	workspaceSlug,
 	autoTriggerEnabled,
 	manualTriggerEnabled,
 	isLoading,
 	isError = false,
+	error,
 	isSaving,
-	onBindConfig,
 	onUpdateReviewSettings,
 	onUpdateFeatures,
 	onResetReviewField,
@@ -63,39 +79,29 @@ export function PracticeDetectionPolicyCard({
 }: PracticeDetectionPolicyCardProps) {
 	if (isError) {
 		return (
-			<Alert variant="destructive">
-				<AlertCircle />
-				<AlertTitle>Failed to load policy</AlertTitle>
-				<AlertDescription>
-					<p>The practice detection policy could not be loaded.</p>
-					{onRetry && (
-						<Button variant="outline" size="sm" className="mt-2" onClick={onRetry}>
-							Retry
-						</Button>
-					)}
-				</AlertDescription>
-			</Alert>
+			<QueryErrorAlert error={error} title="Couldn't load the review policy" onRetry={onRetry} />
 		);
 	}
 
 	if (isLoading || !settings) {
 		return (
 			<div className="flex h-40 items-center justify-center">
-				<Spinner className="h-6 w-6" />
+				<Spinner className="size-6" />
 			</div>
 		);
 	}
 
-	const boundConfigId = settings.practiceConfigId;
-	const hasBoundConfig = boundConfigId != null;
-	const boundConfig = hasBoundConfig
-		? configs.find((config) => config.id === boundConfigId)
-		: undefined;
-	const boundRuntimePaused = boundConfig?.enabled === false;
-	const runtimeItems = [
-		{ value: FANOUT, label: "All enabled models" },
-		...configs.map((config) => ({ value: String(config.id), label: config.name })),
-	];
+	// The model binding is owned by the AI models page (one write path); this page only reports what
+	// detection currently runs on, because every policy knob below is meaningless while it cannot run.
+	const boundModelId = detectionBinding?.instanceModelId ?? detectionBinding?.workspaceModelId;
+	const boundModelScope = detectionBinding?.instanceModelId != null ? "SHARED" : "WORKSPACE";
+	const boundModel =
+		boundModelId != null
+			? availableModels.find(
+					(model) => model.scope === boundModelScope && model.id === boundModelId,
+				)
+			: undefined;
+	const detectionRunnable = detectionBinding?.ready === true && detectionBinding.enabled;
 
 	// Each policy knob shows whether its value is an explicit workspace override or inherited — and when
 	// inherited, spells out the inherited value so a "Reset to default" is a predictable action.
@@ -120,44 +126,53 @@ export function PracticeDetectionPolicyCard({
 		<div className="space-y-6">
 			<Card>
 				<CardHeader>
-					<CardTitle className="text-base">AI model</CardTitle>
+					<CardTitle>Model</CardTitle>
 				</CardHeader>
 				<CardContent className="space-y-4">
-					<Field>
-						<FieldLabel htmlFor="practice-runtime">Model</FieldLabel>
-						<Select
-							items={runtimeItems}
-							value={hasBoundConfig ? String(boundConfigId) : FANOUT}
-							disabled={isSaving}
-							onValueChange={(value) => {
-								if (!value) return;
-								onBindConfig(value === FANOUT ? null : Number(value));
-							}}
-						>
-							<SelectTrigger id="practice-runtime">
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value={FANOUT}>All enabled models</SelectItem>
-								{configs.map((config) => (
-									<SelectItem key={config.id} value={String(config.id)}>
-										{config.name}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-						<FieldDescription>
-							Use one specific model, or run every enabled model in parallel.
-						</FieldDescription>
-					</Field>
-
-					{boundRuntimePaused && (
+					{detectionRunnable ? (
+						<Field>
+							{/* A read-only report, not a control: `FieldTitle` names the value below it without
+							    claiming a `for` target that doesn't exist. */}
+							<FieldTitle>Practice detection runs on</FieldTitle>
+							<p className="font-medium text-sm">
+								{boundModel?.displayName ?? `Model #${boundModelId}`}
+							</p>
+							<FieldDescription>
+								Change the model on the{" "}
+								<Link
+									to="/w/$workspaceSlug/admin/models"
+									params={{ workspaceSlug }}
+									className="underline underline-offset-4"
+								>
+									AI models page
+								</Link>
+								.
+							</FieldDescription>
+						</Field>
+					) : (
 						<Alert variant="destructive">
 							<AlertCircle />
-							<AlertTitle>Selected model is disabled</AlertTitle>
+							<AlertTitle>
+								{detectionBinding
+									? "Practice detection's model is unavailable"
+									: "Practice detection has no model"}
+							</AlertTitle>
 							<AlertDescription>
-								“{boundConfig?.name}” is turned off — practice reviews won't run until you re-enable
-								it (on the Models page) or pick a different model.
+								<p>
+									{detectionBinding
+										? "The model it runs on is turned off or was removed, so reviews can't run."
+										: "Reviews can't run until a model is chosen."}
+								</p>
+								<Button
+									variant="outline"
+									size="sm"
+									className="mt-2"
+									// No `nativeButton={false}`: it would stamp `role="button"` over the anchor, and
+									// this is a navigation — it must keep announcing itself as a link.
+									render={<Link to="/w/$workspaceSlug/admin/models" params={{ workspaceSlug }} />}
+								>
+									Open AI models
+								</Button>
 							</AlertDescription>
 						</Alert>
 					)}
@@ -166,18 +181,17 @@ export function PracticeDetectionPolicyCard({
 
 			<Card>
 				<CardHeader>
-					<CardTitle className="text-base">Triggers</CardTitle>
+					<CardTitle>Triggers</CardTitle>
 				</CardHeader>
 				<CardContent className="space-y-4">
 					<Field orientation="horizontal">
 						<FieldContent>
 							<FieldLabel htmlFor="trigger-auto">Automatic reviews</FieldLabel>
-							<FieldDescription>Run automatically when PR/MR events arrive.</FieldDescription>
 						</FieldContent>
 						<Switch
 							id="trigger-auto"
 							checked={autoTriggerEnabled}
-							disabled={isSaving}
+							disabled={isSaving || (!autoTriggerEnabled && !detectionRunnable)}
 							onCheckedChange={(checked) =>
 								onUpdateFeatures({ practiceReviewAutoTriggerEnabled: checked })
 							}
@@ -193,7 +207,7 @@ export function PracticeDetectionPolicyCard({
 						<Switch
 							id="trigger-manual"
 							checked={manualTriggerEnabled}
-							disabled={isSaving}
+							disabled={isSaving || (!manualTriggerEnabled && !detectionRunnable)}
 							onCheckedChange={(checked) =>
 								onUpdateFeatures({ practiceReviewManualTriggerEnabled: checked })
 							}
@@ -204,13 +218,12 @@ export function PracticeDetectionPolicyCard({
 
 			<Card>
 				<CardHeader>
-					<CardTitle className="text-base">Review policy</CardTitle>
+					<CardTitle>Review policy</CardTitle>
 				</CardHeader>
 				<CardContent className="space-y-4">
 					<Field orientation="horizontal">
 						<FieldContent>
 							<FieldLabel htmlFor="policy-skip-drafts">Skip drafts</FieldLabel>
-							<FieldDescription>Don't review draft PRs/MRs.</FieldDescription>
 							{inheritHint(
 								settings.skipDraftsOverride != null,
 								"SKIP_DRAFTS",
@@ -228,7 +241,6 @@ export function PracticeDetectionPolicyCard({
 					<Field orientation="horizontal">
 						<FieldContent>
 							<FieldLabel htmlFor="policy-deliver-merged">Comment on merged PRs/MRs</FieldLabel>
-							<FieldDescription>Post feedback even after a PR/MR is merged.</FieldDescription>
 							{inheritHint(
 								settings.deliverToMergedOverride != null,
 								"DELIVER_TO_MERGED",
@@ -291,10 +303,7 @@ export function PracticeDetectionPolicyCard({
 								<SelectItem value={COVERAGE_ROLE}>Only users with the review role</SelectItem>
 							</SelectContent>
 						</Select>
-						<FieldDescription>
-							Review every contributor, or only those with the review role. Assigning that role
-							isn't self-serve in-product yet.
-						</FieldDescription>
+						<FieldDescription>Assigning that role isn't self-serve yet.</FieldDescription>
 						{inheritHint(
 							settings.runForAllUsersOverride != null,
 							"RUN_FOR_ALL_USERS",

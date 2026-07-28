@@ -3,9 +3,13 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.feedback;
 import static de.tum.cit.aet.hephaestus.integration.scm.github.feedback.GithubPrNodeIdResolver.GRAPHQL_TIMEOUT;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.ExistingSummaryLookup;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssueComment;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssueCommentConnection;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPageInfo;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -28,6 +32,12 @@ import org.springframework.stereotype.Component;
 public class GithubFeedbackChannel implements FeedbackChannel {
 
     private static final Logger log = LoggerFactory.getLogger(GithubFeedbackChannel.class);
+
+    /** GitHub caps a connection page at 100. */
+    private static final int EXISTING_SUMMARY_SEARCH_PAGE_SIZE = 100;
+
+    /** Our cap, not GitHub's: an unscanned tail answers {@code UNKNOWN}, so recovery retries rather than reposts. */
+    private static final int EXISTING_SUMMARY_SEARCH_PAGE_BUDGET = 3;
 
     private final GitHubGraphQlClientProvider gitHubProvider;
     private final GithubPrNodeIdResolver prNodeIdResolver;
@@ -166,6 +176,94 @@ public class GithubFeedbackChannel implements FeedbackChannel {
         }
         log.info("Edited GitHub comment in place: workspaceId={}, commentId={}", scopeId, commentNodeId);
         return UpdateOutcome.edited(new SummaryHandle(commentNodeId));
+    }
+
+    /**
+     * Scans this PR/issue's comments for one whose body contains {@code marker}, walking the connection
+     * backwards from its newest end — the summary a crashed delivery already posted is the newest comment.
+     */
+    @Override
+    public ExistingSummaryLookup findExistingSummary(FeedbackTarget target, String marker) {
+        if (marker == null || marker.isBlank()) {
+            return ExistingSummaryLookup.unknown();
+        }
+        long scopeId = target.ref().workspaceId();
+        if (gitHubProvider.isRateLimitCritical(scopeId)) {
+            return ExistingSummaryLookup.unknown();
+        }
+        String subject = target.subjectExternalId();
+        String documentName;
+        String owner;
+        String name;
+        int number;
+        String commentsPath;
+        if (isIssueSubject(subject)) {
+            IssueCoordinates issue = parseIssueSubjectExternalId(subject);
+            documentName = "GetIssueCommentsNewest";
+            owner = issue.owner();
+            name = issue.name();
+            number = issue.number();
+            commentsPath = "repository.issue.comments";
+        } else {
+            PrCoordinates pr = parseSubjectExternalId(subject);
+            documentName = "GetPullRequestCommentsNewest";
+            owner = pr.owner();
+            name = pr.name();
+            number = pr.number();
+            commentsPath = "repository.pullRequest.comments";
+        }
+
+        String cursor = null;
+        for (int page = 0; page < EXISTING_SUMMARY_SEARCH_PAGE_BUDGET; page++) {
+            try {
+                ClientGraphQlResponse response = gitHubProvider
+                    .forScope(scopeId)
+                    .documentName(documentName)
+                    .variable("owner", owner)
+                    .variable("name", name)
+                    .variable("number", number)
+                    .variable("last", EXISTING_SUMMARY_SEARCH_PAGE_SIZE)
+                    .variable("before", cursor)
+                    .execute()
+                    .block(GRAPHQL_TIMEOUT);
+                if (response == null || (response.getErrors() != null && !response.getErrors().isEmpty())) {
+                    return ExistingSummaryLookup.unknown();
+                }
+                gitHubProvider.trackRateLimit(scopeId, response);
+
+                GHIssueCommentConnection connection = response
+                    .field(commentsPath)
+                    .toEntity(GHIssueCommentConnection.class);
+                if (connection == null) {
+                    return ExistingSummaryLookup.unknown();
+                }
+                if (connection.getNodes() != null) {
+                    for (GHIssueComment node : connection.getNodes()) {
+                        if (node.getBody() != null && node.getBody().contains(marker) && node.getId() != null) {
+                            return ExistingSummaryLookup.found(new SummaryHandle(node.getId()));
+                        }
+                    }
+                }
+
+                GHPageInfo pageInfo = connection.getPageInfo();
+                boolean hasPreviousPage = pageInfo != null && pageInfo.getHasPreviousPage();
+                if (!hasPreviousPage) {
+                    return ExistingSummaryLookup.absent();
+                }
+                cursor = pageInfo.getStartCursor();
+                if (cursor == null || cursor.isBlank()) {
+                    return ExistingSummaryLookup.unknown();
+                }
+            } catch (RuntimeException e) {
+                log.debug(
+                    "Existing-summary dedup lookup failed (treated as unknown, not absent): scopeId={}, error={}",
+                    scopeId,
+                    e.getMessage()
+                );
+                return ExistingSummaryLookup.unknown();
+            }
+        }
+        return ExistingSummaryLookup.unknown();
     }
 
     /** Conservative NOT_FOUND heuristic: GitHub signals a deleted comment via a free-text top-level error. */

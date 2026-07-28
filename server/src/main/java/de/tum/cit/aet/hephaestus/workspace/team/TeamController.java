@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace.team;
 
+import de.tum.cit.aet.hephaestus.core.AuditExempt;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamInfoDTO;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
@@ -69,6 +70,7 @@ public class TeamController {
     @PostMapping("/{id}/visibility")
     @RequireAtLeastWorkspaceAdmin
     @Operation(summary = "Update team visibility", description = "Show or hide a team in leaderboard calculations")
+    @AuditExempt(reason = "team visibility is a reporting view; teams are SCM-synced, not configured here")
     public ResponseEntity<Void> updateTeamVisibility(
         WorkspaceContext workspaceContext,
         @PathVariable Long id,
@@ -87,6 +89,7 @@ public class TeamController {
 
     @PostMapping("/{teamId}/repositories/{repositoryId}/visibility")
     @RequireAtLeastWorkspaceAdmin
+    @AuditExempt(reason = "repository visibility is a reporting view; grants no access")
     public ResponseEntity<Void> updateRepositoryVisibility(
         WorkspaceContext workspaceContext,
         @PathVariable Long teamId,

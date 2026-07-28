@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -408,13 +409,11 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
 
         @Test
         void shouldReleaseBuffersOnPartialFluxError() {
-            // Track buffer allocation via a custom factory
             var buf1 = bufferFactory.allocateBuffer(16);
             buf1.write("data: ok\n\n".getBytes(StandardCharsets.UTF_8));
             var buf2 = bufferFactory.allocateBuffer(16);
             buf2.write("data: ok2\n\n".getBytes(StandardCharsets.UTF_8));
 
-            // Emit 2 buffers then error
             Flux<DataBuffer> dataFlux = Flux.just((DataBuffer) buf1, (DataBuffer) buf2).concatWith(
                 Flux.error(new RuntimeException("mid-stream failure"))
             );
@@ -425,7 +424,6 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
             // Should not throw — errors are caught internally
             ProxyStreamingUtils.streamSseToResponse(dataFlux, headers, response, 200);
 
-            // Verify the response received the data before the error
             assertThat(response.getStatus()).isEqualTo(200);
         }
 
@@ -451,6 +449,66 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
             assertThat(idx2).isLessThan(idx3);
             assertThat(idx3).isLessThan(idx4);
             assertThat(idx4).isLessThan(idx5);
+        }
+    }
+
+    @Nested
+    class StreamSseToResponseWithTap {
+
+        private final DefaultDataBufferFactory bufferFactory = new DefaultDataBufferFactory();
+
+        /**
+         * A dropped {@code tap.accept(bytes)} call is invisible everywhere else — the client still gets a
+         * perfect stream — while every streamed call silently goes unbilled.
+         */
+        @Test
+        @DisplayName("the tap sees exactly the bytes the client received")
+        void tapObservesEveryChunkTheClientGets() throws IOException {
+            Flux<DataBuffer> dataFlux = Flux.just(
+                bufferFactory.wrap("data: one\n\n".getBytes(StandardCharsets.UTF_8)),
+                bufferFactory.wrap("data: two\n\n".getBytes(StandardCharsets.UTF_8))
+            );
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            StringBuilder tapped = new StringBuilder();
+
+            ProxyStreamingUtils.streamSseToResponse(dataFlux, new HttpHeaders(), response, 200, bytes ->
+                tapped.append(new String(bytes, StandardCharsets.UTF_8))
+            );
+
+            assertThat(tapped.toString()).isEqualTo(response.getContentAsString());
+            assertThat(tapped.toString()).isEqualTo("data: one\n\ndata: two\n\n");
+        }
+
+        @Test
+        @DisplayName("a tap that throws does not interrupt the stream to the client")
+        void aThrowingTapCannotBreakTheStream() throws IOException {
+            Flux<DataBuffer> dataFlux = Flux.just(
+                bufferFactory.wrap("data: one\n\n".getBytes(StandardCharsets.UTF_8)),
+                bufferFactory.wrap("data: two\n\n".getBytes(StandardCharsets.UTF_8))
+            );
+            MockHttpServletResponse response = new MockHttpServletResponse();
+
+            ProxyStreamingUtils.streamSseToResponse(dataFlux, new HttpHeaders(), response, 200, bytes -> {
+                throw new IllegalStateException("bookkeeping blew up");
+            });
+
+            assertThat(response.getContentAsString()).isEqualTo("data: one\n\ndata: two\n\n");
+        }
+
+        @Test
+        @DisplayName("the tap keeps what it saw when the stream errors mid-flight")
+        void tapKeepsWhatItSawBeforeAMidStreamError() {
+            Flux<DataBuffer> dataFlux = Flux.<DataBuffer>just(
+                bufferFactory.wrap("data: delivered\n\n".getBytes(StandardCharsets.UTF_8))
+            ).concatWith(Flux.error(new RuntimeException("upstream died")));
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            StringBuilder tapped = new StringBuilder();
+
+            ProxyStreamingUtils.streamSseToResponse(dataFlux, new HttpHeaders(), response, 200, bytes ->
+                tapped.append(new String(bytes, StandardCharsets.UTF_8))
+            );
+
+            assertThat(tapped.toString()).isEqualTo("data: delivered\n\n");
         }
     }
 }

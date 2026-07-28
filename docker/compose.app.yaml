@@ -75,10 +75,10 @@ services:
           "$$BASE/$$ASSET.sigstore.json"   -o "$$TMP/pin.sigstore.json"
         cosign verify-blob \
           --bundle "$$TMP/pin.sigstore.json" \
-          --certificate-identity-regexp '^https://github\.com/ls1intum/Hephaestus/\.github/workflows/release\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$$' \
+          --certificate-identity 'https://github.com/ls1intum/Hephaestus/.github/workflows/release.yml@refs/heads/main' \
           --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
           "$$TMP/pin.yaml"
-        grep -Eq '^[[:space:]]+reference:[[:space:]]+[a-z0-9][a-z0-9.\-_/:]+@sha256:[a-f0-9]{64}$$' "$$TMP/pin.yaml" \
+        grep -Eq '^[[:space:]]+reference:[[:space:]]+[a-z0-9][a-z0-9._/:-]+@sha256:[a-f0-9]{64}$$' "$$TMP/pin.yaml" \
           || { echo "pin asset is missing a digest-pinned reference" >&2; exit 1; }
         install -m 0644 "$$TMP/pin.yaml" /pin/release-pin.yaml.new
         mv /pin/release-pin.yaml.new /pin/release-pin.yaml
@@ -90,12 +90,26 @@ services:
     restart: "no"
     networks:
       - shared-network
+    # Same cap as the long-running services in this file. This one writes a few lines per deploy, but
+    # `restart: "no"` means its container — and its log — outlives the run and is only replaced on the
+    # next deploy; a failing cosign verify retries and is the case worth bounding.
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
 
   application-server:
     image: "ghcr.io/ls1intum/hephaestus/application-server:${IMAGE_TAG}"
+    # Bounds heap sizing to this container; without it the JVM targets host RAM and co-located
+    # services oversubscribe and swap. Hosts the NATS sync consumers, so it takes the largest limit.
+    mem_limit: ${APPLICATION_SERVER_MEM_LIMIT:-5g}
     ports:
       - "8080"
     environment:
+      # The buildpack's 10M MaxDirectMemorySize sits below this role's steady NIO
+      # footprint (NATS + HTTP); give it headroom.
+      JAVA_TOOL_OPTIONS: "-XX:MaxDirectMemorySize=${APP_MAX_DIRECT_MEMORY:-128M}"
       APP_VERSION: ${IMAGE_TAG}
       SPRING_PROFILES_ACTIVE: prod
       APPLICATION_HOST_URL: https://${APP_HOSTNAME}
@@ -185,7 +199,12 @@ services:
       OUTLINE_OAUTH_CLIENT_SECRET: ${OUTLINE_OAUTH_CLIENT_SECRET:-}
       # GitLab integration
       GITLAB_ENABLED: ${GITLAB_ENABLED:-false}
-      GITLAB_DEFAULT_SERVER_URL: ${GITLAB_DEFAULT_SERVER_URL:-https://gitlab.lrz.de}
+      # Which GitLab instance workspace creation and SCM sync talk to (not auth). Unset, it follows
+      # GITLAB_OAUTH_BASE_URL, so an operator who configures GitLab login gets the SAME instance for
+      # sync without naming it twice — that chain mirrors application.yml's, and it is the reason
+      # this line must not carry a hard-coded instance default: a concrete value here always wins,
+      # so pinning one silently pointed every self-hoster at that instance.
+      GITLAB_DEFAULT_SERVER_URL: ${GITLAB_DEFAULT_SERVER_URL:-${GITLAB_OAUTH_BASE_URL:-https://gitlab.com}}
       # Agent sandbox (practice review + Pi mentor chat). Activated by the worker role
       # (hephaestus.runtime.worker.enabled), then gated per-workspace via WorkspaceFeatures.
       # AgentImagePinGuard requires a digest-pinned agent image in prod; the release-pin-fetcher
@@ -197,8 +216,35 @@ services:
       SANDBOX_MAX_CONCURRENT: ${SANDBOX_MAX_CONCURRENT:-5}
       SANDBOX_MEMORY_BYTES: ${SANDBOX_MEMORY_BYTES:-4294967296}
       SANDBOX_CPUS: ${SANDBOX_CPUS:-2.0}
-      # Agent NATS (job queue for practice review)
-      AGENT_NATS_ENABLED: ${AGENT_NATS_ENABLED:-false}
+      # Agent job queue (practice review). The queue runs on PostgreSQL — no NATS involved. NATS
+      # stays required elsewhere on this pod for webhook-driven sync consumption (NATS_ENABLED above).
+      AGENT_ENABLED: ${AGENT_ENABLED:-false}
+      # ── Retired. Nothing reads these; they are forwarded for ONE release so a stale line in your
+      # docker/.env is visible. A .env entry is a Compose interpolation input, not container
+      # environment: without this block the JVM never sees it and DeprecatedEnvVarStartupWarner
+      # cannot name it. Unset, each resolves to "" and the warner treats blank as absent — set to
+      # anything and you get one WARN at boot per var, on this pod only (deliberately: the other
+      # pods would just repeat it). DELETE this block, and the matching entries in
+      # DeprecatedEnvVarStartupWarner, in the release after the one that retired them.
+      HEPHAESTUS_WORKER_LLM_BASE_URL: ${HEPHAESTUS_WORKER_LLM_BASE_URL:-}
+      HEPHAESTUS_WORKER_LLM_API_KEY: ${HEPHAESTUS_WORKER_LLM_API_KEY:-}
+      HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED: ${HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED:-}
+      AGENT_NATS_ENABLED: ${AGENT_NATS_ENABLED:-}
+      AGENT_NATS_MAX_ACK_PENDING: ${AGENT_NATS_MAX_ACK_PENDING:-}
+      AGENT_NATS_FETCH_BATCH_SIZE: ${AGENT_NATS_FETCH_BATCH_SIZE:-}
+      # Instance-wide LLM knobs. Providers, models, prices and credentials are NOT here — they are
+      # runtime catalog data an instance admin registers in the UI. These three are the deploy-time
+      # facts that cannot be.
+      # Second display currency for spend figures. Empty (the default) is USD only. EUR is the one
+      # supported value: anything else — including a well-formed code like GBP — FAILS THE BOOT with a
+      # message naming what is accepted, rather than starting up and quietly showing USD.
+      # The reports and the FX fetcher are server-role, so this belongs on this pod.
+      HEPHAESTUS_LLM_DISPLAY_CURRENCY: ${HEPHAESTUS_LLM_DISPLAY_CURRENCY:-}
+      HEPHAESTUS_LLM_FX_DAILY_URL: ${HEPHAESTUS_LLM_FX_DAILY_URL:-https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml}
+      # SSRF guard. Set on BOTH this pod and the worker or the two disagree: this pod decides whether
+      # a loopback provider URL may be SAVED, the worker's proxy decides whether it may be DIALLED.
+      # Leave false in production.
+      HEPHAESTUS_LLM_EGRESS_ALLOW_LOOPBACK: ${HEPHAESTUS_LLM_EGRESS_ALLOW_LOOPBACK:-false}
       # Git checkout (bind-mount repos into agent containers)
       GIT_CHECKOUT_ENABLED: ${GIT_CHECKOUT_ENABLED:-false}
       GIT_STORAGE_PATH: /data/git-repos
@@ -208,17 +254,15 @@ services:
       PRACTICE_REVIEW_DELIVER_TO_MERGED: ${PRACTICE_REVIEW_DELIVER_TO_MERGED:-false}
       PRACTICE_REVIEW_COOLDOWN_MINUTES: ${PRACTICE_REVIEW_COOLDOWN_MINUTES:-15}
       PRACTICE_REVIEW_APP_BASE_URL: ${PRACTICE_REVIEW_APP_BASE_URL:-}
-      # Feature flags
-      HEPHAESTUS_FEATURES_FLAGS_PRACTICE_REVIEW_FOR_ALL: ${PRACTICE_REVIEW_FOR_ALL:-false}
-      HEPHAESTUS_FEATURES_FLAGS_GITLAB_WORKSPACE_CREATION: ${GITLAB_WORKSPACE_CREATION:-false}
-      # LLM proxy (generic OpenAI-compatible route)
-      LLM_PROXY_OPENAI_URL: ${LLM_PROXY_OPENAI_URL:-https://api.openai.com}
-      LLM_PROXY_OPENAI_AUTH_HEADER: ${LLM_PROXY_OPENAI_AUTH_HEADER:-Authorization}
-      LLM_PROXY_OPENAI_USE_BEARER: ${LLM_PROXY_OPENAI_USE_BEARER:-true}
-      # LLM proxy (dedicated Azure OpenAI route used by Pi)
-      LLM_PROXY_AZURE_OPENAI_URL: ${LLM_PROXY_AZURE_OPENAI_URL:-}
-      LLM_PROXY_AZURE_OPENAI_AUTH_HEADER: ${LLM_PROXY_AZURE_OPENAI_AUTH_HEADER:-api-key}
-      LLM_PROXY_AZURE_OPENAI_USE_BEARER: ${LLM_PROXY_AZURE_OPENAI_USE_BEARER:-false}
+      # Feature flags. These names are now the server's own — application.yml reads each flag from the
+      # variable of the same name — so they mean the same thing outside these compose files. They used
+      # to be compose-only aliases that fanned out to HEPHAESTUS_FEATURES_FLAGS_*, which made them dead
+      # letters in any deployment that did not use this file. That long form still works and still wins
+      # if you set it. PRACTICE_REVIEW_FOR_ALL also feeds the separate detection gate above.
+      PRACTICE_REVIEW_FOR_ALL: ${PRACTICE_REVIEW_FOR_ALL:-false}
+      GITLAB_WORKSPACE_CREATION: ${GITLAB_WORKSPACE_CREATION:-false}
+      # LLM providers are registered at runtime (Instance admin → AI models), not via env vars —
+      # the proxy reads each connection's base URL/auth from the catalog per request.
       # Worker control channel: same env var feeds the worker pod's registration-token claim.
       HEPHAESTUS_WORKER_HUB_TOKEN_REGISTRATION_TOKEN: ${HEPHAESTUS_WORKER_REGISTRATION_TOKEN:-}
       # thc healthcheck target: actuator liveness on the management port.
@@ -233,7 +277,6 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - git-repos:/data/git-repos
-      - application-server-logs:/var/log/hephaestus
       - release-pin:/pin:ro
     networks:
       - shared-network
@@ -288,27 +331,35 @@ services:
         max-size: "50m"
         max-file: "5"
 
-  # Worker runtime — same image, worker profile, no HTTP server, dials the hub over WSS.
+  # Worker runtime — same image, worker profile, internal-only HTTP proxy, dials the hub over WSS.
   application-worker:
     image: "ghcr.io/ls1intum/hephaestus/application-server:${IMAGE_TAG}"
+    # Bounds heap sizing to this container (see application-server).
+    mem_limit: ${APPLICATION_WORKER_MEM_LIMIT:-3g}
     environment:
+      # See application-server: the buildpack's 10M direct-memory default is too small.
+      JAVA_TOOL_OPTIONS: "-XX:MaxDirectMemorySize=${APP_MAX_DIRECT_MEMORY:-128M}"
       APP_VERSION: ${IMAGE_TAG}
       SPRING_PROFILES_ACTIVE: prod,worker
       HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES:-}
       HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: ${HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST:-true}
       HEPHAESTUS_HUB_URL: ws://application-server:8080/api/workers/connect
       HEPHAESTUS_WORKER_REGISTRATION_TOKEN: ${HEPHAESTUS_WORKER_REGISTRATION_TOKEN:-}
-      NATS_SERVER: nats://nats-server:4222
-      AGENT_NATS_ENABLED: ${AGENT_NATS_ENABLED:-false}
+      # Agent job queue (practice review). The queue runs on PostgreSQL — this pod needs no NATS at
+      # all (it runs no sync/webhook role), so no NATS_SERVER is set here.
+      AGENT_ENABLED: ${AGENT_ENABLED:-false}
       SANDBOX_DOCKER_HOST: ${SANDBOX_DOCKER_HOST:-unix:///var/run/docker.sock}
       SANDBOX_CONTAINER_RUNTIME: ${SANDBOX_CONTAINER_RUNTIME:-}
       SANDBOX_MAX_CONCURRENT: ${SANDBOX_MAX_CONCURRENT:-5}
       SANDBOX_MEMORY_BYTES: ${SANDBOX_MEMORY_BYTES:-4294967296}
       SANDBOX_CPUS: ${SANDBOX_CPUS:-2.0}
-      # BYO LLM credentials: when both set, agent-pi reaches the operator's LLM directly
-      # instead of the app-pod's bundled proxy (not reachable from a separate host).
-      HEPHAESTUS_LLM_BASE_URL: ${HEPHAESTUS_WORKER_LLM_BASE_URL:-}
-      HEPHAESTUS_LLM_API_KEY: ${HEPHAESTUS_WORKER_LLM_API_KEY:-}
+      # SSRF guard for the in-process LLM proxy. Must match application-server's value: that pod
+      # decides whether a loopback provider URL may be SAVED, this one whether it may be DIALLED, and
+      # a split between them shows up as connections that save fine and then fail at call time.
+      HEPHAESTUS_LLM_EGRESS_ALLOW_LOOPBACK: ${HEPHAESTUS_LLM_EGRESS_ALLOW_LOOPBACK:-false}
+      # No LLM credential passthrough needed: the proxy runs in-process on this pod (it follows
+      # the worker/sandbox capability) and reads providers
+      # from the same instance/workspace catalog as application-server.
       HEPHAESTUS_WORKER_CAPACITY_REVIEW_MAX: ${HEPHAESTUS_WORKER_REVIEW_MAX:-auto}
       HEPHAESTUS_WORKER_CAPACITY_MENTOR_MAX: ${HEPHAESTUS_WORKER_MENTOR_MAX:-auto}
       HEPHAESTUS_WORKER_DRAIN_TIMEOUT: ${HEPHAESTUS_WORKER_DRAIN_TIMEOUT:-5m}
@@ -391,6 +442,14 @@ services:
       interval: 5s
       timeout: 10s
       retries: 10
+    # Same cap as the other long-running services in this file. Postgres logs checkpoints, autovacuum
+    # and every failed connection attempt; on the single-host install it shares a disk with the data
+    # directory it is logging about, so an unbounded log can take the database down with it.
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
 
 networks:
   shared-network:
@@ -400,5 +459,4 @@ networks:
 volumes:
   postgresql-data:
   git-repos:
-  application-server-logs:
   release-pin:

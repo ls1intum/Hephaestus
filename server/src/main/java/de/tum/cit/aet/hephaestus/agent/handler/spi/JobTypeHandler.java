@@ -11,10 +11,6 @@ import java.util.Map;
  * preparing workspace context, and delivering results. The executor pipeline and sandbox
  * manager remain completely domain-agnostic.
  *
- * <p>Handlers are registered in {@link de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry}
- * and looked up by {@link AgentJobType}. Handlers are plain objects with constructor-injected
- * dependencies — no Spring annotations on the interface or its methods.
- *
  * <h2>Lifecycle (called by executor)</h2>
  * <ol>
  *   <li>{@link #createSubmission} — event listener extracts metadata + idempotency key</li>
@@ -58,13 +54,22 @@ public interface JobTypeHandler {
      * entirely handler-specific: posting a PR comment, sending an email, creating a ticket,
      * updating a dashboard, etc.
      *
-     * <p>Default implementation is a no-op. Handlers override when delivery logic is ready
-     * (see issue #748).
-     *
      * @param job the completed job (output is available via {@link AgentJob#getOutput()})
      */
     default void deliver(AgentJob job) {
         // No-op — overridden by handlers that need result delivery.
+    }
+
+    /**
+     * Has a delivery for THIS job already landed at the provider, even though its id was never
+     * persisted? Covers the crash window between {@link #deliver} posting and the caller recording
+     * what it posted, so recovery does not re-post a duplicate.
+     *
+     * <p>Defaults to {@code UNKNOWN}, which never re-posts: a handler that cannot search its channel
+     * for the job marker must not be guessed into posting twice.
+     */
+    default ExistingDeliveryLookup findExistingDelivery(AgentJob job) {
+        return ExistingDeliveryLookup.unknown();
     }
 
     /**

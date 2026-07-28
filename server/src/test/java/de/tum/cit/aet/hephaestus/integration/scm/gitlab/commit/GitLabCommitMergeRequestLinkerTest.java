@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.commit;
 
+import static de.tum.cit.aet.hephaestus.integration.scm.GraphQlResponseStubValidator.Vendor.GITLAB;
+import static de.tum.cit.aet.hephaestus.integration.scm.GraphQlResponseStubValidator.assertVendorCouldReturn;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -483,6 +485,7 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
 
     @SuppressWarnings("unchecked")
     private ClientGraphQlResponse mockMrsPage(List<Map<String, Object>> nodes, GitLabPageInfo pageInfo) {
+        assertVendorCouldReturn(GITLAB, "LinkCommitsToMergeRequests", "project.mergeRequests.nodes", nodes);
         ClientGraphQlResponse resp = mock(ClientGraphQlResponse.class);
         lenient().when(resp.isValid()).thenReturn(true);
 
@@ -522,6 +525,7 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
 
         Map<String, Object> mrNode = new LinkedHashMap<>();
         mrNode.put("commits", commitsMap);
+        assertVendorCouldReturn(GITLAB, "GetMergeRequestAllCommits", "project.mergeRequests.nodes", List.of(mrNode));
 
         ClientResponseField nodesField = mock(ClientResponseField.class);
         when(nodesField.<Map>toEntityList(any(Class.class))).thenReturn((List) List.of(mrNode));
@@ -555,6 +559,7 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
 
         Map<String, Object> mrNode = new LinkedHashMap<>();
         mrNode.put("commitsWithoutMergeCommits", commitsMap);
+        assertVendorCouldReturn(GITLAB, "GetMergeRequestCommits", "project.mergeRequests.nodes", List.of(mrNode));
 
         ClientResponseField nodesField = mock(ClientResponseField.class);
         when(nodesField.<Map>toEntityList(any(Class.class))).thenReturn((List) List.of(mrNode));
@@ -564,8 +569,11 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
     }
 
     /**
-     * Builds the map shape that the linker reads from
-     * {@code project.mergeRequests.nodes[*]}.
+     * Builds the map shape that the linker reads from {@code project.mergeRequests.nodes[*]}.
+     *
+     * <p>{@code MergeRequest.iid} is {@code String!} in the checked-in schema, so GitLab sends {@code "42"} and
+     * never {@code 42}. Stubbing it as a number would exercise only the {@code Number} branch of the production
+     * extractor — the branch GitLab can never trigger.
      */
     private static Map<String, Object> mrNode(
         int iid,
@@ -588,7 +596,7 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
         commitsMap.put("pageInfo", pageInfoMap);
 
         Map<String, Object> node = new LinkedHashMap<>();
-        node.put("iid", iid);
+        node.put("iid", String.valueOf(iid));
         node.put("commitsWithoutMergeCommits", commitsMap);
         return node;
     }
@@ -607,7 +615,7 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
         commitsMap.put("pageInfo", pageInfoMap);
 
         Map<String, Object> node = new LinkedHashMap<>();
-        node.put("iid", iid);
+        node.put("iid", String.valueOf(iid));
         node.put("commitsWithoutMergeCommits", commitsMap);
         return node;
     }

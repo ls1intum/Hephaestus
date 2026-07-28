@@ -117,6 +117,291 @@ export type WorkspaceMembership = {
 };
 
 /**
+ * One calendar month of a workspace's LLM spend, rolled up from the usage ledger
+ */
+export type WorkspaceLlmUsageReport = {
+    byDay: Array<LlmUsageByDay>;
+    byJobType: Array<LlmUsageByJobType>;
+    /**
+     * Display-only conversion when the instance has a display currency. Absent = show USD only.
+     */
+    fx?: FxRateInfo;
+    /**
+     * Whether host-funded (shared-model) spend is within its cap, has reached it, or can't be confirmed because some shared-model usage has no price set.
+     */
+    instanceBudgetVerdict: 'WITHIN' | 'EXHAUSTED' | 'UNVERIFIABLE';
+    /**
+     * Monthly cap in USD on spend the host pays for (shared models); null = uncapped. Set by instance admins only — a workspace admin can see it but not change it.
+     */
+    instanceMonthlyBudgetUsd?: number;
+    /**
+     * Whether work on SHARED models is currently paused for this workspace. Authoritative — it mirrors the live gate rather than being derivable from the verdict alone. Always false for a past month, which cannot pause anything.
+     */
+    instancePaused: boolean;
+    /**
+     * This month's confirmed spend on shared (instance) models, in USD — the figure instanceMonthlyBudgetUsd compares against. A floor, not the full total, while unpricedEventCount is non-zero.
+     */
+    instanceTotalCostUsd: number;
+    /**
+     * Calendar month (UTC), ISO yyyy-MM
+     */
+    month: string;
+    /**
+     * The same verdict for spend on this workspace's own provider, against its own cap.
+     */
+    ownProviderBudgetVerdict: 'WITHIN' | 'EXHAUSTED' | 'UNVERIFIABLE';
+    /**
+     * Monthly cap in USD on spend this workspace pays for through its own connected provider; null = uncapped. Set by this workspace's own admins.
+     */
+    ownProviderMonthlyBudgetUsd?: number;
+    /**
+     * Whether work on this workspace's OWN provider is currently paused.
+     */
+    ownProviderPaused: boolean;
+    /**
+     * This month's confirmed spend on this workspace's own connected provider(s), in USD — the figure ownProviderMonthlyBudgetUsd compares against. Different money from instanceTotalCostUsd: the two are never added together.
+     */
+    ownProviderTotalCostUsd: number;
+    /**
+     * Calls this month (either purse) whose price is not yet known. They are excluded from both totals above, so a non-zero value means the real spend may be higher than shown.
+     */
+    unpricedEventCount: number;
+};
+
+/**
+ * Display-only currency conversion for the USD amounts in this response. Multiply a USD amount by ratePerUsd to get the display-currency estimate; always label it as an estimate and show rateDate, which is the date the rate was actually published on (not necessarily today), and attribute it to source.
+ */
+export type FxRateInfo = {
+    /**
+     * ISO 4217 code of the display currency
+     */
+    currencyCode: string;
+    /**
+     * The date the underlying reference rate was published. A closed month always reports a date inside that month, so its converted figure never changes once the month ends.
+     */
+    rateDate: Date;
+    /**
+     * Units of the display currency per 1 USD, at 6 decimal places
+     */
+    ratePerUsd: number;
+    /**
+     * Who published the rate, so a disclosure can name it instead of saying "a reference rate". ECB = the European Central Bank's daily euro foreign-exchange reference rates.
+     */
+    source: 'ECB';
+};
+
+/**
+ * Month spend aggregated by job type
+ */
+export type LlmUsageByJobType = {
+    cacheReadTokens: number;
+    cacheWriteTokens: number;
+    /**
+     * Ledger events (jobs / mentor turns)
+     */
+    events: number;
+    inputTokens: number;
+    /**
+     * Confirmed spend on shared (instance) models for this job type, in USD.
+     */
+    instanceTotalCostUsd: number;
+    jobType: 'PULL_REQUEST_REVIEW' | 'ISSUE_REVIEW' | 'CONVERSATION_REVIEW' | 'MENTOR_TURN';
+    outputTokens: number;
+    /**
+     * Spend on this workspace's own connected provider(s) for this job type, in USD.
+     */
+    ownProviderTotalCostUsd: number;
+    /**
+     * LLM API calls, as reported by the runtime. Detection jobs and mentor turns both include every assistant call in an internal tool loop.
+     */
+    totalCalls: number;
+    /**
+     * Calls for this job type whose price is not yet known. Excluded from both totals above.
+     */
+    unpricedEventCount: number;
+};
+
+/**
+ * Spend for one UTC day
+ */
+export type LlmUsageByDay = {
+    day: Date;
+    events: number;
+    /**
+     * Confirmed spend on shared (instance) models for this day, in USD.
+     */
+    instanceTotalCostUsd: number;
+    /**
+     * Spend on this workspace's own connected provider(s) for this day, in USD.
+     */
+    ownProviderTotalCostUsd: number;
+    /**
+     * Calls this day whose price is not yet known. Excluded from both totals above.
+     */
+    unpricedEventCount: number;
+};
+
+/**
+ * The instance LLM policy as it applies to this workspace (read-only)
+ */
+export type WorkspaceLlmSettings = {
+    /**
+     * Whether this workspace may register its own LLM provider connections
+     */
+    ownProviderAllowed: boolean;
+};
+
+/**
+ * Result of testing your AI provider connection
+ */
+export type WorkspaceLlmProbeResult = {
+    /**
+     * Human-readable diagnostic when not reachable
+     */
+    message?: string;
+    /**
+     * How many models the provider listed (0 if unreachable)
+     */
+    modelCount: number;
+    /**
+     * Whether the provider answered
+     */
+    reachable: boolean;
+};
+
+/**
+ * A model on your AI provider
+ */
+export type WorkspaceLlmModel = {
+    /**
+     * Owning connection's display name
+     */
+    connectionDisplayName: string;
+    /**
+     * Owning connection id
+     */
+    connectionId: number;
+    /**
+     * Context window in tokens
+     */
+    contextWindow?: number;
+    /**
+     * Creation timestamp
+     */
+    createdAt: Date;
+    /**
+     * Currency code
+     */
+    currency: string;
+    /**
+     * Human-readable name
+     */
+    displayName: string;
+    /**
+     * Active toggle
+     */
+    enabled: boolean;
+    /**
+     * Model id
+     */
+    id: number;
+    /**
+     * Maximum output tokens
+     */
+    maxOutputTokens?: number;
+    /**
+     * Cache-read rate per 1M tokens (USD)
+     */
+    per1mCacheReadUsd?: number;
+    /**
+     * Cache-write rate per 1M tokens (USD)
+     */
+    per1mCacheWriteUsd?: number;
+    /**
+     * Input rate per 1M tokens (USD)
+     */
+    per1mInputUsd?: number;
+    /**
+     * Output rate per 1M tokens (USD)
+     */
+    per1mOutputUsd?: number;
+    /**
+     * Price note
+     */
+    priceNote?: string;
+    /**
+     * Pricing mode
+     */
+    pricingMode: 'PRICED' | 'NO_CHARGE' | 'UNPRICED';
+    /**
+     * Unique slug within the workspace
+     */
+    slug: string;
+    /**
+     * Whether the model supports a reasoning mode
+     */
+    supportsReasoning: boolean;
+    /**
+     * Last update timestamp
+     */
+    updatedAt?: Date;
+    /**
+     * Upstream provider model id
+     */
+    upstreamModelId: string;
+};
+
+/**
+ * Your AI provider connection (API key redacted)
+ */
+export type WorkspaceLlmConnection = {
+    /**
+     * Last four characters of the stored API key, if any
+     */
+    apiKeyLast4?: string;
+    /**
+     * Wire protocol
+     */
+    apiProtocol: string;
+    /**
+     * Credential shape
+     */
+    authMode: 'BEARER' | 'API_KEY';
+    /**
+     * Provider base URL
+     */
+    baseUrl: string;
+    /**
+     * Creation timestamp
+     */
+    createdAt: Date;
+    /**
+     * Human-readable name
+     */
+    displayName: string;
+    /**
+     * Whether the connection is active
+     */
+    enabled: boolean;
+    /**
+     * Whether an API key is stored
+     */
+    hasApiKey: boolean;
+    /**
+     * Connection ID
+     */
+    id: number;
+    /**
+     * Unique slug within the workspace
+     */
+    slug: string;
+    /**
+     * Last update timestamp
+     */
+    updatedAt?: Date;
+};
+
+/**
  * Summary information about a workspace for list views
  */
 export type WorkspaceListItem = {
@@ -397,11 +682,11 @@ export type UserInfo = {
 };
 
 /**
- * Request to update the workspace's GitHub Personal Access Token
+ * Request to update the workspace's SCM Personal Access Token
  */
 export type UpdateWorkspaceTokenRequest = {
     /**
-     * GitHub Personal Access Token for API access
+     * SCM Personal Access Token for API access
      */
     personalAccessToken: string;
 };
@@ -459,6 +744,78 @@ export type UpdateWorkspaceNotificationsRequest = {
 };
 
 /**
+ * Update a model on your AI provider (all fields optional)
+ */
+export type UpdateWorkspaceLlmModelRequest = {
+    /**
+     * Context window in tokens
+     */
+    contextWindow?: number;
+    /**
+     * Human-readable name
+     */
+    displayName?: string;
+    /**
+     * Active toggle
+     */
+    enabled?: boolean;
+    /**
+     * Maximum output tokens
+     */
+    maxOutputTokens?: number;
+    /**
+     * Cache-read rate per 1M tokens (USD), if applicable
+     */
+    per1mCacheReadUsd?: number;
+    /**
+     * Cache-write rate per 1M tokens (USD), if applicable
+     */
+    per1mCacheWriteUsd?: number;
+    /**
+     * Input rate per 1M tokens (USD)
+     */
+    per1mInputUsd?: number;
+    /**
+     * Output rate per 1M tokens (USD)
+     */
+    per1mOutputUsd?: number;
+    /**
+     * Note; required when the model is free (e.g. self-hosted, no cost)
+     */
+    priceNote?: string;
+    /**
+     * Pricing mode; when given, replaces the price wholesale (see class docs)
+     */
+    pricingMode?: 'PRICED' | 'NO_CHARGE' | 'UNPRICED';
+    /**
+     * Whether the model supports a reasoning mode
+     */
+    supportsReasoning?: boolean;
+};
+
+/**
+ * Update your AI provider connection (all fields optional)
+ */
+export type UpdateWorkspaceLlmConnectionRequest = {
+    /**
+     * New API key (write-only; never returned)
+     */
+    apiKey?: string;
+    /**
+     * Set true to clear the stored API key
+     */
+    clearApiKey?: boolean;
+    /**
+     * Human-readable name
+     */
+    displayName?: string;
+    /**
+     * Whether the connection is active
+     */
+    enabled?: boolean;
+};
+
+/**
  * Request to update workspace feature flags. Null fields are left unchanged.
  */
 export type UpdateWorkspaceFeaturesRequest = {
@@ -506,6 +863,10 @@ export type UpdateTeamSettingsRequest = {
     hidden: boolean;
 };
 
+export type UpdateSyncJobRequest = {
+    cancelRequested: boolean;
+};
+
 export type UpdateSlackUserPreferencesRequest = {
     channelMessagesAllowed: boolean;
 };
@@ -537,7 +898,7 @@ export type UpdateRepositorySettingsRequest = {
 /**
  * Update per-workspace practice-review policy. Null fields unchanged; 'reset' clears to inherit.
  */
-export type UpdatePracticeReviewSettings = {
+export type UpdatePracticeReviewSettingsRequest = {
     /**
      * Minimum minutes between reviews for the same PR; 0 disables the cooldown
      */
@@ -657,6 +1018,108 @@ export type UpdateLoginProviderRequest = {
 };
 
 /**
+ * Share with: all workspaces, or a selected set
+ */
+export type UpdateLlmModelSharingRequest = {
+    /**
+     * Share with all workspaces (PUBLIC) or only the selected ones (GRANTED)
+     */
+    visibility: 'PUBLIC' | 'GRANTED';
+    /**
+     * Workspace ids to share with when visibility is GRANTED; empty or omitted stages the model without workspace access
+     */
+    workspaceIds?: Array<number>;
+};
+
+/**
+ * Update a model's metadata (all fields optional; pricing and sharing are separate)
+ */
+export type UpdateLlmModelRequest = {
+    /**
+     * Context window in tokens
+     */
+    contextWindow?: number;
+    /**
+     * Human-readable name
+     */
+    displayName?: string;
+    /**
+     * Active toggle (off = existing settings stop working)
+     */
+    enabled?: boolean;
+    /**
+     * Maximum output tokens
+     */
+    maxOutputTokens?: number;
+    /**
+     * Whether the model supports a reasoning mode
+     */
+    supportsReasoning?: boolean;
+};
+
+/**
+ * Reprice a model; supersedes the current price
+ */
+export type UpdateLlmModelPriceRequest = {
+    /**
+     * Note; required when the model is free (e.g. self-hosted, no cost)
+     */
+    note?: string;
+    /**
+     * Cache-read rate per 1M tokens (USD), if applicable
+     */
+    per1mCacheReadUsd?: number;
+    /**
+     * Cache-write rate per 1M tokens (USD), if applicable
+     */
+    per1mCacheWriteUsd?: number;
+    /**
+     * Input rate per 1M tokens (USD); required when the model has a price
+     */
+    per1mInputUsd?: number;
+    /**
+     * Output rate per 1M tokens (USD); required when the model has a price
+     */
+    per1mOutputUsd?: number;
+    /**
+     * PRICED shows the price itself; NO_CHARGE is a deliberate no-cost declaration; UNPRICED shows "No price set"
+     */
+    pricingMode: 'PRICED' | 'NO_CHARGE' | 'UNPRICED';
+};
+
+/**
+ * Update an instance LLM provider connection (all fields optional)
+ */
+export type UpdateLlmConnectionRequest = {
+    /**
+     * New API key (write-only; never returned)
+     */
+    apiKey?: string;
+    /**
+     * Set true to clear the stored API key
+     */
+    clearApiKey?: boolean;
+    /**
+     * Human-readable name
+     */
+    displayName?: string;
+    /**
+     * Whether the connection is enabled
+     */
+    enabled?: boolean;
+};
+
+/**
+ * Set or clear a monthly LLM budget cap
+ */
+export type UpdateLlmBudgetRequest = {
+    /**
+     * Cap in USD; 0 pauses the affected work immediately, null removes the cap. The purse it governs is the one the path names, and only that one: /admin/workspaces/{workspaceSlug}/llm/budget caps spend on shared (instance) models, /workspaces/{workspaceSlug}/llm/budget caps the workspace's spend on its own connected provider. The two are never added together.
+     */
+    monthlyBudgetUsd?: number;
+};
+
+/**
  * Request to update the entire weekly leaderboard digest configuration atomically
  */
 export type UpdateLeaderboardDigestRequest = {
@@ -683,6 +1146,20 @@ export type UpdateLeaderboardDigestRequest = {
 };
 
 /**
+ * Update instance-wide LLM governance settings (all fields optional)
+ */
+export type UpdateInstanceLlmSettingsRequest = {
+    /**
+     * Whether workspaces may register their own LLM connections
+     */
+    allowWorkspaceConnections?: boolean;
+    /**
+     * Comma/newline-delimited egress host allowlist; blank clears it
+     */
+    allowedEgressHosts?: string;
+};
+
+/**
  * Request to update a connection's lifecycle status
  */
 export type UpdateConnectionStatusRequest = {
@@ -696,64 +1173,18 @@ export type UpdateConnectionStatusRequest = {
     state: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
 };
 
-/**
- * Request to update an existing agent configuration (all fields optional — null fields are not changed)
- */
-export type UpdateAgentConfigRequest = {
-    /**
-     * Whether agent containers have internet access
-     */
-    allowInternet?: boolean;
-    /**
-     * Set true to remove the stored API key (takes precedence over llmApiKey)
-     */
-    clearLlmApiKey?: boolean;
-    /**
-     * Authentication mode: PROXY (internal proxy) or API_KEY (direct)
-     */
-    credentialMode?: 'PROXY' | 'API_KEY';
-    /**
-     * Whether the agent is enabled
-     */
-    enabled?: boolean;
-    /**
-     * LLM API key (omit or null to keep existing key)
-     */
-    llmApiKey?: string;
-    /**
-     * Optional LLM base URL override (omit or null to keep existing value; empty string clears it)
-     */
-    llmBaseUrl?: string;
-    /**
-     * LLM provider
-     */
-    llmProvider?: 'ANTHROPIC' | 'OPENAI' | 'AZURE_OPENAI';
-    /**
-     * Maximum concurrent jobs
-     */
-    maxConcurrentJobs?: number;
-    /**
-     * LLM model name
-     */
-    modelName?: string;
-    /**
-     * Job timeout in seconds
-     */
-    timeoutSeconds?: number;
-};
-
-/**
- * Bind an agent config to a workspace purpose; null unbinds
- */
-export type UpdateAgentBindingRequest = {
-    /**
-     * Agent config id to bind, or null to unbind
-     */
-    configId?: number;
-};
-
 export type UpdateAccountRequest = {
     appRole?: string;
+};
+
+/**
+ * Manual sync trigger request body
+ */
+export type TriggerSyncJobRequest = {
+    /**
+     * RECONCILIATION for a full re-sync, BACKFILL for historical data
+     */
+    type: 'INITIAL' | 'RECONCILIATION' | 'BACKFILL';
 };
 
 /**
@@ -868,6 +1299,142 @@ export type LabelInfo = {
      * Repository the label belongs to
      */
     repository?: RepositoryInfo;
+};
+
+/**
+ * One synced resource (repository / channel / collection) — unified read-model row
+ */
+export type SyncResourceState = {
+    /**
+     * Per-resource backfill horizon
+     */
+    backfillCompletedThrough?: Date;
+    /**
+     * Per-resource backfill percent
+     */
+    backfillPercent?: number;
+    /**
+     * Per-entity-class breakdown behind itemCount. One entry per class the integration actually mirrors — 6 for an SCM repository, 1 for a Slack channel or Outline collection. Never null; empty when the resource has never synced.
+     */
+    counts: Array<SyncResourceCount>;
+    /**
+     * Vendor-side identifier
+     */
+    externalId: string;
+    /**
+     * The integration's own row id
+     */
+    id: number;
+    /**
+     * Headline mirrored item count — the rollup of `counts`
+     */
+    itemCount?: number;
+    /**
+     * Last sync error, if any
+     */
+    lastError?: string;
+    /**
+     * Last successful sync timestamp across all entity classes
+     */
+    lastSyncedAt?: Date;
+    /**
+     * Display name
+     */
+    name: string;
+    /**
+     * Integration-defined status string
+     */
+    state: string;
+    /**
+     * Resource kind
+     */
+    type: 'REPOSITORY' | 'CHANNEL' | 'COLLECTION';
+    /**
+     * Vendor-reported upstream count, if cheaply available
+     */
+    upstreamCount?: number;
+};
+
+/**
+ * One entity class mirrored within a resource (issues, pull requests, comments, messages, …)
+ */
+export type SyncResourceCount = {
+    /**
+     * Mirrored row count for this class
+     */
+    count: number;
+    /**
+     * Stable machine token for this class
+     */
+    key: 'issues' | 'pullRequests' | 'issueComments' | 'reviews' | 'reviewComments' | 'commits' | 'messages' | 'documents';
+    /**
+     * Display name
+     */
+    label: string;
+    /**
+     * When this class was last synced. Null means the integration does not track a per-class watermark — not that the class has never synced.
+     */
+    lastSyncedAt?: Date;
+};
+
+/**
+ * One sync_job row — a single INITIAL/RECONCILIATION/BACKFILL pass for a connection
+ */
+export type SyncJob = {
+    /**
+     * Whether a cooperative cancel was requested
+     */
+    cancelRequested: boolean;
+    /**
+     * When the job row was created
+     */
+    createdAt: Date;
+    /**
+     * Truncated error summary, set on FAILED
+     */
+    errorSummary?: string;
+    /**
+     * When the job finished (any terminal status)
+     */
+    finishedAt?: Date;
+    /**
+     * Job id
+     */
+    id: number;
+    /**
+     * Coarse progress: items processed so far
+     */
+    itemsProcessed?: number;
+    /**
+     * Coarse progress: total items, if known
+     */
+    itemsTotal?: number;
+    /**
+     * Per-phase progress detail, integration-specific shape
+     */
+    progress?: {
+        [key: string]: unknown;
+    };
+    /**
+     * When the job started running
+     */
+    startedAt?: Date;
+    /**
+     * Job status
+     */
+    status: 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'SUCCEEDED_WITH_WARNINGS' | 'FAILED' | 'CANCELLED';
+    /**
+     * What initiated this job
+     */
+    trigger: 'SCHEDULED' | 'MANUAL' | 'LIFECYCLE' | 'SYSTEM';
+    /**
+     * Account id of the admin who triggered this job, if MANUAL
+     */
+    triggeredByUserId?: number;
+    /**
+     * What kind of pass this is
+     */
+    type: 'INITIAL' | 'RECONCILIATION' | 'BACKFILL';
 };
 
 export type SortObject = {
@@ -1022,6 +1589,28 @@ export type SessionView = {
 
 export type RevokeSessionsResult = {
     revoked?: number;
+};
+
+/**
+ * Resource-level rollup for the connection overview badge
+ */
+export type ResourceCounts = {
+    /**
+     * Resources currently reporting a sync error
+     */
+    errored: number;
+    /**
+     * Resources that have never completed a sync (no lastSyncedAt). Defined on the timestamp rather than on a provider's status vocabulary so it means the same thing for a repository, a Slack channel and an Outline collection.
+     */
+    pending: number;
+    /**
+     * Resources whose last sync is older than twice the connection's scheduled cadence. Always 0 when the cadence is unknown or the schedule is irregular — staleness is a judgement against a known cron, and without one this declines to guess rather than flagging healthy resources.
+     */
+    stale: number;
+    /**
+     * Total resources known to this connection
+     */
+    total: number;
 };
 
 /**
@@ -1200,6 +1789,32 @@ export type Reaction = {
      * Unique reaction ID
      */
     id: string;
+};
+
+/**
+ * Vendor API rate-limit observation, read from in-memory trackers (not persisted across restarts). Every field except observedAt is present only if the vendor actually reported it.
+ */
+export type RateLimitSnapshot = {
+    /**
+     * Window ceiling, if the vendor reported one. Survives window rollover — a ceiling is window-invariant.
+     */
+    limit?: number;
+    /**
+     * When the underlying vendor response was seen
+     */
+    observedAt: Date;
+    /**
+     * Remaining budget, if reported and still inside the observed window. Null once the window has rolled over.
+     */
+    remaining?: number;
+    /**
+     * When the observed window ends, if reported and still in the future
+     */
+    resetAt?: Date;
+    /**
+     * An observed 429's back-off deadline (observedAt + Retry-After); null if the vendor never told us to back off
+     */
+    throttledUntil?: Date;
 };
 
 /**
@@ -1492,6 +2107,77 @@ export type Profile = {
     xpRecord: ProfileXpRecord;
 };
 
+export type ProblemDetail = {
+    detail?: string;
+    instance?: string;
+    properties?: {
+        [key: string]: unknown;
+    };
+    status?: number;
+    title?: string;
+    type?: string;
+};
+
+/**
+ * Draft connection probe using a supplied (never-persisted) credential
+ */
+export type ProbeLlmConnectionRequest = {
+    /**
+     * API key used only for this probe
+     */
+    apiKey?: string;
+    /**
+     * Wire protocol
+     */
+    apiProtocol: string;
+    /**
+     * Credential shape (default BEARER)
+     */
+    authMode?: 'BEARER' | 'API_KEY';
+    /**
+     * Provider base URL
+     */
+    baseUrl: string;
+};
+
+/**
+ * A workspace's practice-review policy: effective values plus raw overrides
+ */
+export type PracticeReviewSettings = {
+    /**
+     * Effective: minimum minutes between reviews for the same PR
+     */
+    cooldownMinutes: number;
+    /**
+     * Raw override; null = inheriting the fleet default
+     */
+    cooldownMinutesOverride?: number;
+    /**
+     * Effective: deliver feedback to merged PRs/MRs
+     */
+    deliverToMerged: boolean;
+    /**
+     * Raw override; null = inheriting the fleet default
+     */
+    deliverToMergedOverride?: boolean;
+    /**
+     * Effective: run practice review for all developers
+     */
+    runForAllUsers: boolean;
+    /**
+     * Raw override; null = inheriting the fleet default
+     */
+    runForAllUsersOverride?: boolean;
+    /**
+     * Effective: skip draft PRs/MRs
+     */
+    skipDrafts: boolean;
+    /**
+     * Raw override; null = inheriting the fleet default
+     */
+    skipDraftsOverride?: boolean;
+};
+
 /**
  * A practice area grouping related practices into a learning objective
  */
@@ -1609,6 +2295,20 @@ export type PageableObject = {
     unpaged?: boolean;
 };
 
+export type PageSyncJob = {
+    content?: Array<SyncJob>;
+    empty?: boolean;
+    first?: boolean;
+    last?: boolean;
+    number?: number;
+    numberOfElements?: number;
+    pageable?: PageableObject;
+    size?: number;
+    sort?: SortObject;
+    totalElements?: number;
+    totalPages?: number;
+};
+
 export type PageObservationList = {
     content?: Array<ObservationList>;
     empty?: boolean;
@@ -1673,6 +2373,66 @@ export type ObservationList = {
     title: string;
 };
 
+export type PageConfigAuditEntryView = {
+    content?: Array<ConfigAuditEntryView>;
+    empty?: boolean;
+    first?: boolean;
+    last?: boolean;
+    number?: number;
+    numberOfElements?: number;
+    pageable?: PageableObject;
+    size?: number;
+    sort?: SortObject;
+    totalElements?: number;
+    totalPages?: number;
+};
+
+/**
+ * A human-readable actor identity on an audit row. Resolved at read time, so an erased account
+ * degrades here without the trail being rewritten: <code>AccountPurger</code> clears the email, replaces
+ * the display name with a placeholder, and nulls the row's actor references.
+ *
+ * <p>Named distinctly from the auth trail's own <code>AccountRefDTO</code>: the OpenAPI schema key is the
+ * simple name minus the <code>DTO</code> suffix, so two <code>AccountRefDTO</code> records would collide and one
+ * would be silently dropped from the spec.
+ */
+export type ConfigAuditActorRef = {
+    displayName?: string;
+    email?: string;
+    id?: number;
+};
+
+/**
+ * One audit row, flattened for a viewer. Crosses the module boundary, so it carries no entity.
+ */
+export type ConfigAuditEntryView = {
+    actingAccountId?: number;
+    /**
+     * resolved impersonator, present only for {@link ConfigAuditActorKind#IMPERSONATED ConfigAuditActorKind#IMPERSONATED}
+     */
+    actingActor?: ConfigAuditActorRef;
+    action?: 'CREATED' | 'UPDATED' | 'DELETED';
+    /**
+     * resolved identity of {@link de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntryViewDTO#actorAccountId #actorAccountId}; null for SYSTEM rows or once the
+     * account is gone. Read together with {@link de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntryViewDTO#actorKind #actorKind} — that is what keeps
+     * "a system did this" distinct from "we no longer know who did this".
+     */
+    actor?: ConfigAuditActorRef;
+    actorAccountId?: number;
+    actorKind?: 'USER' | 'SYSTEM' | 'IMPERSONATED';
+    /**
+     * dot-paths that differ between {@link de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntryViewDTO#oldValue #oldValue} and {@link de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntryViewDTO#newValue #newValue}
+     */
+    changedKeys?: Array<string>;
+    entityId?: string;
+    entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL';
+    id?: number;
+    newValue?: string;
+    occurredAt?: Date;
+    oldValue?: string;
+    workspaceId?: number;
+};
+
 export type PageAuthEventView = {
     content?: Array<AuthEventView>;
     empty?: boolean;
@@ -1734,25 +2494,17 @@ export type PageAgentJob = {
  */
 export type AgentJob = {
     /**
+     * When this job becomes eligible to be claimed. In the future while the job is waiting — on a retry backoff, or on a hold. Read together with holdReason: a QUEUED job with availableAt in the future is waiting, not starved for workers.
+     */
+    availableAt: Date;
+    /**
      * Timestamp when the job completed
      */
     completedAt?: Date;
     /**
-     * ID of the agent config that ran this job (from the frozen snapshot)
-     */
-    configId?: number;
-    /**
-     * Name of the agent config that ran this job (from the frozen snapshot)
-     */
-    configName?: string;
-    /**
-     * Frozen agent config at submit time
+     * Frozen agent config at submit time (an INSTANCE-scoped connection's baseUrl is redacted to scheme://host; only a WORKSPACE-scoped connection's baseUrl is left intact)
      */
     configSnapshot: unknown;
-    /**
-     * Docker container ID
-     */
-    containerId?: string;
     /**
      * Timestamp when the job was created
      */
@@ -1774,6 +2526,10 @@ export type AgentJob = {
      */
     exitCode?: number;
     /**
+     * Why a QUEUED job is waiting rather than eligible, when the reason is one an admin can undo. BUDGET = the payer is over its monthly LLM cap and the job resumes by itself once the cap is raised or the month rolls over. Absent means no such hold — a future availableAt is then an ordinary retry backoff.
+     */
+    holdReason?: string;
+    /**
      * Job ID
      */
     id: string;
@@ -1790,15 +2546,11 @@ export type AgentJob = {
      */
     llmCacheWriteTokens?: number;
     /**
-     * Estimated cost in USD (agent-reported)
-     */
-    llmCostUsd?: number;
-    /**
-     * LLM model used (e.g. gpt-5.4-mini, claude-sonnet-4-5)
+     * LLM model used (e.g. gpt-5.4-mini, openai/gpt-oss-120b)
      */
     llmModel?: string;
     /**
-     * Model version/snapshot date (e.g. 2026-03-17)
+     * Model version/snapshot date (e.g. 2026-03-17). Only jobs from before the model catalog carry one; absent on everything newer.
      */
     llmModelVersion?: string;
     /**
@@ -1821,6 +2573,10 @@ export type AgentJob = {
      * Job metadata (routing/display info)
      */
     metadata?: unknown;
+    /**
+     * Upstream model this job was admitted on, frozen at submit time (e.g. gpt-5.4-mini). Available from submission, unlike llmModel, which the runner reports only once the job has run.
+     */
+    model?: string;
     /**
      * Job output (agent results)
      */
@@ -1863,36 +2619,6 @@ export type OutlineTokenStatus = {
      * The token's name in Outline. Absent when the token cannot list its own key (a scoped key, or one owned by a user who cannot see it) — sync is unaffected.
      */
     name?: string;
-};
-
-/**
- * Health of the workspace's active Outline connection
- */
-export type OutlineConnectionStatus = {
-    /**
-     * Live (non-tombstoned) mirrored document count across all collections
-     */
-    documentCount: number;
-    /**
-     * Collections whose last sync attempt recorded an error (cleared on the next clean pass)
-     */
-    erroredCollections: number;
-    /**
-     * When a mirrored collection last completed a full reconcile pass, if any
-     */
-    lastSyncedAt?: Date;
-    /**
-     * Enabled collections still awaiting a clean sync pass
-     */
-    pendingCollections: number;
-    /**
-     * Whether a manually triggered full reconcile is currently running for this workspace
-     */
-    syncRunning: boolean;
-    /**
-     * Whether a webhook subscription id is currently stored for this connection. This is existence only, not a liveness check: Outline auto-disables a subscription after repeated delivery failures, and a stale id here self-heals on the next reconcile rather than being verified live by this endpoint.
-     */
-    webhookRegistered: boolean;
 };
 
 /**
@@ -2079,6 +2805,190 @@ export type LoginProviderView = {
 };
 
 /**
+ * Result of testing an LLM connection's /models endpoint
+ */
+export type LlmProbeResult = {
+    /**
+     * Human-readable diagnostic when not reachable
+     */
+    message?: string;
+    /**
+     * Model ids returned by the provider (empty if unreachable)
+     */
+    models: Array<string>;
+    /**
+     * Whether the provider answered with a successful models listing
+     */
+    reachable: boolean;
+    /**
+     * HTTP status returned by the provider, if any
+     */
+    statusCode?: number;
+};
+
+/**
+ * A model's price, per 1M tokens
+ */
+export type LlmModelPrice = {
+    /**
+     * Currency code
+     */
+    currency: string;
+    /**
+     * When this price took effect
+     */
+    effectiveFrom: Date;
+    /**
+     * When this price was superseded; null if still current
+     */
+    effectiveTo?: Date;
+    /**
+     * Price row id
+     */
+    id: number;
+    /**
+     * Note
+     */
+    note?: string;
+    /**
+     * Cache-read rate per 1M tokens (USD)
+     */
+    per1mCacheReadUsd?: number;
+    /**
+     * Cache-write rate per 1M tokens (USD)
+     */
+    per1mCacheWriteUsd?: number;
+    /**
+     * Input rate per 1M tokens (USD)
+     */
+    per1mInputUsd?: number;
+    /**
+     * Output rate per 1M tokens (USD)
+     */
+    per1mOutputUsd?: number;
+    /**
+     * Pricing mode
+     */
+    pricingMode: 'PRICED' | 'NO_CHARGE' | 'UNPRICED';
+};
+
+/**
+ * Instance catalog model
+ */
+export type LlmModel = {
+    /**
+     * Owning connection's display name
+     */
+    connectionDisplayName: string;
+    /**
+     * Owning connection id
+     */
+    connectionId: number;
+    /**
+     * Context window in tokens
+     */
+    contextWindow?: number;
+    /**
+     * Creation timestamp
+     */
+    createdAt: Date;
+    /**
+     * Current price; null if none has ever been set
+     */
+    currentPrice?: LlmModelPrice;
+    /**
+     * Human-readable name
+     */
+    displayName: string;
+    /**
+     * Active toggle
+     */
+    enabled: boolean;
+    /**
+     * Workspace ids shared with; only meaningful when visibility is GRANTED
+     */
+    grantedWorkspaceIds: Array<number>;
+    /**
+     * Model id
+     */
+    id: number;
+    /**
+     * Maximum output tokens
+     */
+    maxOutputTokens?: number;
+    /**
+     * Unique slug within the connection
+     */
+    slug: string;
+    /**
+     * Whether the model supports a reasoning mode
+     */
+    supportsReasoning: boolean;
+    /**
+     * Last update timestamp
+     */
+    updatedAt?: Date;
+    /**
+     * Upstream provider model id
+     */
+    upstreamModelId: string;
+    /**
+     * Share with all workspaces (PUBLIC) or only selected ones (GRANTED)
+     */
+    visibility: 'PUBLIC' | 'GRANTED';
+};
+
+/**
+ * Instance LLM provider connection (API key redacted)
+ */
+export type LlmConnection = {
+    /**
+     * Last four characters of the stored API key, if any
+     */
+    apiKeyLast4?: string;
+    /**
+     * Wire protocol
+     */
+    apiProtocol: string;
+    /**
+     * Credential shape
+     */
+    authMode: 'BEARER' | 'API_KEY';
+    /**
+     * Provider base URL
+     */
+    baseUrl: string;
+    /**
+     * Creation timestamp
+     */
+    createdAt: Date;
+    /**
+     * Human-readable name
+     */
+    displayName: string;
+    /**
+     * Whether the connection is enabled
+     */
+    enabled: boolean;
+    /**
+     * Whether an API key is stored
+     */
+    hasApiKey: boolean;
+    /**
+     * Connection ID
+     */
+    id: number;
+    /**
+     * Unique slug
+     */
+    slug: string;
+    /**
+     * Last update timestamp
+     */
+    updatedAt?: Date;
+};
+
+/**
  * A provider instance the current user is linked to: its type + server-url origin.
  */
 export type LinkedProvider = {
@@ -2205,6 +3115,46 @@ export type LeaderboardEntry = {
      * User info (populated in INDIVIDUAL mode, null in TEAM mode)
      */
     user?: UserInfo;
+};
+
+/**
+ * Integration kind availability + connection status for this workspace
+ */
+export type IntegrationCatalogEntry = {
+    /**
+     * Whether this workspace has a (non-UNINSTALLED) connection for this kind
+     */
+    connected: boolean;
+    /**
+     * Connection id, if connected
+     */
+    connectionId?: number;
+    /**
+     * Connection state, if connected
+     */
+    connectionState?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
+    /**
+     * Human-readable display name
+     */
+    displayName: string;
+    /**
+     * Integration kind
+     */
+    kind: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
+};
+
+/**
+ * Instance-wide LLM governance settings
+ */
+export type InstanceLlmSettings = {
+    /**
+     * Whether workspaces may register their own LLM connections
+     */
+    allowWorkspaceConnections: boolean;
+    /**
+     * Comma/newline-delimited egress host allowlist; blank = allow any public host
+     */
+    allowedEgressHosts?: string;
 };
 
 /**
@@ -2488,6 +3438,98 @@ export type CreateWorkspaceRequest = {
 };
 
 /**
+ * Create a model on your AI provider
+ */
+export type CreateWorkspaceLlmModelRequest = {
+    /**
+     * Context window in tokens
+     */
+    contextWindow?: number;
+    /**
+     * Human-readable name
+     */
+    displayName: string;
+    /**
+     * Whether the model is active (default false)
+     */
+    enabled?: boolean;
+    /**
+     * Maximum output tokens
+     */
+    maxOutputTokens?: number;
+    /**
+     * Cache-read rate per 1M tokens (USD), if applicable
+     */
+    per1mCacheReadUsd?: number;
+    /**
+     * Cache-write rate per 1M tokens (USD), if applicable
+     */
+    per1mCacheWriteUsd?: number;
+    /**
+     * Input rate per 1M tokens (USD); required when the model has a price
+     */
+    per1mInputUsd?: number;
+    /**
+     * Output rate per 1M tokens (USD); required when the model has a price
+     */
+    per1mOutputUsd?: number;
+    /**
+     * Note; required when the model is free (e.g. self-hosted, no cost)
+     */
+    priceNote?: string;
+    /**
+     * Pricing mode (default UNPRICED)
+     */
+    pricingMode?: 'PRICED' | 'NO_CHARGE' | 'UNPRICED';
+    /**
+     * Optional internal slug; generated from displayName when omitted
+     */
+    slug?: string;
+    /**
+     * Whether the model supports a reasoning mode
+     */
+    supportsReasoning?: boolean;
+    /**
+     * Upstream provider model id
+     */
+    upstreamModelId: string;
+};
+
+/**
+ * Connect your own AI provider
+ */
+export type CreateWorkspaceLlmConnectionRequest = {
+    /**
+     * API key (write-only; never returned)
+     */
+    apiKey?: string;
+    /**
+     * Wire protocol
+     */
+    apiProtocol: string;
+    /**
+     * Credential shape (default BEARER)
+     */
+    authMode?: 'BEARER' | 'API_KEY';
+    /**
+     * Provider base URL
+     */
+    baseUrl: string;
+    /**
+     * Human-readable name
+     */
+    displayName: string;
+    /**
+     * Whether the connection is active (default false)
+     */
+    enabled?: boolean;
+    /**
+     * Optional internal slug; generated from displayName when omitted
+     */
+    slug?: string;
+};
+
+/**
  * Submit a reaction to a delivered feedback unit
  */
 export type CreateReaction = {
@@ -2595,49 +3637,71 @@ export type CreateLoginProviderRequest = {
 };
 
 /**
- * Request to create a new agent configuration for a workspace
+ * Create a model on an instance LLM connection
  */
-export type CreateAgentConfigRequest = {
+export type CreateLlmModelRequest = {
     /**
-     * Whether agent containers have internet access
+     * Context window in tokens
      */
-    allowInternet?: boolean;
+    contextWindow?: number;
     /**
-     * Authentication mode: PROXY (internal proxy) or API_KEY (direct)
+     * Human-readable name
      */
-    credentialMode?: 'PROXY' | 'API_KEY';
+    displayName: string;
     /**
-     * Whether the agent is enabled
+     * Whether the model is active (default false)
      */
     enabled?: boolean;
     /**
-     * LLM API key
+     * Maximum output tokens
      */
-    llmApiKey?: string;
+    maxOutputTokens?: number;
     /**
-     * Optional LLM base URL — set for OpenAI/Anthropic-compatible endpoints that need routing through the hephaestus chat/completions provider extension (e.g. TUM GPU, on-prem gateways)
+     * Optional internal slug; generated from displayName when omitted
      */
-    llmBaseUrl?: string;
+    slug?: string;
     /**
-     * LLM provider
+     * Whether the model supports a reasoning mode
      */
-    llmProvider: 'ANTHROPIC' | 'OPENAI' | 'AZURE_OPENAI';
+    supportsReasoning?: boolean;
     /**
-     * Maximum concurrent jobs
+     * Upstream provider model id
      */
-    maxConcurrentJobs?: number;
+    upstreamModelId: string;
+};
+
+/**
+ * Create an instance LLM provider connection
+ */
+export type CreateLlmConnectionRequest = {
     /**
-     * LLM model name
+     * API key (write-only; never returned)
      */
-    modelName?: string;
+    apiKey?: string;
     /**
-     * Unique name within the workspace
+     * Wire protocol
      */
-    name: string;
+    apiProtocol: string;
     /**
-     * Job timeout in seconds
+     * Credential shape (default BEARER)
      */
-    timeoutSeconds?: number;
+    authMode?: 'BEARER' | 'API_KEY';
+    /**
+     * Provider base URL
+     */
+    baseUrl: string;
+    /**
+     * Human-readable name
+     */
+    displayName: string;
+    /**
+     * Whether the connection is enabled (default false)
+     */
+    enabled?: boolean;
+    /**
+     * Optional internal slug; generated from displayName when omitted
+     */
+    slug?: string;
 };
 
 /**
@@ -2668,6 +3732,86 @@ export type Contributor = {
      * Display name of the contributor
      */
     name: string;
+};
+
+/**
+ * Unified sync-observability status for one connection
+ */
+export type ConnectionSyncStatus = {
+    /**
+     * Currently PENDING/RUNNING job, if any
+     */
+    activeJob?: SyncJob;
+    /**
+     * Connection-level backfill rollup, if applicable
+     */
+    backfill?: BackfillSummary;
+    /**
+     * Whether this kind's runner offers an explicitly triggerable backfill pass. Reflects the vendor capability only — the scheduled-backfill flag does not gate it, so a manual backfill stays available while the automatic cycle is administratively paused.
+     */
+    backfillSupported: boolean;
+    /**
+     * Connection id
+     */
+    connectionId: number;
+    /**
+     * Raw connection lifecycle state
+     */
+    connectionState: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
+    /**
+     * Derived health
+     */
+    health: 'PENDING' | 'HEALTHY' | 'DEGRADED' | 'FAILED' | 'SUSPENDED';
+    /**
+     * Integration kind
+     */
+    kind: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
+    /**
+     * When the last inbound webhook/event was processed for this connection, if any
+     */
+    lastEventProcessedAt?: Date;
+    /**
+     * Most recently finished job, if any
+     */
+    lastJob?: SyncJob;
+    /**
+     * Most recent successful job's finish time
+     */
+    lastSuccessfulSyncAt?: Date;
+    /**
+     * When the next periodic reconciliation is expected
+     */
+    nextScheduledSyncAt?: Date;
+    /**
+     * Current rate-limit budget, if known
+     */
+    rateLimit?: RateLimitSnapshot;
+    /**
+     * Resource-level rollup
+     */
+    resourceCounts: ResourceCounts;
+    /**
+     * The periodic reconciliation's cadence in seconds, when the schedule has a regular one. This is what makes a resource's lastSyncedAt judgeable: "synced 4h ago" is only stale if the cadence is hourly, and a client cannot know that without this. Null when the schedule is irregular or unparseable — clients must then decline to judge staleness rather than assume a default, exactly as the server's own stale rollup does.
+     */
+    syncIntervalSeconds?: number;
+    /**
+     * Whether the vendor webhook registration is present; null if not applicable/unknown
+     */
+    webhookRegistered?: boolean;
+};
+
+/**
+ * Connection-level backfill rollup
+ */
+export type BackfillSummary = {
+    /**
+     * 0-100 completion estimate, if computable
+     */
+    percent?: number;
+    /**
+     * Integration-defined backfill state string
+     */
+    state: string;
 };
 
 /**
@@ -2815,6 +3959,52 @@ export type BinaryAchievementProgress = Omit<AchievementProgress, 'type'> & {
 };
 
 /**
+ * A model available for this workspace to bind a Task to
+ */
+export type AvailableLlmModel = {
+    /**
+     * Owning connection's display name
+     */
+    connectionDisplayName: string;
+    /**
+     * Human-readable name
+     */
+    displayName: string;
+    /**
+     * Model id, unique within its scope
+     */
+    id: number;
+    /**
+     * Cache-read rate per 1M tokens (USD)
+     */
+    per1mCacheReadUsd?: number;
+    /**
+     * Cache-write rate per 1M tokens (USD)
+     */
+    per1mCacheWriteUsd?: number;
+    /**
+     * Input rate per 1M tokens (USD)
+     */
+    per1mInputUsd?: number;
+    /**
+     * Output rate per 1M tokens (USD)
+     */
+    per1mOutputUsd?: number;
+    /**
+     * Pricing mode
+     */
+    pricingMode: 'PRICED' | 'NO_CHARGE' | 'UNPRICED';
+    /**
+     * SHARED (instance catalog) or WORKSPACE (your own provider)
+     */
+    scope: 'SHARED' | 'WORKSPACE';
+    /**
+     * Whether the model supports a reasoning mode
+     */
+    supportsReasoning: boolean;
+};
+
+/**
  * Request to assign or update a user's role in a workspace
  */
 export type AssignRoleRequest = {
@@ -2829,115 +4019,50 @@ export type AssignRoleRequest = {
 };
 
 /**
- * Aggregate workspace AI settings: runtime bindings + effective + raw-override practice-review policy
+ * Bind a model and execution limits to an agent purpose
  */
-export type AiSettingsView = {
+export type AgentBindingRequest = {
     /**
-     * Effective: minimum minutes between reviews for the same PR
+     * Whether the sandbox may reach the public internet
      */
-    cooldownMinutes: number;
+    allowInternet?: boolean;
     /**
-     * Raw override; null = inheriting the fleet default
+     * Whether this purpose is active (paused when false)
      */
-    cooldownMinutesOverride?: number;
+    enabled?: boolean;
     /**
-     * Effective: deliver feedback to merged PRs/MRs
+     * Shared (instance-catalog) model id to run this purpose on
      */
-    deliverToMerged: boolean;
+    instanceModelId?: number;
     /**
-     * Raw override; null = inheriting the fleet default
+     * Maximum concurrent runs for this purpose
      */
-    deliverToMergedOverride?: boolean;
+    maxConcurrentJobs?: number;
     /**
-     * Config bound to power the mentor (null = oldest enabled config)
+     * Per-run timeout in seconds (30–3600; one hour is the longest a single run may take)
      */
-    mentorConfigId?: number;
+    timeoutSeconds?: number;
     /**
-     * Whether the mentor feature is enabled for this workspace
+     * Workspace-owned model id to run this purpose on
      */
-    mentorEnabled: boolean;
-    /**
-     * Config bound to power practice detection (null = fan-out to all enabled configs)
-     */
-    practiceConfigId?: number;
-    /**
-     * Whether the practices feature is enabled for this workspace
-     */
-    practicesEnabled: boolean;
-    /**
-     * Effective: run practice review for all developers
-     */
-    runForAllUsers: boolean;
-    /**
-     * Raw override; null = inheriting the fleet default
-     */
-    runForAllUsersOverride?: boolean;
-    /**
-     * Effective: skip draft PRs/MRs
-     */
-    skipDrafts: boolean;
-    /**
-     * Raw override; null = inheriting the fleet default
-     */
-    skipDraftsOverride?: boolean;
+    workspaceModelId?: number;
 };
 
 /**
- * Agent configuration for a workspace (API key redacted)
+ * A workspace's agent binding for one purpose
  */
-export type AgentConfig = {
-    /**
-     * Whether agent containers have internet access
-     */
-    allowInternet: boolean;
-    /**
-     * Timestamp when the config was created
-     */
-    createdAt: Date;
-    /**
-     * Authentication mode
-     */
-    credentialMode: 'PROXY' | 'API_KEY';
-    /**
-     * Whether the agent is enabled
-     */
+export type AgentBinding = {
+    allowInternet?: boolean;
     enabled: boolean;
+    instanceModelId?: number;
+    maxConcurrentJobs?: number;
+    purpose: 'PRACTICE_DETECTION' | 'MENTOR';
     /**
-     * Whether an LLM API key is configured
+     * True when the bound model is available to run right now
      */
-    hasLlmApiKey: boolean;
-    /**
-     * Configuration ID
-     */
-    id: number;
-    /**
-     * Optional LLM base URL override
-     */
-    llmBaseUrl?: string;
-    /**
-     * LLM provider
-     */
-    llmProvider: 'ANTHROPIC' | 'OPENAI' | 'AZURE_OPENAI';
-    /**
-     * Maximum concurrent jobs
-     */
-    maxConcurrentJobs: number;
-    /**
-     * LLM model name
-     */
-    modelName?: string;
-    /**
-     * Unique name within the workspace
-     */
-    name: string;
-    /**
-     * Job timeout in seconds
-     */
-    timeoutSeconds: number;
-    /**
-     * Timestamp when the config was last updated
-     */
-    updatedAt?: Date;
+    ready: boolean;
+    timeoutSeconds?: number;
+    workspaceModelId?: number;
 };
 
 /**
@@ -2953,6 +4078,71 @@ export type AdminWorkspaceView = {
     providerType?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
     status: string;
     workspaceSlug: string;
+};
+
+/**
+ * One workspace's month of spend, as an instance admin sees it
+ */
+export type AdminWorkspaceLlmUsage = {
+    displayName: string;
+    /**
+     * Ledger events (jobs / mentor turns) this month, either purse
+     */
+    events: number;
+    /**
+     * Whether shared-model spend is within the instance cap, has reached it, or can't be confirmed because some shared-model usage has no price set.
+     */
+    instanceBudgetVerdict: 'WITHIN' | 'EXHAUSTED' | 'UNVERIFIABLE';
+    /**
+     * Monthly cap in USD on this workspace's spend on shared (instance) models — the money this instance pays for; null = uncapped. Yours to set.
+     */
+    instanceMonthlyBudgetUsd?: number;
+    /**
+     * Whether work on SHARED models is paused for this workspace right now (current month only) — authoritative, mirroring the live gate.
+     */
+    instancePaused: boolean;
+    /**
+     * This month's confirmed spend on shared (instance) models, in USD — compared against instanceMonthlyBudgetUsd.
+     */
+    instanceTotalCostUsd: number;
+    /**
+     * The same verdict for the workspace's own-provider spend against its own cap.
+     */
+    ownProviderBudgetVerdict: 'WITHIN' | 'EXHAUSTED' | 'UNVERIFIABLE';
+    /**
+     * The workspace's own cap in USD on its own-provider spend; null = uncapped. Read-only here — it governs the workspace's money, so only its own admins may change it.
+     */
+    ownProviderMonthlyBudgetUsd?: number;
+    /**
+     * Whether work on the workspace's OWN provider is paused right now.
+     */
+    ownProviderPaused: boolean;
+    /**
+     * This month's confirmed spend on the workspace's own connected provider(s), in USD — compared against ownProviderMonthlyBudgetUsd.
+     */
+    ownProviderTotalCostUsd: number;
+    /**
+     * Addresses the workspace everywhere else in the API, including its cap
+     */
+    workspaceSlug: string;
+};
+
+/**
+ * Instance-admin per-workspace month rollup (metadata only, no tenant content)
+ */
+export type AdminLlmUsageReport = {
+    /**
+     * Display-only conversion when the instance has a display currency. Absent = show USD only. Applies to every USD amount in this response.
+     */
+    fx?: FxRateInfo;
+    /**
+     * Calendar month (UTC), ISO yyyy-MM
+     */
+    month: string;
+    /**
+     * One row per workspace, including workspaces with no ledger activity this month
+     */
+    workspaces: Array<AdminWorkspaceLlmUsage>;
 };
 
 export type AdminAccountView = {
@@ -3029,8 +4219,8 @@ export type AdminListAuthEventsData = {
         size?: number;
         accountId?: number;
         actingAccountId?: number;
-        eventType?: 'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'APP_ROLE_CHANGED' | 'RESEARCH_CONSENT_REVOKED';
-        result?: 'SUCCESS' | 'FAILURE';
+        eventType?: Array<'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'APP_ROLE_CHANGED' | 'RESEARCH_CONSENT_REVOKED' | 'LLM_CONNECTION_CREATED' | 'LLM_CONNECTION_UPDATED' | 'LLM_CONNECTION_DELETED' | 'LLM_MODEL_CREATED' | 'LLM_MODEL_UPDATED' | 'LLM_MODEL_DELETED' | 'LLM_MODEL_PRICE_CHANGED' | 'LLM_MODEL_SHARING_CHANGED' | 'LLM_SETTINGS_CHANGED' | 'LOGIN_PROVIDER_CREATED' | 'LOGIN_PROVIDER_UPDATED' | 'LOGIN_PROVIDER_DELETED'>;
+        result?: Array<'SUCCESS' | 'FAILURE'>;
         from?: Date;
         to?: Date;
     };
@@ -3052,8 +4242,8 @@ export type AdminExportAuthEventsData = {
     query?: {
         accountId?: number;
         actingAccountId?: number;
-        eventType?: 'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'APP_ROLE_CHANGED' | 'RESEARCH_CONSENT_REVOKED';
-        result?: 'SUCCESS' | 'FAILURE';
+        eventType?: Array<'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'APP_ROLE_CHANGED' | 'RESEARCH_CONSENT_REVOKED' | 'LLM_CONNECTION_CREATED' | 'LLM_CONNECTION_UPDATED' | 'LLM_CONNECTION_DELETED' | 'LLM_MODEL_CREATED' | 'LLM_MODEL_UPDATED' | 'LLM_MODEL_DELETED' | 'LLM_MODEL_PRICE_CHANGED' | 'LLM_MODEL_SHARING_CHANGED' | 'LLM_SETTINGS_CHANGED' | 'LOGIN_PROVIDER_CREATED' | 'LOGIN_PROVIDER_UPDATED' | 'LOGIN_PROVIDER_DELETED'>;
+        result?: Array<'SUCCESS' | 'FAILURE'>;
         from?: Date;
         to?: Date;
     };
@@ -3068,6 +4258,413 @@ export type AdminExportAuthEventsResponses = {
 };
 
 export type AdminExportAuthEventsResponse = AdminExportAuthEventsResponses[keyof AdminExportAuthEventsResponses];
+
+export type AdminListConfigAuditEventsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        workspaceId?: number;
+        page?: number;
+        size?: number;
+        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
+        entityId?: string;
+        changedKey?: string;
+        action?: Array<'CREATED' | 'UPDATED' | 'DELETED'>;
+        actorId?: number;
+        from?: Date;
+        to?: Date;
+    };
+    url: '/admin/config-audit';
+};
+
+export type AdminListConfigAuditEventsResponses = {
+    /**
+     * OK
+     */
+    200: PageConfigAuditEntryView;
+};
+
+export type AdminListConfigAuditEventsResponse = AdminListConfigAuditEventsResponses[keyof AdminListConfigAuditEventsResponses];
+
+export type AdminListLlmConnectionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/admin/llm/connections';
+};
+
+export type AdminListLlmConnectionsResponses = {
+    /**
+     * OK
+     */
+    200: Array<LlmConnection>;
+};
+
+export type AdminListLlmConnectionsResponse = AdminListLlmConnectionsResponses[keyof AdminListLlmConnectionsResponses];
+
+export type AdminCreateLlmConnectionData = {
+    body: CreateLlmConnectionRequest;
+    path?: never;
+    query?: never;
+    url: '/admin/llm/connections';
+};
+
+export type AdminCreateLlmConnectionErrors = {
+    /**
+     * An LLM connection with this slug already exists
+     */
+    409: unknown;
+};
+
+export type AdminCreateLlmConnectionResponses = {
+    /**
+     * Connection created; URL in the Location header
+     */
+    201: LlmConnection;
+};
+
+export type AdminCreateLlmConnectionResponse = AdminCreateLlmConnectionResponses[keyof AdminCreateLlmConnectionResponses];
+
+export type AdminProbeLlmConnectionDraftData = {
+    body: ProbeLlmConnectionRequest;
+    path?: never;
+    query?: never;
+    url: '/admin/llm/connections/probe';
+};
+
+export type AdminProbeLlmConnectionDraftResponses = {
+    /**
+     * OK
+     */
+    200: LlmProbeResult;
+};
+
+export type AdminProbeLlmConnectionDraftResponse = AdminProbeLlmConnectionDraftResponses[keyof AdminProbeLlmConnectionDraftResponses];
+
+export type AdminCreateLlmModelData = {
+    body: CreateLlmModelRequest;
+    path: {
+        connectionId: number;
+    };
+    query?: never;
+    url: '/admin/llm/connections/{connectionId}/models';
+};
+
+export type AdminCreateLlmModelErrors = {
+    /**
+     * LLM connection not found
+     */
+    404: unknown;
+    /**
+     * A model with this slug or upstream model id already exists on the connection
+     */
+    409: unknown;
+};
+
+export type AdminCreateLlmModelResponses = {
+    /**
+     * Model created; URL in the Location header
+     */
+    201: LlmModel;
+};
+
+export type AdminCreateLlmModelResponse = AdminCreateLlmModelResponses[keyof AdminCreateLlmModelResponses];
+
+export type AdminDeleteLlmConnectionData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/admin/llm/connections/{id}';
+};
+
+export type AdminDeleteLlmConnectionErrors = {
+    /**
+     * LLM connection not found
+     */
+    404: unknown;
+    /**
+     * Cannot delete a connection still referenced by one or more models
+     */
+    409: unknown;
+};
+
+export type AdminDeleteLlmConnectionResponses = {
+    /**
+     * Connection deleted
+     */
+    204: void;
+};
+
+export type AdminDeleteLlmConnectionResponse = AdminDeleteLlmConnectionResponses[keyof AdminDeleteLlmConnectionResponses];
+
+export type AdminGetLlmConnectionData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/admin/llm/connections/{id}';
+};
+
+export type AdminGetLlmConnectionErrors = {
+    /**
+     * LLM connection not found
+     */
+    404: unknown;
+};
+
+export type AdminGetLlmConnectionResponses = {
+    /**
+     * OK
+     */
+    200: LlmConnection;
+};
+
+export type AdminGetLlmConnectionResponse = AdminGetLlmConnectionResponses[keyof AdminGetLlmConnectionResponses];
+
+export type AdminUpdateLlmConnectionData = {
+    body: UpdateLlmConnectionRequest;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/admin/llm/connections/{id}';
+};
+
+export type AdminUpdateLlmConnectionErrors = {
+    /**
+     * LLM connection not found
+     */
+    404: unknown;
+};
+
+export type AdminUpdateLlmConnectionResponses = {
+    /**
+     * OK
+     */
+    200: LlmConnection;
+};
+
+export type AdminUpdateLlmConnectionResponse = AdminUpdateLlmConnectionResponses[keyof AdminUpdateLlmConnectionResponses];
+
+export type AdminProbeLlmConnectionData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/admin/llm/connections/{id}/probe';
+};
+
+export type AdminProbeLlmConnectionResponses = {
+    /**
+     * OK
+     */
+    200: LlmProbeResult;
+};
+
+export type AdminProbeLlmConnectionResponse = AdminProbeLlmConnectionResponses[keyof AdminProbeLlmConnectionResponses];
+
+export type AdminListLlmModelsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/admin/llm/models';
+};
+
+export type AdminListLlmModelsResponses = {
+    /**
+     * OK
+     */
+    200: Array<LlmModel>;
+};
+
+export type AdminListLlmModelsResponse = AdminListLlmModelsResponses[keyof AdminListLlmModelsResponses];
+
+export type AdminDeleteLlmModelData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/admin/llm/models/{id}';
+};
+
+export type AdminDeleteLlmModelErrors = {
+    /**
+     * LLM model not found
+     */
+    404: unknown;
+    /**
+     * Cannot delete a model still bound to an agent configuration
+     */
+    409: unknown;
+};
+
+export type AdminDeleteLlmModelResponses = {
+    /**
+     * Model deleted
+     */
+    204: void;
+};
+
+export type AdminDeleteLlmModelResponse = AdminDeleteLlmModelResponses[keyof AdminDeleteLlmModelResponses];
+
+export type AdminGetLlmModelData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/admin/llm/models/{id}';
+};
+
+export type AdminGetLlmModelErrors = {
+    /**
+     * LLM model not found
+     */
+    404: unknown;
+};
+
+export type AdminGetLlmModelResponses = {
+    /**
+     * OK
+     */
+    200: LlmModel;
+};
+
+export type AdminGetLlmModelResponse = AdminGetLlmModelResponses[keyof AdminGetLlmModelResponses];
+
+export type AdminUpdateLlmModelData = {
+    body: UpdateLlmModelRequest;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/admin/llm/models/{id}';
+};
+
+export type AdminUpdateLlmModelErrors = {
+    /**
+     * LLM model not found
+     */
+    404: unknown;
+    /**
+     * Another model on the connection already uses this upstream model id
+     */
+    409: unknown;
+};
+
+export type AdminUpdateLlmModelResponses = {
+    /**
+     * OK
+     */
+    200: LlmModel;
+};
+
+export type AdminUpdateLlmModelResponse = AdminUpdateLlmModelResponses[keyof AdminUpdateLlmModelResponses];
+
+export type AdminUpdateLlmModelPriceData = {
+    body: UpdateLlmModelPriceRequest;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/admin/llm/models/{id}/price';
+};
+
+export type AdminUpdateLlmModelPriceErrors = {
+    /**
+     * LLM model not found
+     */
+    404: unknown;
+};
+
+export type AdminUpdateLlmModelPriceResponses = {
+    /**
+     * OK
+     */
+    200: LlmModel;
+};
+
+export type AdminUpdateLlmModelPriceResponse = AdminUpdateLlmModelPriceResponses[keyof AdminUpdateLlmModelPriceResponses];
+
+export type AdminUpdateLlmModelSharingData = {
+    body: UpdateLlmModelSharingRequest;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/admin/llm/models/{id}/sharing';
+};
+
+export type AdminUpdateLlmModelSharingErrors = {
+    /**
+     * LLM model not found
+     */
+    404: unknown;
+};
+
+export type AdminUpdateLlmModelSharingResponses = {
+    /**
+     * OK
+     */
+    200: LlmModel;
+};
+
+export type AdminUpdateLlmModelSharingResponse = AdminUpdateLlmModelSharingResponses[keyof AdminUpdateLlmModelSharingResponses];
+
+export type AdminGetLlmSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/admin/llm/settings';
+};
+
+export type AdminGetLlmSettingsResponses = {
+    /**
+     * OK
+     */
+    200: InstanceLlmSettings;
+};
+
+export type AdminGetLlmSettingsResponse = AdminGetLlmSettingsResponses[keyof AdminGetLlmSettingsResponses];
+
+export type AdminUpdateLlmSettingsData = {
+    body: UpdateInstanceLlmSettingsRequest;
+    path?: never;
+    query?: never;
+    url: '/admin/llm/settings';
+};
+
+export type AdminUpdateLlmSettingsResponses = {
+    /**
+     * OK
+     */
+    200: InstanceLlmSettings;
+};
+
+export type AdminUpdateLlmSettingsResponse = AdminUpdateLlmSettingsResponses[keyof AdminUpdateLlmSettingsResponses];
+
+export type AdminGetLlmUsageReportData = {
+    body?: never;
+    path?: never;
+    query?: {
+        month?: string;
+    };
+    url: '/admin/llm/usage';
+};
+
+export type AdminGetLlmUsageReportResponses = {
+    /**
+     * OK
+     */
+    200: AdminLlmUsageReport;
+};
+
+export type AdminGetLlmUsageReportResponse = AdminGetLlmUsageReportResponses[keyof AdminGetLlmUsageReportResponses];
 
 export type AdminListLoginProvidersData = {
     body?: never;
@@ -3205,6 +4802,24 @@ export type AdminListWorkspacesResponses = {
 };
 
 export type AdminListWorkspacesResponse = AdminListWorkspacesResponses[keyof AdminListWorkspacesResponses];
+
+export type AdminUpdateWorkspaceLlmBudgetData = {
+    body: UpdateLlmBudgetRequest;
+    path: {
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/admin/workspaces/{workspaceSlug}/llm/budget';
+};
+
+export type AdminUpdateWorkspaceLlmBudgetResponses = {
+    /**
+     * Cap updated
+     */
+    204: void;
+};
+
+export type AdminUpdateWorkspaceLlmBudgetResponse = AdminUpdateWorkspaceLlmBudgetResponses[keyof AdminUpdateWorkspaceLlmBudgetResponses];
 
 export type ImpersonateData = {
     body: ImpersonateRequest;
@@ -3710,7 +5325,7 @@ export type GetWorkspaceResponses = {
 
 export type GetWorkspaceResponse = GetWorkspaceResponses[keyof GetWorkspaceResponses];
 
-export type GetConfigsData = {
+export type ListAgentsData = {
     body?: never;
     path: {
         /**
@@ -3719,138 +5334,19 @@ export type GetConfigsData = {
         workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/agent-configs';
+    url: '/workspaces/{workspaceSlug}/agents';
 };
 
-export type GetConfigsResponses = {
+export type ListAgentsResponses = {
     /**
-     * Agent configs returned
+     * Bindings returned
      */
-    200: Array<AgentConfig>;
+    200: Array<AgentBinding>;
 };
 
-export type GetConfigsResponse = GetConfigsResponses[keyof GetConfigsResponses];
+export type ListAgentsResponse = ListAgentsResponses[keyof ListAgentsResponses];
 
-export type CreateConfigData = {
-    body: CreateAgentConfigRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/agent-configs';
-};
-
-export type CreateConfigErrors = {
-    /**
-     * Config name already exists in this workspace
-     */
-    409: unknown;
-};
-
-export type CreateConfigResponses = {
-    /**
-     * Agent config created
-     */
-    201: AgentConfig;
-};
-
-export type CreateConfigResponse = CreateConfigResponses[keyof CreateConfigResponses];
-
-export type DeleteConfigData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        configId: number;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/agent-configs/{configId}';
-};
-
-export type DeleteConfigErrors = {
-    /**
-     * Agent config not found
-     */
-    404: unknown;
-    /**
-     * Cannot delete config with active jobs
-     */
-    409: unknown;
-};
-
-export type DeleteConfigResponses = {
-    /**
-     * Agent config deleted
-     */
-    204: void;
-};
-
-export type DeleteConfigResponse = DeleteConfigResponses[keyof DeleteConfigResponses];
-
-export type GetConfigData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        configId: number;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/agent-configs/{configId}';
-};
-
-export type GetConfigErrors = {
-    /**
-     * Agent config not found
-     */
-    404: unknown;
-};
-
-export type GetConfigResponses = {
-    /**
-     * Agent config returned
-     */
-    200: AgentConfig;
-};
-
-export type GetConfigResponse = GetConfigResponses[keyof GetConfigResponses];
-
-export type UpdateConfigData = {
-    body: UpdateAgentConfigRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        configId: number;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/agent-configs/{configId}';
-};
-
-export type UpdateConfigErrors = {
-    /**
-     * Agent config not found
-     */
-    404: unknown;
-};
-
-export type UpdateConfigResponses = {
-    /**
-     * Agent config updated
-     */
-    200: AgentConfig;
-};
-
-export type UpdateConfigResponse = UpdateConfigResponses[keyof UpdateConfigResponses];
-
-export type ListJobsData = {
+export type ListAgentJobsData = {
     body?: never;
     path: {
         /**
@@ -3863,26 +5359,22 @@ export type ListJobsData = {
          * Filter by job status
          */
         status?: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
-        /**
-         * Filter by config ID
-         */
-        configId?: number;
         page?: number;
         size?: number;
     };
-    url: '/workspaces/{workspaceSlug}/agent-jobs';
+    url: '/workspaces/{workspaceSlug}/agents/jobs';
 };
 
-export type ListJobsResponses = {
+export type ListAgentJobsResponses = {
     /**
      * Paginated job list
      */
     200: PageAgentJob;
 };
 
-export type ListJobsResponse = ListJobsResponses[keyof ListJobsResponses];
+export type ListAgentJobsResponse = ListAgentJobsResponses[keyof ListAgentJobsResponses];
 
-export type GetJobData = {
+export type GetAgentJobData = {
     body?: never;
     path: {
         /**
@@ -3892,26 +5384,26 @@ export type GetJobData = {
         jobId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/agent-jobs/{jobId}';
+    url: '/workspaces/{workspaceSlug}/agents/jobs/{jobId}';
 };
 
-export type GetJobErrors = {
+export type GetAgentJobErrors = {
     /**
      * Job not found in this workspace
      */
     404: unknown;
 };
 
-export type GetJobResponses = {
+export type GetAgentJobResponses = {
     /**
      * Job detail returned
      */
     200: AgentJob;
 };
 
-export type GetJobResponse = GetJobResponses[keyof GetJobResponses];
+export type GetAgentJobResponse = GetAgentJobResponses[keyof GetAgentJobResponses];
 
-export type CancelJobData = {
+export type CancelAgentJobData = {
     body?: never;
     path: {
         /**
@@ -3921,10 +5413,10 @@ export type CancelJobData = {
         jobId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/agent-jobs/{jobId}/cancel';
+    url: '/workspaces/{workspaceSlug}/agents/jobs/{jobId}/cancel';
 };
 
-export type CancelJobErrors = {
+export type CancelAgentJobErrors = {
     /**
      * Job not found in this workspace
      */
@@ -3935,16 +5427,16 @@ export type CancelJobErrors = {
     409: unknown;
 };
 
-export type CancelJobResponses = {
+export type CancelAgentJobResponses = {
     /**
      * Job cancelled
      */
     200: AgentJob;
 };
 
-export type CancelJobResponse = CancelJobResponses[keyof CancelJobResponses];
+export type CancelAgentJobResponse = CancelAgentJobResponses[keyof CancelAgentJobResponses];
 
-export type RetryDeliveryData = {
+export type RetryAgentJobDeliveryData = {
     body?: never;
     path: {
         /**
@@ -3954,10 +5446,10 @@ export type RetryDeliveryData = {
         jobId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/agent-jobs/{jobId}/delivery/retry';
+    url: '/workspaces/{workspaceSlug}/agents/jobs/{jobId}/delivery/retry';
 };
 
-export type RetryDeliveryErrors = {
+export type RetryAgentJobDeliveryErrors = {
     /**
      * Job not found in this workspace
      */
@@ -3968,16 +5460,67 @@ export type RetryDeliveryErrors = {
     409: unknown;
 };
 
-export type RetryDeliveryResponses = {
+export type RetryAgentJobDeliveryResponses = {
     /**
      * Delivery retried
      */
     200: AgentJob;
 };
 
-export type RetryDeliveryResponse = RetryDeliveryResponses[keyof RetryDeliveryResponses];
+export type RetryAgentJobDeliveryResponse = RetryAgentJobDeliveryResponses[keyof RetryAgentJobDeliveryResponses];
 
-export type GetAiSettingsData = {
+export type DeleteAgentData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        purpose: 'PRACTICE_DETECTION' | 'MENTOR';
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agents/{purpose}';
+};
+
+export type DeleteAgentResponses = {
+    /**
+     * Binding removed
+     */
+    204: void;
+};
+
+export type DeleteAgentResponse = DeleteAgentResponses[keyof DeleteAgentResponses];
+
+export type ConfigureAgentData = {
+    body: AgentBindingRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        purpose: 'PRACTICE_DETECTION' | 'MENTOR';
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agents/{purpose}';
+};
+
+export type ConfigureAgentErrors = {
+    /**
+     * Model not found
+     */
+    404: unknown;
+};
+
+export type ConfigureAgentResponses = {
+    /**
+     * Binding saved
+     */
+    200: AgentBinding;
+};
+
+export type ConfigureAgentResponse = ConfigureAgentResponses[keyof ConfigureAgentResponses];
+
+export type ListWorkspaceConfigAuditEventsData = {
     body?: never;
     path: {
         /**
@@ -3985,95 +5528,28 @@ export type GetAiSettingsData = {
          */
         workspaceSlug: string;
     };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/ai-settings';
-};
-
-export type GetAiSettingsResponses = {
-    /**
-     * AI settings returned
-     */
-    200: AiSettingsView;
-};
-
-export type GetAiSettingsResponse = GetAiSettingsResponses[keyof GetAiSettingsResponses];
-
-export type UpdateMentorConfigData = {
-    body: UpdateAgentBindingRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
+    query?: {
+        page?: number;
+        size?: number;
+        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
+        entityId?: string;
+        changedKey?: string;
+        action?: Array<'CREATED' | 'UPDATED' | 'DELETED'>;
+        actorId?: number;
+        from?: Date;
+        to?: Date;
     };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/ai-settings/mentor-config';
+    url: '/workspaces/{workspaceSlug}/config-audit';
 };
 
-export type UpdateMentorConfigErrors = {
+export type ListWorkspaceConfigAuditEventsResponses = {
     /**
-     * Config not found in this workspace
+     * OK
      */
-    404: unknown;
+    200: PageConfigAuditEntryView;
 };
 
-export type UpdateMentorConfigResponses = {
-    /**
-     * Binding updated
-     */
-    200: AiSettingsView;
-};
-
-export type UpdateMentorConfigResponse = UpdateMentorConfigResponses[keyof UpdateMentorConfigResponses];
-
-export type UpdatePracticeConfigData = {
-    body: UpdateAgentBindingRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/ai-settings/practice-config';
-};
-
-export type UpdatePracticeConfigErrors = {
-    /**
-     * Config not found in this workspace
-     */
-    404: unknown;
-};
-
-export type UpdatePracticeConfigResponses = {
-    /**
-     * Binding updated
-     */
-    200: AiSettingsView;
-};
-
-export type UpdatePracticeConfigResponse = UpdatePracticeConfigResponses[keyof UpdatePracticeConfigResponses];
-
-export type UpdatePracticeReviewSettingsData = {
-    body: UpdatePracticeReviewSettings;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/ai-settings/practice-review';
-};
-
-export type UpdatePracticeReviewSettingsResponses = {
-    /**
-     * Policy updated
-     */
-    200: AiSettingsView;
-};
-
-export type UpdatePracticeReviewSettingsResponse = UpdatePracticeReviewSettingsResponses[keyof UpdatePracticeReviewSettingsResponses];
+export type ListWorkspaceConfigAuditEventsResponse = ListWorkspaceConfigAuditEventsResponses[keyof ListWorkspaceConfigAuditEventsResponses];
 
 export type ListData = {
     body?: never;
@@ -4117,7 +5593,7 @@ export type InitiateResponses = {
 
 export type InitiateResponse = InitiateResponses[keyof InitiateResponses];
 
-export type GetOutlineConnectionStatusData = {
+export type GetIntegrationCatalogData = {
     body?: never;
     path: {
         /**
@@ -4126,50 +5602,17 @@ export type GetOutlineConnectionStatusData = {
         workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/connections/outline/status';
+    url: '/workspaces/{workspaceSlug}/connections/catalog';
 };
 
-export type GetOutlineConnectionStatusErrors = {
+export type GetIntegrationCatalogResponses = {
     /**
-     * The workspace has no ACTIVE Outline connection
+     * OK
      */
-    404: unknown;
+    200: Array<IntegrationCatalogEntry>;
 };
 
-export type GetOutlineConnectionStatusResponses = {
-    /**
-     * Connection health snapshot returned
-     */
-    200: OutlineConnectionStatus;
-};
-
-export type GetOutlineConnectionStatusResponse = GetOutlineConnectionStatusResponses[keyof GetOutlineConnectionStatusResponses];
-
-export type SyncOutlineConnectionData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/connections/outline/sync';
-};
-
-export type SyncOutlineConnectionErrors = {
-    /**
-     * The workspace has no ACTIVE Outline connection
-     */
-    404: unknown;
-};
-
-export type SyncOutlineConnectionResponses = {
-    /**
-     * Reconcile accepted (or already running — duplicate submits are absorbed); poll the connection status resource in the Location header
-     */
-    202: unknown;
-};
+export type GetIntegrationCatalogResponse = GetIntegrationCatalogResponses[keyof GetIntegrationCatalogResponses];
 
 export type GetOutlineTokenStatusData = {
     body?: never;
@@ -4222,6 +5665,162 @@ export type SendSlackTestMessageResponses = {
 };
 
 export type SendSlackTestMessageResponse = SendSlackTestMessageResponses[keyof SendSlackTestMessageResponses];
+
+export type GetConnectionSyncStatusData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        connectionId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/connections/{connectionId}/sync';
+};
+
+export type GetConnectionSyncStatusResponses = {
+    /**
+     * OK
+     */
+    200: ConnectionSyncStatus;
+};
+
+export type GetConnectionSyncStatusResponse = GetConnectionSyncStatusResponses[keyof GetConnectionSyncStatusResponses];
+
+export type ListConnectionSyncJobsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        connectionId: number;
+    };
+    query?: {
+        page?: number;
+        size?: number;
+    };
+    url: '/workspaces/{workspaceSlug}/connections/{connectionId}/sync/jobs';
+};
+
+export type ListConnectionSyncJobsResponses = {
+    /**
+     * OK
+     */
+    200: PageSyncJob;
+};
+
+export type ListConnectionSyncJobsResponse = ListConnectionSyncJobsResponses[keyof ListConnectionSyncJobsResponses];
+
+export type TriggerSyncJobData = {
+    body: TriggerSyncJobRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        connectionId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/connections/{connectionId}/sync/jobs';
+};
+
+export type TriggerSyncJobErrors = {
+    /**
+     * Missing or invalid request body (e.g. absent sync type)
+     */
+    400: ProblemDetail;
+    /**
+     * Connection not found in this workspace
+     */
+    404: ProblemDetail;
+    /**
+     * Connection is not ACTIVE, a different sync type is already running, or manual sync is unsupported for the kind
+     */
+    409: ProblemDetail;
+    /**
+     * The server is too busy to dispatch the sync; retry later
+     */
+    503: ProblemDetail;
+};
+
+export type TriggerSyncJobError = TriggerSyncJobErrors[keyof TriggerSyncJobErrors];
+
+export type TriggerSyncJobResponses = {
+    /**
+     * Idempotent-absorb: a same-type job was already running and is returned unchanged
+     */
+    200: SyncJob;
+    /**
+     * A new sync job was created and dispatched
+     */
+    202: SyncJob;
+};
+
+export type TriggerSyncJobResponse = TriggerSyncJobResponses[keyof TriggerSyncJobResponses];
+
+export type UpdateConnectionSyncJobData = {
+    body: UpdateSyncJobRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        connectionId: number;
+        jobId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/connections/{connectionId}/sync/jobs/{jobId}';
+};
+
+export type UpdateConnectionSyncJobErrors = {
+    /**
+     * The update does not request cancellation
+     */
+    400: ProblemDetail;
+    /**
+     * Job not found in this workspace, or not owned by this connection
+     */
+    404: ProblemDetail;
+    /**
+     * Job is already in a terminal status
+     */
+    409: ProblemDetail;
+};
+
+export type UpdateConnectionSyncJobError = UpdateConnectionSyncJobErrors[keyof UpdateConnectionSyncJobErrors];
+
+export type UpdateConnectionSyncJobResponses = {
+    /**
+     * Cancellation requested; the running job stops cooperatively
+     */
+    202: SyncJob;
+};
+
+export type UpdateConnectionSyncJobResponse = UpdateConnectionSyncJobResponses[keyof UpdateConnectionSyncJobResponses];
+
+export type ListConnectionSyncResourcesData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        connectionId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/connections/{connectionId}/sync/resources';
+};
+
+export type ListConnectionSyncResourcesResponses = {
+    /**
+     * OK
+     */
+    200: Array<SyncResourceState>;
+};
+
+export type ListConnectionSyncResourcesResponse = ListConnectionSyncResourcesResponses[keyof ListConnectionSyncResourcesResponses];
 
 export type ReadData = {
     body?: never;
@@ -4425,6 +6024,403 @@ export type ResetAndRecalculateLeaguesResponses = {
      */
     200: unknown;
 };
+
+export type WorkspaceListAvailableLlmModelsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/llm/available-models';
+};
+
+export type WorkspaceListAvailableLlmModelsResponses = {
+    /**
+     * OK
+     */
+    200: Array<AvailableLlmModel>;
+};
+
+export type WorkspaceListAvailableLlmModelsResponse = WorkspaceListAvailableLlmModelsResponses[keyof WorkspaceListAvailableLlmModelsResponses];
+
+export type UpdateWorkspaceLlmBudgetData = {
+    body: UpdateLlmBudgetRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/llm/budget';
+};
+
+export type UpdateWorkspaceLlmBudgetResponses = {
+    /**
+     * Cap updated
+     */
+    204: void;
+};
+
+export type UpdateWorkspaceLlmBudgetResponse = UpdateWorkspaceLlmBudgetResponses[keyof UpdateWorkspaceLlmBudgetResponses];
+
+export type WorkspaceListLlmConnectionsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/llm/connections';
+};
+
+export type WorkspaceListLlmConnectionsResponses = {
+    /**
+     * OK
+     */
+    200: Array<WorkspaceLlmConnection>;
+};
+
+export type WorkspaceListLlmConnectionsResponse = WorkspaceListLlmConnectionsResponses[keyof WorkspaceListLlmConnectionsResponses];
+
+export type WorkspaceCreateLlmConnectionData = {
+    body: CreateWorkspaceLlmConnectionRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/llm/connections';
+};
+
+export type WorkspaceCreateLlmConnectionErrors = {
+    /**
+     * A connection with this slug already exists in this workspace
+     */
+    409: unknown;
+};
+
+export type WorkspaceCreateLlmConnectionResponses = {
+    /**
+     * Connection created; URL in the Location header
+     */
+    201: WorkspaceLlmConnection;
+};
+
+export type WorkspaceCreateLlmConnectionResponse = WorkspaceCreateLlmConnectionResponses[keyof WorkspaceCreateLlmConnectionResponses];
+
+export type WorkspaceCreateLlmModelData = {
+    body: CreateWorkspaceLlmModelRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        connectionId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/llm/connections/{connectionId}/models';
+};
+
+export type WorkspaceCreateLlmModelErrors = {
+    /**
+     * AI provider connection not found
+     */
+    404: unknown;
+    /**
+     * A model with this slug or upstream model id already exists on the connection
+     */
+    409: unknown;
+};
+
+export type WorkspaceCreateLlmModelResponses = {
+    /**
+     * Model created; URL in the Location header
+     */
+    201: WorkspaceLlmModel;
+};
+
+export type WorkspaceCreateLlmModelResponse = WorkspaceCreateLlmModelResponses[keyof WorkspaceCreateLlmModelResponses];
+
+export type WorkspaceDeleteLlmConnectionData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/llm/connections/{id}';
+};
+
+export type WorkspaceDeleteLlmConnectionErrors = {
+    /**
+     * Connection not found
+     */
+    404: unknown;
+    /**
+     * Cannot delete a connection still referenced by one or more models
+     */
+    409: unknown;
+};
+
+export type WorkspaceDeleteLlmConnectionResponses = {
+    /**
+     * Connection removed
+     */
+    204: void;
+};
+
+export type WorkspaceDeleteLlmConnectionResponse = WorkspaceDeleteLlmConnectionResponses[keyof WorkspaceDeleteLlmConnectionResponses];
+
+export type WorkspaceGetLlmConnectionData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/llm/connections/{id}';
+};
+
+export type WorkspaceGetLlmConnectionErrors = {
+    /**
+     * Connection not found
+     */
+    404: unknown;
+};
+
+export type WorkspaceGetLlmConnectionResponses = {
+    /**
+     * OK
+     */
+    200: WorkspaceLlmConnection;
+};
+
+export type WorkspaceGetLlmConnectionResponse = WorkspaceGetLlmConnectionResponses[keyof WorkspaceGetLlmConnectionResponses];
+
+export type WorkspaceUpdateLlmConnectionData = {
+    body: UpdateWorkspaceLlmConnectionRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/llm/connections/{id}';
+};
+
+export type WorkspaceUpdateLlmConnectionErrors = {
+    /**
+     * Connection not found
+     */
+    404: unknown;
+};
+
+export type WorkspaceUpdateLlmConnectionResponses = {
+    /**
+     * OK
+     */
+    200: WorkspaceLlmConnection;
+};
+
+export type WorkspaceUpdateLlmConnectionResponse = WorkspaceUpdateLlmConnectionResponses[keyof WorkspaceUpdateLlmConnectionResponses];
+
+export type WorkspaceProbeLlmConnectionData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/llm/connections/{id}/probe';
+};
+
+export type WorkspaceProbeLlmConnectionResponses = {
+    /**
+     * OK
+     */
+    200: WorkspaceLlmProbeResult;
+};
+
+export type WorkspaceProbeLlmConnectionResponse = WorkspaceProbeLlmConnectionResponses[keyof WorkspaceProbeLlmConnectionResponses];
+
+export type WorkspaceListLlmModelsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/llm/models';
+};
+
+export type WorkspaceListLlmModelsResponses = {
+    /**
+     * OK
+     */
+    200: Array<WorkspaceLlmModel>;
+};
+
+export type WorkspaceListLlmModelsResponse = WorkspaceListLlmModelsResponses[keyof WorkspaceListLlmModelsResponses];
+
+export type WorkspaceDeleteLlmModelData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/llm/models/{id}';
+};
+
+export type WorkspaceDeleteLlmModelErrors = {
+    /**
+     * Model not found
+     */
+    404: unknown;
+    /**
+     * Cannot delete a model still bound to an agent configuration
+     */
+    409: unknown;
+};
+
+export type WorkspaceDeleteLlmModelResponses = {
+    /**
+     * Model removed
+     */
+    204: void;
+};
+
+export type WorkspaceDeleteLlmModelResponse = WorkspaceDeleteLlmModelResponses[keyof WorkspaceDeleteLlmModelResponses];
+
+export type WorkspaceGetLlmModelData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/llm/models/{id}';
+};
+
+export type WorkspaceGetLlmModelErrors = {
+    /**
+     * Model not found
+     */
+    404: unknown;
+};
+
+export type WorkspaceGetLlmModelResponses = {
+    /**
+     * OK
+     */
+    200: WorkspaceLlmModel;
+};
+
+export type WorkspaceGetLlmModelResponse = WorkspaceGetLlmModelResponses[keyof WorkspaceGetLlmModelResponses];
+
+export type WorkspaceUpdateLlmModelData = {
+    body: UpdateWorkspaceLlmModelRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/llm/models/{id}';
+};
+
+export type WorkspaceUpdateLlmModelErrors = {
+    /**
+     * Model not found
+     */
+    404: unknown;
+    /**
+     * Another model on the connection already uses this upstream model id
+     */
+    409: unknown;
+};
+
+export type WorkspaceUpdateLlmModelResponses = {
+    /**
+     * OK
+     */
+    200: WorkspaceLlmModel;
+};
+
+export type WorkspaceUpdateLlmModelResponse = WorkspaceUpdateLlmModelResponses[keyof WorkspaceUpdateLlmModelResponses];
+
+export type WorkspaceGetLlmSettingsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/llm/settings';
+};
+
+export type WorkspaceGetLlmSettingsResponses = {
+    /**
+     * OK
+     */
+    200: WorkspaceLlmSettings;
+};
+
+export type WorkspaceGetLlmSettingsResponse = WorkspaceGetLlmSettingsResponses[keyof WorkspaceGetLlmSettingsResponses];
+
+export type GetLlmUsageReportData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        month?: string;
+    };
+    url: '/workspaces/{workspaceSlug}/llm/usage';
+};
+
+export type GetLlmUsageReportResponses = {
+    /**
+     * OK
+     */
+    200: WorkspaceLlmUsageReport;
+};
+
+export type GetLlmUsageReportResponse = GetLlmUsageReportResponses[keyof GetLlmUsageReportResponses];
 
 export type ListMembersData = {
     body?: never;
@@ -5421,6 +7417,48 @@ export type ReorderPracticesResponses = {
 };
 
 export type ReorderPracticesResponse = ReorderPracticesResponses[keyof ReorderPracticesResponses];
+
+export type GetPracticeReviewSettingsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/review-settings';
+};
+
+export type GetPracticeReviewSettingsResponses = {
+    /**
+     * Policy returned
+     */
+    200: PracticeReviewSettings;
+};
+
+export type GetPracticeReviewSettingsResponse = GetPracticeReviewSettingsResponses[keyof GetPracticeReviewSettingsResponses];
+
+export type UpdatePracticeReviewSettingsData = {
+    body: UpdatePracticeReviewSettingsRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/review-settings';
+};
+
+export type UpdatePracticeReviewSettingsResponses = {
+    /**
+     * Policy updated
+     */
+    200: PracticeReviewSettings;
+};
+
+export type UpdatePracticeReviewSettingsResponse = UpdatePracticeReviewSettingsResponses[keyof UpdatePracticeReviewSettingsResponses];
 
 export type DeletePracticeData = {
     body?: never;

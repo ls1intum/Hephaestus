@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -41,14 +40,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
         @Param("number") int number
     );
 
-    /**
-     * Finds a pull request by ID with assignees eagerly fetched.
-     * Useful when assignees need to be accessed outside the original transaction,
-     * avoiding LazyInitializationException after the Hibernate session is closed.
-     *
-     * @param id the pull request ID
-     * @return the pull request with assignees loaded, or empty if not found
-     */
+    /** Pull request by id with assignees eagerly fetched, for access after the Hibernate session closes. */
     @Query(
         """
         SELECT p FROM PullRequest p
@@ -58,14 +50,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
     )
     Optional<PullRequest> findByIdWithAssignees(@Param("id") Long id);
 
-    /**
-     * Finds a pull request by ID with assignees and repository eagerly fetched.
-     * Useful when the PR entity is accessed outside the original Hibernate session
-     * (e.g. async event listeners, scheduled tasks).
-     *
-     * @param id the pull request ID
-     * @return the pull request with assignees and repository loaded, or empty if not found
-     */
+    /** Pull request by id with assignees and repository eagerly fetched, for access outside the original session (async listeners, scheduled tasks). */
     @Query(
         """
         SELECT p FROM PullRequest p
@@ -76,16 +61,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
     )
     Optional<PullRequest> findByIdWithAssigneesAndRepository(@Param("id") Long id);
 
-    /**
-     * Finds a pull request by ID with repository eagerly fetched.
-     * Required for passing PRs across transaction boundaries where the repository
-     * relationship needs to be accessed (e.g., for logging nameWithOwner).
-     * Avoids LazyInitializationException when PR is fetched in one transaction
-     * and repository is accessed in another.
-     *
-     * @param id the pull request ID
-     * @return the pull request with repository loaded, or empty if not found
-     */
+    /** Pull request by id with repository eagerly fetched, for passing across transaction boundaries (e.g. logging nameWithOwner). */
     @Query(
         """
         SELECT p FROM PullRequest p
@@ -95,14 +71,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
     )
     Optional<PullRequest> findByIdWithRepository(@Param("id") Long id);
 
-    /**
-     * Finds a pull request by ID with author eagerly fetched.
-     * Used by the practice detection delivery pipeline where the PR author
-     * (contributor) is needed for finding attribution.
-     *
-     * @param id the pull request ID
-     * @return the pull request with author loaded, or empty if not found
-     */
+    /** Pull request by id with author eagerly fetched. Used by the practice-detection delivery pipeline (author = finding attribution). */
     @Query(
         """
         SELECT p FROM PullRequest p
@@ -141,9 +110,6 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
     Optional<PullRequest> findByIdWithAllForGate(@Param("id") Long id);
 
     List<PullRequest> findAllByRepository_Id(Long repositoryId);
-
-    /** Slice (rather than Page) so batching needs no count query. */
-    Slice<PullRequest> findByRepository_Id(Long repositoryId, Pageable pageable);
 
     /**
      * Repository-wide pull-request inventory ordered newest-first by number, for the cross-artifact
@@ -238,7 +204,14 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
             head_ref_oid = COALESCE(EXCLUDED.head_ref_oid, issue.head_ref_oid),
             base_ref_oid = COALESCE(EXCLUDED.base_ref_oid, issue.base_ref_oid),
             merged_by_id = COALESCE(EXCLUDED.merged_by_id, issue.merged_by_id),
-            merge_commit_sha = COALESCE(EXCLUDED.merge_commit_sha, issue.merge_commit_sha)
+            merge_commit_sha = COALESCE(EXCLUDED.merge_commit_sha, issue.merge_commit_sha),
+            -- Resurrect: upstream just handed us this PR, so any tombstone on it is wrong. This is
+            -- what makes a deletion-sweep tombstone reversible — a sweep that tombstoned on bad
+            -- data self-heals on the next ordinary sync instead of needing an operator.
+            -- Keep this comment free of the apostrophe character: Hibernate reads one as the start of
+            -- a quoted range it never finds the end of, and the whole ApplicationContext fails to
+            -- start. NativeQueryCommentArchTest enforces this.
+            deleted_at = NULL
         """,
         nativeQuery = true
     )

@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -45,17 +46,29 @@ public class WorkspaceTeamLabelService {
     private final TeamRepository teamRepository;
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final WorkspaceTeamSettingsService workspaceTeamSettingsService;
+    private final WorkspaceTeamScopeResolver workspaceTeamScopeResolver;
 
     public WorkspaceTeamLabelService(
         WorkspaceRepository workspaceRepository,
         TeamRepository teamRepository,
         WorkspaceMembershipRepository workspaceMembershipRepository,
-        WorkspaceTeamSettingsService workspaceTeamSettingsService
+        WorkspaceTeamSettingsService workspaceTeamSettingsService,
+        WorkspaceTeamScopeResolver workspaceTeamScopeResolver
     ) {
         this.workspaceRepository = workspaceRepository;
         this.teamRepository = teamRepository;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.workspaceTeamSettingsService = workspaceTeamSettingsService;
+        this.workspaceTeamScopeResolver = workspaceTeamScopeResolver;
+    }
+
+    /**
+     * The predicate selecting teams that belong to {@code workspace}. Fails closed: a workspace with no
+     * resolvable scope (no synced organization) has no teams.
+     */
+    private Predicate<Team> inScope(Workspace workspace) {
+        WorkspaceTeamScope scope = workspaceTeamScopeResolver.resolve(workspace).orElse(null);
+        return scope == null ? team -> false : scope::contains;
     }
 
     // User/Team Queries
@@ -70,10 +83,18 @@ public class WorkspaceTeamLabelService {
         List<User> users = workspaceMembershipRepository.findHumanUsersWithTeamsByWorkspaceId(workspace.getId());
         Set<Long> hiddenTeamIds = workspaceTeamSettingsService.getHiddenTeamIds(workspace.getId());
         Set<Long> hiddenMemberIds = workspaceMembershipRepository.findHiddenUserIdsByWorkspaceId(workspace.getId());
+        // The roster is workspace-scoped, but a User is global: its fetched memberships span every tenant
+        // it belongs to, so the teams must be scoped separately.
+        Predicate<Team> inScope = inScope(workspace);
         return users
             .stream()
             .map(user ->
-                UserTeamsDTO.fromUserWithScopeSettings(user, hiddenTeamIds, hiddenMemberIds.contains(user.getId()))
+                UserTeamsDTO.fromUserWithScopeSettings(
+                    user,
+                    hiddenTeamIds,
+                    hiddenMemberIds.contains(user.getId()),
+                    inScope
+                )
             )
             .toList();
     }
@@ -124,6 +145,7 @@ public class WorkspaceTeamLabelService {
         // Return updated team info with workspace-scoped settings
         return teamRepository
             .findWithCollectionsById(teamId)
+            .filter(inScope(workspace))
             .map(team -> createTeamInfoDTOWithWorkspaceSettings(workspace, team));
     }
 
@@ -161,6 +183,7 @@ public class WorkspaceTeamLabelService {
         // Return updated team info with workspace-scoped settings
         return teamRepository
             .findWithCollectionsById(teamId)
+            .filter(inScope(workspace))
             .map(team -> createTeamInfoDTOWithWorkspaceSettings(workspace, team));
     }
 

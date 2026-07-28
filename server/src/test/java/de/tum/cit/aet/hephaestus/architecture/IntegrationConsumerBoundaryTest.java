@@ -28,19 +28,12 @@ import org.junit.jupiter.api.Test;
  */
 class IntegrationConsumerBoundaryTest extends HephaestusArchitectureTest {
 
-    /** Packages allowed to remain under {@code integration/scm/sync/}. */
     private static final List<String> ALLOWED_SYNC_SUBPACKAGES = List.of(
         // Historical-backfill scheduler + service stay here for the duration of this slice;
         // they are Slice-C territory and not in scope for the consumer dissolution.
         "de.tum.cit.aet.hephaestus.integration.scm.sync.backfill"
     );
 
-    /**
-     * Production code must not reside directly under {@code integration/scm/sync/}; only the
-     * allowed sub-packages ({@code backfill}) remain populated. New consumer or sync
-     * orchestration code belongs under {@code integration/consumer/} or
-     * {@code integration/<kind>/sync/}.
-     */
     @Test
     void scmSyncIsEmptyOfNonBackfillCode() {
         List<String> violations = classes
@@ -59,12 +52,6 @@ class IntegrationConsumerBoundaryTest extends HephaestusArchitectureTest {
             .isEmpty();
     }
 
-    /**
-     * The agent runtime role must not link against the integration consumer fleet. Consumer
-     * beans are server-role-only; agents communicate via the agent NATS pull consumer
-     * ({@code hephaestus.agent.nats.*}), a separate connection from
-     * {@code hephaestus.sync.nats.*}. Mixing the two would break role isolation.
-     */
     @Test
     void agentDoesNotDependOnIntegrationConsumer() {
         noClasses()
@@ -74,9 +61,28 @@ class IntegrationConsumerBoundaryTest extends HephaestusArchitectureTest {
             .dependOnClassesThat()
             .resideInAPackage("de.tum.cit.aet.hephaestus.integration.core.consumer..")
             .because(
-                "agent runtime role uses its own NATS connection (hephaestus.agent.nats.*); " +
-                    "depending on integration.consumer would mix bean clusters across roles and " +
-                    "break the runtime-role isolation locked by RuntimeRoleBoundaryTest"
+                "the agent job queue is Postgres-backed, not NATS-backed; depending on " +
+                    "integration.consumer would mix bean clusters across roles and break the " +
+                    "runtime-role isolation locked by RuntimeRoleBoundaryTest"
+            )
+            .check(classes);
+    }
+
+    /**
+     * Not even its own connection: a jnats import anywhere under {@code agent/} would mean a NATS-based
+     * feature crept back in without going through the {@code agent_job} queue.
+     */
+    @Test
+    void agentDoesNotLinkAgainstJnatsAtAll() {
+        noClasses()
+            .that()
+            .resideInAPackage("de.tum.cit.aet.hephaestus.agent..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAPackage("io.nats..")
+            .because(
+                "the agent job queue is Postgres-backed (agent_job table, polled by " +
+                    "AgentJobExecutor) — the agent package must have zero io.nats dependency"
             )
             .check(classes);
     }

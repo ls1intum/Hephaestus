@@ -27,6 +27,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -111,6 +112,29 @@ class SlackChannelHistorySyncServiceTest extends BaseUnitTest {
         assertThat(summary.skipped()).isEqualTo(1);
         verify(slackMessageService, never()).fetchHistoryPage(anyLong(), any(), any(), any(), any(), anyInt());
         verify(monitoredChannelRepository, never()).advanceHistoryWatermark(anyLong(), any(), any(), any());
+    }
+
+    @Test
+    void cancellationBeforeFirstChannel_makesNoSlackRequest() {
+        stubChannels(channel(ANNOUNCED, null));
+
+        var summary = service.syncWorkspace(WS, () -> true);
+
+        assertThat(summary.skipped()).isEqualTo(1);
+        assertThat(summary.requestsUsed()).isZero();
+        verify(slackMessageService, never()).fetchHistoryPage(anyLong(), any(), any(), any(), any(), anyInt());
+        verify(monitoredChannelRepository, never()).advanceHistoryWatermark(anyLong(), any(), any(), any());
+    }
+
+    @Test
+    void cancellationAfterSkippedChannel_countsAllRemainingChannelsAsSkipped() {
+        stubChannels(channel(null, null), channel(ANNOUNCED, null));
+        AtomicInteger checks = new AtomicInteger();
+
+        var summary = service.syncWorkspace(WS, () -> checks.incrementAndGet() > 1);
+
+        assertThat(summary.skipped()).isEqualTo(2);
+        verify(slackMessageService, never()).fetchHistoryPage(anyLong(), any(), any(), any(), any(), anyInt());
     }
 
     @Test
@@ -259,6 +283,36 @@ class SlackChannelHistorySyncServiceTest extends BaseUnitTest {
         verify(ingestService).ingestChannelMessage(TEAM, CHANNEL, "1783000009.000000", null, "U2", "late reply");
         // The parent itself is ingested exactly once (from the history page), not again from the replies echo.
         verify(ingestService).ingestChannelMessage(TEAM, CHANNEL, "1783000007.000000", null, "U1", "root");
+    }
+
+    @Test
+    void repliesBudgetExhaustedMidPagination_doesNotAdvanceChannelWatermark() {
+        service = new SlackChannelHistorySyncService(
+            monitoredChannelRepository,
+            threadRepository,
+            slackMessageService,
+            ingestService,
+            connectionService,
+            new SlackSyncProperties("0 0 4 * * *", 10, 15, Duration.ZERO, true, 1, true)
+        );
+        stubChannels(channel(ANNOUNCED, null));
+        Message parent = plain("1783000007.000000", "U1", "root");
+        parent.setReplyCount(2);
+        when(
+            threadRepository.findByWorkspaceIdAndSlackChannelIdAndSlackThreadTs(WS, CHANNEL, parent.getTs())
+        ).thenReturn(Optional.empty());
+        when(
+            slackMessageService.fetchHistoryPage(eq(WS), eq(CHANNEL), anyString(), anyString(), any(), anyInt())
+        ).thenReturn(new HistoryPage(List.of(parent), null));
+        when(
+            slackMessageService.fetchRepliesPage(eq(WS), eq(CHANNEL), eq(parent.getTs()), anyString(), any(), anyInt())
+        ).thenReturn(new HistoryPage(List.of(), "next"));
+
+        var summary = service.syncWorkspace(WS);
+
+        assertThat(summary.budgetExhausted()).isTrue();
+        assertThat(summary.skipped()).isEqualTo(1);
+        verify(monitoredChannelRepository, never()).advanceHistoryWatermark(anyLong(), any(), any(), any());
     }
 
     @Test

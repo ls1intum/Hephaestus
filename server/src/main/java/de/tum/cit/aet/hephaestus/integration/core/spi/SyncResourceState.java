@@ -1,0 +1,70 @@
+package de.tum.cit.aet.hephaestus.integration.core.spi;
+
+import java.time.Instant;
+import java.util.List;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
+
+/**
+ * Unified read-model row for one synced resource (repository / channel / collection), returned by
+ * {@link ConnectionSyncStateProvider#resources}. The underlying state (watermarks, consent, sync
+ * status) keeps living in each integration's own tables — this is a projection, not a new table.
+ *
+ * @param id                        the integration's own row id for this resource (repository id,
+ *                                  monitored-channel id, collection id, …) — opaque to callers
+ * @param externalId                vendor-side identifier (repo full name, Slack channel id, Outline
+ *                                  collection id)
+ * @param name                      human-readable display name
+ * @param type                      the resource kind
+ * @param state                     free-form, integration-defined status string (e.g. consent state,
+ *                                  sync status) — kept a string for the same reason as
+ *                                  {@link BackfillSummary#state}
+ * @param lastSyncedAt              last successful sync timestamp for this resource, if known
+ * @param itemCount                 headline mirrored item count (issues+PRs, messages, documents), if
+ *                                  known — the rollup of {@code counts} shown in the collapsed row
+ * @param counts                    per-entity-class breakdown behind {@code itemCount}: one entry per
+ *                                  class the integration actually mirrors, never null (empty when the
+ *                                  integration reports no breakdown). See {@link SyncResourceCount} for
+ *                                  why the headline number alone hides a stalled entity class.
+ * @param upstreamCount             vendor-reported count for the same items, if the integration can
+ *                                  fetch it cheaply — lets the UI show "142 / 150 synced"
+ * @param lastError                 last sync error for this resource, if any
+ * @param backfillCompletedThrough  per-resource backfill horizon, if applicable
+ * @param backfillPercent           per-resource backfill percent, if applicable
+ */
+public record SyncResourceState(
+    @NonNull Long id,
+    @NonNull String externalId,
+    @NonNull String name,
+    @NonNull Type type,
+    @NonNull String state,
+    @Nullable Instant lastSyncedAt,
+    @Nullable Long itemCount,
+    @NonNull List<SyncResourceCount> counts,
+    @Nullable Long upstreamCount,
+    @Nullable String lastError,
+    @Nullable Instant backfillCompletedThrough,
+    @Nullable Integer backfillPercent
+) {
+    public SyncResourceState {
+        counts = counts == null ? List.of() : List.copyOf(counts);
+    }
+
+    /**
+     * Shared {@code state} literal for a resource that has completed at least one full sync. Held here
+     * (rather than hand-written per provider) so integrations reporting the same "synced" semantic —
+     * the two SCM providers, and any other whose resource means literally "synced" — render as one
+     * status in the unified UI. Integrations with a genuinely different vocabulary (Slack consent
+     * states, Outline mirror states) keep their own strings.
+     */
+    public static final String STATE_SYNCED = "SYNCED";
+
+    /** Shared {@code state} literal for a resource that has not yet completed its initial full sync. */
+    public static final String STATE_PENDING = "PENDING";
+
+    public enum Type {
+        REPOSITORY,
+        CHANNEL,
+        COLLECTION,
+    }
+}

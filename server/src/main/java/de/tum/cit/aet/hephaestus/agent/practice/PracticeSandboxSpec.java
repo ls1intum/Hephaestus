@@ -21,7 +21,8 @@ public record PracticeSandboxSpec(
     String outputPath,
     @Nullable SecurityProfile securityProfile,
     @Nullable NetworkPolicy networkPolicy,
-    Map<String, String> volumeMounts
+    Map<String, String> volumeMounts,
+    @Nullable String promptDigest
 ) {
     public PracticeSandboxSpec {
         Objects.requireNonNull(image, "image must not be null");

@@ -34,8 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
  * through issue links (the REST issue links API does not support
  * {@code is_child_of}/{@code is_parent_of} — those types do not exist).
  * <p>
- * Uses a single paginated GraphQL query per repository (efficient),
- * unlike the previous REST-based approach which made N+1 API calls.
+ * Uses a single paginated GraphQL query per repository.
  * <p>
  * Includes stale parent cleanup: if a parent-child relationship is
  * removed in GitLab, the local DB is updated to clear the parent.
@@ -80,7 +79,13 @@ public class GitLabSubIssueSyncService {
         String projectPath = repository.getNameWithOwner();
         String safeProjectPath = sanitizeForLog(projectPath);
 
-        List<Issue> issues = issueRepository.findAllByRepository_Id(repository.getId());
+        // Issues only: GitLab keeps issue IIDs and merge-request IIDs in separate per-project
+        // namespaces (issue #5 and MR !5 coexist), and both live in the single-table `issue` table. The
+        // polymorphic list would collide the two in issueByIid (last-writer-wins) and let a merge request
+        // be mistaken for the issue of the same IID — writing a bogus parent onto the MR while the real
+        // issue never gets parented, and clearStaleParents clearing the real issue's legitimate parent.
+        // Sub-issue parenting is an issue-domain concept a merge request has no part in.
+        List<Issue> issues = issueRepository.findAllIssuesByRepositoryId(repository.getId());
         if (issues.isEmpty()) return SyncResult.completed(0);
 
         // Build IID -> Issue lookup map

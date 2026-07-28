@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.RepositoryItemCountProjection;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -27,6 +28,26 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
     Optional<PullRequestReview> findByNativeIdAndProviderId(Long nativeId, Long providerId);
 
     List<PullRequestReview> findAllByPullRequestIdAndProviderId(Long pullRequestId, Long providerId);
+
+    /**
+     * Per-repository review count for the sync-observability breakdown, batched over every repository of
+     * a connection in one grouped join. Reviews arrive nested inside the pull-request backfill's GraphQL
+     * pages, so this count stalling while the pull-request count keeps rising is a real and otherwise
+     * silent failure — which is the reason this class gets its own row.
+     *
+     * <p>Reviews of a tombstoned pull request are excluded, matching how the pull-request count itself
+     * already drops tombstoned rows. A review has no tombstone of its own; the parent's is the only
+     * signal, and counting orphans of a deleted PR would leave this row permanently inflated. The
+     * predicate rides the {@code r.pullRequest} join the grouping already needs.
+     */
+    @Query(
+        "SELECT r.pullRequest.repository.id AS repositoryId, COUNT(r) AS itemCount FROM PullRequestReview r " +
+            "WHERE r.pullRequest.repository.id IN :repositoryIds AND r.pullRequest.deletedAt IS NULL " +
+            "GROUP BY r.pullRequest.repository.id"
+    )
+    List<RepositoryItemCountProjection> countGroupedByRepositoryIds(
+        @Param("repositoryIds") Collection<Long> repositoryIds
+    );
 
     /**
      * All review DECISIONS for a pull request, with the review author eagerly fetched.

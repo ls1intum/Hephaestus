@@ -1,12 +1,15 @@
 import { ClockIcon, GitBranchIcon, GitCommitIcon } from "@primer/octicons-react";
 import { Link } from "@tanstack/react-router";
 
+import { RelativeTime } from "@/components/common/RelativeTime";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { optionalIntegrationsAvailable, requestConsentReopen } from "@/integrations/consent";
 import { cn } from "@/lib/utils";
 
 export interface FooterProps {
 	className?: string;
+	/** Whether this is the production deployment (hides the build strip). */
+	isProduction?: boolean;
 	buildInfo?: {
 		branch?: string;
 		commit?: string;
@@ -15,11 +18,12 @@ export interface FooterProps {
 }
 
 /**
- * Minimal footer with navigation links, attribution, and build info for previews.
- * Version is NOT shown here - it's displayed in the Header beside the logo.
+ * Footer with navigation, attribution, and — outside production — a strip
+ * identifying the running build (branch, commit, deploy time).
  */
-export default function Footer({ className, buildInfo }: FooterProps) {
-	const showBuildInfo = buildInfo?.branch || buildInfo?.commit || buildInfo?.deployedAt;
+export default function Footer({ className, isProduction, buildInfo }: FooterProps) {
+	const showBuildInfo =
+		!isProduction && (buildInfo?.branch || buildInfo?.commit || buildInfo?.deployedAt);
 
 	return (
 		<footer className={cn("border-t border-sidebar-border bg-sidebar py-2 md:px-8", className)}>
@@ -100,7 +104,6 @@ export default function Footer({ className, buildInfo }: FooterProps) {
 						)}
 					</nav>
 
-					{/* Build info only for preview/dev - minimal style */}
 					{showBuildInfo && (
 						<div className="hidden sm:flex items-center gap-2 border-l border-sidebar-border pl-4 text-xs text-muted-foreground/60 font-mono">
 							{buildInfo?.branch && (
@@ -144,14 +147,10 @@ export default function Footer({ className, buildInfo }: FooterProps) {
 							)}
 
 							{buildInfo?.deployedAt && (
-								<Tooltip>
-									<TooltipTrigger className="flex items-center gap-1 cursor-help">
-										<ClockIcon size={12} />
-									</TooltipTrigger>
-									<TooltipContent>
-										Deployed: {buildInfo.deployedAt.replace("T", " ").substring(0, 16)}
-									</TooltipContent>
-								</Tooltip>
+								<span className="flex items-center gap-1">
+									<ClockIcon size={12} aria-hidden />
+									<RelativeTime value={buildInfo.deployedAt} />
+								</span>
 							)}
 						</div>
 					)}

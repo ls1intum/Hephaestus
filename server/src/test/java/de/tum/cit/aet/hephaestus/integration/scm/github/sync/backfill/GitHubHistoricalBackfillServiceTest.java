@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.sync.backfill;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.lenient;
@@ -15,9 +16,11 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.AuthMode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillStateProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncContextProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncSession;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetTestBuilder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncProperties;
@@ -32,9 +35,11 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.sync.backfill.GitHubHist
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -144,8 +149,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             });
     }
 
-    // Test construction helpers
-
     private GitHubHistoricalBackfillService createService(SyncSchedulerProperties schedulerProps) {
         return new GitHubHistoricalBackfillService(
             syncTargetProvider,
@@ -165,120 +168,78 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
         );
     }
 
-    /**
-     * Creates a SyncTarget with completed incremental sync and no backfill progress.
-     */
     private SyncTarget createTargetWithIncrementalComplete(Long id, String repoName) {
-        return new SyncTarget(
-            id,
-            SCOPE_ID,
-            INSTALLATION_ID,
-            null,
-            AuthMode.INSTALLATION_APP,
-            repoName,
-            Instant.now(), // lastLabelsSyncedAt
-            Instant.now(), // lastMilestonesSyncedAt
-            Instant.now(), // lastIssuesSyncedAt (completed)
-            Instant.now(), // lastPullRequestsSyncedAt (completed)
-            null, // lastDiscussionsSyncedAt
-            Instant.now(), // lastCollaboratorsSyncedAt
-            Instant.now(), // lastFullSyncAt
-            null, // issueBackfillHighWaterMark (not initialized)
-            null, // issueBackfillCheckpoint
-            null, // pullRequestBackfillHighWaterMark (not initialized)
-            null, // pullRequestBackfillCheckpoint
-            null, // backfillLastRunAt
-            null, // issueSyncCursor
-            null, // pullRequestSyncCursor
-            null // discussionSyncCursor
-        );
+        // Incremental sync completed; backfill high-water marks left null (not initialized).
+        return SyncTargetTestBuilder.syncTarget()
+            .id(id)
+            .scopeId(SCOPE_ID)
+            .installationId(INSTALLATION_ID)
+            .authMode(AuthMode.INSTALLATION_APP)
+            .repositoryNameWithOwner(repoName)
+            .lastLabelsSyncedAt(Instant.now())
+            .lastMilestonesSyncedAt(Instant.now())
+            .lastIssuesSyncedAt(Instant.now())
+            .lastPullRequestsSyncedAt(Instant.now())
+            .lastCollaboratorsSyncedAt(Instant.now())
+            .lastFullSyncAt(Instant.now())
+            .build();
     }
 
-    /**
-     * Creates a SyncTarget where incremental sync has NOT completed yet.
-     */
     private SyncTarget createTargetPendingIncrementalSync(Long id, String repoName) {
-        return new SyncTarget(
-            id,
-            SCOPE_ID,
-            INSTALLATION_ID,
-            null,
-            AuthMode.INSTALLATION_APP,
-            repoName,
-            null, // lastLabelsSyncedAt
-            null, // lastMilestonesSyncedAt
-            null, // lastIssuesSyncedAt (NOT completed)
-            null, // lastPullRequestsSyncedAt (NOT completed)
-            null, // lastDiscussionsSyncedAt
-            null, // lastCollaboratorsSyncedAt
-            null, // lastFullSyncAt
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null
-        );
+        // All sync timestamps null => incremental sync NOT completed.
+        return SyncTargetTestBuilder.syncTarget()
+            .id(id)
+            .scopeId(SCOPE_ID)
+            .installationId(INSTALLATION_ID)
+            .authMode(AuthMode.INSTALLATION_APP)
+            .repositoryNameWithOwner(repoName)
+            .build();
     }
 
-    /**
-     * Creates a SyncTarget where backfill is already complete.
-     */
     private SyncTarget createTargetWithBackfillComplete(Long id, String repoName) {
-        return new SyncTarget(
-            id,
-            SCOPE_ID,
-            INSTALLATION_ID,
-            null,
-            AuthMode.INSTALLATION_APP,
-            repoName,
-            Instant.now(), // lastLabelsSyncedAt
-            Instant.now(), // lastMilestonesSyncedAt
-            Instant.now(), // lastIssuesSyncedAt
-            Instant.now(), // lastPullRequestsSyncedAt
-            null, // lastDiscussionsSyncedAt
-            Instant.now(), // lastCollaboratorsSyncedAt
-            Instant.now(), // lastFullSyncAt
-            100, // issueBackfillHighWaterMark
-            0, // issueBackfillCheckpoint = 0 means complete
-            50, // pullRequestBackfillHighWaterMark
-            0, // pullRequestBackfillCheckpoint = 0 means complete
-            Instant.now(),
-            null,
-            null,
-            null // discussionSyncCursor
-        );
+        // Checkpoints at 0 => backfill complete.
+        return SyncTargetTestBuilder.syncTarget()
+            .id(id)
+            .scopeId(SCOPE_ID)
+            .installationId(INSTALLATION_ID)
+            .authMode(AuthMode.INSTALLATION_APP)
+            .repositoryNameWithOwner(repoName)
+            .lastLabelsSyncedAt(Instant.now())
+            .lastMilestonesSyncedAt(Instant.now())
+            .lastIssuesSyncedAt(Instant.now())
+            .lastPullRequestsSyncedAt(Instant.now())
+            .lastCollaboratorsSyncedAt(Instant.now())
+            .lastFullSyncAt(Instant.now())
+            .issueBackfillHighWaterMark(100)
+            .issueBackfillCheckpoint(0)
+            .pullRequestBackfillHighWaterMark(50)
+            .pullRequestBackfillCheckpoint(0)
+            .backfillLastRunAt(Instant.now())
+            .build();
     }
 
-    /**
-     * Creates a SyncTarget with backfill in progress (partially complete).
-     */
     private SyncTarget createTargetWithBackfillInProgress(Long id, String repoName) {
-        return new SyncTarget(
-            id,
-            SCOPE_ID,
-            INSTALLATION_ID,
-            null,
-            AuthMode.INSTALLATION_APP,
-            repoName,
-            Instant.now(), // lastLabelsSyncedAt
-            Instant.now(), // lastMilestonesSyncedAt
-            Instant.now(), // lastIssuesSyncedAt (completed)
-            Instant.now(), // lastPullRequestsSyncedAt (completed)
-            null, // lastDiscussionsSyncedAt
-            Instant.now(), // lastCollaboratorsSyncedAt
-            Instant.now(), // lastFullSyncAt
-            100, // issueBackfillHighWaterMark
-            42, // issueBackfillCheckpoint (in progress)
-            50, // pullRequestBackfillHighWaterMark
-            25, // pullRequestBackfillCheckpoint (in progress)
-            Instant.now().minusSeconds(120),
-            "cursor-issue-page-3", // issueSyncCursor
-            "cursor-pr-page-2", // pullRequestSyncCursor
-            null // discussionSyncCursor
-        );
+        // Checkpoints between 0 and high-water mark => backfill in progress.
+        return SyncTargetTestBuilder.syncTarget()
+            .id(id)
+            .scopeId(SCOPE_ID)
+            .installationId(INSTALLATION_ID)
+            .authMode(AuthMode.INSTALLATION_APP)
+            .repositoryNameWithOwner(repoName)
+            .lastLabelsSyncedAt(Instant.now())
+            .lastMilestonesSyncedAt(Instant.now())
+            .lastIssuesSyncedAt(Instant.now())
+            .lastPullRequestsSyncedAt(Instant.now())
+            .lastCollaboratorsSyncedAt(Instant.now())
+            .lastFullSyncAt(Instant.now())
+            .issueBackfillHighWaterMark(100)
+            .issueBackfillCheckpoint(42)
+            .pullRequestBackfillHighWaterMark(50)
+            .pullRequestBackfillCheckpoint(25)
+            .backfillLastRunAt(Instant.now().minusSeconds(120))
+            .issueSyncCursor("cursor-issue-page-3")
+            .pullRequestSyncCursor("cursor-pr-page-2")
+            .build();
     }
 
     private SyncSession createSession(List<SyncTarget> targets) {
@@ -293,8 +254,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             new SyncContextProvider.SyncContext(SCOPE_ID, "test-workspace", "Test Workspace", INSTALLATION_ID)
         );
     }
-
-    // isEnabled
 
     @Nested
     class IsEnabled {
@@ -313,8 +272,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             assertThat(service.isEnabled()).isFalse();
         }
     }
-
-    // runBackfillCycle - disabled / no work
 
     @Nested
     class RunBackfillCycle {
@@ -370,7 +327,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
             BackfillCycleResult result = service.runBackfillCycle();
 
-            // Assert - only the incomplete target should be counted as pending
             assertThat(result.repositoriesProcessed()).isZero();
             assertThat(result.pendingRepositories()).isEqualTo(1);
         }
@@ -385,7 +341,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
             BackfillCycleResult result = service.runBackfillCycle();
 
-            // Assert - no work, no pending (complete repos are silently skipped)
+            // Complete repos are silently skipped: no work, no pending.
             assertThat(result.repositoriesProcessed()).isZero();
             assertThat(result.pendingRepositories()).isZero();
         }
@@ -402,7 +358,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
             BackfillCycleResult result = service.runBackfillCycle();
 
-            // Assert - repo is skipped per-repo because lastIssuesAndPullRequestsSyncedAt == null
+            // Skipped per-repo because lastIssuesAndPullRequestsSyncedAt == null.
             assertThat(result.repositoriesProcessed()).isZero();
             assertThat(result.pendingRepositories()).isEqualTo(1);
         }
@@ -423,8 +379,8 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
             BackfillCycleResult result = service.runBackfillCycle();
 
-            // Assert - repoA: incremental done, attempted backfill but not in DB (not counted)
-            //          repoB: skipped per-repo due to pending incremental sync (counted as pending)
+            // repoA: incremental done, attempted backfill but not in DB (not counted).
+            // repoB: skipped per-repo due to pending incremental sync (counted as pending).
             assertThat(result.pendingRepositories()).isEqualTo(1);
             assertThat(result.repositoriesProcessed()).isZero();
         }
@@ -451,12 +407,9 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
             BackfillCycleResult result = service.runBackfillCycle();
 
-            // Assert - repo B should be counted as pending due to rate limit break
             assertThat(result.pendingRepositories()).isEqualTo(1);
         }
     }
-
-    // backfillRepository (package-private)
 
     @Nested
     class BackfillRepository {
@@ -468,31 +421,17 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
         @Test
         void shouldReturnFalseWhenRepoNameIsInvalid() {
-            SyncTarget target = new SyncTarget(
-                SYNC_TARGET_ID_A,
-                SCOPE_ID,
-                INSTALLATION_ID,
-                null,
-                AuthMode.INSTALLATION_APP,
-                "invalid-repo-name", // no owner/name separator
-                null,
-                null,
-                Instant.now(), // lastIssuesSyncedAt
-                Instant.now(), // lastPullRequestsSyncedAt
-                null, // lastDiscussionsSyncedAt
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null // discussionSyncCursor
-            );
+            SyncTarget target = SyncTargetTestBuilder.syncTarget()
+                .id(SYNC_TARGET_ID_A)
+                .scopeId(SCOPE_ID)
+                .installationId(INSTALLATION_ID)
+                .authMode(AuthMode.INSTALLATION_APP)
+                .repositoryNameWithOwner("invalid-repo-name") // no owner/name separator
+                .lastIssuesSyncedAt(Instant.now())
+                .lastPullRequestsSyncedAt(Instant.now())
+                .build();
 
-            boolean result = service.backfillRepository(target, 50);
+            boolean result = service.backfillRepository(target, 50, BackfillPageObserver.NOOP);
 
             assertThat(result).isFalse();
         }
@@ -502,14 +441,12 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             SyncTarget target = createTargetWithIncrementalComplete(SYNC_TARGET_ID_A, "org/repo-a");
             when(repositoryRepository.findByNameWithOwner("org/repo-a")).thenReturn(Optional.empty());
 
-            boolean result = service.backfillRepository(target, 50);
+            boolean result = service.backfillRepository(target, 50, BackfillPageObserver.NOOP);
 
             assertThat(result).isFalse();
             verify(graphQlClientProvider, never()).forScope(anyLong());
         }
     }
-
-    // BackfillCycleResult
 
     @Nested
     class BackfillCycleResultTests {
@@ -532,8 +469,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             assertThat(result.skipReason()).isEqualTo("rateLimitLow");
         }
     }
-
-    // BackfillProgress
 
     @Nested
     class BackfillProgressTests {
@@ -607,9 +542,45 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
             assertThat(summary).startsWith("Backfill in progress for org/repo-a (last run: ");
         }
-    }
 
-    // SyncTarget convenience methods
+        @Test
+        void percentComplete_notStarted_isNull() {
+            SyncTarget target = createTargetWithIncrementalComplete(SYNC_TARGET_ID_A, "org/repo-a");
+
+            BackfillProgress progress = BackfillProgress.fromSyncTarget(target);
+
+            assertThat(progress.percentComplete()).isNull();
+        }
+
+        @Test
+        void percentComplete_complete_isFullHundred() {
+            SyncTarget target = createTargetWithBackfillComplete(SYNC_TARGET_ID_A, "org/repo-a");
+
+            BackfillProgress progress = BackfillProgress.fromSyncTarget(target);
+
+            assertThat(progress.percentComplete()).isEqualTo(100);
+        }
+
+        @Test
+        void percentComplete_inProgress_reflectsRemainingAgainstHighWaterMarkTotal() {
+            // issueHWM=100, issueCheckpoint(remaining)=42, prHWM=50, prCheckpoint(remaining)=25
+            // total=150, remaining=67 -> done=83 -> 83/150 = 55.33% rounds to 55
+            SyncTarget target = createTargetWithBackfillInProgress(SYNC_TARGET_ID_A, "org/repo-a");
+
+            BackfillProgress progress = BackfillProgress.fromSyncTarget(target);
+
+            assertThat(progress.itemsTotal()).isEqualTo(150);
+            assertThat(progress.itemsRemaining()).isEqualTo(67);
+            assertThat(progress.percentComplete()).isEqualTo(55);
+        }
+
+        @Test
+        void percentComplete_boundaries_emptyAndCompleteTotals() {
+            assertThat(BackfillProgress.percentComplete(true, 25, 100)).isEqualTo(75);
+            assertThat(BackfillProgress.percentComplete(false, 0, 0)).isNull();
+            assertThat(BackfillProgress.percentComplete(true, 0, 0)).isEqualTo(100);
+        }
+    }
 
     @Nested
     class SyncTargetBackfillState {
@@ -658,30 +629,20 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
         @Test
         void shouldReportZeroRemainingWhenHighWaterMarkIsZero() {
-            // Arrange - a repo with zero issues/PRs
-            SyncTarget target = new SyncTarget(
-                SYNC_TARGET_ID_A,
-                SCOPE_ID,
-                INSTALLATION_ID,
-                null,
-                AuthMode.INSTALLATION_APP,
-                "org/empty-repo",
-                null, // lastLabelsSyncedAt
-                null, // lastMilestonesSyncedAt
-                Instant.now(), // lastIssuesSyncedAt
-                Instant.now(), // lastPullRequestsSyncedAt
-                null, // lastDiscussionsSyncedAt
-                null, // lastCollaboratorsSyncedAt
-                null, // lastFullSyncAt
-                0, // issueBackfillHighWaterMark = 0 (no issues)
-                0, // issueBackfillCheckpoint = 0
-                0, // pullRequestBackfillHighWaterMark = 0 (no PRs)
-                0, // pullRequestBackfillCheckpoint = 0
-                Instant.now(),
-                null,
-                null,
-                null
-            );
+            SyncTarget target = SyncTargetTestBuilder.syncTarget()
+                .id(SYNC_TARGET_ID_A)
+                .scopeId(SCOPE_ID)
+                .installationId(INSTALLATION_ID)
+                .authMode(AuthMode.INSTALLATION_APP)
+                .repositoryNameWithOwner("org/empty-repo")
+                .lastIssuesSyncedAt(Instant.now())
+                .lastPullRequestsSyncedAt(Instant.now())
+                .issueBackfillHighWaterMark(0) // no issues
+                .issueBackfillCheckpoint(0)
+                .pullRequestBackfillHighWaterMark(0) // no PRs
+                .pullRequestBackfillCheckpoint(0)
+                .backfillLastRunAt(Instant.now())
+                .build();
 
             assertThat(target.isIssueBackfillComplete()).isTrue();
             assertThat(target.isPullRequestBackfillComplete()).isTrue();
@@ -692,39 +653,25 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
         @Test
         void shouldReportHighWaterMarkAsRemainingWhenCheckpointIsNull() {
-            // Arrange - initialized but checkpoint not yet set (first batch hasn't completed)
-            SyncTarget target = new SyncTarget(
-                SYNC_TARGET_ID_A,
-                SCOPE_ID,
-                INSTALLATION_ID,
-                null,
-                AuthMode.INSTALLATION_APP,
-                "org/repo-a",
-                null, // lastLabelsSyncedAt
-                null, // lastMilestonesSyncedAt
-                Instant.now(), // lastIssuesSyncedAt
-                Instant.now(), // lastPullRequestsSyncedAt
-                null, // lastDiscussionsSyncedAt
-                null, // lastCollaboratorsSyncedAt
-                null, // lastFullSyncAt
-                200, // issueBackfillHighWaterMark
-                null, // issueBackfillCheckpoint (not yet set)
-                80, // pullRequestBackfillHighWaterMark
-                null, // pullRequestBackfillCheckpoint (not yet set)
-                null,
-                null,
-                null,
-                null
-            );
+            // Initialized but checkpoint not yet set (first batch hasn't completed).
+            SyncTarget target = SyncTargetTestBuilder.syncTarget()
+                .id(SYNC_TARGET_ID_A)
+                .scopeId(SCOPE_ID)
+                .installationId(INSTALLATION_ID)
+                .authMode(AuthMode.INSTALLATION_APP)
+                .repositoryNameWithOwner("org/repo-a")
+                .lastIssuesSyncedAt(Instant.now())
+                .lastPullRequestsSyncedAt(Instant.now())
+                .issueBackfillHighWaterMark(200)
+                .pullRequestBackfillHighWaterMark(80)
+                // checkpoints left null (not yet set)
+                .build();
 
-            // Assert - remaining should be the high water mark itself
             assertThat(target.getIssueBackfillRemaining()).isEqualTo(200);
             assertThat(target.getPullRequestBackfillRemaining()).isEqualTo(80);
             assertThat(target.getBackfillRemaining()).isEqualTo(280);
         }
     }
-
-    // getProgress
 
     @Nested
     class GetProgress {
@@ -754,7 +701,47 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
         }
     }
 
-    // Multiple sessions
+    // runBackfillBatch — the manual backfill sync-job runner's per-repository step
+
+    @Nested
+    class RunBackfillBatch {
+
+        @Test
+        void alreadyComplete_returnsFalseWithoutCheckingRateLimit() {
+            service = createService(enabledSchedulerProperties);
+            SyncTarget target = createTargetWithBackfillComplete(SYNC_TARGET_ID_A, "org/repo-a");
+
+            boolean didWork = service.runBackfillBatch(target, 50, BackfillPageObserver.NOOP);
+
+            assertThat(didWork).isFalse();
+            verify(graphQlClientProvider, never()).getRateLimitRemaining(any());
+        }
+
+        @Test
+        void rateLimitBelowThreshold_returnsFalseWithoutAttemptingBackfill() {
+            service = createService(enabledSchedulerProperties); // rateLimitThreshold = 100
+            SyncTarget target = createTargetWithBackfillInProgress(SYNC_TARGET_ID_A, "org/repo-a");
+            when(graphQlClientProvider.getRateLimitRemaining(SCOPE_ID)).thenReturn(50);
+
+            boolean didWork = service.runBackfillBatch(target, 50, BackfillPageObserver.NOOP);
+
+            assertThat(didWork).isFalse();
+        }
+
+        @Test
+        @DisplayName(
+            "gates apply even when isEnabled()=false — a manual trigger is the point when the scheduled cycle is off"
+        )
+        void backfillDisabledGlobally_completeGateStillShortCircuits() {
+            service = createService(disabledSchedulerProperties);
+            SyncTarget target = createTargetWithBackfillComplete(SYNC_TARGET_ID_A, "org/repo-a");
+
+            boolean didWork = service.runBackfillBatch(target, 50, BackfillPageObserver.NOOP);
+
+            assertThat(service.isEnabled()).isFalse();
+            assertThat(didWork).isFalse();
+        }
+    }
 
     @Nested
     class MultipleSessions {
@@ -767,29 +754,13 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             Long installationId2 = 300L;
 
             SyncTarget targetInScope1 = createTargetPendingIncrementalSync(SYNC_TARGET_ID_A, "org/repo-a");
-            SyncTarget targetInScope2 = new SyncTarget(
-                SYNC_TARGET_ID_B,
-                scopeId2,
-                installationId2,
-                null,
-                AuthMode.INSTALLATION_APP,
-                "org2/repo-b",
-                null,
-                null,
-                null, // lastIssuesSyncedAt
-                null, // lastPullRequestsSyncedAt
-                null, // lastDiscussionsSyncedAt
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
+            SyncTarget targetInScope2 = SyncTargetTestBuilder.syncTarget()
+                .id(SYNC_TARGET_ID_B)
+                .scopeId(scopeId2)
+                .installationId(installationId2)
+                .authMode(AuthMode.INSTALLATION_APP)
+                .repositoryNameWithOwner("org2/repo-b")
+                .build();
 
             SyncSession session1 = createSession(List.of(targetInScope1));
             SyncSession session2 = new SyncSession(
@@ -810,14 +781,12 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
             BackfillCycleResult result = service.runBackfillCycle();
 
-            // Assert - both repos have pending incremental sync, so they are skipped per-repo
-            // and counted as pending
+            // Both repos have pending incremental sync, so they are skipped per-repo and counted
+            // as pending.
             assertThat(result.repositoriesProcessed()).isZero();
             assertThat(result.pendingRepositories()).isEqualTo(2);
         }
     }
-
-    // Mixed target states in single session
 
     @Nested
     class MixedTargetStates {
@@ -840,10 +809,9 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
             BackfillCycleResult result = service.runBackfillCycle();
 
-            // Assert:
-            //   completeRepo: backfill complete, silently skipped (not counted)
-            //   pendingRepo: incremental sync pending, skipped per-repo, counted as pending
-            //   eligibleRepo: attempted backfill but not in DB, returns false (not counted)
+            // completeRepo: backfill complete, silently skipped (not counted).
+            // pendingRepo: incremental sync pending, skipped per-repo, counted as pending.
+            // eligibleRepo: attempted backfill but not in DB, returns false (not counted).
             assertThat(result.pendingRepositories()).isEqualTo(1);
             assertThat(result.repositoriesProcessed()).isZero();
         }
@@ -868,6 +836,77 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             //   (not counted as processed, not counted as pending)
             assertThat(result.repositoriesProcessed()).isZero();
             assertThat(result.pendingRepositories()).isZero();
+        }
+    }
+
+    /**
+     * The per-page progress seam. The page loops that call this need a live GraphQL conversation to
+     * reach, but the two rules it enforces stand on their own.
+     */
+    @Nested
+    class NotifyPage {
+
+        @Test
+        void forwardsThePageToTheObserver() {
+            List<String> seen = new ArrayList<>();
+
+            GitHubHistoricalBackfillService.notifyPage(
+                (syncTargetId, repositoryName, phase, lowestNumberSeen, itemsSyncedInBatch) ->
+                    seen.add(
+                        syncTargetId +
+                            "|" +
+                            repositoryName +
+                            "|" +
+                            phase +
+                            "|" +
+                            lowestNumberSeen +
+                            "|" +
+                            itemsSyncedInBatch
+                    ),
+                7L,
+                "org/repo",
+                SyncPhase.ISSUES,
+                3200,
+                412
+            );
+
+            assertThat(seen).containsExactly("7|org/repo|ISSUES|3200|412");
+        }
+
+        @Test
+        void unseededMinimum_isNotReportedAsProgress() {
+            AtomicInteger calls = new AtomicInteger();
+
+            // The page loops seed their running minimum at Integer.MAX_VALUE. Reporting that verbatim
+            // would read as "remaining = 2147483647" and yank the bar back to zero.
+            GitHubHistoricalBackfillService.notifyPage(
+                (a, b, c, d, e) -> calls.incrementAndGet(),
+                7L,
+                "org/repo",
+                SyncPhase.ISSUES,
+                Integer.MAX_VALUE,
+                0
+            );
+
+            assertThat(calls.get()).isZero();
+        }
+
+        @Test
+        void observerThrows_isSwallowedSoAProgressTickCannotFailTheBatch() {
+            // A progress callback has no business aborting the batch it is only observing: losing a tick
+            // is cosmetic, losing the batch means re-fetching every page in it.
+            assertThatCode(() ->
+                GitHubHistoricalBackfillService.notifyPage(
+                    (a, b, c, d, e) -> {
+                        throw new IllegalStateException("observer blew up");
+                    },
+                    7L,
+                    "org/repo",
+                    SyncPhase.PULL_REQUESTS,
+                    100,
+                    5
+                )
+            ).doesNotThrowAnyException();
         }
     }
 }

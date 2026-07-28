@@ -72,9 +72,9 @@ const meta = {
 			action: "add workspace clicked",
 			description: "Callback fired when the add workspace button is clicked",
 		},
-		isAdmin: {
+		isAppAdmin: {
 			control: "boolean",
-			description: "Whether the user has administrative privileges",
+			description: "Whether the user is an instance admin (gates the zero-workspace create CTA)",
 		},
 	},
 	decorators: [
@@ -169,12 +169,12 @@ export const NoWorkspacesRegular: Story = {
 	args: {
 		workspaces: [],
 		activeWorkspace: undefined,
-		isAdmin: false,
+		isAppAdmin: false,
 	},
 	parameters: {
 		docs: {
 			description: {
-				story: "Displays a disabled 'No Workspace' button for regular users.",
+				story: "Displays a disabled 'No workspace' button for regular users.",
 			},
 		},
 	},
@@ -183,16 +183,16 @@ export const NoWorkspacesRegular: Story = {
 /**
  * Empty state when the user is not a member of any workspace (Admin User).
  */
-export const NoWorkspacesAdmin: Story = {
+export const NoWorkspacesAppAdmin: Story = {
 	args: {
 		workspaces: [],
 		activeWorkspace: undefined,
-		isAdmin: true,
+		isAppAdmin: true,
 	},
 	parameters: {
 		docs: {
 			description: {
-				story: "Displays a 'Create Workspace' button for admin users.",
+				story: "Displays a 'Create workspace' button for instance admins.",
 			},
 		},
 	},

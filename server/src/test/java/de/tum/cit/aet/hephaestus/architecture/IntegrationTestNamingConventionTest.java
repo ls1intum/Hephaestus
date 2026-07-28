@@ -8,7 +8,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -26,65 +30,117 @@ import org.junit.jupiter.api.Test;
  * it asserts nothing while looking like coverage. This actually happened to three tests, including
  * two security guards, before this rule was added.
  *
- * <p><b>Scope.</b> A source scan (mirroring {@link NoMockingOwnedEntitiesTest}) of classes that
- * directly {@code extends BaseIntegrationTest}. Abstract bases are exempt (they are never executed
- * directly). Tests extending an intermediate abstract base are out of scope of this particular scan;
- * the convention is enforced where the defect occurred — direct subclasses.
+ * <p>The scan resolves {@code extends} transitively. The first version inspected only classes that
+ * literally wrote {@code extends BaseIntegrationTest}, leaving the intermediate bases uncovered —
+ * {@code AbstractWorkspaceIntegrationTest} above all, which 40-odd controller tests extend.
+ * {@code AgentsPathDispatchTest} and {@code WorkspaceScopedControllerComplianceTest} were dead through
+ * exactly that hole, the latter since the module was created.
+ *
+ * <p>It is a source scan (mirroring {@link NoMockingOwnedEntitiesTest}) rather than an ArchUnit class
+ * scan, because the defect is about <em>file names</em> — all Failsafe looks at — and a compiled class
+ * graph cannot see them. Only top-level declarations count: Failsafe matches a file, so a nested
+ * {@code @Nested} class is never independently discoverable and never independently dead.
  */
 @Tag("architecture")
 class IntegrationTestNamingConventionTest {
 
     private static final String INTEGRATION_BASE = "BaseIntegrationTest";
 
-    /** {@code [abstract] class <Name> ... extends BaseIntegrationTest} — captures the modifier + name. */
-    private static final Pattern CLASS_DECL = Pattern.compile(
-        "\\b(abstract\\s+)?class\\s+(\\w+)[^\\n{]*\\bextends\\s+" + INTEGRATION_BASE + "\\b"
+    /**
+     * Anchored at column 0 so nested classes (always indented by the formatter) are skipped, and so
+     * javadoc/comment lines — which start with {@code *} or {@code /} — can never match.
+     */
+    private static final Pattern TOP_LEVEL_CLASS_DECL = Pattern.compile(
+        "(?m)^(\\w[\\w\\s-]*?\\s)?class\\s+(\\w+)([^\\n{]*)"
     );
+
+    private static final Pattern EXTENDS_CLAUSE = Pattern.compile("\\bextends\\s+(\\w+)");
+
+    private record TestClass(String name, boolean isAbstract, String superName, Path file) {}
 
     @Test
     void everyConcreteIntegrationTestIsNamedIntegrationTestSoFailsafeRunsIt() {
-        Path testRoot = locateTestRoot();
-        List<String> violations = new ArrayList<>();
+        Map<String, TestClass> declarations = scanTestSources(locateTestRoot());
 
-        try (Stream<Path> sources = Files.walk(testRoot)) {
-            sources
-                .filter(Files::isRegularFile)
-                .filter(p -> p.toString().endsWith(".java"))
-                // The base type itself and this guard legitimately mention BaseIntegrationTest.
-                .filter(p -> !p.getFileName().toString().equals(INTEGRATION_BASE + ".java"))
-                .filter(p -> !p.getFileName().toString().equals("IntegrationTestNamingConventionTest.java"))
-                .forEach(p -> scanFile(p, violations));
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        List<String> violations = declarations
+            .values()
+            .stream()
+            .filter(decl -> !decl.isAbstract())
+            .filter(decl -> !decl.name().endsWith("IntegrationTest"))
+            .filter(decl -> integrationBaseChain(decl, declarations) != null)
+            .map(
+                decl ->
+                    "  " +
+                    decl.file().getFileName() +
+                    "  [" +
+                    decl.name() +
+                    "] should be " +
+                    decl.name().replaceFirst("Test$", "") +
+                    "IntegrationTest — inherits @Tag(\"integration\") via " +
+                    integrationBaseChain(decl, declarations)
+            )
+            .sorted()
+            .toList();
 
         assertThat(violations)
             .as(
-                "Concrete BaseIntegrationTest subclasses must be named *IntegrationTest — otherwise Maven " +
-                    "Failsafe (which discovers only **/*IntegrationTest.java) never runs them and Surefire " +
-                    "(unit group only) excludes them, so they silently never execute. Rename the offenders:\n" +
+                "Concrete BaseIntegrationTest subclasses — directly or through any abstract base — must be " +
+                    "named *IntegrationTest. Otherwise Maven Failsafe (which discovers only " +
+                    "**/*IntegrationTest.java) never runs them and Surefire (unit group only) excludes them, " +
+                    "so they silently never execute. Rename the offenders:\n" +
                     String.join("\n", violations)
             )
             .isEmpty();
     }
 
-    private static void scanFile(Path file, List<String> violations) {
+    /**
+     * @return the {@code SomeBase -> BaseIntegrationTest} chain, or {@code null} when {@code decl} does
+     *     not transitively extend the integration base. Cycles (impossible in valid Java, but reachable
+     *     in a half-edited source tree) terminate instead of hanging.
+     */
+    private static String integrationBaseChain(TestClass decl, Map<String, TestClass> declarations) {
+        Set<String> chain = new LinkedHashSet<>();
+        String current = decl.superName();
+        while (current != null && chain.add(current)) {
+            if (current.equals(INTEGRATION_BASE)) {
+                return String.join(" -> ", chain);
+            }
+            TestClass parent = declarations.get(current);
+            current = parent != null ? parent.superName() : null;
+        }
+        return null;
+    }
+
+    private static Map<String, TestClass> scanTestSources(Path testRoot) {
+        Map<String, TestClass> declarations = new HashMap<>();
+        try (Stream<Path> sources = Files.walk(testRoot)) {
+            sources
+                .filter(Files::isRegularFile)
+                .filter(p -> p.toString().endsWith(".java"))
+                .forEach(file -> parse(file).forEach(decl -> declarations.put(decl.name(), decl)));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return declarations;
+    }
+
+    private static List<TestClass> parse(Path file) {
         String content;
         try {
             content = Files.readString(file);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
-        Matcher m = CLASS_DECL.matcher(content);
+        List<TestClass> found = new ArrayList<>();
+        Matcher m = TOP_LEVEL_CLASS_DECL.matcher(content);
         while (m.find()) {
-            boolean isAbstract = m.group(1) != null;
-            String className = m.group(2);
-            if (!isAbstract && !className.endsWith("IntegrationTest")) {
-                violations.add(
-                    "  " + file.getFileName() + "  [" + className + "] should be " + className + "IntegrationTest"
-                );
-            }
+            String modifiers = m.group(1) == null ? "" : m.group(1);
+            Matcher ext = EXTENDS_CLAUSE.matcher(m.group(3));
+            found.add(
+                new TestClass(m.group(2), modifiers.contains("abstract"), ext.find() ? ext.group(1) : null, file)
+            );
         }
+        return found;
     }
 
     private static Path locateTestRoot() {

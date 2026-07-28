@@ -129,7 +129,7 @@ export function ReviewsPopover({
 					</CardTitle>
 					<Button variant="outline" size="icon" onClick={copyPullRequests}>
 						{showCopySuccess ? (
-							<CheckIcon className="text-green-600 size-4" />
+							<CheckIcon className="text-success size-4" />
 						) : (
 							<CopyIcon className="size-4" />
 						)}

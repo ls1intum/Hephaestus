@@ -37,7 +37,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
  * child-row deletes, the PII clearing, or the status flip fails the build.
  *
  * <h2>Time control</h2>
- * The production {@code authClock} bean ({@code Clock.systemUTC()}) is used as-is; we never override
+ * The production {@code clock} bean ({@code Clock.systemUTC()}) is used as-is; we never override
  * it. Instead each fixture sets {@code deleted_at} relative to the very clock the sweeper reads
  * (autowired below), and the cooldown is pinned to a known {@code 24h} via {@code @TestPropertySource}.
  * That makes the cutoff math deterministic without touching the bean graph the JWT decoder shares.

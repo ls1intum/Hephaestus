@@ -33,6 +33,7 @@ import {
 	ItemTitle,
 } from "@/components/ui/item";
 import { Spinner } from "@/components/ui/spinner";
+import { asDate } from "@/lib/dates";
 import { getProviderLabel } from "@/lib/provider";
 
 const PROVIDER_ICONS: Record<string, LucideIcon> = {
@@ -64,9 +65,8 @@ function getProviderIcon(providerType?: string): LucideIcon {
 }
 
 function formatLastLogin(lastLoginAt?: Date): string | undefined {
-	if (!lastLoginAt) return undefined;
-	const date = lastLoginAt instanceof Date ? lastLoginAt : new Date(lastLoginAt);
-	if (Number.isNaN(date.getTime())) return undefined;
+	const date = asDate(lastLoginAt);
+	if (!date) return undefined;
 	return date.toLocaleDateString(undefined, {
 		year: "numeric",
 		month: "short",

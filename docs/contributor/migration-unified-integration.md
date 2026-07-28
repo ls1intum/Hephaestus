@@ -5,6 +5,10 @@ Actionable, post-merge migration steps for operators upgrading from pre-#1198 re
 fresh database and a live GitHub App; steps marked **MANUAL** require an operator
 action that cannot be automated by the deploy.
 
+**Read [§5](#5-scm-disconnect-now-erases-the-mirror-behaviour-change) before
+disconnecting anything.** A later release made SCM disconnect and workspace purge erase the mirrored
+data; it is irreversible.
+
 ## What changed (operator-relevant)
 
 - `gitprovider/**` → `integration/{core,scm}/**`; per-provider credentials now live in a single
@@ -70,7 +74,40 @@ scheduled sync backfills anything missed.
 4. Verify: a workspace's connection is `ACTIVE`, a manual sync pulls data, and a test webhook is
    received (`/actuator/health` on the webhook-server pod).
 
-## 5. Explicitly NOT in this migration (so you don't wait for them)
+## 5. SCM disconnect now erases the mirror (behaviour change)
+
+**This is destructive and has no undo.** It landed after #1198 and applies to any operator upgrading
+past that release.
+
+Previously, disconnecting a GitHub or GitLab connection left every mirrored row in PostgreSQL, and
+purging a workspace cleared only its monitors and local clones. Now both actions run the same
+erasure:
+
+- Mirrored repositories and everything cascading from them (issues, pull/merge requests, reviews,
+  review threads and comments, discussions, labels, milestones, collaborators) are **hard-deleted**,
+  along with the workspace's repository monitors, its local git clones, its activity-event log, and
+  the SCM-derived practice observations and feedback.
+- Only repositories no other workspace still monitors are deleted. A repository shared with another
+  workspace survives; the disconnecting workspace simply loses its access path to it.
+- The org-level mirror (teams, team memberships, organisation memberships) is deleted only when no
+  other non-purged workspace is bound to the same organisation.
+- Retained deliberately: `sync_job`, `connection_activity`, `connection_audit` — operational history
+  with no third-party content — so the disconnection stays auditable. Connection credentials are
+  cleared as part of the same transition.
+
+Consequences for operators:
+
+- **Reconnecting is a fresh initial sync, not a restore.** Anything the vendor no longer has is
+  gone. This matches the Slack and Outline behaviour, which have always erased on disconnect.
+- **Do not use disconnect as a way to rotate credentials.** Re-enter the credential on the existing
+  connection instead.
+- Disconnect is refused with a retryable `409` while a sync job is in flight, so the erase never
+  races a writer.
+
+See [ADR 0024](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0024-integration-sync-lifecycle-and-two-deletion-semantics.md)
+for the full model and [Integration sync lifecycle](./sync-lifecycle.md) for per-integration detail.
+
+## 6. Explicitly NOT in this migration (so you don't wait for them)
 
 - **No 308 redirect** from legacy `/github`·`/gitlab` (hard cutover — §3).
 - **No canonical versioned `IntegrationEvent` wire envelope** — the in-process `ScmDomainEvent`
