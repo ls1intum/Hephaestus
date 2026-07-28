@@ -274,7 +274,9 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         }
 
         if (workspace == null && !isBlank(accountLogin)) {
-            Workspace existingByLogin = workspaceRepository.findByAccountLoginIgnoreCase(accountLogin).orElse(null);
+            Workspace existingByLogin = workspaceRepository
+                .findByAccountLoginIgnoreCaseForUpdate(accountLogin)
+                .orElse(null);
             if (existingByLogin != null && existingByLogin.getStatus() == Workspace.WorkspaceStatus.PURGED) {
                 log.info(
                     "Skipped installation event for purged workspace account: accountLogin={}, installationId={}",

@@ -99,8 +99,12 @@ class GithubConnectionStrategyTest extends BaseUnitTest {
 
     @Test
     void purge_doesNotDeleteAnInstallationStillUsedByAnotherConnection() {
-        IntegrationRef ref = new IntegrationRef(IntegrationKind.GITHUB, 7L, "4242", 9L);
-        when(connectionService.hasOtherInstalledConnection(ref)).thenReturn(true);
+        IntegrationRef ref = new IntegrationRef(IntegrationKind.GITHUB, 7L, "4242");
+        IntegrationRef resolvedRef = new IntegrationRef(IntegrationKind.GITHUB, 7L, "4242", 9L);
+        when(connectionService.findReferenced(ref)).thenReturn(Optional.of(connection));
+        when(connection.getId()).thenReturn(9L);
+        when(connection.getInstanceKey()).thenReturn("4242");
+        when(connectionService.hasOtherInstalledConnection(resolvedRef)).thenReturn(true);
 
         strategy().revokeProvider(ref);
 

@@ -111,14 +111,22 @@ public class GithubConnectionStrategy implements ConnectionStrategy {
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void revokeProvider(IntegrationRef ref) {
-        if (connectionService.hasOtherInstalledConnection(ref)) {
+        var connectionOpt = connectionService.findReferenced(ref);
+        if (connectionOpt.isEmpty()) {
             return;
         }
-        connectionService
-            .findReferenced(ref)
-            .map(connection -> connection.getConfig())
-            .filter(config -> config instanceof ConnectionConfig.GitHubAppConfig)
-            .map(config -> ((ConnectionConfig.GitHubAppConfig) config).installationId())
-            .ifPresent(appTokenService::deleteInstallation);
+        var connection = connectionOpt.get();
+        var resolvedRef = new IntegrationRef(
+            ref.kind(),
+            ref.workspaceId(),
+            connection.getInstanceKey(),
+            connection.getId()
+        );
+        if (connectionService.hasOtherInstalledConnection(resolvedRef)) {
+            return;
+        }
+        if (connection.getConfig() instanceof ConnectionConfig.GitHubAppConfig config) {
+            appTokenService.deleteInstallation(config.installationId());
+        }
     }
 }

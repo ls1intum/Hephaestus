@@ -103,6 +103,12 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
     Optional<Long> findOrganizationProviderIdByWorkspaceId(@Param("workspaceId") Long workspaceId);
 
     Optional<Workspace> findByAccountLoginIgnoreCase(String login);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "5000"))
+    @Query("SELECT w FROM Workspace w WHERE LOWER(w.accountLogin) = LOWER(:login)")
+    Optional<Workspace> findByAccountLoginIgnoreCaseForUpdate(@Param("login") String login);
+
     List<Workspace> findAllByAccountLoginIgnoreCase(String login);
     Optional<Workspace> findByWorkspaceSlug(String workspaceSlug);
     boolean existsByWorkspaceSlug(String workspaceSlug);

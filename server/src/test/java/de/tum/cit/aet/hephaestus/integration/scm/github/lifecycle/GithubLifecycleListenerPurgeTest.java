@@ -138,7 +138,7 @@ class GithubLifecycleListenerPurgeTest extends BaseUnitTest {
         workspace.setAccountLogin("acme");
         workspace.setStatus(Workspace.WorkspaceStatus.PURGED);
         when(workspaceRepository.findByInstallationIdForUpdate(INSTALLATION_ID)).thenReturn(Optional.empty());
-        when(workspaceRepository.findByAccountLoginIgnoreCase("acme")).thenReturn(Optional.of(workspace));
+        when(workspaceRepository.findByAccountLoginIgnoreCaseForUpdate("acme")).thenReturn(Optional.of(workspace));
 
         Workspace result = listener.createOrUpdateFromInstallation(
             INSTALLATION_ID,
