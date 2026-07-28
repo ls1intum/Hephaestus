@@ -3,7 +3,7 @@ import { AboutMissionSection } from "./AboutMissionSection";
 
 /**
  * AboutMissionSection component for displaying the platform's mission and core features.
- * Combines mission statement with feature cards in a grid layout.
+ * Combines the mission statement with an open two-column product overview.
  */
 const meta = {
 	component: AboutMissionSection,

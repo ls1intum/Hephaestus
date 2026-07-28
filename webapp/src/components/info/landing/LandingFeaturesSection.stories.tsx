@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { LandingFeaturesSection } from "./LandingFeaturesSection";
 
 /**
- * Features section for the two main ways developers receive feedback.
+ * Animated overview of the feedback cycle and the delivery options available today.
  */
 const meta = {
 	component: LandingFeaturesSection,
@@ -11,7 +11,7 @@ const meta = {
 		docs: {
 			description: {
 				component:
-					"The features section distinguishes practice feedback on development work from conversations with Heph.",
+					"The section follows project work through practice review, feedback, and developer choice, then shows where feedback can appear today.",
 			},
 		},
 	},
@@ -22,6 +22,6 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Default features section with cards for practice feedback and Heph.
+ * Default feedback cycle with current GitHub, GitLab, web app, and Slack delivery paths.
  */
 export const Default: Story = {};

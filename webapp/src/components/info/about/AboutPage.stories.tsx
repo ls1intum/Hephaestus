@@ -76,7 +76,7 @@ const mockContributors = [
 
 /**
  * About page component that showcases the Hephaestus project, highlighting its mission and team.
- * Features a hero section, feature cards, and team information.
+ * Features a hero section, a product overview, and team information.
  * Gracefully handles loading and error states with appropriate visual feedback.
  */
 const meta = {

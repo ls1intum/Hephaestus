@@ -1,15 +1,15 @@
-import { Code, Sparkles } from "lucide-react";
+import { Hammer, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { FeatureCard, type FeatureData } from "./FeatureCard";
 
 const FEATURES_DATA: FeatureData[] = [
 	{
-		icon: Code,
+		icon: Hammer,
 		badge: "Core feature",
 		title: "Practice feedback",
 		description: "Specific feedback on how the work was done",
 		content:
-			"Hephaestus reviews pull requests, merge requests, and issues against the practices a workspace has chosen. Each piece of feedback points to evidence in the work and suggests what to try next.",
+			"Hephaestus reviews eligible project work against the practices a workspace has chosen. Today, that includes pull requests, merge requests, and issues. Each piece of feedback points to evidence and suggests what to try next.",
 	},
 	{
 		icon: Sparkles,
@@ -17,7 +17,7 @@ const FEATURES_DATA: FeatureData[] = [
 		title: "Chat with Heph",
 		description: "Talk through feedback and recent work",
 		content:
-			"Heph can use recent project activity, delivered feedback, and selected Slack messages or Outline documents as context. Developers can chat in the web app or, when connected, in Slack.",
+			"Heph can use recent project activity, feedback the developer has received, and selected Slack messages or Outline documents as context. Developers can chat in the web app or, when connected, in Slack.",
 	},
 ];
 
@@ -32,10 +32,9 @@ export function AboutMissionSection() {
 
 				<div className="space-y-6">
 					<p className="text-lg leading-relaxed">
-						Developers learn engineering practices by doing the work and getting feedback on it.
-						Expert attention is limited, so many contributors get little or none. Hephaestus makes
-						routine practice feedback available more consistently while leaving human judgement and
-						mentoring relationships to people.
+						Developers learn engineering practices by doing the work and getting feedback. Expert
+						attention is limited, so feedback is often uneven or missing. Hephaestus provides
+						routine practice feedback without replacing human judgement or mentoring relationships.
 					</p>
 
 					<div className="border-l-4 border-primary pl-6 py-2">

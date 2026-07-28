@@ -5,7 +5,7 @@ import { LandingHeroSection } from "./LandingHeroSection";
 /**
  * Hero section component that introduces Hephaestus with a prominent headline,
  * description, and call-to-action buttons. Its animated preview connects project
- * work, practice feedback, delivery surfaces, and a conversation with Heph.
+ * work, practice feedback, and a conversation with Heph.
  */
 const meta = {
 	component: LandingHeroSection,
