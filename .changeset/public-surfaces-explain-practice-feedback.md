@@ -6,7 +6,7 @@ Public pages now explain Hephaestus in plain language: it gives developers feedb
 
 The landing page now shows a representative practice-feedback comment instead of a scoreboard or an unshipped pull-request conversation. Shared links also include a description and social-card metadata.
 
-The README now distinguishes today's delivery surfaces from the broader feedback loop and the planned v1.0 scope. It explains how GitHub, GitLab, Slack, and Outline contribute project context, and describes the three planned ways to receive feedback without tying them to specific page names. It also explains what pre-1.0 releases mean for self-hosted deployments, links to the live release plan, and provides clear paths to the app, documentation, Storybook setup, and contribution guide.
+The README now distinguishes today's delivery surfaces from the broader feedback loop and the planned v1.0 scope. It explains how GitHub, GitLab, Slack, and Outline contribute project context, and describes the three planned ways to receive feedback without tying them to specific page names. It also explains what pre-1.0 releases mean for self-hosted deployments, links to the live release plan, and provides clear paths to the app, documentation, Storybook, and contribution guide. Theme-aware artwork makes the feedback loop easier to scan in GitHub's light and dark modes.
 
 The user guide now matches the shipped multi-workspace GitHub and GitLab setup, current Heph chat, practice-feedback delivery, optional leaderboard and leagues, and configurable Slack digest. Account settings now state clearly that turning off pull-request comments controls delivery only; reviews still run and findings remain available to workspace admins.
 
