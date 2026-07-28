@@ -114,9 +114,12 @@ server {
   root /usr/share/nginx/html;
   index index.html;
 
+  # Server level, not per-location: a page URL can name a person
+  # (/w/<slug>/user/<username>), and this route is internet-exposed.
+  access_log off;
+
   location /assets/ {
     try_files $uri =404;
-    access_log off;
     add_header Cache-Control "public, max-age=31536000, immutable" always;
   }
 
