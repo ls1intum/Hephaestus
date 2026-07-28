@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.settings;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -14,6 +15,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.springframework.beans.factory.ObjectProvider;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -33,7 +35,11 @@ class InstanceSettingsServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         authEventWriter = mock(AuthEventWriter.class);
-        service = new InstanceSettingsService(repository, new AuthEventLogger(authEventWriter), new ObjectMapper());
+        @SuppressWarnings("unchecked")
+        ObjectProvider<AuthEventLogger> loggerProvider = mock(ObjectProvider.class);
+        // Only the write path resolves the logger; the read-path cases never touch it.
+        lenient().when(loggerProvider.getObject()).thenReturn(new AuthEventLogger(authEventWriter));
+        service = new InstanceSettingsService(repository, loggerProvider, new ObjectMapper());
     }
 
     @Test

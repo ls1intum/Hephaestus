@@ -357,15 +357,28 @@ class LegacyAgentConfigMigrationIntegrationTest {
 
     // ── migration driver ────────────────────────────────────────────────────────────────────────
 
-    /** @return how many changesets the release changelog contributes, i.e. how many were NOT applied. */
+    /**
+     * Applies every changeset that precedes the release changelog, so the tag taken next marks the
+     * pre-release state exactly. Counting from the <em>front</em> (rather than subtracting the release's
+     * own changesets from the total) keeps this correct once later changelogs are appended after it —
+     * otherwise the update would run past the release and the tag would land on one of its rows.
+     *
+     * @return how many changesets the release changelog contributes, i.e. how many were NOT applied.
+     */
     private static int updateUpToTheReleaseChangelog() throws Exception {
         try (Liquibase liquibase = liquibase()) {
             List<ChangeSet> pending = liquibase.listUnrunChangeSets(contexts(), new LabelExpression());
+            int beforeRelease = 0;
+            while (
+                beforeRelease < pending.size() && !pending.get(beforeRelease).getFilePath().endsWith(RELEASE_CHANGELOG)
+            ) {
+                beforeRelease++;
+            }
             long release = pending
                 .stream()
                 .filter(cs -> cs.getFilePath().endsWith(RELEASE_CHANGELOG))
                 .count();
-            liquibase.update((int) (pending.size() - release), contexts(), new LabelExpression());
+            liquibase.update(beforeRelease, contexts(), new LabelExpression());
             return (int) release;
         }
     }
