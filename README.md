@@ -23,6 +23,17 @@
 
 Hephaestus gives developers feedback on the engineering practices they use in software projects. It draws on evidence from tools the team already uses — including GitHub or GitLab activity, selected Slack channels, and Outline documents — to explain what worked, what could improve, and what to try next.
 
+<div align="center">
+  <picture>
+    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="./docs/images/readme/landing-feedback-preview-mobile-dark.png">
+    <source media="(max-width: 600px) and (prefers-color-scheme: light)" srcset="./docs/images/readme/landing-feedback-preview-mobile-light.png">
+    <source media="(prefers-color-scheme: dark)" srcset="./docs/images/readme/landing-feedback-preview-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="./docs/images/readme/landing-feedback-preview-light.png">
+    <img alt="Hephaestus reviewing a focused project change: it highlights that the change is easy to review, suggests explaining why it matters, and offers to help draft the explanation with Heph." src="./docs/images/readme/landing-feedback-preview-light.png" width="744">
+  </picture>
+  <p><sub>One feedback example and a follow-up with Heph.</sub></p>
+</div>
+
 Hephaestus is built for software engineering courses, open-source projects, and teams where mentors and maintainers cannot review every contribution themselves.
 
 ## What Hephaestus does today

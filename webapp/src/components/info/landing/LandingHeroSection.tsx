@@ -24,8 +24,13 @@ const entranceTransition = {
 	ease: [0.22, 1, 0.36, 1],
 } as const;
 
-function FeedbackPreview() {
-	const shouldReduceMotion = useReducedMotion();
+interface LandingFeedbackPreviewProps {
+	staticMode?: boolean;
+}
+
+export function LandingFeedbackPreview({ staticMode = false }: LandingFeedbackPreviewProps) {
+	const prefersReducedMotion = useReducedMotion();
+	const shouldReduceMotion = staticMode || prefersReducedMotion;
 
 	return (
 		<motion.div
@@ -33,7 +38,7 @@ function FeedbackPreview() {
 			initial={shouldReduceMotion ? false : { opacity: 0, y: 24, scale: 0.97 }}
 			animate={{ opacity: 1, y: 0, scale: 1 }}
 			transition={{ ...entranceTransition, delay: 0.15 }}
-			className="relative mx-auto h-[560px] w-full max-w-[680px] sm:h-[500px]"
+			className="relative mx-auto h-[590px] w-full max-w-[680px] sm:h-[500px]"
 		>
 			<div className="absolute right-[4%] top-[6%] size-56 rounded-full bg-mentor/10 blur-3xl" />
 			<div className="absolute bottom-[5%] left-[5%] size-64 rounded-full bg-provider-done/10 blur-3xl" />
@@ -67,7 +72,8 @@ function FeedbackPreview() {
 						<path
 							d="m1 1 7 4-7 4"
 							fill="none"
-							stroke="var(--color-border)"
+							stroke="var(--color-mentor)"
+							strokeOpacity="0.45"
 							strokeWidth="1.5"
 							strokeLinecap="round"
 							strokeLinejoin="round"
@@ -79,7 +85,7 @@ function FeedbackPreview() {
 					cy="250"
 					r="106"
 					stroke="currentColor"
-					className="text-mentor/15"
+					className="text-mentor/20"
 					strokeWidth="1.5"
 					strokeDasharray="5 10"
 					animate={shouldReduceMotion ? undefined : { rotate: 360 }}
@@ -96,8 +102,8 @@ function FeedbackPreview() {
 						key={path}
 						d={path}
 						stroke="currentColor"
-						className="text-border"
-						strokeWidth="1.5"
+						className="text-mentor/35"
+						strokeWidth="2"
 						strokeDasharray="4 7"
 						markerEnd="url(#hero-flow-arrow)"
 						initial={shouldReduceMotion ? false : { pathLength: 0, opacity: 0 }}
@@ -119,13 +125,13 @@ function FeedbackPreview() {
 						<GitPullRequest className="size-4" />
 					</div>
 					<div>
-						<p className="text-[10px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
+						<p className="text-[11px] font-semibold tracking-[0.12em] text-muted-foreground uppercase sm:text-xs">
 							Your project work
 						</p>
-						<p className="text-xs font-medium sm:text-sm">A focused change</p>
+						<p className="text-[13px] font-medium sm:text-sm">A focused change</p>
 					</div>
 				</div>
-				<div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+				<div className="flex items-center gap-2 text-[11px] text-muted-foreground">
 					<span className="flex items-center gap-1">
 						<Code2 className="size-3" /> Code
 					</span>
@@ -141,13 +147,13 @@ function FeedbackPreview() {
 				animate={{ opacity: 1, x: 0, rotate: 0 }}
 				transition={{ ...entranceTransition, delay: 0.4 }}
 				whileHover={shouldReduceMotion ? undefined : { y: -4, scale: 1.01 }}
-				className="absolute right-0 top-[112px] w-[51%] rounded-2xl border border-provider-success/40 bg-background/95 p-3 shadow-[0_18px_45px_-24px_rgb(15_23_42_/_0.45)] backdrop-blur-md sm:right-2 sm:top-12 sm:w-[250px] sm:p-4 dark:bg-secondary/70 dark:shadow-black/50"
+				className="absolute right-0 top-[60px] w-[51%] rounded-2xl border border-provider-success/40 bg-background/95 p-3 shadow-[0_18px_45px_-24px_rgb(15_23_42_/_0.45)] backdrop-blur-md sm:right-2 sm:top-12 sm:w-[250px] sm:p-4 dark:bg-secondary/70 dark:shadow-black/50"
 			>
-				<div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.12em] text-provider-success-foreground uppercase sm:text-xs">
+				<div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.12em] text-provider-success-foreground uppercase sm:text-xs">
 					<Check className="size-3.5" />
 					Worth keeping
 				</div>
-				<p className="text-xs leading-relaxed sm:text-sm">
+				<p className="text-[13px] leading-relaxed sm:text-sm">
 					You kept the change focused, so it is easier for someone else to review.
 				</p>
 			</motion.div>
@@ -171,7 +177,7 @@ function FeedbackPreview() {
 						<Hammer className="size-11 sm:size-12" strokeWidth={1.7} />
 					</div>
 					<p className="mt-2 text-sm font-semibold">Hephaestus</p>
-					<p className="text-[10px] text-muted-foreground">Reviews the work</p>
+					<p className="text-[11px] text-muted-foreground">Reviews the work</p>
 				</div>
 			</motion.div>
 
@@ -182,11 +188,11 @@ function FeedbackPreview() {
 				whileHover={shouldReduceMotion ? undefined : { y: -4, scale: 1.01 }}
 				className="absolute bottom-[86px] left-0 w-[52%] rounded-2xl border border-warning/35 bg-background/95 p-3 shadow-[0_18px_45px_-24px_rgb(15_23_42_/_0.45)] backdrop-blur-md sm:bottom-9 sm:left-5 sm:w-[250px] sm:p-4 dark:bg-secondary/70 dark:shadow-black/50"
 			>
-				<div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.12em] text-warning uppercase sm:text-xs">
+				<div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.12em] text-warning uppercase sm:text-xs">
 					<Lightbulb className="size-3.5" />
 					Try next
 				</div>
-				<p className="text-xs leading-relaxed sm:text-sm">
+				<p className="text-[13px] leading-relaxed sm:text-sm">
 					Add one sentence explaining why the change matters.
 				</p>
 			</motion.div>
@@ -198,11 +204,11 @@ function FeedbackPreview() {
 				whileHover={shouldReduceMotion ? undefined : { y: -4, scale: 1.01 }}
 				className="absolute -bottom-2 right-0 w-[51%] rounded-2xl border border-mentor/25 bg-background/95 p-3 shadow-[0_18px_45px_-24px_rgb(15_23_42_/_0.45)] backdrop-blur-md sm:bottom-6 sm:right-3 sm:w-[240px] sm:p-4 dark:bg-secondary/70 dark:shadow-black/50"
 			>
-				<div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.12em] text-mentor uppercase sm:text-xs">
+				<div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.12em] text-mentor uppercase sm:text-xs">
 					<MentorIcon size={20} pad={3} />
 					Talk with Heph
 				</div>
-				<div className="space-y-1.5 text-[10px] sm:text-xs">
+				<div className="space-y-1.5 text-[11px] sm:text-xs">
 					<motion.p
 						initial={shouldReduceMotion ? false : { opacity: 0, x: -8 }}
 						animate={{ opacity: 1, x: 0 }}
@@ -321,7 +327,7 @@ export function LandingHeroSection({
 					</motion.p>
 				</motion.div>
 
-				<FeedbackPreview />
+				<LandingFeedbackPreview />
 			</div>
 		</section>
 	);

@@ -1,37 +1,375 @@
 import {
+	ArrowDown,
+	Check,
+	ClipboardCheck,
+	Code2,
+	FileText,
 	GitPullRequest,
-	Hammer,
+	Lightbulb,
 	MessageSquareText,
-	MousePointerClick,
-	PanelsTopLeft,
 	RotateCcw,
+	TrendingUp,
 } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { MentorIcon } from "@/components/mentor/MentorIcon";
 import { Badge } from "@/components/ui/badge";
 
-const FEEDBACK_STEPS = [
-	{
-		icon: PanelsTopLeft,
-		title: "Your project work",
-		description: "Work and context from the tools your team uses",
-	},
-	{
-		icon: Hammer,
-		title: "Review the work",
-		description: "Hephaestus checks the evidence against your workspace's practices",
-	},
-	{
-		icon: MessageSquareText,
-		title: "Practice feedback",
-		description: "What worked, what could improve, and what to try next",
-	},
-	{
-		icon: MousePointerClick,
-		title: "You decide what helps",
-		description: "Use it, question it, or skip it",
-	},
-] as const;
+const enter = {
+	duration: 0.6,
+	ease: [0.22, 1, 0.36, 1],
+} as const;
+
+interface StageNumberProps {
+	number: number;
+}
+
+function StageNumber({ number }: StageNumberProps) {
+	return (
+		<span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-mentor text-xs font-bold text-white">
+			{number}
+		</span>
+	);
+}
+
+interface StageProps {
+	children: React.ReactNode;
+	className: string;
+	delay: number;
+}
+
+function Stage({ children, className, delay }: StageProps) {
+	const shouldReduceMotion = useReducedMotion();
+
+	return (
+		<motion.article
+			initial={shouldReduceMotion ? false : { opacity: 0, y: 18, scale: 0.98 }}
+			whileInView={{ opacity: 1, y: 0, scale: 1 }}
+			viewport={{ once: true, amount: 0.45 }}
+			transition={{ ...enter, delay }}
+			className={className}
+		>
+			{children}
+		</motion.article>
+	);
+}
+
+function ProjectWorkStage({ mobile = false }: { mobile?: boolean }) {
+	return (
+		<Stage
+			delay={0.05}
+			className={
+				mobile
+					? "relative rounded-3xl border border-border bg-background p-5 shadow-sm dark:bg-secondary/70"
+					: "absolute left-0 top-[72px] z-10 h-[250px] w-[270px] rounded-3xl border border-border bg-background p-6 shadow-[0_20px_50px_-30px_rgb(15_23_42_/_0.45)] dark:bg-secondary/80 dark:shadow-black/50"
+			}
+		>
+			{!mobile && (
+				<>
+					<div className="absolute -right-3 -top-3 -z-20 size-full rounded-3xl border border-mentor/15 bg-mentor/[0.035]" />
+					<div className="absolute -right-1.5 -top-1.5 -z-10 size-full rounded-3xl border border-mentor/20 bg-background dark:bg-secondary" />
+				</>
+			)}
+			<div className="flex items-center gap-3">
+				<StageNumber number={1} />
+				<div>
+					<p className="text-xs font-semibold tracking-[0.12em] text-mentor uppercase">
+						Project work
+					</p>
+					<h3 className="mt-0.5 text-xl font-semibold">Your work and its context</h3>
+				</div>
+			</div>
+			<p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+				Evidence already recorded in the tools your team uses.
+			</p>
+			<div className="mt-5 grid grid-cols-4 gap-2">
+				{[
+					{ icon: Code2, label: "Code" },
+					{ icon: ClipboardCheck, label: "Tasks" },
+					{ icon: MessageSquareText, label: "Talk" },
+					{ icon: FileText, label: "Docs" },
+				].map(({ icon: Icon, label }) => (
+					<div
+						key={label}
+						className="flex flex-col items-center gap-1.5 rounded-xl border border-border/70 bg-muted/30 px-1 py-2.5 text-[10px] text-muted-foreground"
+					>
+						<Icon className="size-4 text-mentor" strokeWidth={1.7} />
+						{label}
+					</div>
+				))}
+			</div>
+		</Stage>
+	);
+}
+
+function ReviewStage({ mobile = false }: { mobile?: boolean }) {
+	return (
+		<Stage
+			delay={0.15}
+			className={
+				mobile
+					? "rounded-3xl border border-border bg-background p-5 shadow-sm dark:bg-secondary/70"
+					: "absolute left-[315px] top-[86px] z-10 h-[250px] w-[300px] rounded-3xl border border-border bg-background p-6 shadow-[0_20px_50px_-30px_rgb(15_23_42_/_0.45)] dark:bg-secondary/80 dark:shadow-black/50"
+			}
+		>
+			<div className="flex items-center gap-3">
+				<StageNumber number={2} />
+				<div>
+					<p className="text-xs font-semibold tracking-[0.12em] text-mentor uppercase">
+						Practice review
+					</p>
+					<h3 className="mt-0.5 text-xl font-semibold">Hephaestus reviews the work</h3>
+				</div>
+			</div>
+			<p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+				Evidence from the work is considered using the engineering practices your workspace chose.
+			</p>
+			<div className="mt-5 flex items-center gap-3">
+				<span className="rounded-xl border border-border bg-muted/30 px-3 py-2 text-sm">
+					Evidence
+				</span>
+				<span className="text-lg text-muted-foreground">+</span>
+				<span className="rounded-xl border border-mentor/30 bg-mentor/10 px-3 py-2 text-sm text-mentor">
+					Practice
+				</span>
+			</div>
+		</Stage>
+	);
+}
+
+function FeedbackStage({ mobile = false }: { mobile?: boolean }) {
+	return (
+		<Stage
+			delay={0.25}
+			className={
+				mobile
+					? "rounded-3xl border border-mentor/35 bg-mentor/[0.045] p-5 shadow-[0_24px_60px_-38px_var(--color-mentor)]"
+					: "absolute right-0 top-[36px] z-10 h-[360px] w-[500px] rounded-3xl border border-mentor/35 bg-mentor/[0.045] p-7 shadow-[0_28px_70px_-40px_var(--color-mentor)]"
+			}
+		>
+			<div className="flex items-center gap-3">
+				<StageNumber number={3} />
+				<div>
+					<p className="text-xs font-semibold tracking-[0.12em] text-mentor uppercase">
+						Practice feedback
+					</p>
+					<h3 className="mt-0.5 text-2xl font-semibold">Feedback reaches you</h3>
+				</div>
+			</div>
+
+			<div className={mobile ? "mt-5 grid gap-3 sm:grid-cols-3" : "mt-5 grid gap-3"}>
+				{[
+					{ icon: Check, label: "What worked" },
+					{ icon: TrendingUp, label: "What could improve" },
+					{ icon: Lightbulb, label: "What to try next" },
+				].map(({ icon: Icon, label }) => (
+					<div key={label} className="flex items-center gap-3 text-sm">
+						<span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-mentor/25 bg-background text-mentor dark:bg-secondary">
+							<Icon className="size-3.5" strokeWidth={1.8} />
+						</span>
+						{label}
+					</div>
+				))}
+			</div>
+
+			<div className="mt-5 border-t border-mentor/20 pt-4">
+				<p className="text-xs font-semibold tracking-[0.12em] text-mentor uppercase">
+					Where feedback can appear today
+				</p>
+				<div className="mt-3 grid gap-2 sm:grid-cols-2">
+					<div className="flex items-center gap-2 rounded-full border border-mentor/25 bg-background/80 px-3 py-2 text-xs dark:bg-secondary/80">
+						<GitPullRequest className="size-4 text-mentor" />
+						Alongside the work
+					</div>
+					<div className="flex items-center gap-2 rounded-full border border-mentor/25 bg-background/80 px-3 py-2 text-xs dark:bg-secondary/80">
+						<MentorIcon size={20} pad={3} />
+						In conversation with Heph
+					</div>
+				</div>
+			</div>
+		</Stage>
+	);
+}
+
+function ChoiceStage({ mobile = false }: { mobile?: boolean }) {
+	return (
+		<Stage
+			delay={0.35}
+			className={
+				mobile
+					? "rounded-3xl border border-mentor/35 bg-background p-5 shadow-sm dark:bg-secondary/70"
+					: "absolute bottom-[26px] left-[405px] z-10 h-[142px] w-[650px] rounded-3xl border border-mentor/35 bg-background p-6 shadow-[0_20px_50px_-30px_rgb(15_23_42_/_0.45)] dark:bg-secondary/80 dark:shadow-black/50"
+			}
+		>
+			<div className={mobile ? "space-y-4" : "flex items-center gap-6"}>
+				<div className="flex items-center gap-3">
+					<StageNumber number={4} />
+					<div>
+						<p className="text-xs font-semibold tracking-[0.12em] text-mentor uppercase">
+							You stay in charge
+						</p>
+						<h3 className="mt-0.5 text-xl font-semibold">You decide what helps</h3>
+					</div>
+				</div>
+				<div className="flex flex-wrap gap-2">
+					{["Use it", "Question it", "Skip it"].map((choice, index) => (
+						<span
+							key={choice}
+							className={
+								index === 2
+									? "rounded-full border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground"
+									: "rounded-full border border-mentor/25 bg-mentor/10 px-3 py-2 text-sm text-mentor"
+							}
+						>
+							{choice}
+						</span>
+					))}
+				</div>
+			</div>
+		</Stage>
+	);
+}
+
+function DesktopFeedbackLoop() {
+	const shouldReduceMotion = useReducedMotion();
+	const connectorTransition = { duration: 0.85, ease: [0.22, 1, 0.36, 1] } as const;
+
+	return (
+		<div className="relative mx-auto mt-14 hidden h-[620px] max-w-[1160px] xl:block">
+			<svg
+				aria-hidden="true"
+				className="absolute inset-0 size-full"
+				viewBox="0 0 1160 620"
+				fill="none"
+			>
+				<defs>
+					<marker
+						id="loop-arrow"
+						viewBox="0 0 10 10"
+						refX="8"
+						refY="5"
+						markerWidth="7"
+						markerHeight="7"
+						orient="auto"
+					>
+						<path
+							d="m1 1 7 4-7 4"
+							fill="none"
+							stroke="var(--color-mentor)"
+							strokeWidth="1.7"
+							strokeLinecap="round"
+							strokeLinejoin="round"
+						/>
+					</marker>
+				</defs>
+				{[
+					{ d: "M270 188H315", delay: 0.2 },
+					{ d: "M615 188H660", delay: 0.35 },
+					{ d: "M1130 396C1180 430 1155 485 1055 500", delay: 0.5 },
+					{ d: "M405 522C265 606 42 588 34 336", delay: 0.65 },
+				].map(({ d, delay }) => (
+					<motion.path
+						key={d}
+						d={d}
+						stroke="currentColor"
+						className="text-mentor/65"
+						strokeWidth="2"
+						strokeLinecap="round"
+						markerEnd="url(#loop-arrow)"
+						initial={shouldReduceMotion ? false : { pathLength: 0, opacity: 0 }}
+						whileInView={{ pathLength: 1, opacity: 1 }}
+						viewport={{ once: true, amount: 0.7 }}
+						transition={{ ...connectorTransition, delay }}
+					/>
+				))}
+			</svg>
+
+			<ProjectWorkStage />
+			<ReviewStage />
+			<FeedbackStage />
+			<ChoiceStage />
+
+			<div className="absolute bottom-0 left-28 flex items-center gap-2 bg-muted/15 px-3 text-xs font-semibold tracking-[0.12em] text-mentor uppercase">
+				<RotateCcw className="size-3.5" />
+				Next project work
+			</div>
+		</div>
+	);
+}
+
+function MobileFeedbackLoop() {
+	return (
+		<div className="relative mx-auto mt-12 max-w-2xl xl:hidden">
+			<div className="relative">
+				<ProjectWorkStage mobile />
+				<MobileArrow />
+				<ReviewStage mobile />
+				<MobileArrow />
+				<FeedbackStage mobile />
+				<MobileArrow />
+				<ChoiceStage mobile />
+			</div>
+			<MobileReturnConnector />
+			<div className="flex items-center justify-center gap-2 text-sm font-medium text-mentor">
+				<RotateCcw className="size-4" />
+				Your next project work continues the cycle
+			</div>
+		</div>
+	);
+}
+
+function MobileReturnConnector() {
+	const shouldReduceMotion = useReducedMotion();
+
+	return (
+		<svg
+			aria-hidden="true"
+			className="mx-auto h-14 w-full max-w-sm"
+			viewBox="0 0 384 56"
+			fill="none"
+		>
+			<motion.path
+				d="M300 2C300 32 210 22 192 48"
+				stroke="currentColor"
+				className="text-mentor/65"
+				strokeWidth="2"
+				strokeLinecap="round"
+				initial={shouldReduceMotion ? false : { pathLength: 0, opacity: 0 }}
+				whileInView={{ pathLength: 1, opacity: 1 }}
+				viewport={{ once: true, amount: 0.8 }}
+				transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+			/>
+			<motion.path
+				d="m184 43 8 5 7-7"
+				stroke="currentColor"
+				className="text-mentor/65"
+				strokeWidth="2"
+				strokeLinecap="round"
+				strokeLinejoin="round"
+				initial={shouldReduceMotion ? false : { opacity: 0 }}
+				whileInView={{ opacity: 1 }}
+				viewport={{ once: true }}
+				transition={{ duration: 0.2, delay: 0.55 }}
+			/>
+		</svg>
+	);
+}
+
+function MobileArrow() {
+	const shouldReduceMotion = useReducedMotion();
+
+	return (
+		<motion.div
+			aria-hidden="true"
+			initial={shouldReduceMotion ? false : { opacity: 0, scaleY: 0.5 }}
+			whileInView={{ opacity: 1, scaleY: 1 }}
+			viewport={{ once: true, amount: 0.8 }}
+			transition={{ duration: 0.35 }}
+			className="flex h-10 origin-top items-center justify-center text-mentor/70"
+		>
+			<ArrowDown className="size-5" strokeWidth={1.8} />
+		</motion.div>
+	);
+}
 
 export function LandingFeaturesSection() {
 	const shouldReduceMotion = useReducedMotion();
@@ -51,175 +389,23 @@ export function LandingFeaturesSection() {
 					initial={shouldReduceMotion ? false : { opacity: 0, y: 18 }}
 					whileInView={{ opacity: 1, y: 0 }}
 					viewport={{ once: true, amount: 0.55 }}
-					transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+					transition={enter}
 					className="mx-auto max-w-5xl text-center"
 				>
 					<Badge className="mb-4" variant="outline">
 						How feedback works
 					</Badge>
-					<h2 className="text-3xl font-bold tracking-[-0.035em] sm:text-4xl md:text-5xl">
+					<h2 className="text-balance text-3xl font-bold tracking-[-0.035em] sm:text-4xl md:text-5xl">
 						From project work to practice feedback
 					</h2>
 					<p className="mx-auto mt-5 max-w-2xl text-pretty text-lg leading-relaxed text-muted-foreground">
-						Hephaestus checks evidence from project work against your workspace's practices, then
-						delivers feedback alongside the work or in conversation.
+						Hephaestus reviews evidence from project work against the practices chosen for the
+						workspace, then gives the developer feedback they can use, question, or skip.
 					</p>
 				</motion.div>
 
-				<div className="relative mx-auto mt-16 max-w-6xl">
-					<motion.div
-						initial={shouldReduceMotion ? false : { scaleX: 0 }}
-						whileInView={{ scaleX: 1 }}
-						viewport={{ once: true, amount: 0.6 }}
-						transition={{ duration: 1, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
-						className="absolute left-[12.5%] right-[12.5%] top-7 hidden h-px origin-left bg-gradient-to-r from-border via-mentor/50 to-border lg:block"
-					/>
-					<motion.ol
-						initial={shouldReduceMotion ? false : "hidden"}
-						whileInView="visible"
-						viewport={{ once: true, amount: 0.35 }}
-						variants={{
-							hidden: {},
-							visible: { transition: { staggerChildren: 0.12 } },
-						}}
-						className="relative grid gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6"
-					>
-						<div
-							aria-hidden="true"
-							className="absolute bottom-7 left-7 top-7 w-px bg-gradient-to-b from-border via-mentor/40 to-border lg:hidden"
-						/>
-						{FEEDBACK_STEPS.map((step, index) => {
-							const Icon = step.icon;
-							return (
-								<motion.li
-									key={step.title}
-									variants={{
-										hidden: { opacity: 0, y: 18 },
-										visible: {
-											opacity: 1,
-											y: 0,
-											transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] },
-										},
-									}}
-									className="group relative flex gap-4 lg:flex-col lg:items-center lg:text-center"
-								>
-									<motion.div
-										whileHover={shouldReduceMotion ? undefined : { y: -4 }}
-										whileTap={shouldReduceMotion ? undefined : { scale: 0.94 }}
-										className="relative z-10 flex size-14 shrink-0 items-center justify-center rounded-2xl border border-border bg-background text-mentor shadow-[0_14px_35px_-22px_rgb(15_23_42_/_0.55)] transition-colors group-hover:border-mentor/30 group-hover:bg-mentor/5 dark:bg-secondary"
-									>
-										<Icon className="size-6" strokeWidth={1.7} />
-									</motion.div>
-									<div className="pt-0.5 lg:pt-2">
-										<p className="text-xs font-semibold tracking-[0.12em] text-mentor uppercase">
-											{String(index + 1).padStart(2, "0")}
-										</p>
-										<h3 className="mt-1 text-lg font-semibold">{step.title}</h3>
-										<p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-											{step.description}
-										</p>
-									</div>
-								</motion.li>
-							);
-						})}
-					</motion.ol>
-
-					<div className="relative mt-7 hidden h-16 lg:block" aria-hidden="true">
-						<svg
-							aria-hidden="true"
-							className="absolute inset-0 size-full"
-							viewBox="0 0 1160 64"
-							fill="none"
-						>
-							<motion.path
-								d="M1080 4C1080 58 80 58 80 4"
-								stroke="currentColor"
-								className="text-mentor/45"
-								strokeWidth="1.5"
-								strokeDasharray="5 7"
-								initial={shouldReduceMotion ? false : { pathLength: 0, opacity: 0 }}
-								whileInView={{ pathLength: 1, opacity: 1 }}
-								viewport={{ once: true, amount: 0.8 }}
-								transition={{ duration: 1, delay: 0.5, ease: [0.22, 1, 0.36, 1] }}
-							/>
-							<motion.path
-								d="m70 14 10-10 10 10"
-								stroke="currentColor"
-								className="text-mentor/60"
-								strokeWidth="1.5"
-								strokeLinecap="round"
-								strokeLinejoin="round"
-								initial={shouldReduceMotion ? false : { opacity: 0 }}
-								whileInView={{ opacity: 1 }}
-								viewport={{ once: true }}
-								transition={{ duration: 0.3, delay: 1.35 }}
-							/>
-						</svg>
-						<div className="absolute inset-x-0 bottom-0 flex justify-center">
-							<span className="inline-flex items-center gap-2 bg-muted/15 px-3 text-xs font-semibold tracking-[0.12em] text-mentor uppercase">
-								<RotateCcw className="size-3.5" />
-								Next project work
-							</span>
-						</div>
-					</div>
-
-					<div className="mt-8 flex items-center gap-2 pl-1 text-sm font-medium text-mentor lg:hidden">
-						<RotateCcw className="size-4" />
-						Next project work continues the cycle
-					</div>
-				</div>
-
-				<motion.div
-					initial={shouldReduceMotion ? false : { opacity: 0, y: 20 }}
-					whileInView={{ opacity: 1, y: 0 }}
-					viewport={{ once: true, amount: 0.35 }}
-					transition={{ duration: 0.65, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
-					className="mx-auto mt-16 grid max-w-6xl border-y border-border/70 lg:grid-cols-[0.78fr_1fr_1fr]"
-				>
-					<div className="flex items-center gap-3 py-6 pr-6 lg:py-8">
-						<MessageSquareText className="size-5 text-mentor" />
-						<div>
-							<p className="text-xs font-semibold tracking-[0.12em] text-muted-foreground uppercase">
-								Available today
-							</p>
-							<p className="mt-1 font-semibold">Where feedback can appear</p>
-						</div>
-					</div>
-
-					<motion.div
-						whileHover={shouldReduceMotion ? undefined : { y: -3 }}
-						className="group border-t border-border/70 py-6 transition-colors hover:bg-background/60 lg:border-l lg:border-t-0 lg:px-8 lg:py-8"
-					>
-						<div className="flex items-start gap-4">
-							<div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-provider-accent text-provider-accent-foreground transition-transform group-hover:-rotate-3">
-								<GitPullRequest className="size-5" />
-							</div>
-							<div>
-								<h3 className="font-semibold">Alongside project work</h3>
-								<p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-									Practice feedback can appear as a comment in GitHub or GitLab.
-								</p>
-							</div>
-						</div>
-					</motion.div>
-
-					<motion.div
-						whileHover={shouldReduceMotion ? undefined : { y: -3 }}
-						className="group border-t border-border/70 py-6 transition-colors hover:bg-background/60 lg:border-l lg:border-t-0 lg:px-8 lg:py-8"
-					>
-						<div className="flex items-start gap-4">
-							<div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-mentor/10 text-mentor transition-transform group-hover:rotate-3">
-								<MentorIcon size={28} pad={4} />
-							</div>
-							<div>
-								<h3 className="font-semibold">Talk with Heph</h3>
-								<p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-									Discuss feedback and recent work in the web app or, when connected, in Slack.
-								</p>
-							</div>
-						</div>
-					</motion.div>
-				</motion.div>
+				<DesktopFeedbackLoop />
+				<MobileFeedbackLoop />
 			</div>
 		</section>
 	);

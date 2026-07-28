@@ -26,7 +26,8 @@
 		"chromatic:ci": "pnpm exec chromatic --only-changed",
 		"chromatic:dry-run": "pnpm exec chromatic --dry-run",
 		"openapi-ts": "openapi-ts",
-		"test:e2e": "playwright test"
+		"test:e2e": "playwright test",
+		"export:readme-assets": "node scripts/export-readme-assets.mjs"
 	},
 	"dependencies": {
 		"@ai-sdk/react": "3.0.186",
