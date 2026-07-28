@@ -4,6 +4,9 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /**
  * The grant allowlist: which workspaces may use a {@code GRANTED}-visibility instance model.
@@ -14,6 +17,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface LlmModelWorkspaceGrantRepository
     extends JpaRepository<LlmModelWorkspaceGrant, LlmModelWorkspaceGrant.Id>
 {
+    @Modifying(flushAutomatically = true)
+    @Query("DELETE FROM LlmModelWorkspaceGrant g WHERE g.id.workspaceId = :workspaceId")
+    int deleteAllByWorkspaceId(@Param("workspaceId") Long workspaceId);
+
     @WorkspaceAgnostic("Instance-admin sharing editor lists all workspaces a catalog model is granted to")
     List<LlmModelWorkspaceGrant> findByIdModelId(Long modelId);
 

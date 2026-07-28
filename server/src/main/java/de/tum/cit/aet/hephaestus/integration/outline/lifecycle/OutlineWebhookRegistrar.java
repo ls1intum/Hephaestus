@@ -254,40 +254,40 @@ public class OutlineWebhookRegistrar {
      */
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void deregister(long workspaceId, long connectionId) {
+        boolean hadSubscription;
+        try {
+            hadSubscription = deregisterStrict(workspaceId, connectionId);
+        } catch (RuntimeException e) {
+            log.warn("outline.webhook: deregistration failed for connectionId={}: {}", connectionId, e.toString());
+            hadSubscription = true;
+        }
+        if (hadSubscription) {
+            reconcileScopeConsumer(workspaceId);
+        }
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public boolean deregisterStrict(long workspaceId, long connectionId) {
         Optional<Connection> connection = connectionService.findInWorkspace(workspaceId, connectionId);
         if (connection.isEmpty() || !(connection.get().getConfig() instanceof ConnectionConfig.OutlineConfig config)) {
-            return;
+            return false;
         }
         String subscriptionId = config.webhookSubscriptionId();
         if (subscriptionId == null || subscriptionId.isBlank()) {
-            return;
+            return false;
         }
         String serverUrl = config.serverUrl();
         Optional<BearerToken> bearer = connectionService.findBearerToken(workspaceId, connectionId);
         if (serverUrl == null || serverUrl.isBlank() || bearer.isEmpty()) {
-            log.info(
-                "outline.webhook: no usable credentials to delete subscription {} for connectionId={} — " +
-                    "it will auto-disable upstream after repeated delivery failures",
-                subscriptionId,
-                connectionId
-            );
-            // The connection already left ACTIVE (that's why this by-id variant is resolving it), so the
-            // subscription provider has already stopped reporting the outline stream for this workspace —
-            // reconcile the scope consumer down to match even though the upstream delete itself is a no-op.
-            reconcileScopeConsumer(workspaceId);
-            return;
+            throw new IllegalStateException("Outline webhook credentials are unavailable");
         }
-        try {
-            outlineApiClient.deleteWebhookSubscription(serverUrl, bearer.get().token(), subscriptionId);
-            log.info(
-                "outline.webhook: deleted subscription {} for deactivated connectionId={}",
-                subscriptionId,
-                connectionId
-            );
-        } catch (RuntimeException e) {
-            log.warn("outline.webhook: deregistration failed for connectionId={}: {}", connectionId, e.toString());
-        }
-        reconcileScopeConsumer(workspaceId);
+        outlineApiClient.deleteWebhookSubscription(serverUrl, bearer.get().token(), subscriptionId);
+        log.info(
+            "outline.webhook: deleted subscription {} for deactivated connectionId={}",
+            subscriptionId,
+            connectionId
+        );
+        return true;
     }
 
     /** A 256-bit hex signing secret (64 chars), comfortably above the NIST-recommended HMAC key length. */

@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.integration.core.events.ConnectionLifecycleEven
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -205,6 +206,28 @@ public class ConnectionService {
     @Transactional(readOnly = true)
     public Optional<Connection> findInWorkspace(long workspaceId, long connectionId) {
         return connectionRepository.findByIdAndWorkspaceId(connectionId, workspaceId);
+    }
+
+    /** Resolves an explicit connection id regardless of state, or otherwise the active connection. */
+    @Transactional(readOnly = true)
+    public Optional<Connection> findReferenced(IntegrationRef ref) {
+        if (ref.connectionId() == null) {
+            return findActive(ref.workspaceId(), ref.kind());
+        }
+        return findInWorkspace(ref.workspaceId(), ref.connectionId()).filter(c -> c.getKind() == ref.kind());
+    }
+
+    @Transactional(readOnly = true)
+    public boolean hasOtherInstalledConnection(IntegrationRef ref) {
+        if (ref.connectionId() == null || ref.instanceKey() == null) {
+            return false;
+        }
+        return connectionRepository.existsByKindAndInstanceKeyAndStateNotAndIdNot(
+            ref.kind(),
+            ref.instanceKey(),
+            IntegrationState.UNINSTALLED,
+            ref.connectionId()
+        );
     }
 
     /**
@@ -446,7 +469,28 @@ public class ConnectionService {
         if (req.next() != IntegrationState.UNINSTALLED) {
             throw new IllegalArgumentException("Disconnect must transition to UNINSTALLED");
         }
-        return applyTransition(connection, req, revoke, /* fenceOnActiveSyncJob */ true);
+        return applyTransition(
+            connection,
+            req,
+            revoke,
+            /* fenceOnActiveSyncJob */ true,
+            /* propagateRevokeFailure */ false
+        );
+    }
+
+    /** Disconnects for mandatory erasure without allowing a sync job to delay credential removal. */
+    @Transactional
+    public Connection disconnectForErasure(Connection connection, TransitionRequest req, Runnable revoke) {
+        if (req.next() != IntegrationState.UNINSTALLED) {
+            throw new IllegalArgumentException("Disconnect must transition to UNINSTALLED");
+        }
+        return applyTransition(
+            connection,
+            req,
+            revoke,
+            /* fenceOnActiveSyncJob */ false,
+            /* propagateRevokeFailure */ true
+        );
     }
 
     private Connection applyTransition(
@@ -454,14 +498,21 @@ public class ConnectionService {
         TransitionRequest req,
         @Nullable Runnable beforeLocalTransition
     ) {
-        return applyTransition(connection, req, beforeLocalTransition, /* fenceOnActiveSyncJob */ false);
+        return applyTransition(
+            connection,
+            req,
+            beforeLocalTransition,
+            /* fenceOnActiveSyncJob */ false,
+            /* propagateRevokeFailure */ false
+        );
     }
 
     private Connection applyTransition(
         Connection connection,
         TransitionRequest req,
         @Nullable Runnable beforeLocalTransition,
-        boolean fenceOnActiveSyncJob
+        boolean fenceOnActiveSyncJob,
+        boolean propagateRevokeFailure
     ) {
         if (connection.getId() != null) {
             long connectionId = connection.getId();
@@ -490,7 +541,11 @@ public class ConnectionService {
             );
         }
         if (beforeLocalTransition != null) {
-            runRevokeIsolated(connection, beforeLocalTransition);
+            if (propagateRevokeFailure) {
+                beforeLocalTransition.run();
+            } else {
+                runRevokeIsolated(connection, beforeLocalTransition);
+            }
         }
         ConnectionAudit audit = new ConnectionAudit(
             connection,
@@ -515,10 +570,17 @@ public class ConnectionService {
         }
         connection.setState(req.next());
         connection.setStateReason(req.detail());
-        if (req.next() == IntegrationState.UNINSTALLED && connection.getCredentialsEncrypted() != null) {
-            connection.setCredentialsEncrypted(null);
-            connection.setCredentialsAlg(null);
-            log.info("Purged credentials on UNINSTALLED transition for connection={}", connection.getId());
+        if (req.next() == IntegrationState.UNINSTALLED) {
+            if (connection.getCredentialsEncrypted() != null) {
+                connection.setCredentialsEncrypted(null);
+                connection.setCredentialsAlg(null);
+                log.info("Purged credentials on UNINSTALLED transition for connection={}", connection.getId());
+            }
+            if (connection.getConfig() instanceof ConnectionConfig.GitLabConfig gitLabConfig) {
+                connection.setConfig(gitLabConfig.withGitlabWebhookId(null));
+            } else if (connection.getConfig() instanceof ConnectionConfig.OutlineConfig outlineConfig) {
+                connection.setConfig(outlineConfig.withWebhookSubscription(null, null));
+            }
         }
         Connection saved = connectionRepository.save(connection);
         publishLifecycleEvent(saved, current, req.next());

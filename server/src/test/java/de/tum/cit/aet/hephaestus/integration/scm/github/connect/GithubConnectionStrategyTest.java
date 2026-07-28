@@ -1,32 +1,40 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.connect;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.oauth.state.OAuthStateService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.ScmWorkspaceContentEraser;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
-/**
- * Attribution: the initiating admin's actorRef must be woven into the OAuth state via the 3-arg
- * {@code issue()}, so the post-callback connection audit row attributes the connect to them. The GitHub
- * controller test passes a null authentication, so only this unit test catches a dropped actorRef.
- *
- * <p>Disconnect-erase wiring: {@code revoke} must drive the shared SCM eraser, not a no-op. Otherwise
- * the admin-disconnect trigger keeps the mirror forever while the vendor-uninstall trigger erases —
- * an asymmetry between the two disconnect paths.
- */
 class GithubConnectionStrategyTest extends BaseUnitTest {
 
     @Mock
     private OAuthStateService oauthStateService;
+
+    @Mock
+    private ConnectionService connectionService;
+
+    @Mock
+    private Connection connection;
+
+    @Mock
+    private GitHubAppTokenService appTokenService;
 
     @Mock
     private ScmWorkspaceContentEraser contentEraser;
@@ -36,6 +44,8 @@ class GithubConnectionStrategyTest extends BaseUnitTest {
             "https://github.com/apps/heph/installations/new",
             "123",
             oauthStateService,
+            connectionService,
+            appTokenService,
             contentEraser
         );
     }
@@ -52,8 +62,71 @@ class GithubConnectionStrategyTest extends BaseUnitTest {
     }
 
     @Test
-    void revoke_erasesTheWorkspacesScmMirror() {
-        strategy().revoke(new IntegrationRef(IntegrationKind.GITHUB, 7L, "4242"));
+    void revoke_uninstallsTheGitHubAppAndErasesTheLocalMirror() {
+        IntegrationRef ref = new IntegrationRef(IntegrationKind.GITHUB, 7L, "4242");
+        when(connectionService.findReferenced(ref)).thenReturn(Optional.of(connection));
+        when(connection.getConfig()).thenReturn(new ConnectionConfig.GitHubAppConfig(4242L, null, null, Set.of()));
+
+        strategy().revoke(ref);
+
+        verify(appTokenService).deleteInstallation(4242L);
+        verify(contentEraser).eraseWorkspaceScmMirror(7L);
+    }
+
+    @Test
+    void revoke_patConnectionNeverDeletesAnInstallation() {
+        IntegrationRef ref = new IntegrationRef(IntegrationKind.GITHUB, 7L, "4242");
+        when(connectionService.findReferenced(ref)).thenReturn(Optional.of(connection));
+        when(connection.getConfig()).thenReturn(new ConnectionConfig.GitHubPatConfig("org", null, Set.of()));
+
+        strategy().revoke(ref);
+
+        verifyNoInteractions(appTokenService);
+        verify(contentEraser).eraseWorkspaceScmMirror(7L);
+    }
+
+    @Test
+    void purge_revokesProviderWithoutErasingLocalData() {
+        IntegrationRef ref = new IntegrationRef(IntegrationKind.GITHUB, 7L, "4242", 9L);
+        when(connectionService.findReferenced(ref)).thenReturn(Optional.of(connection));
+        when(connection.getConfig()).thenReturn(new ConnectionConfig.GitHubAppConfig(4242L, null, null, Set.of()));
+
+        strategy().revokeProvider(ref);
+
+        verify(appTokenService).deleteInstallation(4242L);
+        verifyNoInteractions(contentEraser);
+    }
+
+    @Test
+    void purge_doesNotDeleteAnInstallationStillUsedByAnotherConnection() {
+        IntegrationRef ref = new IntegrationRef(IntegrationKind.GITHUB, 7L, "4242", 9L);
+        when(connectionService.hasOtherInstalledConnection(ref)).thenReturn(true);
+
+        strategy().revokeProvider(ref);
+
+        verifyNoInteractions(appTokenService, contentEraser);
+    }
+
+    @Test
+    void purge_propagatesProviderFailureWithoutErasingLocalData() {
+        IntegrationRef ref = new IntegrationRef(IntegrationKind.GITHUB, 7L, "4242", 9L);
+        when(connectionService.findReferenced(ref)).thenReturn(Optional.of(connection));
+        when(connection.getConfig()).thenReturn(new ConnectionConfig.GitHubAppConfig(4242L, null, null, Set.of()));
+        doThrow(new RuntimeException("github unavailable")).when(appTokenService).deleteInstallation(4242L);
+
+        assertThatThrownBy(() -> strategy().revokeProvider(ref)).hasMessage("github unavailable");
+
+        verifyNoInteractions(contentEraser);
+    }
+
+    @Test
+    void revoke_erasesLocallyWhenGitHubUninstallFails() {
+        IntegrationRef ref = new IntegrationRef(IntegrationKind.GITHUB, 7L, "4242");
+        when(connectionService.findReferenced(ref)).thenReturn(Optional.of(connection));
+        when(connection.getConfig()).thenReturn(new ConnectionConfig.GitHubAppConfig(4242L, null, null, Set.of()));
+        doThrow(new RuntimeException("github unavailable")).when(appTokenService).deleteInstallation(4242L);
+
+        assertThatThrownBy(() -> strategy().revoke(ref)).isInstanceOf(RuntimeException.class);
 
         verify(contentEraser).eraseWorkspaceScmMirror(7L);
     }
@@ -62,6 +135,6 @@ class GithubConnectionStrategyTest extends BaseUnitTest {
     void revoke_withNullRef_isANoOp() {
         strategy().revoke(null);
 
-        verifyNoInteractions(contentEraser);
+        verifyNoInteractions(connectionService, appTokenService, contentEraser);
     }
 }

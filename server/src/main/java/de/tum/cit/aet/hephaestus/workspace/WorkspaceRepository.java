@@ -55,6 +55,15 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
         return findByGitHubInstallationInstanceKey(installationId.toString());
     }
 
+    default Optional<Workspace> findByInstallationIdForUpdate(Long installationId) {
+        if (installationId == null) {
+            return Optional.empty();
+        }
+        return findWorkspaceIdByGitHubInstallationInstanceKey(installationId.toString()).flatMap(
+            this::findByIdForUpdate
+        );
+    }
+
     @Query(
         """
         SELECT c.workspace
@@ -64,6 +73,16 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
         """
     )
     Optional<Workspace> findByGitHubInstallationInstanceKey(@Param("instanceKey") String instanceKey);
+
+    @Query(
+        """
+        SELECT c.workspace.id
+        FROM Connection c
+        WHERE c.kind = de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITHUB
+          AND c.instanceKey = :instanceKey
+        """
+    )
+    Optional<Long> findWorkspaceIdByGitHubInstallationInstanceKey(@Param("instanceKey") String instanceKey);
 
     Optional<Workspace> findByRepositoriesToMonitor_NameWithOwner(String nameWithOwner);
     Optional<Workspace> findByOrganization_Login(String login);

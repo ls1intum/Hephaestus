@@ -1424,7 +1424,7 @@ paths:
       responses:
         "204":
           description: Workspace purged
-      summary: Purge (soft delete) a workspace
+      summary: Permanently delete a workspace and purge its data
       tags:
       - workspace
     get:

@@ -123,16 +123,15 @@ public class OutlineConnectionStrategy implements ConnectionStrategy {
             ref == null ? null : ref.instanceKey()
         );
         if (ref != null) {
-            // Best-effort teardown of the change-notification subscription (never throws).
-            webhookRegistrar.deregister(ref.workspaceId());
-            // GDPR erase on disconnect: nothing mirrored outlives the connection (the workspace-purge
-            // adapter erases the same rows for full teardown).
+            if (ref.connectionId() == null) {
+                webhookRegistrar.deregister(ref.workspaceId());
+            } else {
+                webhookRegistrar.deregister(ref.workspaceId(), ref.connectionId());
+            }
             long erased = outlineDocumentRepository.deleteByWorkspaceId(ref.workspaceId());
             long collections = outlineCollectionRepository.deleteByWorkspaceId(ref.workspaceId());
-            // The event log carries actor subjects (personal data) — it erases with the connection too.
             long events = outlineDocumentEventRepository.deleteByWorkspaceId(ref.workspaceId());
             if (erased > 0 || collections > 0 || events > 0) {
-                // Actor is "system" when no request principal exists (e.g. the workspace-purge path).
                 log.info(
                     "outline.audit: revoke erase — actor={} erased {} mirrored document(s), {} collection registration(s) and {} document event(s) for workspace={}",
                     LoggingUtils.sanitizeForLog(SecurityUtils.getCurrentUserLogin().orElse("system")),
@@ -143,5 +142,13 @@ public class OutlineConnectionStrategy implements ConnectionStrategy {
                 );
             }
         }
+    }
+
+    @Override
+    public void revokeProvider(IntegrationRef ref) {
+        if (ref == null || ref.connectionId() == null) {
+            throw new IllegalArgumentException("Outline provider teardown requires a connection id");
+        }
+        webhookRegistrar.deregisterStrict(ref.workspaceId(), ref.connectionId());
     }
 }

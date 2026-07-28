@@ -434,25 +434,7 @@ public class GitHubAppTokenService {
         }
     }
 
-    // Installation Deletion
-
-    /**
-     * Permanently delete a GitHub App installation via {@code DELETE /app/installations/{installation_id}}.
-     *
-     * <p>Authed with the App JWT (NOT an installation token) — the installation may
-     * already be in a state where it cannot mint a token (suspended, revoked) and we
-     * still need to evict it from the GitHub side. After this call the install is
-     * gone from the vendor's perspective: webhooks stop, repositories lose access.
-     *
-     * <p>404 is treated as success: the installation is already absent on GitHub's
-     * side, which is the desired terminal state from the caller's perspective. The
-     * cache + suspended-set are cleared regardless so this object's view of the
-     * installation matches reality.
-     *
-     * @throws UncheckedIOException for transport / 5xx errors — caller should retry
-     *         next cron tick and MUST NOT delete the local row, otherwise we orphan
-     *         the GitHub-side install.
-     */
+    /** Deletes an installation with the App JWT. A missing installation is already deleted. */
     public void deleteInstallation(long installationId) {
         if (!isConfigured()) {
             throw new IllegalStateException("GitHub App credentials not configured.");
@@ -467,11 +449,8 @@ public class GitHubAppTokenService {
                 .toBodilessEntity()
                 .block();
         } catch (WebClientResponseException.NotFound e) {
-            // Already gone on GitHub side — treat as success; fall through to local cleanup.
+            // Desired state already reached.
         } catch (WebClientResponseException e) {
-            // 401/403/5xx — propagate so caller knows GitHub-side delete failed and
-            // can retry. Do NOT swallow: leaking the install upstream is worse than
-            // failing loud here.
             throw new UncheckedIOException(
                 new IOException(
                     "GitHub API error deleting installation " + installationId + ": " + e.getStatusCode(),
@@ -481,8 +460,6 @@ public class GitHubAppTokenService {
         } catch (RuntimeException e) {
             throw new UncheckedIOException(new IOException("GitHub error deleting installation " + installationId, e));
         } finally {
-            // Drop local caches no matter what — even on failure the next call will
-            // re-mint; on success they're now wrong.
             installTokenCache.invalidate(installationId);
             suspendedInstallations.remove(installationId);
         }

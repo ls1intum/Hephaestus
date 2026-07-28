@@ -38,9 +38,6 @@ describe("AdminSettingsPage — non-integration content", () => {
 		expect(screen.getByText(/reset and recalculate leagues/i)).toBeTruthy();
 	});
 
-	// The danger zone fetches and navigates for itself, so it needs a query client and a router that
-	// this page-level test deliberately does not stand up. Withholding the slug is what keeps it out:
-	// if that guard regressed, this test would fail on the missing providers rather than pass quietly.
 	it("leaves the danger zone out until the active workspace has resolved", () => {
 		setup({ workspaceSlug: undefined });
 		expect(screen.queryByRole("heading", { name: /danger zone/i })).toBeNull();

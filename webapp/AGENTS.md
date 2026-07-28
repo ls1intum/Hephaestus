@@ -122,7 +122,8 @@ export function UserCard(props: UserCardProps) {
 ### Container/Presentation Split
 
 - **Routes** (`src/routes/**`): Data fetching, loaders, auth guards, side effects
-- **Components** (`src/components/**`): Pure, rely solely on props
+- **Components** (`src/components/**`): Pure by default. A cohesive section may own data used only
+  within that section; every story that renders it must mock its requests.
 
 ### Seeding a form from props
 

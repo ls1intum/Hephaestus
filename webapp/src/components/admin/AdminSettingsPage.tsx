@@ -12,7 +12,6 @@ export interface AdminSettingsPageProps {
 	features: FeatureValues;
 	isSavingFeatures: boolean;
 	onToggleFeature: (feature: FeatureKey, enabled: boolean) => void;
-	/** Absent while the active workspace is still resolving; the danger zone waits for it. */
 	workspaceSlug?: string;
 }
 

@@ -260,6 +260,9 @@ public class WorkspaceRepositoryMonitorService {
         String nameWithOwner,
         boolean deferSync
     ) {
+        if (StringUtils.isBlank(nameWithOwner)) {
+            return Optional.empty();
+        }
         // Check suspension BEFORE adding the repo monitor so NATS replay cannot
         // add repos to suspended installations.
         if (isInstallationSuspended(installationId)) {
@@ -271,23 +274,22 @@ public class WorkspaceRepositoryMonitorService {
             return Optional.empty();
         }
 
-        var workspaceOpt = workspaceRepository.findByInstallationId(installationId);
-        if (workspaceOpt.isEmpty() || StringUtils.isBlank(nameWithOwner)) {
-            return workspaceOpt;
-        }
-
-        Workspace workspace = workspaceOpt.get();
-        return ensureRepositoryMonitorInternal(workspace, nameWithOwner, deferSync);
+        return findActiveInstallationForUpdate(installationId).flatMap(workspace ->
+            ensureRepositoryMonitorInternal(workspace, nameWithOwner, deferSync)
+        );
     }
 
     /** Remove a repository monitor for a given installation id if it exists; no-op if missing. */
     @Transactional
     public Optional<Workspace> removeRepositoryMonitorForInstallation(long installationId, String nameWithOwner) {
-        var workspaceOpt = workspaceRepository.findByInstallationId(installationId);
-        if (workspaceOpt.isEmpty() || StringUtils.isBlank(nameWithOwner)) {
-            return workspaceOpt;
+        if (StringUtils.isBlank(nameWithOwner)) {
+            return Optional.empty();
         }
 
+        var workspaceOpt = findActiveInstallationForUpdate(installationId);
+        if (workspaceOpt.isEmpty()) {
+            return Optional.empty();
+        }
         Workspace workspace = workspaceOpt.get();
         var monitorOpt = repositoryToMonitorRepository.findByWorkspaceIdAndNameWithOwner(
             workspace.getId(),
@@ -314,7 +316,7 @@ public class WorkspaceRepositoryMonitorService {
      */
     @Transactional
     public Optional<Workspace> removeAllRepositoriesFromMonitor(long installationId, boolean deleteRepositories) {
-        var workspaceOpt = workspaceRepository.findByInstallationId(installationId);
+        var workspaceOpt = findActiveInstallationForUpdate(installationId);
         workspaceOpt.ifPresent(workspace -> {
             List<RepositoryToMonitor> monitors = repositoryToMonitorRepository.findByWorkspaceId(workspace.getId());
             for (RepositoryToMonitor monitor : monitors) {
@@ -349,7 +351,7 @@ public class WorkspaceRepositoryMonitorService {
             return;
         }
 
-        var workspaceOpt = workspaceRepository.findByInstallationId(installationId);
+        var workspaceOpt = findActiveInstallationForUpdate(installationId);
         if (workspaceOpt.isEmpty()) {
             return;
         }
@@ -371,7 +373,7 @@ public class WorkspaceRepositoryMonitorService {
             snapshot.isPrivate()
         );
 
-        ensureRepositoryMonitorForInstallation(installationId, snapshot.nameWithOwner(), true);
+        ensureRepositoryMonitorInternal(workspace, snapshot.nameWithOwner(), true);
     }
 
     /**
@@ -396,7 +398,7 @@ public class WorkspaceRepositoryMonitorService {
             return;
         }
 
-        var workspaceOpt = workspaceRepository.findByInstallationId(installationId);
+        var workspaceOpt = findActiveInstallationForUpdate(installationId);
         if (workspaceOpt.isEmpty()) {
             return;
         }
@@ -716,6 +718,12 @@ public class WorkspaceRepositoryMonitorService {
             throw new IllegalArgumentException("Workspace context slug must not be blank.");
         }
         return slug;
+    }
+
+    private Optional<Workspace> findActiveInstallationForUpdate(long installationId) {
+        return workspaceRepository
+            .findByInstallationIdForUpdate(installationId)
+            .filter(workspace -> workspace.getStatus() == Workspace.WorkspaceStatus.ACTIVE);
     }
 
     /**

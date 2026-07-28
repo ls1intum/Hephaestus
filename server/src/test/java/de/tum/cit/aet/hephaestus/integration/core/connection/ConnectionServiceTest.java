@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService.T
 import de.tum.cit.aet.hephaestus.integration.core.events.ConnectionLifecycleEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -272,6 +273,52 @@ class ConnectionServiceTest extends BaseUnitTest {
         ArgumentCaptor<ConnectionAudit> audit = ArgumentCaptor.forClass(ConnectionAudit.class);
         verify(auditRepository).save(audit.capture());
         assertThat(audit.getValue().getToState()).isEqualTo(IntegrationState.UNINSTALLED);
+    }
+
+    @Test
+    void transition_toUninstalled_clearsProviderWebhookConfig() {
+        Connection gitLab = connection(
+            IntegrationKind.GITLAB,
+            new ConnectionConfig.GitLabConfig(
+                "https://gitlab.example",
+                12L,
+                34L,
+                ConnectionConfig.GitLabConfig.SigningMode.WHSEC,
+                Set.of()
+            )
+        );
+        Connection outline = connection(
+            IntegrationKind.OUTLINE,
+            new ConnectionConfig.OutlineConfig("https://outline.example", "subscription-1", "secret-1", Set.of())
+        );
+
+        service.transition(gitLab, uninstallRequest("gitlab"));
+        service.transition(outline, uninstallRequest("outline"));
+
+        var gitLabConfig = (ConnectionConfig.GitLabConfig) gitLab.getConfig();
+        assertThat(gitLabConfig.gitlabWebhookId()).isNull();
+        assertThat(gitLabConfig.gitlabGroupId()).isEqualTo(12L);
+        var outlineConfig = (ConnectionConfig.OutlineConfig) outline.getConfig();
+        assertThat(outlineConfig.webhookSubscriptionId()).isNull();
+        assertThat(outlineConfig.webhookSecret()).isNull();
+        assertThat(outlineConfig.serverUrl()).isEqualTo("https://outline.example");
+    }
+
+    @Test
+    void findReferenced_resolvesAnExplicitSuspendedConnection() {
+        Connection connection = connection(
+            IntegrationKind.SLACK,
+            new ConnectionConfig.SlackConfig("team-1", "Acme", null, null, null, Set.of())
+        );
+        connection.setState(IntegrationState.SUSPENDED);
+        IntegrationRef ref = new IntegrationRef(
+            IntegrationKind.SLACK,
+            workspace.getId(),
+            connection.getInstanceKey(),
+            connection.getId()
+        );
+
+        assertThat(service.findReferenced(ref)).contains(connection);
     }
 
     @Test
@@ -635,6 +682,27 @@ class ConnectionServiceTest extends BaseUnitTest {
             .when(connectionRepository.findByIdAndWorkspaceId(connection.getId(), workspace.getId()))
             .thenReturn(java.util.Optional.of(connection));
         return connection;
+    }
+
+    private Connection connection(IntegrationKind kind, ConnectionConfig config) {
+        Connection connection = new Connection(workspace, kind, kind.name().toLowerCase(), config);
+        setId(connection, 55L + kind.ordinal());
+        connection.setState(IntegrationState.ACTIVE);
+        Mockito.lenient()
+            .when(connectionRepository.findByIdAndWorkspaceId(connection.getId(), workspace.getId()))
+            .thenReturn(java.util.Optional.of(connection));
+        return connection;
+    }
+
+    private static TransitionRequest uninstallRequest(String correlationId) {
+        return new TransitionRequest(
+            IntegrationState.UNINSTALLED,
+            "UNINSTALL",
+            "SYSTEM",
+            "system",
+            correlationId,
+            "removed"
+        );
     }
 
     private static TransitionRequest disconnectRequest() {

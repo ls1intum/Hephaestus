@@ -135,8 +135,19 @@ public class GitLabWebhookClient {
      * @param webhookId the webhook ID to delete
      */
     public void deregisterGroupWebhook(Long scopeId, long groupId, long webhookId) {
-        ScopeCredentials credentials = resolveCredentials(scopeId);
+        deregisterGroupWebhook(resolveCredentials(scopeId), scopeId, groupId, webhookId);
+    }
 
+    public void deregisterGroupWebhookWithCredentials(String serverUrl, String token, long groupId, long webhookId) {
+        deregisterGroupWebhook(new ScopeCredentials(serverUrl, token), null, groupId, webhookId);
+    }
+
+    private void deregisterGroupWebhook(
+        ScopeCredentials credentials,
+        @Nullable Long scopeId,
+        long groupId,
+        long webhookId
+    ) {
         try {
             webClient
                 .delete()

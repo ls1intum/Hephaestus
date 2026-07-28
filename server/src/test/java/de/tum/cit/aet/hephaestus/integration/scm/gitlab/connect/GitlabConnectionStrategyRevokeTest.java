@@ -1,6 +1,9 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.connect;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -47,5 +50,24 @@ class GitlabConnectionStrategyRevokeTest extends BaseUnitTest {
         strategy.revoke(null);
 
         verifyNoInteractions(webhookService, contentEraser);
+    }
+
+    @Test
+    void purge_onlyDeregistersTheProviderWebhook() {
+        strategy.revokeProvider(new IntegrationRef(IntegrationKind.GITLAB, 11L, "group-99", 7L));
+
+        verify(webhookService).deregisterWebhookForConnectionStrict(11L, 7L);
+        verifyNoInteractions(contentEraser);
+    }
+
+    @Test
+    void purge_propagatesProviderFailure() {
+        doThrow(new RuntimeException("gitlab unavailable"))
+            .when(webhookService)
+            .deregisterWebhookForConnectionStrict(11L, 7L);
+
+        assertThatThrownBy(() ->
+            strategy.revokeProvider(new IntegrationRef(IntegrationKind.GITLAB, 11L, "group-99", 7L))
+        ).hasMessage("gitlab unavailable");
     }
 }

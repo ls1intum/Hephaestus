@@ -4,11 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.oauth.state.OAuthStateService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy.ConnectFinalization;
@@ -34,6 +37,9 @@ class SlackConnectionStrategyTest extends BaseUnitTest {
     private OAuthStateService oauthStateService;
 
     @Mock
+    private ConnectionService connectionService;
+
+    @Mock
     private SlackOAuthClient oauthClient;
 
     @Mock
@@ -48,6 +54,7 @@ class SlackConnectionStrategyTest extends BaseUnitTest {
     void setUp() {
         strategy = new SlackConnectionStrategy(
             oauthStateService,
+            connectionService,
             oauthClient,
             credentialProvider,
             workspaceContentEraser,
@@ -152,12 +159,10 @@ class SlackConnectionStrategyTest extends BaseUnitTest {
     @Test
     void revoke_withToken_revokesOAuthAndErasesWorkspaceContent() {
         when(credentialProvider.resolve(any())).thenReturn(Optional.of(new BearerToken("xoxb-tok", null)));
-        when(oauthClient.revoke("xoxb-tok")).thenReturn(true);
 
         strategy.revoke(ref());
 
-        verify(oauthClient).revoke("xoxb-tok");
-        // GDPR hard-erase symmetric with Outline: disconnect clears all ingested content + per-channel consent.
+        verify(oauthClient).revokeStrict("xoxb-tok");
         verify(workspaceContentEraser).eraseWorkspace(42L);
     }
 
@@ -167,25 +172,57 @@ class SlackConnectionStrategyTest extends BaseUnitTest {
 
         strategy.revoke(ref());
 
-        verify(oauthClient, never()).revoke(any());
+        verify(oauthClient, never()).revokeStrict(any());
         verify(workspaceContentEraser).eraseWorkspace(42L);
     }
 
     @Test
     void revoke_oauthRevokeThrows_stillErasesWorkspaceContent() {
         when(credentialProvider.resolve(any())).thenReturn(Optional.of(new BearerToken("xoxb-tok", null)));
-        when(oauthClient.revoke("xoxb-tok")).thenThrow(new RuntimeException("slack down"));
+        doThrow(new RuntimeException("slack down")).when(oauthClient).revokeStrict("xoxb-tok");
 
         strategy.revoke(ref());
 
-        // A failed vendor uninstall must never block the local erase.
         verify(workspaceContentEraser).eraseWorkspace(42L);
+    }
+
+    @Test
+    void purge_doesNotRevokeATeamStillUsedByAnotherConnection() {
+        IntegrationRef ref = new IntegrationRef(IntegrationKind.SLACK, 42L, "T1", 7L);
+        when(connectionService.hasOtherInstalledConnection(ref)).thenReturn(true);
+
+        strategy.revokeProvider(ref);
+
+        verifyNoInteractions(credentialProvider, oauthClient);
+    }
+
+    @Test
+    void purge_onlyRevokesTheProviderToken() {
+        IntegrationRef ref = new IntegrationRef(IntegrationKind.SLACK, 42L, "T1", 7L);
+        when(credentialProvider.resolve(ref)).thenReturn(Optional.of(new BearerToken("xoxb-tok", null)));
+
+        strategy.revokeProvider(ref);
+
+        verify(oauthClient).revokeStrict("xoxb-tok");
+        verifyNoInteractions(workspaceContentEraser);
+    }
+
+    @Test
+    void purge_propagatesProviderFailure() {
+        IntegrationRef ref = new IntegrationRef(IntegrationKind.SLACK, 42L, "T1", 7L);
+        when(credentialProvider.resolve(ref)).thenReturn(Optional.of(new BearerToken("xoxb-tok", null)));
+        doThrow(new RuntimeException("slack unavailable")).when(oauthClient).revokeStrict("xoxb-tok");
+
+        assertThatThrownBy(() -> strategy.revokeProvider(ref)).hasMessage("slack unavailable");
+
+        verifyNoInteractions(workspaceContentEraser);
     }
 
     @Test
     void initiate_withoutRedirectUri_failsFast() {
         SlackConnectionStrategy misconfigured = new SlackConnectionStrategy(
             oauthStateService,
+            connectionService,
             oauthClient,
             credentialProvider,
             workspaceContentEraser,

@@ -1,16 +1,23 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.activity.ActivityEventRepository;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJob;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRepository;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobStatus;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobTrigger;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -41,16 +48,22 @@ import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
+import de.tum.cit.aet.hephaestus.workspace.exception.WorkspaceLifecycleViolationException;
+import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeContributor;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -60,7 +73,31 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Integration tests for workspace purge (deletion) covering data cleanup completeness,
  * idempotency, shared entity protection, credential clearing, and authorization.
  */
+@Import(WorkspacePurgeIntegrationTest.FailingContributorConfig.class)
 class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
+
+    private static final AtomicBoolean FAIL_LATE = new AtomicBoolean();
+
+    @TestConfiguration
+    static class FailingContributorConfig {
+
+        @Bean
+        WorkspacePurgeContributor lateFailingContributor() {
+            return new WorkspacePurgeContributor() {
+                @Override
+                public void deleteWorkspaceData(Long workspaceId) {
+                    if (FAIL_LATE.get()) {
+                        throw new IllegalStateException("late purge failure");
+                    }
+                }
+
+                @Override
+                public int getOrder() {
+                    return Integer.MAX_VALUE;
+                }
+            };
+        }
+    }
 
     @Autowired
     private WebTestClient webTestClient;
@@ -121,6 +158,12 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
     private AgentJobRepository agentJobRepository;
+
+    @Autowired
+    private ConnectionRepository connectionRepository;
+
+    @Autowired
+    private SyncJobRepository syncJobRepository;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -201,6 +244,32 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         ensureOwnerMembership(workspace);
 
         return workspace;
+    }
+
+    @Test
+    void laterContributorFailureRollsBackLocalDataAndCredentialErasure() {
+        Workspace workspace = createGitLabWorkspaceWithData("rollback-ws");
+        Long workspaceId = workspace.getId();
+        assertThat(activityEventRepository.countByWorkspaceId(workspaceId)).isPositive();
+
+        FAIL_LATE.set(true);
+        try {
+            assertThatThrownBy(() -> workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("late purge failure");
+        } finally {
+            FAIL_LATE.set(false);
+        }
+
+        Workspace reloaded = workspaceRepository.findById(workspaceId).orElseThrow();
+        assertThat(reloaded.getStatus()).isEqualTo(Workspace.WorkspaceStatus.ACTIVE);
+        assertThat(activityEventRepository.countByWorkspaceId(workspaceId)).isPositive();
+        assertThat(connectionRepository.findByWorkspaceId(workspaceId))
+            .singleElement()
+            .satisfies(connection -> {
+                assertThat(connection.getState()).isEqualTo(IntegrationState.ACTIVE);
+                assertThat(connection.getCredentialsEncrypted()).isNotNull();
+            });
     }
 
     // Data cleanup completeness
@@ -301,6 +370,53 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
     }
 
+    @Nested
+    class Quiescence {
+
+        @Test
+        void purgeRefusesActiveIntegrationSync() {
+            Workspace workspace = createGitLabWorkspaceWithData("active-sync");
+            var connection = connectionRepository.findByWorkspaceId(workspace.getId()).getFirst();
+            SyncJob job = new SyncJob(
+                workspace,
+                connection,
+                connection.getKind(),
+                SyncJobType.RECONCILIATION,
+                SyncJobTrigger.MANUAL,
+                null
+            );
+            job.setStatus(SyncJobStatus.RUNNING);
+            syncJobRepository.saveAndFlush(job);
+
+            assertThatThrownBy(() -> workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug()))
+                .isInstanceOf(WorkspaceLifecycleViolationException.class)
+                .hasMessageContaining("active integration sync");
+
+            assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getStatus()).isEqualTo(
+                Workspace.WorkspaceStatus.ACTIVE
+            );
+        }
+
+        @Test
+        void purgeRefusesQueuedAgentWork() {
+            Workspace workspace = createGitLabWorkspaceWithData("queued-agent");
+            AgentJob job = new AgentJob();
+            job.setWorkspace(workspace);
+            job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
+            job.setStatus(AgentJobStatus.QUEUED);
+            job.setConfigSnapshot(OM.createObjectNode());
+            agentJobRepository.saveAndFlush(job);
+
+            assertThatThrownBy(() -> workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug()))
+                .isInstanceOf(WorkspaceLifecycleViolationException.class)
+                .hasMessageContaining("AI runs are queued");
+
+            assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getStatus()).isEqualTo(
+                Workspace.WorkspaceStatus.ACTIVE
+            );
+        }
+    }
+
     // Shared entity protection
 
     @Nested
@@ -327,9 +443,6 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Nested
     class SensitiveFieldClearing {
-
-        @Autowired
-        private ConnectionRepository connectionRepository;
 
         /**
          * Per-workspace credentials now live on the {@code Connection} aggregate (PAT,

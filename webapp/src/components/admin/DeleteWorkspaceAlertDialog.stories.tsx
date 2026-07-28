@@ -1,8 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { type ComponentProps, useState } from "react";
+import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
+import { Button } from "@/components/ui/button";
 import { DeleteWorkspaceAlertDialog } from "./DeleteWorkspaceAlertDialog";
 
-/** The dialog is portalled, so the plays query the document rather than the story canvas. */
 const meta = {
 	component: DeleteWorkspaceAlertDialog,
 	parameters: { layout: "centered" },
@@ -19,46 +20,69 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** A near-miss slug states the mismatch and purges nothing; the exact slug gets through. */
+function FocusStory(args: ComponentProps<typeof DeleteWorkspaceAlertDialog>) {
+	const [open, setOpen] = useState(false);
+	return (
+		<>
+			<Button onClick={() => setOpen(true)}>Open deletion dialog</Button>
+			<DeleteWorkspaceAlertDialog
+				{...args}
+				open={open}
+				onOpenChange={(next) => {
+					setOpen(next);
+					args.onOpenChange(next);
+				}}
+			/>
+		</>
+	);
+}
+
 export const TypeToConfirm: Story = {
 	play: async ({ args }) => {
 		const dialog = within(await screen.findByRole("alertdialog"));
 		const gate = dialog.getByLabelText(/to confirm/i);
-		const confirm = dialog.getByRole("button", { name: /delete workspace/i });
 
-		await userEvent.type(gate, "acme-crop");
-		await userEvent.click(confirm);
+		await userEvent.type(gate, " acme-corp");
+		await userEvent.keyboard("{Enter}");
 		await expect(args.onConfirm).not.toHaveBeenCalled();
 		await expect(gate).toHaveAttribute("aria-invalid", "true");
+		await expect(gate).toHaveAccessibleDescription(/does not match/i);
 		await expect(dialog.getByText(/that does not match/i)).toBeInTheDocument();
 
 		await userEvent.clear(gate);
 		await userEvent.type(gate, "acme-corp");
-		await userEvent.click(confirm);
+		await userEvent.keyboard("{Enter}");
 		await expect(args.onConfirm).toHaveBeenCalledTimes(1);
 	},
 };
 
-/** The consequences must live in the description, since that is what `aria-describedby` resolves
- * to — an alert dialog suppresses screen-reader virtual navigation, so prose outside it is read
- * to nobody. */
-export const ConsequencesAreDescribed: Story = {
+export const ComplexContentStartsFocused: Story = {
+	render: (args) => <FocusStory {...args} />,
 	play: async () => {
+		await userEvent.click(screen.getByRole("button", { name: /open deletion dialog/i }));
 		const dialog = await screen.findByRole("alertdialog");
-		const describedBy = dialog.getAttribute("aria-describedby");
-		await expect(describedBy).toBeTruthy();
-
-		const description = dialog.ownerDocument.getElementById(describedBy as string);
-		await expect(description).toHaveTextContent(/stays reserved/i);
+		await expect(dialog).toHaveAccessibleDescription("This action cannot be undone.");
+		await waitFor(() =>
+			expect(screen.getByRole("heading", { name: /permanently delete/i })).toHaveFocus(),
+		);
 	},
 };
 
-/** In flight: the gate and the confirm lock, so a second click cannot fire a second purge. */
 export const Deleting: Story = {
 	args: { isDeleting: true },
-	play: async () => {
+	play: async ({ args }) => {
 		const dialog = within(await screen.findByRole("alertdialog"));
 		await expect(dialog.getByRole("button", { name: /deleting/i })).toBeDisabled();
 		await expect(dialog.getByLabelText(/to confirm/i)).toBeDisabled();
+		await userEvent.keyboard("{Escape}");
+		await expect(args.onOpenChange).not.toHaveBeenCalled();
+	},
+};
+
+export const LongWorkspaceSlug: Story = {
+	args: { workspaceSlug: "averylongworkspaceslugwithoutnaturalbreakpointsthatmustwraponsmall" },
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320] },
 	},
 };

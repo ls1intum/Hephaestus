@@ -1,39 +1,27 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.connect;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.oauth.state.OAuthStateService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.InstallationCredential;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.workspace.ScmWorkspaceContentEraser;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
-/**
- * GitHub adapter for {@link ConnectionStrategy}: GitHub App install flow.
- * {@link #initiate} bounces to the configured install URL with a signed {@code state};
- * {@link #finalizeConnect} reads {@code installation_id} from the callback and emits a
- * {@link InstallationCredential} for orchestrator persistence.
- *
- * <p>{@link #revoke} makes no vendor-side call — GitHub App uninstall happens on GitHub's side and
- * is observed via the {@code installation.deleted} lifecycle webhook, which erases mirrored data
- * through {@code GitHubWorkspaceProvisioningAdapter#onInstallationDeleted}. An admin-initiated
- * disconnect takes a different path and must erase the same data itself, via
- * {@link ScmWorkspaceContentEraser}, so mirrored issues/PRs/reviews/comments don't outlive the
- * connection that justified holding them.
- */
 @ConditionalOnServerRole
 @Component
 public class GithubConnectionStrategy implements ConnectionStrategy {
-
-    private static final Logger log = LoggerFactory.getLogger(GithubConnectionStrategy.class);
 
     private static final String CALLBACK_PARAM_INSTALLATION_ID = "installation_id";
     private static final String CALLBACK_PARAM_STATE = "state";
@@ -41,6 +29,8 @@ public class GithubConnectionStrategy implements ConnectionStrategy {
     private final String installUrl;
     private final String appId;
     private final OAuthStateService oauthStateService;
+    private final ConnectionService connectionService;
+    private final GitHubAppTokenService appTokenService;
     private final ScmWorkspaceContentEraser contentEraser;
 
     public GithubConnectionStrategy(
@@ -49,11 +39,15 @@ public class GithubConnectionStrategy implements ConnectionStrategy {
         ) String installUrl,
         @Value("${hephaestus.integration.github.app.id:}") String appId,
         OAuthStateService oauthStateService,
+        ConnectionService connectionService,
+        GitHubAppTokenService appTokenService,
         ScmWorkspaceContentEraser contentEraser
     ) {
         this.installUrl = installUrl == null ? "" : installUrl.trim();
         this.appId = appId == null ? "" : appId.trim();
         this.oauthStateService = oauthStateService;
+        this.connectionService = connectionService;
+        this.appTokenService = appTokenService;
         this.contentEraser = contentEraser;
     }
 
@@ -92,27 +86,34 @@ public class GithubConnectionStrategy implements ConnectionStrategy {
         } catch (NumberFormatException e) {
             return new ConnectFinalization.Failed("installation_id is not a valid long: " + installationIdRaw);
         }
-        // appId from the configured GitHub App; blank in dev profiles that haven't
-        // wired hephaestus.integration.github.app.id yet. The credential record carries it so
-        // downstream callers (token refresh) can reconstruct the JWT without hitting
-        // the DB for an unrelated property.
         InstallationCredential credentials = new InstallationCredential(installationId, appId);
         return new ConnectFinalization.Completed(Long.toString(installationId), credentials, null);
     }
 
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void revoke(IntegrationRef ref) {
         if (ref == null) {
             return;
         }
-        // No vendor-side call: uninstall happens on github.com and is observed via the
-        // installation.deleted webhook, which transitions the Connection separately.
-        // ConnectionService.disconnect() drives the local state change; here we only erase.
-        //
-        // This runs inside the fenced disconnect transaction (sync jobs already cancelled/refused),
-        // before the UNINSTALLED transition clears credentials. Hard-delete, orphan-guarded:
-        // repositories shared with another workspace survive — see ScmWorkspaceContentEraser.
-        log.info("GitHub revoke: erasing local SCM mirror (uninstall itself is webhook-driven), ref={}", ref);
-        contentEraser.eraseWorkspaceScmMirror(ref.workspaceId());
+        try {
+            revokeProvider(ref);
+        } finally {
+            contentEraser.eraseWorkspaceScmMirror(ref.workspaceId());
+        }
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public void revokeProvider(IntegrationRef ref) {
+        if (connectionService.hasOtherInstalledConnection(ref)) {
+            return;
+        }
+        connectionService
+            .findReferenced(ref)
+            .map(connection -> connection.getConfig())
+            .filter(config -> config instanceof ConnectionConfig.GitHubAppConfig)
+            .map(config -> ((ConnectionConfig.GitHubAppConfig) config).installationId())
+            .ifPresent(appTokenService::deleteInstallation);
     }
 }

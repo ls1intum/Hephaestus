@@ -749,7 +749,6 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
     @Test
     @WithAdminUser
     void patchingStatusToPurgedReturnsConflictAndLeavesWorkspaceActive() {
-        // Purge is owner-only via DELETE; the admin-level status endpoint must not offer a bypass.
         User owner = persistUser("purge-bypass-owner");
         Workspace workspace = createWorkspace("purge-bypass", "Purge Bypass", "purge-bypass", AccountType.ORG, owner);
         ensureAdminMembership(workspace);
