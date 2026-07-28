@@ -125,9 +125,11 @@ jobs:
               # front (optimizeDeps.include) and executes all files in one shared iframe (isolate:false,
               # fileParallelism:false): Vite discovering a dependency mid-run reloads the shared page
               # under in-flight tests and deadlocks the suite, so no retry loop can help — the config
-              # must prevent the reload. The timeout is a defensive backstop: a fast loud kill instead
-              # of a 30-minute hung job.
-              timeout 5m pnpm run test:storybook
+              # must prevent the reload. The timeout only catches that deadlock (a wedged run hangs
+              # indefinitely) — it is NOT a performance budget, so keep it well clear of the real
+              # runtime: serial execution of 190 story files takes ~5 min locally and the suite keeps
+              # growing. Trimming this to "just above current" would turn suite growth into a red CI.
+              timeout 15m pnpm run test:storybook
               ;;
             "webapp-visual")
               pnpm run build-storybook
