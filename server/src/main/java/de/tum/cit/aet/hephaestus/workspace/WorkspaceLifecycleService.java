@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamLabelFilterRepo
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamRepositorySettingsRepository;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamSettingsRepository;
 import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeContributor;
+import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeGuard;
 import java.util.Comparator;
 import java.util.List;
 import org.slf4j.Logger;
@@ -47,7 +48,7 @@ public class WorkspaceLifecycleService {
     private final WorkspaceTeamRepositorySettingsRepository workspaceTeamRepositorySettingsRepository;
     private final WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository;
 
-    // SPI for cross-module cleanup during purge
+    private final List<WorkspacePurgeGuard> purgeGuards;
     private final List<WorkspacePurgeContributor> purgeContributors;
 
     public WorkspaceLifecycleService(
@@ -60,6 +61,7 @@ public class WorkspaceLifecycleService {
         WorkspaceTeamLabelFilterRepository workspaceTeamLabelFilterRepository,
         WorkspaceTeamRepositorySettingsRepository workspaceTeamRepositorySettingsRepository,
         WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository,
+        List<WorkspacePurgeGuard> purgeGuards,
         List<WorkspacePurgeContributor> purgeContributors,
         ConfigAuditPort configAudit
     ) {
@@ -73,6 +75,7 @@ public class WorkspaceLifecycleService {
         this.workspaceTeamLabelFilterRepository = workspaceTeamLabelFilterRepository;
         this.workspaceTeamRepositorySettingsRepository = workspaceTeamRepositorySettingsRepository;
         this.workspaceSlugHistoryRepository = workspaceSlugHistoryRepository;
+        this.purgeGuards = purgeGuards;
         this.purgeContributors = purgeContributors;
     }
 
@@ -148,35 +151,11 @@ public class WorkspaceLifecycleService {
         return resumeWorkspace(requireSlug(workspaceContext));
     }
 
-    /**
-     * Purge a workspace by deleting all associated data and marking it as PURGED.
-     *
-     * <p>This performs a hard delete of all workspace-scoped data in the correct order:
-     * <ol>
-     *   <li><b>Stop NATS consumers</b> - Prevents race conditions during cleanup</li>
-     *   <li><b>Delete workspace settings</b> - Team settings, label filters, repository settings</li>
-     *   <li><b>Delete workspace memberships</b> - User-workspace associations</li>
-     *   <li><b>Invoke purge contributors</b> - Module-specific cleanup via SPI (e.g., activity events)</li>
-     *   <li><b>Delete repository monitors</b> - Monitored repository configuration</li>
-     *   <li><b>Delete slug history</b> - URL redirect history</li>
-     *   <li><b>Unlink organization</b> - Clear the organization association</li>
-     *   <li><b>Mark as PURGED</b> - Terminal state preventing reactivation</li>
-     * </ol>
-     *
-     * <p>Idempotent: calling purge on an already purged workspace is a no-op.
-     *
-     * <p><b>Note:</b> This method runs in a single transaction. For very large workspaces
-     * with millions of activity events, consider implementing batch deletion in a
-     * separate scheduled job to avoid long-running transactions.
-     *
-     * @param workspaceSlug the workspace slug
-     * @return the purged workspace
-     * @throws EntityNotFoundException if workspace does not exist
-     */
+    /** Purges an idle workspace. Repeated calls after a successful purge are no-ops. */
     @Transactional
     public Workspace purgeWorkspace(String workspaceSlug) {
         Workspace workspace = workspaceRepository
-            .findByWorkspaceSlug(workspaceSlug)
+            .findByWorkspaceSlugForUpdate(workspaceSlug)
             .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceSlug));
 
         if (workspace.getStatus() == WorkspaceStatus.PURGED) {
@@ -190,52 +169,27 @@ public class WorkspaceLifecycleService {
         Long workspaceId = workspace.getId();
         String sanitizedSlug = LoggingUtils.sanitizeForLog(workspaceSlug);
 
-        // Step 1: Stop NATS consumers FIRST to prevent race conditions
-        // Must happen before any data deletion to avoid processing events for deleted entities
-        stopNatsForWorkspace(workspace);
-        log.debug("Stopped NATS consumer for workspace purge: workspaceId={}", workspaceId);
+        purgeGuards.forEach(guard -> guard.verifyQuiescent(workspaceId));
 
-        // Step 2: Delete workspace settings (team settings, label filters, repository settings)
-        // These have FK constraints to workspace, so delete them first
+        stopNatsForWorkspacePurge(workspace);
+
         workspaceTeamLabelFilterRepository.deleteAllByWorkspaceId(workspaceId);
         workspaceTeamRepositorySettingsRepository.deleteAllByWorkspaceId(workspaceId);
         workspaceTeamSettingsRepository.deleteAllByWorkspaceId(workspaceId);
-        log.debug("Deleted workspace settings: workspaceId={}", workspaceId);
 
-        // Step 3: Delete workspace memberships
         workspaceMembershipRepository.deleteAllByWorkspaceId(workspaceId);
-        log.debug("Deleted workspace memberships: workspaceId={}", workspaceId);
 
-        // Step 4: Invoke purge contributors (e.g., activity events, leaderboard data)
-        // Contributors are sorted by order and handle their own module's cleanup
         purgeContributors
             .stream()
             .sorted(Comparator.comparingInt(WorkspacePurgeContributor::getOrder))
             .forEach(contributor -> contributor.deleteWorkspaceData(workspaceId));
-        log.debug("Invoked purge contributors: workspaceId={}, count={}", workspaceId, purgeContributors.size());
 
-        // Step 5: Delete repository monitors
-        // Use orphanRemoval cascade via collection.clear() — the bulk deleteAllByWorkspaceId()
-        // must NOT be combined with clear() because the bulk delete bypasses the persistence
-        // context, causing orphanRemoval to issue individual DELETEs for already-deleted rows.
+        // Bulk deletion would leave these managed children queued for a second orphan-removal delete.
         workspace.getRepositoriesToMonitor().clear();
-        log.debug("Deleted repository monitors: workspaceId={}", workspaceId);
 
-        // Step 6: Delete slug history (redirect entries)
         workspaceSlugHistoryRepository.deleteAllByWorkspaceId(workspaceId);
-        log.debug("Deleted slug history: workspaceId={}", workspaceId);
-
-        // Step 7: Unlink organization (don't delete - Organization is a shared entity)
         workspace.setOrganization(null);
 
-        // Step 7b: Per-workspace credentials and integration metadata (PAT / Slack tokens,
-        // GitLab webhook ids) live on Connection rows now. The ConnectionPurgeContributor
-        // (order=-100, runs as part of step 4 above) already transitions every active
-        // Connection to UNINSTALLED, which clears credential blobs atomically inside the
-        // transition. No explicit clearing needed here.
-
-        // Step 8: Clear sync timestamps for clean slate on potential reactivation
-        // This ensures that if the workspace is ever reactivated, sync will fetch fresh data
         workspace.setUsersSyncedAt(null);
         workspace.setTeamsSyncedAt(null);
         workspace.setMembersSyncedAt(null);
@@ -243,7 +197,6 @@ public class WorkspaceLifecycleService {
         workspace.setIssueTypesSyncedAt(null);
         workspace.setIssueDependenciesSyncedAt(null);
 
-        // Step 9: Mark workspace as PURGED (terminal state)
         WorkspaceStatus previousStatus = workspace.getStatus();
         workspace.setStatus(WorkspaceStatus.PURGED);
         workspace = workspaceRepository.save(workspace);
@@ -278,13 +231,19 @@ public class WorkspaceLifecycleService {
 
     /**
      * Update the lifecycle status for the workspace using the canonical transition helpers.
+     *
+     * <p>{@code PURGED} is rejected here: purge is owner-only and irreversible, so it is exposed
+     * exclusively through {@code DELETE /workspaces/{workspaceSlug}}. Routing it through the
+     * admin-level status endpoint would bypass the owner requirement.
      */
     @Transactional
     public Workspace updateStatus(String workspaceSlug, WorkspaceStatus targetStatus) {
         return switch (targetStatus) {
             case ACTIVE -> resumeWorkspace(workspaceSlug);
             case SUSPENDED -> suspendWorkspace(workspaceSlug);
-            case PURGED -> purgeWorkspace(workspaceSlug);
+            case PURGED -> throw new WorkspaceLifecycleViolationException(
+                "Workspaces cannot be purged via the status endpoint. Use DELETE /workspaces/{workspaceSlug} (requires the OWNER role)."
+            );
         };
     }
 
@@ -315,6 +274,12 @@ public class WorkspaceLifecycleService {
     private void stopNatsForWorkspace(Workspace workspace) {
         if (shouldUseNats(workspace)) {
             natsConsumerService.ifAvailable(svc -> svc.stopConsumingScope(workspace.getId()));
+        }
+    }
+
+    private void stopNatsForWorkspacePurge(Workspace workspace) {
+        if (shouldUseNats(workspace)) {
+            natsConsumerService.ifAvailable(svc -> svc.stopConsumingScopeForPurge(workspace.getId()));
         }
     }
 

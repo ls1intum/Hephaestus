@@ -91,26 +91,36 @@ public class SlackOAuthClient {
      * Never throws — disconnect-from-vendor is fire-and-forget by design.
      */
     public boolean revoke(String botToken) {
-        if (botToken == null || botToken.isBlank()) return false;
         try {
-            AuthRevoke response = restClient
+            revokeStrict(botToken);
+            return true;
+        } catch (SlackOAuthException e) {
+            log.warn("Slack auth.revoke failed: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    public void revokeStrict(String botToken) {
+        if (botToken == null || botToken.isBlank()) {
+            throw new SlackOAuthException("missing_token");
+        }
+        AuthRevoke response;
+        try {
+            response = restClient
                 .post()
                 .uri("/api/auth.revoke")
                 .header("Authorization", "Bearer " + botToken)
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .retrieve()
                 .body(AuthRevoke.class);
-            if (response == null || !response.ok()) {
-                log.warn(
-                    "Slack auth.revoke returned ok=false: error={}",
-                    response == null ? "null_body" : response.error()
-                );
-                return false;
-            }
-            return true;
         } catch (RestClientException e) {
-            log.warn("Slack auth.revoke transport failure: {}", e.getClass().getSimpleName());
-            return false;
+            throw new SlackOAuthException("transport_failure", e);
+        }
+        if (response == null) {
+            throw new SlackOAuthException("empty_response");
+        }
+        if (!response.ok() && !"token_revoked".equals(response.error())) {
+            throw new SlackOAuthException(response.error() == null ? "unknown" : response.error());
         }
     }
 

@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionPropert
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationService;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
@@ -266,10 +267,24 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             return null;
         }
 
-        Workspace workspace = workspaceRepository.findByInstallationId(installationId).orElse(null);
+        Workspace workspace = workspaceRepository.findByInstallationIdForUpdate(installationId).orElse(null);
+        if (workspace != null && workspace.getStatus() == Workspace.WorkspaceStatus.PURGED) {
+            log.info("Skipped installation event for purged workspace: installationId={}", installationId);
+            return null;
+        }
 
         if (workspace == null && !isBlank(accountLogin)) {
-            Workspace existingByLogin = workspaceRepository.findByAccountLoginIgnoreCase(accountLogin).orElse(null);
+            Workspace existingByLogin = workspaceRepository
+                .findByAccountLoginIgnoreCaseForUpdate(accountLogin)
+                .orElse(null);
+            if (existingByLogin != null && existingByLogin.getStatus() == Workspace.WorkspaceStatus.PURGED) {
+                log.info(
+                    "Skipped installation event for purged workspace account: accountLogin={}, installationId={}",
+                    LoggingUtils.sanitizeForLog(accountLogin),
+                    installationId
+                );
+                return null;
+            }
 
             // Refuse cross-vendor attach: a GitHub install must not co-tenant onto a workspace
             // whose ACTIVE Connection is GITLAB/SLACK — separate tenants that happen to share
@@ -382,7 +397,6 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             workspace.setRepositorySelection(repositorySelection);
         }
 
-        // Reactivating (was PURGED or SUSPENDED) covers an installation deleted and recreated.
         if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE) {
             log.info(
                 "Reactivated workspace from installation: workspaceId={}, previousStatus={}, installationId={}",
@@ -487,7 +501,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
      */
     @Transactional
     public Optional<Workspace> purgeWorkspaceForInstallation(long installationId) {
-        var workspaceOpt = workspaceRepository.findByInstallationId(installationId);
+        var workspaceOpt = workspaceRepository.findByInstallationIdForUpdate(installationId);
         if (workspaceOpt.isEmpty()) {
             log.warn(
                 "Skipped installation purge: reason=noWorkspaceForInstallation, installationId={}",
@@ -496,7 +510,28 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             return Optional.empty();
         }
 
-        Workspace purged = workspaceLifecycleService.purgeWorkspace(workspaceOpt.get().getWorkspaceSlug());
+        Workspace workspace = workspaceOpt.get();
+        IntegrationRef ref = new IntegrationRef(
+            IntegrationKind.GITHUB,
+            workspace.getId(),
+            Long.toString(installationId)
+        );
+        connectionService
+            .findReferenced(ref)
+            .ifPresent(connection ->
+                connectionService.transition(
+                    connection,
+                    new ConnectionService.TransitionRequest(
+                        IntegrationState.UNINSTALLED,
+                        "PROVIDER_UNINSTALLED",
+                        "PROVIDER",
+                        IntegrationKind.GITHUB.name(),
+                        "provider-uninstall-github-" + installationId,
+                        "GitHub reported the installation was deleted"
+                    )
+                )
+            );
+        Workspace purged = workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug());
         log.info(
             "Purged workspace after vendor-side uninstall: installationId={}, workspaceId={}",
             installationId,
@@ -526,12 +561,15 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             );
         }
 
-        var workspaceOpt = workspaceRepository.findByInstallationId(installationId);
+        var workspaceOpt = workspaceRepository.findByInstallationIdForUpdate(installationId);
         if (workspaceOpt.isEmpty() || status == null) {
             return workspaceOpt;
         }
 
         Workspace workspace = workspaceOpt.get();
+        if (workspace.getStatus() == Workspace.WorkspaceStatus.PURGED) {
+            return Optional.of(workspace);
+        }
         if (status != workspace.getStatus()) {
             workspace.setStatus(status);
             workspace = workspaceRepository.save(workspace);
@@ -550,7 +588,9 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
      */
     @Transactional
     public Optional<Workspace> updateRepositorySelection(long installationId, RepositorySelection selection) {
-        var workspaceOpt = workspaceRepository.findByInstallationId(installationId);
+        var workspaceOpt = workspaceRepository
+            .findByInstallationIdForUpdate(installationId)
+            .filter(workspace -> workspace.getStatus() == Workspace.WorkspaceStatus.ACTIVE);
         if (workspaceOpt.isEmpty() || selection == null) {
             return workspaceOpt;
         }
@@ -581,7 +621,8 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         }
 
         workspaceRepository
-            .findByInstallationId(installationId)
+            .findByInstallationIdForUpdate(installationId)
+            .filter(workspace -> workspace.getStatus() == Workspace.WorkspaceStatus.ACTIVE)
             .ifPresentOrElse(
                 workspace -> {
                     String oldLogin = !isBlank(previousLogin) ? previousLogin : workspace.getAccountLogin();

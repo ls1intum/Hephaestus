@@ -18,6 +18,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -25,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -63,6 +65,9 @@ class AgentJobPollFairnessIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     private LlmModel instanceModel;
 
@@ -130,6 +135,20 @@ class AgentJobPollFairnessIntegrationTest extends BaseIntegrationTest {
         UUID jobId = queuedJob(ws, Instant.now());
 
         assertThat(jobRepository.findQueuedIdsOldestFirst(10)).contains(jobId);
+    }
+
+    @Test
+    void purgedWorkspaceJobsCannotBePolledOrClaimed() {
+        Workspace workspace = activeWorkspace("purged-ws");
+        UUID jobId = queuedJob(workspace, Instant.now());
+        workspace.setStatus(Workspace.WorkspaceStatus.PURGED);
+        workspaceRepository.saveAndFlush(workspace);
+
+        assertThat(jobRepository.findQueuedIdsOldestFirst(10)).doesNotContain(jobId);
+        Optional<AgentJob> claimed = transactionTemplate.execute(status ->
+            jobRepository.findByIdQueuedForUpdateSkipLocked(jobId, Instant.now())
+        );
+        assertThat(claimed).isEmpty();
     }
 
     private Workspace activeWorkspace(String slug) {

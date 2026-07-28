@@ -6,6 +6,8 @@ import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
@@ -44,6 +46,7 @@ public class SyncJobService implements SmartLifecycle {
 
     private final SyncJobRepository syncJobRepository;
     private final ConnectionRepository connectionRepository;
+    private final WorkspaceRepository workspaceRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final TransactionTemplate transactionTemplate;
 
@@ -75,21 +78,31 @@ public class SyncJobService implements SmartLifecycle {
     public SyncJobService(
         SyncJobRepository syncJobRepository,
         ConnectionRepository connectionRepository,
+        WorkspaceRepository workspaceRepository,
         ApplicationEventPublisher eventPublisher,
         TransactionTemplate transactionTemplate
     ) {
-        this(syncJobRepository, connectionRepository, eventPublisher, transactionTemplate, Clock.systemUTC());
+        this(
+            syncJobRepository,
+            connectionRepository,
+            workspaceRepository,
+            eventPublisher,
+            transactionTemplate,
+            Clock.systemUTC()
+        );
     }
 
     SyncJobService(
         SyncJobRepository syncJobRepository,
         ConnectionRepository connectionRepository,
+        WorkspaceRepository workspaceRepository,
         ApplicationEventPublisher eventPublisher,
         TransactionTemplate transactionTemplate,
         Clock clock
     ) {
         this.syncJobRepository = syncJobRepository;
         this.connectionRepository = connectionRepository;
+        this.workspaceRepository = workspaceRepository;
         this.eventPublisher = eventPublisher;
         this.transactionTemplate = transactionTemplate;
         this.clock = clock;
@@ -105,6 +118,18 @@ public class SyncJobService implements SmartLifecycle {
         SyncJob job;
         try {
             job = transactionTemplate.execute(status -> {
+                Workspace workspace = workspaceRepository
+                    .findByIdForUpdate(request.workspaceId())
+                    .orElseThrow(() -> new EntityNotFoundException("Workspace", String.valueOf(request.workspaceId())));
+                if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE) {
+                    throw new SyncStateConflictException(
+                        "Cannot start sync for workspace " +
+                            request.workspaceId() +
+                            " in status " +
+                            workspace.getStatus(),
+                        Map.of("workspaceId", request.workspaceId(), "workspaceStatus", workspace.getStatus())
+                    );
+                }
                 connectionRepository.acquireLifecycleLock(connectionId, request.workspaceId());
                 var connection = connectionRepository
                     .findByIdAndWorkspaceId(connectionId, request.workspaceId())

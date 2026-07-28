@@ -7,7 +7,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener;
 import de.tum.cit.aet.hephaestus.integration.scm.github.lifecycle.GithubLifecycleListener;
 import de.tum.cit.aet.hephaestus.workspace.RepositorySelection;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepositoryMonitorService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceScopeFilter;
 import java.util.List;
@@ -25,7 +24,6 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
     private final GithubLifecycleListener githubLifecycleListener;
     private final WorkspaceRepositoryMonitorService repositoryMonitorService;
     private final WorkspaceScopeFilter workspaceScopeFilter;
-    private final WorkspaceRepository workspaceRepository;
 
     private final GitHubWorkspaceDataSyncTrigger dataSyncTrigger;
     private final AsyncTaskExecutor monitoringExecutor;
@@ -34,14 +32,12 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
         GithubLifecycleListener githubLifecycleListener,
         WorkspaceRepositoryMonitorService repositoryMonitorService,
         WorkspaceScopeFilter workspaceScopeFilter,
-        WorkspaceRepository workspaceRepository,
         GitHubWorkspaceDataSyncTrigger dataSyncTrigger,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.githubLifecycleListener = githubLifecycleListener;
         this.repositoryMonitorService = repositoryMonitorService;
         this.workspaceScopeFilter = workspaceScopeFilter;
-        this.workspaceRepository = workspaceRepository;
         this.dataSyncTrigger = dataSyncTrigger;
         this.monitoringExecutor = monitoringExecutor;
     }
@@ -223,17 +219,15 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
             return;
         }
 
-        githubLifecycleListener.updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.ACTIVE);
-
-        // Sync after the outer transaction commits so RepositoryToMonitor rows are visible.
-        workspaceRepository
-            .findByInstallationId(installationId)
+        githubLifecycleListener
+            .updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.ACTIVE)
+            .filter(workspace -> workspace.getStatus() == Workspace.WorkspaceStatus.ACTIVE)
             .ifPresent(workspace -> {
                 Long workspaceId = workspace.getId();
                 afterCommit(() -> triggerInitialSync(installationId, workspaceId));
+                githubLifecycleListener.startNatsForInstallation(installationId);
             });
 
-        githubLifecycleListener.startNatsForInstallation(installationId);
         log.info("Activated installation: installationId={}", installationId);
     }
 

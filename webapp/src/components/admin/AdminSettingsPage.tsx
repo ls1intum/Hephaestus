@@ -1,3 +1,4 @@
+import { AdminDangerZoneSettings } from "./AdminDangerZoneSettings";
 import {
 	AdminFeaturesSettings,
 	type FeatureKey,
@@ -11,6 +12,7 @@ export interface AdminSettingsPageProps {
 	features: FeatureValues;
 	isSavingFeatures: boolean;
 	onToggleFeature: (feature: FeatureKey, enabled: boolean) => void;
+	workspaceSlug?: string;
 }
 
 export function AdminSettingsPage({
@@ -19,6 +21,7 @@ export function AdminSettingsPage({
 	features,
 	isSavingFeatures,
 	onToggleFeature,
+	workspaceSlug,
 }: AdminSettingsPageProps) {
 	return (
 		<div className="container mx-auto py-6 max-w-4xl">
@@ -34,6 +37,8 @@ export function AdminSettingsPage({
 				{features.leaguesEnabled && (
 					<AdminLeagueSettings isResetting={isResettingLeagues} onResetLeagues={onResetLeagues} />
 				)}
+
+				{workspaceSlug != null && <AdminDangerZoneSettings workspaceSlug={workspaceSlug} />}
 			</div>
 		</div>
 	);

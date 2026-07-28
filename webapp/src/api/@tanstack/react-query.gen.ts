@@ -1145,7 +1145,7 @@ export const getProvidersOptions = (options?: Options<GetProvidersData>) => quer
 });
 
 /**
- * Purge (soft delete) a workspace
+ * Permanently delete a workspace and purge its data
  */
 export const purgeWorkspaceMutation = (options?: Partial<Options<PurgeWorkspaceData>>): UseMutationOptions<PurgeWorkspaceResponse, DefaultError, Options<PurgeWorkspaceData>> => {
     const mutationOptions: UseMutationOptions<PurgeWorkspaceResponse, DefaultError, Options<PurgeWorkspaceData>> = {

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.slack.connect;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.oauth.state.OAuthStateService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
@@ -24,17 +25,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Slack OAuth v2 connection strategy. Token-rotation apps are rejected at finalize because
- * token refresh is not yet implemented.
- *
- * <p>{@link #revoke} is a GDPR hard-erase on disconnect, symmetric with Outline: it uninstalls the bot
- * (best-effort OAuth token revoke while the token is still resolvable) <b>and</b> erases every Slack-owned
- * row for the workspace through {@link SlackWorkspaceContentEraser} — the same choke point workspace-purge
- * drives. Nothing ingested (message content, thread aggregates, per-channel consent registrations, per-person
- * opt-outs, mentor DM threads, derived conversation feedback) outlives the connection, so a later reconnect
- * starts from a clean slate rather than backfilling the disconnected consent gap.
- */
+/** Slack OAuth strategy. Token rotation is rejected until refresh is supported. */
 @ConditionalOnServerRole
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
@@ -59,6 +50,7 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
     );
 
     private final OAuthStateService oauthStateService;
+    private final ConnectionService connectionService;
     private final SlackOAuthClient oauthClient;
     private final SlackCredentialProvider credentialProvider;
     private final SlackWorkspaceContentEraser workspaceContentEraser;
@@ -68,6 +60,7 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
 
     public SlackConnectionStrategy(
         OAuthStateService oauthStateService,
+        ConnectionService connectionService,
         SlackOAuthClient oauthClient,
         SlackCredentialProvider credentialProvider,
         SlackWorkspaceContentEraser workspaceContentEraser,
@@ -75,6 +68,7 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
         @Value("${hephaestus.integration.slack.redirect-uri:}") String redirectUri
     ) {
         this.oauthStateService = oauthStateService;
+        this.connectionService = connectionService;
         this.oauthClient = oauthClient;
         this.credentialProvider = credentialProvider;
         this.workspaceContentEraser = workspaceContentEraser;
@@ -159,32 +153,31 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void revoke(IntegrationRef ref) {
-        // 1) Best-effort vendor-side uninstall while the token is still resolvable (credentials are cleared by
-        //    the caller only after this callback returns). A failed/absent token never blocks the local erase.
-        var bundle = credentialProvider.resolve(ref);
-        if (bundle.isPresent() && bundle.get() instanceof BearerToken bt) {
-            try {
-                boolean revoked = oauthClient.revoke(bt.token());
-                log.info("Slack revoke for workspace={}: success={}", ref.workspaceId(), revoked);
-            } catch (RuntimeException e) {
-                log.warn(
-                    "Slack revoke call failed for workspace={} (local erase still applied): {}",
-                    ref.workspaceId(),
-                    e.toString()
-                );
-            }
-        } else {
-            log.debug("Slack token revoke skipped: no bearer token for workspace={}", ref.workspaceId());
+        try {
+            revokeProvider(ref);
+        } catch (RuntimeException e) {
+            log.warn("Slack token revoke failed for workspace={}: {}", ref.workspaceId(), e.toString());
         }
-        // 2) GDPR erase on disconnect (symmetric with Outline): drop every ingested Slack row + per-channel
-        //    consent for the workspace so nothing outlives the connection and a later reconnect cannot silently
-        //    backfill the disconnected consent gap. Opens its own transaction (see the propagation note
-        //    above); if it fails, ConnectionService absorbs it and the local UNINSTALLED transition still lands.
         workspaceContentEraser.eraseWorkspace(ref.workspaceId());
         log.info(
             "slack.audit: revoke erase — cleared ingested Slack content + consent for workspace={}",
             ref.workspaceId()
         );
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public void revokeProvider(IntegrationRef ref) {
+        if (connectionService.hasOtherInstalledConnection(ref)) {
+            return;
+        }
+        BearerToken token = credentialProvider
+            .resolve(ref)
+            .filter(BearerToken.class::isInstance)
+            .map(BearerToken.class::cast)
+            .orElseThrow(() -> new IllegalStateException("Slack bot token is unavailable"));
+        oauthClient.revokeStrict(token.token());
+        // Token revocation does not remove the team-level Slack app installation.
     }
 
     private String redirectUri() {

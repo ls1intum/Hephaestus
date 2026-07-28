@@ -49,6 +49,8 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Unified JetStream consumer fleet for every integration kind and the sole consumer-side entry point:
@@ -92,6 +94,7 @@ public class IntegrationNatsConsumer {
     private static final int MAX_SCOPE_RECONCILE_ATTEMPTS = 6;
 
     private final Object connectionLock = new Object();
+    private final Object scopeLifecycleMonitor = new Object();
     private final AtomicBoolean shuttingDown = new AtomicBoolean(false);
 
     /**
@@ -105,6 +108,7 @@ public class IntegrationNatsConsumer {
      * here means a setup task is in-flight on a virtual thread.
      */
     private final Set<Long> pendingScopeSetup = ConcurrentHashMap.newKeySet();
+    private final Set<Long> stoppingScopes = ConcurrentHashMap.newKeySet();
 
     /**
      * Consecutive failed reconcile attempts per scope, for the self-healing retry backoff. Cleared on the
@@ -273,7 +277,7 @@ public class IntegrationNatsConsumer {
             log.debug("Scope consumer already exists: scopeId={}", scopeId);
             return;
         }
-        if (!pendingScopeSetup.add(scopeId)) {
+        if (!beginScopeSetup(scopeId)) {
             log.debug("Scope consumer setup already in progress: scopeId={}", scopeId);
             return;
         }
@@ -284,7 +288,7 @@ public class IntegrationNatsConsumer {
             } catch (Exception e) {
                 log.error("Failed to start scope consumer: scopeId={}", scopeId, e);
             } finally {
-                pendingScopeSetup.remove(scopeId);
+                endScopeSetup(scopeId);
             }
         });
     }
@@ -310,7 +314,7 @@ public class IntegrationNatsConsumer {
             log.debug("Skipped consumer update: reason=notRunning, scopeId={}", scopeId);
             return;
         }
-        if (!pendingScopeSetup.add(scopeId)) {
+        if (!beginScopeSetup(scopeId)) {
             log.debug("Scope reconcile already in progress: scopeId={}", scopeId);
             return;
         }
@@ -320,32 +324,80 @@ public class IntegrationNatsConsumer {
             } catch (Exception e) {
                 log.error("Failed to update scope consumer: scopeId={}", scopeId, e);
             } finally {
-                pendingScopeSetup.remove(scopeId);
+                endScopeSetup(scopeId);
             }
         });
     }
 
-    /**
-     * Stop and delete every JetStream consumer for the given scope. After this returns, the
-     * server-side durables are gone — a subsequent {@link #startConsumingScope(Long)} recreates them.
-     */
+    /** Stops every consumer for the scope and waits until no handler or setup task is running. */
     public void stopConsumingScope(Long scopeId) {
+        stopConsumingScope(scopeId, false);
+    }
+
+    /**
+     * Stops a terminally-deleted scope and rejects queued restarts. A rolled-back purge releases the
+     * fence; a committed purge keeps it because PURGED workspaces cannot resume.
+     */
+    public void stopConsumingScopeForPurge(Long scopeId) {
+        stopConsumingScope(scopeId, true);
+    }
+
+    private void stopConsumingScope(Long scopeId, boolean retainFenceOnCommit) {
         if (scopeId == null) {
             return;
         }
-        scopeReconcileAttempts.remove(scopeId);
-        List<ScopeConsumer> consumers = scopeConsumers.remove(scopeId);
-        if (consumers == null || consumers.isEmpty()) {
-            log.debug("No scope consumer to stop: scopeId={}", scopeId);
-            return;
-        }
-        stats.setActiveScopeConsumerCount(totalConsumerCount());
-        virtualThreadExecutor.submit(() -> {
-            for (ScopeConsumer consumer : consumers) {
-                stopAndCleanup(consumer);
+        synchronized (scopeLifecycleMonitor) {
+            stoppingScopes.add(scopeId);
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+            while (pendingScopeSetup.contains(scopeId)) {
+                long remaining = deadline - System.nanoTime();
+                if (remaining <= 0) {
+                    stoppingScopes.remove(scopeId);
+                    throw new IllegalStateException("Timed out waiting for scope consumer setup: scopeId=" + scopeId);
+                }
+                try {
+                    TimeUnit.NANOSECONDS.timedWait(scopeLifecycleMonitor, remaining);
+                } catch (InterruptedException e) {
+                    stoppingScopes.remove(scopeId);
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("Interrupted while stopping scope consumer: scopeId=" + scopeId, e);
+                }
             }
+        }
+        scopeReconcileAttempts.remove(scopeId);
+        List<ScopeConsumer> consumers = scopeConsumers.get(scopeId);
+        boolean stopped = false;
+        try {
+            if (consumers == null || consumers.isEmpty()) {
+                log.debug("No scope consumer to stop: scopeId={}", scopeId);
+                stopped = true;
+                return;
+            }
+            for (ScopeConsumer consumer : consumers) {
+                consumer.stop();
+                cleanupConsumer(consumer.streamName(), consumer.consumerName());
+            }
+            scopeConsumers.remove(scopeId, consumers);
+            stats.setActiveScopeConsumerCount(totalConsumerCount());
             log.info("Stopped scope consumers: scopeId={}, count={}", scopeId, consumers.size());
-        });
+            stopped = true;
+        } finally {
+            if (!retainFenceOnCommit || !stopped) {
+                stoppingScopes.remove(scopeId);
+            } else if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.registerSynchronization(
+                    new TransactionSynchronization() {
+                        @Override
+                        public void afterCompletion(int status) {
+                            if (status != TransactionSynchronization.STATUS_COMMITTED) {
+                                stoppingScopes.remove(scopeId);
+                                startConsumingScope(scopeId);
+                            }
+                        }
+                    }
+                );
+            }
+        }
     }
 
     // JetStream setup
@@ -430,6 +482,10 @@ public class IntegrationNatsConsumer {
      * {@link #scopeConsumers} is the only handle by which a consumer can later be stopped or updated.
      */
     private void commitScopeConsumers(Long scopeId, List<ScopeConsumer> consumers) {
+        if (stoppingScopes.contains(scopeId)) {
+            consumers.forEach(this::stopAndCleanup);
+            return;
+        }
         if (consumers.isEmpty()) {
             scopeConsumers.remove(scopeId);
             log.info("Skipped scope consumer setup (no subjects): scopeId={}", scopeId);
@@ -445,7 +501,7 @@ public class IntegrationNatsConsumer {
      * just be a log firehose; the successfully-created consumers from the partial pass keep working either way.
      */
     private void scheduleScopeReconcileRetry(Long scopeId) {
-        if (shuttingDown.get() || !connectionProperties.enabled()) {
+        if (shuttingDown.get() || !connectionProperties.enabled() || stoppingScopes.contains(scopeId)) {
             return;
         }
         int attempt = scopeReconcileAttempts.merge(scopeId, 1, Integer::sum);
@@ -475,7 +531,7 @@ public class IntegrationNatsConsumer {
         if (shuttingDown.get() || !connectionProperties.enabled()) {
             return;
         }
-        if (!pendingScopeSetup.add(scopeId)) {
+        if (!beginScopeSetup(scopeId)) {
             log.debug("Scope reconcile retry skipped: another reconcile in progress, scopeId={}", scopeId);
             return;
         }
@@ -488,11 +544,24 @@ public class IntegrationNatsConsumer {
                     // reconcileScope already logged + re-armed; this is the executor's last-resort net.
                     log.debug("Scope consumer reconcile retry failed: scopeId={}", scopeId, e);
                 } finally {
-                    pendingScopeSetup.remove(scopeId);
+                    endScopeSetup(scopeId);
                 }
             });
         } catch (RejectedExecutionException e) {
-            pendingScopeSetup.remove(scopeId); // shutting down
+            endScopeSetup(scopeId);
+        }
+    }
+
+    private boolean beginScopeSetup(Long scopeId) {
+        synchronized (scopeLifecycleMonitor) {
+            return !stoppingScopes.contains(scopeId) && pendingScopeSetup.add(scopeId);
+        }
+    }
+
+    private void endScopeSetup(Long scopeId) {
+        synchronized (scopeLifecycleMonitor) {
+            pendingScopeSetup.remove(scopeId);
+            scopeLifecycleMonitor.notifyAll();
         }
     }
 

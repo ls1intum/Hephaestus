@@ -107,6 +107,8 @@ class AgentJobServiceTest extends BaseUnitTest {
         workspace = new Workspace();
         workspace.setId(1L);
         workspace.setWorkspaceSlug("test-ws");
+        workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
+        lenient().when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(workspace));
 
         enabledBinding = new WorkspaceAgentBinding();
         enabledBinding.setId(10L);
@@ -185,6 +187,24 @@ class AgentJobServiceTest extends BaseUnitTest {
                 agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_DETECTION)
             ).thenReturn(Optional.empty());
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+
+            Optional<AgentJob> result = service.submit(
+                1L,
+                AgentJobType.PULL_REQUEST_REVIEW,
+                mock(JobSubmissionRequest.class)
+            );
+
+            assertThat(result).isEmpty();
+            verify(agentJobRepository, never()).saveAndFlush(any());
+        }
+
+        @Test
+        void shouldNotSubmitAfterWorkspaceLeavesActiveStatus() {
+            workspace.setStatus(Workspace.WorkspaceStatus.PURGED);
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+            JobTypeHandler handler = mock(JobTypeHandler.class);
+            when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
+            when(handler.createSubmission(any())).thenReturn(createSubmission());
 
             Optional<AgentJob> result = service.submit(
                 1L,

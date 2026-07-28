@@ -424,10 +424,6 @@ public class PullRequestContentSource implements ContentSource {
         String headSha = metadata.has("commit_sha") ? metadata.get("commit_sha").asString() : null;
         String targetBranch = requireText(metadata, "target_branch");
         String sourceBranch = requireText(metadata, "source_branch");
-        if (headSha == null || headSha.isBlank()) {
-            log.warn("No commit_sha in metadata, skipping diff pre-computation");
-            return;
-        }
         Path repoPath = gitRepositoryManager.getRepositoryPath(repositoryId);
 
         try {
@@ -489,11 +485,7 @@ public class PullRequestContentSource implements ContentSource {
         } catch (JobPreparationException e) {
             throw e;
         } catch (Exception e) {
-            log.warn(
-                "Failed to pre-compute diff, agent will compute its own: headSha={}, error={}",
-                headSha,
-                e.getMessage()
-            );
+            throw new JobPreparationException("Failed to pre-compute diff: " + e.getMessage(), e);
         }
     }
 

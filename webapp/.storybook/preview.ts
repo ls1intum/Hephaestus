@@ -6,19 +6,23 @@ import {
 	createRouter,
 	RouterProvider,
 } from "@tanstack/react-router";
+import { isCommonAssetRequest } from "msw";
 import { initialize, mswLoader } from "msw-storybook-addon";
 import React from "react";
 import { ThemeProvider } from "../src/integrations/theme";
 import { handlers } from "../src/mocks/handlers";
 import "../src/styles.css";
 
-// Initialize MSW once for the Storybook browser. `onUnhandledRequest: "bypass"`
-// lets non-API requests (assets, fonts, the worker script itself) through while
-// still mocking the auth endpoints. `serviceWorker.url` resolves the worker under
-// Storybook's base path so it loads from `public/mockServiceWorker.js`.
 initialize(
 	{
-		onUnhandledRequest: "bypass",
+		onUnhandledRequest(request, print) {
+			if (
+				!isCommonAssetRequest(request) &&
+				new URL(request.url).origin === window.location.origin
+			) {
+				print.error();
+			}
+		},
 		quiet: true,
 		serviceWorker: { url: "./mockServiceWorker.js" },
 	},

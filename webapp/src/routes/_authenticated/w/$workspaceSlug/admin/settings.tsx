@@ -108,6 +108,7 @@ function AdminSettings() {
 			}}
 			isSavingFeatures={updateFeatures.isPending}
 			onToggleFeature={handleToggleFeature}
+			workspaceSlug={workspaceSlug ?? undefined}
 		/>
 	);
 }

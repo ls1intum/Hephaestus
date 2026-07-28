@@ -424,7 +424,13 @@ public class OutlineApiClient {
 
     public void deleteWebhookSubscription(String serverUrl, String token, String subscriptionId) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
-        post(resolvedUrl, token, "/api/webhookSubscriptions.delete", Map.of("id", subscriptionId), EMPTY);
+        try {
+            post(resolvedUrl, token, "/api/webhookSubscriptions.delete", Map.of("id", subscriptionId), EMPTY);
+        } catch (OutlineApiException e) {
+            if (!isNotFound(e)) {
+                throw e;
+            }
+        }
     }
 
     /** One {@code POST} through the retry decorator; each attempt goes through the circuit breaker so every failure counts toward the rate. */

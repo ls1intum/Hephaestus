@@ -491,9 +491,7 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
                 new NetworkPolicy(false, null, null)
             );
 
-            assertThat(config.ulimits()).containsKey("nproc");
-            assertThat(config.ulimits().get("nproc").soft()).isEqualTo(512);
-            assertThat(config.ulimits().get("nproc").hard()).isEqualTo(512);
+            assertThat(config.ulimits()).doesNotContainKey("nproc");
         }
 
         @Test

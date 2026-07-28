@@ -6,13 +6,14 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.scm.github.lifecycle.GithubLifecycleListener;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepositoryMonitorService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceScopeFilter;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -44,9 +45,6 @@ class GitHubWorkspaceProvisioningAdapterDeletionTest extends BaseUnitTest {
     private WorkspaceScopeFilter workspaceScopeFilter;
 
     @Mock
-    private WorkspaceRepository workspaceRepository;
-
-    @Mock
     private GitHubWorkspaceDataSyncTrigger dataSyncTrigger;
 
     @Mock
@@ -60,7 +58,6 @@ class GitHubWorkspaceProvisioningAdapterDeletionTest extends BaseUnitTest {
             githubLifecycleListener,
             repositoryMonitorService,
             workspaceScopeFilter,
-            workspaceRepository,
             dataSyncTrigger,
             monitoringExecutor
         );
@@ -104,5 +101,20 @@ class GitHubWorkspaceProvisioningAdapterDeletionTest extends BaseUnitTest {
         verify(githubLifecycleListener).stopNatsForInstallation(INSTALLATION_ID);
         verify(githubLifecycleListener).updateWorkspaceStatus(INSTALLATION_ID, Workspace.WorkspaceStatus.SUSPENDED);
         verify(githubLifecycleListener, never()).purgeWorkspaceForInstallation(anyLong());
+    }
+
+    @Test
+    void staleActivationCannotRestartWorkForAPurgedWorkspace() {
+        Workspace workspace = new Workspace();
+        workspace.setId(11L);
+        workspace.setStatus(Workspace.WorkspaceStatus.PURGED);
+        when(
+            githubLifecycleListener.updateWorkspaceStatus(INSTALLATION_ID, Workspace.WorkspaceStatus.ACTIVE)
+        ).thenReturn(Optional.of(workspace));
+
+        adapter.onInstallationActivated(INSTALLATION_ID);
+
+        verify(githubLifecycleListener, never()).startNatsForInstallation(anyLong());
+        verifyNoInteractions(dataSyncTrigger, monitoringExecutor);
     }
 }

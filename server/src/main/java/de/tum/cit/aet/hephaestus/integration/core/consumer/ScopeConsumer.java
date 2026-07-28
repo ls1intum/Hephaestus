@@ -49,6 +49,7 @@ import org.slf4j.LoggerFactory;
 public final class ScopeConsumer {
 
     private static final Logger log = LoggerFactory.getLogger(ScopeConsumer.class);
+    private static final long STOP_TIMEOUT_MILLIS = 10_000;
 
     /** Null for the installation-wide consumer; never null for scope consumers. */
     private final Long scopeId;
@@ -140,21 +141,31 @@ public final class ScopeConsumer {
         );
     }
 
-    /**
-     * Stops the consumer: closes the subscription, interrupts the dispatch thread,
-     * and NAKs any remaining queued messages. Idempotent and safe to call from a
-     * shutdown hook.
-     */
+    /** Stops the subscription and waits until its dispatch thread can no longer write. */
     public synchronized void stop() {
-        if (!running.compareAndSet(true, false)) {
+        boolean wasRunning = running.getAndSet(false);
+        Thread thread = processorThread;
+        if (!wasRunning && thread == null) {
             return;
         }
-        closeSubscriptionQuietly();
-        Thread thread = processorThread;
+        if (wasRunning) {
+            closeSubscriptionQuietly();
+        }
         if (thread != null) {
             thread.interrupt();
-            processorThread = null;
+            if (thread != Thread.currentThread()) {
+                try {
+                    thread.join(STOP_TIMEOUT_MILLIS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("Interrupted while stopping consumer " + consumerName, e);
+                }
+                if (thread.isAlive()) {
+                    throw new IllegalStateException("Timed out stopping consumer " + consumerName);
+                }
+            }
         }
+        processorThread = null;
         drainAndNakQueue();
         log.debug("Stopped ScopeConsumer: consumerName={}, scopeId={}", consumerName, scopeId);
     }

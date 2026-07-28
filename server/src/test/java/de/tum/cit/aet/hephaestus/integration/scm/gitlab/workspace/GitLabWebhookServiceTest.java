@@ -590,11 +590,14 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
                 )
             );
             when(connectionService.findInWorkspace(1L, 7L)).thenReturn(Optional.of(connection));
+            when(connectionService.findBearerToken(1L, 7L)).thenReturn(
+                Optional.of(new BearerToken("glpat-token", null))
+            );
             when(webhookClientProvider.getIfAvailable()).thenReturn(webhookClient);
 
             webhookService.deregisterWebhookForConnection(1L, 7L);
 
-            verify(webhookClient).deregisterGroupWebhook(1L, 42L, 99L);
+            verify(webhookClient).deregisterGroupWebhookWithCredentials("https://gitlab.com", "glpat-token", 42L, 99L);
         }
 
         @Test
@@ -610,17 +613,17 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
                 )
             );
             when(connectionService.findInWorkspace(1L, 7L)).thenReturn(Optional.of(connection));
+            when(connectionService.findBearerToken(1L, 7L)).thenReturn(
+                Optional.of(new BearerToken("glpat-token", null))
+            );
             when(webhookClientProvider.getIfAvailable()).thenReturn(webhookClient);
             Mockito.doThrow(new IllegalStateException("Scope 1 is not active"))
                 .when(webhookClient)
-                .deregisterGroupWebhook(1L, 42L, 99L);
+                .deregisterGroupWebhookWithCredentials("https://gitlab.com", "glpat-token", 42L, 99L);
 
-            // Swallowed by design: the connection's credentials are already gone post-purge, so the
-            // orphaned hook cannot be deleted here — it auto-disables upstream instead.
             assertThatCode(() -> webhookService.deregisterWebhookForConnection(1L, 7L)).doesNotThrowAnyException();
 
-            // Distinguishes "attempted and swallowed" from "silently skipped the vendor call entirely".
-            verify(webhookClient).deregisterGroupWebhook(1L, 42L, 99L);
+            verify(webhookClient).deregisterGroupWebhookWithCredentials("https://gitlab.com", "glpat-token", 42L, 99L);
         }
 
         @Test

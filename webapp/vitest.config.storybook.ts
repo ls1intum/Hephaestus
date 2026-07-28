@@ -7,6 +7,7 @@ import tailwindcss from "@tailwindcss/vite";
 import viteReact, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 import { playwright } from "@vitest/browser-playwright";
+import pkg from "./package.json" with { type: "json" };
 
 const dirname =
 	typeof __dirname !== "undefined"
@@ -14,6 +15,8 @@ const dirname =
 		: path.dirname(fileURLToPath(import.meta.url));
 
 const reactCompiler = await babel({ presets: [reactCompilerPreset()] });
+
+const runtimeDeps = Object.keys(pkg.dependencies);
 
 export default defineConfig({
 	plugins: [
@@ -30,8 +33,22 @@ export default defineConfig({
 			"@": path.resolve(dirname, "./src")
 		}
 	},
+	// Prevent runtime dependency discovery from reloading the browser test page mid-run.
+	optimizeDeps: {
+		noDiscovery: true,
+		include: [
+			...runtimeDeps,
+			"posthog-js/react",
+			"use-sync-external-store/shim",
+			"use-sync-external-store/shim/with-selector"
+		]
+	},
 	test: {
 		name: "storybook",
+		// Concurrent browser runners can stall on resource-constrained CI.
+		fileParallelism: false,
+		// Reuse one iframe; recreating it for every story file can strand the browser runner.
+		isolate: false,
 		browser: {
 			enabled: true,
 			headless: true,

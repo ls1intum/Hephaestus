@@ -196,6 +196,18 @@ public class AgentJobService {
         String detectionKey = submission.idempotencyKey() + ":detection";
 
         return transactionTemplate.execute(status -> {
+            Workspace currentWorkspace = workspaceRepository
+                .findByIdForUpdate(workspace.getId())
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspace.getId().toString()));
+            if (currentWorkspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE) {
+                log.debug(
+                    "Skipping agent job submission for inactive workspace: workspaceId={}, status={}",
+                    currentWorkspace.getId(),
+                    currentWorkspace.getStatus()
+                );
+                return null;
+            }
+
             WorkspaceAgentBinding binding = agentBindingRepository
                 .findByWorkspaceIdAndPurpose(workspace.getId(), AgentPurpose.PRACTICE_DETECTION)
                 .filter(WorkspaceAgentBinding::isEnabled)
@@ -244,7 +256,7 @@ public class AgentJobService {
             }
 
             AgentJob job = new AgentJob();
-            job.setWorkspace(workspace);
+            job.setWorkspace(currentWorkspace);
             job.setPurpose(AgentPurpose.PRACTICE_DETECTION);
             job.setJobType(jobType);
             job.setSubjectClass(subjectClassFor(jobType));
