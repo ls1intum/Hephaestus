@@ -30,6 +30,27 @@ export function problemDetailOf(
 	return fallback;
 }
 
+/** The server's step-up challenge body (`StepUpRequiredException`). */
+export interface StepUpProblem {
+	code: "step_up_required";
+	/** How recent the sign-in must be, per `hephaestus.auth.step-up-max-age`. */
+	maxAgeSeconds?: number;
+}
+
+/**
+ * Whether the error is the server's step-up challenge (403, `code = step_up_required`): the session
+ * is valid, but its last interactive sign-in is too old for this action. Callers show
+ * ConfirmAccessDialog instead of the generic error.
+ */
+export function isStepUpRequired(err: unknown): err is StepUpProblem {
+	return (
+		typeof err === "object" &&
+		err !== null &&
+		"code" in err &&
+		(err as { code: unknown }).code === "step_up_required"
+	);
+}
+
 /**
  * Extract the HTTP status from a thrown request error, or `undefined` when there isn't one.
  *

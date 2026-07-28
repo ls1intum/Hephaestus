@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwt;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwt.RevokedReason;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
+import de.tum.cit.aet.hephaestus.core.auth.jwt.TokenConstraints;
 import de.tum.cit.aet.hephaestus.core.auth.metrics.AuthMetrics;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.micrometer.core.instrument.Timer;
@@ -17,6 +18,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -42,6 +44,16 @@ public class AuthSessionService {
     private final AuthProperties properties;
     private final Clock clock;
     private final AuthMetrics metrics;
+
+    /**
+     * The window before {@code imp_exp} in which a refresh already auto-exits. Every impersonation
+     * token's {@code exp} is capped AT {@code imp_exp} and the revocation check rejects a token the
+     * moment its {@code expires_at} passes — so a refresh can never arrive "after the ceiling with a
+     * valid token"; without this look-ahead the graceful auto-exit branch would be unreachable and an
+     * impersonated session would die in a hard 401 instead. Must stay >= the SPA keep-alive's
+     * {@code REFRESH_SKEW_MS} (webapp {@code useSessionKeepAlive.ts}).
+     */
+    private static final Duration IMPERSONATION_EXIT_SKEW = Duration.ofSeconds(60);
 
     public AuthSessionService(
         JwtPrincipalFactory principalFactory,
@@ -73,14 +85,16 @@ public class AuthSessionService {
 
     /**
      * The token constraints carried from the presenting token into the re-minted one: the
-     * impersonation pair ({@code act} / {@code imp_exp}) and the absolute session ceiling
-     * ({@code session_exp}). Bundled so {@link #refresh} stays within the parameter-object limit; the
-     * controller reads them off {@code CurrentAccount}.
+     * impersonation pair ({@code act} / {@code imp_exp}), the absolute session ceiling
+     * ({@code session_exp}), and the interactive-authentication anchor ({@code auth_time}).
+     * Bundled so {@link #refresh} stays within the parameter-object limit; the controller reads
+     * them off {@code CurrentAccount}.
      */
     public record RefreshContext(
         @Nullable Long impersonatorId,
         @Nullable Instant impersonationExpiresAt,
-        @Nullable Instant sessionExpiresAt
+        @Nullable Instant sessionExpiresAt,
+        @Nullable Instant authTime
     ) {}
 
     /** Rotate: revoke the presenting token, mint a fresh one (preserving impersonation), set cookie. */
@@ -121,35 +135,42 @@ public class AuthSessionService {
             }
             HephaestusJwtIssuer.Token token;
             if (impersonatorId == null) {
-                // Ordinary (non-impersonation) rotation — carry the absolute session ceiling forward so
-                // the rotated token is re-capped at it (OWASP absolute timeout; impersonation uses imp_exp).
+                // Carry the ceiling + auth_time forward: a silent rotation extends neither.
                 token = jwtIssuer.issue(
                     principalFactory.forAccountId(accountId),
-                    null,
-                    null,
-                    sessionExpiresAt,
+                    TokenConstraints.session(sessionExpiresAt, context.authTime()),
                     request
                 );
                 authEventLogger
                     .event(AuthEvent.EventType.TOKEN_REFRESH, AuthEvent.Result.SUCCESS)
                     .account(accountId)
                     .record();
-            } else if (impersonationExpired(impersonationExpiresAt)) {
-                // Impersonation time-box reached: auto-exit to the operator (mint an operator token
-                // with NO act claim) rather than renewing the impersonation forever via silent refresh.
-                token = jwtIssuer.issue(principalFactory.forAccountId(impersonatorId), null, request);
+            } else if (impersonationExpired(impersonationExpiresAt) || isAppAdmin(account)) {
+                // Auto-exit to the operator (a token with NO act claim), either because the time-box is
+                // up or because the target became an APP_ADMIN mid-session — begin refuses admin→admin
+                // impersonation, and a promotion must not smuggle it in via a rotation.
+                token = jwtIssuer.issue(
+                    principalFactory.forAccountId(impersonatorId),
+                    TokenConstraints.session(sessionExpiresAt, context.authTime()),
+                    request
+                );
+                String exitReason = isAppAdmin(account) ? "TARGET_PROMOTED" : "EXPIRED";
                 authEventLogger
                     .event(AuthEvent.EventType.IMPERSONATION_END, AuthEvent.Result.SUCCESS)
                     .account(accountId)
                     .actingAccount(impersonatorId)
-                    .details("{\"reason\":\"EXPIRED\"}")
+                    .details("{\"reason\":\"" + exitReason + "\"}")
                     .record();
+                metrics.recordImpersonationAutoExit(exitReason.toLowerCase(java.util.Locale.ROOT));
             } else {
-                // Impersonation rotation: re-cap the new token at the same imp_exp ceiling.
                 token = jwtIssuer.issue(
                     principalFactory.forAccountId(accountId),
-                    impersonatorId,
-                    impersonationExpiresAt,
+                    TokenConstraints.impersonation(
+                        impersonatorId,
+                        impersonationExpiresAt,
+                        sessionExpiresAt,
+                        context.authTime()
+                    ),
                     request
                 );
                 authEventLogger
@@ -183,12 +204,18 @@ public class AuthSessionService {
     }
 
     /**
-     * Whether an impersonation session has hit its absolute time-box. A missing ceiling is treated as
-     * expired (fail-safe: a legacy impersonation token without {@code imp_exp} auto-exits on its next
-     * refresh rather than living forever).
+     * Whether the impersonation is at (or within {@link #IMPERSONATION_EXIT_SKEW} of) its time-box.
+     * A missing ceiling counts as expired (fail-safe).
      */
     private boolean impersonationExpired(@Nullable Instant impersonationExpiresAt) {
-        return impersonationExpiresAt == null || !clock.instant().isBefore(impersonationExpiresAt);
+        return (
+            impersonationExpiresAt == null ||
+            !clock.instant().plus(IMPERSONATION_EXIT_SKEW).isBefore(impersonationExpiresAt)
+        );
+    }
+
+    private static boolean isAppAdmin(Account account) {
+        return account.getAppRole() == Account.AppRole.APP_ADMIN;
     }
 
     /** Active (non-revoked, non-expired) sessions for an account. */

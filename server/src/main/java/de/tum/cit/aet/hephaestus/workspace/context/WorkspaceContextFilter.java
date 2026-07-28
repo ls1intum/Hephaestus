@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace.context;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
+import de.tum.cit.aet.hephaestus.core.auth.spi.WorkspaceElevationAudit;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.security.CurrentScmIdentityHolder;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
@@ -69,6 +70,7 @@ public class WorkspaceContextFilter implements Filter {
     private final WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository;
     private final ConnectionService connectionService;
     private final ObjectMapper objectMapper;
+    private final WorkspaceElevationAudit workspaceElevationAudit;
 
     /**
      * Gates the empty-membership ADMIN auto-seed. Defaults to {@code false} so production NEVER grants
@@ -85,6 +87,7 @@ public class WorkspaceContextFilter implements Filter {
         WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository,
         ConnectionService connectionService,
         ObjectMapper objectMapper,
+        WorkspaceElevationAudit workspaceElevationAudit,
         @Value("${hephaestus.workspace.auto-seed-membership:false}") boolean autoSeedMembership
     ) {
         this.workspaceRepository = workspaceRepository;
@@ -94,6 +97,7 @@ public class WorkspaceContextFilter implements Filter {
         this.workspaceSlugHistoryRepository = workspaceSlugHistoryRepository;
         this.connectionService = connectionService;
         this.objectMapper = objectMapper;
+        this.workspaceElevationAudit = workspaceElevationAudit;
         this.autoSeedMembership = autoSeedMembership;
     }
 
@@ -183,11 +187,15 @@ public class WorkspaceContextFilter implements Filter {
             // WorkspaceAccessService's APP_ADMIN elevation. Deliberately ADMIN, never OWNER — ownership is
             // an explicit, member-granted role. Logged as elevated access.
             if (roles.isEmpty() && SecurityUtils.isSuperAdmin()) {
+                Long elevatedAccountId = SecurityUtils.getCurrentAccountId().orElse(null);
                 log.info(
                     "Granted workspace access via instance-admin elevation: accountId={}, workspaceSlug={}",
-                    SecurityUtils.getCurrentAccountId().orElse(null),
+                    elevatedAccountId,
                     safeSlug
                 );
+                if (elevatedAccountId != null) {
+                    workspaceElevationAudit.recordElevatedAccess(elevatedAccountId, workspace.getId());
+                }
                 roles = Set.of(WorkspaceRole.ADMIN);
             }
 

@@ -28,7 +28,20 @@ public final class AuthPropertiesFixture {
         return build("", loginProviders);
     }
 
+    /** Defaults with the given step-up window (the knob {@code StepUpPolicy} validates at startup). */
+    public static AuthProperties withStepUpMaxAge(Duration stepUpMaxAge) {
+        return build("", Map.of(), stepUpMaxAge);
+    }
+
     private static AuthProperties build(String apiBasePath, Map<String, AuthProperties.LoginProviderSeed> providers) {
+        return build(apiBasePath, providers, Duration.ofMinutes(5));
+    }
+
+    private static AuthProperties build(
+        String apiBasePath,
+        Map<String, AuthProperties.LoginProviderSeed> providers,
+        Duration stepUpMaxAge
+    ) {
         return new AuthProperties(
             URI.create("http://localhost:8080"),
             apiBasePath,
@@ -42,6 +55,7 @@ public final class AuthPropertiesFixture {
             "",
             Duration.ofHours(1),
             Duration.ofHours(12),
+            stepUpMaxAge,
             false,
             true
         );

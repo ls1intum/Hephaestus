@@ -34,12 +34,17 @@ import org.springframework.transaction.annotation.Transactional;
  * aud                — default {@link AuthProperties#audience} (caller can override per-issue)
  * jti                — fresh UUID; also INSERTed into {@code issued_jwt} so revocation can short-circuit
  * iat                — {@link Clock#instant()} of the issuing pod
- * exp                — {@code iat + accessTtl}
+ * exp                — {@code min(iat + accessTtl, imp_exp, session_exp)}
  * preferred_username — login (standard OIDC claim)
  * roles              — flat string array of granted roles (Hephaestus-specific; the authority converter reads it)
  * given_name         — first name; only when known
  * act                — RFC 8693 actor object {@code {"sub": "<impersonator_id>"}}; absent when not impersonating
+ * imp_exp            — absolute impersonation ceiling (epoch seconds); impersonation only
+ * session_exp        — absolute session ceiling (epoch seconds); set at login, constant across refreshes
+ * auth_time          — last interactive authentication (OIDC Core, epoch seconds); constant across refreshes
  * </pre>
+ *
+ * <p>See {@link TokenConstraints} for the semantics of the non-principal claims.
  *
  * <h2>Issuance contract</h2>
  * Every successful {@link #issue} call is paired with an {@code issued_jwt} INSERT in the
@@ -74,50 +79,20 @@ public class HephaestusJwtIssuer {
     }
 
     /**
-     * Mint a new access JWT for {@code principal} (optionally under impersonation), recording the
-     * {@code jti} in {@code issued_jwt} in the same transaction. Claim shape: see the class Javadoc.
+     * Mint a new access JWT for {@code principal} under the given {@link TokenConstraints}, recording
+     * the {@code jti} in {@code issued_jwt} in the same transaction. Claim shape: see the class
+     * Javadoc. The token's {@code exp} is capped at
+     * {@code min(now + accessTtl, impersonationExpiresAt, sessionExpiresAt)}.
      *
-     * @param principal      account id + login + roles to bake in.
-     * @param impersonatorId if non-null, sets the RFC 8693 {@code act} claim.
-     * @param request        used to capture {@code user_agent} + remote IP into the revocation row.
+     * @param principal   account id + login + roles to bake in.
+     * @param constraints the session-scoped claims (impersonation pair, session ceiling, auth_time).
+     * @param request     used to capture {@code user_agent} + remote IP into the revocation row.
      */
     @Transactional
-    public Token issue(JwtPrincipal principal, @Nullable Long impersonatorId, @Nullable HttpServletRequest request) {
-        return issue(principal, impersonatorId, null, request);
-    }
-
-    /**
-     * As {@link #issue(JwtPrincipal, Long, HttpServletRequest)} but with an impersonation time-box.
-     * When {@code impersonationExpiresAt} is set, the token's {@code exp} is capped at
-     * {@code min(now + accessTtl, impersonationExpiresAt)} and an {@code imp_exp} claim carries the
-     * absolute ceiling so {@code AuthSessionService.refresh} can auto-exit once it passes. Only the
-     * impersonation paths supply it; ordinary issuance keeps the full {@code accessTtl}.
-     */
-    @Transactional
-    public Token issue(
-        JwtPrincipal principal,
-        @Nullable Long impersonatorId,
-        @Nullable Instant impersonationExpiresAt,
-        @Nullable HttpServletRequest request
-    ) {
-        return issue(principal, impersonatorId, impersonationExpiresAt, null, request);
-    }
-
-    /**
-     * As {@link #issue(JwtPrincipal, Long, Instant, HttpServletRequest)} plus an absolute SESSION
-     * ceiling: the token {@code exp} is capped at {@code min(now + accessTtl, sessionExpiresAt)} and a
-     * constant {@code session_exp} claim carries the ceiling, so {@code AuthSessionService.refresh}
-     * re-caps the rotated token at it — the rolling silent refresh can never extend a session past it
-     * (OWASP absolute timeout). Set at login; carried unchanged across refreshes.
-     */
-    @Transactional
-    public Token issue(
-        JwtPrincipal principal,
-        @Nullable Long impersonatorId,
-        @Nullable Instant impersonationExpiresAt,
-        @Nullable Instant sessionExpiresAt,
-        @Nullable HttpServletRequest request
-    ) {
+    public Token issue(JwtPrincipal principal, TokenConstraints constraints, @Nullable HttpServletRequest request) {
+        Long impersonatorId = constraints.impersonatorId();
+        Instant impersonationExpiresAt = constraints.impersonationExpiresAt();
+        Instant sessionExpiresAt = constraints.sessionExpiresAt();
         Instant now = clock.instant();
         Instant expiresAt = now.plus(properties.accessTtl());
         if (impersonationExpiresAt != null && impersonationExpiresAt.isBefore(expiresAt)) {
@@ -144,13 +119,13 @@ public class HephaestusJwtIssuer {
             claims.claim("act", Map.of("sub", String.valueOf(impersonatorId)));
         }
         if (impersonationExpiresAt != null) {
-            // Absolute impersonation ceiling (epoch seconds), constant across refreshes. refresh reads
-            // it to auto-exit; it is NOT the per-token exp (which is min(now+accessTtl, this)).
             claims.claim("imp_exp", impersonationExpiresAt.getEpochSecond());
         }
         if (sessionExpiresAt != null) {
-            // Absolute session ceiling (epoch seconds), constant across refreshes (OWASP absolute timeout).
             claims.claim("session_exp", sessionExpiresAt.getEpochSecond());
+        }
+        if (constraints.authTime() != null) {
+            claims.claim("auth_time", constraints.authTime().getEpochSecond());
         }
         JwsHeader header = JwsHeader.with(SignatureAlgorithm.ES256).keyId(signingKey.getKeyID()).build();
         Jwt jwt = encoder.encode(JwtEncoderParameters.from(header, claims.build()));

@@ -113,6 +113,8 @@ public class AuthEvent {
         EXPORT_REQUESTED,
         APP_ROLE_CHANGED,
         RESEARCH_CONSENT_REVOKED,
+        /** An instance admin reached a workspace via elevation, not membership. De-duplicated per window. */
+        WORKSPACE_ELEVATION,
         // Instance LLM catalog: GLOBAL, so config_audit_event cannot carry it (workspace_id is NOT NULL).
         LLM_CONNECTION_CREATED,
         LLM_CONNECTION_UPDATED,

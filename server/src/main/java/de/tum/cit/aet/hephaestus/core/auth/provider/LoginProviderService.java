@@ -4,9 +4,11 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
+import de.tum.cit.aet.hephaestus.core.auth.stepup.StepUpPolicy;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.core.security.ServerUrlValidator;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -72,19 +74,32 @@ public class LoginProviderService {
     private final AuthProperties authProperties;
     private final AuthEventLogger authEventLogger;
     private final ObjectMapper objectMapper;
+    private final StepUpPolicy stepUpPolicy;
 
     public LoginProviderService(
         LoginProviderRepository repository,
         LoginProviderClientRegistrationRepository registrationCache,
         AuthProperties authProperties,
         AuthEventLogger authEventLogger,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        StepUpPolicy stepUpPolicy
     ) {
         this.repository = repository;
         this.registrationCache = registrationCache;
         this.authProperties = authProperties;
         this.authEventLogger = authEventLogger;
         this.objectMapper = objectMapper;
+        this.stepUpPolicy = stepUpPolicy;
+    }
+
+    /**
+     * Step-up gate for a provider mutation: it repoints the IdP this instance trusts for every identity
+     * behind it (issue #1323). Called after the request is otherwise valid, so an audited denial always
+     * reflects a request that would have succeeded — the ordering {@code ImpersonationService.begin} uses.
+     * The denial is audited on the same event type the success would carry, so both sit in one filter.
+     */
+    private void requireStepUp(AuthEvent.EventType type, Long actingAccountId, @Nullable Instant actorAuthTime) {
+        stepUpPolicy.requireRecentAuthentication(actorAuthTime, type, null, actingAccountId);
     }
 
     /** Enabled providers for the login page / discovery, stable order. */
@@ -120,7 +135,7 @@ public class LoginProviderService {
 
     /** Create a new login provider (instance admin). The client secret is sealed at rest. */
     @Transactional
-    public LoginProvider create(Draft draft) {
+    public LoginProvider create(Draft draft, Long actingAccountId, @Nullable Instant actorAuthTime) {
         String registrationId = draft.registrationId() == null ? "" : draft.registrationId().trim();
         if (!registrationId.matches("^[a-z][a-z0-9-]{1,62}$")) {
             throw new ResponseStatusException(
@@ -144,6 +159,8 @@ public class LoginProviderService {
         provider.setScopes(resolveScopes(draft.type(), draft.scopes()));
         provider.setEnabled(true);
         provider.setSeededFromEnv(false);
+        // Last, so a denial reflects a request that would otherwise have succeeded.
+        requireStepUp(AuthEvent.EventType.LOGIN_PROVIDER_CREATED, actingAccountId, actorAuthTime);
         LoginProvider saved = persist(provider);
         audit(AuthEvent.EventType.LOGIN_PROVIDER_CREATED, saved, null);
         log.info("auth.login-provider: admin created '{}' ({})", registrationId, saved.getType());
@@ -152,7 +169,12 @@ public class LoginProviderService {
 
     /** Apply a partial update (only non-null fields). registrationId + type are immutable identity. */
     @Transactional
-    public LoginProvider update(String registrationId, Patch patch) {
+    public LoginProvider update(
+        String registrationId,
+        Patch patch,
+        Long actingAccountId,
+        @Nullable Instant actorAuthTime
+    ) {
         LoginProvider provider = require(registrationId);
         // Field NAMES only — this list goes into the audit trail, so it must stay free of values.
         List<String> changed = new ArrayList<>();
@@ -185,6 +207,8 @@ public class LoginProviderService {
             provider.setEnabled(true);
             changed.add("enabled");
         }
+        // Last, so a denial reflects a request that would otherwise have succeeded.
+        requireStepUp(AuthEvent.EventType.LOGIN_PROVIDER_UPDATED, actingAccountId, actorAuthTime);
         LoginProvider saved = persist(provider);
         audit(AuthEvent.EventType.LOGIN_PROVIDER_UPDATED, saved, changed);
         log.info("auth.login-provider: admin updated '{}' (enabled={})", registrationId, saved.isEnabled());
@@ -193,11 +217,12 @@ public class LoginProviderService {
 
     /** Delete a login provider. Refuses to remove the last enabled one (would lock everyone out). */
     @Transactional
-    public void delete(String registrationId) {
+    public void delete(String registrationId, Long actingAccountId, @Nullable Instant actorAuthTime) {
         LoginProvider provider = require(registrationId);
         if (provider.isEnabled()) {
             requireNotLastEnabled(registrationId, "delete");
         }
+        requireStepUp(AuthEvent.EventType.LOGIN_PROVIDER_DELETED, actingAccountId, actorAuthTime);
         repository.delete(provider);
         registrationCache.evict(registrationId);
         audit(AuthEvent.EventType.LOGIN_PROVIDER_DELETED, provider, null);
@@ -362,7 +387,10 @@ public class LoginProviderService {
     }
 
     private LoginProvider persist(LoginProvider provider) {
-        LoginProvider saved = repository.save(provider);
+        // Flush here, not at commit: the UNIQUE(type, base_url) violation must surface before the
+        // caller audits a SUCCESS for a change that is about to roll back (the audit row is written in
+        // its own REQUIRES_NEW transaction, so it would survive).
+        LoginProvider saved = repository.saveAndFlush(provider);
         registrationCache.evict(saved.getRegistrationId());
         return saved;
     }

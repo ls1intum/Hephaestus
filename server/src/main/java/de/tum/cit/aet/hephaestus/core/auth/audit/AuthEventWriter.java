@@ -44,11 +44,13 @@ public class AuthEventWriter {
         this.clock = clock;
     }
 
+    /** @return whether the row was persisted; callers that de-duplicate must not claim a window on false. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void write(AuthEventData data) {
+    public boolean write(AuthEventData data) {
         try {
             AuthEvent event = AuthEvent.create(data, sequence.next(), clock.instant(), captureIp(), captureUserAgent());
             repository.save(event);
+            return true;
         } catch (RuntimeException e) {
             // Swallow — an audit write must never break the business flow — but make it observable:
             // sequence.next() already consumed an id, so a failed save is a permanent gap in the
@@ -56,6 +58,7 @@ public class AuthEventWriter {
             // request itself succeeded.
             metrics.recordAuditWriteFailed();
             log.warn("auth.audit: failed to persist {} event (sequence value lost — gap in trail)", data.type(), e);
+            return false;
         }
     }
 

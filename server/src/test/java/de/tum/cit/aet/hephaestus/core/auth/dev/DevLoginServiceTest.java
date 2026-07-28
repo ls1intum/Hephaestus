@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipal;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
+import de.tum.cit.aet.hephaestus.core.auth.jwt.TokenConstraints;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Clock;
 import java.time.Duration;
@@ -69,7 +70,7 @@ class DevLoginServiceTest extends BaseUnitTest {
         // The mocked repository returns an account with a null id (JPA would assign it), so use lenient
         // matchers: typed/anyLong matchers reject null in Mockito.
         when(principalFactory.forAccountId(any())).thenReturn(new JwtPrincipal(7L, "dev", "dev", Set.of()));
-        when(jwtIssuer.issue(any(), any(), any(), any(), any())).thenReturn(token);
+        when(jwtIssuer.issue(any(), any(), any())).thenReturn(token);
     }
 
     @Test
@@ -79,7 +80,7 @@ class DevLoginServiceTest extends BaseUnitTest {
             ResponseStatusException.class,
             e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND)
         );
-        verify(jwtIssuer, never()).issue(any(), any(), any(), any(), any());
+        verify(jwtIssuer, never()).issue(any(), any(), any());
     }
 
     @Test
@@ -111,11 +112,14 @@ class DevLoginServiceTest extends BaseUnitTest {
         verify(accountRepository).save(saved.capture());
         assertThat(saved.getValue().getPrimaryEmail()).isEqualTo("alice@dev.invalid");
         assertThat(saved.getValue().getAppRole()).isEqualTo(Account.AppRole.USER);
-        // The mint must stamp the same absolute session ceiling the OAuth path does (now + sessionMaxLifetime),
-        // not the unbounded 3-arg overload — capture the 4th arg so a revert to null is caught.
-        ArgumentCaptor<Instant> sessionCeiling = ArgumentCaptor.forClass(Instant.class);
-        verify(jwtIssuer).issue(any(), isNull(), isNull(), sessionCeiling.capture(), any());
-        assertThat(sessionCeiling.getValue()).isEqualTo(FIXED_NOW.plus(SESSION_MAX));
+        // The mint must stamp the same constraints the OAuth path does: the absolute session ceiling
+        // (now + sessionMaxLifetime) AND a fresh auth_time (dev login is an interactive login, so
+        // step-up-gated admin actions work in dev/E2E) — capture so a revert to none() is caught.
+        ArgumentCaptor<TokenConstraints> constraints = ArgumentCaptor.forClass(TokenConstraints.class);
+        verify(jwtIssuer).issue(any(), constraints.capture(), any());
+        assertThat(constraints.getValue().sessionExpiresAt()).isEqualTo(FIXED_NOW.plus(SESSION_MAX));
+        assertThat(constraints.getValue().authTime()).isEqualTo(FIXED_NOW);
+        assertThat(constraints.getValue().impersonatorId()).isNull();
     }
 
     @Test
@@ -145,7 +149,7 @@ class DevLoginServiceTest extends BaseUnitTest {
 
         // No save: the account already exists and no promotion was requested.
         verify(accountRepository, never()).save(any());
-        verify(jwtIssuer).issue(any(), isNull(), isNull(), any(), any());
+        verify(jwtIssuer).issue(any(), any(TokenConstraints.class), any());
     }
 
     @Test

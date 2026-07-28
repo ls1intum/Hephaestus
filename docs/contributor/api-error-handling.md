@@ -35,6 +35,26 @@ When you touch another REST controller:
 
 If controllers reuse the same exception hierarchy (e.g., Git provider controllers), point `@RestControllerAdvice` at the shared base package so every endpoint in that bounded context inherits the mapper. Keep advice classes focused – too many unrelated handlers in a single class become hard to maintain.
 
+## Machine-readable `code` for client-actionable errors
+
+When the SPA must *react* to a specific failure rather than just display it, the ProblemDetail carries
+a snake_case `code` extension member (`problem.setProperty("code", ...)`) that the client switches on —
+never a substring match against `detail`, which is prose and may be reworded. Current vocabulary:
+
+| `code` | Status | Producer | Client reaction |
+|---|---|---|---|
+| `impersonation_read_only` | 403 | `ImpersonationGuard` | Offer to enable write mode |
+| `step_up_required` | 403 | `StepUpRequiredException` | Show the "Confirm access" re-auth dialog (`maxAgeSeconds` says how fresh the sign-in must be) |
+
+An exception extending Spring's `ErrorResponseException` (e.g. `StepUpRequiredException`) can carry the
+body directly when the error is raised deep in a service; Boot's `ProblemDetailsExceptionHandler` renders
+it because `application.yml` sets `spring.mvc.problemdetails.enabled: true`.
+
+> **Trap:** that handler is `@ConditionalOnMissingBean(ResponseEntityExceptionHandler.class)`. If
+> `GlobalControllerAdvice` is ever changed to extend `ResponseEntityExceptionHandler` (as many blog
+> posts suggest), Boot's handler de-registers and every `ErrorResponseException` falls through to the
+> generic `Exception` handler — a 403 silently becomes a 500. `StepUpGateIntegrationTest` catches this.
+
 ## Validation errors deserve structure, too
 
 Spring Boot 3 surfaces method-argument validation failures as `MethodArgumentNotValidException` (body binding) or `ConstraintViolationException` (query/path parameters). Best-practice guides such as [codecentric’s deep dive into RFC 7807/RFC 9457](https://www.codecentric.de/en/knowledge-hub/blog/charge-your-apis-volume-19-understanding-problem-details-for-http-apis-a-deep-dive-into-rfc-7807-and-rfc-9457) and the 2025 Spring exception-handling roundups on [Medium](https://towardsdev.com/stop-the-stacktrace-chaos-exception-handling-in-spring-boot-2025-best-practices-guide-b8c662f56e00) recommend turning both into structured JSON so clients can highlight the right fields. Our convention:

@@ -27,7 +27,7 @@ the `AccountReferenceBoundaryTest` and `ExternalActorIsolationTest` ArchUnit tes
 
 ## JWT claim shape
 
-Strict subset of standard OIDC ID-Token claims:
+Standard OIDC ID-Token claims, plus the three Hephaestus-specific ceilings noted below:
 
 | Claim | Type | Notes |
 |---|---|---|
@@ -36,9 +36,17 @@ Strict subset of standard OIDC ID-Token claims:
 | `aud` | string | `hephaestus-spa` for the SPA cookie. Future audiences allowed. |
 | `jti` | UUID | Inserted into `issued_jwt`. |
 | `iat`, `exp` | Unix seconds | 15-minute TTL. |
-| `scope` | space-delimited | Encodes `app_role` (`USER`/`APP_ADMIN`) + active feature flag keys. |
+| `preferred_username` | string | Git-provider login; drives workspace authorization. |
+| `roles` | string array | Flat granted-authority list: `app_admin` (from `app_role`) + active feature flag keys. |
+| `given_name` | string | First name; only when known. |
 | `act` | object | Only present when impersonating. Per RFC 8693 — `{ "sub": "<impersonator_account_id>" }`. |
+| `imp_exp` | Unix seconds | Only when impersonating: the absolute impersonation ceiling; `exp` is capped at it and refresh auto-exits near it (#1323). |
+| `session_exp` | Unix seconds | Absolute session ceiling, stamped at login and constant across refreshes (OWASP absolute timeout); `exp` is capped at it. |
+| `auth_time` | Unix seconds | OIDC Core: time of the last INTERACTIVE login; constant across silent refreshes. Anchors the step-up re-auth gate for high-risk admin actions (#1323). |
 
-No proprietary claim names. This preserves the option to mount Spring Authorization Server as
-a second issuer later (for Issue #1200 third-party clients) without changing the
-resource-server.
+Standard claim names wherever a standard exists (`act` per RFC 8693, `auth_time` per OIDC Core), so
+mounting Spring Authorization Server as a second issuer later (Issue #1200) stays an option.
+`imp_exp`/`session_exp` are ours: no registered claim expresses "absolute ceiling of this
+impersonation/session", and only our refresh path reads them. `auth_time` is our *issuance* time — we
+are the issuer, and a plain-OAuth2 upstream (GitHub) asserts no authentication time to relay; see
+`docs/contributor/instance-admin.md` for what that does and does not buy.

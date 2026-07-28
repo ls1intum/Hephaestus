@@ -92,7 +92,9 @@ public class LoginProviderAdminController {
                 body.clientId(),
                 body.clientSecret(),
                 body.scopes()
-            )
+            ),
+            CurrentAccount.requireId(),
+            CurrentAccount.authTime()
         );
         LoginProviderViewDTO view = toView(created, callbackBase());
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
@@ -118,7 +120,9 @@ public class LoginProviderAdminController {
                 body.clientSecret(),
                 body.scopes(),
                 body.enabled()
-            )
+            ),
+            CurrentAccount.requireId(),
+            CurrentAccount.authTime()
         );
         return ResponseEntity.ok(toView(updated, callbackBase()));
     }
@@ -127,7 +131,7 @@ public class LoginProviderAdminController {
     @Operation(summary = "Delete a login provider", operationId = "adminDeleteLoginProvider")
     @Audited(ledger = AuditLedger.AUTH_EVENT, type = "LOGIN_PROVIDER_DELETED")
     public ResponseEntity<Void> delete(@PathVariable String registrationId) {
-        loginProviderService.delete(registrationId);
+        loginProviderService.delete(registrationId, CurrentAccount.requireId(), CurrentAccount.authTime());
         return ResponseEntity.noContent().build();
     }
 

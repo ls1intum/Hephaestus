@@ -90,6 +90,9 @@ public class TestSecurityConfig {
                     .claim("iss", "https://test-issuer")
                     .claim("aud", "test-audience")
                     .claim("roles", Arrays.asList("mentor_access", "app_admin"))
+                    // Freshly signed in, so step-up-gated admin endpoints are reachable (#1323). The
+                    // gate's own behaviour is covered against the REAL issuer in StepUpGateIntegrationTest.
+                    .claim("auth_time", Instant.now().getEpochSecond())
                     .issuedAt(Instant.now())
                     .expiresAt(Instant.now().plusSeconds(3600))
                     .build();

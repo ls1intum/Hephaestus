@@ -25,6 +25,13 @@ interface SignInButtonsProps {
 	header?: boolean;
 	/** Destination after a successful dev sign-in (full mode only). Defaults to home. */
 	devReturnTo?: string;
+	/**
+	 * Prefer providers of this type (e.g. `"GITHUB"`) — used by the step-up challenge, where signing in
+	 * with a different provider switches the admin's account instead of confirming it. Best-effort: if
+	 * it matches no sign-in provider (a link-only or unknown primary identity), the full list is shown
+	 * rather than an unusable empty dialog.
+	 */
+	onlyProviderType?: string;
 }
 
 /** GitHub mark SVG. Sized by the Button's `[&_svg]` rule; kept monochrome (currentColor). */
@@ -136,6 +143,7 @@ export function SignInButtons({
 	className,
 	header,
 	devReturnTo,
+	onlyProviderType,
 }: SignInButtonsProps) {
 	const {
 		data: providers,
@@ -184,10 +192,18 @@ export function SignInButtons({
 
 	// The dev sign-in needs a username field, so it renders as a small form (full mode only), never as
 	// an OAuth-style button — and it is excluded from the compact header entirely.
-	const oauthProviders = providers.filter((provider) => {
+	const signInProviders = providers.filter((provider) => {
 		const type = provider.providerType?.toUpperCase();
 		return type !== DEV_PROVIDER_TYPE && !LINK_ONLY_PROVIDER_TYPES.has(type ?? "");
 	});
+	const preferred = onlyProviderType
+		? signInProviders.filter(
+				(p) => p.providerType?.toUpperCase() === onlyProviderType.toUpperCase(),
+			)
+		: signInProviders;
+	// Never render an empty list: a primary identity that is link-only (Slack/Outline) or UNKNOWN
+	// matches nothing here, and a challenge with no button is a lockout.
+	const oauthProviders = preferred.length > 0 ? preferred : signInProviders;
 	const hasDevSignIn = providers.some(
 		(provider) => provider.providerType?.toUpperCase() === DEV_PROVIDER_TYPE,
 	);

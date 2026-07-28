@@ -9,12 +9,15 @@ import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwt;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
+import de.tum.cit.aet.hephaestus.core.auth.jwt.TokenConstraints;
+import de.tum.cit.aet.hephaestus.core.auth.stepup.StepUpPolicy;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -49,6 +52,7 @@ public class ImpersonationService {
     private final AuthEventLogger authEventLogger;
     private final ObjectMapper objectMapper;
     private final AuthProperties properties;
+    private final StepUpPolicy stepUpPolicy;
     private final Clock clock;
 
     public ImpersonationService(
@@ -59,6 +63,7 @@ public class ImpersonationService {
         AuthEventLogger authEventLogger,
         ObjectMapper objectMapper,
         AuthProperties properties,
+        StepUpPolicy stepUpPolicy,
         Clock clock
     ) {
         this.accountRepository = accountRepository;
@@ -68,6 +73,7 @@ public class ImpersonationService {
         this.authEventLogger = authEventLogger;
         this.objectMapper = objectMapper;
         this.properties = properties;
+        this.stepUpPolicy = stepUpPolicy;
         this.clock = clock;
     }
 
@@ -75,12 +81,25 @@ public class ImpersonationService {
     public record Result(HephaestusJwtIssuer.Token token, Long targetAccountId, Long actingAccountId) {}
 
     /**
+     * The operator's carried session anchors, read off the presenting JWT by the controller. An
+     * impersonation is a sub-session of the operator's session — see {@code TokenConstraints}.
+     */
+    public record OperatorSession(@Nullable Instant sessionExpiresAt, @Nullable Instant authTime) {}
+
+    /**
      * Begin impersonating {@code targetAccountId} as {@code operatorAccountId}. The operator
      * MUST be an {@code APP_ADMIN} (the controller enforces this via method security too;
-     * we re-check here as defence in depth). A {@code reason} is mandatory and audited.
+     * we re-check here as defence in depth), MUST pass the step-up re-auth gate
+     * ({@code StepUpPolicy}), and a {@code reason} is mandatory and audited.
      */
     @Transactional
-    public Result begin(Long operatorAccountId, Long targetAccountId, String reason, HttpServletRequest request) {
+    public Result begin(
+        Long operatorAccountId,
+        Long targetAccountId,
+        String reason,
+        OperatorSession operatorSession,
+        HttpServletRequest request
+    ) {
         if (reason == null || reason.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "impersonation reason is required");
         }
@@ -104,16 +123,27 @@ public class ImpersonationService {
         if (target.getAppRole() == Account.AppRole.APP_ADMIN) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "cannot impersonate another app admin");
         }
+        // Checked LAST so ordinary validation errors surface first and an audited denial always
+        // reflects a request that would otherwise have succeeded.
+        stepUpPolicy.requireRecentAuthentication(
+            operatorSession.authTime(),
+            AuthEvent.EventType.IMPERSONATION_BEGIN,
+            target.getId(),
+            operator.getId()
+        );
 
         // Impersonate with the target's own roles so the operator sees the target's view;
-        // ImpersonationGuard makes the session read-only regardless. The act claim records
-        // the operator. Issued via the principal factory so preferred_username = target login.
-        // imp_exp stamps the absolute time-box so silent refresh can't renew it indefinitely.
+        // ImpersonationGuard makes the session read-only regardless. The act claim records the operator.
+        // Issued via the principal factory so preferred_username = target login.
         Instant impersonationExpiresAt = clock.instant().plus(properties.impersonationMaxLifetime());
         HephaestusJwtIssuer.Token token = jwtIssuer.issue(
             principalFactory.forAccount(target),
-            operator.getId(),
-            impersonationExpiresAt,
+            TokenConstraints.impersonation(
+                operator.getId(),
+                impersonationExpiresAt,
+                operatorSession.sessionExpiresAt(),
+                operatorSession.authTime()
+            ),
             request
         );
 
@@ -134,11 +164,18 @@ public class ImpersonationService {
      * validated JWT).
      */
     @Transactional
-    public Result exit(Long operatorAccountId, Long targetAccountId, UUID currentJti, HttpServletRequest request) {
+    public Result exit(
+        Long operatorAccountId,
+        Long targetAccountId,
+        UUID currentJti,
+        OperatorSession operatorSession,
+        HttpServletRequest request
+    ) {
         issuedJwtRepository.revoke(currentJti, clock.instant(), IssuedJwt.RevokedReason.IMPERSONATION_EXIT);
+        // The ORIGINAL ceiling + auth_time: exiting must not mint a fresh unlimited operator session.
         HephaestusJwtIssuer.Token token = jwtIssuer.issue(
             principalFactory.forAccountId(operatorAccountId),
-            null,
+            TokenConstraints.session(operatorSession.sessionExpiresAt(), operatorSession.authTime()),
             request
         );
 

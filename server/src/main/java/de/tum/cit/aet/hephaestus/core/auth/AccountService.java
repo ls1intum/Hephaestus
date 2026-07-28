@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwt;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
+import de.tum.cit.aet.hephaestus.core.auth.stepup.StepUpPolicy;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.time.Clock;
 import java.time.Instant;
@@ -34,6 +35,7 @@ public class AccountService {
     private final IdentityLinkRepository identityLinkRepository;
     private final IssuedJwtRepository issuedJwtRepository;
     private final AuthEventLogger authEventLogger;
+    private final StepUpPolicy stepUpPolicy;
     private final Clock clock;
 
     public AccountService(
@@ -41,12 +43,14 @@ public class AccountService {
         IdentityLinkRepository identityLinkRepository,
         IssuedJwtRepository issuedJwtRepository,
         AuthEventLogger authEventLogger,
+        StepUpPolicy stepUpPolicy,
         Clock clock
     ) {
         this.accountRepository = accountRepository;
         this.identityLinkRepository = identityLinkRepository;
         this.issuedJwtRepository = issuedJwtRepository;
         this.authEventLogger = authEventLogger;
+        this.stepUpPolicy = stepUpPolicy;
         this.clock = clock;
     }
 
@@ -145,7 +149,12 @@ public class AccountService {
     }
 
     @Transactional
-    public Account adminSetRole(Long accountId, @Nullable String appRole, Long actingAccountId) {
+    public Account adminSetRole(
+        Long accountId,
+        @Nullable String appRole,
+        Long actingAccountId,
+        @Nullable Instant actorAuthTime
+    ) {
         Account account = requireById(accountId);
         if (appRole != null) {
             Account.AppRole role;
@@ -175,6 +184,14 @@ public class AccountService {
                     );
                 }
             }
+            // Gate last, so a denial reflects a would-succeed request (and a doomed stale-token demotion
+            // doesn't take the FOR UPDATE lock above) — the ordering ImpersonationService.begin uses.
+            stepUpPolicy.requireRecentAuthentication(
+                actorAuthTime,
+                AuthEvent.EventType.APP_ROLE_CHANGED,
+                accountId,
+                actingAccountId
+            );
             Account.AppRole previousRole = account.getAppRole();
             account.setAppRole(role);
             accountRepository.save(account);
@@ -191,9 +208,9 @@ public class AccountService {
                 );
             }
             // Dedicated APP_ROLE_CHANGED type so the most security-sensitive mutation (granting/revoking
-            // APP_ADMIN) is queryable and alertable on the indexed event_type column — the ADR's stated
-            // mitigation for omitting step-up re-auth. Enum names are [A-Z_] only, so the inline JSON is
-            // injection-safe. previousRole/role are both non-null (app_role is NOT NULL).
+            // APP_ADMIN) is queryable and alertable on the indexed event_type column. Enum names are
+            // [A-Z_] only, so the inline JSON is injection-safe. previousRole/role are both non-null
+            // (app_role is NOT NULL).
             authEventLogger
                 .event(AuthEvent.EventType.APP_ROLE_CHANGED, AuthEvent.Result.SUCCESS)
                 .account(accountId)

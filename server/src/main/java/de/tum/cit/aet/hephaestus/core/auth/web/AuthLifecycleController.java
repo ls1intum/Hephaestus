@@ -60,7 +60,8 @@ public class AuthLifecycleController {
             new AuthSessionService.RefreshContext(
                 CurrentAccount.impersonatorId(),
                 CurrentAccount.impersonationExpiresAt(),
-                CurrentAccount.sessionExpiresAt()
+                CurrentAccount.sessionExpiresAt(),
+                CurrentAccount.authTime()
             ),
             request,
             response
@@ -81,6 +82,7 @@ public class AuthLifecycleController {
             CurrentAccount.requireId(),
             body.targetAccountId(),
             body.reason(),
+            new ImpersonationService.OperatorSession(CurrentAccount.sessionExpiresAt(), CurrentAccount.authTime()),
             request
         );
         sessionService.setCookie(response, result.token());
@@ -99,6 +101,7 @@ public class AuthLifecycleController {
             impersonatorId,
             CurrentAccount.requireId(),
             CurrentAccount.requireJti(),
+            new ImpersonationService.OperatorSession(CurrentAccount.sessionExpiresAt(), CurrentAccount.authTime()),
             request
         );
         sessionService.setCookie(response, result.token());

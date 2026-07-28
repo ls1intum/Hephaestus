@@ -1,12 +1,18 @@
 import type { AdminListAuthEventsData } from "@/api/types.gen";
 export type AuditSeverity = "error" | "warning" | "info";
 
+// Deliberate, rare, mutating acts a human chose to perform. WORKSPACE_ELEVATION is NOT one: it is
+// passive read access emitted by a filter as an admin browses, so tiering it as warning would make it
+// the most common warning row on the instance and teach operators to ignore the tier.
 const HIGH_RISK_EVENTS = new Set([
 	"IMPERSONATION_BEGIN",
 	"APP_ROLE_CHANGED",
 	"ACCOUNT_DELETED",
 	"JWT_REVOKED",
 	"IDENTITY_UNLINKED",
+	"LOGIN_PROVIDER_CREATED",
+	"LOGIN_PROVIDER_UPDATED",
+	"LOGIN_PROVIDER_DELETED",
 ]);
 
 export function eventSeverity(eventType: string, result: string): AuditSeverity {
@@ -33,6 +39,7 @@ export const EVENT_TYPE_LABELS: Record<AuthEventType, string> = {
 	EXPORT_REQUESTED: "Data export requested",
 	APP_ROLE_CHANGED: "Instance role changed",
 	RESEARCH_CONSENT_REVOKED: "Research consent revoked",
+	WORKSPACE_ELEVATION: "Workspace elevation",
 	LLM_CONNECTION_CREATED: "Provider connected",
 	LLM_CONNECTION_UPDATED: "Provider updated",
 	LLM_CONNECTION_DELETED: "Provider removed",

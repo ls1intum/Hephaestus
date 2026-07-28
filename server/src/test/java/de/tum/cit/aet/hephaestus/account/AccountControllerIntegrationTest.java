@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
+import de.tum.cit.aet.hephaestus.core.auth.jwt.TokenConstraints;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -141,7 +142,11 @@ class AccountControllerIntegrationTest {
         link.setDisplayName("GitLab User");
         link = identityLinkRepository.save(link);
 
-        HephaestusJwtIssuer.Token token = jwtIssuer.issue(principalFactory.forAccount(account), null, null);
+        HephaestusJwtIssuer.Token token = jwtIssuer.issue(
+            principalFactory.forAccount(account),
+            TokenConstraints.none(),
+            null
+        );
         return new SeededIdentity(token.value(), link.getId(), provider.getId());
     }
 }

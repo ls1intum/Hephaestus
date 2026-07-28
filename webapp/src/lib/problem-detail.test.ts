@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { problemDetailOf, problemStatusOf } from "./problem-detail";
+import { isStepUpRequired, problemDetailOf, problemStatusOf } from "./problem-detail";
 
 describe("problemDetailOf", () => {
 	it("prefers RFC 9457 `detail` over everything else", () => {
@@ -63,6 +63,25 @@ describe("problemDetailOf", () => {
 			"An unexpected error occurred. Please try again.",
 		);
 		expect(problemDetailOf(42)).toBe("An unexpected error occurred. Please try again.");
+	});
+});
+
+describe("isStepUpRequired", () => {
+	it("detects the server's step-up challenge", () => {
+		expect(isStepUpRequired({ status: 403, code: "step_up_required", maxAgeSeconds: 300 })).toBe(
+			true,
+		);
+	});
+
+	it("ignores other coded problems", () => {
+		expect(isStepUpRequired({ status: 409, code: "last_admin" })).toBe(false);
+	});
+
+	it("is safe on non-objects", () => {
+		expect(isStepUpRequired(null)).toBe(false);
+		expect(isStepUpRequired(undefined)).toBe(false);
+		expect(isStepUpRequired("step_up_required")).toBe(false);
+		expect(isStepUpRequired(new Error("Forbidden"))).toBe(false);
 	});
 });
 
