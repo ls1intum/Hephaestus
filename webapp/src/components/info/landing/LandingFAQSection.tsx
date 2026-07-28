@@ -17,17 +17,17 @@ const faqItems = [
 	{
 		key: "faq-item-2",
 		q: "What is practice feedback?",
-		a: "It is feedback on an observable way of working, such as keeping a change reviewable or explaining why it is needed. Each piece of feedback points to the work it is based on and suggests a next step.",
+		a: "It is feedback on an observable way of working, such as keeping a change reviewable or explaining why it is needed. Practice feedback is tied to evidence in the work and can suggest a next step.",
 	},
 	{
 		key: "faq-item-3",
 		q: "What can I discuss with Heph?",
-		a: "Ask about feedback or recent work, or use the conversation to reflect on what to try next. Heph can use recent project activity, delivered feedback, and selected Slack messages or Outline documents as context.",
+		a: "Ask about feedback or recent work, or use the conversation to reflect on what to try next. Heph can use recent project activity, feedback you have received, and selected Slack messages or Outline documents as context.",
 	},
 	{
 		key: "faq-item-4",
 		q: "Do I have to follow the feedback?",
-		a: "No. Practice feedback is advisory. You can act on it, push back with a reason, or let it pass.",
+		a: "No. Practice feedback is advisory. You decide what to use, question, or skip.",
 	},
 ];
 

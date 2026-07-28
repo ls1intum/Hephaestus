@@ -43,6 +43,7 @@ jobs:
           filters: |
             webapp:
               - 'webapp/**'
+              - 'docs/images/readme/**'
               - 'package.json'
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'

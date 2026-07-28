@@ -1,5 +1,6 @@
 import {
 	ArrowDown,
+	ArrowRight,
 	Check,
 	ClipboardCheck,
 	Code2,
@@ -59,7 +60,7 @@ function ProjectWorkStage({ mobile = false }: { mobile?: boolean }) {
 			delay={0.05}
 			className={
 				mobile
-					? "relative rounded-3xl border border-border bg-background p-5 shadow-sm dark:bg-secondary/70"
+					? "relative rounded-3xl border border-border bg-background p-4 shadow-sm sm:p-5 dark:bg-secondary/70"
 					: "absolute left-0 top-[72px] z-10 h-[250px] w-[270px] rounded-3xl border border-border bg-background p-6 shadow-[0_20px_50px_-30px_rgb(15_23_42_/_0.45)] dark:bg-secondary/80 dark:shadow-black/50"
 			}
 		>
@@ -79,13 +80,13 @@ function ProjectWorkStage({ mobile = false }: { mobile?: boolean }) {
 				</div>
 			</div>
 			<p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-				Evidence already recorded in the tools your team uses.
+				Work and context already available in the tools your team uses.
 			</p>
 			<div className="mt-5 grid grid-cols-4 gap-2">
 				{[
 					{ icon: Code2, label: "Code" },
 					{ icon: ClipboardCheck, label: "Tasks" },
-					{ icon: MessageSquareText, label: "Talk" },
+					{ icon: MessageSquareText, label: "Discussion" },
 					{ icon: FileText, label: "Docs" },
 				].map(({ icon: Icon, label }) => (
 					<div
@@ -107,7 +108,7 @@ function ReviewStage({ mobile = false }: { mobile?: boolean }) {
 			delay={0.15}
 			className={
 				mobile
-					? "rounded-3xl border border-border bg-background p-5 shadow-sm dark:bg-secondary/70"
+					? "rounded-3xl border border-border bg-background p-4 shadow-sm sm:p-5 dark:bg-secondary/70"
 					: "absolute left-[315px] top-[86px] z-10 h-[250px] w-[300px] rounded-3xl border border-border bg-background p-6 shadow-[0_20px_50px_-30px_rgb(15_23_42_/_0.45)] dark:bg-secondary/80 dark:shadow-black/50"
 			}
 		>
@@ -121,7 +122,8 @@ function ReviewStage({ mobile = false }: { mobile?: boolean }) {
 				</div>
 			</div>
 			<p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-				Evidence from the work is considered using the engineering practices your workspace chose.
+				Hephaestus checks evidence from the work against the engineering practices your workspace
+				chose.
 			</p>
 			<div className="mt-5 flex items-center gap-3">
 				<span className="rounded-xl border border-border bg-muted/30 px-3 py-2 text-sm">
@@ -142,7 +144,7 @@ function FeedbackStage({ mobile = false }: { mobile?: boolean }) {
 			delay={0.25}
 			className={
 				mobile
-					? "rounded-3xl border border-mentor/35 bg-mentor/[0.045] p-5 shadow-[0_24px_60px_-38px_var(--color-mentor)]"
+					? "rounded-3xl border border-mentor/35 bg-mentor/[0.045] p-4 shadow-[0_24px_60px_-38px_var(--color-mentor)] sm:p-5"
 					: "absolute right-0 top-[36px] z-10 h-[360px] w-[500px] rounded-3xl border border-mentor/35 bg-mentor/[0.045] p-7 shadow-[0_28px_70px_-40px_var(--color-mentor)]"
 			}
 		>
@@ -196,11 +198,17 @@ function ChoiceStage({ mobile = false }: { mobile?: boolean }) {
 			delay={0.35}
 			className={
 				mobile
-					? "rounded-3xl border border-mentor/35 bg-background p-5 shadow-sm dark:bg-secondary/70"
+					? "rounded-3xl border border-mentor/35 bg-background p-4 shadow-sm sm:p-5 dark:bg-secondary/70"
 					: "absolute bottom-[26px] left-[405px] z-10 h-[142px] w-[650px] rounded-3xl border border-mentor/35 bg-background p-6 shadow-[0_20px_50px_-30px_rgb(15_23_42_/_0.45)] dark:bg-secondary/80 dark:shadow-black/50"
 			}
 		>
-			<div className={mobile ? "space-y-4" : "flex items-center gap-6"}>
+			<div
+				className={
+					mobile
+						? "space-y-4 sm:flex sm:items-center sm:gap-6 sm:space-y-0"
+						: "flex items-center gap-6"
+				}
+			>
 				<div className="flex items-center gap-3">
 					<StageNumber number={4} />
 					<div>
@@ -210,7 +218,7 @@ function ChoiceStage({ mobile = false }: { mobile?: boolean }) {
 						<h3 className="mt-0.5 text-xl font-semibold">You decide what helps</h3>
 					</div>
 				</div>
-				<div className="flex flex-wrap gap-2">
+				<div className="flex flex-wrap gap-1.5 sm:gap-2">
 					{["Use it", "Question it", "Skip it"].map((choice, index) => (
 						<span
 							key={choice}
@@ -229,12 +237,18 @@ function ChoiceStage({ mobile = false }: { mobile?: boolean }) {
 	);
 }
 
-function DesktopFeedbackLoop() {
+function DesktopFeedbackLoop({ forceVisible = false }: { forceVisible?: boolean }) {
 	const shouldReduceMotion = useReducedMotion();
 	const connectorTransition = { duration: 0.85, ease: [0.22, 1, 0.36, 1] } as const;
 
 	return (
-		<div className="relative mx-auto mt-14 hidden h-[620px] max-w-[1160px] xl:block">
+		<div
+			className={
+				forceVisible
+					? "relative mx-auto h-[620px] max-w-[1160px]"
+					: "relative mx-auto mt-14 hidden h-[620px] max-w-[1160px] xl:block"
+			}
+		>
 			<svg
 				aria-hidden="true"
 				className="absolute inset-0 size-full"
@@ -296,61 +310,87 @@ function DesktopFeedbackLoop() {
 	);
 }
 
-function MobileFeedbackLoop() {
+function TabletFeedbackLoop() {
 	return (
-		<div className="relative mx-auto mt-12 max-w-2xl xl:hidden">
-			<div className="relative">
+		<div className="mx-auto mt-12 hidden max-w-4xl md:block xl:hidden">
+			<div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4">
 				<ProjectWorkStage mobile />
-				<MobileArrow />
+				<ArrowRight className="size-6 text-mentor/70" strokeWidth={1.8} aria-hidden="true" />
 				<ReviewStage mobile />
-				<MobileArrow />
-				<FeedbackStage mobile />
-				<MobileArrow />
-				<ChoiceStage mobile />
 			</div>
-			<MobileReturnConnector />
-			<div className="flex items-center justify-center gap-2 text-sm font-medium text-mentor">
-				<RotateCcw className="size-4" />
-				Your next project work continues the cycle
+			<MobileArrow />
+			<FeedbackStage mobile />
+			<MobileArrow />
+			<ChoiceStage mobile />
+			<div className="mx-auto max-w-lg">
+				<CycleReturn />
 			</div>
 		</div>
 	);
 }
 
-function MobileReturnConnector() {
+function MobileFeedbackLoop({ forceVisible = false }: { forceVisible?: boolean }) {
+	return (
+		<div
+			className={
+				forceVisible ? "relative mx-auto max-w-md" : "relative mx-auto mt-12 max-w-md md:hidden"
+			}
+		>
+			<ProjectWorkStage mobile />
+			<MobileArrow />
+			<ReviewStage mobile />
+			<MobileArrow />
+			<FeedbackStage mobile />
+			<MobileArrow />
+			<ChoiceStage mobile />
+			<CycleReturn />
+		</div>
+	);
+}
+
+function CycleReturn() {
 	const shouldReduceMotion = useReducedMotion();
 
 	return (
-		<svg
-			aria-hidden="true"
-			className="mx-auto h-14 w-full max-w-sm"
-			viewBox="0 0 384 56"
-			fill="none"
+		<motion.div
+			initial={shouldReduceMotion ? false : { opacity: 0 }}
+			whileInView={{ opacity: 1 }}
+			viewport={{ once: true, amount: 0.8 }}
+			transition={{ duration: 0.45 }}
+			className="relative h-16"
 		>
-			<motion.path
-				d="M300 2C300 32 210 22 192 48"
-				stroke="currentColor"
-				className="text-mentor/65"
-				strokeWidth="2"
-				strokeLinecap="round"
-				initial={shouldReduceMotion ? false : { pathLength: 0, opacity: 0 }}
-				whileInView={{ pathLength: 1, opacity: 1 }}
-				viewport={{ once: true, amount: 0.8 }}
-				transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-			/>
-			<motion.path
-				d="m184 43 8 5 7-7"
-				stroke="currentColor"
-				className="text-mentor/65"
-				strokeWidth="2"
-				strokeLinecap="round"
-				strokeLinejoin="round"
-				initial={shouldReduceMotion ? false : { opacity: 0 }}
-				whileInView={{ opacity: 1 }}
-				viewport={{ once: true }}
-				transition={{ duration: 0.2, delay: 0.55 }}
-			/>
-		</svg>
+			<svg aria-hidden="true" className="absolute inset-0 size-full" viewBox="0 0 400 64">
+				<motion.path
+					d="M200 0v6c0 23-20 36-48 36H24"
+					fill="none"
+					stroke="currentColor"
+					className="text-mentor/65"
+					strokeWidth="2"
+					strokeLinecap="round"
+					initial={shouldReduceMotion ? false : { pathLength: 0 }}
+					whileInView={{ pathLength: 1 }}
+					viewport={{ once: true, amount: 0.8 }}
+					transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+				/>
+				<motion.path
+					d="m32 36-8 6 8 6"
+					fill="none"
+					stroke="currentColor"
+					className="text-mentor/65"
+					strokeWidth="2"
+					strokeLinecap="round"
+					strokeLinejoin="round"
+					initial={shouldReduceMotion ? false : { opacity: 0 }}
+					whileInView={{ opacity: 1 }}
+					viewport={{ once: true }}
+					transition={{ duration: 0.2, delay: 0.5 }}
+				/>
+			</svg>
+			<div className="absolute bottom-0 left-2 flex items-center gap-2 bg-muted/15 pr-3 text-xs font-semibold tracking-[0.12em] text-mentor uppercase">
+				<RotateCcw className="size-3.5" strokeWidth={1.8} />
+				Next project work
+			</div>
+		</motion.div>
 	);
 }
 
@@ -364,10 +404,34 @@ function MobileArrow() {
 			whileInView={{ opacity: 1, scaleY: 1 }}
 			viewport={{ once: true, amount: 0.8 }}
 			transition={{ duration: 0.35 }}
-			className="flex h-10 origin-top items-center justify-center text-mentor/70"
+			className="flex h-8 origin-top items-center justify-center text-mentor/70"
 		>
 			<ArrowDown className="size-5" strokeWidth={1.8} />
 		</motion.div>
+	);
+}
+
+type LandingFeedbackLoopLayout = "responsive" | "desktop" | "mobile";
+
+interface LandingFeedbackLoopProps {
+	layout?: LandingFeedbackLoopLayout;
+}
+
+export function LandingFeedbackLoop({ layout = "responsive" }: LandingFeedbackLoopProps) {
+	if (layout === "desktop") {
+		return <DesktopFeedbackLoop forceVisible />;
+	}
+
+	if (layout === "mobile") {
+		return <MobileFeedbackLoop forceVisible />;
+	}
+
+	return (
+		<>
+			<DesktopFeedbackLoop />
+			<TabletFeedbackLoop />
+			<MobileFeedbackLoop />
+		</>
 	);
 }
 
@@ -377,7 +441,7 @@ export function LandingFeaturesSection() {
 	return (
 		<section
 			id="features"
-			className="relative w-full overflow-hidden border-y border-border/60 bg-muted/15 py-20 md:py-28"
+			className="relative w-full overflow-hidden border-y border-border/60 bg-muted/15 py-16 md:py-20 xl:py-24"
 		>
 			<div className="pointer-events-none absolute inset-0">
 				<div className="absolute -left-32 top-16 size-80 rounded-full bg-provider-done/5 blur-3xl" />
@@ -404,8 +468,7 @@ export function LandingFeaturesSection() {
 					</p>
 				</motion.div>
 
-				<DesktopFeedbackLoop />
-				<MobileFeedbackLoop />
+				<LandingFeedbackLoop />
 			</div>
 		</section>
 	);

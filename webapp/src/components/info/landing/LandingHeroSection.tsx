@@ -38,7 +38,7 @@ export function LandingFeedbackPreview({ staticMode = false }: LandingFeedbackPr
 			initial={shouldReduceMotion ? false : { opacity: 0, y: 24, scale: 0.97 }}
 			animate={{ opacity: 1, y: 0, scale: 1 }}
 			transition={{ ...entranceTransition, delay: 0.15 }}
-			className="relative mx-auto h-[590px] w-full max-w-[680px] sm:h-[500px]"
+			className="relative mx-auto h-[530px] w-full max-w-[680px] min-[370px]:h-[500px]"
 		>
 			<div className="absolute right-[4%] top-[6%] size-56 rounded-full bg-mentor/10 blur-3xl" />
 			<div className="absolute bottom-[5%] left-[5%] size-64 rounded-full bg-provider-done/10 blur-3xl" />
@@ -151,7 +151,7 @@ export function LandingFeedbackPreview({ staticMode = false }: LandingFeedbackPr
 			>
 				<div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.12em] text-provider-success-foreground uppercase sm:text-xs">
 					<Check className="size-3.5" />
-					Worth keeping
+					What worked
 				</div>
 				<p className="text-[13px] leading-relaxed sm:text-sm">
 					You kept the change focused, so it is easier for someone else to review.
@@ -170,14 +170,16 @@ export function LandingFeedbackPreview({ staticMode = false }: LandingFeedbackPr
 							}
 				}
 				whileHover={shouldReduceMotion ? undefined : { scale: 1.06, rotate: -4 }}
-				className="absolute left-1/2 top-[220px] z-20 -translate-x-1/2 sm:top-[186px]"
+				className="absolute left-1/2 top-[210px] z-20 -translate-x-1/2 min-[370px]:top-[195px] sm:top-[186px]"
 			>
-				<div className="relative flex size-32 flex-col items-center justify-center sm:size-36">
-					<div className="flex size-24 items-center justify-center rounded-full border border-mentor/25 bg-background/95 text-mentor shadow-[0_18px_48px_-18px_var(--color-mentor)] backdrop-blur-xl sm:size-28 dark:bg-secondary">
-						<Hammer className="size-11 sm:size-12" strokeWidth={1.7} />
+				<div className="relative flex size-28 flex-col items-center justify-center sm:size-36">
+					<div className="flex size-20 items-center justify-center rounded-full border border-mentor/25 bg-background/95 text-mentor shadow-[0_18px_48px_-18px_var(--color-mentor)] backdrop-blur-xl sm:size-28 dark:bg-secondary">
+						<Hammer className="size-9 sm:size-12" strokeWidth={1.7} />
 					</div>
-					<p className="mt-2 text-sm font-semibold">Hephaestus</p>
-					<p className="text-[11px] text-muted-foreground">Reviews the work</p>
+					<div className="mt-1 rounded-lg bg-background/90 px-2 py-1 text-center backdrop-blur-sm dark:bg-secondary/90">
+						<p className="text-sm font-semibold">Hephaestus</p>
+						<p className="text-[11px] text-muted-foreground">Reviews the work</p>
+					</div>
 				</div>
 			</motion.div>
 
@@ -186,11 +188,11 @@ export function LandingFeedbackPreview({ staticMode = false }: LandingFeedbackPr
 				animate={{ opacity: 1, x: 0, rotate: 0 }}
 				transition={{ ...entranceTransition, delay: 0.6 }}
 				whileHover={shouldReduceMotion ? undefined : { y: -4, scale: 1.01 }}
-				className="absolute bottom-[86px] left-0 w-[52%] rounded-2xl border border-warning/35 bg-background/95 p-3 shadow-[0_18px_45px_-24px_rgb(15_23_42_/_0.45)] backdrop-blur-md sm:bottom-9 sm:left-5 sm:w-[250px] sm:p-4 dark:bg-secondary/70 dark:shadow-black/50"
+				className="absolute bottom-[32px] left-0 w-[48%] rounded-2xl border border-warning/35 bg-background/95 p-3 shadow-[0_18px_45px_-24px_rgb(15_23_42_/_0.45)] backdrop-blur-md sm:bottom-9 sm:left-5 sm:w-[250px] sm:p-4 dark:bg-secondary/70 dark:shadow-black/50"
 			>
 				<div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.12em] text-warning uppercase sm:text-xs">
 					<Lightbulb className="size-3.5" />
-					Try next
+					What to try next
 				</div>
 				<p className="text-[13px] leading-relaxed sm:text-sm">
 					Add one sentence explaining why the change matters.
@@ -202,29 +204,35 @@ export function LandingFeedbackPreview({ staticMode = false }: LandingFeedbackPr
 				animate={{ opacity: 1, x: 0, rotate: 0 }}
 				transition={{ ...entranceTransition, delay: 0.7 }}
 				whileHover={shouldReduceMotion ? undefined : { y: -4, scale: 1.01 }}
-				className="absolute -bottom-2 right-0 w-[51%] rounded-2xl border border-mentor/25 bg-background/95 p-3 shadow-[0_18px_45px_-24px_rgb(15_23_42_/_0.45)] backdrop-blur-md sm:bottom-6 sm:right-3 sm:w-[240px] sm:p-4 dark:bg-secondary/70 dark:shadow-black/50"
+				className="absolute bottom-0 right-0 w-[48%] rounded-2xl border border-mentor/25 bg-background/95 p-3 shadow-[0_18px_45px_-24px_rgb(15_23_42_/_0.45)] backdrop-blur-md sm:bottom-6 sm:right-3 sm:w-[240px] sm:p-4 dark:bg-secondary/70 dark:shadow-black/50"
 			>
 				<div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.12em] text-mentor uppercase sm:text-xs">
 					<MentorIcon size={20} pad={3} />
 					Talk with Heph
 				</div>
 				<div className="space-y-1.5 text-[11px] sm:text-xs">
-					<motion.p
+					<motion.div
 						initial={shouldReduceMotion ? false : { opacity: 0, x: -8 }}
 						animate={{ opacity: 1, x: 0 }}
 						transition={{ duration: 0.4, delay: 0.9 }}
-						className="mr-4 rounded-xl rounded-bl-sm bg-mentor/10 px-2.5 py-1.5"
+						className="mr-3 rounded-xl rounded-bl-sm bg-mentor/10 px-2.5 py-1.5"
 					>
-						Want help drafting it?
-					</motion.p>
-					<motion.p
+						<span className="mb-0.5 block text-[9px] font-semibold tracking-wide text-mentor uppercase">
+							Heph
+						</span>
+						Want help drafting that sentence?
+					</motion.div>
+					<motion.div
 						initial={shouldReduceMotion ? false : { opacity: 0, x: 8 }}
 						animate={{ opacity: 1, x: 0 }}
 						transition={{ duration: 0.4, delay: 1.05 }}
-						className="ml-7 rounded-xl rounded-br-sm bg-muted px-2.5 py-1.5"
+						className="ml-5 rounded-xl rounded-br-sm bg-muted px-2.5 py-1.5"
 					>
+						<span className="mb-0.5 block text-[9px] font-semibold tracking-wide text-muted-foreground uppercase">
+							You
+						</span>
 						Yes—keep it short.
-					</motion.p>
+					</motion.div>
 				</div>
 			</motion.div>
 		</motion.div>
@@ -240,13 +248,13 @@ export function LandingHeroSection({
 	const shouldReduceMotion = useReducedMotion();
 
 	return (
-		<section className="relative w-full overflow-hidden bg-background pb-16 pt-10 text-foreground sm:pb-20 sm:pt-16 lg:pb-24 lg:pt-20">
+		<section className="relative w-full overflow-hidden bg-background pb-12 pt-8 text-foreground sm:pb-20 sm:pt-16 lg:pb-24 lg:pt-20">
 			<div className="pointer-events-none absolute inset-0 -z-0">
 				<div className="absolute left-1/2 top-0 h-[520px] w-[900px] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,var(--color-mentor)_0%,transparent_68%)] opacity-[0.055]" />
 				<div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
 			</div>
 
-			<div className="container relative z-10 mx-auto grid max-w-7xl items-center gap-14 px-4 md:px-6 lg:grid-cols-[0.82fr_1.18fr] lg:gap-8 xl:gap-14">
+			<div className="container relative z-10 mx-auto grid max-w-7xl items-center gap-8 px-4 md:px-6 sm:gap-14 lg:grid-cols-[0.82fr_1.18fr] lg:gap-8 xl:gap-14">
 				<motion.div
 					initial={shouldReduceMotion ? false : "hidden"}
 					animate="visible"
@@ -265,7 +273,7 @@ export function LandingHeroSection({
 							hidden: { opacity: 0, y: 14 },
 							visible: { opacity: 1, y: 0, transition: entranceTransition },
 						}}
-						className="mb-5 inline-flex items-center gap-2 rounded-full border border-mentor/20 bg-mentor/5 px-3 py-1.5 text-sm font-medium text-mentor"
+						className="mb-4 inline-flex items-center gap-2 rounded-full border border-mentor/20 bg-mentor/5 px-3 py-1.5 text-sm font-medium text-mentor sm:mb-5"
 					>
 						<Hammer className="size-4" />
 						Practice feedback for software teams
@@ -286,9 +294,9 @@ export function LandingHeroSection({
 							hidden: { opacity: 0, y: 16 },
 							visible: { opacity: 1, y: 0, transition: entranceTransition },
 						}}
-						className="mt-6 max-w-[620px] text-pretty text-lg leading-relaxed text-muted-foreground sm:text-xl"
+						className="mt-4 max-w-[620px] text-pretty text-lg leading-relaxed text-muted-foreground sm:mt-6 sm:text-xl"
 					>
-						Hephaestus uses the work and context already available in your team's tools to give you
+						Hephaestus uses relevant work and context from your team's existing tools to give you
 						practice feedback: what worked, what could improve, and what to try next.
 					</motion.p>
 
@@ -297,7 +305,7 @@ export function LandingHeroSection({
 							hidden: { opacity: 0, y: 16 },
 							visible: { opacity: 1, y: 0, transition: entranceTransition },
 						}}
-						className="mt-8 flex w-full flex-col items-center gap-3 sm:w-auto sm:flex-row lg:items-start"
+						className="mt-6 flex w-full flex-col items-center gap-3 sm:mt-8 sm:w-auto sm:flex-row lg:items-start"
 					>
 						<LandingSignInCTA
 							isSignedIn={isSignedIn}
@@ -321,9 +329,9 @@ export function LandingHeroSection({
 							hidden: { opacity: 0 },
 							visible: { opacity: 1, transition: { duration: 0.5, delay: 0.25 } },
 						}}
-						className="mt-5 text-sm text-muted-foreground"
+						className="mt-4 text-sm text-muted-foreground sm:mt-5"
 					>
-						Works with GitHub and GitLab projects
+						Works with projects on GitHub and GitLab
 					</motion.p>
 				</motion.div>
 

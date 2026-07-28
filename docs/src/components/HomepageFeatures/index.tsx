@@ -30,7 +30,7 @@ const FeatureList: FeatureItem[] = [
     title: 'Chat with Heph',
     kicker: 'Talk through feedback and recent work',
     description:
-      'Heph can use your recent issues, commits, reviews, pull or merge requests, and delivered feedback as context.',
+      'Heph can use your recent issues, commits, reviews, pull or merge requests, and feedback you have received as context.',
     bullets: [
       'Ask a question about a recent change',
       'Reflect on feedback before deciding what to do',

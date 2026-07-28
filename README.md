@@ -25,13 +25,13 @@ Hephaestus gives developers feedback on the engineering practices they use in so
 
 <div align="center">
   <picture>
-    <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="./docs/images/readme/landing-feedback-preview-mobile-dark.png">
-    <source media="(max-width: 600px) and (prefers-color-scheme: light)" srcset="./docs/images/readme/landing-feedback-preview-mobile-light.png">
+    <source media="(max-width: 520px) and (prefers-color-scheme: dark)" srcset="./docs/images/readme/landing-feedback-preview-mobile-dark.png">
+    <source media="(max-width: 520px) and (prefers-color-scheme: light)" srcset="./docs/images/readme/landing-feedback-preview-mobile-light.png">
     <source media="(prefers-color-scheme: dark)" srcset="./docs/images/readme/landing-feedback-preview-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="./docs/images/readme/landing-feedback-preview-light.png">
-    <img alt="Hephaestus reviewing a focused project change: it highlights that the change is easy to review, suggests explaining why it matters, and offers to help draft the explanation with Heph." src="./docs/images/readme/landing-feedback-preview-light.png" width="744">
+    <img alt="Example practice feedback on a focused change: Hephaestus notes that the change is easy to review and suggests explaining why it matters; Heph then offers to help draft that explanation." src="./docs/images/readme/landing-feedback-preview-light.png" width="744">
   </picture>
-  <p><sub>One feedback example and a follow-up with Heph.</sub></p>
+  <p><sub>One example of practice feedback and a follow-up with Heph.</sub></p>
 </div>
 
 Hephaestus is built for software engineering courses, open-source projects, and teams where mentors and maintainers cannot review every contribution themselves.
@@ -49,14 +49,16 @@ Hephaestus is built for software engineering courses, open-source projects, and 
 The loop starts with a developer's project work and the context around it. Hephaestus reviews the work against the engineering practices configured for the workspace, turns what it finds into feedback, and delivers that feedback where it can help.
 
 <picture>
-  <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="./docs/static/img/brand/feedback-loop-mobile-dark.svg">
-  <source media="(max-width: 600px) and (prefers-color-scheme: light)" srcset="./docs/static/img/brand/feedback-loop-mobile-light.svg">
-  <source media="(prefers-color-scheme: dark)" srcset="./docs/static/img/brand/feedback-loop-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="./docs/static/img/brand/feedback-loop-light.svg">
-  <img alt="Hephaestus feedback loop: project work and context are reviewed against workspace practices; feedback explains what worked, what could improve, and what to try next; it can reach the developer alongside the work, in a private view, or with Heph; the developer chooses whether to use, question, or skip it before their next project work." src="./docs/static/img/brand/feedback-loop-light.svg">
+  <source media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset="./docs/images/readme/feedback-loop-mobile-dark.png">
+  <source media="(max-width: 640px) and (prefers-color-scheme: light)" srcset="./docs/images/readme/feedback-loop-mobile-light.png">
+  <source media="(max-width: 1024px) and (prefers-color-scheme: dark)" srcset="./docs/images/readme/feedback-loop-tablet-dark.png">
+  <source media="(max-width: 1024px) and (prefers-color-scheme: light)" srcset="./docs/images/readme/feedback-loop-tablet-light.png">
+  <source media="(prefers-color-scheme: dark)" srcset="./docs/images/readme/feedback-loop-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="./docs/images/readme/feedback-loop-light.png">
+  <img alt="Hephaestus feedback loop: project work and context are reviewed against workspace practices; practice feedback explains what worked, what could improve, and what to try next; it can appear alongside the work or in conversation with Heph; the developer decides whether to use, question, or skip it before their next piece of project work." src="./docs/images/readme/feedback-loop-light.png" width="1224">
 </picture>
 
-Developers decide what helps: use the feedback, question it, or skip it. Their next project work continues the cycle. Hephaestus supports mentors, teachers, and maintainers by covering routine feedback. It does not replace their judgement or the relationships they build with developers.
+Developers decide what helps: use the feedback, question it, or skip it. The cycle continues with their next piece of project work. Hephaestus supports mentors, teachers, and maintainers by covering routine feedback. It does not replace their judgement or the relationships they build with developers.
 
 ## Project status
 
