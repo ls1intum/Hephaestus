@@ -6,7 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.spi.AgentConfigChecker;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeDetectionReadiness;
 import de.tum.cit.aet.hephaestus.practices.spi.UserRoleChecker;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceResolver;
@@ -56,7 +56,7 @@ public class PracticeReviewDetectionGate {
 
     private final PracticeReviewProperties properties;
     private final UserRoleChecker userRoleChecker;
-    private final AgentConfigChecker agentConfigChecker;
+    private final PracticeDetectionReadiness practiceDetectionReadiness;
     private final PracticeRepository practiceRepository;
     private final WorkspaceResolver workspaceResolver;
 
@@ -66,13 +66,13 @@ public class PracticeReviewDetectionGate {
     public PracticeReviewDetectionGate(
         PracticeReviewProperties properties,
         UserRoleChecker userRoleChecker,
-        AgentConfigChecker agentConfigChecker,
+        PracticeDetectionReadiness practiceDetectionReadiness,
         PracticeRepository practiceRepository,
         WorkspaceResolver workspaceResolver
     ) {
         this.properties = properties;
         this.userRoleChecker = userRoleChecker;
-        this.agentConfigChecker = agentConfigChecker;
+        this.practiceDetectionReadiness = practiceDetectionReadiness;
         this.practiceRepository = practiceRepository;
         this.workspaceResolver = workspaceResolver;
     }
@@ -173,16 +173,14 @@ public class PracticeReviewDetectionGate {
             return new GateDecision.Skip("manual trigger disabled for workspace");
         }
 
-        // 3. Agent config gate: a config that will ACTUALLY run for detection must exist. Binding-aware
-        // (mirrors AgentJobService.resolvePracticeConfigs) so a bound-but-disabled practice config skips
-        // here instead of detecting (LLM cost) only for submission to resolve to zero jobs.
-        if (!agentConfigChecker.hasRunnablePracticeConfig(workspace.getId(), workspace.getPracticeConfigId())) {
+        // 3. Agent gate: skip rather than incur LLM cost for a detection run that would submit no jobs.
+        if (!practiceDetectionReadiness.hasRunnableAgent(workspace.getId())) {
             log.debug(
-                "Practice review gate: SKIP, reason=noRunnablePracticeConfig, prId={}, workspaceId={}",
+                "Practice review gate: SKIP, reason=noRunnableDetectionAgent, prId={}, workspaceId={}",
                 reviewable.getId(),
                 workspace.getId()
             );
-            return new GateDecision.Skip("no runnable practice config");
+            return new GateDecision.Skip("no runnable practice-detection agent");
         }
 
         // 4. Practice matching: at least one active practice must match the trigger event

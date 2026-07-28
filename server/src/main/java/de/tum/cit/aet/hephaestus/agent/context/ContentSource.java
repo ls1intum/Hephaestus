@@ -19,12 +19,10 @@ import java.util.Map;
  * carry a tuned threshold, or name a practice anywhere (field, file, javadoc). Such derivation is
  * practice-dependent TRANSFORM and belongs downstream — in the per-practice precompute script or the agent
  * (which has the mounted worktree). The single permitted in-connector transform is a practice-AGNOSTIC,
- * lossless structural reshape reused identically by every practice — the staging band: {@code diff_summary.md}
- * is a lossless re-chunking of {@code diff.patch} (passes the rule); a {@code test_presence.json} feature
- * file scanned from the worktree does not (it is Transform — deleted, ELT boundary). {@link #originId()}
- * is the enforcement seam: a provider stamped {@code "scm"} that emits a practice observation is, by definition,
- * code in the wrong layer. The SPI generalises verbatim to Slack/Outline/Jira — each LOADS its native
- * message/doc/ticket object, none pre-judges it.
+ * lossless structural reshape reused identically by every practice (e.g. {@code diff_summary.md} as a
+ * lossless re-chunking of {@code diff.patch}); a feature file scanned from the worktree is Transform and
+ * fails the rule. {@link #originId()} is the enforcement seam: a provider stamped {@code "scm"} that emits
+ * a practice observation is, by definition, code in the wrong layer.
  *
  * <p>Provider order at {@link WorkspaceContextBuilder} is governed by Spring's {@code @Order}; a
  * {@link #required()} provider whose {@link #contribute} throws aborts the build, optional providers degrade
@@ -45,11 +43,9 @@ public interface ContentSource {
 
     /**
      * The integration this provider projects from (ADR 0020) — recorded per file in the context manifest
-     * so the agent sees uniform provenance regardless of which connector produced the bytes. No default:
-     * every provider MUST state its own provenance ({@code "scm"} for SCM-derived context, {@code "core"}
-     * for Hephaestus-native data such as the mentor content sources, a future Slack/Outline connector its own id).
-     * Abstract on purpose — a silent default would mislabel a non-SCM provider's files as {@code "scm"} in
-     * the telescope, corrupting the one thing the manifest exists to provide; the compiler now forbids that.
+     * so the agent sees uniform provenance regardless of which connector produced the bytes.
+     * Abstract on purpose: a silent default would mislabel a non-SCM provider's files as {@code "scm"},
+     * corrupting the one thing the manifest exists to provide.
      */
     String originId();
 

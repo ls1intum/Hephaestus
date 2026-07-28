@@ -23,24 +23,15 @@ import org.springframework.transaction.annotation.Transactional;
     "Workspace-scoped via custom queries that all include workspaceId; PK-only DML allowed for delete/save"
 )
 public interface PracticeRepository extends JpaRepository<Practice, Long> {
-    // Fetches the bound area eagerly so callers (e.g. PracticeStandingContentSource) can read
-    // practice.getArea().getSlug()/getName() outside the transaction — open-in-view is disabled —
-    // without firing one extra SELECT per active practice.
+    // @EntityGraph fetches the bound area eagerly (here and below) so callers can read area fields
+    // outside the transaction — open-in-view is disabled — without one extra SELECT per practice.
     @EntityGraph(attributePaths = "area")
     List<Practice> findByWorkspaceIdAndActiveTrue(Long workspaceId);
 
-    /**
-     * Active practices targeting one artifact kind — the per-job catalog filter (PR job vs issue job).
-     * Fetches the bound area eagerly so {@code PracticeCatalogInjector.inject} can read
-     * {@code practice.getArea().getSlug()} for the index.json area key without firing one extra SELECT
-     * per active practice — open-in-view is disabled. Harmless for the whyBySlug/defectDetectorSlugs
-     * callers, which never touch area.
-     */
+    /** Active practices targeting one artifact kind — the per-job catalog filter (PR job vs issue job). */
     @EntityGraph(attributePaths = "area")
     List<Practice> findByWorkspaceIdAndActiveTrueAndArtifactType(Long workspaceId, WorkArtifact artifactType);
 
-    // Fetches the bound area eagerly so PracticeDTO.from (which reads area.slug) is safe to map
-    // outside the transaction — open-in-view is disabled.
     @EntityGraph(attributePaths = "area")
     Optional<Practice> findByWorkspaceIdAndSlug(Long workspaceId, String slug);
 

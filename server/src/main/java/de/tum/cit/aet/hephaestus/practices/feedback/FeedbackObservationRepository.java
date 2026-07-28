@@ -19,9 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Repository for the immutable {@link FeedbackObservation} M:N join binding a {@link Feedback} unit to the
  * {@link de.tum.cit.aet.hephaestus.practices.model.Observation}s it was composed from.
  *
- * <p>Written via a native {@code ON CONFLICT DO NOTHING} upsert (mirrors {@code Observation
- * .insertIfAbsent}) — the {@code @EmbeddedId}/{@code @MapsId} entity is awkward to build for a plain
- * {@code save()}, and the native path is race-safe on a recorder retry.
+ * <p>Written via a native {@code ON CONFLICT DO NOTHING} upsert — race-safe on a recorder retry.
  *
  * <p>Workspace-agnostic: the join row carries no tenant column — it is scoped through its parent
  * {@link Feedback} (which holds {@code workspace_id}), so callers tenant-scope at the {@code Feedback} level.
@@ -47,9 +45,9 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
     );
 
     /**
-     * Observation ids already bound to a SUPPRESSED unit of this job — i.e. withheld earlier in the flow (B2
-     * reaction suppression writes its {@code REACTED_*} units before the DELIVERED unit is recorded). The
-     * DELIVERED binding excludes these so a withheld observation is never also counted as delivered.
+     * Observation ids already bound to a SUPPRESSED unit of this job (reaction suppression writes its
+     * {@code REACTED_*} units before the DELIVERED unit is recorded). The DELIVERED binding excludes
+     * these so a withheld observation is never also counted as delivered.
      */
     @Query(
         value = """
@@ -62,15 +60,14 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
     List<UUID> findObservationIdsSuppressedForJob(@Param("agentJobId") UUID agentJobId);
 
     /**
-     * The DELIVERED feedback body bound to each of the given observations — the developer's advice source for
-     * the read surfaces (reflection dashboard, observation detail). Per ADR 0021 the immutable {@code Observation}
-     * carries evidence + observation + reasoning but NO advice; advice is composed into the delivered {@code Feedback}
-     * and read back from the delivered {@code Feedback}'s {@code body} column here.
+     * The composed advice body bound to each of the given observations — the advice source for the private
+     * read surfaces. Per ADR 0021 the immutable {@code Observation} carries NO advice; advice lives on the
+     * {@code Feedback} {@code body} column read here.
      *
-     * <p>An observation can be bound to more than one DELIVERED unit (e.g. successive re-deliveries), so this can
-     * return multiple rows per observation id; callers keep the most recent by {@code feedbackCreatedAt}. Only
-     * {@code DELIVERED} units with a non-null body are returned (PREPARED/SUPPRESSED/FAILED carry no body the
-     * developer ever saw).
+     * <p>Returns {@code DELIVERED} AND {@code FAILED} bodies: a failed SCM post must not blank the
+     * developer-facing reflection surfaces. PREPARED/SUPPRESSED units carry no body and drop out on the
+     * null-body filter. An observation can bind several such units (re-deliveries); callers keep the most
+     * recent by {@code feedbackCreatedAt}.
      */
     @Query(
         """
@@ -79,16 +76,19 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
                ff.feedback.createdAt AS feedbackCreatedAt
         FROM FeedbackObservation ff
         WHERE ff.observation.id IN :observationIds
-          AND ff.feedback.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.DELIVERED
+          AND ff.feedback.deliveryState IN (
+                de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.DELIVERED,
+                de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.FAILED
+              )
           AND ff.feedback.body IS NOT NULL
         """
     )
-    List<DeliveredObservationBody> findDeliveredBodiesByObservationIds(
+    List<ObservationAdviceBody> findAdviceBodiesByObservationIds(
         @Param("observationIds") Collection<UUID> observationIds
     );
 
-    /** Projection: an observation id paired with a DELIVERED feedback body and that feedback's creation time. */
-    interface DeliveredObservationBody {
+    /** Projection: an observation id paired with its composed advice body and that feedback's creation time. */
+    interface ObservationAdviceBody {
         UUID getObservationId();
         String getBody();
         Instant getFeedbackCreatedAt();

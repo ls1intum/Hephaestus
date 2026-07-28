@@ -8,17 +8,13 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
- * Persistence for the self-reported worker liveness registry (#1138). Written by each worker
- * ({@code WorkerLivenessReporter}); read by the orphan-recovery sweep to find jobs whose owning
- * worker has gone stale.
+ * Persistence for the self-reported worker liveness registry: written by {@link WorkerLivenessReporter},
+ * read by the orphan-recovery sweep to find jobs whose owning worker has gone stale.
  */
 @Repository
 @WorkspaceAgnostic("Fleet-wide worker coordination; not workspace-scoped.")
 public interface WorkerRegistryRepository extends JpaRepository<WorkerRegistry, String> {
-    /**
-     * Upsert this worker's heartbeat, keyed by {@code worker_id}, using the DB clock for both
-     * {@code last_heartbeat} and {@code registered_at} so liveness comparisons stay on one clock.
-     */
+    /** Upsert this worker's heartbeat on the DB clock, so every liveness comparison stays on one clock. */
     @Modifying
     @Query(
         value = "INSERT INTO worker_registry (worker_id, last_heartbeat, registered_at) " +
@@ -29,10 +25,8 @@ public interface WorkerRegistryRepository extends JpaRepository<WorkerRegistry, 
     void heartbeat(@Param("workerId") String workerId);
 
     /**
-     * Delete registrations whose heartbeat is older than {@code ttlSeconds} (DB clock). Bounds table
-     * growth from workers that died without a clean shutdown (SIGKILL) or from {@code worker_id} churn
-     * (e.g. hostname-derived ids across pod restarts). Uses a TTL far longer than the orphan lease, so
-     * any RUNNING job owned by such a worker has already been requeued before its row is removed.
+     * Delete registrations whose heartbeat is older than {@code ttlSeconds} on the DB clock. The caller
+     * must pass a TTL well above the orphan lease, so any job the worker owned is already requeued.
      *
      * @return number of rows deleted
      */

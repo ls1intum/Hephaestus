@@ -11,16 +11,13 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Atomic boundary for linking a Slack DM to its mentor {@code chat_thread}.
  *
- * <p>This is a <b>separate bean</b> from {@link SlackMentorService} on purpose: the find-or-create writes two
- * rows across two modules — the {@code chat_thread} is provisioned inside the mentor module via
- * {@link MentorSlackThreadService#ensureSlackThread} and the {@code integration.slack.domain} mapping row is
- * saved here — and both must commit or roll back together. {@code @Transactional} only takes effect across a real
- * proxy hop, so if {@link SlackMentorService#handleDm} self-invoked a {@code @Transactional} method on itself the
- * annotation would be ignored and a failure between the two writes would orphan a {@code chat_thread} row. Hoisting
- * the pair into a public {@code @Transactional} method on its own bean makes the atomicity real. {@code handleDm}
- * is deliberately <em>not</em> transactional (it makes remote Slack streaming calls that must stay outside any tx),
- * so this uses plain {@code @Transactional} (no {@code REQUIRES_NEW}) — there is no ambient caller transaction to
- * join, so a new one is started for the two writes.
+ * <p>A <b>separate bean</b> from {@link SlackMentorService} on purpose: the find-or-create writes two rows across
+ * two modules — the {@code chat_thread} via {@link MentorSlackThreadService#ensureSlackThread} and the
+ * {@code integration.slack.domain} mapping row — and both must commit or roll back together.
+ * {@code @Transactional} only takes effect across a real proxy hop, so self-invocation from
+ * {@link SlackMentorService#handleDm} would ignore the annotation and a failure between the writes would orphan a
+ * {@code chat_thread} row. {@code handleDm} itself stays non-transactional (its remote Slack streaming calls must
+ * stay outside any tx), so plain {@code @Transactional} suffices — there is no ambient caller transaction to join.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
@@ -37,11 +34,7 @@ public class MentorSlackThreadLinker {
         this.mentorSlackThreadService = mentorSlackThreadService;
     }
 
-    /**
-     * Find (or lazily create) the mentor {@code chat_thread} that backs this Slack DM. The mapping row lives in
-     * {@code integration.slack.domain}; the {@code chat_thread} is provisioned inside the mentor module. Both
-     * writes commit atomically within this method's transaction.
-     */
+    /** Find (or lazily create) the mentor {@code chat_thread} that backs this Slack DM. */
     @Transactional
     public UUID findOrCreateThread(
         long workspaceId,

@@ -35,8 +35,7 @@ import org.springframework.stereotype.Component;
  * Slack-side half of the weekly leaderboard digest fan-out.
  *
  * <p>Subscribes to {@link LeaderboardDigestReadyEvent} (one event per workspace-channel
- * target, emitted by {@code SlackWeeklyLeaderboardTask}) and performs the vendor-specific
- * work the leaderboard module is no longer allowed to touch: resolving Slack users for an
+ * target, emitted by {@code SlackWeeklyLeaderboardTask}): resolving Slack users for an
  * {@code @}-mention, building the {@code chat.postMessage} block kit payload, and sending.
  * The leaderboard task owns schedule + data assembly; this class owns publish.
  *
@@ -72,8 +71,6 @@ public class SlackLeaderboardDigestPublisher {
     public void onDigestReady(LeaderboardDigestReadyEvent event) {
         List<User> allSlackUsers = slackMessageService.listMembers(event.workspaceId());
 
-        // Render every top entry: an exact-matched reviewer becomes a real <@id> mention, an
-        // unmatched one becomes a plain name — never dropped, never fuzzy-mentioned.
         List<String> rankedMentions = event
             .topEntries()
             .stream()

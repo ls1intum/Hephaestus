@@ -12,25 +12,19 @@ import com.slack.api.model.block.composition.ConfirmationDialogObject;
 import java.util.List;
 
 /**
- * The single source of truth for the in-channel Slack consent notice — its plain-language copy and its Block Kit
- * rendering. Rendered in two places so a member always gets the SAME transparency message and the SAME one-click
- * control:
+ * The single source of truth for the in-channel Slack consent notice — its copy and its Block Kit rendering.
+ * Rendered in two places so a member always gets the same transparency message and one-click control:
  *
  * <ul>
  *   <li>the one-time <strong>activation announcement</strong> posted to the whole channel on
  *       {@code PENDING → ACTIVE} ({@code SlackChannelConsentService});</li>
  *   <li>the <strong>just-in-time ephemeral notice</strong> shown only to a member who joins an already-active
- *       channel afterwards ({@code SlackChannelJoinNoticeHandler}) — the person the one-time announcement could
- *       never reach.</li>
+ *       channel afterwards ({@code SlackChannelJoinNoticeHandler}).</li>
  * </ul>
  *
- * <p>The copy follows plain-language transparency guidance: it says concretely what is read, what is not read, and
- * gives the member direct control. The button carries a Slack {@code confirm} dialog and the stable
+ * <p>The opt-out button carries a Slack {@code confirm} dialog and the stable
  * {@link #ACTION_PARTICIPANT_OPT_OUT} action id the interactivity router binds to the channel-message exclusion +
- * erase path.
- *
- * <p>Pure and dependency-free (static block assembly, no Spring): a plain-text fallback rides on the surrounding
- * message so the notice still reads on a client that cannot render the actions.
+ * erase path. A plain-text fallback rides on the surrounding message for clients that cannot render the actions.
  */
 public final class SlackConsentBlocks {
 
@@ -77,10 +71,7 @@ public final class SlackConsentBlocks {
 
     private SlackConsentBlocks() {}
 
-    /**
-     * The consent notice: copy plus a destructive button with a confirm dialog. Freshly built per call so the
-     * returned list is never shared/mutated.
-     */
+    /** The consent notice: copy plus a destructive button with a confirm dialog. Freshly built per call. */
     public static List<LayoutBlock> consentNotice() {
         return activationNotice();
     }

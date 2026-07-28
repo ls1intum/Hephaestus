@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.export;
 
+import static de.tum.cit.aet.hephaestus.core.TransactionCallbacks.afterCommit;
+
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
@@ -13,8 +15,6 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
@@ -94,7 +94,7 @@ public class AccountExportService {
         // Hand off after the PENDING row commits so the worker's own transaction can read it.
         // The worker is @Async on a separate bean → real proxy hop (no inline self-invocation).
         Long exportId = export.getId();
-        registerAfterCommit(() -> generationWorker.generate(exportId, accountId));
+        afterCommit(() -> generationWorker.generate(exportId, accountId));
         return export;
     }
 
@@ -143,25 +143,5 @@ public class AccountExportService {
             e.getCompletedAt(),
             e.getExpiresAt()
         );
-    }
-
-    /**
-     * Run {@code action} after the current transaction commits, falling back to inline execution
-     * when there is no active synchronization (e.g. in a unit test without a real transaction).
-     * Package-private + overridable so tests can assert the handoff without an executor.
-     */
-    void registerAfterCommit(Runnable action) {
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(
-                new TransactionSynchronization() {
-                    @Override
-                    public void afterCommit() {
-                        action.run();
-                    }
-                }
-            );
-        } else {
-            action.run();
-        }
     }
 }

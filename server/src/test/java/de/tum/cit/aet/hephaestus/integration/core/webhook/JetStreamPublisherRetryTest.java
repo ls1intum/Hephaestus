@@ -65,7 +65,6 @@ class JetStreamPublisherRetryTest extends BaseUnitTest {
             .isInstanceOf(JetStreamPublisher.PublishFailedException.class)
             .hasMessageContaining("gitlab.org.repo.push");
 
-        // Resilience4j should have called the underlying publish exactly maxAttempts times.
         verify(jetStream, times(properties.publish().maxRetries())).publishAsync(
             any(String.class),
             any(Headers.class),

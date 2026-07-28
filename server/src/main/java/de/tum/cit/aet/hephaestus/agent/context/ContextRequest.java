@@ -45,7 +45,7 @@ public sealed interface ContextRequest
      * and runs against a long-lived interactive sandbox keyed by {@code (workspaceId, developerId)}.
      *
      * @param workspaceId   workspace scoping for every content source's queries
-     * @param developerId the active user (sometimes called {@code userId}) the content sources describe
+     * @param developerId the active user the content sources describe
      * @param threadId      conversation thread the request originated from (used by providers
      *                      that need per-thread cache keys)
      * @param currentUserMessageId message persisted for the active turn; history providers exclude it
@@ -72,14 +72,12 @@ public sealed interface ContextRequest
     }
 
     /**
-     * Build the materialised conversation-detection context: the ordered human turns of one
-     * settled Slack thread, materialised as {@code inputs/context/conversation_thread.json}, plus the
-     * same workspace-level cross-artifact context {@code IssueReviewRequest} carries (the project
-     * inventory) — aggregated across every repository the workspace monitors, since a conversation
-     * isn't anchored to one repository. NO diff, NO code, NO repository clone: providers that require a
-     * mounted worktree stay {@code PracticeReviewRequest}-only. Carries the {@link AgentJob} the practice
-     * runner executes; the thread is identified by {@code slack_channel_id} / {@code slack_thread_ts} in
-     * the job metadata.
+     * Build the materialised conversation-detection context: the ordered human turns of one settled
+     * Slack thread ({@code inputs/context/conversation_thread.json}) plus the workspace-level project
+     * inventory, aggregated across every monitored repository since a conversation isn't anchored to
+     * one. NO diff, NO code, NO repository clone: providers that require a mounted worktree stay
+     * {@code PracticeReviewRequest}-only. Carries the {@link AgentJob} the practice runner executes;
+     * the thread is identified by {@code slack_channel_id} / {@code slack_thread_ts} in the job metadata.
      */
     record ConversationReviewRequest(AgentJob job) implements ContextRequest {
         public ConversationReviewRequest {

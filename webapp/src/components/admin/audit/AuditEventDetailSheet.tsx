@@ -1,4 +1,5 @@
 import type { AuthEventView } from "@/api/types.gen";
+import { DetailRow } from "@/components/common/DetailRow";
 import { Badge } from "@/components/ui/badge";
 import {
 	Sheet,
@@ -7,31 +8,18 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from "@/components/ui/sheet";
-import { accountLabel, eventLabel, formatTimestamp, prettyDetails } from "./auditFormat";
+import { prettyJson } from "../audit-shared/pretty-json";
+import { refLabel } from "../audit-shared/ref-label";
+import { formatTimestamp } from "../audit-shared/time-format";
+import { eventLabel, resultLabel } from "./audit-format";
 
 interface AuditEventDetailSheetProps {
 	event: AuthEventView | null;
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	/** Resolve a workspace id to its name (client-side, from the admin workspace list). */
 	resolveWorkspaceName?: (id: number) => string | undefined;
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-	return (
-		<div className="grid grid-cols-[8rem_1fr] gap-2 py-1.5 text-sm">
-			<dt className="text-muted-foreground">{label}</dt>
-			<dd className="min-w-0 break-words">{children}</dd>
-		</div>
-	);
-}
-
-/**
- * Full forensic view of a single audit event — every field the row can't fit (workspace, user agent,
- * pretty-printed details) plus both identities. A right-hand detail drawer is the pattern Datadog and
- * Tailscale use so wide records aren't crammed into columns or hidden in tooltips; a Sheet (vs. a modal
- * Dialog) keeps the audit table visible behind it, matching the "inspect a row" mental model.
- */
 export function AuditEventDetailSheet({
 	event,
 	open,
@@ -39,9 +27,9 @@ export function AuditEventDetailSheet({
 	resolveWorkspaceName,
 }: AuditEventDetailSheetProps) {
 	const ts = event ? formatTimestamp(event.occurredAt) : null;
-	const account = event ? accountLabel(event.account, event.accountId) : null;
-	const actor = event ? accountLabel(event.actor, event.actingAccountId) : null;
-	const pretty = event ? prettyDetails(event.details) : null;
+	const account = event ? refLabel(event.account, event.accountId) : null;
+	const actor = event ? refLabel(event.actor, event.actingAccountId) : null;
+	const pretty = event ? prettyJson(event.details) : null;
 	const workspaceName =
 		event?.workspaceId != null ? resolveWorkspaceName?.(event.workspaceId) : undefined;
 
@@ -55,23 +43,29 @@ export function AuditEventDetailSheet({
 					</SheetDescription>
 				</SheetHeader>
 
-				{event && ts && (
+				{event && (
 					<dl className="divide-y px-4 pb-4">
-						<Row label="Time">
-							<span>{ts.local}</span>
-							<span className="ml-2 text-xs text-muted-foreground">({ts.isoUtc})</span>
-						</Row>
-						<Row label="Result">
+						<DetailRow label="Time">
+							{ts ? (
+								<>
+									<span>{ts.local}</span>
+									<span className="ml-2 text-xs text-muted-foreground">({ts.isoUtc})</span>
+								</>
+							) : (
+								"—"
+							)}
+						</DetailRow>
+						<DetailRow label="Result">
 							<Badge variant={event.result === "FAILURE" ? "destructive" : "outline"}>
-								{event.result}
+								{resultLabel(event.result)}
 							</Badge>
-						</Row>
+						</DetailRow>
 						{event.failureReason && (
-							<Row label="Failure reason">
+							<DetailRow label="Failure reason">
 								<span className="text-destructive">{event.failureReason}</span>
-							</Row>
+							</DetailRow>
 						)}
-						<Row label="Account">
+						<DetailRow label="Account">
 							{account ? (
 								<span>
 									{account}
@@ -84,8 +78,8 @@ export function AuditEventDetailSheet({
 							) : (
 								"—"
 							)}
-						</Row>
-						<Row label="Actor">
+						</DetailRow>
+						<DetailRow label="Impersonated by">
 							{actor ? (
 								<span>
 									{actor}
@@ -96,27 +90,27 @@ export function AuditEventDetailSheet({
 							) : (
 								"—"
 							)}
-						</Row>
-						<Row label="Workspace">
+						</DetailRow>
+						<DetailRow label="Workspace">
 							{event.workspaceId != null
 								? workspaceName
 									? `${workspaceName} (#${event.workspaceId})`
 									: `#${event.workspaceId}`
 								: "—"}
-						</Row>
-						<Row label="IP address">
+						</DetailRow>
+						<DetailRow label="IP address">
 							<span className="font-mono text-xs">{event.ipAddress ?? "—"}</span>
-						</Row>
-						<Row label="User agent">
+						</DetailRow>
+						<DetailRow label="User agent">
 							<span className="text-xs">{event.userAgent ?? "—"}</span>
-						</Row>
-						<Row label="Details">
+						</DetailRow>
+						<DetailRow label="Raw data">
 							{pretty ? (
 								<pre className="max-h-48 overflow-auto rounded bg-muted p-2 text-xs">{pretty}</pre>
 							) : (
 								"—"
 							)}
-						</Row>
+						</DetailRow>
 					</dl>
 				)}
 			</SheetContent>

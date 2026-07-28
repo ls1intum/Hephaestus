@@ -12,12 +12,8 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * Handles Slack's agent Messages tab lifecycle: when a member opens the mentor DM, seed the top of the
- * Messages tab with suggested prompts so the first turn is a click, not a blank box.
- *
- * <p>The prompts are framed around the member's own practice history (needs-attention first), which is the mentor's
- * job to surface once the turn runs. Selecting the concrete needs-attention practices per developer from this
- * pre-turn, security-context-free path is a live-only refinement; the deterministic part is the routing +
- * prompt assembly + the {@code setSuggestedPrompts} seam. Best-effort — a Slack failure is swallowed.
+ * Messages tab with suggested prompts so the first turn is a click, not a blank box. Best-effort — a Slack
+ * failure is swallowed.
  */
 @Service
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")

@@ -16,8 +16,8 @@ import { server } from "@/mocks/server";
 // `*/path` wildcards, so this host is matched regardless of its exact value.
 client.setConfig({ baseUrl: "http://localhost:8080" });
 
-// jsdom has no ResizeObserver; cmdk's <Command.List> observes its own size to size the popup.
-// A no-op stub is enough for tests — no assertions depend on the observed measurements.
+// jsdom has no ResizeObserver; Base UI's anchor positioning observes elements to keep a popup
+// pinned to its trigger. A no-op stub is enough — no assertion depends on the measurements.
 if (typeof globalThis.ResizeObserver === "undefined") {
 	globalThis.ResizeObserver = class ResizeObserver {
 		observe() {}
@@ -26,9 +26,31 @@ if (typeof globalThis.ResizeObserver === "undefined") {
 	};
 }
 
-// jsdom has no scrollIntoView either; cmdk calls it to keep the highlighted option in view.
+// jsdom has no `matchMedia`; the toaster asks it for `prefers-reduced-motion` on mount.
+if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
+	window.matchMedia = (query: string) =>
+		({
+			matches: false,
+			media: query,
+			onchange: null,
+			addListener: () => {},
+			removeListener: () => {},
+			addEventListener: () => {},
+			removeEventListener: () => {},
+			dispatchEvent: () => false,
+		}) as MediaQueryList;
+}
+
+// jsdom has no scrollIntoView either; Base UI calls it to keep the highlighted option in view.
 if (typeof Element.prototype.scrollIntoView !== "function") {
 	Element.prototype.scrollIntoView = () => {};
+}
+
+// jsdom implements no Web Animations API; Base UI's ScrollArea viewport asks its element for
+// running animations on a timer, which would otherwise throw *after* a test finished and surface
+// as an unhandled error. No assertions depend on animations.
+if (typeof Element.prototype.getAnimations !== "function") {
+	Element.prototype.getAnimations = () => [];
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));

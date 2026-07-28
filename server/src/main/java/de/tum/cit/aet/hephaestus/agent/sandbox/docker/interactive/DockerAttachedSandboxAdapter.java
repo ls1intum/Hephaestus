@@ -42,6 +42,7 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
     private final SandboxIdentity identity;
     private final String containerId;
     private final String networkId;
+    private final InteractiveSandboxRuntimeKey runtimeKey;
 
     private final PiProcessHandle process;
     private final JsonlStdoutPump pump;
@@ -74,6 +75,7 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
         String workspaceId,
         String containerId,
         String networkId,
+        InteractiveSandboxRuntimeKey runtimeKey,
         PiProcessHandle process,
         ObjectMapper mapper,
         FrameRingBuffer ring,
@@ -91,6 +93,7 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
         this.identity = new SandboxIdentity(sessionId, userId, workspaceId);
         this.containerId = containerId;
         this.networkId = networkId;
+        this.runtimeKey = runtimeKey;
         this.process = process;
         this.ring = ring;
         this.metrics = metrics;
@@ -281,6 +284,10 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
 
     String networkId() {
         return networkId;
+    }
+
+    boolean hasRuntimeKey(InteractiveSandboxRuntimeKey requested) {
+        return runtimeKey.equals(requested);
     }
 
     EvictionReason terminalReason() {

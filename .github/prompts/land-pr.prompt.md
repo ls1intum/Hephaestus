@@ -98,7 +98,19 @@ pnpm run check
 
 Both must pass.
 
-## 9. Create Branch (if on main)
+## 9. Changeset (required for shipped-code changes)
+
+If this PR changes `server/`, `webapp/`, or `docker/`, it must carry a changeset or CI (`verify-changesets`) fails:
+
+```bash
+pnpm changeset          # user-facing change: pick the bump, describe it for operators
+pnpm changeset --empty  # no user-facing effect (refactor/test/docs-only)
+```
+
+Pre-1.0: never pick `major`. Stage the generated `.changeset/*.md` before committing. `pnpm changeset` is
+interactive — with no TTY, write `.changeset/<slug>.md` by hand (`.changeset/README.md` shows the format).
+
+## 10. Create Branch (if on main)
 
 ```bash
 git branch --show-current
@@ -112,7 +124,7 @@ git checkout -b <type>/<description>
 
 Types: `feat`, `fix`, `docs`, `refactor`, `test`, `ci`, `chore`
 
-## 10. Commit
+## 11. Commit
 
 ```bash
 git add -A
@@ -122,22 +134,22 @@ git commit -m "<type>(<scope>): <description>"
 **Scopes:**
 
 - Service: `webapp`, `server`, `docs`
-- Infra (no release): `ci`, `config`, `deps`, `deps-dev`, `docker`, `scripts`, `security`, `db`, `no-release`
-- Feature: `integration`, `scm`, `leaderboard`, `mentor`, `notifications`, `profile`, `teams`, `workspace`
+- Infra: `ci`, `config`, `deps`, `deps-dev`, `docker`, `scripts`, `security`, `db`, `release`
+- Feature: `auth`, `integration`, `scm`, `leaderboard`, `mentor`, `notifications`, `profile`, `teams`, `workspace`
 
-## 11. Push
+## 12. Push
 
 ```bash
 git push -u origin HEAD
 ```
 
-## 12. Check if PR Exists
+## 13. Check if PR Exists
 
 ```bash
 PAGER=cat gh pr view --json number,url 2>/dev/null && echo "PR exists - skip creation" || echo "No PR - create one"
 ```
 
-## 13. Create PR (if needed)
+## 14. Create PR (if needed)
 
 Skip if step 13 showed "PR exists".
 
@@ -153,7 +165,7 @@ PAGER=cat gh pr create --base main \
 <steps to verify, or 'CI covers this'>"
 ```
 
-## 14. Verify
+## 15. Verify
 
 ```bash
 PAGER=cat gh pr view --json url,title -q '"PR: \(.title)\nURL: \(.url)"'

@@ -46,12 +46,12 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
 
         new WebhookJetStreamBootstrap(jsm, properties).bootstrap();
 
-        // One stream per registered integration kind (gitlab/github/slack).
+        // One stream per NATS-publishing integration kind (gitlab/github/slack/outline).
         ArgumentCaptor<StreamConfiguration> captor = ArgumentCaptor.forClass(StreamConfiguration.class);
-        verify(jsm, times(3)).addStream(captor.capture());
+        verify(jsm, times(4)).addStream(captor.capture());
         assertThat(captor.getAllValues())
             .extracting(StreamConfiguration::getName)
-            .containsExactlyInAnyOrder("gitlab", "github", "slack");
+            .containsExactlyInAnyOrder("gitlab", "github", "slack", "outline");
     }
 
     @Test
@@ -77,7 +77,7 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
         new WebhookJetStreamBootstrap(jsm, overridden).bootstrap();
 
         ArgumentCaptor<StreamConfiguration> captor = ArgumentCaptor.forClass(StreamConfiguration.class);
-        verify(jsm, times(3)).addStream(captor.capture());
+        verify(jsm, times(4)).addStream(captor.capture());
         assertThat(captor.getAllValues())
             .filteredOn(config -> "slack".equals(config.getName()))
             .singleElement()

@@ -23,7 +23,15 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 
-type ProviderType = "GITHUB" | "GITLAB" | "SLACK";
+/** Mirrors `CreateLoginProviderRequest["type"]` — every provider type the server accepts. */
+type ProviderType = "GITHUB" | "GITLAB" | "SLACK" | "OUTLINE";
+
+/** Scope hint per provider type — Outline's OAuth app only needs `read` for identity linking. */
+function scopesPlaceholder(type: ProviderType): string {
+	if (type === "SLACK") return "openid profile email";
+	if (type === "OUTLINE") return "read";
+	return "Defaulted by provider type if blank";
+}
 
 interface LoginProviderFormDialogProps {
 	open: boolean;
@@ -70,21 +78,30 @@ export function LoginProviderFormDialog({
 		setErrors({});
 	}, [open, editing]);
 
-	const isGitlab = type === "GITLAB";
+	// GitHub is always github.com and Slack is always slack.com; GitLab and Outline are self-hosted
+	// per instance, so only those two carry a base URL.
+	const needsBaseUrl = type === "GITLAB" || type === "OUTLINE";
 	const isSlack = type === "SLACK";
+	const isOutline = type === "OUTLINE";
+
+	// The redirect URI the operator must register on the upstream OAuth app. On edit the server
+	// already computed it; on create we derive the same shape from this instance's origin.
+	const redirectUri =
+		editing?.redirectUri ??
+		`${window.location.origin}/api/login/oauth2/code/${registrationId.trim() || "<registration-id>"}`;
 
 	// Mirror the server-side constraints so the operator sees the problem inline before a round-trip:
-	// the registration id is the immutable callback-path segment, and a GitLab base URL must be HTTPS.
+	// the registration id is the immutable callback-path segment, and an instance base URL must be HTTPS.
 	const REGISTRATION_ID_PATTERN = /^[a-z][a-z0-9-]{1,62}$/;
 	const validate = (): boolean => {
 		const next: { registrationId?: string; baseUrl?: string } = {};
 		if (!isEdit && !REGISTRATION_ID_PATTERN.test(registrationId.trim())) {
 			next.registrationId = "Lowercase letters, digits and hyphens; must start with a letter.";
 		}
-		if (isGitlab && (!isEdit || baseUrl.trim())) {
+		if (needsBaseUrl && (!isEdit || baseUrl.trim())) {
 			const value = baseUrl.trim();
 			if (!isEdit && !value) {
-				next.baseUrl = "A GitLab instance URL is required.";
+				next.baseUrl = "An instance base URL is required.";
 			} else if (value && !value.startsWith("https://")) {
 				next.baseUrl = "Must be an HTTPS URL.";
 			}
@@ -101,7 +118,7 @@ export function LoginProviderFormDialog({
 		if (isEdit && editing) {
 			const body: UpdateLoginProviderRequest = {
 				displayName: displayName.trim() || undefined,
-				baseUrl: isGitlab ? baseUrl.trim() || undefined : undefined,
+				baseUrl: needsBaseUrl ? baseUrl.trim() || undefined : undefined,
 				clientId: clientId.trim() || undefined,
 				clientSecret: clientSecret.trim() || undefined,
 				scopes: scopes.trim() || undefined,
@@ -113,7 +130,7 @@ export function LoginProviderFormDialog({
 			registrationId: registrationId.trim(),
 			type,
 			displayName: displayName.trim() || undefined,
-			baseUrl: isGitlab ? baseUrl.trim() || undefined : undefined,
+			baseUrl: needsBaseUrl ? baseUrl.trim() || undefined : undefined,
 			clientId: clientId.trim(),
 			clientSecret: clientSecret.trim(),
 			scopes: scopes.trim() || undefined,
@@ -128,8 +145,8 @@ export function LoginProviderFormDialog({
 					<DialogHeader>
 						<DialogTitle>{isEdit ? "Edit login provider" : "Add login provider"}</DialogTitle>
 						<DialogDescription>
-							Configure sign-in and account-link providers. Slack is link-only: it appears in
-							Settings for account linking, not on the public sign-in page.
+							Configure sign-in and account-link providers. Slack and Outline are link-only: they
+							appear in Settings for account linking, not on the public sign-in page.
 						</DialogDescription>
 					</DialogHeader>
 
@@ -167,12 +184,21 @@ export function LoginProviderFormDialog({
 								<SelectItem value="GITHUB">GitHub</SelectItem>
 								<SelectItem value="GITLAB">GitLab / self-hosted GitLab</SelectItem>
 								<SelectItem value="SLACK">Slack / Sign in with Slack</SelectItem>
+								<SelectItem value="OUTLINE">Outline (link-only)</SelectItem>
 							</SelectContent>
 						</Select>
 						{isSlack && (
 							<FieldDescription>
 								Use the same Slack app client ID and secret. Add this provider's redirect URI to the
 								Slack app redirect URLs.
+							</FieldDescription>
+						)}
+						{isOutline && (
+							<FieldDescription>
+								Outline is <strong>link-only</strong>: users connect it from Settings so their
+								documents are attributed to them — nobody signs in to Hephaestus with it. Create an
+								OAuth app in Outline under <strong>Settings → Applications</strong> and register
+								this redirect URI: <code className="break-all">{redirectUri}</code>
 							</FieldDescription>
 						)}
 					</Field>
@@ -187,7 +213,7 @@ export function LoginProviderFormDialog({
 						/>
 					</Field>
 
-					{isGitlab && (
+					{needsBaseUrl && (
 						<Field data-invalid={errors.baseUrl ? "true" : undefined}>
 							<FieldLabel htmlFor="lp-base-url">Instance base URL</FieldLabel>
 							<Input
@@ -195,13 +221,16 @@ export function LoginProviderFormDialog({
 								type="url"
 								value={baseUrl}
 								onChange={(e) => setBaseUrl(e.target.value)}
-								placeholder="https://gitlab.example.com"
-								required={isGitlab && !isEdit}
+								placeholder={
+									isOutline ? "https://outline.example.com" : "https://gitlab.example.com"
+								}
+								required={!isEdit}
 								aria-invalid={errors.baseUrl ? "true" : undefined}
 								aria-describedby="lp-base-url-description"
 							/>
 							<FieldDescription id="lp-base-url-description">
-								HTTPS only. GitHub is always github.com, so this field is GitLab-only.
+								HTTPS only. GitHub and Slack are always at a fixed host, so this field applies to
+								self-hosted GitLab and Outline instances.
 							</FieldDescription>
 							{errors.baseUrl && <FieldError>{errors.baseUrl}</FieldError>}
 						</Field>
@@ -242,7 +271,7 @@ export function LoginProviderFormDialog({
 							id="lp-scopes"
 							value={scopes}
 							onChange={(e) => setScopes(e.target.value)}
-							placeholder={isSlack ? "openid profile email" : "Defaulted by provider type if blank"}
+							placeholder={scopesPlaceholder(type)}
 						/>
 					</Field>
 

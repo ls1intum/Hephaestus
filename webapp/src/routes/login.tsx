@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { toast } from "sonner";
 import { LoginCard } from "@/components/auth/LoginCard";
 import { useAuth } from "@/integrations/auth/AuthContext";
-import { ACCOUNT_DELETED_NOTICE_KEY } from "@/integrations/auth/accountDeletedNotice";
+import { ACCOUNT_DELETED_NOTICE_KEY } from "@/integrations/auth/account-deleted-notice";
 import { resolveCurrentUser, safeReturnTo } from "@/integrations/auth/guard";
 
 interface LoginSearch {

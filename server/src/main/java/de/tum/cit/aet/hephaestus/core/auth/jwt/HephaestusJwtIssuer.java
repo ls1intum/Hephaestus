@@ -186,8 +186,6 @@ public class HephaestusJwtIssuer {
         if (raw == null || raw.isBlank()) {
             return null;
         }
-        // Only IP literals contain ':' (IPv6) or are all-dotted-decimal/hex (IPv4). Reject anything
-        // that could be a hostname BEFORE calling getByName so we never perform DNS resolution.
         if (!raw.chars().allMatch(c -> Character.digit(c, 16) >= 0 || c == '.' || c == ':' || c == '%')) {
             return null;
         }

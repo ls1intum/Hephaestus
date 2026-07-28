@@ -27,16 +27,14 @@ import org.hibernate.annotations.OnDeleteAction;
  * An immutable, append-only snapshot of a {@link Practice}'s {@code criteria} at a point in time — the
  * rubric exactly as it was when a finding was detected against it.
  *
- * <p>Why this exists (reproducibility): admins edit {@code Practice.criteria} over time. If those
- * edits were destructive, no past finding could be reproduced against the rubric that actually fired it.
- * This is Slowly-Changing-Dimension Type 2 over {@code criteria}: each edit appends a revision;
- * {@link Practice#getCriteria()} remains the current projection, so no read path breaks. Per-practice
- * numbering is monotonic and gap-free ({@code uk_practice_revision_practice_number} enforces one row per
- * {@code (practice, revision_number)}).
+ * <p>Reproducibility: admins edit {@code Practice.criteria} over time; without snapshots no past finding
+ * could be reproduced against the rubric that actually fired it. This is Slowly-Changing-Dimension Type 2
+ * over {@code criteria}: each edit appends a revision; {@link Practice#getCriteria()} remains the current
+ * projection, so no read path breaks.
  *
  * <p>{@code Observation.practiceRevision} pins each finding to the revision the detector saw
- * ({@code fk_observation_revision} ON DELETE SET NULL); a finding detected before versioning shipped pins
- * {@code null} — an honest "pre-versioning" marker, not a reproducible snapshot. See ADR 0021 / ADR 0022.
+ * (ON DELETE SET NULL); a finding detected before versioning shipped pins {@code null} — an honest
+ * "pre-versioning" marker, not a reproducible snapshot. See ADR 0021 / ADR 0022.
  */
 @Entity
 @Immutable
@@ -78,7 +76,7 @@ public class PracticeRevision {
     @Column(name = "revision_number", nullable = false)
     private int revisionNumber;
 
-    /** The {@code criteria} text exactly as it was at this revision (the immutable snapshot this entity exists to keep). */
+    /** The {@code criteria} text exactly as it was at this revision. */
     @Column(name = "criteria", columnDefinition = "TEXT", nullable = false)
     @ToString.Exclude
     private String criteria;

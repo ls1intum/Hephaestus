@@ -1,0 +1,93 @@
+{
+  "data": {
+    "id": "cec98e59-623c-4392-a343-6e96b0995e51",
+    "url": "/doc/fixture-capture-child-2-OHQpaAib7z",
+    "urlId": "OHQpaAib7z",
+    "title": "Fixture Capture Child 2",
+    "text": "# Fixture Capture Child 2\n\nSecond child doc body.",
+    "icon": null,
+    "color": null,
+    "tasks": {
+      "completed": 0,
+      "total": 0
+    },
+    "language": null,
+    "createdAt": "2026-07-11T05:23:59.890Z",
+    "createdBy": {
+      "id": "99bdd8e2-176a-42fa-ba0c-4f9c4ce6caa9",
+      "name": "Felix Admin",
+      "avatarUrl": null,
+      "color": "#0300cc",
+      "role": "admin",
+      "isSuspended": false,
+      "createdAt": "2026-07-10T10:00:45.026Z",
+      "updatedAt": "2026-07-11T05:21:11.460Z",
+      "deletedAt": null,
+      "lastActiveAt": "2026-07-11T05:21:11.460Z",
+      "timezone": null
+    },
+    "updatedAt": "2026-07-11T05:23:59.890Z",
+    "updatedBy": {
+      "id": "99bdd8e2-176a-42fa-ba0c-4f9c4ce6caa9",
+      "name": "Felix Admin",
+      "avatarUrl": null,
+      "color": "#0300cc",
+      "role": "admin",
+      "isSuspended": false,
+      "createdAt": "2026-07-10T10:00:45.026Z",
+      "updatedAt": "2026-07-11T05:21:11.460Z",
+      "deletedAt": null,
+      "lastActiveAt": "2026-07-11T05:21:11.460Z",
+      "timezone": null
+    },
+    "publishedAt": "2026-07-11T05:23:59.896Z",
+    "archivedAt": null,
+    "deletedAt": null,
+    "collaboratorIds": [
+      "99bdd8e2-176a-42fa-ba0c-4f9c4ce6caa9"
+    ],
+    "revision": 3,
+    "fullWidth": false,
+    "collectionId": "fbe68839-b131-44e2-bb93-0bc533d39193",
+    "parentDocumentId": "7d11d73d-1b36-43e3-9f31-b43e98c69b5b",
+    "isCollectionDeleted": false,
+    "templateId": null,
+    "insightsEnabled": true,
+    "popularityScore": 0
+  },
+  "policies": [
+    {
+      "id": "cec98e59-623c-4392-a343-6e96b0995e51",
+      "abilities": {
+        "read": true,
+        "update": true,
+        "delete": true,
+        "move": true,
+        "star": true,
+        "unstar": true,
+        "subscribe": true,
+        "unsubscribe": true,
+        "share": true,
+        "archive": true,
+        "restore": false,
+        "listRevisions": true,
+        "listViews": true,
+        "download": true,
+        "comment": true,
+        "publish": false,
+        "manageUsers": true,
+        "duplicate": true,
+        "createChildDocument": true,
+        "updateInsights": true,
+        "pin": true,
+        "unpin": true,
+        "pinToHome": true,
+        "permanentDelete": false,
+        "unarchive": false,
+        "unpublish": true
+      }
+    }
+  ],
+  "status": 200,
+  "ok": true
+}

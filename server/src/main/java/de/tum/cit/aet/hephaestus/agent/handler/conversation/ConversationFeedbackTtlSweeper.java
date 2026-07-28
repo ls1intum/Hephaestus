@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
  * <p>This bean owns only scheduling, cross-pod locking, and window arithmetic; the per-workspace delete runs in
  * {@link ConversationFeedbackTtlPurger}'s own {@code REQUIRES_NEW} transaction so a failure is isolated. It is
  * {@link WorkspaceAgnostic} because the enumeration query is unscoped and the sweep is inherently cross-workspace,
- * and gated to the server role with {@link SchedulerLock} - the same pattern as {@code SlackRetentionSweeper}.
+ * and gated to the server role with {@link SchedulerLock}.
  */
 @ConditionalOnServerRole
 @Component

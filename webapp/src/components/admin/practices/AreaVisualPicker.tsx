@@ -13,7 +13,7 @@ import {
 	ICON_NAMES,
 	iconSearchText,
 	PILL,
-} from "./areaVisuals";
+} from "./area-visuals";
 
 interface AreaVisualPickerProps {
 	slug: string;

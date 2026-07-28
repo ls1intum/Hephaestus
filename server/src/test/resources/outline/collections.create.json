@@ -1,0 +1,45 @@
+{
+  "id": "224b21b5-1f3e-45ba-a7de-a1f30f5604c1",
+  "event": "collections.create",
+  "actorId": "99bdd8e2-176a-42fa-ba0c-4f9c4ce6caa9",
+  "payload": {
+    "id": "d70d9f42-a1b5-49ae-89e3-030feaeefe62",
+    "model": {
+      "id": "d70d9f42-a1b5-49ae-89e3-030feaeefe62",
+      "url": "/collection/audit-colorful-collection-vD1PXOty0e",
+      "data": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "text": "Testing color+icon fill",
+                "type": "text"
+              }
+            ]
+          }
+        ]
+      },
+      "icon": "beaker",
+      "name": "Audit Colorful Collection",
+      "sort": {
+        "field": "index",
+        "direction": "asc"
+      },
+      "color": "#FF5733",
+      "index": "&",
+      "urlId": "vD1PXOty0e",
+      "sharing": true,
+      "createdAt": "2026-07-11T05:21:58.174Z",
+      "deletedAt": null,
+      "updatedAt": "2026-07-11T05:21:58.174Z",
+      "archivedAt": null,
+      "commenting": null,
+      "permission": "read",
+      "templateManagement": "admin"
+    }
+  },
+  "createdAt": "2026-07-11T05:21:58.198Z",
+  "webhookSubscriptionId": "451e2dc4-010e-44e7-8052-8537a3927ba8"
+}

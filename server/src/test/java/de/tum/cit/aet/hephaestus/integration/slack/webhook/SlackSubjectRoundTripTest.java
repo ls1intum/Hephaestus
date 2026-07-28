@@ -40,7 +40,20 @@ class SlackSubjectRoundTripTest extends BaseUnitTest {
     @Test
     void streamAndFilterAreWiredForSlack() {
         assertThat(ConsumerSubjectMath.streamNameFor(IntegrationKind.SLACK)).contains("slack");
-        assertThat(ConsumerSubjectMath.flatStreamSubjectFilter(IntegrationKind.SLACK)).isEqualTo("slack.>");
+        assertThat(ConsumerSubjectMath.teamFilter("slack", "T0ABC123")).isEqualTo("slack.T0ABC123.>");
+    }
+
+    @Test
+    void slackTeamFilterMatchesPublishedSubjects() {
+        // The per-workspace filter must agree with the deriver's publish-side sanitisation (dots -> ~),
+        // so a filter built from the stored team id always matches the subjects the receiver publishes.
+        JsonNode payload = MAPPER.readTree(
+            "{\"type\":\"event_callback\",\"team_id\":\"T.dotted\",\"event\":{\"type\":\"message\",\"channel_type\":\"channel\",\"channel\":\"C1\"}}"
+        );
+        String subject = DERIVER.deriveSubject(payload, java.util.Map.of());
+        String filterPrefix = ConsumerSubjectMath.teamFilter("slack", "T.dotted");
+        assertThat(filterPrefix).isEqualTo("slack.T~dotted.>");
+        assertThat(subject).startsWith("slack.T~dotted.");
     }
 
     @Test

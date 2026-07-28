@@ -140,7 +140,7 @@ class CredentialBundleCryptoCompatTest extends BaseUnitTest {
                 throw new AssertionError(e);
             }
 
-            // Cross-row substitution must fail — this is the CVE the v2 AAD format closed.
+            // Cross-row ciphertext substitution must fail authentication.
             assertThatThrownBy(() -> converter.decrypt(blob, readCtx)).isInstanceOf(EncryptionException.class);
         }
     }

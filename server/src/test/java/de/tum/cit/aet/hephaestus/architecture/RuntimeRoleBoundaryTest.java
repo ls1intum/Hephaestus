@@ -6,12 +6,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.tngtech.archunit.core.domain.JavaAnnotation;
 import com.tngtech.archunit.core.domain.JavaClass;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
+import java.time.Clock;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.stereotype.Component;
 
@@ -74,6 +78,39 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
             RuntimeRole.WORKER_PROPERTY
         ),
         Map.entry("de.tum.cit.aet.hephaestus.core.runtime.hub.HubConfiguration", RuntimeRole.SERVER_PROPERTY),
+        // Admin surfaces and the services behind them are server-only: the worker and webhook pods do
+        // not load core.auth, so an admin controller mapped there is a route with no authentication
+        // layer under it.
+        Map.entry("de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionAdminController", RuntimeRole.SERVER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionService", RuntimeRole.SERVER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.agent.catalog.LlmModelAdminController", RuntimeRole.SERVER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.agent.catalog.LlmModelService", RuntimeRole.SERVER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.agent.catalog.InstanceLlmSettingsController", RuntimeRole.SERVER_PROPERTY),
+        // NOT listed: InstanceLlmSettingsService. It is deliberately ungated — the workspace-scoped
+        // read of the instance policy goes through it too, and the gate belongs on the admin surface.
+        Map.entry("de.tum.cit.aet.hephaestus.agent.usage.LlmUsageAdminController", RuntimeRole.SERVER_PROPERTY),
+        // Server-only so the worker and webhook pods never acquire an outbound dependency on
+        // ecb.europa.eu — this fetcher is the only egress the display-currency feature has.
+        Map.entry("de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateFetchScheduler", RuntimeRole.SERVER_PROPERTY),
+        // ServerSchedulingConfig silences the @Scheduled tick off-server, but an ungated BEAN still
+        // registers its gauges — permanent zeros in agent.queue.* / mentor.in_flight.* from pods that
+        // never sample. Gate the bean, not just the tick.
+        Map.entry("de.tum.cit.aet.hephaestus.agent.job.AgentQueueHealthSampler", RuntimeRole.SERVER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.agent.job.AgentJobRetentionService", RuntimeRole.SERVER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorInFlightReaper", RuntimeRole.SERVER_PROPERTY),
+        // ADR 0006: the LLM proxy runs beside the sandbox on the WORKER, and only there.
+        Map.entry("de.tum.cit.aet.hephaestus.agent.proxy.LlmProxyController", RuntimeRole.WORKER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.agent.proxy.LlmProxySecurityConfig", RuntimeRole.WORKER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.agent.proxy.ProxyAccounting", RuntimeRole.WORKER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.agent.proxy.ProxyUsageAccumulator", RuntimeRole.WORKER_PROPERTY),
+        // The config-audit viewer and retention sweep are server-only; the recorder deliberately is
+        // not, because every role writes to the trail.
+        Map.entry("de.tum.cit.aet.hephaestus.core.audit.ConfigAuditRetentionJob", RuntimeRole.SERVER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.core.audit.web.AdminConfigAuditController", RuntimeRole.SERVER_PROPERTY),
+        Map.entry(
+            "de.tum.cit.aet.hephaestus.integration.slack.sync.status.SlackIntegrationSyncRunner",
+            RuntimeRole.SERVER_PROPERTY
+        ),
         Map.entry(
             "de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerTokenExchangeController",
             RuntimeRole.SERVER_PROPERTY
@@ -130,6 +167,19 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
         ),
         Map.entry(
             "de.tum.cit.aet.hephaestus.integration.slack.leaderboard.SlackLeaderboardDigestPublisher",
+            RuntimeRole.SERVER_PROPERTY
+        ),
+        // Outline admin/connect surface — server-only, mirroring the Slack entries above.
+        Map.entry(
+            "de.tum.cit.aet.hephaestus.integration.outline.connect.OutlineConnectionStrategy",
+            RuntimeRole.SERVER_PROPERTY
+        ),
+        Map.entry(
+            "de.tum.cit.aet.hephaestus.integration.outline.connect.OutlineConnectionAdminController",
+            RuntimeRole.SERVER_PROPERTY
+        ),
+        Map.entry(
+            "de.tum.cit.aet.hephaestus.integration.outline.collection.OutlineCollectionAdminController",
             RuntimeRole.SERVER_PROPERTY
         )
     );
@@ -226,6 +276,38 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
             .check(classes);
     }
 
+    /**
+     * Every ungated bean that injects a server-gated bean crash-loops the worker and webhook pods at
+     * context refresh — a failure no test tier can see, because none boots with
+     * {@code hephaestus.runtime.server.enabled=false}. {@link java.time.Clock} is the case that
+     * actually bit: its only provider used to be the server-gated {@code AuthJwtConfig}, so the first
+     * ungated consumer (the config-audit recorder, which must load on every role) broke both pods
+     * while the whole suite stayed green. Pin the provider ungated so it cannot regress.
+     */
+    @Test
+    void clockBeanIsAvailableToEveryRuntimeRole() {
+        Set<JavaClass> providers = classes
+            .stream()
+            .filter(c -> c.isAnnotatedWith(Configuration.class))
+            .filter(c ->
+                c
+                    .getMethods()
+                    .stream()
+                    .anyMatch(m -> m.isAnnotatedWith(Bean.class) && m.getRawReturnType().isAssignableTo(Clock.class))
+            )
+            .collect(Collectors.toSet());
+
+        assertThat(providers).as("exactly one @Bean Clock provider; two would make injection ambiguous").hasSize(1);
+        JavaClass provider = providers.iterator().next();
+        assertThat(conditionalOnPropertyAnnotations(provider).findAny())
+            .as(
+                "%s provides the Clock bean and must NOT be runtime-role gated — ungated beans on every " +
+                    "role inject it, and gating it fails context refresh on worker/webhook",
+                provider.getName()
+            )
+            .isEmpty();
+    }
+
     @Test
     void expectedRuntimeGatesArePresent() {
         EXPECTED_GATES.forEach((fqn, expectedProperty) -> {
@@ -301,6 +383,17 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
             )
             .isEmpty();
     }
+
+    /*
+     * There is deliberately no blanket "every @Scheduled class carries a runtime-role gate" rule.
+     * @EnableScheduling lives on the SERVER-gated ServerSchedulingConfig, so off-server no @Scheduled
+     * method fires, gated or not; the gate protects bean-construction side effects (meter
+     * registration), not the tick. Every formulation of the rule was measured against the tree and
+     * needs an exemption list as long as EXPECTED_GATES: @Bean-built sandbox classes that Spring never
+     * evaluates @ConditionalOnProperty on, @Service classes whose schedule is secondary to their API
+     * (gating those deletes the service from pods that call its other methods), and the rate-limit
+     * trackers, which must observe limits on whichever role makes the API call.
+     */
 
     @Test
     void noBeanIsGatedOnTheRetiredSandboxEnabledFlag() {

@@ -1,9 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.handler.conversation;
 
 /**
- * The audience context for one conversational-routing pass. Carries the {@link RecipientRole} the observations in
- * this pass are addressed to (see {@link RecipientRole} for the ADR-0021-C2 reviewer deferral). Reviewer attribution
- * is not built yet, so the listener drives every pass with {@link #author()}.
+ * The audience context for one conversational-routing pass: the {@link RecipientRole} the observations in this
+ * pass are addressed to (see {@link RecipientRole} for the ADR-0021-C2 reviewer deferral).
  */
 public record RoutingContext(RecipientRole recipientRole) {
     public RoutingContext {

@@ -128,7 +128,7 @@ export function AppSidebar({
 						workspaceSlug={activeWorkspace.workspaceSlug}
 						achievementsEnabled={activeWorkspace.achievementsEnabled}
 						practicesEnabled={activeWorkspace.practicesEnabled}
-						mentorEnabled={activeWorkspace.mentorEnabled}
+						scmProviderType={activeWorkspace.providerType === "GITLAB" ? "GITLAB" : "GITHUB"}
 					/>
 				)}
 				{/* Instance-admin lives in its own /admin shell (reached via the footer entry), never in
@@ -149,7 +149,7 @@ export function AppSidebar({
 						activeWorkspace={activeWorkspace}
 						onWorkspaceChange={onWorkspaceChange}
 						onAddWorkspace={onAddWorkspace}
-						isAdmin={isAdmin}
+						isAppAdmin={isAppAdmin}
 					/>
 				)}
 				{contextHeader}

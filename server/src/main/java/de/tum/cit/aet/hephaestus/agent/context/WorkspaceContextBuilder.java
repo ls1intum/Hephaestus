@@ -117,15 +117,11 @@ public class WorkspaceContextBuilder {
                 continue;
             }
             String providerName = provider.getClass().getSimpleName();
-            // Snapshot pre-call keyset AND values so we can detect both (a) brand-new keys
-            // (validated for prefix below) and (b) silent overwrites — a second provider
-            // calling files.put(key, newBytes) on a key already owned by another provider
-            // would otherwise replace the value in-place, and the keyOwner check below
-            // (gated on `if (beforeKeys.contains(key)) continue`) would miss it.
+            // Snapshot pre-call keys AND value references to detect brand-new keys (prefix-validated
+            // below) and silent overwrites. Reference-snapshot suffices: contribute must publish a
+            // NEW byte[] for any modification (earlier outputs are immutable), so reference
+            // inequality on a pre-existing key identifies an overwrite by a second provider.
             Set<String> beforeKeys = Set.copyOf(files.keySet());
-            // Reference-snapshot is enough: ContentSource#contribute is required to publish
-            // a NEW byte[] for any modification (the existing arrays are interpreted as the
-            // owner's immutable output), so reference equality identifies an in-place replace.
             Map<String, byte[]> beforeValues = Map.copyOf(files);
             try {
                 provider.contribute(request, files);
@@ -141,11 +137,8 @@ public class WorkspaceContextBuilder {
             }
             for (String key : files.keySet()) {
                 if (beforeKeys.contains(key)) {
-                    // Pre-existing key — only a re-put is a wiring bug. Reference inequality
-                    // identifies a fresh put(key, newArray); the SPI mandates providers publish a
-                    // NEW byte[] for any change, so this is sufficient. Note: an in-place mutation
-                    // of an earlier provider's array keeps the same reference and is NOT detected —
-                    // the contract relies on providers treating earlier outputs as immutable.
+                    // In-place mutation of an earlier provider's array keeps the same reference and
+                    // is NOT detected — the contract relies on earlier outputs being immutable.
                     if (beforeValues.get(key) != files.get(key)) {
                         String existingOwner = keyOwner.get(key);
                         throw new IllegalStateException(
@@ -164,9 +157,7 @@ public class WorkspaceContextBuilder {
                         providerName + " wrote file outside " + ContentSource.OUTPUT_PREFIX + ": " + key
                     );
                 }
-                // Invariant: a brand-new key (absent from beforeKeys) cannot already be owned —
-                // keyOwner only holds keys that were added to `files`, and every such key is in
-                // beforeKeys on subsequent iterations. The re-put guard above is the real
+                // A brand-new key cannot already be owned; the re-put guard above is the real
                 // cross-provider duplicate detector.
                 assert keyOwner.get(key) == null : "brand-new key already owned: " + key;
                 keyOwner.put(key, providerName);
@@ -174,9 +165,7 @@ public class WorkspaceContextBuilder {
             }
             contributed++;
         }
-        // Telescope (ADR 0020): index every projected file with its connector + a content-addressed sha,
-        // and store each blob in the CAS. Built for the agent-review flows (PR/Issue); the mentor chat
-        // flow has its own context surface. Best-effort — the manifest builder never throws.
+        // Manifest (ADR 0020) only for job-backed review flows; mentor chat has its own context surface.
         if (manifestBuilder != null) {
             AgentJob job = reviewJob(request);
             if (job != null) {

@@ -1,5 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices;
 
+import de.tum.cit.aet.hephaestus.core.AuditExempt;
+import de.tum.cit.aet.hephaestus.core.AuditLedger;
+import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.practices.dto.BindPracticeAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.LearnerPracticeDTO;
@@ -132,6 +135,7 @@ public class PracticeCatalogController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
+    @AuditExempt(reason = "practice content is versioned in practice_revision (SCD-2 lineage)")
     public ResponseEntity<PracticeDTO> createPractice(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody CreatePracticeRequestDTO request
@@ -160,6 +164,7 @@ public class PracticeCatalogController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
+    @AuditExempt(reason = "catalogue display order; changes no behaviour")
     public ResponseEntity<List<PracticeDTO>> reorderPractices(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody ReorderPracticesRequestDTO request
@@ -186,6 +191,9 @@ public class PracticeCatalogController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
+    @AuditExempt(
+        reason = "criteria edits append a practice_revision; other fields are catalogue content that gates nothing"
+    )
     public ResponseEntity<PracticeDTO> updatePractice(
         WorkspaceContext workspaceContext,
         @PathVariable String practiceSlug,
@@ -208,6 +216,7 @@ public class PracticeCatalogController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_ACTIVE")
     public ResponseEntity<PracticeDTO> setActive(
         WorkspaceContext workspaceContext,
         @PathVariable String practiceSlug,
@@ -233,6 +242,7 @@ public class PracticeCatalogController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
+    @AuditExempt(reason = "catalogue grouping; changes no behaviour")
     public ResponseEntity<PracticeDTO> bindArea(
         WorkspaceContext workspaceContext,
         @PathVariable String practiceSlug,
@@ -251,6 +261,7 @@ public class PracticeCatalogController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_ACTIVE")
     public ResponseEntity<Void> deletePractice(WorkspaceContext workspaceContext, @PathVariable String practiceSlug) {
         practiceService.deletePractice(workspaceContext, practiceSlug);
         return ResponseEntity.noContent().build();

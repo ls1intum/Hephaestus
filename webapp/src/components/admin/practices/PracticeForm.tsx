@@ -194,10 +194,10 @@ export function PracticeForm({
 							className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors"
 						>
 							<ArrowLeft className="size-4" />
-							Back to Practices
+							Back to practices
 						</button>
 						<h1 className="text-3xl font-bold tracking-tight">
-							{mode === "create" ? "Create Practice" : `Edit: ${initialData?.name}`}
+							{mode === "create" ? "Create practice" : `Edit: ${initialData?.name}`}
 						</h1>
 						<p className="text-muted-foreground mt-1">
 							{mode === "create"
@@ -526,9 +526,9 @@ export function PracticeForm({
 								{mode === "create" ? "Creating..." : "Saving..."}
 							</>
 						) : mode === "create" ? (
-							"Create Practice"
+							"Create practice"
 						) : (
-							"Save Changes"
+							"Save changes"
 						)}
 					</Button>
 				</div>

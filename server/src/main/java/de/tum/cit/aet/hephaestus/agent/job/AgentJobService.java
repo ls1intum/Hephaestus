@@ -1,19 +1,19 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.handler.IssueReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
-import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerJobCancelDispatcher;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectClass;
@@ -30,7 +30,6 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -47,58 +46,46 @@ public class AgentJobService {
     private static final Set<AgentJobStatus> ACTIVE_STATUSES = Set.of(AgentJobStatus.QUEUED, AgentJobStatus.RUNNING);
 
     private final AgentJobRepository agentJobRepository;
-    private final AgentConfigRepository agentConfigRepository;
+    private final WorkspaceAgentBindingRepository agentBindingRepository;
     private final WorkspaceRepository workspaceRepository;
-    private final ReviewableArtifactLoader artifactLoader;
     private final ConnectionService connectionService;
     private final JobTypeHandlerRegistry handlerRegistry;
     private final ObjectMapper objectMapper;
-    private final ApplicationEventPublisher eventPublisher;
     private final TransactionTemplate transactionTemplate;
     private final PracticeReviewProperties reviewProperties;
-    private final @Nullable SandboxManager sandboxManager;
-    private final Optional<WorkerJobCancelDispatcher> workerJobCancelDispatcher;
+    private final LlmBudgetService llmBudgetService;
+    private final LlmModelResolver llmModelResolver;
 
     public AgentJobService(
         AgentJobRepository agentJobRepository,
-        AgentConfigRepository agentConfigRepository,
+        WorkspaceAgentBindingRepository agentBindingRepository,
         WorkspaceRepository workspaceRepository,
-        ReviewableArtifactLoader artifactLoader,
         ConnectionService connectionService,
         JobTypeHandlerRegistry handlerRegistry,
         ObjectMapper objectMapper,
-        ApplicationEventPublisher eventPublisher,
         TransactionTemplate transactionTemplate,
         PracticeReviewProperties reviewProperties,
-        @Nullable SandboxManager sandboxManager,
-        Optional<WorkerJobCancelDispatcher> workerJobCancelDispatcher
+        LlmBudgetService llmBudgetService,
+        LlmModelResolver llmModelResolver
     ) {
         this.agentJobRepository = agentJobRepository;
-        this.agentConfigRepository = agentConfigRepository;
+        this.agentBindingRepository = agentBindingRepository;
         this.workspaceRepository = workspaceRepository;
-        this.artifactLoader = artifactLoader;
         this.connectionService = connectionService;
         this.handlerRegistry = handlerRegistry;
         this.objectMapper = objectMapper;
-        this.eventPublisher = eventPublisher;
         this.transactionTemplate = transactionTemplate;
         this.reviewProperties = reviewProperties;
-        this.sandboxManager = sandboxManager;
-        this.workerJobCancelDispatcher = workerJobCancelDispatcher;
+        this.llmBudgetService = llmBudgetService;
+        this.llmModelResolver = llmModelResolver;
     }
 
     // Read operations
 
     @Transactional(readOnly = true)
-    public Page<AgentJob> getJobs(Long workspaceId, AgentJobStatus status, Long configId, Pageable pageable) {
-        if (status != null && configId != null) {
-            return agentJobRepository.findByWorkspaceIdAndStatusAndConfigId(workspaceId, status, configId, pageable);
-        }
+    public Page<AgentJob> getJobs(Long workspaceId, AgentJobStatus status, Pageable pageable) {
         if (status != null) {
             return agentJobRepository.findByWorkspaceIdAndStatus(workspaceId, status, pageable);
-        }
-        if (configId != null) {
-            return agentJobRepository.findByWorkspaceIdAndConfigId(workspaceId, configId, pageable);
         }
         return agentJobRepository.findByWorkspaceId(workspaceId, pageable);
     }
@@ -113,12 +100,9 @@ public class AgentJobService {
     // Submit
 
     /**
-     * Build a detached PR review submission request from an already-loaded entity. Reads the PR's lazy
-     * associations (repository/author via {@link ScmEventPayload.PullRequestData#from}), so it MUST be called
-     * inside the caller's open session/transaction. Returns {@code null} when the branch refs needed to
-     * clone/diff are absent (a merged PR retains them). Used by the dev-trigger path, where the controller
-     * keeps load + gate + this build inside one {@link TransactionTemplate} and then submits OUTSIDE it via
-     * {@link #submitPrepared} — because {@link #submit} forbids an outer transaction (SYSTEMIC #5).
+     * Build a detached PR review submission request. Reads the PR's lazy associations, so it MUST be
+     * called inside the caller's open session/transaction and the resulting request submitted OUTSIDE it
+     * via {@link #submitPrepared}. Null when the branch refs needed to clone/diff are absent.
      */
     @Nullable
     PullRequestReviewSubmissionRequest buildReviewRequest(PullRequest pr, @Nullable String triggerEvent) {
@@ -135,11 +119,7 @@ public class AgentJobService {
         );
     }
 
-    /**
-     * Build a detached issue-detection submission request from an already-loaded entity. Reads the issue's
-     * lazy repository, so it MUST be called inside the caller's open session/transaction. Returns
-     * {@code null} when the issue has no repository. Companion to {@link #buildReviewRequest}.
-     */
+    /** Issue-shaped companion to {@link #buildReviewRequest}, with the same session requirement. */
     @Nullable
     IssueReviewSubmissionRequest buildIssueRequest(Issue issue, @Nullable String triggerEvent) {
         if (issue.getRepository() == null) {
@@ -159,121 +139,92 @@ public class AgentJobService {
         );
     }
 
-    /**
-     * Submit a prepared dev request and render the result message. Invoked by the dev-trigger controller
-     * AFTER the load/gate/build transaction has committed, so {@link #submit}'s no-outer-transaction contract
-     * (SYSTEMIC #5) is honoured.
-     */
+    /** Submit a prepared dev request and render the result message. Call only after the build transaction commits. */
     public String submitPrepared(Long workspaceId, AgentJobType jobType, JobSubmissionRequest request) {
         Optional<AgentJob> job = submit(workspaceId, jobType, request);
-        return job.map(j -> "Job submitted: " + j.getId()).orElse("No job created (no enabled agent config?)");
+        return job
+            .map(j -> "Job submitted: " + j.getId())
+            .orElse(
+                "No job created. Practice detection is unbound or disabled for this workspace, or its " +
+                    "monthly AI budget is reached (see the workspace's AI usage report)."
+            );
     }
 
     /**
-     * Submit agent jobs for the given workspace — one per enabled config.
+     * Submit the workspace's practice-detection job for one reviewable artifact, if it has an enabled
+     * binding and the purse funding that binding still has room.
      *
-     * <p>Creates a job for EACH enabled agent config, with config-scoped idempotency keys.
-     * This provides redundancy: if one agent times out, others may still complete.
-     * Each delivery independently posts a new summary comment + diff notes.
+     * <p><strong>Callers MUST NOT wrap this in a transaction.</strong> {@link #submitForBinding} opens
+     * its own so the idempotency-key race it absorbs rolls back only that insert; joined to an outer
+     * transaction, the same race would poison the caller's whole unit of work.
      *
-     * <p><strong>Not {@code @Transactional}</strong>: each config gets its own transaction via
-     * {@link #submitForConfig}, so a constraint-violation race on one config
-     * does not abort the PostgreSQL transaction for subsequent configs.
-     * Callers MUST NOT wrap calls to this method in an outer {@code @Transactional},
-     * as that would cause the template to join the outer transaction, defeating isolation.
-     *
-     * @param workspaceId workspace ID
-     * @param jobType     the job type
-     * @param request     handler-specific submission request
-     * @return the first created (or existing deduplicated) job, or empty if no enabled config found
+     * @return the created (or existing, deduplicated) job; empty when the workspace has no enabled
+     *     practice-detection binding, or the cap funding it is reached
      */
     public Optional<AgentJob> submit(Long workspaceId, AgentJobType jobType, JobSubmissionRequest request) {
         Workspace workspace = workspaceRepository
             .findById(workspaceId)
             .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
 
-        // 1. Resolve which config(s) run (see resolvePracticeConfigs).
-        List<AgentConfig> configs = resolvePracticeConfigs(workspace);
-        if (configs.isEmpty()) {
-            log.debug("No agent config to run practice detection: workspaceId={}", workspaceId);
+        WorkspaceAgentBinding binding = agentBindingRepository
+            .findByWorkspaceIdAndPurposeWithModels(workspaceId, AgentPurpose.PRACTICE_DETECTION)
+            .filter(WorkspaceAgentBinding::isEnabled)
+            .orElse(null);
+        if (binding == null) {
+            log.debug("No practice-detection binding to run: workspaceId={}", workspaceId);
             return Optional.empty();
         }
 
-        // 2. Handler creates submission (metadata + base idempotency key)
+        // THE choke point for all sandboxed LLM work, scoped to whoever pays for THIS binding — which is
+        // why the binding is resolved first: an exhausted host budget must not pause work the workspace
+        // funds itself, or vice versa. Eventually consistent; uncosted in-flight jobs may overshoot.
+        if (llmBudgetService.blockSubmission(workspace, jobType.name(), binding.getFundingSource())) {
+            return Optional.empty();
+        }
+
         JobTypeHandler handler = handlerRegistry.getHandler(jobType);
         JobSubmission submission = handler.createSubmission(request);
 
-        // 3. Submit a job for each resolved config (each in its own transaction)
-        AgentJob firstJob = null;
-        for (AgentConfig config : configs) {
-            AgentJob job = submitForConfig(workspace, config, jobType, submission);
-            if (job != null && firstJob == null) {
-                firstJob = job;
-            }
-        }
-
-        return Optional.ofNullable(firstJob);
+        return Optional.ofNullable(submitForBinding(workspace, jobType, submission));
     }
 
     /**
-     * Resolve the configs to submit for practice detection. If the workspace has an explicit
-     * {@code practiceConfigId} binding, return only that config when it exists and is enabled
-     * (bound-but-disabled = <strong>paused, returns empty</strong>); otherwise fan out to all enabled
-     * configs. The bound id is loaded via the workspace-scoped finder for tenancy safety.
-     *
-     * <p>Note the deliberate asymmetry with the mentor ({@code MentorChatService.resolveLlmConfig}): a
-     * disabled <em>practice</em> binding PAUSES detection (it is opt-in automation — silence is the safe
-     * outcome), whereas a disabled <em>mentor</em> binding FALLS BACK to the oldest enabled config (the
-     * mentor must stay answerable to a user who is mid-conversation).
+     * Submit exactly one practice-detection job — never a fan-out. The binding is re-fetched inside the
+     * transaction because the discovery read in {@link #submit} runs detached.
      */
-    private List<AgentConfig> resolvePracticeConfigs(Workspace workspace) {
-        Long boundConfigId = workspace.getPracticeConfigId();
-        if (boundConfigId != null) {
-            return agentConfigRepository
-                .findByIdAndWorkspaceId(boundConfigId, workspace.getId())
-                .filter(AgentConfig::isEnabled)
-                .map(List::of)
-                .orElseGet(List::of);
-        }
-        return agentConfigRepository
-            .findByWorkspaceId(workspace.getId())
-            .stream()
-            .filter(AgentConfig::isEnabled)
-            .toList();
-    }
-
-    private @Nullable AgentJob submitForConfig(
-        Workspace workspace,
-        AgentConfig config,
-        AgentJobType jobType,
-        JobSubmission submission
-    ) {
-        String configScopedKey = submission.idempotencyKey() + ":config:" + config.getId();
+    private @Nullable AgentJob submitForBinding(Workspace workspace, AgentJobType jobType, JobSubmission submission) {
+        String detectionKey = submission.idempotencyKey() + ":detection";
 
         return transactionTemplate.execute(status -> {
-            // Idempotency check — application-level (partial unique index is safety net)
+            WorkspaceAgentBinding binding = agentBindingRepository
+                .findByWorkspaceIdAndPurpose(workspace.getId(), AgentPurpose.PRACTICE_DETECTION)
+                .filter(WorkspaceAgentBinding::isEnabled)
+                .orElse(null);
+            if (binding == null) {
+                return null; // unbound or disabled since discovery
+            }
+
+            // Application-level idempotency; the partial unique index is the safety net.
             Optional<AgentJob> existing = agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(
                 workspace.getId(),
-                configScopedKey,
+                detectionKey,
                 ACTIVE_STATUSES
             );
             if (existing.isPresent()) {
                 log.info(
                     "Deduplicated job submission: existingJobId={}, idempotencyKey={}",
                     existing.get().getId(),
-                    configScopedKey
+                    detectionKey
                 );
                 return existing.get();
             }
 
-            // Cooldown check — prevent rapid re-triggering for the same (PR, phase)/config.
-            // Strips the trailing freshness segment (commit SHA / updatedAt) to match any freshness.
+            // Cooldown: refuse a re-trigger of the same subject at ANY freshness, not just this one.
             int cooldown = workspace.getReviewSettings().resolveCooldownMinutes(reviewProperties.cooldownMinutes());
             if (cooldown > 0) {
                 String rawPrefix = extractCooldownKeyPrefix(submission.idempotencyKey());
-                // Escape SQL LIKE wildcards in the prefix to prevent unintended pattern matching
                 String escaped = rawPrefix.replace("%", "\\%").replace("_", "\\_");
-                String cooldownPrefix = escaped + "%:config:" + config.getId();
+                String cooldownPrefix = escaped + "%:detection";
                 Instant cutoff = Instant.now().minus(java.time.Duration.ofMinutes(cooldown));
                 Optional<AgentJob> recent = agentJobRepository.findRecentJobByKeyPrefix(
                     workspace.getId(),
@@ -286,7 +237,7 @@ public class AgentJobService {
                         recent.get().getId(),
                         recent.get().getCreatedAt(),
                         cooldown,
-                        configScopedKey
+                        detectionKey
                     );
                     return null;
                 }
@@ -294,20 +245,22 @@ public class AgentJobService {
 
             AgentJob job = new AgentJob();
             job.setWorkspace(workspace);
-            job.setConfig(config);
+            job.setPurpose(AgentPurpose.PRACTICE_DETECTION);
             job.setJobType(jobType);
-            // Stamp the polymorphic subject discriminator from the job type so downstream dispatch (e.g.
-            // DiffNotePoster short-circuits when subjectClass != PULL_REQUEST) is driven off an explicit
-            // value rather than the legacy PULL_REQUEST backfill. Wires SLACK_MESSAGE_THREAD.
             job.setSubjectClass(subjectClassFor(jobType));
             job.setMetadata(submission.metadata());
-            job.setIdempotencyKey(configScopedKey);
-            job.setConfigSnapshot(ConfigSnapshot.from(config).toJson(objectMapper));
-            // The SCM kind drives delivery (which channel posts the comment/diff notes). Resolve it
-            // from the workspace's active connection so EVERY path (events + dev-trigger) sets it —
-            // a null integrationKind made the comment poster NPE and silently drop delivery. We log
-            // loudly when it can't be resolved: the job will still run (LLM cost) but delivery will
-            // fail at the poster, so surfacing it here makes the misconfiguration diagnosable up front.
+            job.setIdempotencyKey(detectionKey);
+            try {
+                job.setConfigSnapshot(ConfigSnapshot.from(binding, llmModelResolver).toJson(objectMapper));
+            } catch (IllegalStateException unavailableModel) {
+                log.warn(
+                    "Skipping practice-detection binding whose model is no longer available: workspaceId={}",
+                    workspace.getId()
+                );
+                return null;
+            }
+            // Resolved here rather than per-path so EVERY submission carries a delivery channel; without
+            // one the job still costs LLM spend but its feedback is dropped at the poster.
             var resolvedKind = connectionService.findActiveProviderKind(workspace.getId());
             if (resolvedKind.isPresent()) {
                 job.setIntegrationKind(resolvedKind.get());
@@ -320,212 +273,30 @@ public class AgentJobService {
                 );
             }
 
-            // Copy LLM API key — needed for all credential modes:
-            // PROXY mode: proxy controller reads it to forward to upstream provider
-            // API_KEY mode: adapter injects it as env var into the container
-            if (config.getLlmApiKey() != null) {
-                job.setLlmApiKey(config.getLlmApiKey());
-            }
+            // The credential is NEVER frozen onto the job: the proxy resolves it live from the snapshot's
+            // catalog connection reference on every call.
 
             try {
                 agentJobRepository.saveAndFlush(job);
             } catch (DataIntegrityViolationException e) {
-                // Partial unique index race: another concurrent submit won.
-                // Mark rollback so the broken Hibernate Session is properly cleaned up.
-                log.info("Idempotency constraint caught concurrent duplicate: key={}", configScopedKey);
+                // Partial unique index race: another concurrent submit won. Mark rollback so the broken
+                // Hibernate Session is cleaned up.
+                log.info("Idempotency constraint caught concurrent duplicate: key={}", detectionKey);
                 status.setRollbackOnly();
                 return null;
             }
 
             log.info(
-                "Agent job submitted: jobId={}, jobType={}, configId={}, workspaceId={}",
+                "Agent job submitted: jobId={}, jobType={}, workspaceId={}",
                 job.getId(),
                 jobType,
-                config.getId(),
                 workspace.getId()
             );
-
-            // Publish event — picked up by AgentJobSubmitter after transaction commits
-            eventPublisher.publishEvent(new AgentJobCreatedEvent(job.getId(), workspace.getId()));
 
             return job;
         });
     }
 
-    // Retry delivery
-
-    /**
-     * Retry delivery for a completed agent job whose delivery previously FAILED.
-     *
-     * <p>Atomically CASes delivery {@code FAILED → PENDING} then re-runs the handler's {@code deliver()}
-     * method — the same delivery path used by {@link AgentJobExecutor} after sandbox execution. Only
-     * {@code FAILED} is accepted as the CAS source: admitting {@code PENDING} would let two concurrent
-     * retries both succeed (a {@code PENDING → PENDING} no-op returns {@code updated=1}).
-     *
-     * <p><strong>PENDING is therefore not recoverable through this API.</strong> A job stuck in
-     * {@code PENDING} (executor crashed between marking PENDING and finishing delivery, or this method
-     * crashed after the {@code FAILED → PENDING} CAS committed) requires operator intervention to demote
-     * it back to {@code FAILED} before it can be retried here.
-     *
-     * @param workspaceId workspace ID
-     * @param jobId       job UUID
-     * @return the job after delivery attempt
-     */
-    public AgentJob retryDelivery(Long workspaceId, UUID jobId) {
-        // CAS: atomically transition FAILED → PENDING (prevents concurrent retry races).
-        // Only FAILED is allowed as source — including PENDING would let two concurrent retries
-        // both CAS successfully (PENDING→PENDING is a no-op that returns updated=1).
-        int updated = transactionTemplate.execute(status -> {
-            // Verify the job exists in this workspace first
-            agentJobRepository
-                .findByIdAndWorkspaceId(jobId, workspaceId)
-                .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()));
-
-            return agentJobRepository.transitionDeliveryStatus(
-                jobId,
-                DeliveryStatus.PENDING,
-                Set.of(DeliveryStatus.FAILED)
-            );
-        });
-
-        if (updated == 0) {
-            throw new AgentJobStateConflictException(
-                "Cannot retry delivery: job must be COMPLETED with delivery status FAILED"
-            );
-        }
-
-        // Reload the entity fresh for delivery (avoids stale detached entity issues)
-        AgentJob job = transactionTemplate.execute(status ->
-            agentJobRepository
-                .findById(jobId)
-                .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()))
-        );
-
-        // Deliver outside transaction (may call external APIs like GitHub)
-        JobTypeHandler handler = handlerRegistry.getHandler(job.getJobType());
-        try {
-            handler.deliver(job);
-            transactionTemplate.executeWithoutResult(tx ->
-                agentJobRepository.updateDeliveryStatus(jobId, DeliveryStatus.DELIVERED, job.getDeliveryCommentId())
-            );
-            log.info("Delivery retry succeeded: jobId={}", jobId);
-        } catch (Exception e) {
-            transactionTemplate.executeWithoutResult(tx ->
-                agentJobRepository.updateDeliveryStatus(jobId, DeliveryStatus.FAILED, job.getDeliveryCommentId())
-            );
-            log.warn("Delivery retry failed: jobId={}, error={}", jobId, e.getMessage(), e);
-            throw new AgentJobStateConflictException("Delivery retry failed: " + e.getMessage());
-        }
-
-        return transactionTemplate.execute(status ->
-            agentJobRepository
-                .findByIdAndWorkspaceId(jobId, workspaceId)
-                .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()))
-        );
-    }
-
-    // Cancel
-
-    /**
-     * Cancel an agent job.
-     *
-     * <p>Uses conditional UPDATE to prevent cancel/executor races. If the job was already
-     * cancelled, this is idempotent. If the job is in a terminal state, throws 409.
-     *
-     * <p>The sandbox cancel call is best-effort within the transaction. Failures are caught
-     * and logged — they do not roll back the CANCELLED status transition.
-     *
-     * @param workspaceId workspace ID
-     * @param jobId       job UUID
-     * @return the cancelled job
-     */
-    @Transactional
-    public AgentJob cancel(Long workspaceId, UUID jobId) {
-        AgentJob job = agentJobRepository
-            .findByIdAndWorkspaceId(jobId, workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()));
-
-        if (job.getStatus() == AgentJobStatus.CANCELLED) {
-            return job; // idempotent
-        }
-
-        if (job.getStatus().isTerminal()) {
-            throw new AgentJobStateConflictException("Cannot cancel job " + jobId + " in status " + job.getStatus());
-        }
-
-        int updated = agentJobRepository.transitionStatus(
-            jobId,
-            AgentJobStatus.CANCELLED,
-            Instant.now(),
-            null,
-            ACTIVE_STATUSES
-        );
-
-        if (updated == 0) {
-            // Executor raced us. Reload and check.
-            AgentJob raced = agentJobRepository
-                .findByIdAndWorkspaceId(jobId, workspaceId)
-                .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()));
-            if (raced.getStatus().isTerminal()) {
-                throw new AgentJobStateConflictException(
-                    "Cannot cancel job " + jobId + " — executor already moved it to " + raced.getStatus()
-                );
-            }
-            // Job was claimed (QUEUED→RUNNING) between our read and CAS. Retry once.
-            updated = agentJobRepository.transitionStatus(
-                jobId,
-                AgentJobStatus.CANCELLED,
-                Instant.now(),
-                null,
-                ACTIVE_STATUSES
-            );
-            if (updated == 0) {
-                // Executor raced us twice. Reload and check terminal state.
-                AgentJob racedAgain = agentJobRepository
-                    .findByIdAndWorkspaceId(jobId, workspaceId)
-                    .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()));
-                if (racedAgain.getStatus() != AgentJobStatus.CANCELLED) {
-                    throw new AgentJobStateConflictException(
-                        "Cannot cancel job " + jobId + " — executor moved it to " + racedAgain.getStatus()
-                    );
-                }
-                return racedAgain;
-            }
-        }
-
-        // Reload to read worker_id (set at claim) for cancel routing.
-        AgentJob fresh = agentJobRepository
-            .findByIdAndWorkspaceId(jobId, workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()));
-
-        // Split deployment: ask the owning worker to stop its container over the WSS channel (#1138).
-        // No-op if that worker isn't connected here — the DB transition + backstops still finish the cancel.
-        workerJobCancelDispatcher.ifPresent(d -> d.dispatch(fresh.getWorkerId(), jobId, "user-cancel"));
-
-        // Monolith / co-located worker: stop the container in-process.
-        if (sandboxManager != null) {
-            try {
-                sandboxManager.cancel(jobId);
-            } catch (Exception e) {
-                log.warn("Sandbox cancel failed for job {} (status already CANCELLED): {}", jobId, e.getMessage());
-            }
-        }
-
-        return fresh;
-    }
-
-    // Cooldown helpers
-
-    /**
-     * Extract the (PR, phase)-scoped prefix from an idempotency key by stripping the trailing freshness
-     * segment (the commit SHA for PRs, the updatedAt version for issues).
-     * Input: {@code "pr_review:owner/repo:42:authoring:abc123"} → Output: {@code "pr_review:owner/repo:42:authoring:"}
-     * This allows LIKE-matching against any freshness for the same (PR, phase).
-     */
-    /**
-     * The persisted {@link SubjectClass} discriminator for a job type. Exhaustive over
-     * {@link AgentJobType} so a new job type must declare its subject class here (compile gate).
-     */
     private static SubjectClass subjectClassFor(AgentJobType jobType) {
         return switch (jobType) {
             case PULL_REQUEST_REVIEW -> SubjectClass.PULL_REQUEST;
@@ -534,10 +305,12 @@ public class AgentJobService {
         };
     }
 
+    /**
+     * Strip the trailing freshness segment (commit SHA / updatedAt) from an idempotency key of the form
+     * {@code "<type>:{nameWithOwner}:{number}:{phase}:{freshness}"}, preserving the (number, phase) scope
+     * so cooldown can LIKE-match any freshness of the same subject.
+     */
     static String extractCooldownKeyPrefix(String idempotencyKey) {
-        // The key format is "<type>:{nameWithOwner}:{number}:{phase}:{freshness}" — only the trailing
-        // freshness segment is stripped, so the (number, phase) scope is preserved.
-        // We want everything up to and including the last ':' before the freshness.
         int lastColon = idempotencyKey.lastIndexOf(':');
         if (lastColon > 0) {
             return idempotencyKey.substring(0, lastColon + 1);

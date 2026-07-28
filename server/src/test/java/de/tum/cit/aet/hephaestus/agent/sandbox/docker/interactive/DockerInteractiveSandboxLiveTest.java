@@ -8,9 +8,8 @@ import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
 import com.github.dockerjava.core.DockerClientImpl;
 import com.github.dockerjava.httpclient5.ApacheDockerHttpClient;
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorRunnerProfile;
+import de.tum.cit.aet.hephaestus.agent.proxy.MentorProxyCredentialRegistry;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiPlanSpec;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiRuntimeFactory;
 import de.tum.cit.aet.hephaestus.agent.sandbox.InteractiveSandboxProperties;
@@ -81,6 +80,7 @@ class DockerInteractiveSandboxLiveTest {
     private DockerInteractiveSandboxAdapter adapter;
     private ExecutorService dockerWaitExecutor;
     private SimpleMeterRegistry meterRegistry;
+    private MentorProxyCredentialRegistry proxyCredentialRegistry;
     private byte[] runnerBytes;
 
     @BeforeAll
@@ -140,6 +140,7 @@ class DockerInteractiveSandboxLiveTest {
             watchdog,
             meterRegistry
         );
+        proxyCredentialRegistry = new MentorProxyCredentialRegistry();
         adapter = new DockerInteractiveSandboxAdapter(
             interactiveProperties,
             sandboxProperties,
@@ -152,7 +153,8 @@ class DockerInteractiveSandboxLiveTest {
             MAPPER,
             dockerWaitExecutor,
             "docker",
-            8080
+            8080,
+            proxyCredentialRegistry
         );
 
         runnerBytes = Files.readAllBytes(Path.of("src/main/resources/agent/pi-mentor-runner.mjs"));
@@ -200,11 +202,56 @@ class DockerInteractiveSandboxLiveTest {
             NODE_IMAGE,
             List.of("node", "/workspace/.runner/pi-mentor-runner.mjs"),
             Map.of(),
-            new NetworkPolicy(true, null, null, null),
+            new NetworkPolicy(true, null, null),
             new ResourceLimits(512 * 1024 * 1024, 1.0, 256, Duration.ofMinutes(5)),
             sec,
             Map.of(".runner/pi-mentor-runner.mjs", runnerBytes),
             Map.of()
+        );
+    }
+
+    private InteractiveSandboxSpec buildSpecWithProxyRoute(
+        String userId,
+        String workspaceId,
+        String baseUrl,
+        AtomicReference<String> token
+    ) {
+        InteractiveSandboxSpec base = buildMentorSpec(userId, workspaceId);
+        String minted = proxyCredentialRegistry.mint(
+            base.sessionId(),
+            new MentorProxyCredentialRegistry.Route("openai-completions", baseUrl, null, null, null, null)
+        );
+        token.set(minted);
+        return new InteractiveSandboxSpec(
+            base.sessionId(),
+            base.userId(),
+            base.workspaceId(),
+            base.image(),
+            base.command(),
+            base.environment(),
+            new NetworkPolicy(true, null, minted),
+            base.resourceLimits(),
+            base.securityProfile(),
+            base.inputFiles(),
+            base.volumeMounts()
+        );
+    }
+
+    private static InteractiveSandboxSpec withContextSnapshot(InteractiveSandboxSpec base, String snapshot) {
+        Map<String, byte[]> inputs = new HashMap<>(base.inputFiles());
+        inputs.put("inputs/context/current_thread_history.json", snapshot.getBytes(StandardCharsets.UTF_8));
+        return new InteractiveSandboxSpec(
+            base.sessionId(),
+            base.userId(),
+            base.workspaceId(),
+            base.image(),
+            base.command(),
+            base.environment(),
+            base.networkPolicy(),
+            base.resourceLimits(),
+            base.securityProfile(),
+            inputs,
+            base.volumeMounts()
         );
     }
 
@@ -293,7 +340,6 @@ class DockerInteractiveSandboxLiveTest {
                     assertThat(metrics.ringBufferDropped.count() - before).isEqualTo((double) expectedDrops)
                 );
 
-            // Late subscriber's snapshot must hold the NEWEST ringCapacity ticks, not any prefix.
             CopyOnWriteArrayList<JsonNode> snapshot = new CopyOnWriteArrayList<>();
             sb.subscribe(snapshot::add);
             await()
@@ -354,6 +400,52 @@ class DockerInteractiveSandboxLiveTest {
             AttachedSandbox b = adapter.attach(buildSpec("u5", "w5"));
             assertThat(b).isSameAs(a);
             a.close(Duration.ofSeconds(2));
+        }
+
+        @Test
+        void compatibleReuseRevokesTheUnusedFreshProxyToken() {
+            AtomicReference<String> firstToken = new AtomicReference<>();
+            AtomicReference<String> unusedToken = new AtomicReference<>();
+            AttachedSandbox first = adapter.attach(
+                withContextSnapshot(
+                    buildSpecWithProxyRoute("u_reuse", "w_reuse", "https://gateway.example/v1", firstToken),
+                    "first turn"
+                )
+            );
+
+            AttachedSandbox reused = adapter.attach(
+                withContextSnapshot(
+                    buildSpecWithProxyRoute("u_reuse", "w_reuse", "https://gateway.example/v1", unusedToken),
+                    "second turn"
+                )
+            );
+
+            assertThat(reused).isSameAs(first);
+            assertThat(proxyCredentialRegistry.validate(firstToken.get())).isPresent();
+            assertThat(proxyCredentialRegistry.validate(unusedToken.get())).isEmpty();
+            first.close(Duration.ofSeconds(2));
+        }
+
+        @Test
+        void changedProxyRouteReplacesTheWarmSandbox() {
+            AtomicReference<String> oldToken = new AtomicReference<>();
+            AtomicReference<String> newToken = new AtomicReference<>();
+            AttachedSandbox oldSandbox = adapter.attach(
+                buildSpecWithProxyRoute("u_route", "w_route", "https://old.example/v1", oldToken)
+            );
+
+            AttachedSandbox replacement = adapter.attach(
+                buildSpecWithProxyRoute("u_route", "w_route", "https://new.example/v1", newToken)
+            );
+
+            assertThat(replacement).isNotSameAs(oldSandbox);
+            assertThat(((DockerAttachedSandboxAdapter) oldSandbox).state()).isEqualTo(AttachedSandboxState.CLOSED);
+            assertThat(proxyCredentialRegistry.validate(oldToken.get())).isEmpty();
+            assertThat(proxyCredentialRegistry.validate(newToken.get()))
+                .get()
+                .extracting(route -> route.baseUrl())
+                .isEqualTo("https://new.example/v1");
+            replacement.close(Duration.ofSeconds(2));
         }
 
         @Test
@@ -483,7 +575,7 @@ class DockerInteractiveSandboxLiveTest {
                 AGENT_PI_IMAGE,
                 List.of("node", "/workspace/.runner/pi-mentor-runner.mjs"),
                 Map.of(),
-                new NetworkPolicy(true, null, null, null),
+                new NetworkPolicy(true, null, null),
                 new ResourceLimits(512 * 1024 * 1024, 1.0, 256, Duration.ofMinutes(5)),
                 sec,
                 Map.of(".runner/pi-mentor-runner.mjs", runnerBytes),
@@ -537,14 +629,13 @@ class DockerInteractiveSandboxLiveTest {
      */
     private InteractiveSandboxSpec buildMentorSpec(String userId, String workspaceId) {
         PiRuntimeFactory factory = new PiRuntimeFactory(MAPPER);
-        // API_KEY + baseUrl triggers the custom provider extension code path used in production.
         PiPlanSpec planSpec = new PiPlanSpec(
-            LlmProvider.OPENAI,
-            CredentialMode.API_KEY,
-            "stub-api-key",
+            "openai-completions",
             "stub-model",
-            "https://api.stub.example.com/v1",
             null,
+            null,
+            false,
+            "stub-proxy-token",
             true,
             120,
             new MentorRunnerProfile(),
@@ -585,9 +676,7 @@ class DockerInteractiveSandboxLiveTest {
                     AGENT_PI_IMAGE +
                     " docker/agents/pi/"
             );
-            // Uses the real PiRuntimeFactory command (mkdir + ln + cp + LD_PRELOAD + node).
-            // If any step in the sh -c chain fails (missing dir, bad symlink, missing cp source),
-            // the runner never starts, the pump sees EOF with non-zero exit, and attach() throws.
+            // A failed bootstrap step means the pump sees EOF with a non-zero exit and attach() throws.
             AttachedSandbox sb = adapter.attach(buildMentorSpec("u_boot", "w_boot"));
             CopyOnWriteArrayList<JsonNode> frames = new CopyOnWriteArrayList<>();
             sb.subscribe(frames::add);
@@ -613,7 +702,6 @@ class DockerInteractiveSandboxLiveTest {
             CopyOnWriteArrayList<JsonNode> frames = new CopyOnWriteArrayList<>();
             sb.subscribe(frames::add);
 
-            // Wait for the runner to be ready before sending any RPC.
             await()
                 .atMost(RPC_TIMEOUT)
                 .untilAsserted(() ->
@@ -668,7 +756,6 @@ class DockerInteractiveSandboxLiveTest {
                     ).isTrue()
                 );
 
-            // hello
             String helloId = UUID.randomUUID().toString();
             sb.send(
                 MAPPER.createObjectNode()
@@ -683,7 +770,6 @@ class DockerInteractiveSandboxLiveTest {
                     assertThat(frames.stream().anyMatch(f -> helloId.equals(f.path("id").asString()))).isTrue()
                 );
 
-            // open_thread
             String threadId = UUID.randomUUID().toString();
             String openId = UUID.randomUUID().toString();
             sb.send(
@@ -705,7 +791,6 @@ class DockerInteractiveSandboxLiveTest {
                     assertThat(openResp.path("result").path("threadId").asString()).isEqualTo(threadId);
                 });
 
-            // prompt (stub emits: agent_start → message_update/text_delta → agent_end)
             String promptId = UUID.randomUUID().toString();
             sb.send(
                 MAPPER.createObjectNode()

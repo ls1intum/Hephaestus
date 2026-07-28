@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import java.time.Instant;
@@ -19,6 +20,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,13 +47,16 @@ public class ConversationalFeedbackPreparer {
 
     private final FeedbackRepository feedbackRepository;
     private final FeedbackObservationRepository feedbackObservationRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public ConversationalFeedbackPreparer(
         FeedbackRepository feedbackRepository,
-        FeedbackObservationRepository feedbackObservationRepository
+        FeedbackObservationRepository feedbackObservationRepository,
+        ApplicationEventPublisher eventPublisher
     ) {
         this.feedbackRepository = feedbackRepository;
         this.feedbackObservationRepository = feedbackObservationRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -75,17 +80,36 @@ public class ConversationalFeedbackPreparer {
             )
             .collect(Collectors.toList());
 
+        // Every admitted observation consumes a slot (raised or withheld), so the band is not bounded by
+        // the per-recipient cap. Overflowing it would collide with the next band and silently drop
+        // the very rows this records — fail loud instead; a job with this many admitted loci is pathological.
+        if (ordered.size() > FeedbackLedgerRecorder.UNIT_ORDINAL_BAND_WIDTH) {
+            throw new IllegalStateException(
+                "Conversational units exceed the ordinal band: jobId=" +
+                    agentJobId +
+                    ", admitted=" +
+                    ordered.size() +
+                    ", band=" +
+                    FeedbackLedgerRecorder.UNIT_ORDINAL_BAND_WIDTH
+            );
+        }
+
         Map<Long, Integer> perRecipientCount = new HashMap<>();
+        // Newly CREATED units only (re-run no-ops excluded) — feeds the per-recipient prepared event.
+        Map<Long, Integer> newlyPreparedByRecipient = new HashMap<>();
         Instant now = Instant.now();
         int position = FeedbackLedgerRecorder.CONVERSATION_UNIT_ORDINAL_BASE;
         int prepared = 0;
         for (Observation observation : ordered) {
             long recipient = observation.getAboutUserId();
             int count = perRecipientCount.getOrDefault(recipient, 0);
-            if (count >= TOP_N_PER_RECIPIENT) {
-                continue;
+            // Over the per-recipient cap the locus is withheld, not raised. The router already established
+            // nobody has seen it, so it still gets a row — dropping it silently would leave it bound to a
+            // DELIVERED unit and read as feedback the developer ignored.
+            boolean overCap = count >= TOP_N_PER_RECIPIENT;
+            if (!overCap) {
+                perRecipientCount.put(recipient, count + 1);
             }
-            perRecipientCount.put(recipient, count + 1);
             int unitPosition = position++;
             if (feedbackRepository.existsByAgentJobIdAndPosition(agentJobId, unitPosition)) {
                 continue;
@@ -100,7 +124,8 @@ public class ConversationalFeedbackPreparer {
                     .aboutUserId(recipient)
                     .channel(FeedbackChannel.CONVERSATION)
                     .position(unitPosition)
-                    .deliveryState(FeedbackDeliveryState.PREPARED)
+                    .deliveryState(overCap ? FeedbackDeliveryState.SUPPRESSED : FeedbackDeliveryState.PREPARED)
+                    .suppressionReason(overCap ? FeedbackSuppressionReason.VOLUME_CAPPED : null)
                     .source(FeedbackSource.AGENT)
                     .createdAt(now)
                     .build()
@@ -111,11 +136,19 @@ public class ConversationalFeedbackPreparer {
                 EvidenceRole.PRIMARY.name(),
                 0
             );
-            prepared++;
+            if (!overCap) {
+                newlyPreparedByRecipient.merge(recipient, 1, Integer::sum);
+                prepared++;
+            }
         }
         if (prepared > 0) {
             log.info("Conversational feedback prepared: jobId={}, units={}", agentJobId, prepared);
         }
+        // Published inside this REQUIRES_NEW transaction so AFTER_COMMIT listeners (the Slack nudge) fire
+        // exactly when the units are durably visible — and not at all on a pure re-run.
+        newlyPreparedByRecipient.forEach((recipient, count) ->
+            eventPublisher.publishEvent(new ConversationFeedbackPreparedEvent(workspaceId, recipient, count))
+        );
         return prepared;
     }
 

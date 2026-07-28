@@ -37,23 +37,15 @@ import org.springframework.web.bind.annotation.RestController;
  */
 class CodeQualityTest extends HephaestusArchitectureTest {
 
-    // GOD CLASS DETECTION
-
     @Nested
     class GodClassTests {
 
         /**
-         * Services should not have excessive constructor parameters.
-         *
-         * <p>More than 12 dependencies indicates a God class that needs splitting.
-         *
-         * <p><strong>Exceptions:</strong> Orchestrator services that coordinate many sub-services
-         * (e.g., GithubDataSyncService) may legitimately have more dependencies.
-         * These should be explicitly named here with justification.
+         * Orchestrator services that coordinate many sub-services may legitimately exceed the
+         * threshold; each exemption below carries its own justification.
          */
         @Test
         void servicesHaveLimitedConstructorParams() {
-            // Orchestrator services that coordinate many sub-services are allowed more dependencies
             Set<String> orchestratorExceptions = Set.of(
                 "GithubDataSyncService", // Coordinates 15 entity-specific sync services
                 "GitHubHistoricalBackfillService", // Coordinates multiple sync services for historical data backfill
@@ -77,9 +69,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
 
-        /**
-         * Controllers should be thin with limited dependencies.
-         */
         @Test
         @DisplayName("Controllers have max 5 dependencies")
         void controllersAreThin() {
@@ -92,12 +81,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
 
-        /**
-         * Services should not have excessive business methods.
-         *
-         * <p>Classes with too many business methods violate SRP and should be split.
-         * Business methods exclude getters, setters, equals, hashCode, toString, and constructors.
-         */
+        /** Business methods exclude getters, setters, equals, hashCode, toString, and constructors. */
         @Test
         void servicesHaveLimitedBusinessMethods() {
             ArchRule rule = classes()
@@ -112,27 +96,11 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         }
     }
 
-    // METHOD COMPLEXITY LIMITS
-
     @Nested
     class MethodComplexityTests {
 
-        /** Maximum parameters per method - indicates complex method. */
         private static final int MAX_METHOD_PARAMETERS = 6;
 
-        /**
-         * Methods should not have too many parameters.
-         *
-         * <p>Too many parameters indicates complex methods that are hard
-         * to test and maintain. Consider using parameter objects.
-         *
-         * <p><strong>Exceptions:</strong>
-         * <ul>
-         *   <li>@Recover methods (Spring Retry requires matching signatures)</li>
-         *   <li>Static factory methods (e.g., `simple()`, `of()`, `from()`)</li>
-         *   <li>Overloaded internal methods with a command-object based alternative</li>
-         * </ul>
-         */
         @Test
         void methodsHaveLimitedParameters() {
             // Methods that have command-object overloads but need many params for internal processing
@@ -171,7 +139,9 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "SlackMessageRepository.tombstone",
                 // JPQL admin-audit query: each nullable filter needs its own @Param for the
                 // CAST(:from AS Instant) IS NULL null-handling — a param object can't express it.
-                "AuthEventRepository.findForAdmin"
+                "AuthEventRepository.findForAdmin",
+                // Atomic JPQL terminal transition; Spring Data query parameters must remain individually bound.
+                "SyncJobRepository.completeActiveJob"
             );
 
             ArchCondition<JavaClass> haveMethodsWithLimitedParams = new ArchCondition<>(
@@ -182,11 +152,11 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     javaClass
                         .getMethods()
                         .stream()
-                        .filter(m -> m.getOwner().equals(javaClass)) // Only declared methods
-                        .filter(m -> !m.getName().startsWith("$")) // Exclude synthetic
-                        .filter(m -> !m.getName().equals("<init>")) // Exclude constructors
-                        .filter(m -> !m.getName().startsWith("lambda$")) // Exclude lambdas
-                        // Exclude @Recover methods (Spring Retry requires matching signatures)
+                        .filter(m -> m.getOwner().equals(javaClass))
+                        .filter(m -> !m.getName().startsWith("$"))
+                        .filter(m -> !m.getName().equals("<init>"))
+                        .filter(m -> !m.getName().startsWith("lambda$"))
+                        // @Recover methods must match the protected method's signature (Spring Retry)
                         .filter(m -> !m.isAnnotatedWith("org.springframework.retry.annotation.Recover"))
                         // Exclude static factory methods (common pattern for parameter objects)
                         .filter(m ->
@@ -195,9 +165,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                                     m.getName().equals("of") ||
                                     m.getName().equals("from")))
                         )
-                        // Exclude allowed overloads with command-object alternatives
                         .filter(m -> !allowedOverloads.contains(javaClass.getSimpleName() + "." + m.getName()))
-                        // Exclude native SQL repository methods (require @Param per column, no param objects)
+                        // Native SQL methods require @Param per column and cannot use parameter objects
                         .filter(m ->
                             !nativeSqlRepositoryMethods.contains(javaClass.getSimpleName() + "." + m.getName())
                         )
@@ -237,12 +206,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
 
-        /**
-         * Public methods in services should not have excessive nesting indicators.
-         *
-         * <p>Methods with many boolean parameters often indicate high cyclomatic complexity.
-         * This is a proxy check since ArchUnit cannot directly measure cyclomatic complexity.
-         */
+        /** Boolean-parameter count is a proxy here since ArchUnit cannot measure cyclomatic complexity directly. */
         @Test
         void serviceMethodsAvoidExcessiveBooleanParams() {
             ArchCondition<JavaClass> avoidManyBooleans = new ArchCondition<>(
@@ -288,23 +252,10 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         }
     }
 
-    // SECURITY PATTERNS
-
     @Nested
     @DisplayName("Security Patterns")
     class SecurityPatternTests {
 
-        /**
-         * Services handling tokens should be in appropriate security-related packages.
-         *
-         * <p>Token services are sensitive and should be in one of:
-         * <ul>
-         *   <li>Security packages (auth, security) - for authentication tokens</li>
-         *   <li>App packages - for session tokens</li>
-         *   <li>Common packages - for shared token utilities</li>
-         *   <li>GitHub packages - for GitHub-specific token handling</li>
-         * </ul>
-         */
         @Test
         void tokenServicesInSecurityPackages() {
             ArchCondition<JavaClass> beInTokenAppropriatePackage = new ArchCondition<>(
@@ -346,17 +297,9 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         }
     }
 
-    // INTERFACE SEGREGATION PRINCIPLE
-
     @Nested
     class InterfaceSegregationTests {
 
-        /**
-         * Interfaces should have limited methods.
-         *
-         * <p>Fat interfaces force implementations to provide methods they
-         * don't need. Prefer small, focused interfaces.
-         */
         @Test
         void interfacesHaveLimitedMethods() {
             ArchCondition<JavaClass> haveLimitedMethods = new ArchCondition<>(
@@ -418,11 +361,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         }
 
         /**
-         * SPI interfaces should be particularly focused.
-         *
-         * <p>Service Provider Interfaces define module contracts - they should be minimal.
-         *
-         * <p><b>Width = abstract + default instance methods.</b> Counting only {@code abstract}
+         * <b>Width = abstract + default instance methods.</b> Counting only {@code abstract}
          * methods would let an interface hide its true surface behind {@code default} no-op
          * bodies — a default no-op is still part of the contract every caller can invoke, so it
          * counts toward ISP width exactly like an abstract method. Static and private (helper)
@@ -440,8 +379,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     int methodCount = (int) javaClass
                         .getMethods()
                         .stream()
-                        // Implementable contract surface: every non-static, non-private instance
-                        // method a caller can invoke or an implementer can override — abstract OR default.
                         .filter(m -> !m.getModifiers().contains(JavaModifier.STATIC))
                         .filter(m -> !m.getModifiers().contains(JavaModifier.PRIVATE))
                         .count();
@@ -475,17 +412,10 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         }
     }
 
-    // DEPENDENCY INVERSION
-
     @Nested
     class DependencyInversionTests {
 
-        /**
-         * Limit ObjectProvider usage for lazy resolution / cycle breaking.
-         *
-         * <p>ObjectProvider is a valid way to break cycles, but should
-         * be used sparingly. Known usages are documented here.
-         */
+        /** ObjectProvider is a valid way to break cycles, but new usages must justify themselves below. */
         @Test
         void objectProviderUsageIsLimited() {
             Set<String> knownCycleBreakers = Set.of(
@@ -494,6 +424,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "WorkspaceLifecycleService", // IntegrationNatsConsumer absent under the webhook runtime role
                 "GitHubWorkspaceProvisioningAdapter", // Lazy-loaded to break circular reference with GithubDataSyncService
                 "WorkspaceRepositoryMonitorService",
+                "ScmWorkspaceContentEraser", // IntegrationNatsConsumer absent under the webhook runtime role — the erase refreshes the scope consumer once after dropping the workspace's monitors
+                "WorkspaceSyncTargetProvider", // IntegrationNatsConsumer absent under the webhook runtime role — reconcileSyncTargetIdentity refreshes the scope consumer after a rename re-key
                 "GitLabWorkspaceInitializationService", // Optional GitLab beans gated by @ConditionalOnProperty
                 "GitLabWebhookService", // Optional GitLab beans gated by @ConditionalOnProperty
                 "GitlabDataSyncScheduler", // Optional GitLab beans gated by @ConditionalOnProperty
@@ -502,7 +434,14 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "AccountPreferencesService", // PosthogClient is optional, gated by @ConditionalOnProperty(hephaestus.posthog.enabled=true)
                 "GitHubWorkspaceDataSyncTrigger", // Lazy-loads GithubDataSyncService + SyncTargetProvider to break the same circular reference WorkspaceProvisioningAdapter handled; the workspace-side trigger sits on the GitHub adapter post-SPI extraction
                 "WorkspaceScopedTables", // EntityManagerFactory is consumed transitively by HibernatePropertiesCustomizer — lazy lookup breaks the EMF<->tenancy startup cycle (see WorkspaceScopedTables javadoc)
-                "MentorChatService" // InteractiveSandboxService is part of the worker capability (DockerSandboxConfiguration, gated on the worker role); absent on non-worker pods — resolved lazily at attach time
+                "MentorChatService", // InteractiveSandboxService is part of the worker capability (DockerSandboxConfiguration, gated on the worker role); absent on non-worker pods — resolved lazily at attach time
+                "OutlineWorkspacePurgeAdapter", // OutlineWebhookRegistrar is optional (gated by @ConditionalOnProperty(hephaestus.integration.outline.enabled)); the always-on purge contributor resolves it lazily so it still drops leftover documents when Outline is disabled
+                "OutlineWebhookRegistrar", // IntegrationNatsConsumer is optional (gated on hephaestus.sync.nats.enabled and the server runtime role); the registrar reconciles the scope consumer after every subscription-id change and must not require the bean
+                "SlackScopeConsumerReconciler", // same reason as OutlineWebhookRegistrar: IntegrationNatsConsumer is optional (nats/server-role gated); the Slack lifecycle reconciler must not require the bean
+                "SyncPushService", // Qualified NATS connection is optional when sync push is disabled or under specs
+                "GitlabConnectionSyncStateProvider", // Rate-limit tracker is conditional with the GitLab runtime beans
+                "OutlineConnectionSyncStateProvider", // Rate-limit tracker (OutlineRateLimitTracker) is @ConditionalOnProperty(outline.enabled) — same optional-bean break as the GitLab provider
+                "InstanceLlmSettingsService" // LlmSettingsAudit's sole impl is @ConditionalOnServerRole, but this service is also consumed by the ungated Workspace{Llm}Service pair (BYO gate check) which load on every runtime role
             );
 
             ArchCondition<JavaField> beInKnownClass = new ArchCondition<>("be in a known cycle-breaking class") {
@@ -533,16 +472,9 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         }
     }
 
-    // LISKOV SUBSTITUTION PRINCIPLE
-
     @Nested
     class LiskovSubstitutionTests {
 
-        /**
-         * Services should not declare generic Exception in methods.
-         *
-         * <p>LSP principle: methods should declare specific exceptions.
-         */
         @Test
         void serviceMethodsDoNotDeclareGenericException() {
             ArchCondition<JavaClass> notDeclareGenericException = new ArchCondition<>(
@@ -589,15 +521,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         }
 
         /**
-         * Service implementations should not throw UnsupportedOperationException.
-         *
-         * <p>LSP principle: a subtype should be substitutable for its supertype.
-         * Throwing UnsupportedOperationException indicates the implementation doesn't
-         * properly fulfill its contract - violating LSP.
-         *
-         * <p><strong>Detection method:</strong> This check scans method bytecode for
-         * instantiation of UnsupportedOperationException, which catches both direct throws
-         * and throws via utility methods.
+         * Scans method bytecode for instantiation of UnsupportedOperationException, which catches
+         * both direct throws and throws via utility methods.
          */
         @Test
         void serviceImplementationsDoNotThrowUnsupportedOperationException() {
@@ -614,7 +539,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                         .filter(m -> !m.getName().startsWith("lambda$"))
                         .filter(m -> !m.getName().equals("<init>"))
                         .forEach(method -> {
-                            // Check if method instantiates UnsupportedOperationException
                             boolean throwsUnsupported = method
                                 .getConstructorCallsFromSelf()
                                 .stream()

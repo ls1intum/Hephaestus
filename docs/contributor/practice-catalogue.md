@@ -7,6 +7,22 @@
 > catalogue's claims can be defended source-by-source. Uses the canonical vocabulary throughout —
 > *area*, never *goal*.
 
+**The catalogue file is the count, and this page is not.** Sections 2 and 3 carry one entry per
+shipped area and practice, but no total — a number typed into a heading drifts the first time
+somebody adds a practice and is then wrong in a way nothing checks. Ask the file instead:
+
+```bash
+jq '.areas | length' server/src/main/resources/practices/default-catalog.json
+jq '[.areas[].practices | length] | add' server/src/main/resources/practices/default-catalog.json
+jq -r '.areas[] | "\(.displayOrder)\t\(.slug)\t\(.practices | length)"' \
+  server/src/main/resources/practices/default-catalog.json
+```
+
+`DefaultPracticeCatalogSeederTest` asserts those same totals, so a catalogue entry added without a
+matching row below still fails CI on the seeder test — but the *grounding* here is only as complete
+as whoever added the entry left it. Adding a practice means adding its row in § 3 and, if it opens a
+new area, its anchor in § 2.
+
 ---
 
 ## 1. What this catalogue is — scope posture (threats to validity)
@@ -54,7 +70,7 @@ orphan; that remap is the gating step (the SCD-2 `practice_revision` history —
 
 ---
 
-## 2. The 11 areas and their standards anchors
+## 2. The areas and their standards anchors
 
 Each area carries a `standardsAnchor` — the body of knowledge that grounds the *grouping*. Anchors are
 attached as metadata (citations), not as renames: the R9 doctrine is "keep the slug, add the citation".
@@ -147,12 +163,27 @@ one 2025 preprint).
 - SWEBOK v4.0 KA8/KA1 — [https://www.computer.org/education/bodies-of-knowledge/software-engineering](https://www.computer.org/education/bodies-of-knowledge/software-engineering)
 - *Issue Tracking Ecosystems: Context and Best Practices* (2025) — [https://arxiv.org/pdf/2507.06704](https://arxiv.org/pdf/2507.06704)
 
+### 2.12 `communication` — *Communicating in the open*
+
+**standardsAnchor:** SWEBOK v4.0 KA *Software Engineering Professional Practice* — the **Communication
+Skills** topic (reading, writing, and team/group communication as a named professional competency);
+Bacchelli & Bird (2013) for the general finding that the expensive part of collaborative development
+is establishing shared understanding, which is what a question or a status update either supplies or
+withholds. **This is the weakest-grounded area in the catalogue**, and deliberately the only one
+whose practices are *all* `practitioner-norm`: no controlled-outcome study in the register below
+shows that better-formed questions or status updates change delivery outcomes. It is also the only
+area scoped to `CONVERSATION_THREAD` rather than a PR or an issue, and the only one whose practices
+carry no `triggerEvents` — it is evaluated on a settled thread, never on an event.
+
+- IEEE CS, *Guide to SWEBOK v4.0* (2024), Software Engineering Professional Practice — [https://www.computer.org/education/bodies-of-knowledge/software-engineering](https://www.computer.org/education/bodies-of-knowledge/software-engineering)
+- Bacchelli & Bird (2013), ICSE — [https://sback.it/publications/icse2013.pdf](https://sback.it/publications/icse2013.pdf)
+
 ---
 
-## 3. The 32 practices — grounding + credibility tier
+## 3. The practices — grounding + credibility tier
 
 Each row: the practice's one-line grounding (study/standard + author/year) and its credibility tier.
-"PR" = `PULL_REQUEST` artifact, "ISSUE" = `ISSUE` artifact.
+"PR" = `PULL_REQUEST` artifact, "ISSUE" = `ISSUE` artifact, "THREAD" = `CONVERSATION_THREAD`.
 
 ### `review-ready-work`
 | Practice (slug) | Artifact | One-line grounding | Tier |
@@ -215,6 +246,12 @@ Each row: the practice's one-line grounding (study/standard + author/year) and i
 | --- | --- | --- | --- |
 | `records-significant-decisions-with-rationale` | PR | Nygard 2011 ADR (record the *why* of a significant decision) — also the single observable design sliver carried in lieu of an architecture area | **practitioner-canonical** |
 | `documents-public-api-and-behaviour-changes` | PR | DORA documentation-quality capability (empirically predicts performance) + SWEBOK KA4 documentation | **practitioner-canonical** |
+| `change-keeps-linked-docs-consistent` | PR | DORA documentation-quality capability (a wiki that contradicts the code is the failure mode that capability names) + SWEBOK KA8 *Configuration status accounting* (documentation is a controlled item that moves with the change). Judges only a document the PR itself links and that the runtime materialised under `inputs/context/outline/`; a missing wiki link is never the finding | **practitioner-canonical** |
+| `issue-points-to-relevant-context` | ISSUE | Bettenburg et al. 2008 (the elements maintainers most value are the ones the reporter must supply because the reader cannot reconstruct them) + Nygard 2011 ADR (a decision is only usable if the work depending on it can find it). Fires only when the issue's own text leans on a decision or design made elsewhere; a self-contained issue is `NOT_APPLICABLE` | **practitioner-canonical** |
+
+This is the one area holding practices for both artifact types — the ISSUE practice sits here rather
+than under `issue-traceability-and-lifecycle` because it judges whether the issue supplies the prior
+*context* an implementer needs, a documentation property, not a traceability one.
 
 ### `delivery-and-version-control-discipline`
 | Practice | Artifact | Grounding | Tier |
@@ -229,6 +266,19 @@ Each row: the practice's one-line grounding (study/standard + author/year) and i
 | `breaks-large-work-into-trackable-subtasks` | ISSUE | SWEBOK KA1 Requirements (decomposition) + CMMI Requirements Development & Management | **practitioner-canonical** |
 | `triages-the-issue-with-labels-and-ownership` | ISSUE | Practitioner convention — no standards body owns an issue-triage taxonomy | **practitioner-norm** |
 | `issue-closed-with-unmet-outcome` | ISSUE | *Issue Tracking Ecosystems* (2025, arXiv preprint) + practitioner convention (confirm the outcome before closing) | preprint + convention |
+
+### `communication`
+
+All three are `CONVERSATION_THREAD` practices evaluated on a settled thread, and all three are
+`practitioner-norm`: SWEBOK names communication a professional competency, but nothing in the
+register below is a controlled-outcome study on question or update phrasing. Treat findings here as
+the most tentative the catalogue produces.
+
+| Practice | Artifact | Grounding | Tier |
+| --- | --- | --- | --- |
+| `asks-answerable-questions` | THREAD | SWEBOK v4.0 *Professional Practice* → Communication Skills + Bacchelli & Bird 2013 (the cost is establishing shared understanding). No controlled-outcome study; judges only whether the ask carries its own context, never whether the underlying problem is real or hard | **practitioner-norm** |
+| `gives-actionable-answers` | THREAD | Bosu et al. 2015 by analogy only — usefulness operationalised as "the recipient could act" — transposed from review comments to a reply in a thread, which is *not* what that study measured. Judges the reply's actionability as written, never whether its technical content is correct | **practitioner-norm** |
+| `posts-clear-status-and-blocker-updates` | THREAD | Practitioner convention (stand-up / async-update norms); no standards body owns it. Judges whether an update names the standing and, when stuck, the blocker and the ask — never whether the work itself is on track | **practitioner-norm** |
 
 ---
 
@@ -253,7 +303,7 @@ or metadata — never a slug (identity key), a stored enum, or a DB CHECK.
 5. **Metadata adds**: ASVS V1/V2 tags on the two injection-adjacent practices; ISO 25010 / SWEBOK KA4 /
    DORA tags on `code-craftsmanship`; `credibilityTier` labels on `merged-past-unresolved-review-threads`
    (practitioner-norm) and `excludes-generated-and-build-artifacts`.
-6. **Developer-facing learner copy (all 32 practices)**: every practice now carries seeded `whyItMatters`
+6. **Developer-facing learner copy (every practice, no exceptions)**: every practice carries seeded `whyItMatters`
    (a learner-facing *explanation* — why the practice matters) and `whatGoodLooksLike` (a concrete
    **exemplar** — what good looks like). These feed the developer-facing layer served through
    `LearnerPracticeDTO` / `GET /practices/learner`; that projection is **criteria-free by construction**

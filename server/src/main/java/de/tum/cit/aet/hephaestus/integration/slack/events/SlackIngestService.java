@@ -22,27 +22,15 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code SlackConversationContentSource} exposes to the mentor). Stores rendered text only (data minimization).
  * Idempotent on {@code (workspace, channel, ts)}.
  *
- * <p><strong>Capability flag (fail-closed layer 1).</strong> Channel/group message ingestion is gated by
- * {@code hephaestus.integration.slack.conversation-ingest.enabled}. The capability is <em>available by default</em>
- * so each workspace can self-serve, but availability alone reads nothing — while the flag is off,
- * {@link #ingestChannelMessage} returns immediately (no discovery row, no store) and the whole channel-ingest →
- * conversation-detection → conversation-feedback subsystem is inert; setting it to {@code false} hard-disables the
- * subsystem fleet-wide. Even with the flag on, ingestion still requires the per-channel consent gate ({@code ACTIVE})
- * and the per-person opt-out firewall below, and is forward-only, so nothing is read until a channel is deliberately
- * activated. The DM/mentor path and everything else in the Slack integration are unaffected by this flag.
- *
- * <p><strong>Consent gate (fail-closed layer 2).</strong> Even with the capability flag on, a message is only
- * persisted once its channel's {@link ConsentState} is {@code ACTIVE}. Channels enter the allow-list (as
- * {@code PENDING}) when the bot is invited ({@code member_joined_channel}) or via the admin directory — approval is
- * an explicit, out-of-band consent action, never an implicit side effect of traffic.
+ * <p>Ingestion is fail-closed behind stacked gates: the fleet-wide capability flag
+ * ({@link #conversationIngestEnabled}), the per-channel consent gate ({@code ACTIVE}), the forward-only
+ * announcement window, and the per-person opt-out firewall. The DM/mentor path and everything else in the Slack
+ * integration are unaffected by the capability flag.
  *
  * <p>On a genuinely new message the author's Slack id is resolved to the workspace {@code User} (member) id and
  * stamped onto {@code slack_message.author_member_id} (the participant-firewall stamp), and the thread aggregate
  * is upserted (window advance + participant union). {@code message_changed}/{@code message_deleted} edit and
  * tombstone the stored row (GDPR Art. 17).
- *
- * <p>Persistence rides the {@code integration.slack.domain} JPA repositories — no raw {@code JdbcTemplate}. The
- * only non-JPA read is the team→workspace tenant resolution, isolated in {@link SlackWorkspaceResolver}.
  */
 @Service
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
@@ -60,11 +48,10 @@ public class SlackIngestService {
     private final ConversationFeedbackErasure conversationFeedbackErasure;
 
     /**
-     * Capability flag, available by default. Gates the channel-ingest entry point ({@link #ingestChannelMessage})
-     * as the first fail-closed layer in front of the per-channel consent gate and the per-person firewall: while
-     * this is {@code false}, channel/group messages are never ingested at all, so the conversation-detection/feedback
-     * subsystem downstream of it stays completely dormant. Bound from
-     * {@code hephaestus.integration.slack.conversation-ingest.enabled}.
+     * Fleet-wide capability flag, available by default, bound from
+     * {@code hephaestus.integration.slack.conversation-ingest.enabled}. The first fail-closed layer in front of the
+     * per-channel consent gate and the per-person firewall: while {@code false}, channel/group messages are never
+     * ingested at all and the conversation-detection/feedback subsystem downstream stays completely dormant.
      */
     private final boolean conversationIngestEnabled;
 
@@ -99,8 +86,6 @@ public class SlackIngestService {
         @Nullable String authorSlackUserId,
         @Nullable String text
     ) {
-        // Fail-closed layer 1: the channel-ingest capability flag. Available by default, but when disabled nothing
-        // is discovered, gated, or stored — the subsystem is fully dormant regardless of channel/person consent.
         if (!conversationIngestEnabled) {
             return;
         }
@@ -129,9 +114,7 @@ public class SlackIngestService {
             return;
         }
 
-        // Person firewall: an individual who opted out of ingestion is never stored,
-        // even on an ACTIVE channel with the capability on. This composes the two-layer gate into:
-        //   ingest iff conversationIngestEnabled AND channel == ACTIVE AND NOT participantOptedOut(workspace, author).
+        // Person firewall: an opted-out individual is never stored, even on an ACTIVE channel with the capability on.
         // Deny-if-opted-out / allow-if-absent, keyed on the author's Slack id (an unauthored/blank sender has no
         // person to gate, so it proceeds — it stamps no member id and unions nothing into participant_member_ids).
         if (
@@ -214,8 +197,6 @@ public class SlackIngestService {
         @Nullable String authorSlackUserId,
         @Nullable String text
     ) {
-        // Fail-closed layer 1: honor the channel-ingest kill switch (ingest + tombstone both do). editMessage can now
-        // INSERT via re-ingest.
         if (!conversationIngestEnabled || channelId.isEmpty() || ts.isEmpty()) {
             return;
         }
@@ -231,11 +212,8 @@ public class SlackIngestService {
         if (updated > 0) {
             return;
         }
-        // Durable edit-before-insert: the edit raced ahead of a NAK-redelivered base insert (row absent). Route the
-        // edited body through the SAME fail-closed ingest stack (consent + forward-only watermark + participant firewall
-        // + identity stamp) so it is stored durably AND consent-safely; the later insertIfAbsent (ON CONFLICT DO NOTHING)
-        // then no-ops. existsBy distinguishes a TOMBSTONED row (updated == 0 but present -> skip, no resurrection) from a
-        // genuinely-absent one (re-ingest).
+        // Edit raced ahead of a NAK-redelivered base insert (row absent). existsBy distinguishes a TOMBSTONED row
+        // (updated == 0 but present -> skip, no resurrection) from a genuinely-absent one (re-ingest).
         if (!messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, channelId, ts)) {
             ingestChannelMessage(teamId, channelId, ts, threadTs, authorSlackUserId, text);
             // Stamp edited_at (insertIfAbsent does not): a row born from message_changed genuinely is an edited message,
@@ -245,28 +223,20 @@ public class SlackIngestService {
     }
 
     /**
-     * Channel erasure: flip the channel to {@code REVOKED} so ingestion stops immediately and its stored threads
-     * drop out of every {@code consent_state = 'ACTIVE'} projector, <em>and</em> promptly delete the channel's
-     * ingested content — its {@code slack_message} rows (the raw message text) and its {@code slack_thread}
-     * aggregates (which hold the {@code participant_member_ids} personal data) — rather than waiting for the
-     * 180-day retention sweep, which covers messages only and would leave the thread aggregates behind. Every
-     * write carries the {@code workspace_id} predicate; the whole method is transactional and idempotent (a
-     * channel that was never allow-listed, or was already erased, deletes 0 rows).
+     * Channel erasure: flip the channel to {@code REVOKED} so ingestion stops immediately, and promptly delete the
+     * channel's ingested content — its {@code slack_message} rows and its {@code slack_thread} aggregates (which
+     * hold the {@code participant_member_ids} personal data) — rather than waiting for the 180-day retention sweep,
+     * which covers messages only. Transactional and idempotent (an unknown or already-erased channel deletes 0 rows).
      *
-     * <p><strong>Derived CONVERSATION feedback is now hard-deleted too (true erasure, not inert-by-gate).</strong>
-     * The observations/feedback composed from these threads carry {@code artifact_type = CONVERSATION_THREAD} +
-     * {@code artifact_id = slack_thread.id} but hold no FK back to {@code slack_thread}, so dropping the aggregate
-     * alone would only render them INERT (the mentor consent gate withholds them once the channel is non-ACTIVE).
-     * To satisfy GDPR Art. 17 for the derived copies we collect the channel's thread ids first and call the
-     * practices-owned {@link ConversationFeedbackErasure} port, which deletes exactly those CONVERSATION_THREAD
-     * rows (cascading their {@code feedback_observation}/placement/reaction children) and nothing else — PR/ISSUE
-     * rows and other tenants' rows are untouched. The port inverts the dependency ({@code integration.slack →
-     * practices::spi}, implementation inside {@code practices}), so no Spring Modulith cycle forms.
+     * <p>Derived CONVERSATION feedback is hard-deleted too (GDPR Art. 17 for the derived copies, not inert-by-gate):
+     * those rows carry {@code artifact_type = CONVERSATION_THREAD} + {@code artifact_id = slack_thread.id} with no
+     * FK back to {@code slack_thread}, so the channel's thread ids are collected first and passed to the
+     * practices-owned {@link ConversationFeedbackErasure} port, which deletes exactly those rows (cascading their
+     * observation/placement/reaction children) — PR/ISSUE rows and other tenants' rows are untouched. The port
+     * inverts the dependency ({@code integration.slack → practices::spi}), so no Spring Modulith cycle forms.
      */
     @Transactional
     public void eraseChannel(long workspaceId, String channelId) {
-        // Collect the channel's thread ids BEFORE dropping the aggregates — the derived practice rows are keyed by
-        // slack_thread.id as their artifact_id, so we need the ids to erase the derived copies.
         List<Long> threadIds = threadRepository.findIdsByWorkspaceIdAndSlackChannelId(workspaceId, channelId);
         monitoredChannelRepository.revokeConsent(workspaceId, channelId);
         conversationFeedbackErasure.eraseForThreads(workspaceId, threadIds);

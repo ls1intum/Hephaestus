@@ -19,8 +19,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Append-only auth-event log. Monthly RANGE-partitioned on {@code occurred_at} and self-managed
- * by pg_partman (create-ahead + 12-month retention, oldest dropped) —
- * runs on stock Postgres with no {@code pg_partman} / custom image. Records the
+ * by pg_partman (create-ahead + 12-month retention, oldest dropped). Records the
  * {@code (account_id, acting_account_id)} pair for every impersonation so every action attributable
  * to an impersonator is reconstructible.
  *
@@ -70,9 +69,9 @@ public class AuthEvent {
     @Nullable
     private String failureReason;
 
-    @Column(name = "git_provider_id")
+    @Column(name = "provider_id")
     @Nullable
-    private Long gitProviderId;
+    private Long providerId;
 
     @Column(name = "workspace_id")
     @Nullable
@@ -114,6 +113,20 @@ public class AuthEvent {
         EXPORT_REQUESTED,
         APP_ROLE_CHANGED,
         RESEARCH_CONSENT_REVOKED,
+        // Instance LLM catalog: GLOBAL, so config_audit_event cannot carry it (workspace_id is NOT NULL).
+        LLM_CONNECTION_CREATED,
+        LLM_CONNECTION_UPDATED,
+        LLM_CONNECTION_DELETED,
+        LLM_MODEL_CREATED,
+        LLM_MODEL_UPDATED,
+        LLM_MODEL_DELETED,
+        LLM_MODEL_PRICE_CHANGED,
+        LLM_MODEL_SHARING_CHANGED,
+        LLM_SETTINGS_CHANGED,
+        // Instance login providers: GLOBAL, and they change how everyone signs in to this instance.
+        LOGIN_PROVIDER_CREATED,
+        LOGIN_PROVIDER_UPDATED,
+        LOGIN_PROVIDER_DELETED,
     }
 
     public enum Result {
@@ -141,7 +154,7 @@ public class AuthEvent {
         e.accountId = data.accountId();
         e.actingAccountId = data.actingAccountId();
         e.failureReason = data.failureReason();
-        e.gitProviderId = data.gitProviderId();
+        e.providerId = data.gitProviderId();
         e.workspaceId = data.workspaceId();
         e.identityLinkId = data.identityLinkId();
         e.ipInet = ipInet;

@@ -76,11 +76,13 @@ public class SlackMessageService {
 
     private final Slack slack;
     private final SlackCredentialProvider credentialProvider;
+    private final SlackRateLimitTracker rateLimitTracker;
     private final ConcurrentMap<Long, String> botUserIdCache = new ConcurrentHashMap<>();
 
-    public SlackMessageService(SlackCredentialProvider credentialProvider) {
+    public SlackMessageService(SlackCredentialProvider credentialProvider, SlackRateLimitTracker rateLimitTracker) {
         this.slack = Slack.getInstance();
         this.credentialProvider = credentialProvider;
+        this.rateLimitTracker = rateLimitTracker;
     }
 
     public void sendForWorkspace(long workspaceId, String channelId, List<LayoutBlock> blocks, String fallback) {
@@ -105,7 +107,7 @@ public class SlackMessageService {
             request.threadTs(threadTs);
         }
         try {
-            ChatPostMessageResponse response = callHonoringRateLimit(() ->
+            ChatPostMessageResponse response = callHonoringRateLimit(workspaceId, () ->
                 slack.methods(token).chatPostMessage(request.build())
             );
             if (!response.isOk()) {
@@ -131,10 +133,8 @@ public class SlackMessageService {
 
     /**
      * Post an <strong>ephemeral</strong> message via {@code chat.postEphemeral} — visible only to {@code slackUserId}
-     * in {@code channelId}, seen by no one else and gone on reload. The seam the just-in-time consent notice (shown
-     * to a member who joins an already-active channel) and the in-message opt-out confirmation render through.
-     * Mirrors {@link #sendForWorkspace}: throws {@link SlackSendException} carrying the Slack error so the caller can
-     * log-and-swallow (the notice is best-effort).
+     * in {@code channelId} and gone on reload. Throws {@link SlackSendException} carrying the Slack error so the
+     * caller can log-and-swallow (the notice is best-effort).
      */
     public void sendEphemeralForWorkspace(
         long workspaceId,
@@ -150,10 +150,10 @@ public class SlackMessageService {
             .channel(channelId)
             .user(slackUserId)
             .blocks(blocks)
-            .text(fallback) // fallback text shown in notifications + accessibility tools
+            .text(fallback)
             .build();
         try {
-            ChatPostEphemeralResponse response = callHonoringRateLimit(() ->
+            ChatPostEphemeralResponse response = callHonoringRateLimit(workspaceId, () ->
                 slack.methods(token).chatPostEphemeral(request)
             );
             if (!response.isOk()) {
@@ -178,21 +178,21 @@ public class SlackMessageService {
         }
     }
 
-    /**
-     * The app's own bot user id ({@code U…}) for this workspace via {@code auth.test}, or empty when it cannot be
-     * resolved (no active connection / Slack failure). Best-effort and never throws — used only to skip the bot's
-     * OWN {@code member_joined_channel} event (adding the app to a channel fires that event too), so an unresolved
-     * id degrades to "cannot confirm it's the bot" rather than blocking the caller.
-     *
-     * <p>Positive results are cached per workspace: the bot user id is stable for an installation, and this runs on
-     * the serial event-consumer thread for every {@code member_joined_channel}, so an uncached remote call per join
-     * would stall unrelated workspaces' events. Failures are not cached (retried on the next event).
-     */
     /** Evict the cached bot user id, e.g. on uninstall — a later reconnect may install a different app. */
     public void evictBotUserId(long workspaceId) {
         botUserIdCache.remove(workspaceId);
     }
 
+    /**
+     * The app's own bot user id ({@code U…}) for this workspace via {@code auth.test}, or empty when it cannot be
+     * resolved (no active connection / Slack failure). Best-effort and never throws — used only to skip the bot's
+     * OWN {@code member_joined_channel} event, so an unresolved id degrades to "cannot confirm it's the bot"
+     * rather than blocking the caller.
+     *
+     * <p>Positive results are cached per workspace: the bot user id is stable for an installation, and this runs on
+     * the serial event-consumer thread for every {@code member_joined_channel}, so an uncached remote call per join
+     * would stall unrelated workspaces' events. Failures are not cached (retried on the next event).
+     */
     public Optional<String> resolveBotUserId(long workspaceId) {
         String cached = botUserIdCache.get(workspaceId);
         if (cached != null) {
@@ -203,7 +203,9 @@ public class SlackMessageService {
             return Optional.empty();
         }
         try {
-            AuthTestResponse r = callHonoringRateLimit(() -> slack.methods(token.get()).authTest(req -> req));
+            AuthTestResponse r = callHonoringRateLimit(workspaceId, () ->
+                slack.methods(token.get()).authTest(req -> req)
+            );
             if (r.isOk() && r.getUserId() != null && !r.getUserId().isBlank()) {
                 botUserIdCache.put(workspaceId, r.getUserId());
                 return Optional.of(r.getUserId());
@@ -278,17 +280,16 @@ public class SlackMessageService {
     }
 
     /**
-     * Publish (replace) the App Home tab view for one member via {@code views.publish}. The seam the App
-     * Home (disclosure + research-consent toggle) renders through — the sibling of
-     * {@code chat.postMessage} for the Home surface. Throws {@link SlackSendException} carrying the Slack
-     * error so the caller can log-and-swallow (App Home render is best-effort, like the onboarding CTA).
+     * Publish (replace) the App Home tab view for one member via {@code views.publish}. Throws
+     * {@link SlackSendException} carrying the Slack error so the caller can log-and-swallow (App Home render is
+     * best-effort).
      */
     public void publishHomeView(long workspaceId, String slackUserId, View view) {
         String token = resolveToken(workspaceId).orElseThrow(() ->
             new SlackSendException(workspaceId, slackUserId, "no_active_slack_connection")
         );
         try {
-            ViewsPublishResponse r = callHonoringRateLimit(() ->
+            ViewsPublishResponse r = callHonoringRateLimit(workspaceId, () ->
                 slack.methods(token).viewsPublish(req -> req.userId(slackUserId).view(view))
             );
             if (!r.isOk()) {
@@ -314,7 +315,7 @@ public class SlackMessageService {
 
     /**
      * Set the assistant "thinking…" status on a thread. Best-effort: only assistant threads support it, so a
-     * failure (e.g. a plain DM thread) is swallowed — it's a liveness nicety, never load-bearing.
+     * failure (e.g. a plain DM thread) is swallowed.
      */
     public void setStatus(long workspaceId, String channel, String threadTs, String status) {
         Optional<String> token = resolveToken(workspaceId);
@@ -331,8 +332,8 @@ public class SlackMessageService {
     }
 
     /**
-     * Set suggested prompts at the top of the agent Messages tab. Best-effort: prompts are a discovery nicety,
-     * never load-bearing.
+     * Set suggested prompts at the top of the agent Messages tab. Best-effort: prompts are a discovery nicety, so
+     * a failure is swallowed.
      */
     public void setSuggestedPrompts(long workspaceId, String channel, String title, List<SuggestedPrompt> prompts) {
         Optional<String> token = resolveToken(workspaceId);
@@ -362,7 +363,7 @@ public class SlackMessageService {
         try {
             do {
                 String pageCursor = cursor;
-                ConversationsListResponse response = callHonoringRateLimit(() ->
+                ConversationsListResponse response = callHonoringRateLimit(workspaceId, () ->
                     methods.conversationsList(req ->
                         req
                             .types(List.of(ConversationType.PUBLIC_CHANNEL, ConversationType.PRIVATE_CHANNEL))
@@ -410,7 +411,7 @@ public class SlackMessageService {
             new SlackSendException(workspaceId, channelId, "no_active_slack_connection")
         );
         try {
-            ConversationsInfoResponse response = callHonoringRateLimit(() ->
+            ConversationsInfoResponse response = callHonoringRateLimit(workspaceId, () ->
                 slack.methods(token).conversationsInfo(req -> req.channel(channelId).includeNumMembers(true))
             );
             if (!response.isOk()) {
@@ -445,7 +446,7 @@ public class SlackMessageService {
             return new ConversationLookup.Unavailable("no_active_slack_connection");
         }
         try {
-            ConversationsInfoResponse response = callHonoringRateLimit(() ->
+            ConversationsInfoResponse response = callHonoringRateLimit(workspaceId, () ->
                 slack.methods(token.get()).conversationsInfo(req -> req.channel(channelId))
             );
             if (!response.isOk()) {
@@ -500,6 +501,7 @@ public class SlackMessageService {
         );
         try {
             var response = callHonoringRateLimit(
+                workspaceId,
                 () ->
                     slack
                         .methods(token)
@@ -548,6 +550,7 @@ public class SlackMessageService {
         );
         try {
             var response = callHonoringRateLimit(
+                workspaceId,
                 () ->
                     slack
                         .methods(token)
@@ -587,7 +590,7 @@ public class SlackMessageService {
             new SlackSendException(workspaceId, channelId, "no_active_slack_connection")
         );
         try {
-            ConversationsJoinResponse response = callHonoringRateLimit(() ->
+            ConversationsJoinResponse response = callHonoringRateLimit(workspaceId, () ->
                 slack.methods(token).conversationsJoin(req -> req.channel(channelId))
             );
             if (!response.isOk()) {
@@ -629,7 +632,7 @@ public class SlackMessageService {
         try {
             do {
                 final String pageCursor = cursor;
-                UsersListResponse response = callHonoringRateLimit(() ->
+                UsersListResponse response = callHonoringRateLimit(workspaceId, () ->
                     methods.usersList(r -> r.limit(USERS_LIST_PAGE_SIZE).cursor(pageCursor))
                 );
                 if (!response.isOk()) {
@@ -687,17 +690,15 @@ public class SlackMessageService {
      * wait-and-retry happens here. Non-429 {@link SlackApiException} and {@link IOException} propagate unchanged so
      * the caller's existing error handling is preserved.
      */
-    private <T> T callHonoringRateLimit(SlackCall<T> call) throws SlackApiException, IOException {
-        return callHonoringRateLimit(call, RATE_LIMIT_MAX_WAIT_MS, RATE_LIMIT_TOTAL_BUDGET_MS);
+    private <T> T callHonoringRateLimit(long workspaceId, SlackCall<T> call) throws SlackApiException, IOException {
+        return callHonoringRateLimit(workspaceId, call, RATE_LIMIT_MAX_WAIT_MS, RATE_LIMIT_TOTAL_BUDGET_MS);
     }
 
     /**
-     * Variant with explicit wait/budget bounds. Interactive callers keep the tight defaults (a user is waiting);
-     * the nightly history reconciliation passes wider bounds because Slack's non-Marketplace clamp on
-     * {@code conversations.history} answers with {@code Retry-After: 60} — a 20s wait cap would retry early, eat
-     * another 429, and burn the request budget.
+     * Variant with explicit wait/budget bounds: interactive callers keep the tight defaults (a user is waiting),
+     * the nightly reconciliation passes the wider {@code SYNC_*} bounds (see {@link #SYNC_RATE_LIMIT_MAX_WAIT_MS}).
      */
-    private <T> T callHonoringRateLimit(SlackCall<T> call, long maxWaitMs, long totalBudgetMs)
+    private <T> T callHonoringRateLimit(long workspaceId, SlackCall<T> call, long maxWaitMs, long totalBudgetMs)
         throws SlackApiException, IOException {
         long budgetLeftMs = totalBudgetMs;
         int attempt = 0;
@@ -706,8 +707,14 @@ public class SlackMessageService {
                 return call.call();
             } catch (SlackApiException e) {
                 long retryAfterMs = rateLimitRetryAfterMillis(e);
-                if (retryAfterMs == SlackSendException.NOT_RATE_LIMITED || budgetLeftMs <= 0) {
-                    throw e; // not a rate-limit, or the retry budget is spent — let the caller map it
+                if (retryAfterMs == SlackSendException.NOT_RATE_LIMITED) {
+                    throw e; // not a rate-limit — let the caller map it
+                }
+                // Report the throttle before deciding whether to retry: an admin needs to see a 429 even
+                // (especially) when the retry budget is spent and the call is about to fail.
+                rateLimitTracker.recordThrottle(workspaceId, retryAfterMs);
+                if (budgetLeftMs <= 0) {
+                    throw e; // retry budget spent — let the caller map it
                 }
                 long waitMs = Math.min(Math.min(backoffWithJitter(retryAfterMs, ++attempt), maxWaitMs), budgetLeftMs);
                 log.warn(
@@ -732,9 +739,12 @@ public class SlackMessageService {
      * Map a streaming-call {@link SlackApiException} onto a {@link SlackSendException}, carrying the 429
      * {@code Retry-After} wait so the streaming channel can honor it without counting it as a stream death.
      */
-    private static SlackSendException streamFailure(long workspaceId, String channel, SlackApiException e) {
+    private SlackSendException streamFailure(long workspaceId, String channel, SlackApiException e) {
         long retryAfterMs = rateLimitRetryAfterMillis(e);
         if (retryAfterMs != SlackSendException.NOT_RATE_LIMITED) {
+            // The streaming path honors Retry-After in the caller rather than here, so this is the second
+            // (and last) place a Slack 429 is recognized — record it so the admin surface sees it too.
+            rateLimitTracker.recordThrottle(workspaceId, retryAfterMs);
             return new SlackSendException(workspaceId, channel, "ratelimited", retryAfterMs, e);
         }
         return new SlackSendException(workspaceId, channel, "transport_failure", e);

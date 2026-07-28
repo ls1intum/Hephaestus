@@ -1,0 +1,102 @@
+name: Validate Compose
+
+# The self-hosted stack (docker/self-host/) composes the reference deployment's
+# service definitions via `include`, so a change to docker/compose.*.yaml can
+# break a stranger's install without touching a single self-host file. Rendering
+# both stacks here turns interpolation- and merge-level breakage into a red check
+# instead of a bad first boot. (Semantic breakage — a renamed service silently
+# joining the stack, an inherited runtime bug — still needs a real boot.)
+#
+# Runs on every PR (not just docker/ changes) so it can be a required check,
+# matching how verify-changesets.yml is wired. It is cheap: only `docker compose
+# config`, no image pulls.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: "Render compose stacks"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Render the self-hosted stack
+        working-directory: docker/self-host
+        run: |
+          set -euo pipefail
+          # Fill the required values the way an operator would; `docker compose
+          # config` fails on any variable the stack requires but .env.example
+          # does not carry, which is exactly the drift we want to catch.
+          cp .env.example .env
+          sed -i \
+            -e 's|^APP_HOSTNAME=$|APP_HOSTNAME=hephaestus.example.com|' \
+            -e 's|^ACME_EMAIL=$|ACME_EMAIL=operator@example.com|' \
+            -e 's|^POSTGRES_PASSWORD=$|POSTGRES_PASSWORD=ci-not-a-real-password|' \
+            -e 's|^HEPHAESTUS_SECURITY_ENCRYPTION_KEY=$|HEPHAESTUS_SECURITY_ENCRYPTION_KEY=0123456789abcdef0123456789abcdef|' \
+            -e 's|^HEPHAESTUS_AUTH_STATE_COOKIE_KEY=$|HEPHAESTUS_AUTH_STATE_COOKIE_KEY=Y2ktbm90LWEtcmVhbC1zdGF0ZS1jb29raWUta2V5|' \
+            -e 's|^WEBHOOK_SECRET=$|WEBHOOK_SECRET=ci000000000000000000000000000000000|' \
+            .env
+          docker compose config > /dev/null
+          echo "Rendered services:"
+          docker compose config --services | sort
+
+      - name: Fail on unset variables
+        working-directory: docker/self-host
+        run: |
+          set -euo pipefail
+          # `config` only warns about variables missing from .env; a warning here
+          # means .env.example has fallen behind the stack it renders.
+          if docker compose config 2>&1 >/dev/null | grep "variable is not set"; then
+            echo "::error::docker/self-host/.env.example is missing variables the stack references (see warnings above)"
+            exit 1
+          fi
+
+      - name: Assert the merged stack matches single-host intent
+        working-directory: docker/self-host
+        run: |
+          set -euo pipefail
+          services=$(docker compose config --services)
+          for unwanted in application-worker maintenance; do
+            grep -qx "$unwanted" <<< "$services" && {
+              echo "::error::'$unwanted' is a reference-deployment service and must not run on a single host"; exit 1; } || true
+          done
+          for required in application-server webhook-server postgres nats-server webapp reverse-proxy; do
+            grep -qx "$required" <<< "$services" || {
+              echo "::error::'$required' is missing from the self-hosted stack"; exit 1; }
+          done
+          # Compose 2.21-2.23 parse `!override` but silently ignore it, which would
+          # publish the reference's dashboard port and keep the maintainers' ACME
+          # email. Assert the merged result rather than trust the runner's version.
+          rendered=$(docker compose config)
+          grep -q "admin@tum.de" <<< "$rendered" && {
+            echo "::error::the maintainers' ACME email survived the override — Compose is too old to honour !override"; exit 1; } || true
+          published=$(docker compose config --format json \
+            | jq -r '.services["reverse-proxy"].ports[].published' | sort -n | tr '\n' ' ')
+          [ "$published" = "80 443 " ] || {
+            echo "::error::reverse-proxy publishes '$published', expected '80 443 ' — !override was ignored"; exit 1; }
+
+      - name: Assert the pinned release version has not drifted
+        run: |
+          set -euo pipefail
+          # scripts/sync-selfhost-version.mjs keeps these equal to the release on
+          # every Version PR; a mismatch means someone edited one by hand.
+          pkg=$(node -p "require('./package.json').version")
+          env_tag=$(grep -m1 '^IMAGE_TAG=' docker/self-host/.env.example | cut -d= -f2)
+          [ "$pkg" = "$env_tag" ] || {
+            echo "::error::IMAGE_TAG=$env_tag in .env.example != package.json $pkg (run scripts/sync-selfhost-version.mjs)"; exit 1; }
+
+      - name: Render the reference deployment
+        working-directory: docker
+        run: |
+          set -euo pipefail
+          # Values mirror what the deploy workflow supplies; only proves the files
+          # still render, not that they are correct for production.
+          docker compose \
+            -f compose.proxy.yaml -f compose.core.yaml -f compose.app.yaml \
+            --env-file self-host/.env config --quiet

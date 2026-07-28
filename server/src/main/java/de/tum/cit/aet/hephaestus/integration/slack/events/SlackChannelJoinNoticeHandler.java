@@ -16,24 +16,16 @@ import tools.jackson.databind.JsonNode;
  * Just-in-time consent transparency for a member who joins an <em>already-active</em> monitored channel.
  *
  * <p>The one-time activation announcement ({@code SlackChannelConsentService}) reaches only the members present when
- * a channel is turned on. A person who joins afterwards would be ingested with no notice — the headline consent gap.
- * This handler closes it: on a {@code member_joined_channel} event it posts an EPHEMERAL notice, visible only to the
- * joiner, carrying the same plain-language copy and the same one-click opt-out as the announcement. This realises the
- * ICO "ongoing + just-in-time" transparency expectation (tell people at the moment their data starts being used).
+ * a channel is turned on; a person who joins afterwards would be ingested with no notice. This handler closes that
+ * gap: on a {@code member_joined_channel} event it posts an EPHEMERAL notice, visible only to the joiner, carrying
+ * the same plain-language copy and one-click opt-out as the announcement — the ICO "ongoing + just-in-time"
+ * transparency expectation (tell people at the moment their data starts being used).
  *
- * <p>Gated so it never over-fires:
- * <ol>
- *   <li><strong>workspace</strong> — the event's {@code team_id} must map to an active Slack connection;</li>
- *   <li><strong>ACTIVE consent</strong> — the channel must be actively ingested ({@link SlackChannelConsentGate}).
- *       A join into a {@code PENDING}/{@code PAUSED}/{@code REVOKED} or non-allow-listed channel is a no-op: nothing
- *       is being read, so there is nothing to disclose;</li>
- *   <li><strong>not the bot</strong> — adding the app to a channel also fires {@code member_joined_channel} with the
- *       bot as the joiner; comparing against the app's own bot user id (cached {@code auth.test}) skips that
- *       self-join so the bot never messages itself, and registers the channel as {@code PENDING} instead.</li>
- * </ol>
- *
- * <p>Best-effort throughout: it runs from the Slack consumer, and a Slack-side
- * failure is logged and swallowed — a dropped notice does not block anything and forward-only ingestion is unaffected.
+ * <p>It fires only for a real member joining an actively-ingested channel: a join into a non-{@code ACTIVE} or
+ * non-allow-listed channel discloses nothing because nothing is being read, and the bot's own self-join (the app
+ * being added to a channel) never posts a notice — it registers the channel as {@code PENDING} instead.
+ * Best-effort throughout: a Slack-side failure is logged and swallowed — a dropped notice blocks nothing and
+ * forward-only ingestion is unaffected.
  */
 @Service
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")

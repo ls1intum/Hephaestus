@@ -82,7 +82,6 @@ public class WorkerSessionRegistry implements SmartLifecycle {
         }
     }
 
-    /** @return the session if registered. */
     public Optional<WorkerSession> findByWorkerId(String workerId) {
         return Optional.ofNullable(byWorkerId.get(workerId));
     }
@@ -95,8 +94,6 @@ public class WorkerSessionRegistry implements SmartLifecycle {
     public int activeCount() {
         return byWorkerId.size();
     }
-
-    // SmartLifecycle
 
     @Override
     public boolean isRunning() {

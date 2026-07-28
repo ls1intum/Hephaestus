@@ -32,19 +32,12 @@ import org.hibernate.annotations.OnDeleteAction;
  * side) and the external comment/note id so re-delivery can be reconciled per anchor.
  *
  * <p>Append-only / {@code @Immutable}: posting outcomes that change over time are represented by
- * writing a new placement row rather than mutating an existing one through the ORM. The parent
- * {@link Feedback} lives in the same {@code practices.feedback} module, so a real
- * {@code @ManyToOne} association is used with DB-level {@code ON DELETE CASCADE} — no scalar-FK
- * cycle workaround is needed. This is the WADM <em>selector</em> edge (where a body of commentary
- * is anchored), orthogonal to the {@link FeedbackObservation} <em>target</em> edge.
+ * writing a new placement row rather than mutating an existing one through the ORM. This is the
+ * <em>selector</em> edge (where a body of commentary is anchored), orthogonal to the
+ * {@link FeedbackObservation} <em>target</em> edge.
  *
- * <p>The diff-anchor columns are a coupled group (changelog {@code 1781092589259}): they are populated
- * only for {@code INLINE} placements, so all are nullable and NULL means "this surface carries no diff
- * coordinate" (the normal case for {@code SUMMARY} / {@code CONVERSATION_TURN}). The enum columns are
- * value-constrained by {@code chk_feedback_placement_placement} (NOT NULL) and the NULL-tolerant
- * {@code chk_feedback_placement_anchor_kind} / {@code chk_feedback_placement_anchor_side}. Two indexes
- * exist: {@code idx_feedback_placement_feedback} (a unit's placements + the FK {@code ON DELETE CASCADE})
- * and {@code idx_feedback_placement_external_ref} (reconcile a posted comment id back to its placement).
+ * <p>The diff-anchor columns are a coupled group: populated only for {@code INLINE} placements, so all
+ * are nullable and NULL means "this surface carries no diff coordinate".
  *
  * @see Feedback for the feedback unit being placed
  * @see PlacementType for SUMMARY/INLINE/CONVERSATION_TURN
@@ -101,10 +94,7 @@ public class FeedbackPlacement {
 
     // --- Diff anchor coordinates (all nullable: only INLINE placements anchor to a diff) ---
 
-    /**
-     * Granularity of the anchor: LINE / RANGE / FILE / IMAGE. NULL for non-INLINE placements (the
-     * placement carries no diff coordinate). Constrained by {@code chk_feedback_placement_anchor_kind}.
-     */
+    /** Granularity of the anchor: LINE / RANGE / FILE / IMAGE. NULL for non-INLINE placements. */
     @Enumerated(EnumType.STRING)
     @Column(name = "anchor_kind", length = 16)
     private PlacementAnchorKind anchorKind;
@@ -132,22 +122,19 @@ public class FeedbackPlacement {
     // --- External delivery reconciliation ---
 
     /**
-     * Channel-native id of the posted comment/note for this placement (one per row — a unit's
-     * summary id, its inline note ids, and GitHub place-then-fallback are distinct placements, never
-     * one overloaded scalar). NULL when the placement was not posted to an external surface (a
-     * conversation turn, or a render that produced no postable artifact). Indexed by
-     * {@code idx_feedback_placement_external_ref} for reconciling a posted id back to its placement.
+     * Channel-native id of the posted comment/note for this placement (one per row — never one
+     * overloaded scalar per unit). NULL when the placement was not posted to an external surface.
+     * Indexed for reconciling a posted id back to its placement.
      */
     @Column(name = "posted_comment_ref", columnDefinition = "TEXT")
     private String postedCommentRef;
 
     /**
-     * Typed link to the mentor assistant {@code chat_message} that delivered this placement — set only for a
-     * {@code CONVERSATION_TURN} placement (changelog {@code 1782980500800-2}). Kept as a raw scalar (not a
-     * {@code @ManyToOne}) because {@code chat_message} lives in the {@code mentor} module; the DB carries the scalar
-     * FK {@code sfk_feedback_placement_chat_message} (ADR 0017 {@code sfk_*} naming, excluded from the JPA-vs-DB
-     * drift gate) with {@code ON DELETE SET NULL}, so the placement survives the
-     * message being deleted while the temporal record is preserved. NULL for SUMMARY / INLINE placements.
+     * Link to the mentor assistant {@code chat_message} that delivered this placement — set only for a
+     * {@code CONVERSATION_TURN} placement, NULL otherwise. Kept as a raw scalar (not a {@code @ManyToOne})
+     * because {@code chat_message} lives in the {@code mentor} module; the DB carries a scalar FK
+     * (ADR 0017 {@code sfk_*} naming) with {@code ON DELETE SET NULL}, so the placement survives the
+     * message being deleted.
      */
     @Column(name = "chat_message_id", columnDefinition = "UUID")
     private UUID chatMessageId;

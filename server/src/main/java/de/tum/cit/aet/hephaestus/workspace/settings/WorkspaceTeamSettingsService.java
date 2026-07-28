@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceTeamScopeResolver;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -52,6 +53,7 @@ public class WorkspaceTeamSettingsService {
     private final TeamRepository teamRepository;
     private final RepositoryRepository repositoryRepository;
     private final LabelRepository labelRepository;
+    private final WorkspaceTeamScopeResolver workspaceTeamScopeResolver;
 
     public WorkspaceTeamSettingsService(
         WorkspaceTeamSettingsRepository teamSettingsRepository,
@@ -60,7 +62,8 @@ public class WorkspaceTeamSettingsService {
         WorkspaceRepository workspaceRepository,
         TeamRepository teamRepository,
         RepositoryRepository repositoryRepository,
-        LabelRepository labelRepository
+        LabelRepository labelRepository,
+        WorkspaceTeamScopeResolver workspaceTeamScopeResolver
     ) {
         this.teamSettingsRepository = teamSettingsRepository;
         this.repositorySettingsRepository = repositorySettingsRepository;
@@ -69,6 +72,7 @@ public class WorkspaceTeamSettingsService {
         this.teamRepository = teamRepository;
         this.repositoryRepository = repositoryRepository;
         this.labelRepository = labelRepository;
+        this.workspaceTeamScopeResolver = workspaceTeamScopeResolver;
     }
 
     // Team Visibility (Hidden) Settings
@@ -487,10 +491,10 @@ public class WorkspaceTeamSettingsService {
     // Utility Methods
 
     private boolean belongsToWorkspace(Team team, Workspace workspace) {
-        if (team == null || workspace == null || workspace.getAccountLogin() == null) {
-            return false;
-        }
-        return workspace.getAccountLogin().equalsIgnoreCase(team.getOrganization());
+        return workspaceTeamScopeResolver
+            .resolve(workspace)
+            .map(scope -> scope.contains(team))
+            .orElse(false);
     }
 
     /**

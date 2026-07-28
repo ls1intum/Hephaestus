@@ -50,14 +50,15 @@ server:
             remote-ip-header: X-Forwarded-For
             protocol-header: X-Forwarded-Proto
         redirect-context-root: false
+        # No Tomcat file access log. Writing one to a host volume added nothing but a boot dependency
+        # on a writable /var/log/hephaestus (a fresh named volume is root:root, which aborted startup).
+        # Deliberately, NO layer writes a per-request IP/URL record: the Traefik ingress
+        # (docker/compose.proxy.yaml) runs without --accesslog too, which is Traefik's default. Client
+        # IPs are recorded only against auth_event rows, under that table's 12-month partitioned
+        # window. This is a documented GDPR posture (docs/admin/dsms/): enabling either access log is a
+        # material change that needs the record of processing updated with it.
         accesslog:
-            enabled: true
-            directory: /var/log/hephaestus/access
-            prefix: access
-            suffix: .log
-            file-date-format: .yyyy-MM-dd
-            max-days: 14
-            pattern: "%{yyyy-MM-dd'T'HH:mm:ssXXX}t %a %m %U %H %s %b %D"
+            enabled: false
 
 hephaestus:
     host-url: ${APPLICATION_HOST_URL}
@@ -91,11 +92,24 @@ hephaestus:
         personal-api-key: ${POSTHOG_PERSONAL_API_KEY:}
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # SCM + SLACK INTEGRATION (Production)
+    # SCM + SLACK + OUTLINE INTEGRATION (Production)
     #
     # Slack: per-workspace bot tokens are issued via OAuth and encrypted at rest in the
     # `connection` table — there is no global bot token. Events API and interactivity are
     # verified with HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET on the webhook-server.
+    #
+    # Outline: per-workspace API key, pasted by a workspace admin and encrypted at rest in the
+    # same `connection` table (Outline keys are session-scoped and cannot self-rotate, so there
+    # is no refresh flow — a lapsed key is re-entered by hand). Its webhook secret is
+    # PER-SUBSCRIPTION, minted by OutlineWebhookRegistrar when it registers the subscription and
+    # stored on that same connection row — so, unlike Slack, there is NO global signing secret
+    # env var and the webhook-server verifies deliveries by reading the row through JPA.
+    # HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED gates every Outline bean (matchIfMissing=false) and
+    # must be set on application-server, application-worker (the agent context is assembled
+    # there) and webhook-server (which otherwise answers 501 to every delivery).
+    # OUTLINE_OAUTH_* additionally seeds the link-only login provider; OUTLINE_OAUTH_BASE_URL is
+    # required whenever OUTLINE_OAUTH_CLIENT_ID is set (a blank base URL skips the seed with a WARN).
+    # Everything binds from env in the base application.yml — Outline needs no prod-only override.
     # ═══════════════════════════════════════════════════════════════════════════
     integration:
         github:
@@ -144,8 +158,8 @@ hephaestus:
     # ═══════════════════════════════════════════════════════════════════════════
     # AGENT SANDBOX & PRACTICE REVIEW (Production)
     # ═══════════════════════════════════════════════════════════════════════════
-    # Sandbox, agent NATS, git checkout, and LLM proxy are configured via env
-    # vars in compose.app.yaml. Defaults come from base application.yml.
+    # Sandbox, the agent job queue (PostgreSQL-backed), git checkout, and LLM proxy are
+    # configured via env vars in compose.app.yaml. Defaults come from base application.yml.
     # The only prod-specific overrides go here (storage path for git repos).
     git:
         storage-path: ${GIT_STORAGE_PATH:/data/git-repos}

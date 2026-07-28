@@ -109,7 +109,14 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
         @Param("now") Instant now
     );
 
-    /** Open issues assigned to user, ordered most recent first, scoped to workspace. */
+    /**
+     * Open issues assigned to user, ordered most recent first, scoped to workspace.
+     *
+     * <p>{@code TYPE(i) = Issue} excludes the {@code PullRequest} subclass rows that share this table
+     * under single-table inheritance — without it a GitLab workspace lists merge requests as "assigned
+     * open issues", and this list disagrees with the typed open-issue count in
+     * {@link #fetchUserCounts}, which already carries the discriminator.
+     */
     @Query(
         """
         SELECT i
@@ -118,7 +125,8 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
         JOIN i.assignees a
         LEFT JOIN FETCH i.repository
         LEFT JOIN FETCH i.milestone
-        WHERE a.id = :userId
+        WHERE TYPE(i) = Issue
+          AND a.id = :userId
           AND rtm.workspace.id = :workspaceId
           AND i.state = de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.OPEN
         ORDER BY i.createdAt DESC

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.slack.connect;
 
+import de.tum.cit.aet.hephaestus.core.AuditExempt;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
@@ -51,6 +52,7 @@ public class SlackConnectionAdminController {
      */
     @PostMapping("/test-message")
     @Operation(operationId = "sendSlackTestMessage", summary = "Post a test message to verify the Slack connection")
+    @AuditExempt(reason = "sends a message to verify delivery; stores no configuration")
     public SlackTestMessageResponseDTO sendTestMessage(
         WorkspaceContext workspace,
         @RequestBody(required = false) @Nullable SlackTestMessageRequestDTO body

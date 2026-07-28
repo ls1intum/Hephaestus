@@ -49,6 +49,12 @@ class TriggerEventCatalogTest extends BaseUnitTest {
     }
 
     @Test
+    void conversationFocus_hasNoSubscribableEvents() {
+        // Conversation detection is quiescence-scheduled, not event-subscribed — no event may be offered.
+        assertThat(TriggerEventCatalog.eligibleFor(WorkArtifact.CONVERSATION_THREAD)).isEmpty();
+    }
+
+    @Test
     void focusSetsAreDisjoint_soACombinationCannotBeAccidentallyValidForBoth() {
         var pr = TriggerEventCatalog.eligibleFor(WorkArtifact.PULL_REQUEST);
         var issue = TriggerEventCatalog.eligibleFor(WorkArtifact.ISSUE);

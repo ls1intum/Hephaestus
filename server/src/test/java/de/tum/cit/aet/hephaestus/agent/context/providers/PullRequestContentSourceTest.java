@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.context.providers;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -10,6 +11,8 @@ import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ScmTokenSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -58,12 +61,16 @@ class PullRequestContentSourceTest extends BaseUnitTest {
     @Mock
     private ConnectionService connectionService;
 
+    @Mock
+    private ScmTokenSource scmTokenSource;
+
     private static final Long WORKSPACE_ID = 99L;
 
     private PullRequestContentSource provider;
 
     @BeforeEach
     void setUp() {
+        lenient().when(scmTokenSource.kind()).thenReturn(IntegrationKind.GITLAB);
         provider = new PullRequestContentSource(
             objectMapper,
             gitRepositoryManager,
@@ -72,7 +79,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             developerHistoryProvider,
             gitDiffOperations,
             connectionService,
-            List.of()
+            List.of(scmTokenSource)
         );
     }
 
@@ -108,6 +115,23 @@ class PullRequestContentSourceTest extends BaseUnitTest {
         lenient()
             .when(gitRepositoryManager.getRepositoryPath(123L))
             .thenReturn(Path.of("/tmp/hephaestus-git-repos/123"));
+        lenient().when(gitRepositoryManager.commitExists(123L, "abc123def456")).thenReturn(true);
+        lenient()
+            .when(
+                gitDiffOperations.resolveDiffRange(
+                    Path.of("/tmp/hephaestus-git-repos/123"),
+                    "main",
+                    "feature/auth-fix",
+                    "abc123def456"
+                )
+            )
+            .thenReturn(new String[] { "main", "abc123def456" });
+        lenient()
+            .when(gitDiffOperations.diff(Path.of("/tmp/hephaestus-git-repos/123"), "main", "abc123def456"))
+            .thenReturn("diff --git a/a.txt b/a.txt\n@@ -0,0 +1 @@\n+content\n");
+        lenient()
+            .when(gitDiffOperations.diffStat(Path.of("/tmp/hephaestus-git-repos/123"), "main", "abc123def456"))
+            .thenReturn(" a.txt | 1\n");
     }
 
     /** stubGit() plus a resolvable range with a real one-hunk diff — diff pre-computation fails closed otherwise. */
@@ -327,7 +351,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
 
         @Test
         void computeAndStoreDiffSummary_parsesPerFileChunks() throws Exception {
-            // The diff_summary.md parser is driven directly from an annotated diff.patch (no git needed).
             String annotated =
                 "[L1] diff --git a/src/A.java b/src/A.java\n" +
                 "[L1] +line a1\n" +
@@ -349,10 +372,10 @@ class PullRequestContentSourceTest extends BaseUnitTest {
         @Test
         void computeAndStoreDiffSummary_emptyDiffPatch_writesNothing() {
             Map<String, byte[]> files = new LinkedHashMap<>();
-            provider.computeAndStoreDiffSummary(files); // no diff.patch present at all
+            provider.computeAndStoreDiffSummary(files);
             assertThat(files).doesNotContainKey("inputs/context/diff_summary.md");
 
-            files.put("inputs/context/diff.patch", new byte[0]); // present but empty
+            files.put("inputs/context/diff.patch", new byte[0]);
             provider.computeAndStoreDiffSummary(files);
             assertThat(files).doesNotContainKey("inputs/context/diff_summary.md");
         }
@@ -364,7 +387,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             lenient()
                 .when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L))
                 .thenReturn(List.of());
-            // A resolvable range but a blank diff → "Empty diff: no changed files…".
             when(
                 gitDiffOperations.resolveDiffRange(Path.of(repoPath), "main", "feature/auth-fix", "abc123def456")
             ).thenReturn(new String[] { "main", "abc123def456" });
@@ -394,32 +416,12 @@ class PullRequestContentSourceTest extends BaseUnitTest {
         }
 
         @Test
-        void headUnavailableAndRangeUnresolvable_abortsWithJobPreparationException() {
-            stubGit();
-            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
-            lenient()
-                .when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L))
-                .thenReturn(List.of());
-            // Head commit absent locally AND no resolution strategy works: the job must abort —
-            // running diff-less hands the model a bare repo mount to fabricate findings against.
-            when(gitRepositoryManager.commitExists(123L, "abc123def456")).thenReturn(false);
-            when(
-                gitDiffOperations.resolveDiffRange(Path.of(repoPath), "main", "feature/auth-fix", "abc123def456")
-            ).thenReturn(null);
-
-            assertThatThrownBy(() -> provider.contribute(request(sampleMetadata()), new LinkedHashMap<>()))
-                .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("head commit not available");
-        }
-
-        @Test
         void headVerifiedButRangeUnresolvable_abortsWithJobPreparationException() {
             stubGit();
             when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
             lenient()
                 .when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L))
                 .thenReturn(List.of());
-            // headVerified = true (commit present) but every range-resolution strategy fails → hard abort.
             when(gitRepositoryManager.commitExists(123L, "abc123def456")).thenReturn(true);
             when(
                 gitDiffOperations.resolveDiffRange(Path.of(repoPath), "main", "feature/auth-fix", "abc123def456")
@@ -428,6 +430,23 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             assertThatThrownBy(() -> provider.contribute(request(sampleMetadata()), new LinkedHashMap<>()))
                 .isInstanceOf(JobPreparationException.class)
                 .hasMessageContaining("all resolution strategies failed");
+        }
+
+        @Test
+        void missingPinnedHead_abortsBeforeSandboxLaunch() {
+            stubGit();
+            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
+            lenient()
+                .when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L))
+                .thenReturn(List.of());
+            when(gitRepositoryManager.commitExists(123L, "abc123def456")).thenReturn(false);
+            when(
+                gitDiffOperations.resolveDiffRange(Path.of(repoPath), "main", "feature/auth-fix", "abc123def456")
+            ).thenReturn(null);
+
+            assertThatThrownBy(() -> provider.contribute(request(sampleMetadata()), new LinkedHashMap<>()))
+                .isInstanceOf(JobPreparationException.class)
+                .hasMessageContaining("pinned head commit is unavailable");
         }
 
         @Test
@@ -475,6 +494,34 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             assertThat(files).containsKey("inputs/context/diff_summary.md");
             String patch = new String(files.get("inputs/context/diff.patch"), StandardCharsets.UTF_8);
             assertThat(patch).contains("[L2] +added");
+        }
+
+        @Test
+        void fetchesProviderReviewRefForForkHead() {
+            stubGit();
+            when(connectionService.findActiveProviderKind(WORKSPACE_ID)).thenReturn(
+                Optional.of(IntegrationKind.GITLAB)
+            );
+            when(scmTokenSource.serverUrl(WORKSPACE_ID)).thenReturn(Optional.of("https://scm.example"));
+            when(scmTokenSource.accessToken(WORKSPACE_ID)).thenReturn(Optional.of("token"));
+            when(scmTokenSource.reviewHeadRef(42)).thenReturn(Optional.of("refs/merge-requests/42/head"));
+            when(
+                gitRepositoryManager.fetchRemoteCommit(123L, "refs/merge-requests/42/head", "abc123def456", "token")
+            ).thenReturn(true);
+            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
+            lenient()
+                .when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L))
+                .thenReturn(List.of());
+
+            provider.contribute(request(sampleMetadata()), new LinkedHashMap<>());
+
+            verify(gitRepositoryManager).ensureRepository(123L, "https://scm.example/owner/repo.git", "token");
+            verify(gitRepositoryManager).fetchRemoteCommit(
+                123L,
+                "refs/merge-requests/42/head",
+                "abc123def456",
+                "token"
+            );
         }
     }
 

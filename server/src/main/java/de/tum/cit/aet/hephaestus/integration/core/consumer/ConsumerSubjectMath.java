@@ -9,29 +9,31 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Pure subject helpers for NATS consumers. Repository integrations use scoped wildcard filters such as
- * {@code github.owner.repo.>}; Slack Events API callbacks use the flat {@code slack.>} consumer. Slack
- * interactivity/button postbacks stay on the separate signed HTTP endpoint.
+ * {@code github.owner.repo.>}; Slack Events API callbacks use per-workspace filters
+ * {@code slack.<team>.>} (Slack interactivity/button postbacks stay on the separate signed HTTP
+ * endpoint); Outline change notifications use per-subscription filters {@code outline.<subscriptionId>.>}.
+ *
+ * <p>{@link #kindFromSubjectPrefix(String)} is the single source of truth for NATS-subject routing. It
+ * lists the kinds that publish to JetStream (GitHub, GitLab, Slack, Outline) and never calls
+ * {@link IntegrationKind#valueOf(String)} on subject-derived input.
  *
  * @see de.tum.cit.aet.hephaestus.integration.core.webhook.IntegrationKindRouting the HTTP-path router
  */
 public final class ConsumerSubjectMath {
 
-    /**
-     * NATS subject-prefix allow-list — the kinds that publish to JetStream. Slack Events API callbacks publish as
-     * {@code slack.<team>.<scope>.<event>}; Slack interactivity/button postbacks carry no subject.
-     */
+    /** Subject-prefix allow-list — the kinds that publish to JetStream. */
     private static final Map<String, IntegrationKind> PREFIX_TO_KIND = Map.of(
         "github",
         IntegrationKind.GITHUB,
         "gitlab",
         IntegrationKind.GITLAB,
         "slack",
-        IntegrationKind.SLACK
+        IntegrationKind.SLACK,
+        "outline",
+        IntegrationKind.OUTLINE
     );
 
-    private ConsumerSubjectMath() {
-        // utility class - no instances
-    }
+    private ConsumerSubjectMath() {}
 
     // Subject prefix construction (publisher-mirror)
 
@@ -109,17 +111,11 @@ public final class ConsumerSubjectMath {
 
     /**
      * Wildcard subject filter that matches every installation-level event for the given
-     * {@link IntegrationKind}. Today only GitHub publishes installation events (GitLab
-     * uses PAT-based auth and has no installation concept); the kind is taken as a
-     * parameter so the SPI signature stays vendor-neutral and new installation-capable
-     * vendors can plug in without renaming the call site.
+     * {@link IntegrationKind}. Only GitHub publishes installation events today; the kind
+     * stays a parameter so the SPI signature remains vendor-neutral.
      *
-     * @param kind installation-aware kind. Must be {@link IntegrationKind#GITHUB} today;
-     *             any other kind throws {@link UnsupportedOperationException} with a
-     *             clear message rather than silently producing a bogus filter.
      * @return the subject e.g. {@code github.?.?.>}
-     * @throws UnsupportedOperationException if {@code kind} does not yet have installation
-     *             semantics (anything other than GITHUB today).
+     * @throws UnsupportedOperationException if {@code kind} has no installation semantics
      */
     public static String installationAwareSubjectFilter(IntegrationKind kind) {
         if (kind == null) {
@@ -127,7 +123,7 @@ public final class ConsumerSubjectMath {
         }
         return switch (kind) {
             case GITHUB -> buildSubjectPrefix("github", "?/?") + ".>";
-            case GITLAB, SLACK -> throw new UnsupportedOperationException(
+            case GITLAB, SLACK, OUTLINE -> throw new UnsupportedOperationException(
                 "Installation-aware subject filter not yet supported for kind=" +
                     kind +
                     " (only GITHUB publishes installation events today)"
@@ -136,12 +132,8 @@ public final class ConsumerSubjectMath {
     }
 
     /**
-     * Resolves the NATS stream name for an {@link IntegrationKind}. Currently a 1:1 mapping
-     * (GitHub → {@code "github"}, GitLab → {@code "gitlab"}); kinds without a stream return
-     * {@link Optional#empty()} so callers can short-circuit without exceptions on the path.
-     *
-     * <p>Slack maps to the {@code "slack"} stream (monitored-channel {@code message} ingest).
-     * A null kind returns {@link Optional#empty()} so callers can short-circuit on the path.
+     * Resolves the NATS stream name for an {@link IntegrationKind}; a null kind returns
+     * {@link Optional#empty()} so callers can short-circuit on the path.
      */
     public static Optional<String> streamNameFor(@Nullable IntegrationKind kind) {
         if (kind == null) {
@@ -150,16 +142,51 @@ public final class ConsumerSubjectMath {
         return switch (kind) {
             case GITHUB -> Optional.of("github");
             case GITLAB -> Optional.of("gitlab");
+            case OUTLINE -> Optional.of("outline");
             case SLACK -> Optional.of("slack");
         };
+    }
+
+    /**
+     * Wildcard subject filter matching every event for a single subscription-scoped stream. Format:
+     * {@code <stream>.<subscriptionId>.>}. Used by the documentation family (Outline today), where a
+     * workspace subscribes to exactly one change-notification subscription whose id is a dot-free UUID.
+     */
+    public static String subscriptionFilter(String streamName, String subscriptionId) {
+        if (streamName == null || streamName.isBlank()) {
+            throw new IllegalArgumentException("Stream name cannot be null or empty.");
+        }
+        if (subscriptionId == null || subscriptionId.isBlank()) {
+            throw new IllegalArgumentException("Subscription id cannot be null or empty.");
+        }
+        return streamName + "." + subscriptionId.trim() + ".>";
+    }
+
+    /**
+     * Wildcard subject filter that matches every event for one messaging-team tenant:
+     * {@code <stream>.<team>.>}. Dots in the team id are replaced with {@code ~}, matching the
+     * publish-side sanitisation of the messaging subject derivers so the filter and the published
+     * subject always agree.
+     *
+     * @param streamName the NATS stream name (e.g. {@code slack})
+     * @param teamId     the vendor team id from the workspace's connection config
+     * @return a subject like {@code slack.T0ABC123.>}
+     */
+    public static String teamFilter(String streamName, String teamId) {
+        if (streamName == null || streamName.isBlank()) {
+            throw new IllegalArgumentException("Stream name cannot be null or empty.");
+        }
+        if (teamId == null || teamId.isBlank()) {
+            throw new IllegalArgumentException("Team id cannot be null or empty.");
+        }
+        return streamName + "." + teamId.trim().replace('.', '~') + ".>";
     }
 
     // Subject → kind
 
     /**
      * Explicit allow-list mapping of subject prefix → {@link IntegrationKind}. Returns
-     * {@link Optional#empty()} for null, blank, dot-less, or unknown prefixes. Never
-     * reflects on input.
+     * {@link Optional#empty()} for null, blank, dot-less, or unknown prefixes.
      */
     public static Optional<IntegrationKind> kindFromSubjectPrefix(@Nullable String fullSubject) {
         if (fullSubject == null || fullSubject.isBlank()) {
@@ -174,9 +201,7 @@ public final class ConsumerSubjectMath {
     }
 
     /**
-     * Builds the durable consumer name for a scope. Format:
-     * {@code <base>-scope-<scopeId>}. Returned name is suitable for direct use as a
-     * JetStream durable identifier.
+     * Builds the durable consumer name for a scope. Format: {@code <base>-scope-<scopeId>}.
      */
     public static String scopeConsumerName(String baseConsumerName, long scopeId) {
         if (baseConsumerName == null || baseConsumerName.isBlank()) {
@@ -194,34 +219,5 @@ public final class ConsumerSubjectMath {
             throw new IllegalArgumentException("Base consumer name cannot be null or blank.");
         }
         return baseConsumerName + "-installation";
-    }
-
-    /**
-     * Builds the durable consumer name for a fleet-wide flat-stream consumer:
-     * {@code <base>-<stream>}. A flat-stream kind is not repository-scoped, so a single
-     * fleet-wide consumer subscribes to {@link #flatStreamSubjectFilter(IntegrationKind)} and
-     * resolves the tenant inside the handler (mirroring the installation-wide consumer's shape;
-     * today only the messaging kinds, e.g. Slack).
-     */
-    public static String flatStreamConsumerName(String baseConsumerName, IntegrationKind kind) {
-        if (baseConsumerName == null || baseConsumerName.isBlank()) {
-            throw new IllegalArgumentException("Base consumer name cannot be null or blank.");
-        }
-        return baseConsumerName + "-" + resolveStream(kind);
-    }
-
-    /**
-     * Wildcard subject filter matching every event on a flat-stream kind's stream
-     * ({@code <stream>.>}). One fleet-wide filter — a flat-stream kind has no per-scope
-     * repository fan-out.
-     */
-    public static String flatStreamSubjectFilter(IntegrationKind kind) {
-        return resolveStream(kind) + ".>";
-    }
-
-    private static String resolveStream(IntegrationKind kind) {
-        return streamNameFor(kind).orElseThrow(() ->
-            new IllegalArgumentException("No NATS stream resolved for kind=" + kind)
-        );
     }
 }

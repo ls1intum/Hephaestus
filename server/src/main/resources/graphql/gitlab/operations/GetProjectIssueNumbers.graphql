@@ -1,0 +1,48 @@
+# Full upstream issue-IID listing for one project — the upstream half of the RECONCILIATION deletion
+# sweep's set difference (GitLabDeletionSweepService). The GitLab counterpart of GitHub's
+# GetRepositoryIssueNumbers.
+#
+# Selects `iid` and nothing else: this is deliberately the cheapest possible complete enumeration.
+# The content query (GetProjectIssues) drags in title/description/labels/assignees/author/milestone
+# per node and pays a large complexity cost against GitLab's 100-points-per-minute budget; the sweep
+# needs only the key set, never the content.
+#
+# `count` guards the sweep: it is compared against the number of IIDs actually received, and nothing
+# is deleted unless the two agree. Without it, a listing that silently stopped short would be
+# indistinguishable from a project that really has fewer issues — and would authorize deleting every
+# issue past the truncation point.
+#
+# `sort: CREATED_ASC` (not the content query's UPDATED_DESC): a stable, append-only order. An issue
+# created upstream while pagination is in flight sorts to the END, so it is either enumerated before
+# the last page or is legitimately outside this snapshot — it never shifts an already-fetched page and
+# so is never silently skipped. UPDATED_DESC would let a mid-listing update reorder the set under the
+# cursor.
+#
+# No `state:` filter — a sweep must see EVERY issue that exists upstream, opened and closed alike. Any
+# filter here turns "absent from upstream" into "absent from this filtered view", which is precisely
+# how a sweep deletes live data. Confidential issues the token can see are enumerated too; they are a
+# superset of what the mirror stores (the mirror skips confidential), so their presence upstream can
+# only protect a local row, never delete one.
+# `issuesEnabled` guards a failure the `count` cross-check cannot catch. GitLab's IssuesFinder scopes
+# its query with
+# `.merge(Project.with_issues_enabled)`: a project whose Issues feature is switched off is filtered
+# out of the finder entirely, so this query returns `count: 0` and zero nodes — a syntactically
+# perfect, fully paginated, "complete" empty listing. `0 == 0` passes the count check, and the sweep
+# would tombstone every mirrored issue of a project whose issues are merely hidden, not deleted.
+# The sweep refuses the listing when this flag is explicitly false. It is nullable in the schema; a
+# null is treated as "unknown" and left to the sweep's empty-listing guard.
+query GetProjectIssueNumbers($fullPath: ID!, $first: Int!, $after: String) {
+    project(fullPath: $fullPath) {
+        issuesEnabled
+        issues(first: $first, after: $after, sort: CREATED_ASC) {
+            count
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+            nodes {
+                iid
+            }
+        }
+    }
+}

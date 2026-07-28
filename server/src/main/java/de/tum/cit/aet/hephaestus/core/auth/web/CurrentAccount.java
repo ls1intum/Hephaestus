@@ -18,9 +18,6 @@ import org.springframework.web.server.ResponseStatusException;
  * <p>Our JWTs carry {@code sub = Account.id} (decimal), {@code jti} (UUID), and optionally
  * {@code act} (impersonator id). This is the single place those are parsed so controllers
  * stay declarative.
- *
- * <p>The resource-server chain validates our own ES256 JWTs via {@code RevocationAwareJwtDecoder},
- * whose {@code sub} is the decimal account id; these accessors parse it directly.
  */
 public final class CurrentAccount {
 
@@ -33,6 +30,30 @@ public final class CurrentAccount {
             return Long.parseLong(jwt.getSubject());
         } catch (NumberFormatException e) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "token subject is not an account id");
+        }
+    }
+
+    /** Whether a validated token is present at all — i.e. someone, rather than a background job, is acting. */
+    public static boolean isAuthenticated() {
+        return jwtOrNull() != null;
+    }
+
+    /**
+     * The authenticated account id ({@code sub}), or {@code null} when there is no token or its subject
+     * is not an account id. Callers that must not fail the request over it use this; controllers want
+     * {@link #requireId()}, which 401s instead. Pair it with {@link #isAuthenticated()} when the two
+     * null causes ("nobody is signed in" vs "signed in but unresolvable") mean different things.
+     */
+    @Nullable
+    public static Long idOrNull() {
+        Jwt jwt = jwtOrNull();
+        if (jwt == null) {
+            return null;
+        }
+        try {
+            return Long.parseLong(jwt.getSubject());
+        } catch (NumberFormatException e) {
+            return null;
         }
     }
 

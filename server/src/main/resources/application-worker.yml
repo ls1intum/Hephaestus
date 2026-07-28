@@ -23,8 +23,18 @@ spring:
         timeout-per-shutdown-phase: 6m
 
 server:
-    # -1 disables the application HTTP connector; actuator stays on management.server.port.
-    port: -1
+    # A REAL port — never -1. The LLM proxy is the ONLY LLM credential path (ADR 0006's
+    # 2026-07-22 amendment): LlmProxyController/LlmProxySecurityConfig wire wherever the worker /
+    # sandbox capability is present. Disabling the HTTP connector (-1) leaves that proxy
+    # controller wired as a bean but unreachable — the sandbox's
+    # `http://<thisPod>:<serverPort>/internal/llm` target resolves to a negative port, so every
+    # sandboxed job this pod claims fails to reach its LLM. Internal-only: no `ports:` mapping
+    # in docker/compose.app.yaml's application-worker service publishes this externally, and no
+    # Traefik router targets it — only /internal/llm/** and /actuator/** answer here, since the entire
+    # user-facing auth/web surface stays off (hephaestus.runtime.server.enabled=false below leaves
+    # every @ConditionalOnServerRole bean, including the JwtDecoder, unwired — Spring Security's
+    # fallback chain denies everything else it doesn't otherwise recognize).
+    port: ${SERVER_PORT:8080}
 
 hephaestus:
     runtime:
@@ -38,15 +48,8 @@ hephaestus:
     sync:
         nats:
             enabled: false
-    agent:
-        nats:
-            enabled: true
 
     worker:
         control:
             endpoint: ${HEPHAESTUS_HUB_URL:}
             registration-token: ${HEPHAESTUS_WORKER_REGISTRATION_TOKEN:}
-        # BYO LLM credentials override the app-pod proxy when both fields are set.
-        llm:
-            base-url: ${HEPHAESTUS_LLM_BASE_URL:}
-            api-key: ${HEPHAESTUS_LLM_API_KEY:}

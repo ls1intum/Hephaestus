@@ -7,6 +7,9 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationFamily;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import java.time.Instant;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
@@ -16,8 +19,17 @@ import tools.jackson.databind.ObjectMapper;
  * Detailed view of a single Connection — extends {@link ConnectionSummaryDTO} with the
  * sealed config serialized to a free-form JSON object ({@code Map<String, Object>} →
  * {@code type: object, additionalProperties: true} in the spec, so it round-trips through
- * client codegen). NEVER carries credentials; the encrypted blob stays inside the entity
- * and is not exposed by this DTO.
+ * client codegen). NEVER carries credentials: the encrypted credential blob stays inside the
+ * entity, and every secret-bearing key of the config itself is stripped by
+ * {@link #redactSensitive} before serialization.
+ *
+ * <p><b>Why redact here and not with {@code @JsonIgnore} on the record component?</b> The very
+ * same {@link ObjectMapper} bean serializes {@link
+ * de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig} into the JSONB
+ * {@code connection.config} column (Hibernate's {@code json_format_mapper} is wired to it in
+ * {@code HibernateJacksonFormatMapperConfig}). Annotating the component would therefore drop the
+ * secret on write and destroy the stored value — the API-boundary filter below is the only place
+ * the two concerns can be separated.
  *
  * <p>Mirroring the summary fields (rather than embedding the summary record) keeps
  * the JSON shape flat — the API consumer sees one record, not a nested {@code summary}
@@ -36,9 +48,26 @@ public record ConnectionDetailDTO(
     Set<Capability> capabilities,
     @Nullable Map<String, Object> config
 ) {
+    /**
+     * Config keys whose values are secrets and must never cross the API boundary — matched
+     * case-insensitively against the serialized config map.
+     *
+     * <p>Currently {@code webhookSecret} on {@code OutlineConfig}: the AES-GCM ciphertext of the
+     * live HMAC signing secret of the workspace's Outline change-notification subscription. Leaking
+     * it to the browser (and to every logging proxy in between) hands an attacker the material to
+     * forge signed deliveries.
+     *
+     * <p>{@code ConnectionDetailDTOTest#everySecretShapedConfigComponentIsRegisteredAsSensitive}
+     * reflects over every {@link
+     * de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig} subtype and fails if a
+     * new secret-shaped component is added without being listed here.
+     */
+    public static final Set<String> SENSITIVE_CONFIG_KEYS = Set.of("webhooksecret");
+
     @SuppressWarnings("unchecked")
     public static ConnectionDetailDTO from(Connection c, IntegrationManifestRegistry manifests, ObjectMapper mapper) {
-        Map<String, Object> configMap = c.getConfig() == null ? null : mapper.convertValue(c.getConfig(), Map.class);
+        Map<String, Object> configMap =
+            c.getConfig() == null ? null : redactSensitive(mapper.convertValue(c.getConfig(), Map.class));
         return new ConnectionDetailDTO(
             c.getId(),
             c.getKind(),
@@ -52,5 +81,25 @@ public record ConnectionDetailDTO(
             manifests.capabilitiesFor(c.getKind()),
             configMap
         );
+    }
+
+    /**
+     * Drops every {@link #SENSITIVE_CONFIG_KEYS} entry. The key is removed outright rather than
+     * masked with a placeholder: a {@code "***"} value would round-trip back through an admin
+     * "edit config" client as a literal secret. Keys are compared lowercased with {@link
+     * Locale#ROOT} (the {@code LocaleSafetyArchTest} contract).
+     */
+    static Map<String, Object> redactSensitive(Map<String, Object> raw) {
+        Map<String, Object> safe = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : raw.entrySet()) {
+            String key = entry.getKey();
+            if (key != null && SENSITIVE_CONFIG_KEYS.contains(key.toLowerCase(Locale.ROOT))) {
+                continue;
+            }
+            // LinkedHashMap (not Map.copyOf): config components are @Nullable and Jackson emits
+            // them as JSON nulls, which Map.copyOf rejects.
+            safe.put(key, entry.getValue());
+        }
+        return Collections.unmodifiableMap(safe);
     }
 }

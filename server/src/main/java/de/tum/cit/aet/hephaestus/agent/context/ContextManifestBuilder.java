@@ -68,22 +68,16 @@ public class ContextManifestBuilder {
                     continue;
                 }
                 byte[] bytes = files.get(key);
-                // A provider that mapped the key to a null blob would NPE on bytes.length below, and the
-                // catch(RuntimeException) would then discard the ENTIRE manifest — losing the telescope index
-                // for every other valid context file in the job. Skip the single bad entry instead.
+                // Skip a null blob: an NPE here would discard the ENTIRE manifest via the best-effort catch.
                 if (bytes == null) {
                     continue;
                 }
                 ObjectNode entry = entries.addObject();
-                // Emit the FULL workspace-relative key (e.g. "inputs/context/test_presence.json"), not a bare
-                // filename. The criteria + orchestrator prompt cite the full path, so the manifest — the agent's
-                // authoritative index of available context — must speak the SAME path vocabulary, else a bare
-                // name there reads as a different file and the enrichment context stays unopened.
+                // Full workspace-relative key, not a bare filename — criteria and orchestrator prompt cite
+                // the full path, so the manifest must speak the same path vocabulary.
                 entry.put("path", key);
-                // Never default to a connector name — that is exactly the mislabel the manifest exists to
-                // prevent. originId() is abstract so every provider-written key is present; "unknown" is
-                // the fail-loud marker for the impossible case rather than a silent attribution to SCM.
-                // getOrDefault only substitutes on an ABSENT key, so coalesce a present-but-null mapping too.
+                // "unknown" is the fail-loud marker, never a default connector attribution. Plain get + null
+                // check (not getOrDefault) also coalesces a present-but-null mapping.
                 String connector = keyConnector.get(key);
                 entry.put("connector", connector != null ? connector : "unknown");
                 entry.put("bytes", bytes.length);
@@ -93,8 +87,7 @@ public class ContextManifestBuilder {
             files.put(SandboxLayout.MANIFEST_PATH, manifestBytes);
             persistJobManifest(jobId, manifestBytes);
         } catch (RuntimeException e) {
-            // Log the throwable, not just getMessage() — an NPE message is null/unhelpful and this path is
-            // best-effort-swallowed, so a stack trace is the only diagnostic a prod failure leaves behind.
+            // Log the full throwable — this path is swallowed, so the stack trace is the only diagnostic.
             log.warn("Context manifest generation failed (best-effort), continuing without it", e);
         }
     }

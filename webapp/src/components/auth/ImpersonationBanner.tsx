@@ -75,10 +75,12 @@ export function ImpersonationBanner() {
 			role="status"
 			aria-live="polite"
 			className={cn(
+				// Tokenized (not raw amber/red) so the alarm colours track the theme: warning while
+				// read-only, destructive once writes are enabled.
 				"sticky top-0 z-50 flex w-full items-center justify-center gap-x-3 gap-y-1 flex-wrap border-b px-4 py-2 text-sm",
 				writesEnabled
-					? "border-red-300 bg-red-100 text-red-900 dark:border-red-800 dark:bg-red-950 dark:text-red-100"
-					: "border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100",
+					? "border-destructive/40 bg-destructive/15 text-destructive"
+					: "border-warning/40 bg-warning/15 text-warning",
 			)}
 		>
 			<span>
@@ -92,7 +94,7 @@ export function ImpersonationBanner() {
 					variant="outline"
 					size="sm"
 					onClick={() => setWritesEnabled(false)}
-					className="h-7 border-red-400 bg-transparent text-red-900 hover:bg-red-200 dark:border-red-700 dark:text-red-100 dark:hover:bg-red-900"
+					className="h-7 border-destructive/50 bg-transparent text-destructive hover:bg-destructive/20 hover:text-destructive"
 				>
 					Disable writes
 				</Button>
@@ -103,7 +105,7 @@ export function ImpersonationBanner() {
 							<Button
 								variant="outline"
 								size="sm"
-								className="h-7 border-amber-400 bg-transparent text-amber-900 hover:bg-amber-200 dark:border-amber-700 dark:text-amber-100 dark:hover:bg-amber-900"
+								className="h-7 border-warning/50 bg-transparent text-warning hover:bg-warning/20 hover:text-warning"
 							/>
 						}
 					>
@@ -137,8 +139,8 @@ export function ImpersonationBanner() {
 				className={cn(
 					"h-7 bg-transparent",
 					writesEnabled
-						? "border-red-400 text-red-900 hover:bg-red-200 dark:border-red-700 dark:text-red-100 dark:hover:bg-red-900"
-						: "border-amber-400 text-amber-900 hover:bg-amber-200 dark:border-amber-700 dark:text-amber-100 dark:hover:bg-amber-900",
+						? "border-destructive/50 text-destructive hover:bg-destructive/20 hover:text-destructive"
+						: "border-warning/50 text-warning hover:bg-warning/20 hover:text-warning",
 				)}
 			>
 				{exit.isPending ? <Spinner className="mr-2 size-3.5" /> : null}

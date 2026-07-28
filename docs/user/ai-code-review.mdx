@@ -50,7 +50,7 @@ For issues tied to specific code locations, Hephaestus posts inline notes direct
 
 If you want Hephaestus to re-analyze your MR (for example, after pushing new commits), post this as a comment on your MR:
 
-```
+```text
 /hephaestus review
 ```
 
@@ -75,6 +75,17 @@ The specific practices evaluated depend on your workspace configuration. Common 
 - **Design** -- View decomposition, logic separation, state ownership, preview quality, accessibility
 - **Code quality** -- Meaningful naming, code hygiene
 - **Process** -- MR description quality, commit discipline
+
+### Documentation the reviewer can read
+
+If your workspace connects a team wiki ([Outline](https://www.getoutline.com/)), the reviewer can read the
+documents your work points at. Link an architecture decision record or design doc from the MR description or
+an issue and the reviewer reads that document rather than guessing at it, so feedback on practices like
+*"records significant decisions with rationale"* is grounded in what you actually wrote.
+
+Only the collections an administrator chose to mirror are ever read, the reviewer never writes anything back
+to the wiki, and a document that is deleted upstream is dropped from Hephaestus too. Connecting your own
+Outline account under **Settings → Connected accounts** lets the documents you authored be attributed to you.
 
 ## Opting out
 

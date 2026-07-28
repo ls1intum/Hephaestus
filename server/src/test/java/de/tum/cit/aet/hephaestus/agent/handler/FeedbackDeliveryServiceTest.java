@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
@@ -84,8 +85,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             /* appBaseUrl */ APP_BASE_URL,
             /* cooldownMinutes */ 15,
             /* progressFooter */ false,
-            /* reactionSuppression */ false,
-            /* policyFloor */ false
+            /* reactionSuppression */ false
         );
         service = new FeedbackDeliveryService(
             commentPoster,
@@ -97,8 +97,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             feedbackLedgerRecorder,
             observationTrendService
         );
-        // Inline reconciliation runs on every OPEN-PR delivery — even with zero diff notes — to clear an
-        // earlier run's stale notes. Default it to a benign result so tests that don't pin it don't NPE.
+        // Reconciliation runs on every OPEN-PR delivery even with zero diff notes; default it benign
+        // so tests that don't pin it don't NPE.
         org.mockito.Mockito.lenient()
             .when(
                 diffNotePoster.reconcileInlineNotes(
@@ -152,7 +152,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             );
 
             var diffNotes = List.of(new DiffNote("src/Foo.java", 10, null, "Fix this"));
-            var delivery = new DeliveryContent("Fix the tests.", diffNotes);
+            var delivery = new DeliveryContent("Fix the tests.", diffNotes, List.of());
             service.deliverFeedback(job, delivery);
 
             verify(commentPoster).postFormattedBody(eq(job), any(String.class));
@@ -165,13 +165,15 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         void editsPriorSummaryInPlace() {
             AgentJob job = createJob();
             stubOpenPr();
-            // A live summary already exists on this continuity line → edit it, do not post anew.
             when(feedbackLedgerRecorder.priorLiveSummaryRef(eq(job))).thenReturn(Optional.of("IC_prior"));
             when(commentPoster.updateFormattedBody(eq(job), eq("IC_prior"), any(String.class))).thenReturn(
                 new PullRequestCommentPoster.UpdateResult(PullRequestCommentPoster.UpdateResult.Kind.EDITED, "IC_prior")
             );
 
-            service.deliverFeedback(job, new DeliveryContent("Re-reviewed: still fix the tests.", List.of()));
+            service.deliverFeedback(
+                job,
+                new DeliveryContent("Re-reviewed: still fix the tests.", List.of(), List.of())
+            );
 
             verify(commentPoster).updateFormattedBody(eq(job), eq("IC_prior"), any(String.class));
             verify(commentPoster, never()).postFormattedBody(eq(job), any(String.class));
@@ -184,13 +186,12 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             when(feedbackLedgerRecorder.priorLiveSummaryRef(eq(job))).thenReturn(Optional.of("IC_prior"));
-            // Edit found the prior comment GONE (a human deleted it) → post a fresh one.
             when(commentPoster.updateFormattedBody(eq(job), eq("IC_prior"), any(String.class))).thenReturn(
                 new PullRequestCommentPoster.UpdateResult(PullRequestCommentPoster.UpdateResult.Kind.GONE, null)
             );
             when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_new");
 
-            service.deliverFeedback(job, new DeliveryContent("Fresh summary.", List.of()));
+            service.deliverFeedback(job, new DeliveryContent("Fresh summary.", List.of(), List.of()));
 
             verify(commentPoster).updateFormattedBody(eq(job), eq("IC_prior"), any(String.class));
             verify(commentPoster).postFormattedBody(eq(job), any(String.class));
@@ -203,22 +204,21 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             when(feedbackLedgerRecorder.priorLiveSummaryRef(eq(job))).thenReturn(Optional.of("IC_prior"));
-            // A rate-limit / network blip → TRANSIENT: keep the live summary, never create-fallback (no double-post).
             when(commentPoster.updateFormattedBody(eq(job), eq("IC_prior"), any(String.class))).thenReturn(
                 new PullRequestCommentPoster.UpdateResult(PullRequestCommentPoster.UpdateResult.Kind.TRANSIENT, null)
             );
 
-            service.deliverFeedback(job, new DeliveryContent("Re-reviewed.", List.of()));
+            service.deliverFeedback(job, new DeliveryContent("Re-reviewed.", List.of(), List.of()));
 
             verify(commentPoster, never()).postFormattedBody(eq(job), any(String.class));
-            assertThat(job.getDeliveryCommentId()).isEqualTo("IC_prior"); // still points at the live summary
+            assertThat(job.getDeliveryCommentId()).isEqualTo("IC_prior");
         }
 
         @Test
         void skipsWhenPrNotStubbed() {
             AgentJob job = createJob();
 
-            var delivery = new DeliveryContent("This should not be posted.", List.of());
+            var delivery = new DeliveryContent("This should not be posted.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
@@ -239,7 +239,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 observationTrendService.computeForTarget(WorkArtifact.PULL_REQUEST, PULL_REQUEST_ID, WORKSPACE_ID)
             ).thenReturn(Optional.of(resolvedTrend()));
 
-            footerService.deliverFeedback(job, new DeliveryContent("Re-reviewed.", List.of()));
+            footerService.deliverFeedback(job, new DeliveryContent("Re-reviewed.", List.of(), List.of()));
 
             // (a) the edited summary body carries the rendered footer
             var body = ArgumentCaptor.forClass(String.class);
@@ -268,10 +268,15 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             pr.setState(Issue.State.CLOSED);
             when(pullRequestRepository.findByIdWithAuthor(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
 
-            var delivery = new DeliveryContent("Fix stuff.", List.of());
+            var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                eq(job),
+                eq(delivery),
+                eq(FeedbackSuppressionReason.ARTIFACT_CLOSED)
+            );
         }
 
         @Test
@@ -281,16 +286,19 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             pr.setState(Issue.State.MERGED);
             when(pullRequestRepository.findByIdWithAuthor(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
 
-            var delivery = new DeliveryContent("Fix stuff.", List.of());
+            var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                eq(job),
+                eq(delivery),
+                eq(FeedbackSuppressionReason.ARTIFACT_MERGED)
+            );
         }
 
         @Test
         void deliversToMergedPrWhenWorkspaceOverridesProperty() {
-            // Split-brain guard: fleet property deliverToMerged=false, but this workspace overrides it
-            // to true → the merged PR must still be delivered. Gate and delivery must agree per-workspace.
             AgentJob job = createJob();
             var pr = createOpenPr();
             pr.setState(Issue.State.MERGED);
@@ -302,9 +310,13 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(ws));
             when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_comment789");
 
-            service.deliverFeedback(job, new DeliveryContent("Fix stuff.", List.of()));
+            service.deliverFeedback(job, new DeliveryContent("Fix stuff.", List.of(), List.of()));
 
-            verify(commentPoster).postFormattedBody(eq(job), any(String.class));
+            var body = ArgumentCaptor.forClass(String.class);
+            verify(commentPoster).postFormattedBody(eq(job), body.capture());
+            assertThat(job.getDeliveryCommentId()).isEqualTo("IC_comment789");
+            // Body is wrapped with a marker + footer, so assert containment rather than equality.
+            assertThat(body.getValue()).contains("Fix stuff.");
         }
 
         @Test
@@ -314,10 +326,15 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             pr.setDraft(true);
             when(pullRequestRepository.findByIdWithAuthor(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
 
-            var delivery = new DeliveryContent("Fix stuff.", List.of());
+            var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                eq(job),
+                eq(delivery),
+                eq(FeedbackSuppressionReason.ARTIFACT_DRAFT)
+            );
         }
 
         @Test
@@ -328,10 +345,15 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             prefs.setAiReviewEnabled(false);
             when(userPreferencesRepository.findByUserId(AUTHOR_ID)).thenReturn(Optional.of(prefs));
 
-            var delivery = new DeliveryContent("Fix stuff.", List.of());
+            var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                eq(job),
+                eq(delivery),
+                eq(FeedbackSuppressionReason.RECIPIENT_OPTED_OUT)
+            );
         }
 
         @Test
@@ -339,26 +361,104 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             when(pullRequestRepository.findByIdWithAuthor(PULL_REQUEST_ID)).thenReturn(Optional.empty());
 
-            var delivery = new DeliveryContent("Fix stuff.", List.of());
+            var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                eq(job),
+                eq(delivery),
+                eq(FeedbackSuppressionReason.ARTIFACT_GONE)
+            );
+        }
+
+        @Test
+        void blankAfterSanitize_noInlineLanded_recordsEmptyAfterSanitize() {
+            AgentJob job = createJob();
+            stubOpenPr();
+
+            var delivery = new DeliveryContent("", List.of(), List.of());
+            service.deliverFeedback(job, delivery);
+
+            verify(commentPoster, never()).postFormattedBody(any(), any());
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                eq(job),
+                eq(delivery),
+                eq(FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE)
+            );
+            verify(feedbackLedgerRecorder, never()).record(
+                any(),
+                any(),
+                any(),
+                any(),
+                org.mockito.ArgumentMatchers.anyBoolean()
+            );
+        }
+
+        @Test
+        void blankAfterSanitize_inlineLanded_recordsDeliveredWithoutSummary() {
+            AgentJob job = createJob();
+            stubOpenPr();
+            var note = new DiffNote("src/Foo.java", 10, null, "Fix this", "ck-foo");
+            var signal = new InlineFindingChannel.DeliveredSignal(
+                "ck-foo",
+                new FindingAnchor.DiffAnchor("src/Foo.java", 10, null),
+                InlineFindingChannel.Disposition.POSTED,
+                "note-1",
+                "disc-1"
+            );
+            when(diffNotePoster.reconcileInlineNotes(any(), any())).thenReturn(
+                new DiffNotePoster.DiffNoteResult(1, 0, List.of(signal))
+            );
+
+            var delivery = new DeliveryContent("", List.of(note), List.of());
+            service.deliverFeedback(job, delivery);
+
+            verify(feedbackLedgerRecorder).record(
+                eq(job),
+                eq(delivery),
+                eq(WorkArtifact.PULL_REQUEST),
+                eq(List.of(signal)),
+                eq(true)
+            );
+            verify(feedbackLedgerRecorder, never()).recordSuppressedUnit(any(), any(), any());
         }
 
         @Test
         void throwsWhenSummaryPostReturnsNoId() {
-            // Integrity failure: a real, non-blank summary body was submitted but the provider
-            // returned no comment id — the developer sees nothing, so the job must fail loud.
             AgentJob job = createJob();
             stubOpenPr();
             when(commentPoster.postFormattedBody(any(), any())).thenReturn(null);
 
-            var delivery = new DeliveryContent("A real, non-blank summary body.", List.of());
+            var delivery = new DeliveryContent("A real, non-blank summary body.", List.of(), List.of());
 
             assertThatThrownBy(() -> service.deliverFeedback(job, delivery)).isInstanceOf(
                 de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException.class
             );
             assertThat(job.getDeliveryCommentId()).isNull();
+            verify(feedbackLedgerRecorder).recordUndelivered(eq(job), eq(delivery));
+        }
+
+        @Test
+        void summaryLandedThenInlineFailed_doesNotRecordFalseUndelivered() {
+            // A false undelivered here would double-raise the loci of a summary the developer already saw.
+            AgentJob job = createJob();
+            stubOpenPr();
+            when(commentPoster.postFormattedBody(any(), any())).thenReturn("IC_summary_1");
+            when(diffNotePoster.reconcileInlineNotes(eq(job), any())).thenThrow(
+                new de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException("no inline channel wired")
+            );
+
+            var delivery = new DeliveryContent(
+                "Summary.",
+                List.of(new DiffNote("src/Foo.java", 3, null, "x")),
+                List.of()
+            );
+            assertThatThrownBy(() -> service.deliverFeedback(job, delivery)).isInstanceOf(
+                de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException.class
+            );
+            assertThat(job.getDeliveryCommentId()).isEqualTo("IC_summary_1");
+            verify(feedbackLedgerRecorder, never()).recordUndelivered(any(), any());
         }
 
         @Test
@@ -369,10 +469,10 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(pullRequestRepository.findByIdWithAuthor(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
             when(commentPoster.postFormattedBody(any(), any())).thenReturn("IC_comment456");
 
-            var delivery = new DeliveryContent("Fix stuff.", List.of());
+            var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
-            verify(commentPoster).postFormattedBody(eq(job), any(String.class));
+            assertThat(job.getDeliveryCommentId()).isEqualTo("IC_comment456");
             verifyNoInteractions(userPreferencesRepository);
         }
 
@@ -382,7 +482,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             stubOpenPr();
             when(commentPoster.postFormattedBody(any(), any())).thenThrow(new RuntimeException("GraphQL timeout"));
 
-            var delivery = new DeliveryContent("Summary.", List.of());
+            var delivery = new DeliveryContent("Summary.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
             assertThat(job.getDeliveryCommentId()).isNull();
@@ -401,7 +501,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 new DiffNote("src/Foo.java", 10, null, "Fix this"),
                 new DiffNote("src/Bar.java", 20, null, "And this")
             );
-            var delivery = new DeliveryContent(null, diffNotes);
+            var delivery = new DeliveryContent(null, diffNotes, List.of());
             service.deliverFeedback(job, delivery);
 
             verify(diffNotePoster).reconcileInlineNotes(eq(job), eq(diffNotes));
@@ -409,40 +509,25 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
         @Test
         void emptyDiffNotesStillReconcilesToClearStaleNotesOnOpenPr() {
-            // G1 regression: a re-review that now produces ZERO inline notes must STILL reconcile so an
-            // earlier run's stale line-numbered notes are cleared (the empty-diff pathology). Reconciliation
-            // runs with an empty list — the clear half of clear-then-post.
             AgentJob job = createJob();
             stubOpenPr();
             when(commentPoster.postFormattedBody(any(), any())).thenReturn("IC_comment789");
 
-            service.deliverFeedback(job, new DeliveryContent("Summary only, nothing inline.", List.of()));
+            service.deliverFeedback(job, new DeliveryContent("Summary only, nothing inline.", List.of(), List.of()));
 
             verify(diffNotePoster).reconcileInlineNotes(eq(job), eq(List.of()));
         }
 
         @Test
-        void suppressedPrNeverReconciles_noDataLoss() {
-            // Symmetric guard: a CLOSED PR is suppressed upstream and must NEVER reach reconciliation —
-            // otherwise a re-run on a closed PR would wipe the delivered review (data loss).
+        void suppressedClosedPrNeverReconcilesSoARerunCannotWipeTheDeliveredReview() {
             AgentJob job = createJob();
             var pr = createOpenPr();
             pr.setState(Issue.State.CLOSED);
             when(pullRequestRepository.findByIdWithAuthor(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
 
-            service.deliverFeedback(job, new DeliveryContent("Summary.", List.of()));
+            service.deliverFeedback(job, new DeliveryContent("Summary.", List.of(), List.of()));
 
             verify(diffNotePoster, never()).reconcileInlineNotes(any(), any());
-        }
-
-        @Test
-        void doesNotThrowOnFailure() {
-            AgentJob job = createJob();
-            stubOpenPr();
-            when(commentPoster.postFormattedBody(any(), any())).thenThrow(new RuntimeException("GraphQL timeout"));
-
-            var delivery = new DeliveryContent("Summary.", List.of());
-            service.deliverFeedback(job, delivery);
         }
 
         @Test
@@ -450,7 +535,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             job.setMetadata(null);
 
-            var delivery = new DeliveryContent("Fix stuff.", List.of());
+            var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
@@ -464,7 +549,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             metadata.put("pr_number", 42);
             job.setMetadata(metadata);
 
-            var delivery = new DeliveryContent("Fix stuff.", List.of());
+            var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
@@ -494,7 +579,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(diffNotePoster.reconcileInlineNotes(eq(job), any())).thenReturn(
                 new DiffNotePoster.DiffNoteResult(1, 0, List.of(landedSignal("corr-1")))
             );
-            // The demotion edit lands.
             when(commentPoster.updateFormattedBody(eq(job), eq("IC_summary"), any(String.class))).thenReturn(
                 new PullRequestCommentPoster.UpdateResult(
                     PullRequestCommentPoster.UpdateResult.Kind.EDITED,
@@ -504,10 +588,9 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
             var delivery = new DeliveryContent(
                 "Full-line summary.",
-                List.of(new DiffNote("src/Foo.java", 10, null, "x"))
+                List.of(new DiffNote("src/Foo.java", 10, null, "x")),
+                List.of()
             );
-            // The recomposer must be CALLED with exactly the delivered key set, and its output must be what
-            // gets edited in place — a no-op that ignored the signals would never invoke updateFormattedBody.
             service.deliverFeedback(job, delivery, deliveredKeys -> {
                 assertThat(deliveredKeys).containsExactly("corr-1");
                 return "Demoted summary body.";
@@ -524,15 +607,13 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_summary");
-            // Inline reconcile produced ZERO delivered signals (default benign stub, no signals).
             boolean[] recomposed = { false };
 
-            service.deliverFeedback(job, new DeliveryContent("Full-line summary.", List.of()), keys -> {
+            service.deliverFeedback(job, new DeliveryContent("Full-line summary.", List.of(), List.of()), keys -> {
                 recomposed[0] = true;
                 return "should-not-be-used";
             });
 
-            // The recomposer is never consulted and the summary is never re-edited.
             assertThat(recomposed[0]).isFalse();
             verify(commentPoster, never()).updateFormattedBody(eq(job), any(String.class), any(String.class));
         }
@@ -554,9 +635,10 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 new DiffNotePoster.DiffNoteResult(0, 1, List.of(failed))
             );
 
-            service.deliverFeedback(job, new DeliveryContent("Full-line summary.", List.of()), keys -> "demoted");
+            service.deliverFeedback(job, new DeliveryContent("Full-line summary.", List.of(), List.of()), keys ->
+                "demoted"
+            );
 
-            // No non-FAILED key → no demotion edit; the full-line fallback summary already posted stands.
             verify(commentPoster, never()).updateFormattedBody(eq(job), any(String.class), any(String.class));
         }
     }
@@ -581,6 +663,21 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName(
+            "a body formatted via the real delivery path is found by the " +
+                "real dedup-lookup marker — regression test for the two-different-literals bug"
+        )
+        void formattedBodyIsFoundByTheDedupLookupMarker() {
+            AgentJob job = createJob();
+
+            String formatted = FeedbackDeliveryService.formatPracticeNote("Some review content", job);
+
+            // Mirrors GithubFeedbackChannel#findExistingSummary's own match check: body.contains(marker).
+            String lookupMarker = PullRequestCommentPoster.summaryMarkerFor(job);
+            assertThat(formatted).contains(lookupMarker);
+        }
+
+        @Test
         void noPreferencesLink() {
             AgentJob job = createJob();
             job.setStartedAt(Instant.parse("2024-01-01T00:00:00Z"));
@@ -602,8 +699,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             /* appBaseUrl */ APP_BASE_URL,
             /* cooldownMinutes */ 15,
             /* progressFooter */ true,
-            /* reactionSuppression */ false,
-            /* policyFloor */ false
+            /* reactionSuppression */ false
         );
         return new FeedbackDeliveryService(
             commentPoster,

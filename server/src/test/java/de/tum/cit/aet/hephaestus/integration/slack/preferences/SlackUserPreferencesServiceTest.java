@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.integration.slack.preferences;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -95,16 +97,11 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(List.of(slackLink, gitLabLink));
         when(membershipQuery.membershipsForLogins(Set.of("ga84xah"))).thenReturn(
             List.of(
-                new AccountWorkspaceMembershipQuery.WorkspaceMembershipView(
-                    1L,
-                    "hephaestustest",
-                    "Hephaestus",
-                    "MEMBER"
-                )
+                new AccountWorkspaceMembershipQuery.WorkspaceMembershipView(1L, "acme", "Hephaestus", "MEMBER", 314L)
             )
         );
-        Connection visible = slackConnection(1L, "hephaestustest", "Hephaestus", "T1", "hephaestus-test");
-        Connection inaccessible = slackConnection(2L, "other", "Other", "T1", "hephaestus-test");
+        Connection visible = slackConnection(1L, "acme", "Hephaestus", "T1", "acme-slack");
+        Connection inaccessible = slackConnection(2L, "other", "Other", "T1", "acme-slack");
         when(
             connectionRepository.findAllByKindAndInstanceKeyInAndState(
                 IntegrationKind.SLACK,
@@ -122,10 +119,10 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
         assertThat(dto.workspaces())
             .singleElement()
             .satisfies(workspace -> {
-                assertThat(workspace.workspaceSlug()).isEqualTo("hephaestustest");
+                assertThat(workspace.workspaceSlug()).isEqualTo("acme");
                 assertThat(workspace.workspaceName()).isEqualTo("Hephaestus");
                 assertThat(workspace.slackTeamId()).isEqualTo("T1");
-                assertThat(workspace.slackTeamName()).isEqualTo("hephaestus-test");
+                assertThat(workspace.slackTeamName()).isEqualTo("acme-slack");
                 assertThat(workspace.slackDisplayName()).isEqualTo("Felix Slack");
                 assertThat(workspace.channelMessagesAllowed()).isFalse();
                 assertThat(workspace.activeMonitoredChannelCount()).isEqualTo(3L);
@@ -141,7 +138,7 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
                 IntegrationKind.SLACK,
                 IntegrationState.ACTIVE
             )
-        ).thenReturn(Optional.of(slackConnection(1L, "hephaestustest", "Hephaestus", "T1", "hephaestus-test")));
+        ).thenReturn(Optional.of(slackConnection(1L, "acme", "Hephaestus", "T1", "acme-slack")));
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(
             List.of(link(SLACK_PROVIDER_ID, "U1", "T1", "Felix Slack"))
         );
@@ -164,7 +161,7 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
                 IntegrationKind.SLACK,
                 IntegrationState.ACTIVE
             )
-        ).thenReturn(Optional.of(slackConnection(1L, "hephaestustest", "Hephaestus", "T1", "hephaestus-test")));
+        ).thenReturn(Optional.of(slackConnection(1L, "acme", "Hephaestus", "T1", "acme-slack")));
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(
             List.of(link(SLACK_PROVIDER_ID, "U1", "T1", "Felix Slack"))
         );
@@ -172,7 +169,9 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
         service.updateChannelMessagesAllowed(1L, ACCOUNT_ID, true);
 
         verify(participantConsentService).recordChannelMessageOptIn(1L, "U1");
-        verify(erasureService, never()).erasePerson(1L, 123L, "U1");
+        // Deliberately unconstrained: pinning the arguments would let an erasure of SOMEONE ELSE'S data
+        // pass, which is the exact accident this forbids.
+        verify(erasureService, never()).erasePerson(anyLong(), anyLong(), anyString());
     }
 
     @Test
@@ -183,7 +182,7 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
                 IntegrationKind.SLACK,
                 IntegrationState.ACTIVE
             )
-        ).thenReturn(Optional.of(slackConnection(1L, "hephaestustest", "Hephaestus", "T1", "hephaestus-test")));
+        ).thenReturn(Optional.of(slackConnection(1L, "acme", "Hephaestus", "T1", "acme-slack")));
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(
             List.of(link(SLACK_PROVIDER_ID, "U2", "T2", "Other Slack"))
         );
@@ -214,7 +213,7 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
 
     private void givenWorkspaceSummary() {
         when(workspaceSummaryQuery.findById(1L)).thenReturn(
-            Optional.of(new WorkspaceSummaryQuery.WorkspaceSummary(1L, "hephaestustest", "Hephaestus", null))
+            Optional.of(new WorkspaceSummaryQuery.WorkspaceSummary(1L, "acme", "Hephaestus"))
         );
     }
 

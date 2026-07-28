@@ -128,8 +128,17 @@ public class ConnectionAdminService {
             .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId));
 
         ConnectionConfig config = buildConfigForInlineKind(kind, userInput, instanceKey);
-        Connection connection = new Connection(workspace, kind, instanceKey, config);
-        connection = connectionRepository.save(connection);
+        // Reconnect-friendly upsert: (workspace, kind, instance_key) is unique, so a previous
+        // UNINSTALLED install of the same vendor instance is revived with fresh config +
+        // credentials instead of colliding — the guarded INITIATE reconnect in
+        // ConnectionService.transition allows the UNINSTALLED → ACTIVE revival.
+        Connection connection = connectionRepository
+            .findByWorkspaceIdAndKindAndInstanceKey(workspaceId, kind, instanceKey)
+            .map(existing -> {
+                existing.setConfig(config);
+                return existing;
+            })
+            .orElseGet(() -> connectionRepository.save(new Connection(workspace, kind, instanceKey, config)));
 
         persistCredentials(connection, credentials);
 
@@ -151,9 +160,8 @@ public class ConnectionAdminService {
 
     /**
      * Encrypt + persist the credential bundle alongside the Connection. Null bundle is a
-     * no-op (some inline flows may persist credentials in a follow-up step). The actual
-     * encryption + algorithm-tag bookkeeping lives in {@link Connection#setCredentials}
-     * so this method stays a thin wrapper around dependency wiring.
+     * no-op (some inline flows persist credentials in a follow-up step); encryption +
+     * algorithm-tag bookkeeping lives in {@link Connection#setCredentials}.
      */
     private void persistCredentials(Connection connection, @Nullable CredentialBundle bundle) {
         if (bundle == null) {
@@ -202,6 +210,12 @@ public class ConnectionAdminService {
                 /* notificationChannelId */ null,
                 /* teamLabel */ null,
                 /* retentionDays */ null,
+                enabledStreams
+            );
+            case OUTLINE -> new ConnectionConfig.OutlineConfig(
+                userInput.getOrDefault("server_url", null),
+                /* webhookSubscriptionId */ null,
+                /* webhookSecret */ null,
                 enabledStreams
             );
         };

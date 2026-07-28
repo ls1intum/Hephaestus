@@ -21,8 +21,8 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * A federated-login association between an {@link Account} and an upstream IdP subject.
- * Per Issue #1200's spec; the {@code team_id} column supports multi-instance IdPs
- * (Slack workspaces, Microsoft tenants) where the subject alone is ambiguous.
+ * The {@code team_id} column supports multi-instance IdPs (Slack workspaces, Microsoft
+ * tenants) where the subject alone is ambiguous.
  *
  * <h2>Lookup discipline</h2>
  * Account lookup at login is <em>always</em> {@code (git_provider, subject, team_id)} via the

@@ -57,29 +57,73 @@ jobs:
               - '.github/workflows/**'
               - '.github/actions/**'
 
-  # Post preview links immediately (no waiting for other jobs)
-  preview-links:
+  # Coolify's preview switch is all-or-nothing: enabled, it deploys every open PR. We leave it
+  # disabled and create a preview per PR from the Coolify UI, and this job keeps the ones that
+  # exist up to date. Coolify's deploy API only accepts a pull request that already has a preview,
+  # so a PR without one is a no-op. Instance identifiers come from repository variables; a fork or
+  # an unconfigured instance simply skips.
+  preview:
     name: "Preview / Coolify"
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && vars.COOLIFY_URL != '' && vars.COOLIFY_APP_UUID != ''
     permissions:
       statuses: write
-    timeout-minutes: 1
+    timeout-minutes: 2
+    env:
+      COOLIFY_URL: ${{ vars.COOLIFY_URL }}
+      COOLIFY_APP_UUID: ${{ vars.COOLIFY_APP_UUID }}
+      COOLIFY_PROJECT_UUID: ${{ vars.COOLIFY_PROJECT_UUID }}
+      COOLIFY_ENVIRONMENT_UUID: ${{ vars.COOLIFY_ENVIRONMENT_UUID }}
     steps:
-      - name: Post Coolify preview link
+      - name: Link the preview deployments page on the PR
+        if: vars.COOLIFY_PROJECT_UUID != '' && vars.COOLIFY_ENVIRONMENT_UUID != ''
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
-            const sha = context.payload.pull_request.head.sha;
+            const { COOLIFY_URL, COOLIFY_PROJECT_UUID, COOLIFY_ENVIRONMENT_UUID, COOLIFY_APP_UUID } = process.env;
             await github.rest.repos.createCommitStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              sha: sha,
+              sha: context.payload.pull_request.head.sha,
               state: 'success',
-              target_url: 'https://coolify.hephaestus.aet.cit.tum.de/project/lc8sows0ok8g880sg4o4o84w/environment/ek8o8800g4wks84c8w8wcckc/application/wg44k0ccsoscsgcco8swc4ks/preview-deployments',
+              target_url: `${COOLIFY_URL}/project/${COOLIFY_PROJECT_UUID}/environment/${COOLIFY_ENVIRONMENT_UUID}/application/${COOLIFY_APP_UUID}/preview-deployments`,
               description: 'Click Details to view Coolify preview deployments',
-              context: 'Preview / Coolify'
+              context: 'Preview / Coolify',
             });
+
+      # Forks are skipped deliberately: a preview runs with the instance's real credentials.
+      - name: Update this PR's preview deployment, if it has one
+        if: github.event.action == 'synchronize' && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${COOLIFY_TOKEN}" ]; then
+            echo "::notice::COOLIFY_API_TOKEN is not configured; skipping preview update."
+            exit 0
+          fi
+
+          body=$(mktemp)
+          status=$(curl -sS -o "${body}" -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
+            -H 'Accept: application/json' \
+            --retry 3 --retry-connrefused --max-time 30 \
+            "${COOLIFY_URL}/api/v1/deploy?uuid=${COOLIFY_APP_UUID}&pr=${PR_NUMBER}")
+
+          if [ "${status}" -ge 400 ]; then
+            echo "::error::Coolify returned HTTP ${status}: $(cat "${body}")"
+            exit 1
+          fi
+
+          deployment=$(jq -r '.deployments[0].deployment_uuid // empty' "${body}")
+          if [ -z "${deployment}" ]; then
+            echo "::notice::PR #${PR_NUMBER} has no preview deployment ($(jq -r '.deployments[0].message // "no deployment queued"' "${body}"))."
+            exit 0
+          fi
+
+          echo "::notice::Queued Coolify deployment ${deployment} for PR #${PR_NUMBER}."
 
   Quality:
     uses: ./.github/workflows/ci-quality-gates.yml

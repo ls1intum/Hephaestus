@@ -1,0 +1,133 @@
+package de.tum.cit.aet.hephaestus.integration.outline.sync;
+
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocument;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot;
+import java.time.Instant;
+import java.util.function.Consumer;
+import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * The Outline mirror's only write transactions: short {@code REQUIRES_NEW} units that touch nothing but the
+ * database, so {@link OutlineDocumentSyncService} can run its enumeration and HTTP calls holding no pooled
+ * connection. Holding one across the wire turns a slow-but-alive Outline into pool starvation and a Postgres
+ * backend {@code idle in transaction}, blocking vacuum on the mirror.
+ *
+ * <p>These live apart from {@link OutlineMirrorWriter} because {@code @Transactional} only takes effect across a
+ * proxy hop, and the retry layered on top must run outside any transaction — a failed optimistic-lock flush marks
+ * its transaction rollback-only, so retrying inside it could never commit.
+ */
+@Component
+@ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
+public class OutlineMirrorTransactions {
+
+    private static final Logger log = LoggerFactory.getLogger(OutlineMirrorTransactions.class);
+
+    private final OutlineDocumentRepository documentRepository;
+    private final OutlineCollectionRepository collectionRepository;
+
+    public OutlineMirrorTransactions(
+        OutlineDocumentRepository documentRepository,
+        OutlineCollectionRepository collectionRepository
+    ) {
+        this.documentRepository = documentRepository;
+        this.collectionRepository = collectionRepository;
+    }
+
+    /**
+     * Upserts one mirrored document. The row is re-read inside this transaction rather than carried in from the
+     * caller's diff, so the write applies to current state and the {@code @Version} window stays narrow.
+     *
+     * @return the body-free snapshot of the row as written, so the caller's diff map stays current
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public OutlineDocumentSnapshot upsertDocument(
+        long workspaceId,
+        long connectionId,
+        String documentId,
+        Consumer<OutlineDocument> mutator
+    ) {
+        OutlineDocument doc = documentRepository
+            .findByWorkspaceIdAndConnectionIdAndDocumentId(workspaceId, connectionId, documentId)
+            .orElseGet(() -> {
+                OutlineDocument fresh = new OutlineDocument();
+                fresh.setWorkspaceId(workspaceId);
+                fresh.setConnectionId(connectionId);
+                fresh.setDocumentId(documentId);
+                return fresh;
+            });
+        mutator.accept(doc);
+        return OutlineDocumentSnapshot.of(documentRepository.saveAndFlush(doc));
+    }
+
+    /**
+     * Update an <em>existing</em> mirrored document — the tombstone and archive-stamp paths, which must
+     * never conjure a row for a document the mirror does not have.
+     *
+     * @return the snapshot as written, or {@code null} when the row is gone (hard-deleted by a concurrent
+     *         collection erase); the caller treats that as "nothing left to do"
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public @Nullable OutlineDocumentSnapshot updateDocument(
+        long workspaceId,
+        long connectionId,
+        String documentId,
+        Consumer<OutlineDocument> mutator
+    ) {
+        return documentRepository
+            .findByWorkspaceIdAndConnectionIdAndDocumentId(workspaceId, connectionId, documentId)
+            .map(doc -> {
+                mutator.accept(doc);
+                return OutlineDocumentSnapshot.of(documentRepository.saveAndFlush(doc));
+            })
+            .orElse(null);
+    }
+
+    /**
+     * Update a registered collection's bookkeeping (catalog fields, watermarks, sync status, last error).
+     * A row that vanished mid-pass (the admin removed the collection from the mirror while the reconcile
+     * was walking it) is skipped: there is nothing left to record progress on.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void updateCollection(
+        long workspaceId,
+        long connectionId,
+        String collectionId,
+        Consumer<OutlineCollection> mutator
+    ) {
+        collectionRepository
+            .findByWorkspaceIdAndConnectionIdAndCollectionId(workspaceId, connectionId, collectionId)
+            .ifPresentOrElse(
+                row -> {
+                    mutator.accept(row);
+                    collectionRepository.saveAndFlush(row);
+                },
+                () ->
+                    log.debug(
+                        "outline.sync: collection {} vanished from the registry mid-pass (workspaceId={}) — skipping its bookkeeping write",
+                        collectionId,
+                        workspaceId
+                    )
+            );
+    }
+
+    /**
+     * The staleness drop: hard-delete tombstoned rows older than {@code cutoff}. Its own read-write
+     * transaction — a derived delete inherits Spring Data's {@code readOnly = true} default otherwise and
+     * would silently never flush.
+     *
+     * @return rows deleted
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public long dropStaleTombstones(long workspaceId, Instant cutoff) {
+        return documentRepository.deleteByWorkspaceIdAndDeletedAtBefore(workspaceId, cutoff);
+    }
+}

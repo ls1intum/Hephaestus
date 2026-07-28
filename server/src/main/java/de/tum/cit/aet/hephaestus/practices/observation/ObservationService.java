@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.DeliveredObservationBody;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.ObservationAdviceBody;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -337,8 +337,8 @@ public class ObservationService {
         if (observationIds.isEmpty()) {
             return Map.of();
         }
-        Map<UUID, DeliveredObservationBody> latest = new HashMap<>();
-        for (DeliveredObservationBody row : feedbackObservationRepository.findDeliveredBodiesByObservationIds(
+        Map<UUID, ObservationAdviceBody> latest = new HashMap<>();
+        for (ObservationAdviceBody row : feedbackObservationRepository.findAdviceBodiesByObservationIds(
             observationIds
         )) {
             latest.merge(row.getObservationId(), row, (existing, candidate) ->

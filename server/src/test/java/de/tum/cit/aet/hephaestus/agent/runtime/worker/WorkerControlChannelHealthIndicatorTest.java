@@ -56,8 +56,7 @@ class WorkerControlChannelHealthIndicatorTest extends BaseUnitTest {
             new WorkerProperties.Capacity("1", "1"),
             new WorkerProperties.Drain(Duration.ofMinutes(5)),
             new WorkerProperties.Heartbeat(interval),
-            new WorkerProperties.Control(URI.create("ws://example"), "tok", Duration.ofSeconds(10)),
-            new WorkerProperties.Llm(null, null)
+            new WorkerProperties.Control(URI.create("ws://example"), "tok", Duration.ofSeconds(10))
         );
     }
 }

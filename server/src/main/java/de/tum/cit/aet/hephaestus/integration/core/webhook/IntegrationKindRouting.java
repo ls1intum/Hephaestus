@@ -21,7 +21,9 @@ public class IntegrationKindRouting {
         "gitlab",
         IntegrationKind.GITLAB,
         "slack",
-        IntegrationKind.SLACK
+        IntegrationKind.SLACK,
+        "outline",
+        IntegrationKind.OUTLINE
     );
 
     public Optional<IntegrationKind> resolve(String pathSegment) {

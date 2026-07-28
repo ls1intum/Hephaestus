@@ -1,6 +1,17 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { getCurrentUserOptions } from "@/api/@tanstack/react-query.gen";
-import type { CurrentUserView } from "@/api/types.gen";
+import {
+	getCurrentUserMembershipOptions,
+	getCurrentUserOptions,
+} from "@/api/@tanstack/react-query.gen";
+import type { CurrentUserView, WorkspaceMembership } from "@/api/types.gen";
+
+/**
+ * Shared by the route guards and `AuthContext` so both read one cache entry on one schedule. A 401
+ * is a definitive "not signed in", not a transient error, so it is never retried.
+ */
+export function currentUserQueryOptions() {
+	return { ...getCurrentUserOptions(), retry: false, staleTime: 30_000 };
+}
 
 /**
  * Resolve the current user for route `beforeLoad` guards (ADR 0017 cookie-session auth).
@@ -9,6 +20,10 @@ import type { CurrentUserView } from "@/api/types.gen";
  * with the in-app `useAuth` surface — this makes the first paint correct (no auth
  * flash) because the route blocks on the same query the rest of the app reads.
  *
+ * `revalidateIfStale` refreshes in the background rather than blocking, because this guard runs on
+ * EVERY authenticated navigation and one flaky request would bounce a signed-in user to /login.
+ * Without it `ensureQueryData` would serve a revoked `appRole` for the life of the tab.
+ *
  * A 401/403 (or any fetch failure) resolves to `null` rather than throwing, so
  * guards can branch on authentication without try/catch noise at every call site.
  */
@@ -16,7 +31,10 @@ export async function resolveCurrentUser(
 	queryClient: QueryClient,
 ): Promise<CurrentUserView | null> {
 	try {
-		return await queryClient.ensureQueryData({ ...getCurrentUserOptions(), retry: false });
+		return await queryClient.ensureQueryData({
+			...currentUserQueryOptions(),
+			revalidateIfStale: true,
+		});
 	} catch {
 		return null;
 	}
@@ -33,6 +51,41 @@ export function isAppAdmin(
 	user: Partial<Pick<CurrentUserView, "appRole">> | null | undefined,
 ): boolean {
 	return user?.appRole === "APP_ADMIN";
+}
+
+/** A "not a member" answer, as opposed to a transport failure, which carries no status at all. */
+function isServerRefusal(error: unknown): boolean {
+	const status = (error as { status?: unknown } | null)?.status;
+	return typeof status === "number" && status >= 400 && status < 500;
+}
+
+/**
+ * Shared by the route guard and `useWorkspaceAccess` so both read one cache entry on one schedule —
+ * the hook's default `staleTime` of 0 would otherwise refetch the moment the guard's fetch landed.
+ * `staleTime` is therefore also the bound on how long a role change takes to reach the UI.
+ */
+export function workspaceMembershipQueryOptions(workspaceSlug: string) {
+	return {
+		...getCurrentUserMembershipOptions({ path: { workspaceSlug } }),
+		staleTime: 30_000,
+		// Retrying a refusal would stall the redirect of everyone who is legitimately not a member.
+		retry: (failureCount: number, error: unknown) => !isServerRefusal(error) && failureCount < 2,
+	};
+}
+
+/**
+ * `fetchQuery`, not `ensureQueryData`: the latter ignores `staleTime`, so a revoked admin would keep
+ * the admin UI for the life of the tab. Any failure resolves to `null` — unverifiable is not allowed.
+ */
+export async function resolveWorkspaceMembership(
+	queryClient: QueryClient,
+	workspaceSlug: string,
+): Promise<WorkspaceMembership | null> {
+	try {
+		return await queryClient.fetchQuery(workspaceMembershipQueryOptions(workspaceSlug));
+	} catch {
+		return null;
+	}
 }
 
 /**

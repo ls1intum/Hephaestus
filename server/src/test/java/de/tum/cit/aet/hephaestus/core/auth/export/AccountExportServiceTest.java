@@ -78,7 +78,7 @@ class AccountExportServiceTest extends BaseUnitTest {
         when(featureRepo.findFlagsByAccountId(ACCOUNT_ID)).thenReturn(List.of("mentor_access"));
         when(authEventRepo.findByAccountSince(eq(ACCOUNT_ID), any())).thenReturn(List.of());
         when(membershipQuery.membershipsForLogins(any())).thenReturn(
-            List.of(new WorkspaceMembershipView(7L, "tum-ase", "TUM ASE", "MEMBER"))
+            List.of(new WorkspaceMembershipView(7L, "tum-ase", "TUM ASE", "MEMBER", 314L))
         );
         when(preferencesQuery.preferencesForLogin("ada")).thenReturn(
             Optional.of(new AccountPreferencesQuery.PreferencesView(true, false))
@@ -118,7 +118,6 @@ class AccountExportServiceTest extends BaseUnitTest {
         // this account's identity link and looked it up via preferencesForLogin("ada") — so the
         // returned-state assertions above already prove the Account → login bridge; no verify needed.
 
-        // Serialize and assert no token/credential/key material is present anywhere in the JSON.
         String json = new ObjectMapper().writeValueAsString(bundle);
         assertThat(json).contains("\"ada@example.com\"", "tum-ase", "mentor_access");
         assertThat(json.toLowerCase())
@@ -137,7 +136,6 @@ class AccountExportServiceTest extends BaseUnitTest {
         AccountExportRepository repo = mock(AccountExportRepository.class);
         AccountExportService service = newService(repo);
 
-        // A real export owned by OTHER_ACCOUNT_ID; the (id, account) scoped lookup misses for us.
         when(repo.findByIdAndAccountId(1000L, ACCOUNT_ID)).thenReturn(Optional.empty());
 
         Optional<?> result = service.status(1000L, ACCOUNT_ID);
@@ -211,7 +209,7 @@ class AccountExportServiceTest extends BaseUnitTest {
             return e;
         });
 
-        // No active transaction in a unit test → registerAfterCommit runs inline.
+        // No active transaction in a unit test → TransactionCallbacks.afterCommit runs the handoff inline.
         AccountExportService service = new AccountExportService(repo, worker, logger, clock);
 
         AccountExport created = service.requestExport(ACCOUNT_ID);

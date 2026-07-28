@@ -10,7 +10,7 @@ import {
 	poseidonTrident,
 	prometheusLongName,
 	zeusThunderbolt,
-} from "@/components/achievements/storyMockData";
+} from "@/components/achievements/story-mock-data";
 import { Button } from "@/components/ui/button";
 
 /**

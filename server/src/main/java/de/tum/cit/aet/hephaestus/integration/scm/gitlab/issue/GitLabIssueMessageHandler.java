@@ -22,10 +22,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Processes both {@code event_type: "issue"} and {@code event_type: "confidential_issue"} payloads.
  * Both arrive on the same NATS subject ({@code object_kind: "issue"}).
  * <p>
- * Confidential issue events are not ingested — an event whose current {@code confidential} flag is set
- * is skipped here. This scopes the guarantee to ingestion: a row already stored while non-confidential is
- * not purged by this handler when a later {@code update} flips {@code confidential=true} (that
- * purge/redaction would live in {@link GitLabIssueProcessor}, not in this router).
+ * Confidential issue events are not ingested — an event whose current {@code confidential} flag is set is
+ * not (re)stored. In addition, a public → confidential flip purges any snapshot mirrored while the issue
+ * was still public via {@link GitLabIssueProcessor#purgeConfidential} (soft-delete tombstone), so a stale
+ * public copy of now-restricted data does not linger.
  * <p>
  * Routes to {@link GitLabIssueProcessor} based on the action:
  * <ul>
@@ -72,12 +72,6 @@ public class GitLabIssueMessageHandler extends AbstractIntegrationMessageHandler
             return;
         }
 
-        // Skip confidential issues entirely
-        if (event.isConfidential()) {
-            log.debug("Skipped confidential issue event: iid={}", event.objectAttributes().iid());
-            return;
-        }
-
         String projectPath = event.project().pathWithNamespace();
         if (projectPath == null || projectPath.isBlank()) {
             log.warn("Received issue event with missing project path");
@@ -86,17 +80,26 @@ public class GitLabIssueMessageHandler extends AbstractIntegrationMessageHandler
         String safeProjectPath = sanitizeForLog(projectPath);
         GitLabEventAction action = event.actionType();
 
+        ProcessingContext context = contextResolver.resolve(projectPath, action.getValue(), "issue");
+        if (context == null) {
+            return;
+        }
+
+        // Confidential issues are never (re)ingested. But an issue that flips public → confidential must
+        // also have any snapshot we mirrored while it was public purged — otherwise a stale public copy of
+        // now-restricted data lingers. Resolve the context first so we know the repository, then tombstone.
+        if (event.isConfidential()) {
+            log.debug("Confidential issue event: purging any public snapshot, iid={}", event.objectAttributes().iid());
+            issueProcessor.purgeConfidential(event, context);
+            return;
+        }
+
         log.info(
             "Processing issue event: projectPath={}, iid={}, action={}",
             safeProjectPath,
             event.objectAttributes().iid(),
             action
         );
-
-        ProcessingContext context = contextResolver.resolve(projectPath, action.getValue(), "issue");
-        if (context == null) {
-            return;
-        }
 
         switch (action) {
             case OPEN -> issueProcessor.process(event, context);

@@ -1,12 +1,17 @@
 package de.tum.cit.aet.hephaestus.core.auth.web;
 
 import de.tum.cit.aet.hephaestus.core.auth.dev.DevLoginService;
+import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
+import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderService;
 import de.tum.cit.aet.hephaestus.core.auth.spi.IdentityProviderCatalog;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
@@ -31,13 +36,16 @@ public class IdentityProviderDiscoveryController {
     private static final String DEV_PROVIDER_TYPE = "DEV";
 
     private final IdentityProviderCatalog identityProviderCatalog;
+    private final LoginProviderService loginProviderService;
     private final DevLoginService devLoginService;
 
     public IdentityProviderDiscoveryController(
         IdentityProviderCatalog identityProviderCatalog,
+        LoginProviderService loginProviderService,
         DevLoginService devLoginService
     ) {
         this.identityProviderCatalog = identityProviderCatalog;
+        this.loginProviderService = loginProviderService;
         this.devLoginService = devLoginService;
     }
 
@@ -63,13 +71,17 @@ public class IdentityProviderDiscoveryController {
     @PreAuthorize("permitAll()")
     @Operation(summary = "List available identity providers", operationId = "listIdentityProviders")
     public ResponseEntity<List<IdentityProviderViewDTO>> list() {
+        Map<String, LoginProvider.ProviderType> typesByRegistrationId = loginProviderService
+            .listEnabled()
+            .stream()
+            .collect(Collectors.toMap(LoginProvider::getRegistrationId, LoginProvider::getType, (a, b) -> a));
         List<IdentityProviderViewDTO> views = new ArrayList<>();
         for (ClientRegistration reg : identityProviderCatalog.listRegistrations()) {
             views.add(
                 new IdentityProviderViewDTO(
                     reg.getRegistrationId(),
                     reg.getClientName() != null ? reg.getClientName() : reg.getRegistrationId(),
-                    providerTypeOf(reg),
+                    providerTypeOf(reg, typesByRegistrationId::get),
                     baseUrlOf(reg)
                 )
             );
@@ -84,8 +96,23 @@ public class IdentityProviderDiscoveryController {
     }
 
     /**
-     * The provider type drives the SPA's icon choice and link-only filtering.
+     * The provider type drives the SPA's icon choice and link-only filtering. Prefers the
+     * {@code login_provider} row's type (authoritative — an OUTLINE registration's authorization host is
+     * an arbitrary self-hosted instance, indistinguishable from a GitLab by URL shape); falls back to
+     * the legacy host sniff when no row resolves.
      */
+    static String providerTypeOf(
+        ClientRegistration reg,
+        Function<String, LoginProvider.ProviderType> typeByRegistrationId
+    ) {
+        LoginProvider.ProviderType rowType = typeByRegistrationId.apply(reg.getRegistrationId());
+        if (rowType != null) {
+            return rowType.name();
+        }
+        return providerTypeOf(reg);
+    }
+
+    /** Legacy host-sniff fallback for a registration without a {@code login_provider} row. */
     static String providerTypeOf(ClientRegistration reg) {
         // Match on the parsed HOST, not a substring of the whole URI — "github.com" appearing in a
         // path/query of a GitLab instance (or a look-alike host) must not be misclassified as GitHub.

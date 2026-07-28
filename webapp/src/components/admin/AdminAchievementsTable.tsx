@@ -13,6 +13,7 @@ import {
 } from "@tanstack/react-table";
 import { ArrowUpDown, ChevronDown, RefreshCw, Search, Sparkles, Users } from "lucide-react";
 import { useMemo, useState } from "react";
+import { TablePagination } from "@/components/common/TablePagination";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -22,15 +23,6 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import {
-	Pagination,
-	PaginationContent,
-	PaginationEllipsis,
-	PaginationItem,
-	PaginationLink,
-	PaginationNext,
-	PaginationPrevious,
-} from "@/components/ui/pagination";
 import {
 	Select,
 	SelectContent,
@@ -173,28 +165,6 @@ export function AdminAchievementsTable({
 			globalFilter,
 		},
 	});
-
-	const generatePaginationItems = () => {
-		const pageCount = table.getPageCount();
-		const currentPage = table.getState().pagination.pageIndex + 1;
-		const items = [];
-
-		if (pageCount <= 7) {
-			for (let i = 1; i <= pageCount; i++) {
-				items.push(i);
-			}
-		} else {
-			if (currentPage <= 3) {
-				items.push(1, 2, 3, 4, "...", pageCount);
-			} else if (currentPage >= pageCount - 2) {
-				items.push(1, "...", pageCount - 3, pageCount - 2, pageCount - 1, pageCount);
-			} else {
-				items.push(1, "...", currentPage - 1, currentPage, currentPage + 1, "...", pageCount);
-			}
-		}
-
-		return items;
-	};
 
 	return (
 		<div className="w-full space-y-4">
@@ -341,47 +311,11 @@ export function AdminAchievementsTable({
 						</Select>
 					</div>
 
-					{table.getPageCount() > 1 && (
-						<Pagination>
-							<PaginationContent>
-								<PaginationItem>
-									<PaginationPrevious
-										onClick={() => table.previousPage()}
-										className={
-											!table.getCanPreviousPage()
-												? "pointer-events-none opacity-50"
-												: "cursor-pointer"
-										}
-									/>
-								</PaginationItem>
-
-								{generatePaginationItems().map((page, index) => (
-									<PaginationItem key={page === "..." ? `ellipsis-${index}` : `page-${page}`}>
-										{page === "..." ? (
-											<PaginationEllipsis />
-										) : (
-											<PaginationLink
-												onClick={() => table.setPageIndex(Number(page) - 1)}
-												isActive={table.getState().pagination.pageIndex + 1 === page}
-												className="cursor-pointer"
-											>
-												{page}
-											</PaginationLink>
-										)}
-									</PaginationItem>
-								))}
-
-								<PaginationItem>
-									<PaginationNext
-										onClick={() => table.nextPage()}
-										className={
-											!table.getCanNextPage() ? "pointer-events-none opacity-50" : "cursor-pointer"
-										}
-									/>
-								</PaginationItem>
-							</PaginationContent>
-						</Pagination>
-					)}
+					<TablePagination
+						page={table.getState().pagination.pageIndex}
+						totalPages={table.getPageCount()}
+						onPageChange={(page) => table.setPageIndex(page)}
+					/>
 				</div>
 			</div>
 		</div>

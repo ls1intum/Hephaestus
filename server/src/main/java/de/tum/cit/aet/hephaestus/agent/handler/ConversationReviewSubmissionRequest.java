@@ -4,14 +4,10 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import java.util.Objects;
 
 /**
- * Submission request for {@link de.tum.cit.aet.hephaestus.agent.AgentJobType#CONVERSATION_REVIEW} jobs.
- *
- * <p>Identifies one settled Slack thread and the single participant the findings are filed against. There is no
- * repository / diff / head SHA — the thread is identified by {@code (channelId, threadTs)} and the freshness
- * segment of the idempotency key is the thread's newest {@code ts} ({@code lastTs}), which plays the role the
- * head SHA plays for a PR: a thread that grew re-reviews, while {@code extractCooldownKeyPrefix} strips it so the
- * built-in cooldown scopes on the thread + subject alone (a late reply with a new {@code lastTs} does not
- * re-fire).
+ * Submission request for {@link de.tum.cit.aet.hephaestus.agent.AgentJobType#CONVERSATION_REVIEW} jobs:
+ * one settled Slack thread, identified by {@code (channelId, threadTs)}, and the single participant the
+ * findings are filed against. Idempotency/cooldown semantics of {@code lastTs} are documented at the key
+ * construction in {@link ConversationReviewHandler#createSubmission}.
  *
  * @param slackThreadId the {@code slack_thread} aggregate id (the delivery artifactId)
  * @param slackChannelId the Slack channel id
