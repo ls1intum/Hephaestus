@@ -2157,11 +2157,11 @@ export type AreaStatusCell = {
      */
     areaSlug: string;
     /**
-     * Where the developer stands on this area, read against the area's practices — not a rank
+     * Where the developer stands on this area, read against its practices
      */
     status: 'DEVELOPING' | 'STRENGTH' | 'MIXED' | 'NO_ACTIVITY';
     /**
-     * Direction versus the previous report window — the developer's own trajectory, never a peer comparison
+     * Direction versus the previous report window
      */
     trend: 'IMPROVING' | 'WORSENING' | 'STEADY' | 'NEW';
 };

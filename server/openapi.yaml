@@ -5839,8 +5839,8 @@ components:
           description: Area slug
         status:
           type: string
-          description: "Where the developer stands on this area, read against the\
-            \ area's practices — not a rank"
+          description: "Where the developer stands on this area, read against its\
+            \ practices"
           enum:
           - DEVELOPING
           - STRENGTH
@@ -5848,8 +5848,7 @@ components:
           - NO_ACTIVITY
         trend:
           type: string
-          description: "Direction versus the previous report window — the developer's\
-            \ own trajectory, never a peer comparison"
+          description: Direction versus the previous report window
           enum:
           - IMPROVING
           - WORSENING
