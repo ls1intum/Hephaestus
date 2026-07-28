@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepositor
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.scm.github.installation.GitHubInstallationRepositoryEnumerationService;
@@ -101,6 +102,38 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
         assertThat(monitors)
             .extracting(RepositoryToMonitor::getNameWithOwner)
             .containsExactly("HephaestusTest/HelloWorld");
+    }
+
+    @Test
+    void replayedRepositoryAddCannotRepopulateAPurgedWorkspace() {
+        Workspace workspace = persistWorkspace(RepositorySelection.SELECTED);
+        workspace.setStatus(Workspace.WorkspaceStatus.PURGED);
+        workspaceRepository.saveAndFlush(workspace);
+
+        workspaceRepositoryMonitorService.ensureRepositoryAndMonitorFromSnapshot(
+            INSTALLATION_ID,
+            new ProvisioningListener.RepositorySnapshot(4L, "HephaestusTest/replayed", "replayed", true)
+        );
+
+        assertThat(repositoryToMonitorRepository.findByWorkspaceId(workspace.getId())).isEmpty();
+        assertThat(repositoryRepository.findByNameWithOwner("HephaestusTest/replayed")).isEmpty();
+    }
+
+    @Test
+    void replayedRepositoryRemovalCannotMutateAPurgedWorkspace() {
+        Workspace workspace = persistWorkspace(RepositorySelection.SELECTED);
+        repositoryToMonitorRepository.saveAndFlush(buildMonitor(workspace, "HephaestusTest/retained"));
+        workspace.setStatus(Workspace.WorkspaceStatus.PURGED);
+        workspaceRepository.saveAndFlush(workspace);
+
+        workspaceRepositoryMonitorService.removeRepositoryMonitorForInstallation(
+            INSTALLATION_ID,
+            "HephaestusTest/retained"
+        );
+
+        assertThat(repositoryToMonitorRepository.findByWorkspaceId(workspace.getId()))
+            .extracting(RepositoryToMonitor::getNameWithOwner)
+            .containsExactly("HephaestusTest/retained");
     }
 
     private Workspace persistWorkspace(RepositorySelection selection) {

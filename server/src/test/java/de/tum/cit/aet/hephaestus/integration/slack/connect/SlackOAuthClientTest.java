@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.slack.connect;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.integration.slack.connect.SlackOAuthClient.OAuthV2Access;
@@ -103,5 +104,33 @@ class SlackOAuthClientTest extends BaseUnitTest {
             .isInstanceOf(SlackOAuthException.class)
             .hasMessageContaining("slack oauth client not configured");
         assertThat(slackMock.getRequestCount()).isEqualTo(0);
+    }
+
+    @Test
+    void revokeStrict_treatsAnAlreadyRevokedTokenAsSuccess() {
+        slackMock.enqueue(
+            new MockResponse.Builder()
+                .code(200)
+                .addHeader("Content-Type", "application/json")
+                .body("{\"ok\":false,\"error\":\"token_revoked\"}")
+                .build()
+        );
+
+        assertThatCode(() -> client.revokeStrict("xoxb-revoked")).doesNotThrowAnyException();
+    }
+
+    @Test
+    void revokeStrict_propagatesProviderFailure() {
+        slackMock.enqueue(
+            new MockResponse.Builder()
+                .code(200)
+                .addHeader("Content-Type", "application/json")
+                .body("{\"ok\":false,\"error\":\"invalid_auth\"}")
+                .build()
+        );
+
+        assertThatThrownBy(() -> client.revokeStrict("xoxb-invalid"))
+            .isInstanceOf(SlackOAuthException.class)
+            .hasMessageContaining("invalid_auth");
     }
 }

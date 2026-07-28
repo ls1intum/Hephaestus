@@ -77,7 +77,7 @@ public class WorkspaceController {
     }
 
     @DeleteMapping
-    @Operation(summary = "Purge (soft delete) a workspace")
+    @Operation(summary = "Permanently delete a workspace and purge its data")
     @ApiResponse(responseCode = "204", description = "Workspace purged")
     @RequireWorkspaceOwner
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "WORKSPACE_STATUS")

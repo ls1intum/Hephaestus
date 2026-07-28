@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.workspace.exception.RepositoryAlreadyMonitoredE
 import de.tum.cit.aet.hephaestus.workspace.exception.RepositoryManagementNotAllowedException;
 import de.tum.cit.aet.hephaestus.workspace.exception.WorkspaceLifecycleViolationException;
 import de.tum.cit.aet.hephaestus.workspace.exception.WorkspaceSlugConflictException;
+import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeBlockedException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
@@ -68,8 +69,8 @@ public class WorkspaceControllerAdvice {
         );
     }
 
-    @ExceptionHandler(WorkspaceLifecycleViolationException.class)
-    ProblemDetail handleLifecycleViolation(WorkspaceLifecycleViolationException exception) {
+    @ExceptionHandler({ WorkspaceLifecycleViolationException.class, WorkspacePurgeBlockedException.class })
+    ProblemDetail handleLifecycleViolation(RuntimeException exception) {
         return problem(HttpStatus.CONFLICT, "Workspace lifecycle violation", userFacingDetail(exception.getMessage()));
     }
 

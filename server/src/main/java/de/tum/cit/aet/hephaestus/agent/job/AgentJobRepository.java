@@ -20,11 +20,26 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
+    @Modifying(flushAutomatically = true)
+    @Query("DELETE FROM AgentJob j WHERE j.workspace.id = :workspaceId")
+    int deleteAllByWorkspaceId(@Param("workspaceId") Long workspaceId);
+
     Page<AgentJob> findByWorkspaceId(Long workspaceId, Pageable pageable);
 
     Page<AgentJob> findByWorkspaceIdAndStatus(Long workspaceId, AgentJobStatus status, Pageable pageable);
 
     Optional<AgentJob> findByIdAndWorkspaceId(UUID id, Long workspaceId);
+
+    @Query(
+        "SELECT CASE WHEN COUNT(j) > 0 THEN true ELSE false END FROM AgentJob j " +
+            "WHERE j.workspace.id = :workspaceId AND (" +
+            "j.status IN (" +
+            "de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.QUEUED, " +
+            "de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.RUNNING) OR " +
+            "(j.status = de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.COMPLETED AND " +
+            "j.deliveryStatus = de.tum.cit.aet.hephaestus.agent.job.DeliveryStatus.PENDING))"
+    )
+    boolean existsPurgeBlockingWork(@Param("workspaceId") Long workspaceId);
 
     long countByWorkspaceIdAndPurposeAndStatusIn(
         Long workspaceId,
@@ -81,8 +96,9 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      */
     @WorkspaceAgnostic("ID-based claim; job ID from a workspace-scoped candidate poll")
     @Query(
-        value = "SELECT * FROM agent_job WHERE id = :id AND status = 'QUEUED' AND available_at <= :now " +
-            "FOR UPDATE SKIP LOCKED",
+        value = "SELECT j.* FROM agent_job j JOIN workspace w ON w.id = j.workspace_id " +
+            "WHERE j.id = :id AND j.status = 'QUEUED' AND j.available_at <= :now AND w.status = 'ACTIVE' " +
+            "FOR UPDATE OF j SKIP LOCKED",
         nativeQuery = true
     )
     Optional<AgentJob> findByIdQueuedForUpdateSkipLocked(@Param("id") UUID id, @Param("now") Instant now);
@@ -262,8 +278,9 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
      */
     @WorkspaceAgnostic("Cross-workspace poll candidates; caller is the @WorkspaceAgnostic job poller")
     @Query(
-        value = "SELECT j.id FROM agent_job j " +
+        value = "SELECT j.id FROM agent_job j JOIN workspace w ON w.id = j.workspace_id " +
             "WHERE j.status = 'QUEUED' " +
+            "AND w.status = 'ACTIVE' " +
             "AND j.available_at <= now() " +
             "AND (" +
             "  (SELECT count(*) FROM agent_job r " +

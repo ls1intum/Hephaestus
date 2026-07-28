@@ -21,6 +21,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncProgress;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -55,6 +56,9 @@ class SyncJobServiceTest extends BaseUnitTest {
     private ConnectionRepository connectionRepository;
 
     @Mock
+    private WorkspaceRepository workspaceRepository;
+
+    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     @Mock
@@ -87,6 +91,8 @@ class SyncJobServiceTest extends BaseUnitTest {
 
         workspace = new Workspace();
         workspace.setId(WORKSPACE_ID);
+        workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
+        lenient().when(workspaceRepository.findByIdForUpdate(WORKSPACE_ID)).thenReturn(Optional.of(workspace));
         connection = mock(Connection.class);
         lenient().when(connection.getId()).thenReturn(CONNECTION_ID);
         lenient().when(connection.getWorkspace()).thenReturn(workspace);
@@ -184,6 +190,7 @@ class SyncJobServiceTest extends BaseUnitTest {
         service = new SyncJobService(
             syncJobRepository,
             connectionRepository,
+            workspaceRepository,
             eventPublisher,
             transactionTemplate,
             clock
@@ -229,6 +236,18 @@ class SyncJobServiceTest extends BaseUnitTest {
             .isInstanceOf(SyncStateConflictException.class)
             .hasMessageContaining("UNINSTALLED");
 
+        verify(syncJobRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void beginJob_workspaceNotActive_rejectsBeforeLockingConnection() {
+        workspace.setStatus(Workspace.WorkspaceStatus.PURGED);
+
+        assertThatThrownBy(() -> service.beginJob(defaultRequest()))
+            .isInstanceOf(SyncStateConflictException.class)
+            .hasMessageContaining("PURGED");
+
+        verify(connectionRepository, never()).acquireLifecycleLock(anyLong(), anyLong());
         verify(syncJobRepository, never()).saveAndFlush(any());
     }
 

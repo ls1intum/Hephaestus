@@ -21,6 +21,8 @@ public interface SyncJobRepository extends JpaRepository<SyncJob, Long> {
 
     Page<SyncJob> findByWorkspace_Id(long workspaceId, Pageable pageable);
 
+    boolean existsByWorkspace_IdAndStatusIn(long workspaceId, Collection<SyncJobStatus> statuses);
+
     /** The one-active-job guard's read: present result means the connection already has a job in flight. */
     Optional<SyncJob> findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
         long connectionId,

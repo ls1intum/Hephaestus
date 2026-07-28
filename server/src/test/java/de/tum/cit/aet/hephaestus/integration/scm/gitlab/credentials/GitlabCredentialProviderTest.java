@@ -22,13 +22,6 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
-/**
- * Decryption smoke test for the GitLab provider — proves the converter wiring works
- * end-to-end. Connection lookup branches (missing / non-ACTIVE / missing blob → empty)
- * are covered transitively by the parallel Slack/GitHub tests + the converter's
- * own contract tests; we only re-verify the happy-path decode here to keep the suite
- * compact.
- */
 class GitlabCredentialProviderTest extends BaseUnitTest {
 
     @Mock
@@ -50,11 +43,10 @@ class GitlabCredentialProviderTest extends BaseUnitTest {
         Connection connection = newGitlabConnection(workspaceId);
         connection.setCredentials(new BearerToken("glpat-secret", null), converter);
         connection.setState(IntegrationState.ACTIVE);
-        when(connectionService.findActive(workspaceId, IntegrationKind.GITLAB)).thenReturn(Optional.of(connection));
+        IntegrationRef ref = new IntegrationRef(IntegrationKind.GITLAB, workspaceId, "200");
+        when(connectionService.findReferenced(ref)).thenReturn(Optional.of(connection));
 
-        Optional<CredentialBundle> resolved = provider.resolve(
-            new IntegrationRef(IntegrationKind.GITLAB, workspaceId, "200")
-        );
+        Optional<CredentialBundle> resolved = provider.resolve(ref);
 
         assertThat(resolved).contains(new BearerToken("glpat-secret", null));
     }
@@ -64,9 +56,10 @@ class GitlabCredentialProviderTest extends BaseUnitTest {
         long workspaceId = 17L;
         Connection connection = newGitlabConnection(workspaceId);
         connection.setState(IntegrationState.ACTIVE);
-        when(connectionService.findActive(workspaceId, IntegrationKind.GITLAB)).thenReturn(Optional.of(connection));
+        IntegrationRef ref = new IntegrationRef(IntegrationKind.GITLAB, workspaceId, "200");
+        when(connectionService.findReferenced(ref)).thenReturn(Optional.of(connection));
 
-        assertThat(provider.resolve(new IntegrationRef(IntegrationKind.GITLAB, workspaceId, "200"))).isEmpty();
+        assertThat(provider.resolve(ref)).isEmpty();
     }
 
     @Test

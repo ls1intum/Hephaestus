@@ -65,6 +65,14 @@ Entries exist only for releases that need operator action. Everything else is in
 
 ### Next release
 
+#### 🔴 Workspace purge moved to the owner-only deletion endpoint
+
+**Affected**: automation that sets a workspace status to `PURGED`.
+
+`PATCH /workspaces/{slug}/status` now accepts only `ACTIVE` and `SUSPENDED`. Replace a purge request
+with `DELETE /workspaces/{slug}` and authenticate as that workspace's owner. The old request returns
+`409 Workspace lifecycle violation`.
+
 #### 🔴 LLM provider configuration moved from env vars to the admin console
 
 **Affected**: any deployment setting `HEPHAESTUS_WORKER_LLM_BASE_URL`, `HEPHAESTUS_WORKER_LLM_API_KEY`, `HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED`, or an `AGENT_DEFAULT_CONFIG_*` variable.

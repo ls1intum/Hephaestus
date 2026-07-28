@@ -253,6 +253,44 @@ class ScopeConsumerTest {
             verify(lateMessage, atLeastOnce()).nak();
             assertThat(handlerInvocations.get()).isZero();
         }
+
+        @Test
+        void stopWaitsForInFlightHandler() throws Exception {
+            ConsumerContext ctx = mock(ConsumerContext.class);
+            ArgumentCaptor<MessageHandler> handlerCaptor = ArgumentCaptor.forClass(MessageHandler.class);
+            when(ctx.consume(handlerCaptor.capture())).thenReturn(mock(MessageConsumer.class));
+            CountDownLatch handlerStarted = new CountDownLatch(1);
+            CountDownLatch releaseHandler = new CountDownLatch(1);
+            CountDownLatch stopped = new CountDownLatch(1);
+            ScopeConsumer consumer = new ScopeConsumer(
+                SCOPE_ID,
+                CONSUMER_NAME,
+                STREAM,
+                ctx,
+                mock(StreamContext.class),
+                SUBJECTS,
+                msg -> {
+                    handlerStarted.countDown();
+                    while (releaseHandler.getCount() > 0) {
+                        try {
+                            releaseHandler.await();
+                        } catch (InterruptedException ignored) {}
+                    }
+                }
+            );
+            consumer.start();
+            handlerCaptor.getValue().onMessage(messageWithSubject("github.acme.repo.in-flight"));
+            assertThat(handlerStarted.await(2, TimeUnit.SECONDS)).isTrue();
+
+            Thread.ofVirtual().start(() -> {
+                consumer.stop();
+                stopped.countDown();
+            });
+
+            assertThat(stopped.await(100, TimeUnit.MILLISECONDS)).isFalse();
+            releaseHandler.countDown();
+            assertThat(stopped.await(2, TimeUnit.SECONDS)).isTrue();
+        }
     }
 
     @Nested

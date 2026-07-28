@@ -49,11 +49,10 @@ class SlackCredentialProviderTest extends BaseUnitTest {
         );
         connection.setCredentials(new BearerToken("xoxb-secret-bot-token", null), converter);
         connection.setState(IntegrationState.ACTIVE);
-        when(connectionService.findActive(workspaceId, IntegrationKind.SLACK)).thenReturn(Optional.of(connection));
+        IntegrationRef ref = new IntegrationRef(IntegrationKind.SLACK, workspaceId, "T12345");
+        when(connectionService.findReferenced(ref)).thenReturn(Optional.of(connection));
 
-        Optional<CredentialBundle> resolved = provider.resolve(
-            new IntegrationRef(IntegrationKind.SLACK, workspaceId, "T12345")
-        );
+        Optional<CredentialBundle> resolved = provider.resolve(ref);
 
         assertThat(resolved).contains(new BearerToken("xoxb-secret-bot-token", null));
     }

@@ -31,6 +31,11 @@ public interface ConnectionStrategy {
     /** Revoke vendor-side (best-effort) and signal local state change. */
     void revoke(IntegrationRef ref);
 
+    /** Strict provider-only teardown used before a transactional workspace purge. */
+    default void revokeProvider(IntegrationRef ref) {
+        throw new UnsupportedOperationException("Strict provider teardown is not implemented for " + kind());
+    }
+
     record InitiateRequest(
         long workspaceId,
         IntegrationKind kind,

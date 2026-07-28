@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.integration.core.handler.IntegrationMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.core.spi.EventTypeKey;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.NatsSubscriptionProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.NatsSubscriptionProvider.NatsSubscriptionInfo;
 import de.tum.cit.aet.hephaestus.integration.core.spi.NatsSubscriptionProvider.StreamSubscription;
 import de.tum.cit.aet.hephaestus.integration.core.sync.activity.ConnectionActivityRecorder;
@@ -26,6 +27,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -33,6 +36,8 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Unit tests for {@link IntegrationNatsConsumer}.
@@ -54,6 +59,74 @@ import org.junit.jupiter.params.provider.CsvSource;
  */
 @Tag("unit")
 class IntegrationNatsConsumerTest {
+
+    @Test
+    void purgeFenceRejectsQueuedConsumerRestart() {
+        NatsSubscriptionProvider subscriptions = mock(NatsSubscriptionProvider.class);
+        IntegrationNatsConsumer consumer = new IntegrationNatsConsumer(
+            new NatsConnectionProperties(true, "nats://localhost:4222", "heph", 7, null),
+            new NatsConsumerProperties(
+                Duration.ofMinutes(5),
+                500,
+                Duration.ofSeconds(2),
+                new NatsConsumerProperties.PoisonProperties(10, Duration.ofSeconds(2), Duration.ofMinutes(5))
+            ),
+            subscriptions,
+            mock(IntegrationMessageDispatcher.class),
+            mock(IntegrationPoisonHandler.class),
+            new IntegrationConsumerStats(),
+            mock(ConnectionActivityRecorder.class)
+        );
+        try {
+            consumer.stopConsumingScopeForPurge(7L);
+            consumer.startConsumingScope(7L);
+
+            verifyNoInteractions(subscriptions);
+        } finally {
+            consumer.shutdown();
+        }
+    }
+
+    @Test
+    void rolledBackPurgeRestartsConsumption() throws Exception {
+        CountDownLatch restarted = new CountDownLatch(1);
+        IntegrationNatsConsumer consumer = new IntegrationNatsConsumer(
+            new NatsConnectionProperties(true, "nats://localhost:4222", "heph", 7, null),
+            new NatsConsumerProperties(
+                Duration.ofMinutes(5),
+                500,
+                Duration.ofSeconds(2),
+                new NatsConsumerProperties.PoisonProperties(10, Duration.ofSeconds(2), Duration.ofMinutes(5))
+            ),
+            scopeId -> Optional.empty(),
+            mock(IntegrationMessageDispatcher.class),
+            mock(IntegrationPoisonHandler.class),
+            new IntegrationConsumerStats(),
+            mock(ConnectionActivityRecorder.class)
+        ) {
+            @Override
+            void ensureNatsConnectionEstablished() {}
+
+            @Override
+            void reconcileScope(Long scopeId) {
+                restarted.countDown();
+            }
+        };
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            consumer.stopConsumingScopeForPurge(7L);
+            List<TransactionSynchronization> synchronizations = TransactionSynchronizationManager.getSynchronizations();
+            TransactionSynchronizationManager.clearSynchronization();
+            synchronizations.forEach(s -> s.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK));
+
+            assertThat(restarted.await(2, TimeUnit.SECONDS)).isTrue();
+        } finally {
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.clearSynchronization();
+            }
+            consumer.shutdown();
+        }
+    }
 
     @Test
     void newConsumerStartsAtNewMessagesInsteadOfReplayingStreamHistory() {

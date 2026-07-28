@@ -594,7 +594,7 @@ export const gitLabPreflight = <ThrowOnError extends boolean = false>(options: O
 export const getProviders = <ThrowOnError extends boolean = false>(options?: Options<GetProvidersData, ThrowOnError>) => (options?.client ?? client).get<GetProvidersResponses, unknown, ThrowOnError>({ url: '/workspaces/providers', ...options });
 
 /**
- * Purge (soft delete) a workspace
+ * Permanently delete a workspace and purge its data
  */
 export const purgeWorkspace = <ThrowOnError extends boolean = false>(options: Options<PurgeWorkspaceData, ThrowOnError>) => (options.client ?? client).delete<PurgeWorkspaceResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

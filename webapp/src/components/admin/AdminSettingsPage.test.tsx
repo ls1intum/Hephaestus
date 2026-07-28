@@ -37,4 +37,9 @@ describe("AdminSettingsPage — non-integration content", () => {
 		setup({ features: { ...features, leaguesEnabled: true } });
 		expect(screen.getByText(/reset and recalculate leagues/i)).toBeTruthy();
 	});
+
+	it("leaves the danger zone out until the active workspace has resolved", () => {
+		setup({ workspaceSlug: undefined });
+		expect(screen.queryByRole("heading", { name: /danger zone/i })).toBeNull();
+	});
 });

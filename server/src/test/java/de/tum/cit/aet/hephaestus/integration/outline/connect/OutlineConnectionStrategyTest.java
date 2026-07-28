@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.outline.connect;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
@@ -87,5 +88,15 @@ class OutlineConnectionStrategyTest extends BaseUnitTest {
         verify(outlineDocumentRepository).deleteByWorkspaceId(5L);
         // GDPR erase on disconnect covers the event log too — actor subjects are personal data.
         verify(outlineDocumentEventRepository).deleteByWorkspaceId(5L);
+    }
+
+    @Test
+    void purge_onlyDeregistersTheProviderSubscription() {
+        IntegrationRef ref = new IntegrationRef(IntegrationKind.OUTLINE, 5L, "team-9", 7L);
+
+        strategy().revokeProvider(ref);
+
+        verify(webhookRegistrar).deregisterStrict(5L, 7L);
+        verifyNoInteractions(outlineDocumentRepository, outlineCollectionRepository, outlineDocumentEventRepository);
     }
 }
