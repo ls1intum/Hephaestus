@@ -1,93 +1,133 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="270" viewBox="0 0 1080 270" role="img" aria-labelledby="title desc">
-  <title id="title">The Hephaestus feedback loop</title>
-  <desc id="desc">Gather project activity, observe engineering practices, compose clear feedback, deliver it in context, and let the developer respond. The response closes the loop.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="580" viewBox="0 0 1120 580" role="img" aria-labelledby="title desc">
+  <title id="title">How Hephaestus turns project work into practice feedback</title>
+  <desc id="desc">Project work and its context go to Hephaestus, which reviews the work against the workspace's practices. Feedback explains what worked, what could improve, and what to try next. It can appear alongside the work, in a private view, or in conversation with Heph. The developer decides whether to use, question, or skip it before continuing with their next project work.</desc>
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .surface { fill: #fff; stroke: #d0d7de; }
+    .layer { fill: #f6f3ff; stroke: #d8cff2; }
+    .feedback { fill: #f6f3ff; stroke: #a994d8; }
+    .choice { fill: #fff; stroke: #a994d8; }
+    .title { fill: #1f2328; font-size: 20px; font-weight: 700; }
+    .body { fill: #59636e; font-size: 18px; }
+    .small { fill: #59636e; font-size: 16px; }
+    .eyebrow { fill: #574584; font-size: 15px; font-weight: 700; letter-spacing: .7px; }
+    .return { fill: #574584; font-size: 16px; font-weight: 700; letter-spacing: .8px; }
+    .number { fill: #fff; font-size: 13px; font-weight: 700; text-anchor: middle; }
+    .icon { fill: none; stroke: #574584; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .flow { fill: none; stroke: #7b68ae; stroke-width: 3; stroke-linecap: round; }
+  </style>
   <defs>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
-      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#1f2328" flood-opacity=".1"/>
+      <feDropShadow dx="0" dy="4" stdDeviation="7" flood-color="#1f2328" flood-opacity=".1"/>
     </filter>
-    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M1 1l7 4-7 4" fill="none" stroke="#7d8590" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-    </marker>
-    <marker id="loop-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M1 1l7 4-7 4" fill="none" stroke="#6e5aa7" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <marker id="arrow" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M2 1.5 10 6l-8 4.5" fill="none" stroke="#7b68ae" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
     </marker>
   </defs>
 
-  <g fill="none" stroke="#7d8590" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)">
-    <path d="M195 136h23"/>
-    <path d="M405 136h23"/>
-    <path d="M615 136h23"/>
-    <path d="M825 136h23"/>
-  </g>
+  <!-- One continuous story: project work → review → feedback → developer choice → next work. -->
+  <path class="flow" d="M280 195h42" marker-end="url(#arrow)"/>
+  <path class="flow" d="M625 195h42" marker-end="url(#arrow)"/>
+  <path class="flow" d="M1080 260c48 40 35 135-71 205" marker-end="url(#arrow)"/>
+  <path class="flow" d="M460 478C302 548 90 532 65 311" marker-end="url(#arrow)"/>
+  <text x="205" y="563" class="return" text-anchor="middle">NEXT PROJECT WORK</text>
 
-  <path d="M945 198v43H105v-40" fill="none" stroke="#6e5aa7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#loop-arrow)"/>
-  <rect x="412" y="224" width="256" height="34" rx="17" fill="#f6f3ff" stroke="#d8cff2"/>
-  <text x="540" y="246" fill="#574584" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="13" font-weight="600" text-anchor="middle">Response closes the loop</text>
-
+  <!-- 1. Project work: layered artifacts rather than another generic process card. -->
   <g filter="url(#shadow)">
-    <rect x="15" y="70" width="180" height="128" rx="16" fill="#fff" stroke="#d0d7de"/>
-    <rect x="225" y="70" width="180" height="128" rx="16" fill="#fff" stroke="#d0d7de"/>
-    <rect x="435" y="70" width="180" height="128" rx="16" fill="#fff" stroke="#d0d7de"/>
-    <rect x="645" y="70" width="180" height="128" rx="16" fill="#fff" stroke="#d0d7de"/>
-    <rect x="855" y="70" width="180" height="128" rx="16" fill="#574584" stroke="#574584"/>
+    <rect x="52" y="68" width="228" height="210" rx="18" class="layer"/>
+    <rect x="41" y="79" width="228" height="210" rx="18" class="layer"/>
+    <rect x="30" y="90" width="250" height="210" rx="18" class="surface"/>
+  </g>
+  <circle cx="56" cy="116" r="17" fill="#574584"/>
+  <text x="56" y="121" class="number">1</text>
+  <text x="82" y="122" class="title">Your project work</text>
+  <text x="55" y="154" class="body">With the context around it</text>
+  <g transform="translate(58 184)">
+    <rect width="190" height="82" rx="12" fill="#f6f8fa" stroke="#d0d7de"/>
+    <rect x="8" y="13" width="35" height="56" rx="9" fill="#fff" stroke="#d0d7de"/>
+    <g class="icon" transform="translate(13 29) scale(.78)">
+      <path d="m8 8-4 4 4 4"/>
+      <path d="m16 8 4 4-4 4"/>
+      <path d="m14 4-4 16"/>
+    </g>
+    <rect x="54" y="13" width="35" height="56" rx="9" fill="#fff" stroke="#d0d7de"/>
+    <g class="icon" transform="translate(60 31) scale(.75)">
+      <path d="M4 12.5 9 17l11-11"/>
+    </g>
+    <rect x="100" y="13" width="35" height="56" rx="9" fill="#fff" stroke="#d0d7de"/>
+    <path d="M108 28h18a6 6 0 0 1 6 6v5a6 6 0 0 1-6 6h-5l-6 6v-6h-7a6 6 0 0 1-6-6v-5a6 6 0 0 1 6-6Z" fill="#eee9ff" stroke="#a994d8"/>
+    <rect x="146" y="13" width="35" height="56" rx="9" fill="#fff" stroke="#d0d7de"/>
+    <g class="icon" transform="translate(153 29) scale(.72)">
+      <path d="M6 2h9l5 5v15H6z"/>
+      <path d="M14 2v6h6M9 13h8M9 17h6"/>
+    </g>
   </g>
 
-  <g>
-    <circle cx="105" cy="70" r="27" fill="#f0ebff" stroke="#d8cff2"/>
-    <g transform="translate(93 58)" fill="none" stroke="#574584" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M10.7 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v4.1"/>
-      <path d="m21 21-1.9-1.9"/>
-      <circle cx="17" cy="17" r="3"/>
-    </g>
-    <text x="105" y="125" fill="#1f2328" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="18" font-weight="700" text-anchor="middle">Gather</text>
-    <text x="105" y="153" fill="#59636e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14" text-anchor="middle">Project activity</text>
+  <!-- 2. Hephaestus: evidence is considered against the workspace's practices. -->
+  <g filter="url(#shadow)">
+    <rect x="335" y="83" width="290" height="217" rx="22" class="surface"/>
+  </g>
+  <circle cx="362" cy="110" r="17" fill="#574584"/>
+  <text x="362" y="115" class="number">2</text>
+  <text x="388" y="113" class="title">Hephaestus reviews</text>
+  <text x="388" y="138" class="title">the work</text>
+  <text x="362" y="172" class="body">Against your workspace's</text>
+  <text x="362" y="194" class="body">engineering practices</text>
+  <g transform="translate(362 222)">
+    <rect width="94" height="46" rx="13" fill="#f6f8fa" stroke="#d0d7de"/>
+    <text x="47" y="29" class="small" text-anchor="middle">Evidence</text>
+    <circle cx="118" cy="23" r="14" fill="#fff" stroke="#d0d7de"/>
+    <text x="118" y="29" class="title" font-size="18" text-anchor="middle">+</text>
+    <rect x="144" width="110" height="46" rx="13" fill="#eee9ff" stroke="#a994d8"/>
+    <text x="199" y="29" class="small" text-anchor="middle">Practice</text>
   </g>
 
-  <g>
-    <circle cx="315" cy="70" r="27" fill="#f0ebff" stroke="#d8cff2"/>
-    <g transform="translate(303 58)" fill="none" stroke="#574584" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M3 7V5a2 2 0 0 1 2-2h2"/>
-      <path d="M17 3h2a2 2 0 0 1 2 2v2"/>
-      <path d="M21 17v2a2 2 0 0 1-2 2h-2"/>
-      <path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
-      <circle cx="12" cy="12" r="3"/>
-      <path d="m16 16-1.9-1.9"/>
-    </g>
-    <text x="315" y="125" fill="#1f2328" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="18" font-weight="700" text-anchor="middle">Observe</text>
-    <text x="315" y="153" fill="#59636e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14" text-anchor="middle">Engineering practices</text>
+  <!-- 3. The output is the focal point: useful feedback and multiple delivery surfaces. -->
+  <g filter="url(#shadow)">
+    <rect x="670" y="46" width="410" height="332" rx="22" class="feedback"/>
+  </g>
+  <circle cx="698" cy="75" r="17" fill="#574584"/>
+  <text x="698" y="80" class="number">3</text>
+  <text x="724" y="72" class="eyebrow">PRACTICE FEEDBACK</text>
+  <text x="724" y="99" class="title">Feedback reaches you</text>
+  <g transform="translate(698 123)">
+    <circle cx="12" cy="12" r="11" fill="#fff" stroke="#a994d8"/>
+    <path d="m7 12 3 3 7-7" class="icon"/>
+    <text x="34" y="17" class="body">What worked</text>
+
+    <circle cx="12" cy="52" r="11" fill="#fff" stroke="#a994d8"/>
+    <path d="M7 57 17 47M11 47h6v6" class="icon"/>
+    <text x="34" y="57" class="body">What could improve</text>
+
+    <circle cx="12" cy="92" r="11" fill="#fff" stroke="#a994d8"/>
+    <path d="M7 92h10M13 88l4 4-4 4" class="icon"/>
+    <text x="34" y="97" class="body">What to try next</text>
+  </g>
+  <path d="M698 235h354" stroke="#c9bfe3"/>
+  <text x="698" y="262" class="eyebrow">WHERE FEEDBACK CAN APPEAR</text>
+  <g transform="translate(698 280)">
+    <rect width="142" height="36" rx="18" fill="#fff" stroke="#b8a8df"/>
+    <text x="71" y="23" class="small" text-anchor="middle">Alongside the work</text>
+    <rect x="150" width="142" height="36" rx="18" fill="#fff" stroke="#b8a8df"/>
+    <text x="221" y="23" class="small" text-anchor="middle">In your private view</text>
+    <rect x="103" y="44" width="94" height="36" rx="18" fill="#fff" stroke="#b8a8df"/>
+    <text x="150" y="67" class="small" text-anchor="middle">With Heph</text>
   </g>
 
-  <g>
-    <circle cx="525" cy="70" r="27" fill="#f0ebff" stroke="#d8cff2"/>
-    <g transform="translate(513 58)" fill="none" stroke="#574584" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M13 21h8"/>
-      <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>
-    </g>
-    <text x="525" y="125" fill="#1f2328" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="18" font-weight="700" text-anchor="middle">Compose</text>
-    <text x="525" y="153" fill="#59636e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14" text-anchor="middle">Clear, useful feedback</text>
+  <!-- 4. The human decision uses a different visual grammar from the system stages. -->
+  <g filter="url(#shadow)">
+    <rect x="460" y="420" width="550" height="120" rx="22" class="choice"/>
   </g>
-
-  <g>
-    <circle cx="735" cy="70" r="27" fill="#f0ebff" stroke="#d8cff2"/>
-    <g transform="translate(723 58)" fill="none" stroke="#574584" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/>
-      <path d="m21.854 2.147-10.94 10.939"/>
-    </g>
-    <text x="735" y="125" fill="#1f2328" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="18" font-weight="700" text-anchor="middle">Deliver</text>
-    <text x="735" y="153" fill="#59636e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14" text-anchor="middle">In context</text>
-  </g>
-
-  <g>
-    <circle cx="945" cy="70" r="27" fill="#6e5aa7" stroke="#8f7bc6"/>
-    <g transform="translate(933 58)" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/>
-      <path d="m10 15-3-3 3-3"/>
-      <path d="M7 12h8a2 2 0 0 1 2 2v1"/>
-    </g>
-    <text x="945" y="125" fill="#fff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="18" font-weight="700" text-anchor="middle">Respond</text>
-    <text x="945" y="151" fill="#eee9ff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="13" text-anchor="middle">
-      <tspan x="945">Act, push back,</tspan>
-      <tspan x="945" dy="19">or pass</tspan>
-    </text>
+  <circle cx="492" cy="453" r="18" fill="#574584"/>
+  <text x="492" y="458" class="number">4</text>
+  <text x="521" y="448" class="eyebrow">YOU STAY IN CHARGE</text>
+  <text x="521" y="477" class="title">You decide what helps</text>
+  <g transform="translate(521 493)">
+    <rect width="64" height="34" rx="17" fill="#eee9ff" stroke="#b8a8df"/>
+    <text x="32" y="22" class="small" text-anchor="middle">Use it</text>
+    <rect x="72" width="88" height="34" rx="17" fill="#eee9ff" stroke="#b8a8df"/>
+    <text x="116" y="22" class="small" text-anchor="middle">Question it</text>
+    <rect x="168" width="76" height="34" rx="17" fill="#f6f8fa" stroke="#d0d7de"/>
+    <text x="206" y="22" class="small" text-anchor="middle">Skip it</text>
   </g>
 </svg>

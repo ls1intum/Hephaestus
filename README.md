@@ -35,17 +35,17 @@ Hephaestus is built for software engineering courses, open-source projects, and 
 
 ## How feedback works
 
-The core loop is to **gather** a developer's work, **observe** the practices it shows, **compose** feedback worth acting on, and **deliver** it where and when it is useful. The developer's **response** closes the loop.
+The loop starts with a developer's project work and the context around it. Hephaestus reviews the work against the engineering practices configured for the workspace, turns what it finds into feedback, and delivers that feedback where it can help.
 
 <picture>
   <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="./docs/static/img/brand/feedback-loop-mobile-dark.svg">
   <source media="(max-width: 600px) and (prefers-color-scheme: light)" srcset="./docs/static/img/brand/feedback-loop-mobile-light.svg">
   <source media="(prefers-color-scheme: dark)" srcset="./docs/static/img/brand/feedback-loop-dark.svg">
   <source media="(prefers-color-scheme: light)" srcset="./docs/static/img/brand/feedback-loop-light.svg">
-  <img alt="Hephaestus feedback loop: gather project work, observe the engineering practices in it, compose useful feedback, deliver it in context, and let the developer respond." src="./docs/static/img/brand/feedback-loop-light.svg">
+  <img alt="Hephaestus feedback loop: project work and context are reviewed against workspace practices; feedback explains what worked, what could improve, and what to try next; it can reach the developer alongside the work, in a private view, or with Heph; the developer chooses whether to use, question, or skip it before their next project work." src="./docs/static/img/brand/feedback-loop-light.svg">
 </picture>
 
-Developers decide what to do with the feedback: act on it, push back with a reason, or let it pass. Hephaestus supports mentors, teachers, and maintainers by covering routine feedback. It does not replace their judgement or the relationships they build with developers.
+Developers decide what helps: use the feedback, question it, or skip it. Their next project work continues the cycle. Hephaestus supports mentors, teachers, and maintainers by covering routine feedback. It does not replace their judgement or the relationships they build with developers.
 
 ## Project status
 
