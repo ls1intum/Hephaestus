@@ -1,13 +1,26 @@
 <div align="center">
-  <img alt="Hephaestus Logo" height="100px" src="./docs/static/img/brand/hammer_bg.svg">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./docs/static/img/brand/hammer_bg_dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="./docs/static/img/brand/hammer_bg.svg">
+    <img alt="" height="100" src="./docs/static/img/brand/hammer_bg.svg">
+  </picture>
 
-  [![CI/CD](https://github.com/ls1intum/Hephaestus/actions/workflows/cicd.yml/badge.svg)](https://github.com/ls1intum/Hephaestus/actions/workflows/cicd.yml)
-  [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/ls1intum/Hephaestus/blob/main/LICENSE)
-  [![Docs](https://img.shields.io/badge/docs-live-brightgreen)](https://ls1intum.github.io/Hephaestus/)
-  [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/ls1intum/Hephaestus/blob/main/CONTRIBUTING.md)
+  <h1>Hephaestus</h1>
+  <p><strong>Feedback on how you work</strong></p>
+
+  <p>
+    <a href="https://hephaestus.aet.cit.tum.de"><img alt="Open the Hephaestus web app" src="https://img.shields.io/badge/Open_the_web_app-493C83?style=for-the-badge"></a>
+    <a href="https://ls1intum.github.io/Hephaestus/"><img alt="Read the Hephaestus documentation" src="https://img.shields.io/badge/Read_the_docs-1F75CB?style=for-the-badge&logo=docusaurus&logoColor=white"></a>
+    <a href="./CONTRIBUTING.md"><img alt="Contribute to Hephaestus" src="https://img.shields.io/badge/Contribute-24292F?style=for-the-badge&logo=github&logoColor=white"></a>
+  </p>
+
+  <p>
+    <a href="https://github.com/ls1intum/Hephaestus/releases/latest"><img alt="Latest Hephaestus release" src="https://img.shields.io/github/v/release/ls1intum/Hephaestus?display_name=tag&sort=semver"></a>
+    <a href="https://github.com/ls1intum/Hephaestus/actions/workflows/cicd.yml"><img alt="CI/CD status" src="https://github.com/ls1intum/Hephaestus/actions/workflows/cicd.yml/badge.svg"></a>
+    <a href="https://github.com/ls1intum/Hephaestus/blob/main/LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
+    <a href="https://ls1intum.github.io/Hephaestus/contributor/local-development#component-workflow-storybook--chromatic"><img alt="Set up the Hephaestus component library in Storybook" src="./docs/static/img/brand/badge-storybook.svg"></a>
+  </p>
 </div>
-
-# Hephaestus — feedback on how you work
 
 Hephaestus gives developers feedback on the engineering practices they use in software projects. It draws on evidence from tools the team already uses — including GitHub or GitLab activity, selected Slack channels, and Outline documents — to explain what worked, what could improve, and what to try next.
 
@@ -42,8 +55,8 @@ The project is named after Hephaestus, the Greek god of blacksmiths and craftsme
 
 ## Documentation
 
-Technical & user docs (GitHub Pages): [https://ls1intum.github.io/Hephaestus/](https://ls1intum.github.io/Hephaestus/)
-UI component docs: [Storybook](https://main--66a8981a27ced8fef3190d41.chromatic.com/)
+- **[Documentation](https://ls1intum.github.io/Hephaestus/):** user, administrator, and contributor guides.
+- **[Storybook](https://ls1intum.github.io/Hephaestus/contributor/local-development#component-workflow-storybook--chromatic):** run and review web interface components locally.
 
 ### Setup
 
