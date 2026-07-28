@@ -33,8 +33,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 /**
  * Central orchestrator for keeping workspace records in sync with external
  * provisioning sources.
- * <p>
- * Uses GitHub REST API directly for workspace provisioning.
  */
 @Service
 public class WorkspaceProvisioningService {
@@ -144,9 +142,8 @@ public class WorkspaceProvisioningService {
         workspace.setRepositorySelection(RepositorySelection.SELECTED);
         Workspace savedWorkspace = workspaceRepository.save(workspace);
 
-        // Provision the GitHub PAT Connection row. instance_key="pat" matches the
-        // backfill convention for legacy PAT workspaces — single PAT row per workspace,
-        // ACTIVE state, bearer credential stored encrypted via the per-row AAD.
+        // instance_key="pat" matches the backfill convention for legacy PAT workspaces;
+        // the bearer credential is stored encrypted via the per-row AAD.
         connectionService.provisionPatConnection(
             savedWorkspace,
             IntegrationKind.GITHUB,
@@ -182,10 +179,7 @@ public class WorkspaceProvisioningService {
         ensureAdminMembership(savedWorkspace);
     }
 
-    /**
-     * Bootstrap a default GitLab PAT workspace from configuration properties.
-     * Mirrors {@link #bootstrapDefaultPatWorkspace()} for GitLab.
-     */
+    /** Bootstrap a default GitLab PAT workspace from configuration properties. */
     @Transactional
     public void bootstrapDefaultGitLabPatWorkspace() {
         if (!workspaceProperties.initGitlabDefault()) {
@@ -211,8 +205,7 @@ public class WorkspaceProvisioningService {
         // A workspace already exists for this account-login. Two cases:
         //   (a) it has an ACTIVE GitLab Connection → already bootstrapped, no-op.
         //   (b) it has an ACTIVE non-GitLab Connection (e.g. GitHub) → refuse cross-vendor
-        //       attach. Symmetric with GithubLifecycleListener#createOrUpdateFromInstallation.
-        //       Falling through to createWorkspace would crash on the slug unique constraint.
+        //       attach; falling through to createWorkspace would crash on the slug unique constraint.
         List<Workspace> existing = workspaceRepository.findAllByAccountLoginIgnoreCase(groupPath);
         if (!existing.isEmpty()) {
             Optional<Workspace> existingGitLab = existing
@@ -240,9 +233,7 @@ public class WorkspaceProvisioningService {
         String serverUrl = resolveGitLabServerUrl(config.serverUrl());
         Long ownerUserId = syncGitLabUserForPAT(config.token(), serverUrl, groupPath);
 
-        // Derive a valid slug from the group path (replace / with -)
         String slug = groupPath.replace("/", "-");
-        // Use the last path segment as the display name
         String displayName = groupPath.contains("/") ? groupPath.substring(groupPath.lastIndexOf('/') + 1) : groupPath;
 
         Workspace workspace = workspaceService.createWorkspace(
@@ -285,21 +276,12 @@ public class WorkspaceProvisioningService {
     }
 
     /**
-     * Resolves or creates a git provider User entity for a GitLab PAT workspace owner.
+     * Resolves or creates a git provider {@link User} for a GitLab PAT workspace owner — the
+     * entry point for user-initiated GitLab workspace creation via the REST API. Validates the
+     * PAT against the GitLab API and upserts the user record so workspace ownership can be
+     * assigned immediately.
      *
-     * <p>This is the public entry point for user-initiated GitLab workspace creation
-     * (via the REST API). When the authenticated user has no corresponding git provider
-     * {@link User} entity yet (common for first-time GitLab logins), this method
-     * validates the PAT against the GitLab API and upserts the user record so that
-     * workspace ownership can be assigned immediately.
-     *
-     * <p>If the user already exists, the upsert is a no-op merge thanks to the
-     * {@code ON CONFLICT (provider_id, native_id) DO UPDATE} clause in
-     * {@link UserRepository#upsertUser}.
-     *
-     * @param patToken    the GitLab Personal Access Token from the workspace creation request
-     * @param serverUrl   the GitLab server URL (may be null to use the default)
-     * @param accountLogin the GitLab group path used as the workspace account login
+     * @param serverUrl the GitLab server URL (may be null to use the default)
      * @return the database ID of the resolved or created User
      * @throws IllegalStateException if the token cannot be validated against GitLab
      */
@@ -314,19 +296,12 @@ public class WorkspaceProvisioningService {
      * {@link User} entity so they can be assigned as workspace owner.
      *
      * <p>Identity is resolved from the account's federated identities, not from JWT claims: the
-     * Hephaestus cookie-JWT carries only {@code sub = Account.id}. The chain is
-     * {@code sub → Account → active GitLab IdentityLink → User} (see
-     * {@code AuthenticatedGitProviderUserService}). A first-time, login-only user therefore gets a
-     * {@code User} created here (it is normally created during sync) so workspace creation has an
-     * owner to assign.
-     *
-     * <p>For GitLab workspaces the account must have an active GitLab {@code IdentityLink}. A user
-     * who logged in via GitLab satisfies this immediately; one who logged in only via GitHub does
-     * not, and this method throws {@code 409} so the frontend can prompt them to link GitLab first.
-     * The provider server URL comes from the {@code IdentityLink}'s own {@code git_provider} row.
+     * cookie-JWT carries only {@code sub = Account.id}, so the chain is
+     * {@code sub → Account → active GitLab IdentityLink → User}. A first-time, login-only user
+     * gets a {@code User} created here (it is normally created during sync).
      *
      * @throws org.springframework.web.server.ResponseStatusException 409 if the account has no
-     *         active GitLab identity linked
+     *         active GitLab identity linked, so the frontend can prompt to link GitLab first
      */
     @Transactional
     public void ensureAuthenticatedUserExists() {
@@ -334,13 +309,10 @@ public class WorkspaceProvisioningService {
     }
 
     /**
-     * Resolves the GitLab server URL from the workspace config or falls back to the
-     * global default exposed via {@link WorkspaceProviderAvailability}.
-     *
-     * <p>The availability port exposes the same URL the wizard would show — that URL is the
-     * one configured under {@code hephaestus.integration.gitlab.default-server-url} (the historical
-     * single source of truth). When availability is unset (feature flag off), throws —
-     * bootstrap of a GitLab workspace cannot proceed without one.
+     * Resolves the GitLab server URL from the workspace config, falling back to the default
+     * exposed via {@link WorkspaceProviderAvailability}
+     * ({@code hephaestus.integration.gitlab.default-server-url}). Throws when availability is
+     * unset (feature flag off) — GitLab bootstrap cannot proceed without a URL.
      */
     private String resolveGitLabServerUrl(String configServerUrl) {
         if (!isBlank(configServerUrl)) {
@@ -380,7 +352,6 @@ public class WorkspaceProvisioningService {
             .findByTypeAndServerUrl(IdentityProviderType.GITLAB, serverUrl)
             .orElse(null);
 
-        // If provider exists, check for existing user scoped to this provider
         if (provider != null) {
             Optional<User> existing = userRepository.findByLoginAndProviderId(groupPath, provider.getId());
             if (existing.isPresent()) {
@@ -393,7 +364,6 @@ public class WorkspaceProvisioningService {
         // form is additionally validated in resolveGitLabServerUrl.
         WebClient gitlabClient = WebClient.builder().clientConnector(WebClientConnectors.ssrfGuarded()).build();
 
-        // Try personal access token endpoint first
         GitLabTokenUserResponse userInfo = null;
         try {
             userInfo = gitlabClient
@@ -412,7 +382,6 @@ public class WorkspaceProvisioningService {
         }
 
         if (userInfo != null && userInfo.id() != null) {
-            // Personal access token — use user info directly
             return upsertGitLabUser(
                 userInfo.id(),
                 userInfo.username() != null ? userInfo.username() : groupPath,
@@ -423,7 +392,6 @@ public class WorkspaceProvisioningService {
             );
         }
 
-        // Fall back to group endpoint — validates the token against the target group
         log.info("Falling back to group API for token validation: serverUrl={}, groupPath={}", serverUrl, groupPath);
         GitLabGroupResponse groupInfo = gitlabClient
             .get()
@@ -439,7 +407,6 @@ public class WorkspaceProvisioningService {
             );
         }
 
-        // Create a synthetic bot user representing the group token owner
         return upsertGitLabUser(
             groupInfo.id(),
             groupPath,
@@ -561,13 +528,11 @@ public class WorkspaceProvisioningService {
             .orElseThrow(() -> new IllegalStateException("IdentityProvider for GitHub not found"));
         Long providerId = provider.getId();
 
-        // Check for existing user scoped to GitHub provider
         Optional<User> existing = userRepository.findByLoginAndProviderId(accountLogin, providerId);
         if (existing.isPresent()) {
             return existing.get().getId();
         }
 
-        // Fetch user info from GitHub to get the native user ID
         GitHubUserResponse userInfo = webClient
             .get()
             .uri("/users/{login}", accountLogin)
@@ -585,8 +550,8 @@ public class WorkspaceProvisioningService {
         String avatar = userInfo.avatarUrl() != null ? userInfo.avatarUrl() : "";
         String htmlUrl = userInfo.htmlUrl() != null ? userInfo.htmlUrl() : "";
 
-        // Use the three-step upsert (lock, free conflicts, insert)
-        // to avoid uk_user_login_lower violations under concurrency.
+        // Three-step upsert (lock, free conflicts, insert) avoids uk_user_login_lower
+        // violations under concurrency.
         userRepository.acquireLoginLock(login, providerId);
         userRepository.freeLoginConflicts(login, userInfo.id(), providerId);
         userRepository.upsertUser(
@@ -620,8 +585,6 @@ public class WorkspaceProvisioningService {
         @JsonProperty("avatar_url") String avatarUrl,
         @JsonProperty("html_url") String htmlUrl
     ) {}
-
-    // DTOs for GitLab REST API
 
     private record GitLabTokenUserResponse(
         Long id,

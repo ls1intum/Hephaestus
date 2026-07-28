@@ -13,7 +13,7 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 
 /**
- * Maps a Slack DM to the mentor {@code chat_thread} it drives (P2/D7). Workspace-scoped (scalar
+ * Maps a Slack DM to the mentor {@code chat_thread} it drives. Workspace-scoped (scalar
  * {@code workspaceId}); {@code chatThreadId} is a scalar cross-module reference (never a JPA association) into the
  * {@code agent}/{@code mentor} module — the {@code chat_thread} row itself is created inside that module via the
  * {@code mentor-chat} named interface.
@@ -31,7 +31,7 @@ import org.hibernate.annotations.CreationTimestamp;
 @NoArgsConstructor
 public class MentorSlackThread {
 
-    /** Client-assigned UUID (no DB default), mirroring the mentor module's {@code chat_thread} id convention. */
+    /** Client-assigned UUID (no DB default). */
     @Id
     @Column(name = "id", columnDefinition = "UUID")
     private UUID id;

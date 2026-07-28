@@ -1,27 +1,25 @@
 package de.tum.cit.aet.hephaestus.agent.runtime;
 
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Inputs for {@link PiRuntimeFactory#build(PiPlanSpec)}. Validation lives in the compact
- * constructor; callers construct positionally.
+ * Inputs for {@link PiRuntimeFactory#build(PiPlanSpec)}.
  *
- * <p><b>baseUrl trap:</b> exported as {@code OPENAI_BASE_URL} / {@code ANTHROPIC_BASE_URL} only in
- * API_KEY modes — PROXY mode resolves its base URL from the sandbox-injected
- * {@code $LLM_PROXY_URL}, so a baseUrl here would be silently shadowed.
+ * @param apiProtocol Pi's own {@code api} token (e.g. {@code openai-completions}), passed verbatim
+ *     into the {@code hephaestus} provider registration
+ * @param jobToken the job-scoped bearer credential the sandbox authenticates to the LLM proxy with;
+ *     required, because that proxy is the only path a sandbox has to a model
  */
 public record PiPlanSpec(
-    LlmProvider provider,
-    CredentialMode credentialMode,
-    @Nullable String credential,
-    @Nullable String modelName,
-    @Nullable String baseUrl,
-    @Nullable String jobToken,
+    String apiProtocol,
+    String upstreamModelId,
+    @Nullable Integer contextWindow,
+    @Nullable Integer maxOutputTokens,
+    boolean supportsReasoning,
+    String jobToken,
     boolean allowInternet,
     int timeoutSeconds,
     PiRunnerProfile runnerProfile,
@@ -29,8 +27,12 @@ public record PiPlanSpec(
     String precomputeStep
 ) {
     public PiPlanSpec {
-        Objects.requireNonNull(provider, "provider");
-        Objects.requireNonNull(credentialMode, "credentialMode");
+        if (apiProtocol == null || apiProtocol.isBlank()) {
+            throw new IllegalArgumentException("apiProtocol must not be blank");
+        }
+        if (upstreamModelId == null || upstreamModelId.isBlank()) {
+            throw new IllegalArgumentException("upstreamModelId must not be blank");
+        }
         Objects.requireNonNull(runnerProfile, "runnerProfile");
         if (runnerProfile.runnerScript() == null || runnerProfile.runnerScript().isBlank()) {
             throw new IllegalArgumentException("runnerProfile.runnerScript() must not be blank");
@@ -43,27 +45,11 @@ public record PiPlanSpec(
                     timeoutSeconds
             );
         }
-        switch (credentialMode) {
-            case PROXY -> {
-                if (jobToken == null || jobToken.isBlank()) {
-                    throw new IllegalArgumentException("jobToken is required in PROXY mode");
-                }
-                // PROXY resolves its base URL from the sandbox-injected $LLM_PROXY_URL, so a baseUrl here is
-                // genuinely shadowed (see the record's "baseUrl trap" javadoc). PROXY is the DEFAULT credential
-                // mode and llmBaseUrl is independently settable, so a valid persisted config legitimately
-                // arrives as PROXY + non-null baseUrl. Normalise it away (it is harmless and unused) rather
-                // than throwing on a supported, default topology.
-                baseUrl = null;
-            }
-            case API_KEY -> {
-                if (credential == null || credential.isBlank()) {
-                    throw new IllegalArgumentException("credential is required in " + credentialMode + " mode");
-                }
-            }
+        if (jobToken == null || jobToken.isBlank()) {
+            throw new IllegalArgumentException("jobToken is required — every sandbox talks to the LLM proxy");
         }
-        // Map.copyOf freezes the MAP, but byte[] values stay caller-mutable shared references — a caller could
-        // mutate file contents after validation passed. Clone each value too so the record is genuinely
-        // immutable (the keySet allowlist check below then runs over the defensive copy).
+        // Cloned, not just Map.copyOf'd: a frozen map still shares its byte[] values with the caller,
+        // who could then mutate file contents after the allowlist check below has passed.
         extraInputs =
             extraInputs != null
                 ? extraInputs

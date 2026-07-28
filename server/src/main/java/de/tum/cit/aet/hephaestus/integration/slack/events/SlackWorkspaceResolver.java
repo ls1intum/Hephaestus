@@ -12,8 +12,7 @@ import org.springframework.stereotype.Component;
  * and must discover which workspace it maps to. The {@code connection} table is itself workspace-scoped, so a JPA
  * query keyed on {@code instance_key} alone would be rejected by the tenancy {@code StatementInspector} (there is no
  * {@code workspace_id} to predicate on — that is exactly what we are resolving). A narrow raw {@code JdbcTemplate}
- * read is the deliberate, isolated exception, mirroring how the webhook pipeline resolves a workspace from an
- * inbound payload before any scoped work begins.
+ * read is the deliberate, isolated exception.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")

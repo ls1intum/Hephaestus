@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.ExistingSummaryLookup;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackContent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackTarget;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.SummaryHandle;
@@ -17,9 +18,11 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabBackwardPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolver.MrInfo;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -94,8 +97,6 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
 
     @Test
     void updateSummaryEscapesSlashCommands() {
-        // The edit path must escape just like the create path: a leading slash command in the new body
-        // reaches updateNote's `body` variable backtick-wrapped, so an in-place edit can't smuggle an action.
         FeedbackTarget target = gitlabTarget();
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
 
@@ -129,7 +130,6 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
         assertThat(GitlabFeedbackChannel.escapeSlashCommands("Please ask them to /approve it")).isEqualTo(
             "Please ask them to /approve it"
         );
-        // A multi-line body escapes each line-start command independently.
         assertThat(GitlabFeedbackChannel.escapeSlashCommands("/approve\n/merge")).isEqualTo("`/approve`\n`/merge`");
     }
 
@@ -157,9 +157,8 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
 
     @Test
     void postSummaryWrapsTransportErrorAsFeedbackDeliveryException() {
-        // A transport/timeout RuntimeException from .block() must surface as the channel's typed exception
-        // (consistent with updateSummary) so PullRequestCommentPoster's catch(FeedbackDeliveryException)
-        // wraps it uniformly instead of a raw RuntimeException bypassing that wrap.
+        // Must surface as the channel's typed exception so PullRequestCommentPoster's
+        // catch(FeedbackDeliveryException) wraps it uniformly instead of a raw RuntimeException bypassing that wrap.
         FeedbackTarget target = gitlabTarget();
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         when(mrResolver.resolve(1L, "group/project", 42)).thenReturn(
@@ -205,7 +204,6 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
 
     @Test
     void postSummaryRoutesIssueSubjectToIssueGid() {
-        // An issue subject ("path#iid") resolves the issue gid (not the MR path) and posts via createNote.
         FeedbackTarget issueTarget = new FeedbackTarget(
             new IntegrationRef(IntegrationKind.GITLAB, 1L, null),
             "group/project#7",
@@ -274,7 +272,6 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
             new FeedbackContent("body", "marker")
         );
 
-        // A deleted note → GONE so the caller posts fresh (NOT a throw, NOT a transient double-post).
         assertThat(outcome.kind()).isEqualTo(FeedbackChannel.UpdateOutcome.Kind.GONE);
     }
 
@@ -290,7 +287,6 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
             new FeedbackContent("body", "marker")
         );
 
-        // An unknown vendor error → TRANSIENT: keep the prior summary, do NOT re-post (no double-post).
         assertThat(outcome.kind()).isEqualTo(FeedbackChannel.UpdateOutcome.Kind.TRANSIENT);
     }
 
@@ -311,7 +307,6 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
     @Test
     void updateSummaryThrowsOnBlankExternalId() {
         FeedbackTarget target = gitlabTarget();
-        // A blank id is a data bug, not recoverable — still a hard error (checked before any rate-limit/transport).
         assertThatThrownBy(() -> channel.updateSummary(target, "  ", new FeedbackContent("body", "marker")))
             .isInstanceOf(FeedbackDeliveryException.class)
             .hasMessageContaining("external note id is missing");
@@ -364,8 +359,278 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
         assertThat(outcome.kind()).isEqualTo(FeedbackChannel.UpdateOutcome.Kind.GONE);
     }
 
+    private static final String MARKER = "<!-- hephaestus-summary:job-1 -->";
+
+    private HttpGraphQlClient.RequestSpec mockRequestChain() {
+        HttpGraphQlClient client = mock(HttpGraphQlClient.class);
+        HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(gitLabProvider.forScope(1L)).thenReturn(client);
+        when(client.documentName(any())).thenReturn(spec);
+        when(spec.variable(any(), any())).thenReturn(spec);
+        return spec;
+    }
+
+    /** Keyed by response path, so a test that stubs the MR path fails outright if the channel reads the issue path. */
+    private ClientGraphQlResponse mockNotesPage(
+        String notesPath,
+        List<Map<String, Object>> notes,
+        boolean hasPreviousPage,
+        String startCursor,
+        List<ResponseError> errors
+    ) {
+        ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
+        lenient().when(response.getErrors()).thenReturn(errors);
+        ClientResponseField nodesField = mock(ClientResponseField.class);
+        lenient().when(response.field(notesPath + ".nodes")).thenReturn(nodesField);
+        lenient().when(nodesField.getValue()).thenReturn(notes);
+        ClientResponseField pageInfoField = mock(ClientResponseField.class);
+        lenient().when(response.field(notesPath + ".pageInfo")).thenReturn(pageInfoField);
+        lenient()
+            .when(pageInfoField.toEntity(GitLabBackwardPageInfo.class))
+            .thenReturn(new GitLabBackwardPageInfo(hasPreviousPage, startCursor));
+        return response;
+    }
+
+    private ClientGraphQlResponse mockMrNotesPage(
+        List<Map<String, Object>> notes,
+        boolean hasPreviousPage,
+        String startCursor
+    ) {
+        return mockNotesPage(MR_NOTES_PATH, notes, hasPreviousPage, startCursor, List.of());
+    }
+
+    private static final String MR_NOTES_PATH = "project.mergeRequest.notes";
+    private static final String ISSUE_NOTES_PATH = "project.issue.notes";
+
+    private static Map<String, Object> note(String id, String body) {
+        return Map.of("id", id, "body", body);
+    }
+
+    @Test
+    void findExistingSummary_matchOnFirstPage_isFound() {
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+        HttpGraphQlClient.RequestSpec spec = mockRequestChain();
+        ClientGraphQlResponse page = mockMrNotesPage(
+            List.of(note("gid://gitlab/Note/1", "a human said hi"), note("gid://gitlab/Note/2", MARKER + "\nsummary")),
+            false,
+            null
+        );
+        when(spec.execute()).thenReturn(Mono.just(page));
+
+        ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), MARKER);
+
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.FOUND);
+        // The handle is the note's own global id — exactly what updateSummary passes to UpdateNote as `id`.
+        assertThat(result.handle().externalId()).isEqualTo("gid://gitlab/Note/2");
+    }
+
+    /**
+     * The just-posted summary is the newest note, so the newest end is requested first — no {@code before}
+     * cursor, a {@code last} page size. A forward walk would only reach the marker after the whole thread.
+     */
+    @Test
+    void findExistingSummary_walksTheNewestEndFirst() {
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+        HttpGraphQlClient.RequestSpec spec = mockRequestChain();
+        ClientGraphQlResponse page = mockMrNotesPage(List.of(note("gid://gitlab/Note/9", MARKER)), true, "c");
+        when(spec.execute()).thenReturn(Mono.just(page));
+
+        channel.findExistingSummary(gitlabTarget(), MARKER);
+
+        verify(spec).variable(eq("last"), eq(100));
+        verify(spec).variable(eq("before"), eq(null));
+        verify(spec).variable(eq("fullPath"), eq("group/project"));
+        verify(spec).variable(eq("iid"), eq("42"));
+    }
+
+    @Test
+    void findExistingSummary_everyNoteScanned_noMatch_isAbsent() {
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+        HttpGraphQlClient.RequestSpec spec = mockRequestChain();
+        ClientGraphQlResponse page = mockMrNotesPage(
+            List.of(note("gid://gitlab/Note/1", "unrelated")),
+            false, // hasPreviousPage=false — the walk reached the oldest note, every note was seen
+            null
+        );
+        when(spec.execute()).thenReturn(Mono.just(page));
+
+        ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), MARKER);
+
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.ABSENT);
+    }
+
+    @Test
+    void findExistingSummary_pageBudgetExhaustedWithOlderNotesLeft_isUnknown_notAbsent() {
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+        HttpGraphQlClient.RequestSpec spec = mockRequestChain();
+        ClientGraphQlResponse page = mockMrNotesPage(
+            List.of(note("gid://gitlab/Note/1", "unrelated")),
+            true,
+            "cursor-1"
+        );
+        when(spec.execute()).thenReturn(Mono.just(page));
+
+        ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), MARKER);
+
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.UNKNOWN);
+        verify(spec, org.mockito.Mockito.times(3)).execute();
+    }
+
+    @Test
+    void findExistingSummary_blankStartCursorWithOlderNotesLeft_isUnknown_notAbsent() {
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+        HttpGraphQlClient.RequestSpec spec = mockRequestChain();
+        ClientGraphQlResponse page = mockMrNotesPage(List.of(note("gid://gitlab/Note/1", "unrelated")), true, "  ");
+        when(spec.execute()).thenReturn(Mono.just(page));
+
+        ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), MARKER);
+
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.UNKNOWN);
+        verify(spec, org.mockito.Mockito.times(1)).execute();
+    }
+
+    @Test
+    void findExistingSummary_secondPageHasTheMatch_isFound() {
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+        HttpGraphQlClient.RequestSpec spec = mockRequestChain();
+        ClientGraphQlResponse page1 = mockMrNotesPage(
+            List.of(note("gid://gitlab/Note/1", "unrelated")),
+            true,
+            "cursor-1"
+        );
+        ClientGraphQlResponse page2 = mockMrNotesPage(List.of(note("gid://gitlab/Note/2", MARKER)), false, null);
+        when(spec.execute()).thenReturn(Mono.just(page1), Mono.just(page2));
+
+        ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), MARKER);
+
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.FOUND);
+        assertThat(result.handle().externalId()).isEqualTo("gid://gitlab/Note/2");
+        verify(spec).variable(eq("before"), eq("cursor-1"));
+    }
+
+    @Test
+    void findExistingSummary_topLevelGraphQlError_isUnknown_notAbsent() {
+        // The page itself is a complete, match-free, fully-scanned body — the error alone must stop this from
+        // reading as a confirmed absence.
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+        HttpGraphQlClient.RequestSpec spec = mockRequestChain();
+        ResponseError error = mock(ResponseError.class);
+        ClientGraphQlResponse page = mockNotesPage(
+            MR_NOTES_PATH,
+            List.of(note("gid://gitlab/Note/1", "unrelated")),
+            false,
+            null,
+            List.of(error)
+        );
+        when(spec.execute()).thenReturn(Mono.just(page));
+
+        ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), MARKER);
+
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.UNKNOWN);
+    }
+
+    /**
+     * An ISSUE subject ({@code path#iid}) must reach the issue's own notes. This used to be a permanent
+     * {@code UNKNOWN} — the lookup only knew a merge-request document — so the channel could never find the
+     * summary it had itself posted on an issue.
+     */
+    @Test
+    void findExistingSummary_issueSubject_scansIssueNotes_isFound() {
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+        HttpGraphQlClient client = mock(HttpGraphQlClient.class);
+        HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(gitLabProvider.forScope(1L)).thenReturn(client);
+        when(client.documentName(any())).thenReturn(spec);
+        when(spec.variable(any(), any())).thenReturn(spec);
+        // Stubbed ONLY on the issue path: reading the merge-request path would yield null nodes → UNKNOWN.
+        ClientGraphQlResponse page = mockNotesPage(
+            ISSUE_NOTES_PATH,
+            List.of(note("gid://gitlab/Note/7", MARKER + "\nsummary")),
+            false,
+            null,
+            List.of()
+        );
+        when(spec.execute()).thenReturn(Mono.just(page));
+
+        ExistingSummaryLookup result = channel.findExistingSummary(gitlabIssueTarget(), MARKER);
+
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.FOUND);
+        assertThat(result.handle().externalId()).isEqualTo("gid://gitlab/Note/7");
+        verify(client).documentName("GetIssueNotesNewest");
+        verify(spec).variable(eq("fullPath"), eq("group/project"));
+        verify(spec).variable(eq("iid"), eq("7"));
+    }
+
+    @Test
+    void findExistingSummary_issueSubject_noMatch_isAbsent() {
+        // Fail-closed is only correct when absence is UNPROVEN. A fully scanned issue thread with no marker
+        // is a proven absence and must license the caller to post — otherwise the issue summary never lands.
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+        HttpGraphQlClient.RequestSpec spec = mockRequestChain();
+        ClientGraphQlResponse page = mockNotesPage(
+            ISSUE_NOTES_PATH,
+            List.of(note("gid://gitlab/Note/1", "hi")),
+            false,
+            null,
+            List.of()
+        );
+        when(spec.execute()).thenReturn(Mono.just(page));
+
+        ExistingSummaryLookup result = channel.findExistingSummary(gitlabIssueTarget(), MARKER);
+
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.ABSENT);
+    }
+
+    @Test
+    void findExistingSummary_mergeRequestSubject_usesTheMergeRequestDocument() {
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+        HttpGraphQlClient client = mock(HttpGraphQlClient.class);
+        HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(gitLabProvider.forScope(1L)).thenReturn(client);
+        when(client.documentName(any())).thenReturn(spec);
+        when(spec.variable(any(), any())).thenReturn(spec);
+        ClientGraphQlResponse page = mockMrNotesPage(List.of(note("gid://gitlab/Note/3", MARKER)), false, null);
+        when(spec.execute()).thenReturn(Mono.just(page));
+
+        ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), MARKER);
+
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.FOUND);
+        verify(client).documentName("GetMergeRequestNotesNewest");
+    }
+
+    @Test
+    void findExistingSummary_transportError_isUnknown_notAbsent() {
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+        HttpGraphQlClient.RequestSpec spec = mockRequestChain();
+        when(spec.execute()).thenReturn(Mono.error(new RuntimeException("connection reset")));
+
+        ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), MARKER);
+
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.UNKNOWN);
+    }
+
+    @Test
+    void findExistingSummary_rateLimitCritical_isUnknown_notAbsent() {
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(true);
+
+        ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), MARKER);
+
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.UNKNOWN);
+    }
+
+    @Test
+    void findExistingSummary_blankMarker_isUnknown() {
+        ExistingSummaryLookup result = channel.findExistingSummary(gitlabTarget(), "  ");
+
+        assertThat(result.kind()).isEqualTo(ExistingSummaryLookup.Kind.UNKNOWN);
+    }
+
     private static FeedbackTarget gitlabTarget() {
         return new FeedbackTarget(new IntegrationRef(IntegrationKind.GITLAB, 1L, null), "group/project!42", null);
+    }
+
+    private static FeedbackTarget gitlabIssueTarget() {
+        return new FeedbackTarget(new IntegrationRef(IntegrationKind.GITLAB, 1L, null), "group/project#7", null);
     }
 
     @SuppressWarnings("unchecked")

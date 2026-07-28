@@ -97,7 +97,7 @@ If `LEGAL_PROFILE` is empty and no overrides are mounted, the webapp serves a cl
 Use Art. 13 GDPR as the outline. Hephaestus processes personal data in at least the following categories, which your privacy statement must cover:
 
 - **Identity and authentication** — Hephaestus-native auth federating to GitHub / LRZ GitLab; per federated identity we store the provider, stable subject id, login, email-at-signup, and display name (ADR 0017).
-- **Repository synchronisation** — for every configured repository: pull/merge requests, issues, reviews, review comments, commit metadata, profile information of the authors.
+- **Repository synchronisation** — for every configured repository: pull/merge requests, issues, reviews, review comments, commit metadata, profile information of the authors. State the retention triggers: this mirrored copy is erased when the last workspace stops monitoring the source repository, when the workspace's integration is disconnected, or when the workspace is purged — see the erasure triggers in the [record of processing](./dsms/record-of-processing.md).
 - **Account settings and notification email** — user preferences, notification subscriptions, optional self-provided notification email.
 - **AI-assisted features** — if enabled: messages sent to the configured LLM provider, persisted conversations, generated findings.
 - **Server logs** — IP address, request metadata (Art. 6(1)(e) or (f) depending on your legal framing).

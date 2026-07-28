@@ -12,6 +12,14 @@ public interface PiRunnerProfile {
     /** Runner script filename under {@code resources/agent/}. */
     String runnerScript();
 
+    /**
+     * Sibling ES-module files the runner imports relatively (e.g. {@code ./pi-finding-normalize.mjs}).
+     * Each is staged at the workspace root next to the runner so the import resolves. Empty by default.
+     */
+    default List<String> sidecarScripts() {
+        return List.of();
+    }
+
     /** V8 flags for the {@code node} invocation. */
     List<String> nodeFlags();
 

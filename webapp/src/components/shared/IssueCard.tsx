@@ -84,7 +84,7 @@ export function IssueCard({
 					<span className="font-medium flex justify-center items-center space-x-1">
 						{isLoading ? (
 							<>
-								<Skeleton className="size-5 bg-green-500/30" />
+								<Skeleton className="size-5 bg-success/30" />
 								<Skeleton className="h-4 w-16 lg:w-36" />
 							</>
 						) : (
@@ -117,7 +117,7 @@ export function IssueCard({
 					<span className="flex items-center gap-2">
 						{isLoading ? (
 							<>
-								<Skeleton className="h-4 w-8 bg-green-500/30" />
+								<Skeleton className="h-4 w-8 bg-success/30" />
 								<Skeleton className="h-4 w-8 bg-destructive/20" />
 							</>
 						) : (

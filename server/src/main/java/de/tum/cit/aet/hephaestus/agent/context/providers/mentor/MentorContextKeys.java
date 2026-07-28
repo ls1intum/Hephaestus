@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
+import de.tum.cit.aet.hephaestus.agent.context.providers.OutlineDocumentContentSource;
 import java.util.Set;
 
 /**
@@ -20,7 +21,8 @@ public final class MentorContextKeys {
         RecentAuthoredWorkContentSource.OUTPUT_KEY,
         SlackConversationContentSource.OUTPUT_KEY,
         PreparedConversationFeedbackContentSource.OUTPUT_KEY,
-        CurrentThreadHistoryContentSource.OUTPUT_KEY
+        CurrentThreadHistoryContentSource.OUTPUT_KEY,
+        OutlineDocumentContentSource.OUTPUT_KEY
     );
 
     private MentorContextKeys() {}

@@ -16,6 +16,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClie
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlSyncCoordinator;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GraphQlConnectionOverflowDetector;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.GitHubGraphQlFragments;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
@@ -27,6 +31,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.stereotype.Service;
@@ -55,13 +60,15 @@ import reactor.util.retry.Retry;
  * This service runs separately from {@link CommitAuthorEnrichmentService} because it targets
  * all commits lacking contributor rows (not just those with unresolved emails).
  * <p>
- * <b>Why buildBatchQuery uses raw string construction:</b> GraphQL aliases
- * ({@code commit0: object(oid:"..."), commit1: object(oid:"...")}) are syntactic constructs
- * that cannot be parameterized via GraphQL variables. Spring's {@code HttpGraphQlClient}
- * does not support dynamic alias counts or templating. Building the query string
- * programmatically is the only viable approach for batching a variable number of commits
- * per request. SHA values are validated against {@link #SHA_PATTERN} before interpolation
- * to prevent injection.
+ * <b>Why buildBatchQuery assembles a string:</b> the aliases
+ * ({@code commit0: object(oid:"..."), commit1: object(oid:"...")}) are syntax, not values — no GraphQL
+ * variable can stand in for an alias name, and the count varies per batch — so the envelope cannot be a
+ * static document. Only the envelope is assembled: the per-commit selection set lives in
+ * {@code graphql/github/fragments/CommitEnrichmentFields.graphql} and is appended verbatim, which is
+ * what puts every field name under {@code GraphQlOperationDocumentValidationTest} (via
+ * {@code GetCommitMetadata.graphql}) and {@code GraphQlResponseStubValidator}. The assembled string
+ * itself is validated against the checked-in schema by {@code CommitMetadataEnrichmentServiceQueryTest}.
+ * SHA values are validated against {@link #SHA_PATTERN} before interpolation to prevent injection.
  */
 @Service
 @Slf4j
@@ -82,11 +89,25 @@ public class CommitMetadataEnrichmentService {
     /** Maximum retry attempts for GraphQL error classification. */
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
-    /** Initial page size for authors connection. Most commits have 1-3 authors. */
-    private static final int AUTHORS_PAGE_SIZE = 10;
+    /**
+     * Initial page size for the authors connection. Most commits have 1-3 authors.
+     *
+     * <p>Must equal the {@code authors(first:)} argument in {@code CommitEnrichmentFields.graphql}: the
+     * overflow follow-up starts counting from this number, so a disagreement silently re-fetches or skips
+     * authors. Pinned by {@code CommitMetadataEnrichmentServiceQueryTest}.
+     */
+    static final int AUTHORS_PAGE_SIZE = 10;
 
-    /** Initial page size for associated pull requests connection. Most commits link to 1-5 PRs. */
-    private static final int ASSOCIATED_PRS_PAGE_SIZE = 10;
+    /**
+     * Initial page size for the associated pull requests connection. Most commits link to 1-5 PRs.
+     *
+     * <p>Must equal the {@code associatedPullRequests(first:)} argument in the fragment, for the same
+     * reason as {@link #AUTHORS_PAGE_SIZE}.
+     */
+    static final int ASSOCIATED_PRS_PAGE_SIZE = 10;
+
+    /** Per-commit selection set, loaded once from the checked-in fragment document. */
+    private static final String COMMIT_ENRICHMENT_FRAGMENT = loadCommitEnrichmentFragment();
 
     /** Maximum pages to fetch in follow-up pagination to prevent runaway loops. */
     private static final int MAX_FOLLOW_UP_PAGES = 10;
@@ -358,79 +379,54 @@ public class CommitMetadataEnrichmentService {
     }
 
     /**
-     * Builds a GraphQL query that fetches commit authors, associated PRs, and enrichment metadata.
-     * <p>
-     * Uses {@code authors(first:10)} to get co-authors from Co-authored-by trailers,
-     * {@code associatedPullRequests(first:10)} to get linked PRs, and additional free-data
-     * fields ({@code additions}, {@code deletions}, {@code changedFilesIfAvailable},
-     * {@code authoredDate}, {@code committedDate}, {@code messageHeadline}, {@code message},
-     * {@code url}, {@code signature}, {@code authoredByCommitter}, {@code committedViaWeb},
-     * {@code parents}) that piggyback on the same query at zero extra API cost.
-     * <p>
-     * Both connections include {@code pageInfo { hasNextPage endCursor }} so overflow
-     * can be detected and follow-up pagination issued per-commit.
+     * Builds the batched GraphQL query: one {@code commitN} alias per SHA, each spreading the checked-in
+     * {@code CommitEnrichmentFields} fragment, with the fragment text appended once at the end.
+     *
+     * <p>Static and package-private so the assembled string can be parsed and validated against the
+     * vendor schema in a unit test — the one part of this request that no {@code .graphql} document can
+     * cover, because the alias count is a runtime value.
      */
-    private String buildBatchQuery(String owner, String repoName, List<String> shas) {
+    static String buildBatchQuery(String owner, String repoName, List<String> shas) {
         StringBuilder sb = new StringBuilder();
         sb.append("query {\n");
         sb.append("  rateLimit { cost limit remaining resetAt }\n");
         sb.append("  repository(owner: \"").append(owner).append("\", name: \"").append(repoName).append("\") {\n");
 
         for (int i = 0; i < shas.size(); i++) {
-            sb.append("    commit").append(i).append(": object(oid: \"").append(shas.get(i)).append("\") {\n");
-            sb.append("      ... on Commit {\n");
-            sb.append("        oid\n");
-            // Free data: authoritative commit metadata
-            sb.append("        additions\n");
-            sb.append("        deletions\n");
-            sb.append("        changedFilesIfAvailable\n");
-            sb.append("        authoredDate\n");
-            sb.append("        committedDate\n");
-            sb.append("        messageHeadline\n");
-            // R1: Use dedicated messageBody field instead of extracting from full message
-            sb.append("        messageBody\n");
-            sb.append("        url\n");
-            // R2: Expanded signature verification fields
-            sb.append("        signature { isValid state wasSignedByGitHub signer { login } }\n");
-            // Free data: boolean flags
-            sb.append("        authoredByCommitter\n");
-            sb.append("        committedViaWeb\n");
-            // R3: Parent OIDs for merge commit analysis (up to 3 parents)
-            sb.append("        parents(first: 3) { totalCount nodes { oid } }\n");
-            // R4: CI status check rollup
-            sb.append("        statusCheckRollup { state }\n");
-            // R6: Organizational commit attribution (direct Organization field, not a connection)
-            sb.append("        onBehalfOf { login }\n");
-            // Multi-author contributor data with pagination support
-            sb.append("        authors(first: ").append(AUTHORS_PAGE_SIZE).append(") {\n");
-            sb.append("          totalCount\n");
-            sb.append("          pageInfo { hasNextPage endCursor }\n");
-            sb.append("          nodes {\n");
-            sb.append("            name\n");
-            sb.append("            email\n");
-            sb.append("            user { login databaseId }\n");
-            sb.append("          }\n");
-            sb.append("        }\n");
-            sb.append("        committer {\n");
-            sb.append("          name\n");
-            sb.append("          email\n");
-            sb.append("          user { login databaseId }\n");
-            sb.append("        }\n");
-            // Associated pull requests with pagination support
-            sb.append("        associatedPullRequests(first: ").append(ASSOCIATED_PRS_PAGE_SIZE).append(") {\n");
-            sb.append("          totalCount\n");
-            sb.append("          pageInfo { hasNextPage endCursor }\n");
-            sb.append("          nodes {\n");
-            sb.append("            number\n");
-            sb.append("          }\n");
-            sb.append("        }\n");
-            sb.append("      }\n");
-            sb.append("    }\n");
+            sb
+                .append("    commit")
+                .append(i)
+                .append(": object(oid: \"")
+                .append(shas.get(i))
+                .append("\") { ...")
+                .append(GitHubGraphQlFragments.COMMIT_ENRICHMENT_FIELDS_NAME)
+                .append(" }\n");
         }
 
         sb.append("  }\n");
         sb.append("}\n");
+        sb.append(commitEnrichmentFragment());
         return sb.toString();
+    }
+
+    /**
+     * The fragment document, read once. A failure here means the resource is missing from the packaged
+     * jar, which would otherwise surface as a GraphQL validation error from GitHub on every batch.
+     */
+    private static String loadCommitEnrichmentFragment() {
+        ClassPathResource resource = new ClassPathResource(GitHubGraphQlFragments.COMMIT_ENRICHMENT_FIELDS_RESOURCE);
+        try (InputStream in = resource.getInputStream()) {
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new IllegalStateException(
+                "Missing GraphQL fragment " + GitHubGraphQlFragments.COMMIT_ENRICHMENT_FIELDS_RESOURCE,
+                e
+            );
+        }
+    }
+
+    static String commitEnrichmentFragment() {
+        return COMMIT_ENRICHMENT_FRAGMENT;
     }
 
     /**

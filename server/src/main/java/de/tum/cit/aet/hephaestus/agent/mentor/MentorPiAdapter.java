@@ -1,6 +1,9 @@
 package de.tum.cit.aet.hephaestus.agent.mentor;
 
+import de.tum.cit.aet.hephaestus.agent.config.AgentBindingLimits;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MentorContextKeys;
+import de.tum.cit.aet.hephaestus.agent.proxy.MentorProxyCredentialRegistry;
+import de.tum.cit.aet.hephaestus.agent.proxy.MentorProxyCredentialRegistry.Route;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentImageProperties;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiPlanSpec;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiRuntimeFactory;
@@ -34,15 +37,12 @@ public class MentorPiAdapter {
     private static final MentorRunnerProfile PROFILE = new MentorRunnerProfile();
 
     private final PiRuntimeFactory runtimeFactory;
-    private final MentorAgentProperties mentorProperties;
     private final AgentImageProperties imageProperties;
+    private final MentorProxyCredentialRegistry proxyCredentialRegistry;
 
     /**
-     * Build the interactive sandbox spec for a mentor chat session. Sandbox is keyed by
-     * {@code (developerId, workspaceId)}; concurrent attaches reuse the live handle.
-     * When {@code sessionRestore} is non-null, the prior turn's JSONL is injected at
-     * {@code .sessions/<threadId>.jsonl} so Pi's {@code switchSession} restores byte-identical
-     * state for prompt-cache continuity.
+     * Build the interactive sandbox spec for a mentor chat session. A non-null {@code sessionRestore}
+     * injects the prior turn's JSONL so Pi restores it, keeping the prompt cache warm.
      */
     public InteractiveSandboxSpec buildSandboxSpec(
         MentorAgentRequest request,
@@ -61,29 +61,33 @@ public class MentorPiAdapter {
             extraInputs.put(SESSIONS_DIR_PREFIX + sessionRestore.threadId() + ".jsonl", sessionRestore.bytes());
         }
 
-        // Honor the bound mentor config's base URL first (per-workspace LLM gateway, e.g. a TUM GPU
-        // endpoint that activates the hephaestus provider); fall back to the global mentor property.
-        String baseUrl;
-        if (llmConfig.llmBaseUrl() != null && !llmConfig.llmBaseUrl().isBlank()) {
-            baseUrl = llmConfig.llmBaseUrl();
-        } else {
-            baseUrl = mentorProperties.baseUrl().isBlank() ? null : mentorProperties.baseUrl();
-        }
+        String baseUrl = llmConfig.baseUrl();
 
-        // The config API floor (@Min(30) on AgentConfig timeoutSeconds) sits below PiPlanSpec's runtime
-        // floor (must exceed TIMEOUT_BUFFER_SECONDS=60), so a legitimately persisted 30-60s config would
-        // otherwise throw from PiPlanSpec and surface as an ERROR on the chat stream. Clamp up to the
-        // minimum buildable budget so any valid config always yields a mentor sandbox.
-        int timeoutSeconds = Math.max(llmConfig.timeoutSeconds(), PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS + 1);
+        int timeoutSeconds = clampToRunnableTurnBudget(llmConfig.timeoutSeconds());
+
+        // Generated here rather than inside InteractiveSandboxSpec so it can also key the mint: the
+        // sandbox adapter revokes this token by the same sessionId when it disposes the session.
+        UUID sessionId = UUID.randomUUID();
+        String proxyToken = proxyCredentialRegistry.mint(
+            sessionId,
+            new Route(
+                llmConfig.apiProtocol(),
+                baseUrl,
+                llmConfig.connectionScope(),
+                llmConfig.connectionId(),
+                llmConfig.modelId(),
+                llmConfig.workspaceId()
+            )
+        );
 
         PiPlanSpec planSpec = new PiPlanSpec(
-            llmConfig.llmProvider(),
-            llmConfig.credentialMode(),
-            llmConfig.llmApiKey(),
-            llmConfig.modelName(),
-            baseUrl,
-            null,
-            true,
+            llmConfig.apiProtocol(),
+            llmConfig.upstreamModelId(),
+            llmConfig.contextWindow(),
+            llmConfig.maxOutputTokens(),
+            llmConfig.supportsReasoning(),
+            proxyToken,
+            llmConfig.allowInternet(),
             timeoutSeconds,
             PROFILE,
             extraInputs,
@@ -93,7 +97,7 @@ public class MentorPiAdapter {
         PiPlan plan = runtimeFactory.build(planSpec);
 
         return new InteractiveSandboxSpec(
-            UUID.randomUUID(),
+            sessionId,
             Long.toString(request.developerId()),
             Long.toString(request.workspaceId()),
             imageProperties.reference(),
@@ -104,6 +108,18 @@ public class MentorPiAdapter {
             SecurityProfile.DEFAULT,
             plan.inputFiles(),
             Map.of()
+        );
+    }
+
+    /**
+     * The binding API's floor sits below the runtime's, and a binding that never went through that API
+     * could exceed its ceiling — so clamp both ends here, where a turn's budget is actually fixed.
+     */
+    private static int clampToRunnableTurnBudget(int configuredTimeoutSeconds) {
+        return Math.clamp(
+            configuredTimeoutSeconds,
+            PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS + 1,
+            AgentBindingLimits.MAX_TIMEOUT_SECONDS
         );
     }
 
@@ -118,8 +134,7 @@ public class MentorPiAdapter {
             if (!MentorContextKeys.ALLOWED_OUTPUT_KEYS.contains(key)) {
                 throw new IllegalArgumentException("unsupported mentor context input key: " + key);
             }
-            // Reject null bytes here so the failure names the offending key, rather than surfacing as an
-            // opaque NPE deep inside PiPlanSpec's Map.copyOf(extraInputs), which rejects null values.
+            // Checked here so the failure names the key, not as an NPE deep inside PiPlanSpec.
             if (entry.getValue() == null) {
                 throw new IllegalArgumentException("contextInputs value for '" + key + "' must not be null");
             }

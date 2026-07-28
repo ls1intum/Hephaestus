@@ -20,12 +20,7 @@ class WorkspaceSummaryQueryAdapter implements WorkspaceSummaryQuery {
         return workspaceRepository
             .findById(workspaceId)
             .map(workspace ->
-                new WorkspaceSummary(
-                    workspace.getId(),
-                    workspace.getWorkspaceSlug(),
-                    workspace.getDisplayName(),
-                    workspace.getMentorConfigId()
-                )
+                new WorkspaceSummary(workspace.getId(), workspace.getWorkspaceSlug(), workspace.getDisplayName())
             );
     }
 }

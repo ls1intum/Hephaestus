@@ -23,9 +23,8 @@ import org.jspecify.annotations.Nullable;
  * mutable current state on {@link SlackMonitoredChannel}.
  *
  * <p><strong>Immutable by construction.</strong> The entity is {@link Immutable} and its repository exposes only
- * insert + workspace-scoped read; there is no update or delete path, so the audit trail cannot be rewritten. The
- * only mutation to the table is appending a new transition. Workspace-scoped (scalar {@code workspaceId}, absent
- * from {@code WorkspaceScopedTables.GLOBAL_TABLES}) → a tenancy predicate rides every read.
+ * insert + workspace-scoped read; there is no update or delete path, so the audit trail cannot be rewritten.
+ * Workspace-scoped → a tenancy predicate rides every read.
  */
 @Entity
 @Immutable
@@ -45,9 +44,8 @@ public class SlackChannelConsentEvent {
     private String slackChannelId;
 
     /**
-     * The state the channel left. Null only for a hypothetical transition of a not-yet-persisted channel.
-     * Value-constrained by {@code chk_slack_channel_consent_event_from_state}, the audit-trail sibling of
-     * {@code slack_monitored_channel}'s {@code chk_slack_monitored_channel_consent} (same {@link ConsentState}).
+     * The state the channel left. Null only for a transition of a not-yet-persisted channel.
+     * Value-constrained by {@code chk_slack_channel_consent_event_from_state} ({@link ConsentState} values).
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "from_state", length = 16)
@@ -60,8 +58,8 @@ public class SlackChannelConsentEvent {
 
     /**
      * The workspace {@code User} (admin) who made the change; null if driven by a system path rather than an admin.
-     * FK'd to {@code "user"(id)} ON DELETE SET NULL ({@code sfk_slack_channel_consent_event_actor}) — no JPA
-     * association, matching {@code SlackMessage#getAuthorMemberId()}'s DB-only-FK convention.
+     * FK'd to {@code "user"(id)} ON DELETE SET NULL ({@code sfk_slack_channel_consent_event_actor}); DB-only FK,
+     * no JPA association.
      */
     @Column(name = "actor_user_id")
     private @Nullable Long actorUserId;

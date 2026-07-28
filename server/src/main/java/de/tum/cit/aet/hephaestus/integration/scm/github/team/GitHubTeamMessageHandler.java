@@ -26,6 +26,19 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitHub team webhook events.
+ *
+ * <p><b>Subject tiers.</b> GitHub delivers {@code team} events with two different payload shapes and
+ * the generic subject deriver keys them onto two different tiers:
+ * <ul>
+ *   <li>{@code created}/{@code edited}/{@code deleted} carry only an {@code organization} →
+ *       {@code organization.team} (this handler).</li>
+ *   <li>{@code added_to_repository}/{@code removed_from_repository} additionally carry a
+ *       {@code repository} → {@code repository.team}, routed by {@link GitHubTeamRepositoryMessageHandler}
+ *       which delegates back into {@link #routeTeamEvent(GitHubTeamEventDTO)}.</li>
+ * </ul>
+ * Without the second registration the repo-permission actions would key to {@code repository.team},
+ * which has no handler, and be silently ACK-dropped — team↔repo permission changes would only land at
+ * the next full team sync.
  */
 @Component
 public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<GitHubTeamEventDTO> {
@@ -66,6 +79,16 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
 
     @Override
     protected void handleEvent(GitHubTeamEventDTO event) {
+        routeTeamEvent(event);
+    }
+
+    /**
+     * Shared routing for every team action, regardless of subject tier. Package-visible so the
+     * {@code repository.team} sibling handler ({@link GitHubTeamRepositoryMessageHandler}) can reuse the
+     * exact same dispatch for the {@code added_to_repository}/{@code removed_from_repository} deliveries
+     * that arrive on the repository tier.
+     */
+    void routeTeamEvent(GitHubTeamEventDTO event) {
         var teamDto = event.team();
 
         if (teamDto == null) {
@@ -82,13 +105,11 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
             orgLogin != null ? sanitizeForLog(orgLogin) : "unknown"
         );
 
-        // Resolve scope from organization login
         Long scopeId = orgLogin != null ? scopeIdResolver.findScopeIdByOrgLogin(orgLogin).orElse(null) : null;
         if (scopeId == null) {
             log.debug("Skipped team event: reason=noAssociatedScope, orgLogin={}", sanitizeForLog(orgLogin));
             return;
         }
-        // Create context for team events (no repository context available, but scope is resolved)
         IdentityProvider gitHubProvider = gitProviderRepository
             .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
             .orElseThrow(() -> new IllegalStateException("GitHub provider not configured"));
@@ -107,13 +128,6 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
         }
     }
 
-    /**
-     * Handles the {@code added_to_repository} action by creating a TeamRepositoryPermission.
-     * <p>
-     * The webhook payload includes the team (with its native id) and the repository
-     * (with its native id). We look up both by native ID + provider to find internal entities,
-     * then create a permission record with the team's default permission level.
-     */
     private void handleAddedToRepository(GitHubTeamEventDTO event, IdentityProvider provider) {
         var repoRef = event.repository();
         var teamDto = event.team();
@@ -148,13 +162,10 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
         Team team = teamOpt.get();
         Repository repo = repoOpt.get();
 
-        // Map the team's default permission from the DTO (e.g., "pull", "push", "admin")
         TeamRepositoryPermission.PermissionLevel level = mapWebhookPermission(teamDto.permission());
 
-        // Check if permission already exists
         var existingOpt = permissionRepository.findByTeam_IdAndRepository_Id(team.getId(), repo.getId());
         if (existingOpt.isPresent()) {
-            // Update permission level if changed
             TeamRepositoryPermission existing = existingOpt.get();
             if (existing.getPermission() != level) {
                 existing.setPermission(level);
@@ -178,9 +189,6 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
         }
     }
 
-    /**
-     * Handles the {@code removed_from_repository} action by deleting the TeamRepositoryPermission.
-     */
     private void handleRemovedFromRepository(GitHubTeamEventDTO event, IdentityProvider provider) {
         var repoRef = event.repository();
         var teamDto = event.team();
@@ -239,11 +247,9 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
     }
 
     /**
-     * Maps GitHub REST API permission strings to our PermissionLevel enum.
-     * <p>
-     * GitHub webhook payloads use different permission names than the GraphQL API:
-     * REST API: "pull", "triage", "push", "maintain", "admin"
-     * GraphQL: READ, TRIAGE, WRITE, MAINTAIN, ADMIN
+     * GitHub webhook payloads use REST-style permission names ({@code pull}, {@code triage}, {@code
+     * push}, {@code maintain}, {@code admin}), not the GraphQL enum ({@code READ}, {@code TRIAGE},
+     * {@code WRITE}, {@code MAINTAIN}, {@code ADMIN}) used elsewhere.
      */
     private static TeamRepositoryPermission.PermissionLevel mapWebhookPermission(String permission) {
         if (permission == null) {

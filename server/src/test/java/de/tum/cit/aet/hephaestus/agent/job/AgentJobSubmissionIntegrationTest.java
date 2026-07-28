@@ -3,10 +3,13 @@ package de.tum.cit.aet.hephaestus.agent.job;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -20,26 +23,19 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.event.ApplicationEvents;
-import org.springframework.test.context.event.RecordApplicationEvents;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Integration test for {@link AgentJobService#submit} exercising real PostgreSQL
- * idempotency (partial unique index), config snapshot capture, and event publication.
- */
-@RecordApplicationEvents
 class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -51,7 +47,13 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
     private AgentJobRepository agentJobRepository;
 
     @Autowired
-    private AgentConfigRepository agentConfigRepository;
+    private WorkspaceAgentBindingRepository agentBindingRepository;
+
+    @Autowired
+    private LlmConnectionRepository llmConnectionRepository;
+
+    @Autowired
+    private LlmModelRepository llmModelRepository;
 
     @Autowired
     private WorkspaceRepository workspaceRepository;
@@ -68,11 +70,8 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
-    private ApplicationEvents applicationEvents;
-
     private Workspace workspace;
-    private AgentConfig agentConfig;
+    private WorkspaceAgentBinding agentBinding;
     private Long prId;
     private Repository repo;
 
@@ -82,14 +81,18 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
 
         workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("submit-test"));
 
-        agentConfig = new AgentConfig();
-        agentConfig.setWorkspace(workspace);
-        agentConfig.setName("test-config");
-        agentConfig.setEnabled(true);
-        agentConfig.setLlmProvider(LlmProvider.ANTHROPIC);
-        agentConfig.setCredentialMode(CredentialMode.PROXY);
-        agentConfig.setTimeoutSeconds(300);
-        agentConfig = agentConfigRepository.save(agentConfig);
+        LlmConnection connection = llmConnectionRepository.save(LlmCatalogTestFixtures.connection("submit-test"));
+        LlmModel model = llmModelRepository.save(
+            LlmCatalogTestFixtures.model(connection, "submit-model", "gpt-submit-test")
+        );
+
+        WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
+        binding.setWorkspace(workspace);
+        binding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        binding.setEnabled(true);
+        binding.setInstanceModel(model);
+        binding.setTimeoutSeconds(300);
+        agentBinding = agentBindingRepository.save(binding);
 
         // Seed git entities needed for the submission request
         IdentityProvider provider = gitProviderRepository
@@ -191,35 +194,15 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             AgentJob job = result.get();
             assertThat(job.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
             assertThat(job.getJobType()).isEqualTo(AgentJobType.PULL_REQUEST_REVIEW);
-            assertThat(job.getIdempotencyKey()).isEqualTo(
-                // per-phase key: a manual/dev submission carries the "manual" phase segment
-                "pr_review:org/submit-repo:10:manual:abc123:config:" + agentConfig.getId()
-            );
+            assertThat(job.getIdempotencyKey()).isEqualTo("pr_review:org/submit-repo:10:manual:abc123:detection");
+            assertThat(job.getPurpose()).isEqualTo(AgentPurpose.PRACTICE_DETECTION);
             assertThat(job.getConfigSnapshot()).isNotNull();
             assertThat(job.getMetadata().get("pull_request_id").asLong()).isEqualTo(prId);
             assertThat(job.getMetadata().get("pr_number").asInt()).isEqualTo(10);
             assertThat(job.getMetadata().get("commit_sha").asString()).isEqualTo("abc123");
 
-            // Verify persisted in DB
             AgentJob fromDb = agentJobRepository.findById(job.getId()).orElseThrow();
             assertThat(fromDb.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
-        }
-
-        @Test
-        void publishesAgentJobCreatedEvent() {
-            var request = createRequest("event123");
-
-            Optional<AgentJob> result = agentJobService.submit(
-                workspace.getId(),
-                AgentJobType.PULL_REQUEST_REVIEW,
-                request
-            );
-
-            assertThat(result).isPresent();
-            List<AgentJobCreatedEvent> events = applicationEvents.stream(AgentJobCreatedEvent.class).toList();
-            assertThat(events).hasSize(1);
-            assertThat(events.get(0).jobId()).isEqualTo(result.get().getId());
-            assertThat(events.get(0).workspaceId()).isEqualTo(workspace.getId());
         }
     }
 
@@ -245,7 +228,6 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             assertThat(second).isPresent();
             assertThat(second.get().getId()).isEqualTo(first.get().getId());
 
-            // Only 1 row in DB
             assertThat(agentJobRepository.findAll()).hasSize(1);
         }
 
@@ -278,17 +260,16 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             // simulating a job created by a concurrent request before this one.
             AgentJob existing = new AgentJob();
             existing.setWorkspace(workspace);
-            existing.setConfig(agentConfig);
+            existing.setPurpose(AgentPurpose.PRACTICE_DETECTION);
             existing.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
             existing.setIdempotencyKey(
                 // per-phase key: must carry the "manual" phase to dedup against a manual submission
-                "pr_review:" + repo.getNameWithOwner() + ":10:manual:race123:config:" + agentConfig.getId()
+                "pr_review:" + repo.getNameWithOwner() + ":10:manual:race123:detection"
             );
             existing.setMetadata(OBJECT_MAPPER.createObjectNode());
             existing.setConfigSnapshot(OBJECT_MAPPER.createObjectNode());
             agentJobRepository.saveAndFlush(existing);
 
-            // Submit through service — application-level check finds the existing job
             var request = createRequest("race123");
             Optional<AgentJob> result = agentJobService.submit(
                 workspace.getId(),
@@ -302,11 +283,11 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    class NoConfig {
+    class NoBinding {
 
         @Test
-        void returnsEmptyWhenNoConfig() {
-            agentConfigRepository.deleteAll();
+        void returnsEmptyWhenNoBinding() {
+            agentBindingRepository.deleteAll();
 
             var request = createRequest("noconfig123");
             Optional<AgentJob> result = agentJobService.submit(
@@ -320,8 +301,8 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
 
         @Test
         void returnsEmptyWhenDisabled() {
-            agentConfig.setEnabled(false);
-            agentConfigRepository.save(agentConfig);
+            agentBinding.setEnabled(false);
+            agentBindingRepository.save(agentBinding);
 
             var request = createRequest("disabled123");
             Optional<AgentJob> result = agentJobService.submit(
@@ -351,11 +332,9 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             var snapshot = result.get().getConfigSnapshot();
             assertThat(snapshot.get("timeoutSeconds").asInt()).isEqualTo(300);
 
-            // Change the config after submission
-            agentConfig.setTimeoutSeconds(900);
-            agentConfigRepository.save(agentConfig);
+            agentBinding.setTimeoutSeconds(900);
+            agentBindingRepository.save(agentBinding);
 
-            // Re-load the job from DB — snapshot should still reflect the original
             AgentJob fromDb = agentJobRepository.findById(result.get().getId()).orElseThrow();
             assertThat(fromDb.getConfigSnapshot().get("timeoutSeconds").asInt()).isEqualTo(300);
         }

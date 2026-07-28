@@ -58,24 +58,14 @@ public class SlackThread {
     @ColumnDefault("0")
     private int messageCount = 0;
 
-    /**
-     * Conversation-detection watermark: the Slack {@code ts} through which this thread was last analysed
-     * (changelog {@code 1782980500800-13}). Read/written by {@code integration.slack.conversation} through the
-     * scoped {@code SlackThreadRepository} JPQL (advance in
-     * {@code SlackThreadRepository#advanceReviewWatermark}, compare in
-     * {@code SlackThreadRepository#findSettledCandidateRows}) — a plain mapped field, no raw SQL involved.
-     */
+    /** Conversation-detection watermark: the Slack {@code ts} through which this thread was last analysed. */
     @Column(name = "last_reviewed_ts", length = 32)
     private @Nullable String lastReviewedTs;
 
     /**
-     * Resolved participant member ids for the mentor-context participant firewall ({@code bigint[]}, changelog
-     * {@code 1782980500800-12}; a GIN index backs the {@code = ANY(...)} membership lookup). Selected as a plain
-     * mapped field via Hibernate's {@code @JdbcTypeCode(SqlTypes.ARRAY)} marshalling wherever the whole array is
-     * read (e.g. {@code SlackThreadRepository#findSettledCandidateRows}); the {@code = ANY(...)} membership test
-     * itself stays a native {@code @Query} on {@code SlackThreadRepository#findParticipatingThreadRows} because
-     * Postgres array-membership has no portable JPQL form. {@code NOT NULL DEFAULT '{}'} — never null, empty until
-     * participants resolve.
+     * Resolved participant member ids for the mentor-context participant firewall ({@code bigint[]}; a GIN index
+     * backs the {@code = ANY(...)} membership lookup, which stays a native query because Postgres array membership
+     * has no portable JPQL form). {@code NOT NULL DEFAULT '{}'} — never null, empty until participants resolve.
      */
     @Column(name = "participant_member_ids", nullable = false)
     @JdbcTypeCode(SqlTypes.ARRAY)

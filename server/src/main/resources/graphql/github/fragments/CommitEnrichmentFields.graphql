@@ -1,0 +1,84 @@
+# The selection set CommitMetadataEnrichmentService asks for per commit.
+#
+# It lives here, and not inline in that service, because it is the part worth guarding: every field
+# name below is checked against the vendor schema by GraphQlOperationDocumentValidationTest (through
+# GetCommitMetadata.graphql, which spreads this fragment) and every response stub shaped like it is
+# checked by GraphQlResponseStubValidator. A string built in Java is invisible to both.
+#
+# The envelope around it still cannot be a static document: the service batches N commits into one
+# request as one aliased `commit0: object(oid: "…") { … }` … `commitN: …` per commit, and GraphQL
+# aliases are syntax, not variables — no variable can stand in for an alias name, and the count
+# varies per batch. So the service assembles the aliases and appends this fragment verbatim.
+# CommitMetadataEnrichmentServiceQueryTest validates that assembled string against the same schema,
+# which is what closes the remaining gap.
+#
+# Everything here rides along at zero extra API cost once the commit object is resolved.
+fragment CommitEnrichmentFields on Commit {
+    oid
+    additions
+    deletions
+    changedFilesIfAvailable
+    authoredDate
+    committedDate
+    messageHeadline
+    messageBody
+    url
+    signature {
+        isValid
+        state
+        wasSignedByGitHub
+        signer {
+            login
+        }
+    }
+    authoredByCommitter
+    committedViaWeb
+    # Parent OIDs for merge-commit analysis.
+    parents(first: 3) {
+        totalCount
+        nodes {
+            oid
+        }
+    }
+    statusCheckRollup {
+        state
+    }
+    # Organizational attribution: a direct Organization field, not a connection.
+    onBehalfOf {
+        login
+    }
+    # pageInfo on both connections so overflow can be detected and paged per-commit.
+    authors(first: 10) {
+        totalCount
+        pageInfo {
+            hasNextPage
+            endCursor
+        }
+        nodes {
+            name
+            email
+            user {
+                login
+                databaseId
+            }
+        }
+    }
+    committer {
+        name
+        email
+        user {
+            login
+            databaseId
+        }
+    }
+    associatedPullRequests(first: 10) {
+        totalCount
+        pageInfo {
+            hasNextPage
+            endCursor
+        }
+        nodes {
+            number
+        }
+    }
+}

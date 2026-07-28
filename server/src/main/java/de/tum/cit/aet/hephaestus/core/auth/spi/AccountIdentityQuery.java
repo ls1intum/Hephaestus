@@ -43,6 +43,19 @@ public interface AccountIdentityQuery {
     Optional<Long> resolveAccountId(Long providerId, String subject, @Nullable String teamId);
 
     /**
+     * Reverse of {@link #linkExternalActor}: the {@code Account} owning an active identity link already wired
+     * to {@code externalActorId} (the SCM actor mirror / {@code User} id). Lets an integration adapter start
+     * from a workspace member and reach the account's OTHER identities via {@link #activeLinksForAccount}
+     * (e.g. the Slack subject for a proactive DM) without importing {@code core.auth} domain types. Only links
+     * provisioned through a login carry the wiring, so a member who never signed in resolves to empty.
+     * Deterministic when multiple active links match (lowest link id wins).
+     *
+     * @param externalActorId the {@code User} (actor mirror) row id
+     * @return the owning account id, or empty when no active link is wired to that actor
+     */
+    Optional<Long> resolveAccountIdForActor(Long externalActorId);
+
+    /**
      * Point an {@code IdentityLink} at its git-provider actor mirror. Idempotent: a no-op when the
      * link already references {@code externalActorId} (or the link no longer exists). Closes the
      * {@code IdentityLink → ExternalActor} gap so profile surfaces can render "your activity" without

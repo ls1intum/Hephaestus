@@ -178,6 +178,33 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     int deleteAllConversationThreadFeedback(@Param("workspaceId") Long workspaceId);
 
     /**
+     * Hard-delete every {@code PULL_REQUEST} / {@code ISSUE} feedback unit for a workspace — the
+     * SCM-derived counterpart of {@link #deleteAllConversationThreadFeedback}, invoked when the
+     * workspace's SCM mirror is erased on connection-disconnect or workspace-purge. These units hold
+     * mirrored third-party content directly (quoted diff/comment text in the evidence payload) and
+     * reference the artifact only by a soft {@code artifact_id}, so they neither cascade with the
+     * repository delete nor survive it meaningfully. DB {@code ON DELETE CASCADE} clears
+     * {@code feedback_observation} / {@code feedback_placement} / {@code feedback_reaction}. The
+     * {@code workspace_id} + {@code artifact_type} predicates keep {@code CONVERSATION_THREAD} units
+     * and other tenants' rows untouched. Idempotent.
+     *
+     * @return the number of feedback units deleted
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        """
+        DELETE FROM Feedback f
+        WHERE f.workspaceId = :workspaceId
+          AND f.artifactType IN (
+            de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST,
+            de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.ISSUE
+          )
+        """
+    )
+    int deleteAllScmArtifactFeedback(@Param("workspaceId") Long workspaceId);
+
+    /**
      * Hard-delete the {@code CONVERSATION_THREAD} feedback a single person is the <em>subject</em> of
      * ({@code about_user_id = :aboutUserId}) within a workspace — the derived-content half of a person opt-out /
      * account hard-delete, invoked through

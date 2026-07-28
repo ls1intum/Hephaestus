@@ -9,10 +9,12 @@ import { Spinner } from "@/components/ui/spinner";
 import { useAllAchievementDefinitions } from "@/hooks/use-all-achievement-definitions";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { useAuth } from "@/integrations/auth/AuthContext";
+import { workspaceAdminHead } from "@/lib/page-title";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/achievement-designer")(
 	{
+		head: workspaceAdminHead("Achievement designer"),
 		component: AchievementDesignerPage,
 	},
 );

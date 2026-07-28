@@ -3,9 +3,13 @@ package de.tum.cit.aet.hephaestus.workspace;
 import static de.tum.cit.aet.hephaestus.workspace.Workspace.WorkspaceStatus;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsumer;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionProperties;
+import de.tum.cit.aet.hephaestus.workspace.audit.WorkspaceAuditSnapshots;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.exception.WorkspaceLifecycleViolationException;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamLabelFilterRepository;
@@ -29,6 +33,7 @@ public class WorkspaceLifecycleService {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceLifecycleService.class);
 
+    private final ConfigAuditPort configAudit;
     private final NatsConnectionProperties natsProperties;
     private final WorkspaceRepository workspaceRepository;
     /** Absent under webhook profile (server.enabled=false). */
@@ -55,8 +60,10 @@ public class WorkspaceLifecycleService {
         WorkspaceTeamLabelFilterRepository workspaceTeamLabelFilterRepository,
         WorkspaceTeamRepositorySettingsRepository workspaceTeamRepositorySettingsRepository,
         WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository,
-        List<WorkspacePurgeContributor> purgeContributors
+        List<WorkspacePurgeContributor> purgeContributors,
+        ConfigAuditPort configAudit
     ) {
+        this.configAudit = configAudit;
         this.natsProperties = natsProperties;
         this.workspaceRepository = workspaceRepository;
         this.natsConsumerService = natsConsumerService;
@@ -89,8 +96,10 @@ public class WorkspaceLifecycleService {
         }
 
         if (workspace.getStatus() != WorkspaceStatus.SUSPENDED) {
+            WorkspaceStatus previous = workspace.getStatus();
             workspace.setStatus(WorkspaceStatus.SUSPENDED);
             workspace = workspaceRepository.save(workspace);
+            recordStatusChange(workspace, previous, WorkspaceStatus.SUSPENDED);
             log.info("Suspended workspace: workspaceSlug={}", LoggingUtils.sanitizeForLog(workspaceSlug));
             stopNatsForWorkspace(workspace);
         }
@@ -123,8 +132,10 @@ public class WorkspaceLifecycleService {
         }
 
         if (workspace.getStatus() != WorkspaceStatus.ACTIVE) {
+            WorkspaceStatus previous = workspace.getStatus();
             workspace.setStatus(WorkspaceStatus.ACTIVE);
             workspace = workspaceRepository.save(workspace);
+            recordStatusChange(workspace, previous, WorkspaceStatus.ACTIVE);
             log.info("Resumed workspace: workspaceSlug={}", LoggingUtils.sanitizeForLog(workspaceSlug));
             startNatsForWorkspace(workspace);
         }
@@ -233,8 +244,10 @@ public class WorkspaceLifecycleService {
         workspace.setIssueDependenciesSyncedAt(null);
 
         // Step 9: Mark workspace as PURGED (terminal state)
+        WorkspaceStatus previousStatus = workspace.getStatus();
         workspace.setStatus(WorkspaceStatus.PURGED);
         workspace = workspaceRepository.save(workspace);
+        recordStatusChange(workspace, previousStatus, WorkspaceStatus.PURGED);
 
         log.info("Purged workspace: workspaceSlug={}, workspaceId={}", sanitizedSlug, workspaceId);
         return workspace;
@@ -321,5 +334,17 @@ public class WorkspaceLifecycleService {
      */
     private boolean shouldUseNats(Workspace workspace) {
         return natsProperties.enabled() && workspace != null;
+    }
+
+    private void recordStatusChange(Workspace workspace, WorkspaceStatus from, WorkspaceStatus to) {
+        configAudit.record(
+            ConfigAuditEntry.updated(
+                ConfigAuditEntityType.WORKSPACE_STATUS,
+                workspace.getId(),
+                workspace.getId(),
+                new WorkspaceAuditSnapshots.StatusSnapshot(from == null ? null : from.name()),
+                new WorkspaceAuditSnapshots.StatusSnapshot(to == null ? null : to.name())
+            )
+        );
     }
 }

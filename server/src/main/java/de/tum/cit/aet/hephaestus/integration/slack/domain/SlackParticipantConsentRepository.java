@@ -26,8 +26,7 @@ public interface SlackParticipantConsentRepository
     /**
      * Idempotent upsert of a person's consent decision, keyed by {@code (workspace_id, slack_user_id)}. Creates the
      * row on first decision and, on the composite-key conflict, overwrites the two consent bits, the source, and
-     * {@code decided_at}. Native (the composite {@code ON CONFLICT} target has no Spring Data derived form) — each
-     * column is a distinct {@code @Param}. INSERTs are exempt from the tenancy predicate check.
+     * {@code decided_at}. Native because the composite {@code ON CONFLICT} target has no Spring Data derived form.
      */
     @Modifying
     @Transactional
@@ -115,9 +114,8 @@ public interface SlackParticipantConsentRepository
     );
 
     /**
-     * The count of individuals who have opted OUT of ingestion in this workspace — surfaced to the admin
-     * activation control plane so an admin sees how many members have exercised the person firewall. Person opt-out
-     * is workspace-scoped (not per-channel), so this is a single workspace-wide count.
+     * Count of individuals who have opted OUT of ingestion in this workspace. Person opt-out is workspace-scoped
+     * (not per-channel), so this is a single workspace-wide count.
      */
     long countByWorkspaceIdAndIngestionOptedOutTrue(Long workspaceId);
 

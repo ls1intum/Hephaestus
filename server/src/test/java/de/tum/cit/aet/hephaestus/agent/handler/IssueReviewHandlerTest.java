@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.List;
@@ -144,13 +145,38 @@ class IssueReviewHandlerTest extends BaseUnitTest {
         }
 
         private DeliveryContent note() {
-            return new DeliveryContent("One thing to tighten: add acceptance criteria.", List.of());
+            return new DeliveryContent("One thing to tighten: add acceptance criteria.", List.of(), List.of());
         }
 
         @Test
         void closedIssue_isSuppressed_neverPosts() {
-            handler.postIssueNote(issueJob("CLOSED"), note());
+            AgentJob job = issueJob("CLOSED");
+            DeliveryContent delivery = note();
+
+            handler.postIssueNote(job, delivery);
+
             verify(commentPoster, never()).postIssueFormattedBody(any(), any());
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                eq(job),
+                eq(delivery),
+                eq(FeedbackSuppressionReason.ARTIFACT_CLOSED)
+            );
+        }
+
+        @Test
+        void blankAfterSanitize_isSuppressed_withEmptyAfterSanitizeReason() {
+            // Issues have no inline lane: a body that sanitises to blank means nothing reached the developer.
+            AgentJob job = issueJob("OPEN");
+            DeliveryContent delivery = new DeliveryContent("", List.of(), List.of());
+
+            handler.postIssueNote(job, delivery);
+
+            verify(commentPoster, never()).postIssueFormattedBody(any(), any());
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                eq(job),
+                eq(delivery),
+                eq(FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE)
+            );
         }
 
         @Test
@@ -164,6 +190,8 @@ class IssueReviewHandlerTest extends BaseUnitTest {
             assertThat(job.getDeliveryCommentId()).isEqualTo("gid://gitlab/Note/9");
             // C12: a confirmed post records the ledger.
             verify(feedbackLedgerRecorder).record(eq(job), any(), any(), any());
+            // A successful delivery must NOT also persist a FAILED/undelivered unit.
+            verify(feedbackLedgerRecorder, never()).recordUndelivered(any(), any());
         }
 
         @Test
@@ -176,6 +204,8 @@ class IssueReviewHandlerTest extends BaseUnitTest {
             // C12: a swallowed delivery failure means the student saw nothing — the ledger must NOT record a
             // phantom DELIVERED unit (which would also supersede the real prior, corrupting it like A3).
             verify(feedbackLedgerRecorder, never()).record(any(), any(), any(), any());
+            // ...but the composed body must be persisted as a FAILED unit so it stays auditable.
+            verify(feedbackLedgerRecorder).recordUndelivered(eq(job), any());
         }
 
         @Test
@@ -195,6 +225,8 @@ class IssueReviewHandlerTest extends BaseUnitTest {
             );
             assertThat(job.getDeliveryCommentId()).isNull();
             verify(feedbackLedgerRecorder, never()).record(any(), any(), any(), any());
+            // The undelivered body is persisted (FAILED) BEFORE the exception re-throws, so it is not lost.
+            verify(feedbackLedgerRecorder).recordUndelivered(eq(job), any());
         }
 
         @Test
@@ -208,12 +240,15 @@ class IssueReviewHandlerTest extends BaseUnitTest {
 
             assertThat(job.getDeliveryCommentId()).isNull();
             verify(feedbackLedgerRecorder, never()).record(any(), any(), any(), any());
+            verify(feedbackLedgerRecorder).recordUndelivered(eq(job), any());
         }
 
         @Test
         void noDeliveryContent_isNoop() {
             handler.postIssueNote(issueJob("OPEN"), null);
             verify(commentPoster, never()).postIssueFormattedBody(any(), any());
+            // Nothing was composed, so there is nothing to persist as undelivered either.
+            verify(feedbackLedgerRecorder, never()).recordUndelivered(any(), any());
         }
     }
 }

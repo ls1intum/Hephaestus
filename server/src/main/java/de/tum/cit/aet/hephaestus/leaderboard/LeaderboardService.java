@@ -16,6 +16,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserInfoDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceTeamScope;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceTeamScopeResolver;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamSettingsService;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -53,6 +55,7 @@ public class LeaderboardService {
     private final LeaguePointsService leaguePointsService;
     private final WorkspaceMembershipService workspaceMembershipService;
     private final WorkspaceTeamSettingsService workspaceTeamSettingsService;
+    private final WorkspaceTeamScopeResolver workspaceTeamScopeResolver;
 
     public LeaderboardService(
         UserRepository userRepository,
@@ -62,7 +65,8 @@ public class LeaderboardService {
         TeamPathResolver teamPathResolver,
         LeaguePointsService leaguePointsService,
         WorkspaceMembershipService workspaceMembershipService,
-        WorkspaceTeamSettingsService workspaceTeamSettingsService
+        WorkspaceTeamSettingsService workspaceTeamSettingsService,
+        WorkspaceTeamScopeResolver workspaceTeamScopeResolver
     ) {
         this.userRepository = userRepository;
         this.leaderboardReviewQueryRepository = leaderboardReviewQueryRepository;
@@ -72,6 +76,7 @@ public class LeaderboardService {
         this.leaguePointsService = leaguePointsService;
         this.workspaceMembershipService = workspaceMembershipService;
         this.workspaceTeamSettingsService = workspaceTeamSettingsService;
+        this.workspaceTeamScopeResolver = workspaceTeamScopeResolver;
     }
 
     @Transactional(readOnly = true)
@@ -142,14 +147,13 @@ public class LeaderboardService {
             leaderboardXpQueryService.getLeaderboardData(workspaceId, after, before, teamIds)
         );
 
-        // Include ALL team members, even those with zero activity
+        // Pad with zero-activity members, enumerated by workspace membership rather than the org-login
+        // string (which leaks between workspaces sharing an account_login).
         List<User> allTeamMembers;
         if (team.isPresent() && !teamIds.isEmpty()) {
             allTeamMembers = userRepository.findAllByTeamIds(teamIds);
-        } else if (workspace.getAccountLogin() != null) {
-            allTeamMembers = userRepository.findAllHumanInTeamsOfOrganization(workspace.getAccountLogin());
         } else {
-            allTeamMembers = Collections.emptyList();
+            allTeamMembers = workspaceMembershipService.getHumanMembersWithTeams(workspaceId);
         }
 
         // Add zero-score entries for team members without activity
@@ -307,11 +311,12 @@ public class LeaderboardService {
         Map<Long, List<Team>> teamHierarchy = teamPathResolver.buildHierarchy(workspace);
         // Use workspace-scoped hidden settings instead of deprecated Team.hidden field
         Set<Long> hiddenTeamIds = workspaceTeamSettingsService.getHiddenTeamIds(workspace.getId());
+        WorkspaceTeamScope scope = workspaceTeamScopeResolver.resolve(workspace).orElse(null);
         List<Team> targetTeams =
-            workspace.getAccountLogin() == null
+            scope == null
                 ? List.of()
                 : teamRepository
-                      .findAllByOrganizationIgnoreCase(workspace.getAccountLogin())
+                      .findAllByOrganizationIgnoreCaseAndProviderId(scope.accountLogin(), scope.providerId())
                       .stream()
                       .filter(team -> team.getId() != null && !hiddenTeamIds.contains(team.getId()))
                       .toList();

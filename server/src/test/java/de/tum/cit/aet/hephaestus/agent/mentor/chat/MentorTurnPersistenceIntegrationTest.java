@@ -1,11 +1,18 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
+import static de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures.admittedMentorConfig;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.tum.cit.aet.hephaestus.agent.mentor.MentorLlmConfig;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.exception.TurnAlreadyInFlightException;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.TranslatorState;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageEventRepository;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
+import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -20,6 +27,10 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import io.micrometer.core.instrument.MeterRegistry;
+import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -36,6 +47,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
@@ -74,7 +87,22 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     private ChatMessageRepository chatMessageRepository;
 
     @Autowired
+    private LlmUsageEventRepository usageEventRepository;
+
+    @Autowired
+    private LlmUsageRecorder usageRecorder;
+
+    @Autowired
+    private MentorInFlightReaper reaper;
+
+    @Autowired
+    private MeterRegistry meterRegistry;
+
+    @Autowired
     private DataSource dataSource;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     private Workspace workspace;
     private User user;
@@ -177,7 +205,8 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
             thread,
             "hello mentor",
             assistantId,
-            null
+            null,
+            admittedMentorConfig()
         );
         assertThat(cookie.assistantMessageId()).isEqualTo(assistantId);
 
@@ -199,7 +228,8 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
             thread,
             "hello mentor",
             assistantId,
-            clientUserId
+            clientUserId,
+            admittedMentorConfig()
         );
         assertThat(cookie.userMessageId()).isEqualTo(clientUserId);
         assertThat(chatMessageRepository.findById(clientUserId)).isPresent();
@@ -208,19 +238,14 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     @Test
     void persistInFlight_secondCallThrows() {
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
-        persistence.persistInFlight(thread, "first", UUID.randomUUID(), null);
-        assertThatThrownBy(() -> persistence.persistInFlight(thread, "second", UUID.randomUUID(), null)).isInstanceOf(
-            TurnAlreadyInFlightException.class
-        );
+        persistence.persistInFlight(thread, "first", UUID.randomUUID(), null, admittedMentorConfig());
+        assertThatThrownBy(() ->
+            persistence.persistInFlight(thread, "second", UUID.randomUUID(), null, admittedMentorConfig())
+        ).isInstanceOf(TurnAlreadyInFlightException.class);
     }
 
     @Test
-    void persistInFlight_concurrentRace_exactlyOneWins() throws Exception {
-        // Sequential calls only prove the SQL `WHERE in_flight` semantics fire. The dual-lock
-        // defence (Java MentorTurnLock + DB partial unique index) is supposed to handle the
-        // case where two API replicas (or two virtual threads on one replica) race the same
-        // thread id. This test proves the DB half: even if the Java lock were stripped,
-        // exactly one writer wins at the row level.
+    void persistInFlight_concurrentRace_theDbUniqueIndexAloneLetsExactlyOneWriterWin() throws Exception {
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
 
         ExecutorService pool = Executors.newFixedThreadPool(2);
@@ -231,14 +256,13 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
                 ready.countDown();
                 fire.await(5, TimeUnit.SECONDS);
                 try {
-                    return persistence.persistInFlight(thread, "race", UUID.randomUUID(), null);
+                    return persistence.persistInFlight(thread, "race", UUID.randomUUID(), null, admittedMentorConfig());
                 } catch (RuntimeException ex) {
                     return ex; // surface to caller for classification
                 }
             };
             var fa = pool.submit(attempt);
             var fb = pool.submit(attempt);
-            // Wait until both threads are at the barrier, then release simultaneously.
             assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
             fire.countDown();
             Object resultA = fa.get(10, TimeUnit.SECONDS);
@@ -273,7 +297,8 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
             thread,
             "hello",
             assistantId,
-            null
+            null,
+            admittedMentorConfig()
         );
 
         TranslatorState state = new TranslatorState(assistantId);
@@ -321,7 +346,8 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
             thread,
             "hi",
             assistantId,
-            null
+            null,
+            admittedMentorConfig()
         );
 
         TranslatorState state = new TranslatorState(assistantId);
@@ -344,7 +370,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         JsonNode meta = chatMessageRepository.findById(assistantId).orElseThrow().getMetadata();
         assertThat(meta.path("usage").path("input").asLong()).isEqualTo(100);
         assertThat(meta.path("usage").path("output").asLong()).isEqualTo(50);
-        // The wire's 200 survives — not the 150 a naive input+output derivation would write.
         assertThat(meta.path("usage").path("totalTokens").asLong()).isEqualTo(200);
     }
 
@@ -357,7 +382,8 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
             thread,
             "hello",
             assistantId,
-            null
+            null,
+            admittedMentorConfig()
         );
 
         // 3-byte and 4-byte UTF-8 characters exercise any layer that round-trips through String.
@@ -377,10 +403,9 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void finalise_storesSessionJsonlAboveToastThreshold() {
-        // Postgres TOAST threshold is ~2KB; values above ~8KB go out-of-line into pg_toast.
-        // A 1MB payload exercises detoast on read — the path that would surface any
-        // encoding/transport regression introduced by JDBC stream handling. Far more
-        // realistic for a 20+ turn conversation than the byte-string fixtures above.
+        // Postgres TOAST threshold is ~2KB, so a 1MB payload exercises out-of-line storage and
+        // detoast on read — the path that would surface an encoding/transport regression in JDBC
+        // stream handling.
         UUID threadId = UUID.randomUUID();
         ChatThread thread = persistence.ensureThread(workspace.getId(), threadId, user, "hello");
         UUID assistantId = UUID.randomUUID();
@@ -388,7 +413,8 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
             thread,
             "hello",
             assistantId,
-            null
+            null,
+            admittedMentorConfig()
         );
 
         byte[] bigBytes = new byte[1024 * 1024]; // 1 MiB
@@ -422,7 +448,8 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
             thread,
             "follow-up",
             assistantId,
-            null
+            null,
+            admittedMentorConfig()
         );
         persistence.finalise(
             cookie,
@@ -441,7 +468,8 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
             thread,
             "hello",
             assistantId,
-            null
+            null,
+            admittedMentorConfig()
         );
 
         persistence.interrupt(cookie, new TranslatorState(assistantId), new IllegalStateException("upstream timeout"));
@@ -452,70 +480,254 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void optimisticLocking_staleSnapshotSaveFails() {
-        // Root-cause protection against the reaper-vs-late-finalise data corruption: a
-        // writer that loaded the entity at version=N can no longer overwrite a row the
-        // reaper bumped to N+1. Hibernate detects the version mismatch on the SQL UPDATE
-        // predicate (`WHERE id = ? AND version = ?`) and throws — the persistence service
-        // catches and skips, so the reaper's observation survives.
+    void interrupt_afterLlmCallStarted_writesUnverifiableLedgerEventWhenUsageIsMissing() {
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
         UUID assistantId = UUID.randomUUID();
-        persistence.persistInFlight(thread, "hello", assistantId, null);
+        MentorTurnPersistence.TurnPersistenceCookie cookie = persistence.persistInFlight(
+            thread,
+            "hello",
+            assistantId,
+            null,
+            admittedMentorConfig()
+        );
+        TranslatorState state = new TranslatorState(assistantId);
+        state.markLlmCallStarted();
+
+        persistence.interrupt(cookie, state, new IllegalStateException("upstream disconnected"));
+
+        var event = usageEventRepository
+            .findAll()
+            .stream()
+            .filter(row -> row.getSourceId().equals(assistantId))
+            .findFirst();
+        assertThat(event).isPresent();
+        assertThat(event.orElseThrow().getPricingState()).isEqualTo(PricingState.UNPRICED);
+        assertThat(event.orElseThrow().getCostUsd()).isNull();
+    }
+
+    @Test
+    void finalise_cacheOnlyUsage_writesPricedLedgerEvent() {
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
+        UUID assistantId = UUID.randomUUID();
+        LlmPriceSnapshot price = new LlmPriceSnapshot(
+            FundingSource.INSTANCE,
+            PricingState.PRICED,
+            12L,
+            null,
+            new BigDecimal("10"),
+            new BigDecimal("20"),
+            new BigDecimal("2"),
+            new BigDecimal("3")
+        );
+        MentorLlmConfig config = new MentorLlmConfig(
+            "openai-responses",
+            "https://api.openai.com/v1",
+            "test-model",
+            null,
+            null,
+            false,
+            FundingSource.INSTANCE,
+            1L,
+            1L,
+            null,
+            price,
+            false,
+            600
+        );
+        MentorTurnPersistence.TurnPersistenceCookie cookie = persistence.persistInFlight(
+            thread,
+            "hello",
+            assistantId,
+            null,
+            config
+        );
+        TranslatorState state = new TranslatorState(assistantId);
+        state.markLlmCallStarted();
+        ObjectNode usage = NODES.objectNode();
+        usage.put("input", 0).put("output", 0).put("cacheRead", 500_000).put("cacheWrite", 0);
+        state.observeUsage(usage);
+
+        persistence.finalise(cookie, state, new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, null));
+
+        var event = usageEventRepository
+            .findAll()
+            .stream()
+            .filter(row -> row.getSourceId().equals(assistantId))
+            .findFirst()
+            .orElseThrow();
+        assertThat(event.getPricingState()).isEqualTo(PricingState.PRICED);
+        assertThat(event.getCacheReadTokens()).isEqualTo(500_000);
+        assertThat(event.getCostUsd()).isEqualByComparingTo("1.000000");
+    }
+
+    @Test
+    void interrupt_beforeLlmCallStarted_doesNotInventAUsageEvent() {
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
+        UUID assistantId = UUID.randomUUID();
+        MentorTurnPersistence.TurnPersistenceCookie cookie = persistence.persistInFlight(
+            thread,
+            "hello",
+            assistantId,
+            null,
+            admittedMentorConfig()
+        );
+
+        persistence.interrupt(
+            cookie,
+            new TranslatorState(assistantId),
+            new IllegalStateException("sandbox attach failed")
+        );
+
+        assertThat(usageEventRepository.findAll()).noneMatch(row -> row.getSourceId().equals(assistantId));
+    }
+
+    @Test
+    void optimisticLocking_aLateFinaliseCannotOverwriteWhatTheReaperWrote() throws Exception {
+        UUID assistantId = persistInFlightTurn("hello");
 
         // Simulate the in-flight runner: load a managed snapshot at the current version.
         ChatMessage stale = chatMessageRepository.findById(assistantId).orElseThrow();
         Long versionBefore = stale.getVersion();
         assertThat(versionBefore).isNotNull();
 
-        // Reaper sweeps, bumps version explicitly via @Modifying SQL.
-        chatMessageRepository.reapStaleInFlight(Instant.now().plusSeconds(60));
+        setCreatedAt(assistantId, Instant.now().minus(Duration.ofMinutes(80)));
+        reaperWithAnUnsafeWindow().reap();
         ChatMessage afterReaper = chatMessageRepository.findById(assistantId).orElseThrow();
         assertThat(afterReaper.getVersion()).isEqualTo(versionBefore + 1L);
         assertThat(afterReaper.getStatus()).isEqualTo(ChatMessage.Status.interrupted);
 
-        // Stale-snapshot save attempt: Hibernate's UPDATE predicate fails on the version,
-        // surfaces as OptimisticLockingFailureException. The version mismatch is the single
-        // durable signal that another writer touched the row.
         stale.setStatus(ChatMessage.Status.completed);
         assertThatThrownBy(() -> {
             chatMessageRepository.saveAndFlush(stale);
         }).isInstanceOf(OptimisticLockingFailureException.class);
 
-        // After the failed save attempt, the row in the DB still reflects the reaper's observation.
         ChatMessage finalState = chatMessageRepository.findById(assistantId).orElseThrow();
         assertThat(finalState.getStatus()).isEqualTo(ChatMessage.Status.interrupted);
         assertThat(finalState.getMetadata().path("error").asString()).isEqualTo("server restart");
     }
 
     @Test
-    void reaper_flipsStaleInFlightRows() throws Exception {
-        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "stuck");
-        UUID assistantId = UUID.randomUUID();
-        persistence.persistInFlight(thread, "stuck", assistantId, null);
+    void accountingReaper_neverSelectsLegitimateTurnsAndAccountsTrulyStaleTurnOnce() throws Exception {
+        UUID tenMinuteTurn = persistInFlightTurn("ten-minute-turn");
+        UUID maxDurationTurn = persistInFlightTurn("max-duration-turn");
+        UUID staleTurn = persistInFlightTurn("stale-turn");
+        Instant now = Instant.now();
+        setCreatedAt(tenMinuteTurn, now.minus(Duration.ofMinutes(10)));
+        setCreatedAt(maxDurationTurn, now.minus(Duration.ofMinutes(60)));
+        setCreatedAt(staleTurn, now.minus(Duration.ofMinutes(80)));
 
-        // The cutoff is "older than now" — fresh rows are NOT reaped.
-        int updated = chatMessageRepository.reapStaleInFlight(Instant.now().minusSeconds(60));
-        assertThat(updated).isZero();
-        assertThat(chatMessageRepository.findById(assistantId).orElseThrow().getStatus()).isEqualTo(
+        MentorInFlightReaper sweeper = reaperWithAnUnsafeWindow();
+        assertThat(sweeper.window()).isEqualTo(Duration.ofMinutes(70));
+        sweeper.reap();
+        sweeper.reap();
+
+        assertThat(chatMessageRepository.findById(tenMinuteTurn).orElseThrow().getStatus()).isEqualTo(
             ChatMessage.Status.in_flight
         );
+        assertThat(chatMessageRepository.findById(maxDurationTurn).orElseThrow().getStatus()).isEqualTo(
+            ChatMessage.Status.in_flight
+        );
+        assertThat(chatMessageRepository.findById(staleTurn).orElseThrow().getStatus()).isEqualTo(
+            ChatMessage.Status.interrupted
+        );
+        assertThat(usageEventRepository.findAll())
+            .filteredOn(row -> row.getSourceId().equals(staleTurn))
+            .hasSize(1);
+    }
 
-        // Cutoff in the future → row is past the cutoff → reaped.
-        int updatedSweep = chatMessageRepository.reapStaleInFlight(Instant.now().plusSeconds(60));
-        assertThat(updatedSweep).isEqualTo(1);
-        ChatMessage reaped = chatMessageRepository.findById(assistantId).orElseThrow();
-        assertThat(reaped.getStatus()).isEqualTo(ChatMessage.Status.interrupted);
-        assertThat(reaped.getMetadata().path("error").asString()).isEqualTo("server restart");
+    @Test
+    @DisplayName("a turn abandoned by a crashed worker is billed for the calls the proxy recorded")
+    void accountingReaper_billsACrashedTurnFromItsProxyRecordedUsage() throws Exception {
+        UUID crashedTurn = persistInFlightTurn("crashed-turn");
+        // Two calls served through the proxy before the worker went away, at $10/M input.
+        accumulateProxyCall(crashedTurn, 40_000, 1_000, 250, 5_000);
+        accumulateProxyCall(crashedTurn, 60_000, 2_000, 250, 5_000);
+        setCreatedAt(crashedTurn, Instant.now().minus(Duration.ofMinutes(80)));
+
+        reaperWithAnUnsafeWindow().reap();
+
+        assertThat(chatMessageRepository.findById(crashedTurn).orElseThrow().getStatus()).isEqualTo(
+            ChatMessage.Status.interrupted
+        );
+        var event = usageEventRepository
+            .findAll()
+            .stream()
+            .filter(row -> row.getSourceId().equals(crashedTurn))
+            .findFirst()
+            .orElseThrow();
+        assertThat(event.getInputTokens()).isEqualTo(100_000);
+        assertThat(event.getOutputTokens()).isEqualTo(3_000);
+        assertThat(event.getCacheReadTokens()).isEqualTo(10_000);
+        assertThat(event.getReasoningTokens()).isEqualTo(500);
+        assertThat(event.getTotalCalls()).isEqualTo(2);
+        assertThat(event.getPricingState()).isEqualTo(PricingState.PRICED);
+        assertThat(event.getCostUsd()).isEqualByComparingTo("1.000000");
+    }
+
+    @Test
+    @DisplayName("a turn with no recorded call stays unverifiable rather than being priced as free")
+    void accountingReaper_keepsATurnWithNoRecordedCallUnverifiable() throws Exception {
+        UUID silentTurn = persistInFlightTurn("silent-turn");
+        setCreatedAt(silentTurn, Instant.now().minus(Duration.ofMinutes(80)));
+
+        reaperWithAnUnsafeWindow().reap();
+
+        var event = usageEventRepository
+            .findAll()
+            .stream()
+            .filter(row -> row.getSourceId().equals(silentTurn))
+            .findFirst()
+            .orElseThrow();
+        assertThat(event.getPricingState()).isEqualTo(PricingState.UNPRICED);
+        assertThat(event.getInputTokens()).isZero();
+        assertThat(event.getCostUsd()).isNull();
+    }
+
+    private void accumulateProxyCall(UUID turnId, long input, long output, long reasoning, long cacheRead) {
+        new TransactionTemplate(transactionManager).executeWithoutResult(ignored ->
+            assertThat(chatMessageRepository.accumulateLlmUsage(turnId, input, output, reasoning, cacheRead)).isEqualTo(
+                1
+            )
+        );
+    }
+
+    private UUID persistInFlightTurn(String prompt) {
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, prompt);
+        UUID assistantId = UUID.randomUUID();
+        persistence.persistInFlight(thread, prompt, assistantId, null, admittedMentorConfig());
+        return assistantId;
+    }
+
+    /**
+     * A window below the safe floor, so the clamp — not the requested ten minutes — decides which rows
+     * are stale. Hand-built because the injected bean's {@code @SchedulerLock} needs a {@code shedlock}
+     * table that {@code ddl-auto=create} doesn't produce; the injected bean is still passed as
+     * self-reference so each turn runs in the {@code REQUIRES_NEW} transaction the batch semantics need.
+     */
+    private MentorInFlightReaper reaperWithAnUnsafeWindow() {
+        return new MentorInFlightReaper(
+            chatMessageRepository,
+            usageRecorder,
+            meterRegistry,
+            reaper,
+            Duration.ofMinutes(10)
+        );
+    }
+
+    private void setCreatedAt(UUID messageId, Instant createdAt) throws Exception {
+        try (
+            var connection = dataSource.getConnection();
+            var statement = connection.prepareStatement("UPDATE chat_message SET created_at = ? WHERE id = ?")
+        ) {
+            statement.setTimestamp(1, Timestamp.from(createdAt));
+            statement.setObject(2, messageId);
+            assertThat(statement.executeUpdate()).isEqualTo(1);
+        }
     }
 
     @Test
     @DisplayName("chk_chat_message_status rejects values outside (in_flight,completed,interrupted)")
     void statusColumnCheckConstraintFires() throws Exception {
-        // Pin the production DB-level guard. The column CHECK is the only backstop that
-        // catches a future writer typo'ing `"in_flite"` or inventing a new status without a
-        // matching application-side state machine update. The integration test profile
-        // recreates the constraint in @BeforeEach so this assertion exercises the real
-        // predicate, not just a JPA enum validation.
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "constraint test");
         Assertions.assertThatThrownBy(() -> {
             try (
@@ -534,11 +746,8 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
             }
         })
             .isInstanceOf(java.sql.SQLException.class)
-            // The constraint name varies by environment: production ships our explicit
-            // `chk_chat_message_status` via Liquibase, while the test profile's ddl-auto=create
-            // also generates a Hibernate-implicit `chat_message_status_check` from the
-            // @Enumerated(EnumType.STRING) field. Either fires first — both encode the same
-            // enum invariant — so the assertion accepts either.
+            // Production ships the explicit `chk_chat_message_status` via Liquibase; ddl-auto=create
+            // also generates a Hibernate-implicit `chat_message_status_check`. Either can fire first.
             .satisfies(t ->
                 Assertions.assertThat(t.getMessage()).containsAnyOf(
                     "chk_chat_message_status",

@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 
 interface ErrorSearch {
 	code?: string;
@@ -34,9 +34,10 @@ const ERROR_COPY: Record<string, { title: string; description: string }> = {
 			"That provider identity is already linked to another account. Sign in with the original account instead.",
 	},
 	link_requires_auth: {
-		title: "Sign in before linking Slack",
+		// Slack and Outline are both link-only: they can only be attached to an existing session.
+		title: "Sign in before linking that account",
 		description:
-			"Open Hephaestus, sign in with GitHub or GitLab, then connect Slack from Settings.",
+			"Open Hephaestus, sign in with GitHub or GitLab, then connect Slack or Outline from Settings.",
 	},
 	unknown_provider: {
 		title: "Provider is not configured",
@@ -68,9 +69,14 @@ function AuthErrorPage() {
 
 	return (
 		<div className="flex min-h-[100dvh] items-center justify-center p-4">
-			<Card className="w-full max-w-md text-center">
+			{/* This page IS the failure message: announce it on arrival, and title it as the page's h1. */}
+			<Card className="w-full max-w-md text-center" role="alert">
 				<CardHeader>
-					<CardTitle className="text-2xl">{title}</CardTitle>
+					{/* The page's only heading, so it must be an h1 — CardTitle renders a div, which would
+					    leave this page with no heading at all for screen-reader navigation. */}
+					<h1 data-slot="card-title" className="text-2xl leading-snug font-medium">
+						{title}
+					</h1>
 					<CardDescription>{description}</CardDescription>
 				</CardHeader>
 				<CardContent>

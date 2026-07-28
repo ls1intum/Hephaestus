@@ -92,12 +92,8 @@ class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTe
 
     @AfterEach
     void tearDown() throws Exception {
-        // The column-DROP is the FIRST action and the system-property restore is in the finally, so
-        // a DDL failure can no longer skip the property restore (it always runs) and the drop is no
-        // longer ordered after a step that could throw before it. Previously both shared one
-        // try/finally where the DROP sat in the try guarding only the property restore; any earlier
-        // throw inside that try left the legacy columns on the shared schema until the class-level
-        // @DirtiesContext recycled the context — polluting any sibling test that ran in between.
+        // Column-DROP first, system-property restore in the finally: a DDL failure must not skip
+        // the restore, and the legacy columns must not survive on the shared schema.
         try {
             // NOTE: account_login is a live current column — do NOT drop it here.
             executeDdl(
@@ -138,7 +134,6 @@ class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTe
             .as("App mode mints installation tokens on demand — no credential blob")
             .isNull();
 
-        // Config matches GitHubAppConfig with installationId, accountLogin, serverUrl
         var connection = connectionRepository.findById(row.id()).orElseThrow();
         assertThat(connection.getConfig()).isInstanceOf(ConnectionConfig.GitHubAppConfig.class);
         var cfg = (ConnectionConfig.GitHubAppConfig) connection.getConfig();
@@ -219,8 +214,6 @@ class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTe
         long firstRunCount = countConnectionRows();
         assertThat(firstRunCount).isEqualTo(1);
 
-        // Second invocation — the ON CONFLICT (workspace_id, kind, instance_key) DO NOTHING
-        // path must observe no net change.
         runBackfill();
         assertThat(countConnectionRows())
             .as("idempotency: ON CONFLICT must skip already-backfilled rows")
@@ -238,15 +231,12 @@ class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTe
 
     @Test
     void skipsAppInstallationRowsWithNullInstallationId() throws Exception {
-        // Mode=GITHUB_APP_INSTALLATION but installation_id IS NULL — log+skip, no row.
         insertWorkspaceWithLegacyColumns("GITHUB_APP_INSTALLATION", "acme-org", null, null, null);
 
         runBackfill();
 
         assertThat(countConnectionRows()).isZero();
     }
-
-    // helpers
 
     private void runBackfill() throws Exception {
         WorkspaceConnectionBackfillChange change = new WorkspaceConnectionBackfillChange();

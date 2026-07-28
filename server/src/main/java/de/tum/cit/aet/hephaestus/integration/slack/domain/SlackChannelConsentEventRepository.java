@@ -16,10 +16,7 @@ public interface SlackChannelConsentEventRepository extends Repository<SlackChan
     /** Append one consent transition. Insert-only: the entity is {@code @Immutable}, so this never updates. */
     SlackChannelConsentEvent save(SlackChannelConsentEvent event);
 
-    /**
-     * The full transition history of one channel, oldest first — the admin audit listing. Carries the
-     * {@code workspace_id} predicate; the {@code (workspace_id, slack_channel_id, created_at)} index serves it.
-     */
+    /** The full transition history of one channel, oldest first — the admin audit listing. */
     List<SlackChannelConsentEvent> findByWorkspaceIdAndSlackChannelIdOrderByCreatedAtAscIdAsc(
         Long workspaceId,
         String slackChannelId

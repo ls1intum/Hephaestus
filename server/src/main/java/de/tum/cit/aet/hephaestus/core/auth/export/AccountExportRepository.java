@@ -31,8 +31,8 @@ public interface AccountExportRepository extends JpaRepository<AccountExport, Lo
 
     /**
      * Bulk-expire READY exports past their retention window: flip to EXPIRED and free the payload in
-     * one UPDATE, without loading the (large) BYTEA blobs into the persistence context (the prior
-     * findById-per-id undid the id-only projection). Returns the number of rows affected.
+     * one UPDATE, without loading the (large) BYTEA blobs into the persistence context. Returns the
+     * number of rows affected.
      */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(

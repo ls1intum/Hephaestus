@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService.ConversationLookup;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.BooleanSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -43,13 +44,40 @@ public class SlackChannelMetadataRefresher {
         this.consentService = consentService;
     }
 
-    /** Refresh one workspace's channel metadata. Returns the number of channels checked. */
+    /** Refresh one workspace's channel metadata, uninterruptibly. Returns the number of channels checked. */
     public int refreshWorkspace(long workspaceId) {
+        return refreshWorkspace(workspaceId, () -> false);
+    }
+
+    /**
+     * Refresh one workspace's channel metadata, checking {@code cancelled} before each channel.
+     *
+     * <p>The check is per channel because each channel costs one {@code conversations.info} round trip: a
+     * workspace with a few hundred allow-listed channels otherwise keeps calling Slack for minutes after the
+     * admin pressed Cancel, and the pass runs <em>before</em> the history sync (which already honors the
+     * handle), so the cancel appeared to do nothing at all. Aborting here is safe at any point: every channel
+     * is refreshed independently and nothing is inferred from absence, so a partial pass is simply a smaller
+     * pass — the next one repeats it.
+     *
+     * @return the number of channels actually checked (fewer than the workspace's total when cancelled)
+     */
+    public int refreshWorkspace(long workspaceId, BooleanSupplier cancelled) {
         List<SlackMonitoredChannel> channels = monitoredChannelRepository.findByWorkspaceIdAndConsentStateNot(
             workspaceId,
             ConsentState.REVOKED
         );
+        int checked = 0;
         for (SlackMonitoredChannel channel : channels) {
+            if (cancelled.getAsBoolean()) {
+                log.info(
+                    "slack.sync: metadata refresh cancelled for workspaceId={} after {} of {} channel(s)",
+                    workspaceId,
+                    checked,
+                    channels.size()
+                );
+                return checked;
+            }
+            checked++;
             try {
                 refreshChannel(workspaceId, channel);
             } catch (RuntimeException e) {
@@ -61,7 +89,7 @@ public class SlackChannelMetadataRefresher {
                 );
             }
         }
-        return channels.size();
+        return checked;
     }
 
     private void refreshChannel(long workspaceId, SlackMonitoredChannel channel) {

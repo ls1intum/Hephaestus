@@ -1,0 +1,414 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
+import { BrainCircuit, Plus } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+import {
+	adminCreateLlmConnectionMutation,
+	adminCreateLlmModelMutation,
+	adminDeleteLlmConnectionMutation,
+	adminDeleteLlmModelMutation,
+	adminGetLlmSettingsOptions,
+	adminGetLlmSettingsQueryKey,
+	adminListLlmConnectionsOptions,
+	adminListLlmConnectionsQueryKey,
+	adminListLlmModelsOptions,
+	adminListLlmModelsQueryKey,
+	adminListWorkspacesOptions,
+	adminProbeLlmConnectionDraftMutation,
+	adminProbeLlmConnectionMutation,
+	adminUpdateLlmConnectionMutation,
+	adminUpdateLlmModelMutation,
+	adminUpdateLlmModelPriceMutation,
+	adminUpdateLlmModelSharingMutation,
+	adminUpdateLlmSettingsMutation,
+} from "@/api/@tanstack/react-query.gen";
+import type {
+	CreateLlmConnectionRequest,
+	LlmConnection,
+	LlmModel,
+	UpdateInstanceLlmSettingsRequest,
+	UpdateLlmConnectionRequest,
+} from "@/api/types.gen";
+import { AdminLlmConnectionFormDialog } from "@/components/admin/llm/AdminLlmConnectionFormDialog";
+import { AdminLlmConnectionsTable } from "@/components/admin/llm/AdminLlmConnectionsTable";
+import { AdminLlmModelAccessDialog } from "@/components/admin/llm/AdminLlmModelAccessDialog";
+import { AdminLlmModelFormDialog } from "@/components/admin/llm/AdminLlmModelFormDialog";
+import { AdminLlmModelsSection } from "@/components/admin/llm/AdminLlmModelsSection";
+import { InstanceLlmSettingsCard } from "@/components/admin/llm/InstanceLlmSettingsCard";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import { filedUnder, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
+import {
+	type AdminLlmModelSaveBody,
+	AdminLlmModelSaveError,
+	saveAdminLlmModelSafely,
+} from "@/lib/admin-llm-model-save";
+import { instanceAdminHead } from "@/lib/page-title";
+import { problemDetailOf } from "@/lib/problem-detail";
+
+export const Route = createFileRoute("/_authenticated/admin/models")({
+	head: instanceAdminHead("AI models"),
+	component: AdminLlmPage,
+});
+
+/** One prefix per row kind, so a delete cannot un-disable a row whose own write is still in flight. */
+const CONNECTION_WRITE_MUTATION_KEY = ["adminWriteLlmConnection"];
+const MODEL_WRITE_MUTATION_KEY = ["adminWriteLlmModel"];
+
+function AdminLlmPage() {
+	const queryClient = useQueryClient();
+
+	const [selectedConnectionId, setSelectedConnectionId] = useState<number | null>(null);
+	const [connectionDialogOpen, setConnectionDialogOpen] = useState(false);
+	const [editingConnection, setEditingConnection] = useState<LlmConnection | null>(null);
+	const [probedModels, setProbedModels] = useState<{
+		connectionId: number | null;
+		models: string[];
+	} | null>(null);
+
+	const [modelDialogOpen, setModelDialogOpen] = useState(false);
+	const [editingModel, setEditingModel] = useState<LlmModel | null>(null);
+	const [accessModel, setAccessModel] = useState<LlmModel | null>(null);
+
+	const connectionsQuery = useQuery(adminListLlmConnectionsOptions());
+	const connections = connectionsQuery.data ?? [];
+	const selectedConnection =
+		connections.find((c) => c.id === selectedConnectionId) ?? connections[0];
+
+	const modelsQuery = useQuery(adminListLlmModelsOptions());
+	const allModels = modelsQuery.data ?? [];
+	const modelCounts = allModels.reduce<Record<number, number>>((acc, model) => {
+		acc[model.connectionId] = (acc[model.connectionId] ?? 0) + 1;
+		return acc;
+	}, {});
+	const modelsForSelectedConnection = selectedConnection
+		? allModels.filter((m) => m.connectionId === selectedConnection.id)
+		: [];
+
+	const workspacesQuery = useQuery(adminListWorkspacesOptions());
+	const workspaceOptions = (workspacesQuery.data ?? []).map((w) => ({
+		id: w.id,
+		displayName: w.displayName,
+		workspaceSlug: w.workspaceSlug,
+	}));
+
+	const settingsQuery = useQuery(adminGetLlmSettingsOptions());
+
+	const invalidateConnections = () =>
+		queryClient.invalidateQueries({ queryKey: adminListLlmConnectionsQueryKey() });
+	const invalidateModels = () =>
+		queryClient.invalidateQueries({ queryKey: adminListLlmModelsQueryKey() });
+
+	const createConnection = useMutation({
+		...adminCreateLlmConnectionMutation(),
+		onSuccess: (created) => {
+			invalidateConnections();
+			setConnectionDialogOpen(false);
+			setSelectedConnectionId(created.id);
+			setProbedModels((current) =>
+				current?.connectionId === null
+					? { connectionId: created.id, models: current.models }
+					: null,
+			);
+			toast.success("Connection added");
+		},
+		onError: (error) =>
+			toast.error("Couldn't add the connection", { description: problemDetailOf(error) }),
+	});
+
+	const updateConnection = useMutation({
+		...filedUnder(CONNECTION_WRITE_MUTATION_KEY, adminUpdateLlmConnectionMutation()),
+		onSuccess: () => {
+			invalidateConnections();
+			setConnectionDialogOpen(false);
+			toast.success("Connection updated");
+		},
+		onError: (error) =>
+			toast.error("Couldn't update the connection", { description: problemDetailOf(error) }),
+	});
+
+	const deleteConnection = useMutation({
+		...filedUnder(CONNECTION_WRITE_MUTATION_KEY, adminDeleteLlmConnectionMutation()),
+		onSuccess: (_data, variables) => {
+			invalidateConnections();
+			if (variables.path.id === selectedConnectionId) setSelectedConnectionId(null);
+			toast.success("Connection deleted");
+		},
+		onError: (error) =>
+			toast.error("Couldn't delete the connection", { description: problemDetailOf(error) }),
+	});
+
+	const mutatingConnectionIds = usePendingMutationIds<{ path: { id: number } }>(
+		CONNECTION_WRITE_MUTATION_KEY,
+		(variables) => variables.path.id,
+	);
+
+	const probeDraft = useMutation({ ...adminProbeLlmConnectionDraftMutation() });
+	const probeSaved = useMutation({ ...adminProbeLlmConnectionMutation() });
+
+	const createModel = useMutation({ ...adminCreateLlmModelMutation() });
+	const updateModel = useMutation({ ...adminUpdateLlmModelMutation() });
+	const updatePrice = useMutation({ ...adminUpdateLlmModelPriceMutation() });
+	const updateSharing = useMutation({
+		...filedUnder(MODEL_WRITE_MUTATION_KEY, adminUpdateLlmModelSharingMutation()),
+	});
+	const deleteModel = useMutation({
+		...filedUnder(MODEL_WRITE_MUTATION_KEY, adminDeleteLlmModelMutation()),
+		onSuccess: () => {
+			invalidateModels();
+			toast.success("Model deleted");
+		},
+		onError: (error) =>
+			toast.error("Couldn't delete the model", { description: problemDetailOf(error) }),
+	});
+
+	const mutatingModelIds = usePendingMutationIds<{ path: { id: number } }>(
+		MODEL_WRITE_MUTATION_KEY,
+		(variables) => variables.path.id,
+	);
+
+	const updateSettings = useMutation({
+		...adminUpdateLlmSettingsMutation(),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: adminGetLlmSettingsQueryKey() });
+			toast.success("Settings saved");
+		},
+		onError: (error) =>
+			toast.error("Couldn't save settings", { description: problemDetailOf(error) }),
+	});
+
+	const isModelSaving =
+		createModel.isPending ||
+		updateModel.isPending ||
+		updatePrice.isPending ||
+		updateSharing.isPending;
+
+	const handleSaveModel = async (body: AdminLlmModelSaveBody) => {
+		if (!selectedConnection) return;
+		try {
+			await saveAdminLlmModelSafely({
+				connectionId: selectedConnection.id,
+				editing: editingModel,
+				body,
+				operations: {
+					create: (connectionId, metadata) =>
+						createModel.mutateAsync({ path: { connectionId }, body: metadata }),
+					updateMetadata: (id, metadata) =>
+						updateModel.mutateAsync({ path: { id }, body: metadata }),
+					updatePrice: (id, price) => updatePrice.mutateAsync({ path: { id }, body: price }),
+					updateSharing: (id, sharing) =>
+						updateSharing.mutateAsync({ path: { id }, body: sharing }),
+				},
+			});
+			invalidateModels();
+			setModelDialogOpen(false);
+			toast.success(editingModel ? "Model updated" : "Model added");
+		} catch (error) {
+			invalidateModels();
+			if (error instanceof AdminLlmModelSaveError && error.modelId != null) {
+				toast.error("Model saved inactive, but setup is incomplete", {
+					description: "Review the model and save again before activating it.",
+				});
+			} else {
+				toast.error("Couldn't save the model", { description: problemDetailOf(error) });
+			}
+		}
+	};
+
+	return (
+		<div className="mx-auto w-full max-w-6xl space-y-6 py-6">
+			<header className="flex flex-wrap items-start justify-between gap-3">
+				<div className="space-y-1">
+					<div className="flex items-center gap-2">
+						<BrainCircuit className="size-6 text-muted-foreground" aria-hidden />
+						<h1 className="text-2xl font-semibold">AI models</h1>
+					</div>
+					<p className="max-w-2xl text-sm text-muted-foreground">
+						Connect OpenAI-compatible endpoints and share models with workspaces.
+					</p>
+				</div>
+				<Button
+					disabled={!connectionsQuery.isSuccess}
+					onClick={() => {
+						setEditingConnection(null);
+						setProbedModels({ connectionId: null, models: [] });
+						setConnectionDialogOpen(true);
+					}}
+				>
+					<Plus className="size-4" aria-hidden />
+					Add connection
+				</Button>
+			</header>
+
+			<AdminLlmConnectionsTable
+				connections={connections}
+				modelCounts={modelCounts}
+				modelCountsAvailable={modelsQuery.isSuccess}
+				isLoading={connectionsQuery.isLoading}
+				isError={connectionsQuery.isError}
+				error={connectionsQuery.error}
+				onRetry={() => connectionsQuery.refetch()}
+				mutatingIds={mutatingConnectionIds}
+				selectedId={selectedConnection?.id ?? null}
+				onSelect={(connection) => {
+					setSelectedConnectionId(connection.id);
+				}}
+				onEdit={(connection) => {
+					setEditingConnection(connection);
+					setProbedModels({ connectionId: connection.id, models: [] });
+					setConnectionDialogOpen(true);
+				}}
+				onToggleEnabled={(connection, enabled) => {
+					updateConnection.mutate({ path: { id: connection.id }, body: { enabled } });
+				}}
+				onDelete={(connection) => {
+					deleteConnection.mutate({ path: { id: connection.id } });
+				}}
+				onAdd={() => {
+					setEditingConnection(null);
+					setProbedModels({ connectionId: null, models: [] });
+					setConnectionDialogOpen(true);
+				}}
+			/>
+
+			{selectedConnection &&
+				(modelsQuery.isError ? (
+					<QueryErrorAlert
+						error={modelsQuery.error}
+						title="Could not load models"
+						onRetry={() => modelsQuery.refetch()}
+					/>
+				) : modelsQuery.isLoading ? (
+					<div
+						className="flex h-32 items-center justify-center"
+						role="status"
+						aria-label="Loading models"
+					>
+						<Spinner className="size-6" />
+					</div>
+				) : (
+					<AdminLlmModelsSection
+						connectionDisplayName={selectedConnection.displayName}
+						connectionEnabled={selectedConnection.enabled}
+						workspaceOptions={workspaceOptions}
+						models={modelsForSelectedConnection}
+						mutatingIds={mutatingModelIds}
+						onAdd={() => {
+							setEditingModel(null);
+							setModelDialogOpen(true);
+						}}
+						onEdit={(model) => {
+							setEditingModel(model);
+							setModelDialogOpen(true);
+						}}
+						onManageAccess={setAccessModel}
+						onDelete={(model) => {
+							deleteModel.mutate({ path: { id: model.id } });
+						}}
+					/>
+				))}
+
+			{settingsQuery.isError ? (
+				<QueryErrorAlert
+					error={settingsQuery.error}
+					title="Could not load AI policy"
+					onRetry={() => settingsQuery.refetch()}
+				/>
+			) : (
+				<InstanceLlmSettingsCard
+					settings={settingsQuery.data}
+					isLoading={settingsQuery.isLoading}
+					isSubmitting={updateSettings.isPending}
+					onSave={(body: UpdateInstanceLlmSettingsRequest) => updateSettings.mutate({ body })}
+				/>
+			)}
+
+			<AdminLlmConnectionFormDialog
+				open={connectionDialogOpen}
+				onOpenChange={(open) => {
+					setConnectionDialogOpen(open);
+					if (!open) setProbedModels(null);
+				}}
+				editing={editingConnection}
+				isSubmitting={createConnection.isPending || updateConnection.isPending}
+				onCreate={(body: CreateLlmConnectionRequest) => createConnection.mutate({ body })}
+				onUpdate={(id, body: UpdateLlmConnectionRequest) => {
+					updateConnection.mutate({ path: { id }, body });
+				}}
+				isProbing={probeDraft.isPending || probeSaved.isPending}
+				onProbe={(request, callbacks) => {
+					probeDraft.mutate(
+						{ body: request },
+						{
+							onSuccess: callbacks.onSuccess,
+							onError: (error) =>
+								callbacks.onError(problemDetailOf(error, "The provider didn't answer.")),
+						},
+					);
+				}}
+				onProbeSaved={(id, callbacks) => {
+					probeSaved.mutate(
+						{ path: { id } },
+						{
+							onSuccess: callbacks.onSuccess,
+							onError: (error) =>
+								callbacks.onError(problemDetailOf(error, "The provider didn't answer.")),
+						},
+					);
+				}}
+				onProbed={(models) =>
+					setProbedModels({ connectionId: editingConnection?.id ?? null, models })
+				}
+			/>
+
+			<AdminLlmModelFormDialog
+				open={modelDialogOpen}
+				onOpenChange={setModelDialogOpen}
+				editing={editingModel}
+				workspaceOptions={workspaceOptions}
+				probedModelIds={
+					probedModels && selectedConnection && probedModels.connectionId === selectedConnection.id
+						? probedModels.models
+						: []
+				}
+				isSubmitting={isModelSaving}
+				onSave={handleSaveModel}
+			/>
+
+			<AdminLlmModelAccessDialog
+				open={accessModel != null}
+				// Dismissal is allowed while the PUT is in flight: we set no request timeout, so refusing
+				// it would trap focus in the popup against a connection that never answers. The request
+				// runs on and its row stays disabled, so this cannot reopen onto a second save.
+				onOpenChange={(open) => {
+					if (!open) setAccessModel(null);
+				}}
+				model={accessModel}
+				workspaceOptions={workspaceOptions}
+				isLoadingWorkspaces={workspacesQuery.isLoading}
+				workspacesError={workspacesQuery.error}
+				onRetryWorkspaces={() => workspacesQuery.refetch()}
+				isSubmitting={updateSharing.isPending}
+				onSave={(body) => {
+					if (!accessModel) return;
+					updateSharing.mutate(
+						{ path: { id: accessModel.id }, body },
+						{
+							onSuccess: () => {
+								invalidateModels();
+								setAccessModel(null);
+								toast.success("Workspace access updated");
+							},
+							onError: (error) =>
+								toast.error("Couldn't update workspace access", {
+									description: problemDetailOf(error),
+								}),
+						},
+					);
+				}}
+			/>
+		</div>
+	);
+}

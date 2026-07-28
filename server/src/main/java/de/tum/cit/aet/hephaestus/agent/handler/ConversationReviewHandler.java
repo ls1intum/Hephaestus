@@ -28,13 +28,10 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Handler for {@link AgentJobType#CONVERSATION_REVIEW} jobs — the Slack-conversation counterpart of
- * {@link IssueReviewHandler}. It is <strong>repo-less</strong>: there is no clone, no diff, no
- * {@code inputs/sources/scm/} mount ({@code volumeMounts()} defaults to empty), and no SCM comment is posted.
- * The case context is the thread's ordered human turns, materialised as
- * {@code inputs/context/conversation_thread.json} by {@code ConversationThreadContentSource}, plus the same
- * cross-artifact project inventory {@link IssueReviewHandler} mounts — aggregated across every repository the
- * workspace monitors ({@code WorkspaceInventoryContentSource}), since a conversation isn't anchored to one repo.
+ * Handler for {@link AgentJobType#CONVERSATION_REVIEW} jobs. <strong>Repo-less</strong>: no clone, no diff,
+ * no {@code inputs/sources/scm/} mount, and no SCM comment. The case context is the thread's ordered human
+ * turns ({@code inputs/context/conversation_thread.json}) plus the workspace-wide project inventory, since a
+ * conversation isn't anchored to one repo.
  *
  * <p>Delivery persists findings via {@link PracticeDetectionDeliveryService} (target type CONVERSATION_THREAD,
  * {@code aboutUserId} carried explicitly in metadata) and then publishes {@link PracticeDetectionDeliveredEvent}
@@ -93,11 +90,9 @@ public class ConversationReviewHandler implements JobTypeHandler {
         metadata.put("slack_thread_ts", r.slackThreadTs());
         metadata.put("about_user_id", r.aboutUserId());
 
-        // Key shape mirrors the PR/issue 5-segment form "<type>:<scope>:<number>:<phase>:<freshness>" so
-        // AgentJobService.extractCooldownKeyPrefix strips ONLY the trailing freshness (lastTs): cooldown then
-        // scopes on (channel, thread, subject) — a late reply that advances lastTs does NOT re-fire, while the
-        // watermark growth gate in the scheduler admits genuinely new turns. None of channel/threadTs/user
-        // contain ':' so the segment boundaries are unambiguous.
+        // Trailing segment is the disposable freshness (lastTs): AgentJobService.extractCooldownKeyPrefix
+        // strips only it, so cooldown scopes on (channel, thread, subject) — a late reply that advances lastTs
+        // does NOT re-fire. None of channel/threadTs/user contain ':' so segment boundaries are unambiguous.
         String idempotencyKey =
             "conversation_review:" +
             r.slackChannelId() +
@@ -119,11 +114,6 @@ public class ConversationReviewHandler implements JobTypeHandler {
         if (job.getWorkspace() == null) {
             throw new JobPreparationException("Job has no workspace: jobId=" + job.getId());
         }
-        // Repo-less: ConversationThreadContentSource writes inputs/context/conversation_thread.json and the
-        // best-effort WorkspaceInventoryContentSource writes inputs/context/project_inventory.json (aggregated
-        // across the workspace's monitored repos — see ContextRequest.ConversationReviewRequest). Neither
-        // touches a git worktree: no SCM source is written, and volumeMounts() below stays empty, so the
-        // orchestrator/runner run without a clone.
         Map<String, byte[]> files = new LinkedHashMap<>(
             workspaceContextBuilder.build(new ContextRequest.ConversationReviewRequest(job))
         );
@@ -136,8 +126,7 @@ public class ConversationReviewHandler implements JobTypeHandler {
     private TaskEnvelope buildTaskEnvelope(AgentJob job, JsonNode metadata) {
         String channelId = metadata.path("slack_channel_id").asString("");
         String threadTs = metadata.path("slack_thread_ts").asString("");
-        // Reuse the PracticeReview task kind — the runner is artifact-agnostic; the prompt + the conversation
-        // context file drive it. The routing hints (number/repo) are non-empty placeholders the runner ignores.
+        // Reuse the artifact-agnostic PracticeReview task kind; the number/repo hints are placeholders the runner ignores.
         Task task = new Task.PracticeReview(buildPrompt(channelId, threadTs, job), 1, "slack-thread:" + channelId);
         return TaskEnvelope.of(job.getId(), job.getWorkspace().getId(), task);
     }
@@ -172,7 +161,7 @@ public class ConversationReviewHandler implements JobTypeHandler {
                 "No valid findings in agent output: jobId=" + job.getId() + ", discarded=" + parsed.discarded().size()
             );
         }
-        // Coherence coercion mirrors the issue path: defect-detector GOOD → NOT_APPLICABLE + severity sentinel.
+        // Coherence coercion: defect-detector GOOD → NOT_APPLICABLE + severity sentinel.
         Set<String> defectDetectorSlugs =
             job.getWorkspace() == null
                 ? Set.of()
@@ -183,7 +172,6 @@ public class ConversationReviewHandler implements JobTypeHandler {
         List<PracticeDetectionResultParser.ValidatedFinding> coercedFindings =
             PracticeDetectionResultParser.coerceCoherence(parsed.validFindings(), defectDetectorSlugs);
 
-        // Persist observations (aboutUserId resolved from metadata about_user_id) in its own transaction.
         PracticeDetectionDeliveryService.DeliveryResult result = deliveryService.deliver(job, coercedFindings);
         log.info(
             "Conversation delivery complete: inserted={}, unknownSlug={}, duplicate={}, jobId={}",
@@ -193,10 +181,8 @@ public class ConversationReviewHandler implements JobTypeHandler {
             job.getId()
         );
 
-        // Drive the conversational-delivery loop: publish INSIDE a transaction so the AFTER_COMMIT listener
-        // fires (deliver() runs outside a transaction in the executor). The listener re-reads the now-committed
-        // observations, admits OBSERVED problems targeted at the judged author, and prepares CONVERSATION units
-        // that surface in the author's next mentor DM turn. Best-effort — a publish hiccup never fails the job.
+        // Publish INSIDE a transaction so the AFTER_COMMIT listener fires (deliver() runs outside a transaction
+        // in the executor). Best-effort — a publish hiccup never fails the job; findings are already persisted.
         try {
             transactionTemplate.executeWithoutResult(status ->
                 eventPublisher.publishEvent(

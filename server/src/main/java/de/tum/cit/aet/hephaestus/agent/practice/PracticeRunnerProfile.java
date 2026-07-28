@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.practice;
 
 import de.tum.cit.aet.hephaestus.agent.runtime.PiRunnerProfile;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import java.util.List;
 import java.util.Map;
 
@@ -13,11 +14,22 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
 
     public static final String SCRIPT = "pi-runner.mjs";
 
+    /** Imported by {@link #SCRIPT} with a relative specifier, so both must be staged beside it. */
+    private static final List<String> SIDECARS = List.of(
+        "pi-finding-normalize.mjs",
+        SandboxLayout.PROVIDER_HELPER_FILENAME
+    );
+
     private static final List<String> FLAGS = List.of("--no-warnings");
 
     @Override
     public String runnerScript() {
         return SCRIPT;
+    }
+
+    @Override
+    public List<String> sidecarScripts() {
+        return SIDECARS;
     }
 
     @Override

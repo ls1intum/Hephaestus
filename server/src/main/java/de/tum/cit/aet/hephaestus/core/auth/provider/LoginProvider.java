@@ -20,9 +20,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 /**
  * An instance-scoped OAuth2 login provider (a sign-in option offered on the login page) — GitHub,
- * GitLab.com, or a self-hosted GitLab. Replaces the env-only defaults and the per-workspace OIDC
- * Connections with a single runtime-manageable table: a deployment ships with seeded defaults (env →
- * seed) and an instance admin can add more (e.g. a self-hosted GitLab) without a redeploy.
+ * GitLab.com, or a self-hosted GitLab. A deployment ships with seeded defaults (env → seed) and an
+ * instance admin can add more (e.g. a self-hosted GitLab) without a redeploy.
  *
  * <p>{@code registrationId} is the OAuth callback id ({@code /login/oauth2/code/{registrationId}}) and
  * what {@code IdentityLink} provider resolution and the admin allowlist key on, so it is stable and
@@ -55,6 +54,23 @@ public class LoginProvider {
          * it uses the OIDC path (id_token with a {@code sub} + verified {@code team_id} claim), not OAuth2.
          */
         SLACK,
+        /**
+         * Outline wiki (v0.77+). A <em>link-only</em> secondary provider like {@link #SLACK}, but plain
+         * OAuth2, NOT OIDC — Outline issues no id_token and has no discovery/userinfo endpoint; identity
+         * comes from {@code POST {base}/api/auth.info} with the user's access token (see
+         * {@code OutlineAuthInfoUserService}). Per-instance {@code baseUrl} (self-hosted), validated like a
+         * self-hosted GitLab (HTTPS + SSRF guard). The Outline team id keys {@code IdentityLink.teamId}.
+         */
+        OUTLINE;
+
+        /**
+         * Link-only providers are never a primary sign-in: they can only attach an identity to an already
+         * authenticated account (Slack workspace identity, Outline wiki identity). Enforced at flow begin
+         * ({@code AuthBeginController}) and again at provisioning ({@code AccountProvisioningService}).
+         */
+        public boolean isLinkOnly() {
+            return this == SLACK || this == OUTLINE;
+        }
     }
 
     @Id

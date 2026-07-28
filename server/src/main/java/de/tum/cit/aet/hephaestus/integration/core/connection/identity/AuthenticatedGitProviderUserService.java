@@ -57,7 +57,7 @@ public class AuthenticatedGitProviderUserService {
     /**
      * Resolve the SCM {@code User} for the current principal, provisioning it from the account's
      * federated identities on first sight. GitLab identities take precedence over GitHub when an
-     * account has both (preserving the prior {@code gitlab_id}-first ordering). The provider server
+     * account has both. The provider server
      * URL comes from each {@code IdentityLink}'s own {@code git_provider} row, which is authoritative
      * for the provider the user actually logged in with.
      */
@@ -73,7 +73,6 @@ public class AuthenticatedGitProviderUserService {
             return Optional.empty();
         }
 
-        // GitLab first (matches the historical gitlab_id-before-github_id ordering), then GitHub.
         IdentityLinkView gitLabLink = firstOfType(links, IdentityProviderType.GITLAB);
         if (gitLabLink != null) {
             return Optional.of(provisionUser(gitLabLink));

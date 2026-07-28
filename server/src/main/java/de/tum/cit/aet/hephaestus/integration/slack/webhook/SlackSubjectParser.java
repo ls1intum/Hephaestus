@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
  *
  * <p>Subjects with fewer than four dot-delimited components are malformed and throw
  * {@link IllegalArgumentException}; the consumer dispatcher turns that into a debug-logged
- * no-op ACK rather than a silent drop (mirrors {@code GithubSubjectParser}).
+ * no-op ACK rather than a silent drop.
  */
 @Component
 public class SlackSubjectParser implements SubjectParser {

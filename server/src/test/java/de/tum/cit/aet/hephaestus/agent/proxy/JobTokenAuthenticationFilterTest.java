@@ -2,32 +2,42 @@ package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.servlet.FilterChain;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
+import java.math.BigDecimal;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import tools.jackson.databind.ObjectMapper;
 
 class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
@@ -37,7 +47,9 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
     @Mock
     private FilterChain filterChain;
 
+    private MentorProxyCredentialRegistry mentorRegistry;
     private JobTokenAuthenticationFilter filter;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     /** A valid Base64-URL token (43 chars, 256 bits). */
     private static final String VALID_TOKEN = "dGVzdC10b2tlbi0xMjM0NTY3ODkwMTIzNDU2Nzg5MDE";
@@ -45,7 +57,8 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        filter = new JobTokenAuthenticationFilter(agentJobRepository);
+        mentorRegistry = new MentorProxyCredentialRegistry();
+        filter = new JobTokenAuthenticationFilter(agentJobRepository, mentorRegistry, objectMapper);
         SecurityContextHolder.clearContext();
     }
 
@@ -61,7 +74,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         void shouldRejectNonPrivateIp() throws Exception {
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("8.8.8.8");
-            request.addHeader("x-api-key", VALID_TOKEN);
+            request.addHeader("Authorization", "Bearer " + VALID_TOKEN);
             var response = new MockHttpServletResponse();
 
             filter.doFilterInternal(request, response, filterChain);
@@ -141,21 +154,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldExtractFromXApiKey() throws Exception {
-            var job = createRunningJob();
-            when(
-                agentJobRepository.findByJobTokenHashAndStatus(eq(VALID_TOKEN_HASH), eq(AgentJobStatus.RUNNING))
-            ).thenReturn(Optional.of(job));
-
-            // Capture authentication during filter chain execution (before finally clears it)
-            var authCapture = new AtomicReference<Authentication>();
-            doAnswer(invocation -> {
-                authCapture.set(SecurityContextHolder.getContext().getAuthentication());
-                return null;
-            })
-                .when(filterChain)
-                .doFilter(any(), any());
-
+        void shouldRejectXApiKeyProviderHeader() throws Exception {
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
             request.addHeader("x-api-key", VALID_TOKEN);
@@ -163,11 +162,8 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
             filter.doFilterInternal(request, response, filterChain);
 
-            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
-            verify(filterChain).doFilter(any(), any());
-            assertThat(authCapture.get()).isInstanceOf(JobTokenAuthentication.class);
-            // Verify context is cleaned up after filter chain completes
-            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
+            verify(filterChain, never()).doFilter(any(), any());
         }
 
         @Test
@@ -195,25 +191,13 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
             verify(filterChain).doFilter(any(), any());
             assertThat(authCapture.get()).isInstanceOf(JobTokenAuthentication.class);
-            assertThat(((JobTokenAuthentication) authCapture.get()).getPrincipal()).isSameAs(job);
+            ProxyRouting routing = (ProxyRouting) ((JobTokenAuthentication) authCapture.get()).getPrincipal();
+            assertThat(routing.principalDescription()).isEqualTo("job:" + job.getId());
             assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
         }
 
         @Test
-        void shouldExtractFromAzureApiKey() throws Exception {
-            var job = createRunningJob();
-            when(
-                agentJobRepository.findByJobTokenHashAndStatus(eq(VALID_TOKEN_HASH), eq(AgentJobStatus.RUNNING))
-            ).thenReturn(Optional.of(job));
-
-            var authCapture = new AtomicReference<Authentication>();
-            doAnswer(invocation -> {
-                authCapture.set(SecurityContextHolder.getContext().getAuthentication());
-                return null;
-            })
-                .when(filterChain)
-                .doFilter(any(), any());
-
+        void shouldRejectApiKeyProviderHeader() throws Exception {
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
             request.addHeader("api-key", VALID_TOKEN);
@@ -221,18 +205,15 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
             filter.doFilterInternal(request, response, filterChain);
 
-            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
-            verify(filterChain).doFilter(any(), any());
-            assertThat(authCapture.get()).isInstanceOf(JobTokenAuthentication.class);
-            assertThat(((JobTokenAuthentication) authCapture.get()).getPrincipal()).isSameAs(job);
-            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
+            verify(filterChain, never()).doFilter(any(), any());
         }
 
         @Test
         void shouldReturn401ForMalformedToken() throws Exception {
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
-            request.addHeader("x-api-key", "not a valid base64!!!");
+            request.addHeader("Authorization", "Bearer not a valid base64!!!");
             var response = new MockHttpServletResponse();
 
             filter.doFilterInternal(request, response, filterChain);
@@ -248,7 +229,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
-            request.addHeader("x-api-key", VALID_TOKEN);
+            request.addHeader("Authorization", "Bearer " + VALID_TOKEN);
             var response = new MockHttpServletResponse();
 
             filter.doFilterInternal(request, response, filterChain);
@@ -257,10 +238,19 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldReturn401ForWhitespaceOnlyToken() throws Exception {
+        @DisplayName(
+            "a job with no config snapshot (should be impossible in prod — column is NOT NULL) is refused, not NPE'd"
+        )
+        void shouldReturn401WhenJobHasNoConfigSnapshot() throws Exception {
+            var job = new AgentJob();
+            job.setJobToken(VALID_TOKEN);
+            when(
+                agentJobRepository.findByJobTokenHashAndStatus(eq(VALID_TOKEN_HASH), eq(AgentJobStatus.RUNNING))
+            ).thenReturn(Optional.of(job));
+
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
-            request.addHeader("x-api-key", "   ");
+            request.addHeader("Authorization", "Bearer " + VALID_TOKEN);
             var response = new MockHttpServletResponse();
 
             filter.doFilterInternal(request, response, filterChain);
@@ -269,11 +259,12 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             verify(filterChain, never()).doFilter(any(), any());
         }
 
-        @Test
-        void shouldReturn401ForEmptyBearer() throws Exception {
+        @ParameterizedTest(name = "Authorization: [{0}]")
+        @ValueSource(strings = { "Bearer ", "Bearer    " })
+        void shouldReturn401ForABearerHeaderWithNoToken(String header) throws Exception {
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
-            request.addHeader("Authorization", "Bearer ");
+            request.addHeader("Authorization", header);
             var response = new MockHttpServletResponse();
 
             filter.doFilterInternal(request, response, filterChain);
@@ -285,39 +276,62 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         @Test
         void shouldAcceptCaseInsensitiveBearer() throws Exception {
             var job = createRunningJob();
-            when(
-                agentJobRepository.findByJobTokenHashAndStatus(eq(VALID_TOKEN_HASH), eq(AgentJobStatus.RUNNING))
-            ).thenReturn(Optional.of(job));
 
-            var request = new MockHttpServletRequest();
-            request.setRemoteAddr("10.0.0.2");
-            request.addHeader("Authorization", "bearer " + VALID_TOKEN);
-            var response = new MockHttpServletResponse();
+            Authentication installed = authenticateAndCaptureAuthentication(job, "bearer " + VALID_TOKEN, null);
 
-            filter.doFilterInternal(request, response, filterChain);
-
-            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
-            verify(filterChain).doFilter(any(), any());
+            assertThatTheChainRanAsTheJob(installed, job);
         }
 
         @Test
-        void shouldPreferXApiKeyOverBearer() throws Exception {
+        void shouldIgnoreProviderKeyWhenBearerIsPresent() throws Exception {
             var job = createRunningJob();
+
+            Authentication installed = authenticateAndCaptureAuthentication(
+                job,
+                "Bearer " + VALID_TOKEN,
+                "provider-key-must-be-ignored"
+            );
+
+            assertThatTheChainRanAsTheJob(installed, job);
+        }
+
+        /**
+         * MockHttpServletResponse's status defaults to 200, so asserting SC_OK proves nothing on its
+         * own — a filter that forwarded the chain WITHOUT installing the job's authentication would
+         * pass that. What has to hold is that the downstream chain ran as this job.
+         */
+        private void assertThatTheChainRanAsTheJob(Authentication installed, AgentJob job) {
+            assertThat(installed).isInstanceOf(JobTokenAuthentication.class);
+            ProxyRouting routing = (ProxyRouting) ((JobTokenAuthentication) installed).getPrincipal();
+            assertThat(routing.principalDescription()).isEqualTo("job:" + job.getId());
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        }
+
+        private Authentication authenticateAndCaptureAuthentication(
+            AgentJob job,
+            String authorizationHeader,
+            @Nullable String providerKeyHeader
+        ) throws Exception {
             when(
                 agentJobRepository.findByJobTokenHashAndStatus(eq(VALID_TOKEN_HASH), eq(AgentJobStatus.RUNNING))
             ).thenReturn(Optional.of(job));
+            var authCapture = new AtomicReference<Authentication>();
+            doAnswer(invocation -> {
+                authCapture.set(SecurityContextHolder.getContext().getAuthentication());
+                return null;
+            })
+                .when(filterChain)
+                .doFilter(any(), any());
 
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
-            request.addHeader("x-api-key", VALID_TOKEN);
-            request.addHeader("Authorization", "Bearer some-other-token");
-            var response = new MockHttpServletResponse();
+            if (providerKeyHeader != null) {
+                request.addHeader("x-api-key", providerKeyHeader);
+            }
+            request.addHeader("Authorization", authorizationHeader);
 
-            filter.doFilterInternal(request, response, filterChain);
-
-            // Should authenticate with x-api-key token (VALID_TOKEN), not the Bearer token
-            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
-            verify(filterChain).doFilter(any(), any());
+            filter.doFilterInternal(request, new MockHttpServletResponse(), filterChain);
+            return authCapture.get();
         }
 
         @Test
@@ -334,13 +348,13 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
-            request.addHeader("x-api-key", VALID_TOKEN);
+            request.addHeader("Authorization", "Bearer " + VALID_TOKEN);
             var response = new MockHttpServletResponse();
 
             try {
                 filter.doFilterInternal(request, response, filterChain);
             } catch (jakarta.servlet.ServletException expected) {
-                // Expected
+                // no-op
             }
 
             assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
@@ -350,7 +364,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         void shouldRejectTokenWithPadding() throws Exception {
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
-            request.addHeader("x-api-key", "dGVzdA==");
+            request.addHeader("Authorization", "Bearer dGVzdA==");
             var response = new MockHttpServletResponse();
 
             filter.doFilterInternal(request, response, filterChain);
@@ -361,22 +375,244 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         @Test
         void shouldNotBeBypassedByXForwardedFor() throws Exception {
             var request = new MockHttpServletRequest();
-            request.setRemoteAddr("8.8.8.8"); // Public IP
-            request.addHeader("X-Forwarded-For", "10.0.0.2"); // Spoofed private IP
-            request.addHeader("x-api-key", VALID_TOKEN);
+            request.setRemoteAddr("8.8.8.8");
+            request.addHeader("X-Forwarded-For", "10.0.0.2");
+            request.addHeader("Authorization", "Bearer " + VALID_TOKEN);
             var response = new MockHttpServletResponse();
 
             filter.doFilterInternal(request, response, filterChain);
 
-            // Should still reject — uses getRemoteAddr(), not X-Forwarded-For
+            // Uses getRemoteAddr(), not X-Forwarded-For
             assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_FORBIDDEN);
             verify(filterChain, never()).doFilter(any(), any());
         }
     }
 
+    @Nested
+    @DisplayName("Mentor session token fallback — the mentor sandbox is not an AgentJob row")
+    class MentorTokenFallback {
+
+        @Test
+        void aMentorRegistryTokenAuthenticatesWhenNoJobMatches() throws Exception {
+            when(agentJobRepository.findByJobTokenHashAndStatus(any(), eq(AgentJobStatus.RUNNING))).thenReturn(
+                Optional.empty()
+            );
+            String mentorToken = mentorRegistry.mint(
+                UUID.randomUUID(),
+                new MentorProxyCredentialRegistry.Route(
+                    "openai-completions",
+                    "https://api.openai.com",
+                    null,
+                    null,
+                    null,
+                    null
+                )
+            );
+
+            var authCapture = new AtomicReference<Authentication>();
+            doAnswer(invocation -> {
+                authCapture.set(SecurityContextHolder.getContext().getAuthentication());
+                return null;
+            })
+                .when(filterChain)
+                .doFilter(any(), any());
+
+            var request = new MockHttpServletRequest();
+            request.setRemoteAddr("10.0.0.2");
+            request.addHeader("Authorization", "Bearer " + mentorToken);
+            var response = new MockHttpServletResponse();
+
+            filter.doFilterInternal(request, response, filterChain);
+
+            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
+            ProxyRouting routing = (ProxyRouting) ((JobTokenAuthentication) authCapture.get()).getPrincipal();
+            assertThat(routing.apiProtocol()).isEqualTo("openai-completions");
+        }
+
+        @Test
+        void aTokenMatchingNeitherJobNorMentorRegistryIsRefused() throws Exception {
+            when(agentJobRepository.findByJobTokenHashAndStatus(any(), eq(AgentJobStatus.RUNNING))).thenReturn(
+                Optional.empty()
+            );
+
+            var request = new MockHttpServletRequest();
+            request.setRemoteAddr("10.0.0.2");
+            request.addHeader("Authorization", "Bearer " + VALID_TOKEN);
+            var response = new MockHttpServletResponse();
+
+            filter.doFilterInternal(request, response, filterChain);
+
+            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
+            verify(filterChain, never()).doFilter(any(), any());
+        }
+    }
+
+    @Nested
+    @DisplayName("the billed attempt resolved from the row")
+    class BilledAttempt {
+
+        @Test
+        @DisplayName("carries the row's retry_count, so a later attempt's write can be told apart")
+        void theRoutingCarriesTheAttemptNumber() throws Exception {
+            var job = createRunningJob();
+            job.setRetryCount(3);
+
+            ProxyRouting routing = authenticateAndCaptureRouting(job);
+
+            assertThat(routing.attempt()).isNotNull();
+            assertThat(routing.attempt().number()).isEqualTo(3);
+            assertThat(routing.attempt().sourceId()).isEqualTo(job.getId());
+        }
+
+        /** 1M input at $10/1M plus 100k output at $30/1M is the $13 asserted below. */
+        @Test
+        @DisplayName("prices the calls the attempt has already made with the rates frozen at admission")
+        void theRoutingPricesWhatTheAttemptHasAlreadySpent() throws Exception {
+            var job = createRunningJob(
+                new LlmPriceSnapshot(
+                    FundingSource.INSTANCE,
+                    PricingState.PRICED,
+                    1L,
+                    null,
+                    new BigDecimal("10"),
+                    new BigDecimal("30"),
+                    new BigDecimal("1"),
+                    new BigDecimal("2")
+                )
+            );
+            job.setLlmTotalInputTokens(1_000_000);
+            job.setLlmTotalOutputTokens(100_000);
+
+            ProxyRouting routing = authenticateAndCaptureRouting(job);
+
+            assertThat(routing.inFlightSpendUsd()).isEqualByComparingTo("13");
+        }
+
+        /** Only reachable for a job that never went through {@code LlmAdmissionService}, which refuses one. */
+        @Test
+        @DisplayName("a snapshot with no frozen price contributes no in-flight spend")
+        void aSnapshotWithoutAPriceContributesNothing() throws Exception {
+            var job = createRunningJob();
+            job.setLlmTotalInputTokens(1_000_000);
+
+            ProxyRouting routing = authenticateAndCaptureRouting(job);
+
+            assertThat(routing.inFlightSpendUsd()).isEqualByComparingTo("0");
+        }
+
+        private ProxyRouting authenticateAndCaptureRouting(AgentJob job) throws Exception {
+            when(
+                agentJobRepository.findByJobTokenHashAndStatus(eq(VALID_TOKEN_HASH), eq(AgentJobStatus.RUNNING))
+            ).thenReturn(Optional.of(job));
+            var authCapture = new AtomicReference<Authentication>();
+            doAnswer(invocation -> {
+                authCapture.set(SecurityContextHolder.getContext().getAuthentication());
+                return null;
+            })
+                .when(filterChain)
+                .doFilter(any(), any());
+
+            var request = new MockHttpServletRequest();
+            request.setRemoteAddr("10.0.0.2");
+            request.addHeader("Authorization", "Bearer " + VALID_TOKEN);
+            filter.doFilterInternal(request, new MockHttpServletResponse(), filterChain);
+
+            return (ProxyRouting) ((JobTokenAuthentication) authCapture.get()).getPrincipal();
+        }
+    }
+
     private AgentJob createRunningJob() {
+        return createRunningJob(null);
+    }
+
+    private AgentJob createRunningJob(LlmPriceSnapshot price) {
         var job = new AgentJob();
         job.setJobToken(VALID_TOKEN);
+        ConfigSnapshot snapshot = new ConfigSnapshot(
+            ConfigSnapshot.SCHEMA_VERSION,
+            "openai-completions",
+            "https://api.openai.com/v1",
+            "gpt-5-mini",
+            null,
+            null,
+            null,
+            false,
+            null,
+            null,
+            null,
+            null,
+            600,
+            false,
+            price
+        );
+        job.setConfigSnapshot(snapshot.toJson(objectMapper));
+        job.setId(java.util.UUID.randomUUID());
+        Workspace workspace = new Workspace();
+        workspace.setId(7L);
+        job.setWorkspace(workspace);
         return job;
+    }
+
+    /**
+     * Why the proxy chain may disable CSRF. CSRF is exploitable only where the browser attaches a
+     * credential by itself; this filter reads one only from {@code Authorization}, so a forged
+     * cross-site request has nothing ambient to ride on. Static analysis flags the
+     * {@code csrf.disable()} in {@link LlmProxySecurityConfig} and cannot see that, so these tests
+     * are what keep the justification honest.
+     *
+     * <p>The negative cases send a token the last case proves is good, so "authenticates nobody"
+     * cannot pass for the trivial reason that the token was bad. They assert the repository is
+     * never even consulted: the filter does not find a credential to look up.
+     */
+    @Nested
+    class NoAmbientCredentialIsAccepted {
+
+        @Test
+        void theSameTokenInACookieAuthenticatesNobody() throws Exception {
+            var request = new MockHttpServletRequest();
+            request.setRemoteAddr("10.0.0.2");
+            request.setCookies(new Cookie("hephaestus_session", VALID_TOKEN), new Cookie("JSESSIONID", VALID_TOKEN));
+
+            filter.doFilterInternal(request, new MockHttpServletResponse(), filterChain);
+
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+            verify(agentJobRepository, never()).findByJobTokenHashAndStatus(any(), any());
+            verify(filterChain, never()).doFilter(any(), any());
+        }
+
+        @Test
+        void theSameTokenInAQueryParameterAuthenticatesNobody() throws Exception {
+            var request = new MockHttpServletRequest();
+            request.setRemoteAddr("10.0.0.2");
+            request.setParameter("access_token", VALID_TOKEN);
+            request.setParameter("token", VALID_TOKEN);
+
+            filter.doFilterInternal(request, new MockHttpServletResponse(), filterChain);
+
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+            verify(agentJobRepository, never()).findByJobTokenHashAndStatus(any(), any());
+            verify(filterChain, never()).doFilter(any(), any());
+        }
+
+        @Test
+        void theSameTokenInTheHeaderDoesAuthenticate() throws Exception {
+            when(
+                agentJobRepository.findByJobTokenHashAndStatus(eq(VALID_TOKEN_HASH), eq(AgentJobStatus.RUNNING))
+            ).thenReturn(Optional.of(createRunningJob()));
+            var authInsideChain = new AtomicReference<Authentication>();
+            doAnswer(invocation -> {
+                authInsideChain.set(SecurityContextHolder.getContext().getAuthentication());
+                return null;
+            })
+                .when(filterChain)
+                .doFilter(any(), any());
+            var request = new MockHttpServletRequest();
+            request.setRemoteAddr("10.0.0.2");
+            request.addHeader("Authorization", "Bearer " + VALID_TOKEN);
+
+            filter.doFilterInternal(request, new MockHttpServletResponse(), filterChain);
+
+            assertThat(authInsideChain.get()).isNotNull();
+        }
     }
 }

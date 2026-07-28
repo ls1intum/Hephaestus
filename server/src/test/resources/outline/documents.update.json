@@ -1,0 +1,92 @@
+{
+  "id": "c69ae635-fa17-44de-820a-270ff717c3f4",
+  "event": "documents.update",
+  "actorId": "99bdd8e2-176a-42fa-ba0c-4f9c4ce6caa9",
+  "payload": {
+    "id": "7d11d73d-1b36-43e3-9f31-b43e98c69b5b",
+    "model": {
+      "id": "7d11d73d-1b36-43e3-9f31-b43e98c69b5b",
+      "url": "/doc/fixture-capture-doc-renamed-JpRHHJuY8M",
+      "data": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 1
+            },
+            "content": [
+              {
+                "text": "Fixture Capture Doc Renamed",
+                "type": "text"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "text": "Updated body for fixture capture (rename).",
+                "type": "text"
+              }
+            ]
+          }
+        ]
+      },
+      "icon": null,
+      "text": "# Fixture Capture Doc Renamed\n\nUpdated body for fixture capture (rename).",
+      "color": null,
+      "tasks": {
+        "total": 0,
+        "completed": 0
+      },
+      "title": "Fixture Capture Doc Renamed",
+      "urlId": "JpRHHJuY8M",
+      "language": null,
+      "revision": 4,
+      "createdAt": "2026-07-11T05:23:17.240Z",
+      "createdBy": {
+        "id": "99bdd8e2-176a-42fa-ba0c-4f9c4ce6caa9",
+        "name": "Felix Admin",
+        "role": "admin",
+        "color": "#0300cc",
+        "timezone": null,
+        "avatarUrl": null,
+        "createdAt": "2026-07-10T10:00:45.026Z",
+        "deletedAt": null,
+        "updatedAt": "2026-07-11T05:21:11.460Z",
+        "isSuspended": false,
+        "lastActiveAt": "2026-07-11T05:21:11.460Z"
+      },
+      "deletedAt": null,
+      "fullWidth": false,
+      "updatedAt": "2026-07-11T05:23:18.441Z",
+      "updatedBy": {
+        "id": "99bdd8e2-176a-42fa-ba0c-4f9c4ce6caa9",
+        "name": "Felix Admin",
+        "role": "admin",
+        "color": "#0300cc",
+        "timezone": null,
+        "avatarUrl": null,
+        "createdAt": "2026-07-10T10:00:45.026Z",
+        "deletedAt": null,
+        "updatedAt": "2026-07-11T05:21:11.460Z",
+        "isSuspended": false,
+        "lastActiveAt": "2026-07-11T05:21:11.460Z"
+      },
+      "archivedAt": null,
+      "templateId": null,
+      "publishedAt": "2026-07-11T05:23:17.248Z",
+      "collectionId": "fbe68839-b131-44e2-bb93-0bc533d39193",
+      "collaboratorIds": [
+        "99bdd8e2-176a-42fa-ba0c-4f9c4ce6caa9"
+      ],
+      "insightsEnabled": true,
+      "popularityScore": 0,
+      "parentDocumentId": null,
+      "isCollectionDeleted": false
+    }
+  },
+  "createdAt": "2026-07-11T05:23:18.474Z",
+  "webhookSubscriptionId": "451e2dc4-010e-44e7-8052-8537a3927ba8"
+}

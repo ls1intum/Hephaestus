@@ -83,9 +83,7 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
 
         @Test
         void idempotencyKeyCooldownScopesOnThreadPlusSubjectNotFreshness() {
-            // The key ends in a disposable freshness segment (lastTs). AgentJobService.extractCooldownKeyPrefix
-            // strips ONLY that trailing segment, so cooldown keys on (channel, thread, subject) — a late reply
-            // with a NEW lastTs shares the prefix and does not re-fire.
+            // The trailing segment is the disposable freshness (lastTs) that extractCooldownKeyPrefix strips.
             JobSubmission submission = handler.createSubmission(sampleRequest());
             assertThat(submission.idempotencyKey()).isEqualTo(
                 "conversation_review:C0ABC:1700000000.100000:42:1700000900.500000"
@@ -126,31 +124,23 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
 
         @Test
         void volumeMountsAreEmpty() {
-            // The load-bearing repo-less contract: a CONVERSATION_REVIEW job binds NO volume mounts (it inherits the
-            // default JobTypeHandler.volumeMounts() == Map.of(), unlike the PR handler that mounts the clone). This
-            // empty map is exactly what lets the orchestrator/runner run without a repository clone.
+            // Inherits the default JobTypeHandler.volumeMounts() == Map.of() — what lets the runner skip the clone.
             assertThat(handler.volumeMounts(conversationJob())).isEmpty();
         }
 
         @Test
         void prepareInputFilesWritesNoScmSourceAndOnlyContextPlusTask() {
             AgentJob job = conversationJob();
-            // WorkspaceContextBuilder is mocked here (its own provider wiring — conversation_thread.json plus the
-            // best-effort, workspace-wide project_inventory.json — is covered by WorkspaceContextBuilderTest /
-            // ConversationThreadContentSourceTest / WorkspaceInventoryContentSourceTest); stub a representative
-            // context file. The practice-catalog injection (inputs/practices/*) is a mocked no-op here; neither
-            // path writes an SCM source.
+            // WorkspaceContextBuilder is mocked (its provider wiring has its own tests); stub a representative
+            // context file. The practice-catalog injection is a mocked no-op; neither path writes an SCM source.
             when(workspaceContextBuilder.build(any())).thenReturn(
                 Map.of(SandboxLayout.CONTEXT_PREFIX + "conversation_thread.json", "{\"messages\":[]}".getBytes())
             );
 
             Map<String, byte[]> files = handler.prepareInputFiles(job);
 
-            // The conversation context file is the sole case input, alongside the task envelope — the
-            // "context + task, nothing else" shape the test name asserts.
             assertThat(files).containsKey(SandboxLayout.CONTEXT_PREFIX + "conversation_thread.json");
             assertThat(files).containsKey(SandboxLayout.TASK_ENVELOPE_FILENAME);
-            // No SCM source keep file is written anywhere in the prepared workspace.
             assertThat(files).doesNotContainKey(SandboxLayout.SCM_SOURCE_KEEP);
             assertThat(files.keySet()).noneMatch(k -> k.startsWith(SandboxLayout.SOURCES_PREFIX));
         }

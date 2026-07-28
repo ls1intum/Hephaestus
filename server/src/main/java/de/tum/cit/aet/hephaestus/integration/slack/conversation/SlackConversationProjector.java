@@ -14,26 +14,14 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Slack-owned implementation of the agent {@link ConversationThreadProjection} SPI: projects the Slack
- * channel-ingest substrate into the per-audience, thread-grouped conversation view the mentor sees. The single
- * privacy invariant lives here: a thread is only visible to a mentor audience that is itself a
- * <em>participant</em> of it, only while the channel's consent is {@code ACTIVE}, and only its non-tombstoned
- * messages ({@code deleted_at IS NULL}).
+ * channel-ingest substrate into the per-audience, thread-grouped conversation view the mentor sees. The privacy
+ * invariant lives here: a thread is only visible to a mentor audience that is itself a <em>participant</em> of it,
+ * only while the channel's consent is {@code ACTIVE}, and only its non-tombstoned messages
+ * ({@code deleted_at IS NULL}).
  *
- * <p><strong>Ownership.</strong> This class lives in {@code integration.slack} because it reads Slack's own
- * private tables ({@code slack_thread}/{@code slack_message}/{@code slack_monitored_channel}); the agent consumes
- * the projected payload through the SPI, never the schema. A column rename in these tables is therefore a compile-
- * and-JPQL change <em>inside Slack</em>, not a silent runtime break in the agent.
- *
- * <p><strong>Participant firewall.</strong> {@code slack_thread.participant_member_ids} is the GIN-indexed
- * {@code bigint[]} of resolved SCM user ids stamped by the ingest write-path; the audience match is
- * {@code audienceMemberId = ANY(participant_member_ids)}, evaluated by
- * {@link SlackThreadRepository#findParticipatingThreadRows} (native — Postgres array membership has no portable
- * JPQL form). A mentor chat therefore surfaces only conversations the requesting developer actually took part in
- * — never a channel they merely share a workspace with.
- *
- * <p><strong>Persistence &amp; tenancy.</strong> Every read here rides the {@code integration.slack.domain} JPA
- * repositories — no raw {@code JdbcTemplate}. Every query carries an explicit {@code workspace_id} predicate, on
- * both the thread scan and the per-thread message fetch, so there is no path that reads a Slack row without
+ * <p>Lives in {@code integration.slack} because it reads Slack's own private tables; the agent consumes the
+ * projected payload through the SPI, never the schema. Every query carries an explicit {@code workspace_id}
+ * predicate — on both the thread scan and the per-thread message fetch — so no path reads a Slack row without
  * pinning the workspace.
  */
 @Service
@@ -105,11 +93,9 @@ public class SlackConversationProjector implements ConversationThreadProjection 
     /**
      * Build the ordered-turns payload for a SINGLE settled thread (conversation detection). Unlike
      * {@link #buildPayload} this is keyed on the thread itself — there is no participant firewall, because the
-     * detection job judges the thread as a work artifact, not a per-audience mentor view. The same
-     * untrusted-content quarantine envelope and the same non-tombstoned, workspace-pinned, consent-gated
-     * ({@code slack_monitored_channel.consent_state = 'ACTIVE'}) message fetch are reused — so a channel that is
-     * paused/revoked between enqueue and execution yields an empty payload rather than leaking its messages.
-     * Pure read; the content source wraps the result under {@code conversation_thread.json}.
+     * detection job judges the thread as a work artifact, not a per-audience mentor view. Reuses the quarantine
+     * envelope and the consent/tombstone/workspace-gated message fetch of {@link #appendThreadMessages}. Pure
+     * read; the content source wraps the result under {@code conversation_thread.json}.
      *
      * @param workspaceId the workspace to scope every query to (explicit predicate)
      * @param channelId   the thread's Slack channel id
@@ -152,13 +138,12 @@ public class SlackConversationProjector implements ConversationThreadProjection 
 
     /**
      * Non-tombstoned messages of one thread (root {@code slack_ts = thread_ts} + replies
-     * {@code slack_thread_ts = thread_ts}), oldest first. Workspace-pinned, and gated on the channel's consent
-     * being {@code ACTIVE} — the same {@code slack_monitored_channel} join as {@link #findParticipatingThreads},
-     * via {@link SlackMessageRepository#findThreadMessages}. The consent predicate lives on the message read
-     * itself (not only on the thread scan) so the detection path — which keys straight into
-     * {@link #buildThreadPayload} without a prior consent-filtered thread scan — cannot leak revoked/paused-channel
-     * messages when a channel is paused or revoked between enqueue and execution (or on a retry): a non-ACTIVE
-     * channel yields zero messages, atomically with the read.
+     * {@code slack_thread_ts = thread_ts}), oldest first. Workspace-pinned and gated on the channel's consent
+     * being {@code ACTIVE}, via {@link SlackMessageRepository#findThreadMessages}. The consent predicate lives on
+     * the message read itself (not only on the thread scan) so the detection path — which enters via
+     * {@link #buildThreadPayload} without a prior consent-filtered thread scan — cannot leak messages from a
+     * channel paused or revoked between enqueue and execution: a non-ACTIVE channel yields zero messages,
+     * atomically with the read.
      */
     private void appendThreadMessages(long workspaceId, ThreadKey key, ArrayNode messages) {
         List<SlackThreadMessageRow> rows = messageRepository.findThreadMessages(

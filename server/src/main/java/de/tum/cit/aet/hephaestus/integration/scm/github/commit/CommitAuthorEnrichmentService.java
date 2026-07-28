@@ -62,10 +62,8 @@ import reactor.util.retry.Retry;
  * cheaply (two indexed DB lookups per email). When new users are synced to the
  * database, their emails will match on the next cycle — no TTL needed.
  * <p>
- * <b>Key improvement:</b> This service no longer depends on {@code GitRepositoryManager}
- * for enrichment. Emails are captured at commit ingestion time (webhook or backfill)
- * and stored on the {@code git_commit} table, eliminating the need to open JGit
- * bare clones during enrichment.
+ * Emails are captured at commit ingestion (webhook or backfill) and stored on the
+ * {@code git_commit} table, so enrichment never opens a JGit bare clone.
  */
 @Service
 @Slf4j

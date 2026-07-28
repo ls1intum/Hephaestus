@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { authClient } from "@/integrations/auth/authClient";
+import { authClient } from "@/integrations/auth/auth-client";
 
 /**
  * Passwordless dev/test sign-in form, rendered by {@link SignInButtons} only when the server advertises

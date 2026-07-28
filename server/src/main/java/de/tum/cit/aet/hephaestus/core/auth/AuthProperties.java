@@ -145,8 +145,8 @@ public record AuthProperties(
      * One instance login provider to seed. {@code type} selects the OAuth wiring (GitHub → github.com
      * endpoints; GitLab → endpoints derived from {@code baseUrl}); {@code baseUrl} is the instance root
      * for a self-hosted GitLab (ignored for GitHub, which is github.com only). {@code displayName} is the
-     * login-button label (defaults to the registration id when blank). A blank {@code clientId} omits the
-     * provider so credential-less pods still boot.
+     * login-button label (defaults to the registration id when blank). A blank {@code clientId} <em>or</em>
+     * {@code clientSecret} omits the provider so credential-less pods still boot.
      *
      * <p>Scopes are intentionally NOT settable here — they are derived from {@code type} in
      * {@code LoginProviderService} so the GitLab "must not request {@code openid}" invariant cannot be
@@ -159,9 +159,40 @@ public record AuthProperties(
         @DefaultValue("") String clientSecret,
         @DefaultValue("") String displayName
     ) {
-        /** A provider with a blank client id is skipped at seed time (no crash). */
+        /**
+         * A provider slot counts as configured only when it carries BOTH halves of the OAuth client
+         * credential. A half-filled slot (client id set, secret blank — e.g. {@code OUTLINE_OAUTH_CLIENT_ID}
+         * exported but {@code OUTLINE_OAUTH_CLIENT_SECRET} forgotten) would otherwise seed an ENABLED
+         * provider whose every link/sign-in attempt dies at the token exchange with an opaque IdP error.
+         * Treat it as unconfigured — {@code LoginProviderService} reports the missing half at ERROR — so a
+         * credential-less pod still boots but a broken button is never offered.
+         */
         public boolean configured() {
-            return clientId != null && !clientId.isBlank();
+            return !isBlank(clientId) && !isBlank(clientSecret);
+        }
+
+        /**
+         * True when the slot is half-filled: one of the two credential halves is present, the other blank.
+         * An entirely blank slot ("this deployment has no wiki") is silence; a half-filled one is an
+         * operator mistake that must be reported loudly.
+         */
+        public boolean partiallyConfigured() {
+            return !configured() && (!isBlank(clientId) || !isBlank(clientSecret));
+        }
+
+        /** The blank credential half, for an actionable "set this env var" diagnostic; empty when both are set. */
+        public String missingCredentialField() {
+            if (isBlank(clientId)) {
+                return "client-id";
+            }
+            if (isBlank(clientSecret)) {
+                return "client-secret";
+            }
+            return "";
+        }
+
+        private static boolean isBlank(String value) {
+            return value == null || value.isBlank();
         }
     }
 }

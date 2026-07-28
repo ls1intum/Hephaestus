@@ -1,33 +1,54 @@
 # Security Policy
 
-## Supported versions
+## Reporting a Vulnerability
 
-Hephaestus is pre-1.0 software under active development. Security fixes land on the latest release line (currently 0.73.x) — see [GitHub Releases](https://github.com/ls1intum/Hephaestus/releases) for the current version. Older 0.x releases do not receive backported fixes; please upgrade to the latest release.
+**Please do not report security vulnerabilities through public GitHub issues, discussions, or pull requests.**
 
-## Reporting a vulnerability
+Report privately via [GitHub private vulnerability reporting](https://github.com/ls1intum/Hephaestus/security/advisories/new) — it keeps the report confidential and credits you in the resulting advisory. If you cannot use GitHub, email [felixtj.dietrich@tum.de](mailto:felixtj.dietrich@tum.de) with the subject "Hephaestus Security Vulnerability Report".
 
-We take the security of this project seriously. If you discover a vulnerability, please report it privately:
+Please include as much as you can:
 
-1. **Preferred: GitHub private vulnerability reporting.** Open a draft advisory at [github.com/ls1intum/Hephaestus/security/advisories/new](https://github.com/ls1intum/Hephaestus/security/advisories/new). This keeps the report confidential while we investigate and lets us collaborate on a fix and credit you in the published advisory.
+- The affected component (application server, webapp, webhook receiver, deployment configuration, ...)
+- Steps to reproduce, ideally with a proof of concept
+- The impact — what an attacker could achieve
+- Any suggested fix or mitigation
 
-2. **Alternative: email.** Send an email to [felixtj.dietrich@tum.de](mailto:felixtj.dietrich@tum.de) with the subject line "Security Vulnerability Report".
+## What to Expect
 
-3. **Details to include**:
-   - A description of the vulnerability.
-   - Steps to reproduce the vulnerability.
-   - Potential impact of the vulnerability.
-   - Any available patches or suggestions for fixing the issue.
+Security reports are triaged before other work.
 
-4. **Response time**:
-   - You can expect an initial acknowledgment of your report within 48 hours.
-   - We will provide regular updates on the status of your report as we investigate and address the issue.
+- **Initial response within 14 days.**
+- We follow **coordinated disclosure**: please give us time to ship a fix before disclosing publicly. If we cannot agree on a timeline, we treat **90 days** from your report as the default disclosure date, shortened when a vulnerability is being actively exploited.
+- Confirmed vulnerabilities are fixed as soon as feasible and published as [GitHub Security Advisories](https://github.com/ls1intum/Hephaestus/security/advisories). You are credited unless you prefer to stay anonymous.
 
-5. **Handling of the vulnerability**:
-   - If the vulnerability is confirmed, we will work to release a patch as soon as possible.
-   - You will be credited for your discovery if you wish, or you can remain anonymous.
-   - If the report is declined, we will provide a detailed explanation as to why it does not meet the criteria for a security vulnerability.
+We do not run a bug bounty program.
 
-6. **Confidentiality**:
-   - Please do not disclose the vulnerability publicly until we have had an opportunity to address it.
+## Safe Harbor
 
-Thank you for helping us keep our project safe and secure!
+We consider good-faith security research conducted under this policy to be authorized, and we will not pursue or support legal action against you for it. If a third party takes action against you for such research, we will make our authorization known. In return, only access the minimum data needed to demonstrate an issue, and do not degrade, disrupt, or destroy data or service.
+
+## Supported Versions
+
+Hephaestus is pre-1.0 and released continuously from `main`; **only the latest release is supported**. There are no maintenance branches or backports.
+
+## Scope
+
+In scope: the code in this repository — the Spring Boot application server (including the webhook receiver), the React webapp, and the deployment/Docker configuration we ship.
+
+Out of scope:
+
+- Vulnerabilities in third-party dependencies without a Hephaestus-specific exploit path — report those upstream
+- Denial-of-service, volumetric attacks, and scanner output without a demonstrated impact
+- Social engineering or phishing of maintainers or users
+- Testing against deployments you do not operate — **do not test against our production instances**; run your own (see the [local development guide](https://ls1intum.github.io/Hephaestus/contributor/local-development))
+
+## Automated Security Measures
+
+Independent of this reporting channel, the project runs:
+
+- **Dependency updates**: [Renovate](https://docs.renovatebot.com/) (Mend-hosted) with vulnerability alerts prioritized and auto-merged ([`renovate.json`](renovate.json))
+- **Dependency & secret scanning in CI**: Trivy filesystem scan and TruffleHog ([`ci-security-scan.yml`](.github/workflows/ci-security-scan.yml))
+- **Static analysis**: GitHub CodeQL
+- **Native alerts**: GitHub secret scanning and Dependabot dependency alerts
+
+A machine-readable [`security.txt`](https://hephaestus.aet.cit.tum.de/.well-known/security.txt) ([RFC 9116](https://www.rfc-editor.org/info/rfc9116/)) points to this policy.

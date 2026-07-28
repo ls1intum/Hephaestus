@@ -1,0 +1,48 @@
+{
+  "pagination": {
+    "limit": 25,
+    "offset": 0,
+    "nextPath": "/api/webhookSubscriptions.list?limit=25&offset=25",
+    "total": 1
+  },
+  "data": [
+    {
+      "id": "451e2dc4-010e-44e7-8052-8537a3927ba8",
+      "name": "Hephaestus documentation sync",
+      "url": "https://hephaestus-test.felixdietrich.com/webhooks/outline",
+      "secret": "REDACTED_TEST_FIXTURE_SECRET_0000000000000000000000000000",
+      "events": [
+        "documents.create",
+        "documents.publish",
+        "documents.unpublish",
+        "documents.update",
+        "documents.archive",
+        "documents.unarchive",
+        "documents.delete",
+        "documents.move",
+        "collections.create",
+        "collections.update",
+        "collections.delete"
+      ],
+      "enabled": true,
+      "createdBy": {
+        "id": "99bdd8e2-176a-42fa-ba0c-4f9c4ce6caa9",
+        "name": "Felix Admin",
+        "avatarUrl": null,
+        "color": "#0300cc",
+        "role": "admin",
+        "isSuspended": false,
+        "createdAt": "2026-07-10T10:00:45.026Z",
+        "updatedAt": "2026-07-11T05:21:11.460Z",
+        "deletedAt": null,
+        "lastActiveAt": "2026-07-11T05:21:11.460Z",
+        "timezone": null
+      },
+      "createdById": "99bdd8e2-176a-42fa-ba0c-4f9c4ce6caa9",
+      "createdAt": "2026-07-10T19:22:28.776Z",
+      "updatedAt": "2026-07-10T19:22:28.776Z"
+    }
+  ],
+  "status": 200,
+  "ok": true
+}

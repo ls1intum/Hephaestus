@@ -23,14 +23,12 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Seeds a grounded default practice catalog (process-level areas + their practices) into the default
- * workspace once workspaces exist ({@link WorkspacesInitializedEvent}). The catalog lives as data in
- * {@code resources/practices/default-catalog.json} so it stays editable without code changes, and every
- * row remains fully configurable afterwards through the normal practice/area CRUD endpoints.
+ * Seeds the default practice catalog ({@code resources/practices/default-catalog.json}) into the default
+ * workspace once workspaces exist ({@link WorkspacesInitializedEvent}).
  *
- * <p>Idempotent: an area that already exists in the workspace is skipped, so re-running on startup (or
- * after an admin has edited the catalog) never overwrites configured state. Failures are isolated from
- * the rest of startup, mirroring {@code DefaultAgentConfigSeeder}.
+ * <p>Idempotent: rows that already exist are skipped and never updated, so re-running on startup never
+ * overwrites configured state (existing criteria are NOT refreshed on boot). Failures are isolated from
+ * the rest of startup.
  */
 @Component
 class DefaultPracticeCatalogSeeder {
@@ -78,9 +76,8 @@ class DefaultPracticeCatalogSeeder {
     }
 
     private void seedCatalog() {
-        // Deterministic target: the lowest-id workspace. findAll() has no ORDER BY, so without this sort the
-        // seeded workspace would be whatever row Postgres returned first — arbitrary and inconsistent across
-        // restarts when multiple workspaces exist (the startup listener bootstraps several).
+        // Deterministic target: the lowest-id workspace. findAll() has no ORDER BY, so without this sort
+        // the seeded workspace would vary across restarts when multiple workspaces exist.
         Workspace workspace = workspaceRepository
             .findAll()
             .stream()
@@ -97,9 +94,8 @@ class DefaultPracticeCatalogSeeder {
         int seededPractices = 0;
         for (JsonNode areaNode : catalog.path("areas")) {
             String areaSlug = areaNode.path("slug").asString();
-            // Per-ROW idempotency (not per-area): create the area only if absent, but ALWAYS walk its practices
-            // and create each only if absent. A per-area skip would, after a mid-area failure (area created, only
-            // some practices seeded), permanently leave the remaining practices unseeded because the area exists.
+            // Per-ROW idempotency (not per-area): always walk the practices even when the area exists,
+            // otherwise a mid-area failure would permanently leave the remaining practices unseeded.
             if (!areaRepository.existsByWorkspaceIdAndSlug(ctx.id(), areaSlug)) {
                 areaService.createArea(
                     ctx,
@@ -117,8 +113,7 @@ class DefaultPracticeCatalogSeeder {
 
             for (JsonNode practiceNode : areaNode.path("practices")) {
                 String practiceSlug = practiceNode.path("slug").asString();
-                // Per-ROW resilience: one malformed catalog entry (e.g. an unknown artifactType that makes
-                // WorkArtifact.valueOf throw) must skip only that row, not abort the rest of the catalog.
+                // One malformed catalog entry must skip only that row, not abort the rest of the catalog.
                 try {
                     if (seedPractice(ctx, catalog, areaSlug, practiceNode, practiceSlug)) {
                         seededPractices++;
@@ -139,14 +134,11 @@ class DefaultPracticeCatalogSeeder {
     }
 
     /**
-     * Seed a single practice row idempotently. Returns {@code true} when it created or (re-)bound a practice,
-     * {@code false} when the practice already existed and was left untouched.
+     * Seed a single practice row idempotently; returns {@code true} when it created or (re-)bound a practice.
      *
-     * <p>Resumable seeding: create + bind run in SEPARATE transactions, so a mid-seed failure can strand a
-     * practice that exists but is unbound (area=NULL). A plain exists-then-skip guard would never re-bind it.
-     * Instead, fetch-or-create, then bind only when the area is still null — so a half-seeded practice
-     * self-heals on the next boot, while an admin who has intentionally bound (or unbound) a practice is never
-     * overwritten.
+     * <p>Create + bind run in separate transactions, so a mid-seed failure can strand a practice that exists
+     * but is unbound (area=NULL). Binding only when the area is still null lets such a row self-heal on the
+     * next boot without ever overwriting an admin's intentional (un)binding.
      */
     private boolean seedPractice(
         WorkspaceContext ctx,
@@ -173,8 +165,7 @@ class DefaultPracticeCatalogSeeder {
         List<String> triggerEvents = new ArrayList<>();
         practiceNode.path("triggerEvents").forEach(t -> triggerEvents.add(t.asString()));
         WorkArtifact focus = WorkArtifact.valueOf(practiceNode.path("artifactType").asString());
-        // A practice may opt into a non-default preamble (e.g. the code-judging PULL_REQUEST_CODE contract
-        // for practices that read the diff) via a "preamble" key; otherwise the focus name is the key.
+        // A practice may opt into a non-default preamble via a "preamble" key; otherwise the focus name is the key.
         String preambleKey = text(practiceNode, "preamble");
         if (preambleKey == null) {
             preambleKey = focus.name();
@@ -194,10 +185,8 @@ class DefaultPracticeCatalogSeeder {
 
     /**
      * Loads the optional per-practice precompute script from {@code practices/precompute/<slug>.ts} on the
-     * classpath. Returns {@code null} when a practice has no script — the common case (precompute is the
-     * downstream Transform home only for practices whose grounding genuinely benefits from pre-staging facts
-     * the runner can derive from {repo, diff, metadata}). The script emits hints/metrics/directions, never a
-     * observation — the LLM still does the heavy lifting.
+     * classpath; {@code null} when a practice has no script (the common case). The script emits
+     * hints/metrics, never an observation — the LLM still does the heavy lifting.
      */
     @Nullable
     private String loadPrecomputeScript(String slug) {
@@ -214,13 +203,10 @@ class DefaultPracticeCatalogSeeder {
     }
 
     /**
-     * Prepends the shared per-focus evidence-contract preamble (authored once in
-     * {@code criteriaPreambles.<FOCUS>}) to the practice-specific criteria, so every seeded practice —
-     * and any future one of that focus — inherits the same artifact contract without restating it. The
-     * preamble is reinforcing and explicitly subordinate to the inline criteria (it ends by deferring to
-     * the practice-specific contract), so composition never weakens the validated detection logic. When
-     * no preamble is configured for the key the criteria is stored verbatim, keeping older catalogs and
-     * already-seeded workspaces byte-for-byte unchanged.
+     * Prepends the shared evidence-contract preamble ({@code criteriaPreambles.<KEY>}) to the
+     * practice-specific criteria so every practice of a focus inherits the same artifact contract without
+     * restating it. The preamble defers to the inline criteria, so composition never weakens the validated
+     * detection logic. When no preamble is configured the criteria is stored verbatim.
      */
     private static String composeCriteria(JsonNode catalog, String preambleKey, String criteria) {
         String preamble = text(catalog.path("criteriaPreambles"), preambleKey);

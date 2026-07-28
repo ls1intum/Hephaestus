@@ -8,7 +8,7 @@ package de.tum.cit.aet.hephaestus.core.auth.spi;
  * inverts that: {@code core.auth} implements it (over its {@code AuthEventLogger} + the
  * {@code RESEARCH_CONSENT_REVOKED} event type) and the preference owner consumes it. Best-effort by
  * contract — an audit write must never break the consent flow, so implementations swallow their own
- * failures (mirroring the {@code AuthEventWriter} guarantee).
+ * failures.
  */
 public interface ResearchConsentAudit {
     /**

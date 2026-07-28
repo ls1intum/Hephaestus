@@ -4,22 +4,27 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
+import de.tum.cit.aet.hephaestus.agent.catalog.ResolvedLlmModel;
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
-import de.tum.cit.aet.hephaestus.agent.mentor.MentorAgentProperties;
+import de.tum.cit.aet.hephaestus.agent.mentor.MentorLlmConfig;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorPiAdapter;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.exception.MentorRunnerException;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.exception.TurnAlreadyInFlightException;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.PiEventToUiChunkTranslator;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
+import de.tum.cit.aet.hephaestus.agent.proxy.MentorProxyCredentialRegistry;
+import de.tum.cit.aet.hephaestus.agent.proxy.ProxyRouting;
+import de.tum.cit.aet.hephaestus.agent.proxy.ProxyTokenUsage;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.AttachedSandbox;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
@@ -27,6 +32,14 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxIdentity;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
+import de.tum.cit.aet.hephaestus.agent.usage.AdmittedLlmModel;
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetBlockReason;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetDecision;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
+import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
@@ -34,9 +47,9 @@ import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.mentor.ThreadSurface;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -57,11 +70,13 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -87,11 +102,10 @@ class MentorChatServiceTest extends BaseUnitTest {
     private static final UUID THREAD_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
 
     /**
-     * Number of synchronous orchestrator preamble sends that precede the runner event stream:
-     * {@code Start} (1), {@code DataMentorStatus} (2), then the translator's {@code Start} + {@code StartStep}
-     * from Pi's first {@code message_start} (3, 4). A disconnect scheduled at this index lands on the FIRST
-     * mid-stream text chunk (the event-handler thread). Named so the intent survives a preamble refactor —
-     * a raw literal silently moves which frame throws.
+     * Sends before the runner event stream starts: {@code Start}, {@code DataMentorStatus}, then the
+     * translator's {@code Start} + {@code StartStep} from Pi's first {@code message_start}. A disconnect
+     * scheduled at this index lands on the first mid-stream text chunk. Named so the intent survives a
+     * preamble refactor — a raw literal would silently move which frame throws.
      */
     private static final int PREAMBLE_SEND_COUNT = 4;
 
@@ -104,10 +118,7 @@ class MentorChatServiceTest extends BaseUnitTest {
     ChatThreadRepository chatThreadRepository;
 
     @Mock
-    AgentConfigRepository agentConfigRepository;
-
-    @Mock
-    WorkspaceRepository workspaceRepository;
+    WorkspaceAgentBindingRepository agentBindingRepository;
 
     @Mock
     WorkspaceContextBuilder workspaceContextBuilder;
@@ -121,11 +132,22 @@ class MentorChatServiceTest extends BaseUnitTest {
     @Mock
     MentorTurnPersistence persistence;
 
+    @Mock
+    de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService llmBudgetService;
+
+    @Mock
+    LlmModelResolver llmModelResolver;
+
+    @Mock
+    LlmAdmissionService llmAdmissionService;
+
     private MentorTurnLock turnLock;
     private PiEventToUiChunkTranslator translator;
     private ScheduledExecutorService scheduler;
     private ExecutorService turnExec;
     private FakeSandbox sandbox;
+    private MentorProxyCredentialRegistry proxyCredentialRegistry;
+    private String sessionToken;
     private MentorChatService service;
     private RecordingEmitter emitter;
     private io.micrometer.core.instrument.simple.SimpleMeterRegistry meterRegistry;
@@ -138,6 +160,18 @@ class MentorChatServiceTest extends BaseUnitTest {
         // Direct executor so the test runs on the caller thread — no race between dispatch and assertion.
         turnExec = directExecutor();
         sandbox = new FakeSandbox();
+        proxyCredentialRegistry = new MentorProxyCredentialRegistry();
+        sessionToken = proxyCredentialRegistry.mint(
+            sandbox.identity().sessionId(),
+            new MentorProxyCredentialRegistry.Route(
+                "openai-responses",
+                "https://upstream.example.com/v1",
+                FundingSource.INSTANCE,
+                1L,
+                2L,
+                WORKSPACE_ID
+            )
+        );
         emitter = new RecordingEmitter();
 
         // Package-private constructors on the executor wrappers (see MentorChatExecutorConfig)
@@ -149,13 +183,10 @@ class MentorChatServiceTest extends BaseUnitTest {
             new MentorChatExecutorConfig.MentorRunnerTimeoutScheduler(scheduler);
 
         meterRegistry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
-        MentorAgentProperties mentorProps = new MentorAgentProperties(100_000, "");
         service = new MentorChatService(
             userRepository,
             chatThreadRepository,
-            agentConfigRepository,
-            workspaceRepository,
-            mentorProps,
+            agentBindingRepository,
             workspaceContextBuilder,
             mentorPiAdapter,
             sandboxServiceProvider(interactiveSandboxService),
@@ -165,7 +196,24 @@ class MentorChatServiceTest extends BaseUnitTest {
             mapper,
             turnExecutorBean,
             schedulerBean,
-            new MentorChatMetrics(meterRegistry)
+            new MentorChatMetrics(meterRegistry),
+            llmBudgetService,
+            llmAdmissionService,
+            proxyCredentialRegistry
+        );
+
+        when(llmBudgetService.decide(WORKSPACE_ID)).thenReturn(LlmBudgetDecision.ALLOWED);
+
+        when(llmModelResolver.resolve(any())).thenReturn(
+            new ResolvedLlmModel("https://api.openai.com", "openai-completions", "test-model", null, null, false)
+        );
+        when(llmModelResolver.connectionRef(any())).thenReturn(LlmModelResolver.ConnectionRef.NONE);
+        when(llmAdmissionService.admit(any(WorkspaceAgentBinding.class))).thenReturn(
+            new AdmittedLlmModel(
+                new ResolvedLlmModel("https://api.openai.com", "openai-completions", "test-model", null, null, false),
+                new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 1L, 2L, WORKSPACE_ID),
+                new LlmPriceSnapshot(FundingSource.INSTANCE, PricingState.NO_CHARGE, 3L, null, null, null, null, null)
+            )
         );
 
         // Default happy-path collaborator wiring; individual tests override as needed.
@@ -174,40 +222,36 @@ class MentorChatServiceTest extends BaseUnitTest {
         user.setLogin("octo");
         when(userRepository.getCurrentUserElseThrow()).thenReturn(user);
 
-        AgentConfig agentConfig = new AgentConfig();
-        agentConfig.setEnabled(true);
-        agentConfig.setLlmProvider(LlmProvider.OPENAI);
-        agentConfig.setCredentialMode(CredentialMode.API_KEY);
-        agentConfig.setLlmApiKey("test-key");
-        agentConfig.setModelName("test-model");
-        agentConfig.setTimeoutSeconds(600);
-        when(agentConfigRepository.findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(eq(WORKSPACE_ID))).thenReturn(
-            Optional.of(agentConfig)
-        );
-
+        WorkspaceAgentBinding mentorBinding = new WorkspaceAgentBinding();
+        mentorBinding.setId(99L);
+        mentorBinding.setPurpose(AgentPurpose.MENTOR);
+        mentorBinding.setEnabled(true);
+        mentorBinding.setTimeoutSeconds(600);
         Workspace ws = new Workspace();
         ws.setWorkspaceSlug("acme");
+        when(agentBindingRepository.findByWorkspaceIdAndPurpose(WORKSPACE_ID, AgentPurpose.MENTOR)).thenReturn(
+            Optional.of(mentorBinding)
+        );
         ChatThread thread = new ChatThread();
         thread.setId(THREAD_ID);
         thread.setWorkspace(ws);
         thread.setUser(user);
         when(persistence.ensureThread(eq(WORKSPACE_ID), eq(THREAD_ID), any(), any())).thenReturn(thread);
-        when(persistence.persistInFlight(any(), any(), any(), any())).thenAnswer(inv -> {
+        when(persistence.persistInFlight(any(), any(), any(), any(), any())).thenAnswer(inv -> {
             UUID assistantId = inv.getArgument(2, UUID.class);
+            MentorLlmConfig admitted = inv.getArgument(4, MentorLlmConfig.class);
             return new MentorTurnPersistence.TurnPersistenceCookie(
                 THREAD_ID,
                 UUID.randomUUID(),
                 assistantId,
-                Instant.now()
+                Instant.now(),
+                admitted.upstreamModelId(),
+                admitted.priceSnapshot()
             );
         });
         when(workspaceContextBuilder.build(any())).thenReturn(new LinkedHashMap<>());
         when(interactiveSandboxService.attach(any())).thenReturn(sandbox);
         when(mentorPiAdapter.buildSandboxSpec(any(), any(), any(), any())).thenReturn(stubSpec());
-        // augmentFinishWithCost passes through unchanged when the mock isn't told otherwise.
-        // Without this stub the default Mockito null return would replace the Finish chunk in the
-        // happy-path stream — the wire would lose its terminal frame and `turnComplete` would
-        // never resolve.
         when(persistence.augmentFinishWithCost(any(UIMessageChunk.Finish.class), any())).thenAnswer(inv ->
             inv.getArgument(0, UIMessageChunk.Finish.class)
         );
@@ -224,7 +268,6 @@ class MentorChatServiceTest extends BaseUnitTest {
 
     @Test
     void runTurn_happyPath_emitsStartThenChunksThenFinish() throws Exception {
-        // Set up the runner-side drive: respond to control calls, then push the Pi event stream.
         scheduleHappyPathResponses(sandbox).run();
 
         runTurnSync();
@@ -244,15 +287,10 @@ class MentorChatServiceTest extends BaseUnitTest {
             "finish-step",
             "finish"
         );
-        // No error chunk on the happy path.
         assertThat(types).doesNotContain("error");
-        // Persistence completed via finalise (not interrupt).
         verify(persistence).finalise(any(), any(), any(UIMessageChunk.Finish.class));
         verify(persistence, never()).interrupt(any(), any(), any());
-        // Lock released — no leaked active keys.
         assertThat(turnLock.activeKeys()).isZero();
-        // The production path through MentorChatService must bump the SUCCESS
-        // counter — without this assertion the metrics wiring is decoupled from real flow.
         assertOutcomeRecorded(MentorChatMetrics.Outcome.SUCCESS);
         assertThat(meterRegistry.find("mentor.turn.duration").timer().count()).isEqualTo(1L);
     }
@@ -311,9 +349,6 @@ class MentorChatServiceTest extends BaseUnitTest {
 
     @Test
     void runTurn_webPromptIsVerbatimUserMessage_noSurfaceDirective() {
-        // WEB is the counterpart of the two SLACK_DM tests above: MentorTurnPromptFactory.forRunner
-        // must pass the developer's message straight through to the runner, with no [Surface: ...]
-        // directive wrapper and no thread-history block appended.
         scheduleHappyPathResponses(sandbox).run();
 
         runTurnSync("What should I do next based on recent work?", ThreadSurface.WEB);
@@ -365,79 +400,178 @@ class MentorChatServiceTest extends BaseUnitTest {
         );
     }
 
-    // 1b. Mentor runtime resolution — a bound + enabled config is preferred and the workspace-scoped
-    // finder (the only real cross-tenant guard) is used; the fan-out fallback is NOT consulted.
-
     @Test
     void runTurn_prefersBoundEnabledMentorConfig_overFallback() throws Exception {
         Workspace boundWs = new Workspace();
-        boundWs.setMentorConfigId(99L);
-        when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(boundWs));
-        AgentConfig boundConfig = new AgentConfig();
-        boundConfig.setEnabled(true);
-        boundConfig.setLlmProvider(LlmProvider.OPENAI);
-        boundConfig.setCredentialMode(CredentialMode.API_KEY);
-        boundConfig.setLlmApiKey("bound-key");
-        boundConfig.setModelName("bound-model");
-        boundConfig.setTimeoutSeconds(600);
-        when(agentConfigRepository.findByIdAndWorkspaceId(99L, WORKSPACE_ID)).thenReturn(Optional.of(boundConfig));
+        WorkspaceAgentBinding boundBinding = new WorkspaceAgentBinding();
+        // Deliberately not the id setUp's default binding carries, so asserting on identity actually
+        // proves the workspace-scoped finder's binding was used, not just "some binding was".
+        boundBinding.setId(4242L);
+        boundBinding.setPurpose(AgentPurpose.MENTOR);
+        boundBinding.setEnabled(true);
+        boundBinding.setTimeoutSeconds(600);
+        when(agentBindingRepository.findByWorkspaceIdAndPurpose(WORKSPACE_ID, AgentPurpose.MENTOR)).thenReturn(
+            Optional.of(boundBinding)
+        );
 
         scheduleHappyPathResponses(sandbox).run();
         runTurnSync();
 
-        verify(agentConfigRepository).findByIdAndWorkspaceId(99L, WORKSPACE_ID);
-        verify(agentConfigRepository, never()).findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(WORKSPACE_ID);
+        var admitted = ArgumentCaptor.forClass(WorkspaceAgentBinding.class);
+        verify(llmAdmissionService).admit(admitted.capture());
+        assertThat(admitted.getValue().getId()).isEqualTo(4242L);
     }
-
-    // 1c. The deliberate asymmetry vs practice detection: a bound-but-DISABLED mentor config does NOT
-    // pause the mentor (which would block chat) — it falls back to the oldest enabled config.
 
     @Test
-    void runTurn_fallsBackToOldestEnabled_whenBoundMentorConfigDisabled() throws Exception {
+    void runTurn_disabledBoundConfig_failsClosedBeforeSandboxAttach() throws Exception {
         Workspace boundWs = new Workspace();
-        boundWs.setMentorConfigId(99L);
-        when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(boundWs));
-        AgentConfig disabled = new AgentConfig();
+        WorkspaceAgentBinding disabled = new WorkspaceAgentBinding();
+        disabled.setId(99L);
+        disabled.setPurpose(AgentPurpose.MENTOR);
         disabled.setEnabled(false);
-        when(agentConfigRepository.findByIdAndWorkspaceId(99L, WORKSPACE_ID)).thenReturn(Optional.of(disabled));
+        when(agentBindingRepository.findByWorkspaceIdAndPurpose(WORKSPACE_ID, AgentPurpose.MENTOR)).thenReturn(
+            Optional.of(disabled)
+        );
 
-        scheduleHappyPathResponses(sandbox).run();
         runTurnSync();
 
-        verify(agentConfigRepository).findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(WORKSPACE_ID);
+        assertThat(String.join("\n", emitter.rawData)).contains(
+            "Hephaestus is not ready to mentor in this workspace yet. Connect a mentor model, then try again."
+        );
+        verify(interactiveSandboxService, never()).attach(any());
     }
-
-    // 1d. No enabled AgentConfig for the workspace → resolveLlmConfig.orElseThrow. This is the only
-    // un-covered exit of the documented cross-tenant guard, and it fires BEFORE the sandbox attaches —
-    // a distinct early-failure ordering (no runner, lock still released, ERROR outcome).
 
     @Test
     void runTurn_noEnabledConfig_recordsErrorAndNeverAttaches() throws Exception {
-        // Neither a bound config (findById → empty by default) nor the fallback finder yields a config.
-        when(agentConfigRepository.findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(eq(WORKSPACE_ID))).thenReturn(
+        when(agentBindingRepository.findByWorkspaceIdAndPurpose(WORKSPACE_ID, AgentPurpose.MENTOR)).thenReturn(
             Optional.empty()
         );
 
         runTurnSync();
 
-        // Error surfaced on the wire (resolveLlmConfig threw before any runner work).
         assertThat(emitter.recordedTypes()).contains("error");
         assertThat(String.join("\n", emitter.rawData))
             .contains(
                 "Hephaestus is not ready to mentor in this workspace yet. Connect a mentor model, then try again."
             )
             .doesNotContain("workspace " + WORKSPACE_ID);
-        // Sandbox never attached — the failure precedes the cold-start attach.
         try {
             verify(interactiveSandboxService, never()).attach(any());
         } catch (InteractiveSandboxException e) {
             throw new AssertionError(e);
         }
-        // No runner persistence side effects past the in-flight row; neither finalise nor a sandbox close.
         verify(persistence, never()).finalise(any(), any(), any());
-        // Lock released cleanly and the ERROR outcome recorded.
         assertThat(turnLock.activeKeys()).isZero();
         assertOutcomeRecorded(MentorChatMetrics.Outcome.ERROR);
+    }
+
+    private static LlmBudgetDecision instanceBlocked(LlmBudgetBlockReason reason) {
+        return new LlmBudgetDecision(reason, LlmBudgetBlockReason.NONE);
+    }
+
+    private void admitWorkspaceFundedMentorModel() {
+        when(llmAdmissionService.admit(any(WorkspaceAgentBinding.class))).thenReturn(
+            new AdmittedLlmModel(
+                new ResolvedLlmModel("https://byo.example.com", "openai-completions", "byo-model", null, null, false),
+                new LlmModelResolver.ConnectionRef(FundingSource.WORKSPACE, 1L, 2L, WORKSPACE_ID),
+                new LlmPriceSnapshot(FundingSource.WORKSPACE, PricingState.NO_CHARGE, null, 4L, null, null, null, null)
+            )
+        );
+    }
+
+    @Test
+    void runTurn_budgetExhausted_blocksBeforePersistingWithBudgetMessage() throws Exception {
+        when(llmBudgetService.decide(WORKSPACE_ID)).thenReturn(instanceBlocked(LlmBudgetBlockReason.EXHAUSTED));
+
+        runTurnSync();
+
+        assertThat(emitter.recordedTypes()).contains("error");
+        assertThat(String.join("\n", emitter.rawData))
+            .contains("This workspace's monthly AI budget is reached")
+            .doesNotContain("has no price");
+        verify(persistence, never()).persistInFlight(any(), any(), any(), any(), any());
+        try {
+            verify(interactiveSandboxService, never()).attach(any());
+        } catch (InteractiveSandboxException e) {
+            throw new AssertionError(e);
+        }
+        assertOutcomeRecorded(MentorChatMetrics.Outcome.ERROR);
+        assertThat(meterRegistry.find("llm.budget.blocked").tag("surface", "mentor").counter().count()).isEqualTo(1d);
+    }
+
+    @Test
+    void runTurn_unpricedUsageBlocksACappedWorkspace_blocksBeforePersistingWithDistinctMessage() throws Exception {
+        when(llmBudgetService.decide(WORKSPACE_ID)).thenReturn(
+            instanceBlocked(LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED)
+        );
+
+        runTurnSync();
+
+        assertThat(emitter.recordedTypes()).contains("error");
+        assertThat(String.join("\n", emitter.rawData))
+            .contains("Some usage has no price, so it can't be checked against the budget")
+            .doesNotContain("is reached");
+        verify(persistence, never()).persistInFlight(any(), any(), any(), any(), any());
+        try {
+            verify(interactiveSandboxService, never()).attach(any());
+        } catch (InteractiveSandboxException e) {
+            throw new AssertionError(e);
+        }
+        assertOutcomeRecorded(MentorChatMetrics.Outcome.ERROR);
+        assertThat(meterRegistry.find("llm.budget.blocked").tag("surface", "mentor").counter().count()).isEqualTo(1d);
+    }
+
+    @Test
+    void runTurn_instanceBudgetExhaustedButMentorRunsOnOwnProvider_proceedsNormally() throws Exception {
+        admitWorkspaceFundedMentorModel();
+        when(llmBudgetService.decide(WORKSPACE_ID)).thenReturn(instanceBlocked(LlmBudgetBlockReason.EXHAUSTED));
+        scheduleHappyPathResponses(sandbox).run();
+
+        runTurnSync();
+
+        assertThat(emitter.recordedTypes()).doesNotContain("error");
+        assertOutcomeRecorded(MentorChatMetrics.Outcome.SUCCESS);
+    }
+
+    @Test
+    void runTurn_byoBudgetExhaustedAndMentorRunsOnOwnProvider_blocksWithWorkspaceAdminCopy() throws Exception {
+        admitWorkspaceFundedMentorModel();
+        when(llmBudgetService.decide(WORKSPACE_ID)).thenReturn(
+            new LlmBudgetDecision(LlmBudgetBlockReason.NONE, LlmBudgetBlockReason.EXHAUSTED)
+        );
+
+        runTurnSync();
+
+        assertThat(emitter.recordedTypes()).contains("error");
+        assertThat(String.join("\n", emitter.rawData))
+            .contains("This workspace's monthly AI cap is reached")
+            .contains("a workspace admin raises the cap");
+        verify(persistence, never()).persistInFlight(any(), any(), any(), any(), any());
+        assertOutcomeRecorded(MentorChatMetrics.Outcome.ERROR);
+    }
+
+    @Test
+    void runTurn_byoBudgetExhaustedButMentorRunsOnASharedModel_proceedsNormally() throws Exception {
+        when(llmBudgetService.decide(WORKSPACE_ID)).thenReturn(
+            new LlmBudgetDecision(LlmBudgetBlockReason.NONE, LlmBudgetBlockReason.EXHAUSTED)
+        );
+        scheduleHappyPathResponses(sandbox).run();
+
+        runTurnSync();
+
+        assertThat(emitter.recordedTypes()).doesNotContain("error");
+        assertOutcomeRecorded(MentorChatMetrics.Outcome.SUCCESS);
+    }
+
+    @Test
+    void runTurn_budgetNotBlocked_proceedsNormally() throws Exception {
+        when(llmBudgetService.decide(WORKSPACE_ID)).thenReturn(LlmBudgetDecision.ALLOWED);
+        scheduleHappyPathResponses(sandbox).run();
+
+        runTurnSync();
+
+        assertThat(emitter.recordedTypes()).doesNotContain("error");
+        assertOutcomeRecorded(MentorChatMetrics.Outcome.SUCCESS);
     }
 
     @Test
@@ -516,60 +650,39 @@ class MentorChatServiceTest extends BaseUnitTest {
     @Test
     void runTurn_clientDisconnect_completesNormallyAndAbortsRunner() throws Exception {
         scheduleHappyPathResponses(sandbox).run();
-        // The preamble sends succeed (Start, DataMentorStatus, then translator's Start + StartStep from
-        // message_start); the next send throws IOException. By then the runner client is live, so the
-        // abort hook fires. The runner keeps streaming to Finish; persistence.finalise still
-        // runs from inside handleEvent — disconnects must NOT be reclassified as turn failures.
         emitter.disconnectAfterCalls = PREAMBLE_SEND_COUNT;
 
         runTurnSync();
 
-        // Abort was sent.
         assertThat(sandbox.methodsSent()).contains("abort");
-        // No error chunk emitted — disconnects are not surfaced as turn errors.
         assertThat(emitter.recordedTypes()).doesNotContain("error");
-        // Persistence ran finalise (not interrupt).
         verify(persistence, atLeastOnce()).finalise(any(), any(), any(UIMessageChunk.Finish.class));
         verify(persistence, never()).interrupt(any(), any(), any());
-        // Lock released.
         assertThat(turnLock.activeKeys()).isZero();
-        // Disconnect on the EVENT-HANDLER thread (call #5 = mid-stream chunk send) is
-        // intentionally swallowed inside handleEvent; the runner keeps draining; the turn
-        // completes naturally as SUCCESS even though the wire was already gone. The abort
-        // hook fired (verified above). CLIENT_DISCONNECT outcome is reserved for the rare
-        // case where the orchestrator's *synchronous* sends fail before the runner attaches —
-        // tested separately below.
+        // A disconnect on the event-handler thread is swallowed inside handleEvent; the runner keeps
+        // draining and the turn completes as SUCCESS even though the wire is gone. CLIENT_DISCONNECT
+        // is reserved for the synchronous-send failure case, tested separately below.
         assertOutcomeRecorded(MentorChatMetrics.Outcome.SUCCESS);
     }
 
     @Test
     void runTurn_clientDisconnectBeforeEventStream_stillAbortsAndFinalises() throws Exception {
         scheduleHappyPathResponses(sandbox).run();
-        // Disconnect lands on call #3 — the translator's FIRST chunk from Pi's message_start — i.e. before
-        // any text delta has streamed. This proves the abort hook + persistence.finalise still run when the
-        // disconnect precedes the bulk of the event stream, not only on a mid-text chunk. Decoupled from the
-        // exact preamble length so it survives a preamble refactor.
+        // Disconnect on the translator's first chunk, before any text delta — proves abort + finalise
+        // still run this early, not only on a mid-text chunk.
         emitter.disconnectAfterCalls = 2;
 
         runTurnSync();
 
-        // Abort fired and the runner drained to its terminal Finish despite the gone wire.
         assertThat(sandbox.methodsSent()).contains("abort");
         verify(persistence, atLeastOnce()).finalise(any(), any(), any(UIMessageChunk.Finish.class));
         verify(persistence, never()).interrupt(any(), any(), any());
         assertThat(turnLock.activeKeys()).isZero();
-        // Same as the mid-stream case: a disconnect swallowed inside handleEvent completes as SUCCESS.
         assertOutcomeRecorded(MentorChatMetrics.Outcome.SUCCESS);
     }
 
     @Test
     void runTurn_clientDisconnectOnSyncSend_recordsClientDisconnect() throws Exception {
-        // The orchestrator's two synchronous sends (Start, DataMentorStatus) happen BEFORE
-        // sandbox.attach. If either throws ClientDisconnectedException (e.g. the client
-        // already closed the socket between request acceptance and Tomcat dispatch), the
-        // catch sets outcome=CLIENT_DISCONNECT and the sandbox is never attached. This is
-        // the only path that records that outcome — without this test it would be
-        // dead-on-write.
         emitter.disconnectAfterCalls = 1; // call #2 (DataMentorStatus) throws
 
         runTurnSync();
@@ -601,45 +714,101 @@ class MentorChatServiceTest extends BaseUnitTest {
         assertOutcomeRecorded(MentorChatMetrics.Outcome.POISONED);
     }
 
+    private void probeProxyDuringPrompt(String token, AtomicReference<ProxyRouting.BilledAttempt> seen) {
+        Consumer<JsonNode> scripted = sandbox.onSend;
+        sandbox.onSend = frame -> {
+            if ("prompt".equals(frame.path("method").asString(""))) {
+                ProxyRouting.BilledAttempt attempt = proxyCredentialRegistry.validate(token).orElseThrow().attempt();
+                if (attempt != null) {
+                    // 100k input tokens at the fixture's $10/M — a whole dollar of this turn's own spend.
+                    proxyCredentialRegistry.accumulate(attempt.sourceId(), new ProxyTokenUsage(100_000, 0, 0, 0));
+                }
+                seen.set(proxyCredentialRegistry.validate(token).orElseThrow().attempt());
+            }
+            scripted.accept(frame);
+        };
+    }
+
+    private void admitAtTenDollarsPerMillionInputTokens() {
+        when(llmAdmissionService.admit(any(WorkspaceAgentBinding.class))).thenReturn(
+            new AdmittedLlmModel(
+                new ResolvedLlmModel("https://api.openai.com", "openai-completions", "test-model", null, null, false),
+                new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 1L, 2L, WORKSPACE_ID),
+                new LlmPriceSnapshot(
+                    FundingSource.INSTANCE,
+                    PricingState.PRICED,
+                    3L,
+                    null,
+                    new BigDecimal("10"),
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO
+                )
+            )
+        );
+    }
+
+    @Test
+    @DisplayName("mid-turn, the sandbox credential reports this turn and what it has already spent")
+    void aTurnIsBoundToItsSandboxCredentialOnlyWhileItRuns() {
+        admitAtTenDollarsPerMillionInputTokens();
+        AtomicReference<ProxyRouting.BilledAttempt> duringPrompt = new AtomicReference<>();
+        scheduleHappyPathResponses(sandbox).run();
+        probeProxyDuringPrompt(sessionToken, duringPrompt);
+
+        runTurnSync();
+
+        assertThat(duringPrompt.get()).as("the turn was billable while it ran").isNotNull();
+        assertThat(duringPrompt.get().sourceType()).isEqualTo(LlmUsageSourceType.MENTOR_TURN);
+        assertThat(duringPrompt.get().spentUsd())
+            .as("and the gate could see what it had already spent")
+            .isEqualByComparingTo("1.00");
+        assertThat(proxyCredentialRegistry.validate(sessionToken).orElseThrow().attempt())
+            .as("it stops being billable when it ends")
+            .isNull();
+    }
+
+    @Test
+    @DisplayName("a turn that dies mid-way still releases its binding")
+    void aTurnThatDiesStillReleasesItsBinding() {
+        AtomicReference<ProxyRouting.BilledAttempt> duringPrompt = new AtomicReference<>();
+        scheduleRunnerPoisoned(sandbox).run();
+        probeProxyDuringPrompt(sessionToken, duringPrompt);
+
+        runTurnSync();
+
+        verify(persistence).interrupt(any(), any(), any(Throwable.class));
+        assertThat(duringPrompt.get()).as("it was billable while it ran").isNotNull();
+        assertThat(proxyCredentialRegistry.validate(sessionToken).orElseThrow().attempt()).isNull();
+    }
+
     // 4. In-flight conflict from persistence → 409 chunk; no runner activity
 
     @Test
     @DisplayName("in-flight conflict: persistence throws; conflict chunk sent; sandbox never attached")
     void runTurn_inFlightConflict_returns409() {
-        when(persistence.persistInFlight(any(), any(), any(), any())).thenThrow(
-            new TurnAlreadyInFlightException(THREAD_ID, new RuntimeException("dup"))
-        );
+        doThrow(new TurnAlreadyInFlightException(THREAD_ID, new RuntimeException("dup")))
+            .when(persistence)
+            .persistInFlight(any(), any(), any(), any(), any());
 
         runTurnSync();
 
         List<String> types = emitter.recordedTypes();
-        // After Start, we hit the conflict path: data-mentor-status (conflict) + error.
         assertThat(types).contains("data-mentor-status").contains("error");
-        // No sandbox attach attempted — the SDK was never invoked because persistence threw first.
-        // (verify via Mockito on interactiveSandboxService.attach)
         try {
             verify(interactiveSandboxService, never()).attach(any());
         } catch (InteractiveSandboxException e) {
             throw new AssertionError(e);
         }
         assertThat(turnLock.activeKeys()).isZero();
-        // In-flight conflict tagged distinctly so SLO panels separate "real failure" from
-        // "load-shed retry". This persistence-throws path triggers the DB-index outcome —
-        // the JVM lock was acquired, so the conflict comes from the durable backstop.
         assertOutcomeRecorded(MentorChatMetrics.Outcome.IN_FLIGHT_CONFLICT_DB);
     }
 
-    /**
-     * Asserts exactly one increment on {@code mentor.turn.completed{outcome=<expected>}} and
-     * exactly one increment on {@code mentor.turn.started}. Keeps started/completed in lockstep
-     * — if a future refactor lands one without the other, dashboards drift and SLO ratios lie.
-     */
     private void assertOutcomeRecorded(MentorChatMetrics.Outcome expected) {
         assertThat(meterRegistry.find("mentor.turn.started").counter().count()).as("mentor.turn.started").isEqualTo(1d);
         assertThat(meterRegistry.find("mentor.turn.completed").tag("outcome", expected.tag()).counter().count())
             .as("mentor.turn.completed{outcome=%s}", expected.tag())
             .isEqualTo(1d);
-        // No other outcome got bumped — proves the test asserts the RIGHT branch.
         long otherOutcomes = Arrays.stream(MentorChatMetrics.Outcome.values())
             .filter(o -> o != expected)
             .mapToLong(o ->
@@ -680,10 +849,7 @@ class MentorChatServiceTest extends BaseUnitTest {
             holder.join(2_000);
         }
 
-        // Persistence MUST NOT be called when the LOCAL lock rejects up front.
-        verify(persistence, never()).persistInFlight(any(), any(), any(), any());
-        // Distinct outcome metric so SLO dashboards separate same-JVM double-submit from the
-        // durable DB backstop (the latter signals JVM-lock leak across replicas).
+        verify(persistence, never()).persistInFlight(any(), any(), any(), any(), any());
         assertOutcomeRecorded(MentorChatMetrics.Outcome.IN_FLIGHT_CONFLICT_LOCAL);
     }
 

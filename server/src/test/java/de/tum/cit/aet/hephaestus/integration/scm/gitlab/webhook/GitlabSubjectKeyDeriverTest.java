@@ -2,9 +2,13 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.webhook;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.integration.core.spi.EventTypeKey;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventType;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
@@ -13,10 +17,21 @@ import tools.jackson.databind.ObjectMapper;
 class GitlabSubjectKeyDeriverTest extends BaseUnitTest {
 
     private final GitlabSubjectKeyDeriver deriver = new GitlabSubjectKeyDeriver();
+    private final GitlabSubjectParser parser = new GitlabSubjectParser();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private JsonNode json(String raw) throws Exception {
         return objectMapper.readTree(raw);
+    }
+
+    private JsonNode fixture(String name) throws Exception {
+        return objectMapper.readTree(Files.readAllBytes(Path.of("src/test/resources/gitlab", name)));
+    }
+
+    /** The event token a consumer would resolve from this subject — the handler-registry lookup key. */
+    private String resolvedEventKey(String subject) {
+        EventTypeKey key = parser.parse(subject);
+        return key.eventType();
     }
 
     @Test
@@ -83,6 +98,77 @@ class GitlabSubjectKeyDeriverTest extends BaseUnitTest {
     @Test
     void placeholdersWhenNoPathOrEvent() throws Exception {
         assertThat(deriver.deriveSubject(json("{}"), Map.of())).isEqualTo("gitlab.?.?.unknown");
+    }
+
+    // --- Group-tier live events (project / subgroup / member) ---
+    // These events register their handlers under the stable "project"/"subgroup"/"member" keys. Emitting
+    // the raw event_name (e.g. "project_create") with a "?" namespace would produce a key no handler owns
+    // AND a subject no consumer filter matches — a silent drop. The deriver must normalize the key and
+    // carry the root group token so the workspace organizationFilter (gitlab.<accountLogin>.?.>) matches.
+
+    @Test
+    void projectEventFixtureNormalizesToProjectKeyAndOrgScope() throws Exception {
+        String subject = deriver.deriveSubject(fixture("project.create.json"), Map.of());
+        // Root group of "hephaestustest/test-webhook-project" is the workspace accountLogin; project slot
+        // is the org-scope placeholder so create/rename/transfer/delete all route regardless of path change.
+        assertThat(subject).isEqualTo("gitlab.hephaestustest.?.project");
+        assertThat(resolvedEventKey(subject)).isEqualTo(GitLabEventType.PROJECT.getValue());
+    }
+
+    @Test
+    void subgroupEventFixtureNormalizesToSubgroupKeyAndOrgScope() throws Exception {
+        String subject = deriver.deriveSubject(fixture("subgroup.create.json"), Map.of());
+        assertThat(subject).isEqualTo("gitlab.hephaestustest.?.subgroup");
+        assertThat(resolvedEventKey(subject)).isEqualTo(GitLabEventType.SUBGROUP.getValue());
+    }
+
+    @Test
+    void memberEventFixtureNormalizesToMemberKey() throws Exception {
+        // Member payloads carry only the leaf group_path ("test-subgroup" here), so a subgroup-scoped
+        // membership change can't resolve the workspace root — a documented limitation healed by the
+        // periodic member sync. Key normalization still holds unconditionally.
+        String subject = deriver.deriveSubject(fixture("member.add.json"), Map.of());
+        assertThat(subject).isEqualTo("gitlab.test-subgroup.?.member");
+        assertThat(resolvedEventKey(subject)).isEqualTo(GitLabEventType.MEMBER.getValue());
+    }
+
+    @Test
+    void rootGroupMemberEventRoutesToOrgScope() throws Exception {
+        // Adding a member to the ROOT group carries group_path == accountLogin, so it routes cleanly.
+        JsonNode payload = json(
+            "{\"event_name\":\"user_add_to_group\",\"group_path\":\"hephaestustest\",\"group_id\":1,\"user_id\":2}"
+        );
+        assertThat(deriver.deriveSubject(payload, Map.of())).isEqualTo("gitlab.hephaestustest.?.member");
+    }
+
+    @Test
+    void normalizesEveryGroupTierEventVerb() throws Exception {
+        assertThat(
+            resolvedEventKey(deriver.deriveSubject(json("{\"event_name\":\"project_rename\"}"), Map.of()))
+        ).isEqualTo("project");
+        assertThat(
+            resolvedEventKey(deriver.deriveSubject(json("{\"event_name\":\"project_transfer\"}"), Map.of()))
+        ).isEqualTo("project");
+        assertThat(
+            resolvedEventKey(deriver.deriveSubject(json("{\"event_name\":\"subgroup_destroy\"}"), Map.of()))
+        ).isEqualTo("subgroup");
+        assertThat(
+            resolvedEventKey(deriver.deriveSubject(json("{\"event_name\":\"user_remove_from_group\"}"), Map.of()))
+        ).isEqualTo("member");
+        assertThat(
+            resolvedEventKey(deriver.deriveSubject(json("{\"event_name\":\"user_update_for_group\"}"), Map.of()))
+        ).isEqualTo("member");
+    }
+
+    @Test
+    void doesNotFoldProjectMemberVerbsOntoGroupMemberKey() throws Exception {
+        // Project-member events (user_*_to_team) are a different handler concern; they must NOT normalize
+        // to the group "member" key.
+        String subject = deriver.deriveSubject(
+            json("{\"event_name\":\"user_add_to_team\",\"project\":{\"path_with_namespace\":\"g/p\"}}"),
+            Map.of()
+        );
+        assertThat(subject).isEqualTo("gitlab.g.p.user_add_to_team");
     }
 
     @Test

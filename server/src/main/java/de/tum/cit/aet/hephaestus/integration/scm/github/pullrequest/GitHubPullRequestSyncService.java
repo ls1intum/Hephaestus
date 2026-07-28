@@ -33,7 +33,11 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncPropert
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GraphQlConnectionOverflowDetector;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPullRequestConnection;
+import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.EmbeddedCommentsDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.EmbeddedProjectItemsDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment.GitHubIssueCommentProcessor;
+import de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment.GitHubIssueCommentSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment.dto.GitHubIssueCommentEventDTO.GitHubCommentDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.GitHubProjectItemSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest.dto.EmbeddedReviewThreadsDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest.dto.EmbeddedReviewsDTO;
@@ -48,6 +52,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
@@ -65,9 +70,15 @@ import reactor.util.retry.Retry;
  * Service for synchronizing GitHub pull requests via GraphQL API.
  * <p>
  * This service fetches PRs using typed GraphQL models and delegates persistence
- * to GitHubPullRequestProcessor. Reviews and review threads (with comments) are
- * fetched inline with PRs to avoid N+1 query patterns - only PRs with more than
- * 10 reviews or 10 review threads require additional API calls for pagination.
+ * to GitHubPullRequestProcessor. Conversation comments, reviews, and review threads
+ * (with comments) are fetched inline with PRs to avoid N+1 query patterns - only PRs
+ * with more than 10 conversation comments, 10 reviews, or 10 review threads require
+ * additional API calls for pagination.
+ * <p>
+ * Conversation (top-level) comments are the same IssueComment entity as issue comments and are
+ * persisted through the same GitHubIssueCommentProcessor. They must be fetched here because
+ * GitHub's {@code repository.issues} connection - the issue sync's source - excludes pull requests,
+ * so this is the only sync path that can observe them.
  * <p>
  * Supports checkpoint/cursor persistence for resumable sync operations.
  * When a sync target ID is provided, the pagination cursor is persisted after
@@ -90,6 +101,8 @@ public class GitHubPullRequestSyncService {
     private final GitHubPullRequestProcessor pullRequestProcessor;
     private final GitHubPullRequestReviewSyncService reviewSyncService;
     private final GitHubPullRequestReviewCommentSyncService reviewCommentSyncService;
+    private final GitHubIssueCommentProcessor issueCommentProcessor;
+    private final GitHubIssueCommentSyncService issueCommentSyncService;
     private final GitHubProjectItemSyncService projectItemSyncService;
     private final BackfillStateProvider backfillStateProvider;
     private final TransactionTemplate transactionTemplate;
@@ -98,26 +111,29 @@ public class GitHubPullRequestSyncService {
     private final GitHubExceptionClassifier exceptionClassifier;
     private final GitHubGraphQlSyncCoordinator graphQlSyncHelper;
 
-    /** Maximum number of retry attempts for transient failures. */
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
     /**
-     * Container for PRs that need additional review pagination.
-     * Stores PR ID instead of entity reference to survive transaction rollbacks.
-     * If a transaction is rolled back, the PR entity is detached but the ID
-     * allows us to verify the PR exists before syncing reviews.
+     * PRs needing additional review pagination. Stores PR ID rather than an entity reference so
+     * the reference survives if the creating transaction rolls back.
      */
     private record PullRequestWithReviewCursor(Long pullRequestId, String reviewCursor, int inlineCount) {}
 
     /**
-     * Container for PRs that need additional review thread/comment pagination.
-     * Stores PR ID instead of entity reference to survive transaction rollbacks.
+     * PRs needing additional review thread/comment pagination. Stores PR ID rather than an
+     * entity reference to survive transaction rollbacks.
      */
     private record PullRequestWithThreadCursor(Long pullRequestId, String threadCursor) {}
 
     /**
-     * Container for PRs that need additional project item pagination.
-     * Stores PR ID instead of entity reference to survive transaction rollbacks.
+     * PRs needing additional conversation comment pagination. Stores PR ID rather than an entity
+     * reference to survive transaction rollbacks.
+     */
+    private record PullRequestWithCommentCursor(Long pullRequestId, String commentCursor) {}
+
+    /**
+     * PRs needing additional project item pagination. Stores PR ID rather than an entity
+     * reference to survive transaction rollbacks.
      *
      * @param pullRequestId the database ID of the PR
      * @param nodeId the GitHub GraphQL node ID (needed for pagination query)
@@ -132,6 +148,8 @@ public class GitHubPullRequestSyncService {
         GitHubPullRequestProcessor pullRequestProcessor,
         GitHubPullRequestReviewSyncService reviewSyncService,
         GitHubPullRequestReviewCommentSyncService reviewCommentSyncService,
+        GitHubIssueCommentProcessor issueCommentProcessor,
+        GitHubIssueCommentSyncService issueCommentSyncService,
         GitHubProjectItemSyncService projectItemSyncService,
         BackfillStateProvider backfillStateProvider,
         TransactionTemplate transactionTemplate,
@@ -146,6 +164,8 @@ public class GitHubPullRequestSyncService {
         this.pullRequestProcessor = pullRequestProcessor;
         this.reviewSyncService = reviewSyncService;
         this.reviewCommentSyncService = reviewCommentSyncService;
+        this.issueCommentProcessor = issueCommentProcessor;
+        this.issueCommentSyncService = issueCommentSyncService;
         this.projectItemSyncService = projectItemSyncService;
         this.backfillStateProvider = backfillStateProvider;
         this.transactionTemplate = transactionTemplate;
@@ -272,9 +292,6 @@ public class GitHubPullRequestSyncService {
         // standard 30s timeout, triggering retries that waste rate limit budget.
         Duration timeout = syncProperties.extendedGraphqlTimeout();
 
-        // Determine if incremental sync is enabled and compute the effective timestamp
-        // For first sync (lastSyncTimestamp == null), use configured timeframe as fallback
-        // Apply safety buffer to handle clock skew between server and GitHub
         Instant effectiveSyncTimestamp = lastSyncTimestamp;
         boolean isIncrementalSync = false;
         if (syncProperties.incrementalSyncEnabled()) {
@@ -302,13 +319,32 @@ public class GitHubPullRequestSyncService {
             isIncrementalSync = true;
         }
 
+        // Probe the newest PR's updatedAt before running the expensive full query. Mirrors the
+        // issue-sync totalCount probe (~1 point vs ~59). Only valid for the unfiltered,
+        // start-from-scratch case: a state-split retry observes a different population, and a
+        // resumed cursor means we already know there is work left to page through.
+        if (isIncrementalSync && effectiveSyncTimestamp != null && initialCursor == null && states == null) {
+            if (
+                !hasPullRequestsUpdatedSince(client, ownerAndName, effectiveSyncTimestamp, timeout, safeNameWithOwner)
+            ) {
+                log.info(
+                    "Skipped PR sync: reason=noUpdatedPullRequests, repoName={}, since={}",
+                    safeNameWithOwner,
+                    effectiveSyncTimestamp
+                );
+                return SyncResult.completed(0);
+            }
+        }
+
         int totalPRsSynced = 0;
         int totalReviewsSynced = 0;
         int totalReviewCommentsSynced = 0;
+        int totalCommentsSynced = 0;
         int totalProjectItemsSynced = 0;
         int reportedTotalCount = -1;
         List<PullRequestWithReviewCursor> prsNeedingReviewPagination = new ArrayList<>();
         List<PullRequestWithThreadCursor> prsNeedingThreadPagination = new ArrayList<>();
+        List<PullRequestWithCommentCursor> prsNeedingCommentPagination = new ArrayList<>();
         List<PullRequestWithProjectItemCursor> prsNeedingProjectItemPagination = new ArrayList<>();
         String cursor = initialCursor;
         boolean hasMore = true;
@@ -339,10 +375,9 @@ public class GitHubPullRequestSyncService {
             }
 
             try {
-                // Fetch data from GitHub API outside of transaction.
-                // Use Mono.defer() to wrap the entire execute() call so retries cover body streaming.
-                // This is CRITICAL: WebClient ExchangeFilterFunction retries only cover the HTTP exchange,
-                // not body consumption. PrematureCloseException occurs DURING body streaming.
+                // Wrap the entire execute() call in Mono.defer() so retries also cover body
+                // streaming — WebClient's ExchangeFilterFunction retries only the HTTP exchange,
+                // not body consumption, and PrematureCloseException occurs during body streaming.
                 final String currentCursor = cursor;
                 final int currentPage = pageCount;
                 ClientGraphQlResponse response = Mono.defer(() ->
@@ -409,10 +444,8 @@ public class GitHubPullRequestSyncService {
                     break;
                 }
 
-                // Track rate limit from response (per-scope tracking)
                 graphQlClientProvider.trackRateLimit(scopeId, response);
 
-                // Check if we should pause due to rate limiting
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
                     if (
                         !graphQlSyncHelper.waitForRateLimitIfNeeded(
@@ -440,13 +473,13 @@ public class GitHubPullRequestSyncService {
                     reportedTotalCount = connection.getTotalCount();
                 }
 
-                // Process the page within its own transaction to keep transactions short
+                // Process the page within its own transaction to keep transactions short.
                 final Long repoId = repositoryId;
                 PageSyncResult pageResult = transactionTemplate.execute(status -> {
                     // Re-fetch repository within transaction to ensure it's attached to session
                     Repository repo = repositoryRepository.findById(repoId).orElse(null);
                     if (repo == null) {
-                        return new PageSyncResult(0, 0, 0, 0);
+                        return new PageSyncResult(0, 0, 0, 0, 0);
                     }
                     // Eagerly initialize the lazy provider proxy to prevent
                     // LazyInitializationException when EventContext.from() accesses provider.getType()
@@ -458,6 +491,7 @@ public class GitHubPullRequestSyncService {
                         scopeId,
                         prsNeedingReviewPagination,
                         prsNeedingThreadPagination,
+                        prsNeedingCommentPagination,
                         prsNeedingProjectItemPagination
                     );
                 });
@@ -466,6 +500,7 @@ public class GitHubPullRequestSyncService {
                     totalPRsSynced += pageResult.prsSynced();
                     totalReviewsSynced += pageResult.reviewsSynced();
                     totalReviewCommentsSynced += pageResult.reviewCommentsSynced();
+                    totalCommentsSynced += pageResult.commentsSynced();
                     totalProjectItemsSynced += pageResult.projectItemsSynced();
                 }
 
@@ -473,11 +508,11 @@ public class GitHubPullRequestSyncService {
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
 
-                // GitHub has a known bug where hasNextPage returns false prematurely
-                // around ~500 nodes (community discussion #30687). When totalCount
-                // indicates more data exists and we have a valid cursor, force-continue.
-                // Safety: if GitHub truly has no more data, the next page returns empty
-                // nodes and the existing isEmpty() check at line ~434 breaks out cleanly.
+                // GitHub has a known bug where hasNextPage returns false prematurely around
+                // ~500 nodes (community discussion #30687). When totalCount indicates more data
+                // exists and we have a valid cursor, force-continue. If GitHub truly has no more
+                // data, the next page returns empty nodes and the isEmpty() check above breaks
+                // out cleanly.
                 if (!hasMore && cursor != null && reportedTotalCount > 0 && totalPRsSynced < reportedTotalCount) {
                     log.info(
                         "Forcing pagination past hasNextPage=false (GitHub GraphQL ~500-node bug): fetched={}, totalCount={}, repo={}",
@@ -488,8 +523,8 @@ public class GitHubPullRequestSyncService {
                     hasMore = true;
                 }
 
-                // For incremental sync: check if the oldest PR in this page is older than effectiveSyncTimestamp
-                // PRs are ordered by updatedAt DESC, so the last item is the oldest
+                // PRs are ordered by updatedAt DESC, so the last node in the page is the oldest —
+                // compare it against effectiveSyncTimestamp to decide whether to stop.
                 if (incrementalSync && hasMore) {
                     var nodes = connection.getNodes();
                     if (!nodes.isEmpty()) {
@@ -512,11 +547,10 @@ public class GitHubPullRequestSyncService {
                     persistCursorCheckpoint(syncTargetId, cursor);
                 }
 
-                // Reset retry counter after successful page
                 retryAttempt = 0;
 
-                // Throttle between pagination requests to avoid hammering GitHub
-                // This reduces 502/504 errors caused by rapid-fire complex queries
+                // Throttle between pagination requests — rapid-fire complex queries trigger
+                // 502/504s from GitHub.
                 if (hasMore && !syncProperties.paginationThrottle().isZero()) {
                     try {
                         Thread.sleep(syncProperties.paginationThrottle().toMillis());
@@ -535,7 +569,6 @@ public class GitHubPullRequestSyncService {
 
                 switch (category) {
                     case RETRYABLE -> {
-                        // Transient error - retry with exponential backoff
                         if (retryAttempt < MAX_RETRY_ATTEMPTS) {
                             retryAttempt++;
                             log.warn(
@@ -564,7 +597,6 @@ public class GitHubPullRequestSyncService {
                         break;
                     }
                     case RATE_LIMITED -> {
-                        // Rate limited - wait for reset time if available, then retry
                         if (retryAttempt < MAX_RETRY_ATTEMPTS && classification.suggestedWait() != null) {
                             retryAttempt++;
                             long waitMs = Math.min(
@@ -596,7 +628,6 @@ public class GitHubPullRequestSyncService {
                         break;
                     }
                     case NOT_FOUND -> {
-                        // Resource not found - skip and continue
                         log.warn(
                             "Resource not found during PR sync, skipping: repoName={}, error={}",
                             safeNameWithOwner,
@@ -606,7 +637,6 @@ public class GitHubPullRequestSyncService {
                         break;
                     }
                     case AUTH_ERROR -> {
-                        // Authentication error - abort sync
                         log.error(
                             "Aborting PR sync due to auth error: repoName={}, error={}",
                             safeNameWithOwner,
@@ -616,7 +646,6 @@ public class GitHubPullRequestSyncService {
                         break;
                     }
                     case CLIENT_ERROR -> {
-                        // Client error - abort sync
                         log.error(
                             "Aborting PR sync due to client error: repoName={}, error={}",
                             safeNameWithOwner,
@@ -626,7 +655,6 @@ public class GitHubPullRequestSyncService {
                         break;
                     }
                     default -> {
-                        // Unknown error - log and abort
                         log.error(
                             "Aborting PR sync due to unknown error: repoName={}, error={}",
                             safeNameWithOwner,
@@ -641,16 +669,14 @@ public class GitHubPullRequestSyncService {
             }
         }
 
-        // Check for overflow: did we fetch fewer items than GitHub reported?
-        // Only meaningful during full sync — during incremental sync we intentionally fetch
-        // only recently-updated items, so fetchedCount < totalCount is expected by design.
-        // The force-pagination above should have handled most cases, but if GitHub
-        // returned empty pages (truly can't serve more data), we fall back to state splitting.
+        // Only meaningful during full sync — incremental sync intentionally fetches only
+        // recently-updated items, so fetchedCount < totalCount is expected there by design. The
+        // force-pagination above handles most truncation; if GitHub still returns empty pages
+        // (truly can't serve more data), fall back to state splitting.
         if (reportedTotalCount >= 0 && !incrementalSync) {
-            // Keep totalPRsSynced as the comparand: the fallback below is defined in terms of it.
-            // checkPaginated returns true only on a real early-stop gap (empty page after
-            // force-pagination), suppressing the benign over-report that previously triggered a
-            // spurious state-split.
+            // totalPRsSynced is the comparand the fallback below uses. checkPaginated returns
+            // true only on a real early-stop gap (empty page after force-pagination), not on the
+            // benign case where GitHub's totalCount over-reports.
             boolean overflowDetected = GraphQlConnectionOverflowDetector.checkPaginated(
                 "pullRequests",
                 totalPRsSynced,
@@ -697,9 +723,6 @@ public class GitHubPullRequestSyncService {
             }
         }
 
-        // Fetch remaining reviews for PRs with >10 reviews (using cursor for efficient continuation)
-        // Each call to syncRemainingReviews handles its own transactions
-        // Re-fetch PRs from database to handle transaction rollbacks gracefully
         if (!prsNeedingReviewPagination.isEmpty()) {
             log.debug(
                 "Starting additional review fetch for PRs with pagination: repoName={}, prCount={}",
@@ -730,9 +753,6 @@ public class GitHubPullRequestSyncService {
             }
         }
 
-        // Fetch remaining review threads/comments for PRs with >10 threads (using cursor for efficient continuation)
-        // Each call to syncRemainingThreads handles its own transactions
-        // Re-fetch PRs from database to handle transaction rollbacks gracefully
         if (!prsNeedingThreadPagination.isEmpty()) {
             log.debug(
                 "Starting additional review thread fetch for PRs with pagination: repoName={}, prCount={}",
@@ -740,9 +760,8 @@ public class GitHubPullRequestSyncService {
                 prsNeedingThreadPagination.size()
             );
             for (PullRequestWithThreadCursor prWithCursor : prsNeedingThreadPagination) {
-                // Re-fetch PR from database with repository eagerly loaded to avoid
-                // LazyInitializationException when syncRemainingThreads accesses pr.getRepository()
-                // in a new transaction. If the transaction that created this PR was rolled back, skip it.
+                // Re-fetch with repository eagerly loaded to avoid LazyInitializationException in
+                // the new transaction; skip if the creating transaction was rolled back.
                 PullRequest pr = pullRequestRepository
                     .findByIdWithRepository(prWithCursor.pullRequestId())
                     .orElse(null);
@@ -762,9 +781,36 @@ public class GitHubPullRequestSyncService {
             }
         }
 
-        // Fetch remaining project items for PRs in >5 projects (using cursor for efficient continuation)
-        // Each call to syncRemainingProjectItems handles its own transactions
-        // Re-fetch PRs from database to handle transaction rollbacks gracefully
+        // Reuses the issue-comment sync service: a PR's conversation comments are IssueComments,
+        // and that service routes on the parent's concrete type.
+        if (!prsNeedingCommentPagination.isEmpty()) {
+            log.debug(
+                "Starting additional conversation comment fetch for PRs with pagination: repoName={}, prCount={}",
+                safeNameWithOwner,
+                prsNeedingCommentPagination.size()
+            );
+            for (PullRequestWithCommentCursor prWithCursor : prsNeedingCommentPagination) {
+                // Re-fetch PR with repository eagerly loaded to avoid LazyInitializationException
+                // when syncRemainingComments accesses pr.getRepository() in a new transaction.
+                PullRequest pr = pullRequestRepository
+                    .findByIdWithRepository(prWithCursor.pullRequestId())
+                    .orElse(null);
+                if (pr == null) {
+                    log.debug(
+                        "Skipped comment pagination: reason=prNotFound (likely transaction rollback), prId={}",
+                        prWithCursor.pullRequestId()
+                    );
+                    continue;
+                }
+                int additionalComments = issueCommentSyncService.syncRemainingComments(
+                    scopeId,
+                    pr,
+                    prWithCursor.commentCursor()
+                );
+                totalCommentsSynced += additionalComments;
+            }
+        }
+
         if (!prsNeedingProjectItemPagination.isEmpty()) {
             log.debug(
                 "Starting additional project item fetch for PRs with pagination: repoName={}, prCount={}",
@@ -772,9 +818,8 @@ public class GitHubPullRequestSyncService {
                 prsNeedingProjectItemPagination.size()
             );
             for (PullRequestWithProjectItemCursor prWithCursor : prsNeedingProjectItemPagination) {
-                // Re-fetch PR from database with repository eagerly loaded to avoid
-                // LazyInitializationException when syncRemainingProjectItems accesses pr.getRepository()
-                // in a new transaction. If the transaction that created this PR was rolled back, skip it.
+                // Re-fetch with repository eagerly loaded to avoid LazyInitializationException in
+                // the new transaction; skip if the creating transaction was rolled back.
                 PullRequest pr = pullRequestRepository
                     .findByIdWithRepository(prWithCursor.pullRequestId())
                     .orElse(null);
@@ -785,7 +830,6 @@ public class GitHubPullRequestSyncService {
                     );
                     continue;
                 }
-                // Sync remaining project items using the nodeId stored in the cursor
                 int additionalItems = projectItemSyncService.syncRemainingProjectItems(
                     scopeId,
                     prWithCursor.nodeId(),
@@ -798,24 +842,23 @@ public class GitHubPullRequestSyncService {
             }
         }
 
-        // Clear cursor on successful completion (uses REQUIRES_NEW)
-        // Only clear if sync completed without abort
         if (syncTargetId != null && !hasMore && abortReason == null) {
             clearCursorCheckpoint(syncTargetId);
         }
 
-        // Determine the final result status
         SyncResult.Status finalStatus = abortReason != null ? abortReason : SyncResult.Status.COMPLETED;
 
         log.info(
-            "Completed pull request sync: repoName={}, prCount={}, reviewCount={}, reviewCommentCount={}, projectItemCount={}, prsWithReviewPagination={}, prsWithThreadPagination={}, prsWithProjectItemPagination={}, resumed={}, incremental={}, stoppedByIncremental={}, status={}",
+            "Completed pull request sync: repoName={}, prCount={}, reviewCount={}, reviewCommentCount={}, commentCount={}, projectItemCount={}, prsWithReviewPagination={}, prsWithThreadPagination={}, prsWithCommentPagination={}, prsWithProjectItemPagination={}, resumed={}, incremental={}, stoppedByIncremental={}, status={}",
             safeNameWithOwner,
             totalPRsSynced,
             totalReviewsSynced,
             totalReviewCommentsSynced,
+            totalCommentsSynced,
             totalProjectItemsSynced,
             prsNeedingReviewPagination.size(),
             prsNeedingThreadPagination.size(),
+            prsNeedingCommentPagination.size(),
             prsNeedingProjectItemPagination.size(),
             resuming,
             incrementalSync,
@@ -825,13 +868,17 @@ public class GitHubPullRequestSyncService {
         return new SyncResult(finalStatus, totalPRsSynced);
     }
 
-    /**
-     * Result of processing a page of pull requests.
-     */
-    private record PageSyncResult(int prsSynced, int reviewsSynced, int reviewCommentsSynced, int projectItemsSynced) {}
+    private record PageSyncResult(
+        int prsSynced,
+        int reviewsSynced,
+        int reviewCommentsSynced,
+        int commentsSynced,
+        int projectItemsSynced
+    ) {}
 
     /**
-     * Processes a page of pull requests with their embedded reviews, review threads, and project items.
+     * Processes a page of pull requests with their embedded conversation comments, reviews,
+     * review threads, and project items.
      */
     private PageSyncResult processPullRequestPage(
         GHPullRequestConnection connection,
@@ -839,11 +886,13 @@ public class GitHubPullRequestSyncService {
         Long scopeId,
         List<PullRequestWithReviewCursor> prsNeedingReviewPagination,
         List<PullRequestWithThreadCursor> prsNeedingThreadPagination,
+        List<PullRequestWithCommentCursor> prsNeedingCommentPagination,
         List<PullRequestWithProjectItemCursor> prsNeedingProjectItemPagination
     ) {
         int prsSynced = 0;
         int reviewsSynced = 0;
         int reviewCommentsSynced = 0;
+        int commentsSynced = 0;
         int projectItemsSynced = 0;
 
         for (var graphQlPullRequest : connection.getNodes()) {
@@ -854,14 +903,29 @@ public class GitHubPullRequestSyncService {
                 continue;
             }
 
-            // Process the PR
             PullRequest entity = pullRequestProcessor.process(prWithReviews.pullRequest(), context);
             if (entity == null) {
                 continue;
             }
             prsSynced++;
 
-            // Process embedded reviews (pass context to enable activity event creation)
+            // Process embedded conversation comments through the shared issue-comment processor —
+            // same entity, same table as issue comments. Keyed by PR number, which the processor
+            // resolves against the PullRequest rows the IssueRepository lookup skips.
+            EmbeddedCommentsDTO embeddedComments = prWithReviews.embeddedComments();
+            for (GitHubCommentDTO commentDTO : embeddedComments.comments()) {
+                if (issueCommentProcessor.process(commentDTO, entity.getNumber(), context) != null) {
+                    commentsSynced++;
+                }
+            }
+
+            if (embeddedComments.needsPagination()) {
+                prsNeedingCommentPagination.add(
+                    new PullRequestWithCommentCursor(entity.getId(), embeddedComments.endCursor())
+                );
+            }
+
+            // context enables activity event creation for inline reviews
             EmbeddedReviewsDTO embeddedReviews = prWithReviews.embeddedReviews();
             for (GitHubReviewDTO reviewDTO : embeddedReviews.reviews()) {
                 if (reviewSyncService.processInlineReview(reviewDTO, entity.getId(), context) != null) {
@@ -869,8 +933,6 @@ public class GitHubPullRequestSyncService {
                 }
             }
 
-            // Track PRs that need additional review pagination (with cursor for efficient continuation)
-            // Store PR ID instead of entity reference to survive transaction rollbacks
             if (embeddedReviews.needsPagination()) {
                 prsNeedingReviewPagination.add(
                     new PullRequestWithReviewCursor(
@@ -881,22 +943,17 @@ public class GitHubPullRequestSyncService {
                 );
             }
 
-            // Process embedded review threads and their comments
             EmbeddedReviewThreadsDTO embeddedThreads = prWithReviews.embeddedReviewThreads();
             for (GitHubReviewThreadDTO thread : embeddedThreads.threads()) {
-                int commentsSynced = reviewCommentSyncService.processThread(thread, entity, scopeId);
-                reviewCommentsSynced += commentsSynced;
+                reviewCommentsSynced += reviewCommentSyncService.processThread(thread, entity, scopeId);
             }
 
-            // Track PRs that need additional thread pagination (with cursor for efficient continuation)
-            // Store PR ID instead of entity reference to survive transaction rollbacks
             if (embeddedThreads.needsPagination()) {
                 prsNeedingThreadPagination.add(
                     new PullRequestWithThreadCursor(entity.getId(), embeddedThreads.endCursor())
                 );
             }
 
-            // Process embedded project items
             EmbeddedProjectItemsDTO embeddedProjectItems = prWithReviews.embeddedProjectItems();
             projectItemsSynced += projectItemSyncService.processEmbeddedItems(
                 embeddedProjectItems,
@@ -904,8 +961,6 @@ public class GitHubPullRequestSyncService {
                 entity.getId()
             );
 
-            // Track PRs that need additional project item pagination
-            // Store PR ID instead of entity reference to survive transaction rollbacks
             if (embeddedProjectItems.needsPagination()) {
                 prsNeedingProjectItemPagination.add(
                     new PullRequestWithProjectItemCursor(
@@ -917,7 +972,93 @@ public class GitHubPullRequestSyncService {
             }
         }
 
-        return new PageSyncResult(prsSynced, reviewsSynced, reviewCommentsSynced, projectItemsSynced);
+        return new PageSyncResult(prsSynced, reviewsSynced, reviewCommentsSynced, commentsSynced, projectItemsSynced);
+    }
+
+    /**
+     * Lightweight probe answering "has any pull request been updated since {@code since}?".
+     * <p>
+     * Uses the GetRepositoryPullRequestLatestUpdate query, which costs ~1 rate limit point
+     * against ~59 for the full GetRepositoryPullRequests query. Because GitHub's pullRequests
+     * connection offers no server-side {@code since} filter, the probe fetches the single
+     * most-recently-updated PR (UPDATED_AT DESC, first: 1) and compares its {@code updatedAt}
+     * against the cutoff: if even the newest PR predates the cutoff, no PR can have changed.
+     * <p>
+     * Fails open — any probe failure returns {@code true} so the caller runs the full sync
+     * rather than silently skipping data.
+     *
+     * @param client            the GraphQL client
+     * @param ownerAndName      the parsed repository owner and name
+     * @param since             the incremental cutoff
+     * @param timeout           the GraphQL request timeout
+     * @param safeNameWithOwner sanitized repository name for logging
+     * @return {@code false} only when the probe positively proves nothing changed
+     */
+    private boolean hasPullRequestsUpdatedSince(
+        HttpGraphQlClient client,
+        RepositoryOwnerAndName ownerAndName,
+        Instant since,
+        Duration timeout,
+        String safeNameWithOwner
+    ) {
+        try {
+            ClientGraphQlResponse response = Mono.defer(() ->
+                client
+                    .documentName("GetRepositoryPullRequestLatestUpdate")
+                    .variable("owner", ownerAndName.owner())
+                    .variable("name", ownerAndName.name())
+                    .execute()
+            )
+                .retryWhen(
+                    Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                        .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                        .jitter(JITTER_FACTOR)
+                        .filter(ScmTransportErrors::isTransportError)
+                        .doBeforeRetry(signal ->
+                            log.warn(
+                                "Retrying after transport error: context=pullRequestUpdateProbe, repoName={}, attempt={}, error={}",
+                                safeNameWithOwner,
+                                signal.totalRetries() + 1,
+                                signal.failure().getMessage()
+                            )
+                        )
+                )
+                .block(timeout);
+
+            if (response == null || !response.isValid()) {
+                log.warn(
+                    "PR update probe returned invalid response, falling back to full sync: repoName={}",
+                    safeNameWithOwner
+                );
+                return true;
+            }
+
+            List<Map> nodes = response.field("repository.pullRequests.nodes").toEntityList(Map.class);
+            if (nodes.isEmpty()) {
+                // Repository genuinely has no pull requests at all — nothing to sync.
+                return false;
+            }
+
+            Object rawUpdatedAt = nodes.get(0).get("updatedAt");
+            if (rawUpdatedAt == null) {
+                log.warn(
+                    "PR update probe returned null updatedAt, falling back to full sync: repoName={}",
+                    safeNameWithOwner
+                );
+                return true;
+            }
+
+            Instant newestUpdatedAt = OffsetDateTime.parse(rawUpdatedAt.toString()).toInstant();
+            return !newestUpdatedAt.isBefore(since);
+        } catch (Exception e) {
+            // Fail-open: if the probe itself fails, proceed with the full sync
+            log.warn(
+                "PR update probe failed, falling back to full sync: repoName={}, error={}",
+                safeNameWithOwner,
+                e.getMessage()
+            );
+            return true;
+        }
     }
 
     /**

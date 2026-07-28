@@ -1,9 +1,13 @@
 # Migration guide — Unified integration framework (#1198 / PR #1306)
 
-Actionable, post-merge migration steps for operators upgrading from `main` to the unified
+Actionable, post-merge migration steps for operators upgrading from pre-#1198 releases to the unified
 `integration/{core,scm}` framework. Steps marked **VERIFIED** were exercised at runtime against a
-fresh database + the live GitHub App during PR review; steps marked **MANUAL** require an operator
+fresh database and a live GitHub App; steps marked **MANUAL** require an operator
 action that cannot be automated by the deploy.
+
+**Read [§5](#5-scm-disconnect-now-erases-the-mirror-behaviour-change) before
+disconnecting anything.** A later release made SCM disconnect and workspace purge erase the mirrored
+data; it is irreversible.
 
 ## What changed (operator-relevant)
 
@@ -12,9 +16,9 @@ action that cannot be automated by the deploy.
   `workspace.installation_id / personal_access_token / git_provider_mode / gitlab_* / slack_* /
   leaderboard_notification_*` columns.
 - All SCM/Slack config consolidated under `hephaestus.integration.*` (was `hephaestus.scm.*` /
-  `hephaestus.gitprovider.*` / standalone Slack props). `application.yml` / `application-prod.yml`
-  in this PR are already migrated — **only out-of-band overrides (env, k8s secrets, compose) need
-  updating.**
+  `hephaestus.gitprovider.*` / standalone Slack props). The in-repo `application.yml` /
+  `application-prod.yml` are already migrated — **only out-of-band overrides (env, k8s secrets,
+  compose) need updating.**
 - Inbound webhooks moved from `POST /github` & `POST /gitlab` to a single `POST /webhooks/{kind}`
   (`github`, `gitlab`). **This is a hard cutover — there is no 308 redirect from the old paths.**
 
@@ -42,8 +46,8 @@ schema validates. The credential migration is changeset `1780313973588` →
    table (`ON CONFLICT DO NOTHING` — idempotent, safe to re-run).
 2. A **HALT guard** (`-21c`) aborts the migration if workspaces exist but no `connection` rows
    were produced *and* credentials were present — preventing the subsequent column drops from
-   destroying un-migrated credentials. (Hardened in this PR to not false-trip when every workspace
-   has a `NULL git_provider_mode`, i.e. genuinely nothing to migrate.)
+   destroying un-migrated credentials. It does not trip when every workspace has a
+   `NULL git_provider_mode`, i.e. genuinely nothing to migrate.
 3. **Drops** the legacy `workspace.*` credential columns.
 
 Because the encryption key is read during the backfill, **`HEPHAESTUS_SECURITY_ENCRYPTION_KEY`
@@ -70,7 +74,40 @@ scheduled sync backfills anything missed.
 4. Verify: a workspace's connection is `ACTIVE`, a manual sync pulls data, and a test webhook is
    received (`/actuator/health` on the webhook-server pod).
 
-## 5. Explicitly NOT in this PR (so you don't wait for them)
+## 5. SCM disconnect now erases the mirror (behaviour change)
+
+**This is destructive and has no undo.** It landed after #1198 and applies to any operator upgrading
+past that release.
+
+Previously, disconnecting a GitHub or GitLab connection left every mirrored row in PostgreSQL, and
+purging a workspace cleared only its monitors and local clones. Now both actions run the same
+erasure:
+
+- Mirrored repositories and everything cascading from them (issues, pull/merge requests, reviews,
+  review threads and comments, discussions, labels, milestones, collaborators) are **hard-deleted**,
+  along with the workspace's repository monitors, its local git clones, its activity-event log, and
+  the SCM-derived practice observations and feedback.
+- Only repositories no other workspace still monitors are deleted. A repository shared with another
+  workspace survives; the disconnecting workspace simply loses its access path to it.
+- The org-level mirror (teams, team memberships, organisation memberships) is deleted only when no
+  other non-purged workspace is bound to the same organisation.
+- Retained deliberately: `sync_job`, `connection_activity`, `connection_audit` — operational history
+  with no third-party content — so the disconnection stays auditable. Connection credentials are
+  cleared as part of the same transition.
+
+Consequences for operators:
+
+- **Reconnecting is a fresh initial sync, not a restore.** Anything the vendor no longer has is
+  gone. This matches the Slack and Outline behaviour, which have always erased on disconnect.
+- **Do not use disconnect as a way to rotate credentials.** Re-enter the credential on the existing
+  connection instead.
+- Disconnect is refused with a retryable `409` while a sync job is in flight, so the erase never
+  races a writer.
+
+See [ADR 0024](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0024-integration-sync-lifecycle-and-two-deletion-semantics.md)
+for the full model and [Integration sync lifecycle](./sync-lifecycle.md) for per-integration detail.
+
+## 6. Explicitly NOT in this migration (so you don't wait for them)
 
 - **No 308 redirect** from legacy `/github`·`/gitlab` (hard cutover — §3).
 - **No canonical versioned `IntegrationEvent` wire envelope** — the in-process `ScmDomainEvent`
@@ -78,15 +115,6 @@ scheduled sync backfills anything missed.
 - **No anonymous-installation bootstrap table** (waived).
 - **No JetStream DLQ** (ADR 0013 — by design).
 
-## 6. What was runtime-verified during review
-
-- Clean migration from `main` on a fresh DB (all changesets, schema validates).
-- App boots in all three runtime roles; a boot-blocking bug (OAuth-state secret unconditionally
-  required) was fixed so local dev boots without extra config.
-- **GitHub App end-to-end:** App installations auto-provisioned workspaces + `connection` rows,
-  discovered repositories, and ran incremental sync + commit backfill (issues, PRs, reviews,
-  commits, users) with **zero errors**; per-repo watermarks set for incremental re-sync.
-
-> Live webhook delivery, GitLab, Slack OAuth, and LLM-review paths were **not** exercised in the
-> review session (they need a public tunnel + live OAuth apps). Use the steps above plus the
-> service `AGENTS.md` runbooks to validate them in a staging environment.
+> Live webhook delivery, GitLab, Slack OAuth, and LLM-review paths need a public tunnel + live
+> OAuth apps to exercise. Use the steps above plus the service `AGENTS.md` runbooks to validate
+> them in a staging environment.

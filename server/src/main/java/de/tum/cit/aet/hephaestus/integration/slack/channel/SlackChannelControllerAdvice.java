@@ -11,10 +11,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /**
- * Error mapper for the Slack admin controllers. Scoped to the {@code integration.slack} package so every Slack
- * REST route returns RFC-7807 {@code ProblemDetail} for its domain violations, following the
- * {@code docs/contributor/api-error-handling.md} convention (mirrors {@code WorkspaceControllerAdvice}). Not-found /
- * validation / auth flow through the global advice.
+ * Maps Slack domain exceptions to RFC-7807 {@code ProblemDetail} for every Slack REST route, per
+ * {@code docs/contributor/api-error-handling.md}. Not-found / validation / auth flow through the global advice.
  */
 @RestControllerAdvice(basePackages = "de.tum.cit.aet.hephaestus.integration.slack")
 @Order(Ordered.HIGHEST_PRECEDENCE)

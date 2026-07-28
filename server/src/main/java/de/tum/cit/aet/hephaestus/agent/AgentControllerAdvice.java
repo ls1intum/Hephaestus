@@ -1,11 +1,13 @@
 package de.tum.cit.aet.hephaestus.agent;
 
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigBoundException;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigCredentialModeException;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigHasActiveJobsException;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigNameConflictException;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionInUseException;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionSlugConflictException;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelInUseException;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelSlugConflictException;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelUpstreamIdConflictException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStateConflictException;
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
+import java.net.URI;
 import java.util.Optional;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -15,43 +17,59 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /**
- * Error mapper for agent-specific exceptions.
- * Kept in the agent module to avoid a cyclic dependency between agent and workspace.
+ * Error mapper for agent-module exceptions, per {@code docs/contributor/api-error-handling.md}.
+ *
+ * <p>An agent exception without an explicit handler below returns 500 regardless of any
+ * {@code @ResponseStatus} on it: {@code GlobalControllerAdvice}'s
+ * {@code @ExceptionHandler(Exception.class)} catches it before
+ * {@link org.springframework.web.servlet.mvc.support.ResponseStatusExceptionResolver} can run.
  */
-@RestControllerAdvice
+@RestControllerAdvice(basePackageClasses = AgentControllerAdvice.class)
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class AgentControllerAdvice {
 
-    @ExceptionHandler(AgentConfigHasActiveJobsException.class)
-    ProblemDetail handleAgentConfigHasActiveJobs(AgentConfigHasActiveJobsException exception) {
-        return problem(HttpStatus.CONFLICT, "Agent config has active jobs", exception.getMessage());
-    }
-
-    @ExceptionHandler(AgentConfigNameConflictException.class)
-    ProblemDetail handleAgentConfigNameConflict(AgentConfigNameConflictException exception) {
-        return problem(HttpStatus.CONFLICT, "Agent config name conflict", exception.getMessage());
-    }
-
-    @ExceptionHandler(AgentConfigBoundException.class)
-    ProblemDetail handleAgentConfigBound(AgentConfigBoundException exception) {
-        return problem(HttpStatus.CONFLICT, "Agent config is bound", exception.getMessage());
-    }
-
-    @ExceptionHandler(AgentConfigCredentialModeException.class)
-    ProblemDetail handleAgentConfigCredentialMode(AgentConfigCredentialModeException exception) {
-        return problem(HttpStatus.BAD_REQUEST, "Invalid credential mode", exception.getMessage());
-    }
-
     @ExceptionHandler(AgentJobStateConflictException.class)
     ProblemDetail handleAgentJobStateConflict(AgentJobStateConflictException exception) {
-        return problem(HttpStatus.CONFLICT, "Agent job state conflict", exception.getMessage());
+        return problem(HttpStatus.CONFLICT, "agent-job-state-conflict", "Agent job state conflict", exception);
     }
 
-    private ProblemDetail problem(HttpStatus status, String title, String detail) {
+    @ExceptionHandler(LlmConnectionInUseException.class)
+    ProblemDetail handleConnectionInUse(LlmConnectionInUseException exception) {
+        return problem(HttpStatus.CONFLICT, "llm-connection-in-use", "LLM connection is in use", exception);
+    }
+
+    @ExceptionHandler(LlmModelInUseException.class)
+    ProblemDetail handleModelInUse(LlmModelInUseException exception) {
+        return problem(HttpStatus.CONFLICT, "llm-model-in-use", "LLM model is in use", exception);
+    }
+
+    @ExceptionHandler(LlmConnectionSlugConflictException.class)
+    ProblemDetail handleConnectionSlugConflict(LlmConnectionSlugConflictException exception) {
+        return problem(HttpStatus.CONFLICT, "llm-connection-slug-conflict", "LLM connection slug conflict", exception);
+    }
+
+    @ExceptionHandler(LlmModelSlugConflictException.class)
+    ProblemDetail handleModelSlugConflict(LlmModelSlugConflictException exception) {
+        return problem(HttpStatus.CONFLICT, "llm-model-slug-conflict", "LLM model slug conflict", exception);
+    }
+
+    @ExceptionHandler(LlmModelUpstreamIdConflictException.class)
+    ProblemDetail handleModelUpstreamIdConflict(LlmModelUpstreamIdConflictException exception) {
+        return problem(
+            HttpStatus.CONFLICT,
+            "llm-model-upstream-id-conflict",
+            "LLM model upstream id conflict",
+            exception
+        );
+    }
+
+    /** The {@code type} slug is API surface clients match on — renaming one is a breaking change. */
+    private ProblemDetail problem(HttpStatus status, String typeSlug, String title, Exception exception) {
         ProblemDetail problem = ProblemDetail.forStatus(status);
+        problem.setType(URI.create("/problems/" + typeSlug));
         problem.setTitle(title);
         problem.setDetail(
-            Optional.ofNullable(detail)
+            Optional.ofNullable(exception.getMessage())
                 .map(LoggingUtils::sanitizeForLog)
                 .filter(s -> !s.isBlank())
                 .orElse("The agent request could not be processed.")

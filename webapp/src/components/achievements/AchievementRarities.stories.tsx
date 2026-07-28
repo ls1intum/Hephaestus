@@ -9,7 +9,7 @@ import {
 	hermesSprint,
 	poseidonTrident,
 	zeusThunderbolt,
-} from "@/components/achievements/storyMockData";
+} from "@/components/achievements/story-mock-data";
 
 /**
  * Showcases all six achievement rarity tiers side by side using mythic-themed artifacts.

@@ -9,10 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.CredentialMode;
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
-import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
@@ -44,6 +41,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.event.ApplicationEvents;
@@ -76,9 +74,6 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private AgentJobRepository agentJobRepository;
-
-    @Autowired
-    private AgentConfigRepository agentConfigRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -117,15 +112,6 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
         createPractice("pr-description-quality", "PR Description Quality");
         createPractice("error-handling", "Error Handling");
-
-        AgentConfig config = new AgentConfig();
-        config.setWorkspace(workspace);
-        config.setName("pipeline-config");
-        config.setEnabled(true);
-        config.setLlmProvider(LlmProvider.ANTHROPIC);
-        config.setCredentialMode(CredentialMode.PROXY);
-        config.setTimeoutSeconds(300);
-        config = agentConfigRepository.save(config);
 
         IdentityProvider provider = gitProviderRepository
             .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
@@ -185,7 +171,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
         agentJob = new AgentJob();
         agentJob.setWorkspace(workspace);
-        agentJob.setConfig(config);
+        agentJob.setPurpose(AgentPurpose.PRACTICE_DETECTION);
         agentJob.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         agentJob.setStatus(AgentJobStatus.COMPLETED);
         agentJob.setConfigSnapshot(
@@ -283,8 +269,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             verify(commentPoster).postFormattedBody(eq(agentJob), any(String.class));
             verify(diffNotePoster).reconcileInlineNotes(eq(agentJob), any());
 
-            // DeliveryStatus and DB persistence happen in AgentJobExecutor.persistDeliveryStatus(), not in
-            // handler.deliver() — so on the in-memory object the commentId is set but the status stays null.
+            // AgentJobExecutor persists deliveryStatus, not handler.deliver(), so it stays null here.
             assertThat(agentJob.getDeliveryCommentId()).isEqualTo("comment-123");
             assertThat(agentJob.getDeliveryStatus()).isNull();
         }
@@ -319,10 +304,11 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
             assertThat(observationRepository.findAll()).hasSize(2);
 
-            // Approval comment posted (no negatives → approval summary). Inline notes are reconciled
-            // unconditionally on an OPEN PR with an EMPTY list — clearing any prior run's stale
-            // line-numbered notes while posting no new ones.
-            verify(commentPoster).postFormattedBody(any(), any());
+            // A findings summary reaches this same call, so only the body text tells an approval apart.
+            var body = ArgumentCaptor.forClass(String.class);
+            verify(commentPoster).postFormattedBody(eq(agentJob), body.capture());
+            assertThat(body.getValue()).contains("nothing to change here");
+
             verify(diffNotePoster).reconcileInlineNotes(eq(agentJob), eq(List.of()));
         }
     }
@@ -378,7 +364,6 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
             handler.deliver(agentJob);
 
-            // 2 persisted (known slugs), 1 discarded (unknown)
             List<Observation> findings = observationRepository.findAll();
             assertThat(findings).hasSize(2);
 
@@ -433,14 +418,12 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
             handler.deliver(agentJob);
 
-            // Findings ARE persisted (deliver() persists first, then posts)
+            // Findings are still persisted: deliver() persists first, then posts.
             assertThat(observationRepository.findAll()).hasSize(2);
 
-            // Comment NOT posted (FeedbackDeliveryService skips closed PRs)
             verify(commentPoster, never()).postFormattedBody(any(), any());
             verify(diffNotePoster, never()).reconcileInlineNotes(any(), any());
 
-            // Delivery status not set (feedback was skipped)
             assertThat(agentJob.getDeliveryCommentId()).isNull();
             assertThat(agentJob.getDeliveryStatus()).isNull();
         }
@@ -461,18 +444,16 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             handler.deliver(agentJob);
             assertThat(observationRepository.findAll()).hasSize(2);
 
-            // Re-delivering the same job inserts no duplicates (ON CONFLICT DO NOTHING).
             handler.deliver(agentJob);
             assertThat(observationRepository.findAll()).hasSize(2);
 
-            // Event published once per deliver() call.
             List<PracticeDetectionCompletedEvent> events = applicationEvents
                 .stream(PracticeDetectionCompletedEvent.class)
                 .toList();
             assertThat(events).hasSize(2);
             assertThat(events.get(0).findingsInserted()).isEqualTo(2);
             assertThat(events.get(1).findingsInserted()).isZero();
-            assertThat(events.get(1).findingsDiscarded()).isEqualTo(2); // duplicates
+            assertThat(events.get(1).findingsDiscarded()).isEqualTo(2);
         }
     }
 }

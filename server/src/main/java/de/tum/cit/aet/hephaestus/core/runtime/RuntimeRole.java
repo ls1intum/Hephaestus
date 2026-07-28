@@ -20,29 +20,23 @@ public final class RuntimeRole {
     public static final String PROPERTY_PREFIX = "hephaestus.runtime";
 
     /**
-     * Wired property key for the server-role gate. Gates {@code ServerSchedulingConfig}
-     * ({@code @EnableScheduling}), {@code IntegrationNatsConsumer} (the unified
-     * integration-framework NATS pull consumer), {@code WorkspaceStartupListener}, the entire
-     * user-facing {@code core.auth} web/auth surface and {@code WorkspaceContextFilter} (both via
-     * {@link ConditionalOnServerRole}). Authoritative list lives in {@code RuntimeRoleBoundaryTest};
-     * setting this flag {@code false} removes those bean clusters from this JVM while the rest of the
-     * monolith continues to load. See ADR 0008.
+     * Wired property key for the server-role gate. Gates {@code ServerSchedulingConfig},
+     * {@code IntegrationNatsConsumer}, {@code WorkspaceStartupListener}, the user-facing
+     * {@code core.auth} web/auth surface and {@code WorkspaceContextFilter} (both via
+     * {@link ConditionalOnServerRole}). Authoritative list lives in {@code RuntimeRoleBoundaryTest}.
      */
     public static final String SERVER_PROPERTY = PROPERTY_PREFIX + ".server.enabled";
 
     /**
      * Wired property key for the worker-role gate. Gates {@code DockerSandboxConfiguration}
-     * and {@code AgentNatsConsumerConfig}. Setting to {@code false} removes the Docker
-     * sandbox runtime and the agent NATS pull consumer from this JVM; the rest of the
-     * monolith continues to load.
+     * and the poll-based {@code AgentJobExecutor}.
      */
     public static final String WORKER_PROPERTY = PROPERTY_PREFIX + ".worker.enabled";
 
     /**
      * Wired property key for the webhook-role gate. Gates webhook HTTP ingress,
      * inbound signature verification, JetStream publishing/bootstrap, health
-     * indicators, and graceful-shutdown lifecycle. Setting to
-     * {@code false} removes those beans; the rest of the monolith continues to load.
+     * indicators, and graceful-shutdown lifecycle.
      *
      * <p>The {@code webhook-server} production container deploys with this flag {@code true}
      * and {@link #SERVER_PROPERTY} / {@link #WORKER_PROPERTY} {@code false} so it runs
@@ -53,9 +47,9 @@ public final class RuntimeRole {
     public static final String WEBHOOK_PROPERTY = PROPERTY_PREFIX + ".webhook.enabled";
 
     /**
-     * Capability flag (NOT a role): toggles the worker-internal LLM proxy controller +
-     * security chain. Default true on the server; the BYO-runner trust model keeps LLM
-     * credentials on the coordinator (see ADR 0006).
+     * Property key enabling the agent job poller, which additionally requires
+     * {@link #WORKER_PROPERTY}. The LLM proxy gates on {@link #WORKER_PROPERTY} alone, so it is always
+     * up wherever jobs can run — it is the only LLM credential path a job has.
      */
-    public static final String SANDBOX_LLM_PROXY_PROPERTY = "hephaestus.sandbox.llm-proxy.enabled";
+    public static final String AGENT_ENABLED_PROPERTY = "hephaestus.agent.enabled";
 }

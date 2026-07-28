@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { expect, within } from "storybook/test";
 import type { TeamInfo } from "@/api/types.gen";
 import type { ExtendedUserTeams } from "./types";
 import { UsersTable } from "./UsersTable";
@@ -204,7 +205,7 @@ export const ManyUsers: Story = {
 			name: `User ${i + 1}`,
 			hidden: false,
 			url: `https://github.com/user${i + 1}`,
-			teams: mockTeams.filter(() => Math.random() > 0.5),
+			teams: mockTeams.filter((_team, teamIndex) => (i + teamIndex) % 3 === 0),
 			user: {
 				id: `user-${i + 10}`,
 				name: `User ${i + 1}`,
@@ -212,5 +213,9 @@ export const ManyUsers: Story = {
 				email: `user${i + 1}@example.com`,
 			},
 		})),
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByRole("navigation", { name: "pagination" })).toBeInTheDocument();
 	},
 };

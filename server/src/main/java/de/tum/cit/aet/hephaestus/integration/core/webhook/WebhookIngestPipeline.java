@@ -136,9 +136,6 @@ public class WebhookIngestPipeline {
                 yield ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "stale-timestamp"));
             }
             case VerificationResult.Invalid i -> {
-                // The response collapses every Invalid.reason into one category so attacker probes cannot
-                // distinguish missing-secret from signature-mismatch from malformed-header; the discriminator
-                // survives in the server-side log.
                 log.warn("Webhook rejected for kind={}: {}", kind, i.reason());
                 yield ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "invalid"));
             }
@@ -185,10 +182,8 @@ public class WebhookIngestPipeline {
         String subject = deriver.deriveSubject(payload, headers);
         String dedupId = deriver.deriveDedupKey(body, headers);
 
-        // Pass the vendor event header through unchanged when present, and ALWAYS
-        // attach the Nats-Msg-Id for server-side dedup. JetStreamPublisher already
-        // echoes the latter through its PublishOptions; including it on the headers
-        // keeps the wire trace self-describing.
+        // Nats-Msg-Id also rides in JetStreamPublisher's PublishOptions; duplicating it on the
+        // headers keeps the wire trace self-describing.
         Map<String, String> outboundHeaders = new LinkedHashMap<>();
         passthroughHeader(outboundHeaders, headers, "X-GitHub-Event");
         passthroughHeader(outboundHeaders, headers, "X-GitHub-Delivery");

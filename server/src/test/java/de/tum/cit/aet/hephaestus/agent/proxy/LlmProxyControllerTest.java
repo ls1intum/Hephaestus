@@ -2,748 +2,680 @@ package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.LlmProvider;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.agent.catalog.EgressPolicy;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmAuthMode;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
+import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import java.net.URI;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
+import mockwebserver3.MockResponse;
+import mockwebserver3.MockWebServer;
+import mockwebserver3.RecordedRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientRequestException;
-import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
 
 class LlmProxyControllerTest extends BaseUnitTest {
 
-    private static final LlmProxyProperties DEFAULT_PROPS = new LlmProxyProperties(
-        "https://api.anthropic.com",
-        "https://api.openai.com",
-        "Authorization",
-        true,
-        "",
-        "api-key",
-        false
-    );
-
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
+    @Mock
+    private LlmModelResolver resolver;
+
+    @Mock
+    private EgressPolicy egressPolicy;
+
+    @Mock
+    private ProxyBudgetGate budgetGate;
+
+    @Mock
+    private ProxyUsageAccumulator usageAccumulator;
+
+    @Mock
+    private MentorTurnUsageAccumulator mentorTurnUsageAccumulator;
+
     private LlmProxyController controller;
-    private SimpleMeterRegistry meterRegistry;
 
     @BeforeEach
     void setUp() {
-        meterRegistry = new SimpleMeterRegistry();
-        controller = new LlmProxyController(WebClient.create(), DEFAULT_PROPS, OBJECT_MAPPER, meterRegistry);
-        SecurityContextHolder.clearContext();
+        controller = new LlmProxyController(
+            WebClient.create(),
+            resolver,
+            egressPolicy,
+            OBJECT_MAPPER,
+            new ProxyAccounting(
+                budgetGate,
+                usageAccumulator,
+                mentorTurnUsageAccumulator,
+                new SimpleMeterRegistry(),
+                OBJECT_MAPPER
+            )
+        );
     }
 
     @AfterEach
-    void tearDown() {
+    void clearAuthentication() {
         SecurityContextHolder.clearContext();
     }
 
-    private void setUpAuthentication(AgentJob job) {
-        SecurityContextHolder.getContext().setAuthentication(new JobTokenAuthentication(job));
-    }
-
-    private AgentJob createJobWithApiKey(String apiKey) {
-        var job = new AgentJob();
-        job.setId(UUID.randomUUID());
-        job.setLlmApiKey(apiKey);
-        return job;
-    }
-
     @Nested
-    class HeaderStripping {
+    class BudgetGate {
 
         @Test
-        void shouldStripXApiKey() {
-            var config = ProviderProxyConfig.forProvider(LlmProvider.ANTHROPIC, DEFAULT_PROPS);
-            HttpHeaders incoming = new HttpHeaders();
-            incoming.set("x-api-key", "job-token-should-be-stripped");
-            incoming.set("Content-Type", "application/json");
+        void the429BodyNamesTheSharedPurseForASharedModelCall() {
+            var routing = routing("openai-completions");
+            authenticate(routing);
+            when(budgetGate.isBlocked(routing)).thenReturn(true);
 
-            HttpHeaders out = controller.buildUpstreamHeaders(incoming, config, "sk-real-key");
+            var result = controller.proxy(
+                request("POST", "/internal/llm/chat/completions"),
+                new MockHttpServletResponse(),
+                new HttpHeaders(),
+                jsonBody()
+            );
 
-            assertThat(out.getFirst("x-api-key")).isEqualTo("sk-real-key");
-            assertThat(out.get("x-api-key")).hasSize(1);
-            assertThat(out.getFirst("Content-Type")).isEqualTo("application/json");
+            assertThat(result.getStatusCode().value()).isEqualTo(429);
+            assertThat(String.valueOf(result.getBody()))
+                .contains("Shared-model budget reached")
+                .contains("raises the budget");
         }
 
         @Test
-        void shouldStripAuthorization() {
-            var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, DEFAULT_PROPS);
-            HttpHeaders incoming = new HttpHeaders();
-            incoming.set(HttpHeaders.AUTHORIZATION, "Bearer job-token-should-be-stripped");
-            incoming.set("Content-Type", "application/json");
+        void the429BodyNamesTheOwnProviderPurseForAnOwnProviderCall() {
+            var routing = workspaceFundedRouting();
+            authenticate(routing);
+            when(budgetGate.isBlocked(routing)).thenReturn(true);
 
-            HttpHeaders out = controller.buildUpstreamHeaders(incoming, config, "sk-real-key");
+            var result = controller.proxy(
+                request("POST", "/internal/llm/chat/completions"),
+                new MockHttpServletResponse(),
+                new HttpHeaders(),
+                jsonBody()
+            );
 
-            assertThat(out.getFirst(HttpHeaders.AUTHORIZATION)).isEqualTo("Bearer sk-real-key");
-            assertThat(out.get(HttpHeaders.AUTHORIZATION)).hasSize(1);
+            assertThat(result.getStatusCode().value()).isEqualTo(429);
+            assertThat(String.valueOf(result.getBody()))
+                .contains("Own-provider budget reached")
+                .contains("raises the cap");
+        }
+
+        /** 502, not 429: the credential resolves to nothing, so anything but 429 proves the call got through. */
+        @Test
+        void doesNotRejectACallTheGateAllows() {
+            var routing = workspaceFundedRouting();
+            authenticate(routing);
+            when(budgetGate.isBlocked(routing)).thenReturn(false);
+            when(resolver.resolveProxyCredential(any())).thenReturn(null);
+
+            var result = controller.proxy(
+                request("POST", "/internal/llm/chat/completions"),
+                new MockHttpServletResponse(),
+                new HttpHeaders(),
+                jsonBody()
+            );
+
+            assertThat(result.getStatusCode().value()).isEqualTo(502);
+        }
+    }
+
+    /**
+     * A mentor sandbox outlives the turns that use it, so its credential stays valid between them.
+     * A call that arrives in that gap names no execution — and an unnamed call is one no accumulator
+     * can write down, since both of them key on the attempt.
+     */
+    @Nested
+    class CallsWithNoBillingTarget {
+
+        @Test
+        void refusesAMentorCallMadeBetweenTurnsRatherThanServingItUnbilled() {
+            authenticate(unboundMentorSessionRouting());
+
+            var result = controller.proxy(
+                request("POST", "/internal/llm/chat/completions"),
+                new MockHttpServletResponse(),
+                new HttpHeaders(),
+                jsonBody()
+            );
+
+            assertThat(result.getStatusCode().value()).isEqualTo(403);
+            verifyNoInteractions(resolver);
+            verifyNoInteractions(mentorTurnUsageAccumulator);
+            verifyNoInteractions(usageAccumulator);
         }
 
         @Test
-        void shouldStripAzureApiKey() {
-            var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, DEFAULT_PROPS);
-            HttpHeaders incoming = new HttpHeaders();
-            incoming.set("api-key", "job-token-should-be-stripped");
+        void refusesBeforeConsultingTheBudgetGate() {
+            authenticate(unboundMentorSessionRouting());
 
-            HttpHeaders out = controller.buildUpstreamHeaders(incoming, config, "sk-real-key");
+            controller.proxy(
+                request("POST", "/internal/llm/chat/completions"),
+                new MockHttpServletResponse(),
+                new HttpHeaders(),
+                jsonBody()
+            );
 
-            assertThat(out.get("api-key")).isNull();
-        }
-
-        @Test
-        void shouldStripAllAuthHeaders() {
-            var config = ProviderProxyConfig.forProvider(LlmProvider.ANTHROPIC, DEFAULT_PROPS);
-            HttpHeaders incoming = new HttpHeaders();
-            incoming.set("x-api-key", "token1");
-            incoming.set(HttpHeaders.AUTHORIZATION, "Bearer token2");
-            incoming.set("api-key", "token3");
-
-            HttpHeaders out = controller.buildUpstreamHeaders(incoming, config, "sk-real-key");
-
-            assertThat(out.getFirst("x-api-key")).isEqualTo("sk-real-key");
-            assertThat(out.get(HttpHeaders.AUTHORIZATION)).isNull();
-            assertThat(out.get("api-key")).isNull();
-        }
-
-        @Test
-        void shouldRemoveHostAndSetAcceptEncodingIdentity() {
-            var config = ProviderProxyConfig.forProvider(LlmProvider.ANTHROPIC, DEFAULT_PROPS);
-            HttpHeaders incoming = new HttpHeaders();
-            incoming.set(HttpHeaders.HOST, "app-server:8080");
-            incoming.set(HttpHeaders.ACCEPT_ENCODING, "gzip, deflate");
-
-            HttpHeaders out = controller.buildUpstreamHeaders(incoming, config, "sk-real-key");
-
-            assertThat(out.get(HttpHeaders.HOST)).isNull();
-            assertThat(out.getFirst(HttpHeaders.ACCEPT_ENCODING)).isEqualTo("identity");
-        }
-
-        @Test
-        void shouldStripHopByHopHeaders() {
-            var config = ProviderProxyConfig.forProvider(LlmProvider.ANTHROPIC, DEFAULT_PROPS);
-            HttpHeaders incoming = new HttpHeaders();
-            incoming.set(HttpHeaders.CONNECTION, "keep-alive");
-            incoming.set(HttpHeaders.TRANSFER_ENCODING, "chunked");
-            incoming.set("Keep-Alive", "timeout=5");
-            incoming.set("Content-Type", "application/json");
-
-            HttpHeaders out = controller.buildUpstreamHeaders(incoming, config, "sk-real-key");
-
-            assertThat(out.get(HttpHeaders.CONNECTION)).isNull();
-            assertThat(out.get(HttpHeaders.TRANSFER_ENCODING)).isNull();
-            assertThat(out.get("Keep-Alive")).isNull();
-            assertThat(out.getFirst("Content-Type")).isEqualTo("application/json");
-        }
-
-        @Test
-        void shouldPreserveCustomHeaders() {
-            var config = ProviderProxyConfig.forProvider(LlmProvider.ANTHROPIC, DEFAULT_PROPS);
-            HttpHeaders incoming = new HttpHeaders();
-            incoming.set("Content-Type", "application/json");
-            incoming.set("anthropic-version", "2024-01-01");
-            incoming.set("X-Custom", "preserved");
-
-            HttpHeaders out = controller.buildUpstreamHeaders(incoming, config, "sk-real-key");
-
-            assertThat(out.getFirst("Content-Type")).isEqualTo("application/json");
-            assertThat(out.getFirst("anthropic-version")).isEqualTo("2024-01-01");
-            assertThat(out.getFirst("X-Custom")).isEqualTo("preserved");
+            verifyNoInteractions(budgetGate);
         }
     }
 
     @Nested
-    class PathTraversal {
+    class SafeSurface {
 
         @Test
-        @DisplayName("should reject .. in subpath")
-        void shouldRejectPathTraversal() {
-            AgentJob job = createJobWithApiKey("sk-real-key");
-            setUpAuthentication(job);
+        void shouldRejectNonPostBeforeCredentialResolution() {
+            authenticate(routing("openai-completions"));
+            var request = request("GET", "/internal/llm/chat/completions");
 
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/../../../etc/passwd");
-            var response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("x-api-key", "token");
+            var result = controller.proxy(request, new MockHttpServletResponse(), new HttpHeaders(), jsonBody());
 
-            var result = controller.proxy("anthropic", request, response, headers, "{}".getBytes());
-
-            assertThat(result.getStatusCode().value()).isEqualTo(400);
+            assertThat(result.getStatusCode().value()).isEqualTo(405);
+            verifyNoInteractions(resolver);
         }
 
         @Test
-        void shouldRejectDoubleDotInDecodedPath() {
-            AgentJob job = createJobWithApiKey("sk-real-key");
-            setUpAuthentication(job);
+        void shouldRejectWrongPathBeforeCredentialResolution() {
+            authenticate(routing("openai-completions"));
+            var request = request("POST", "/internal/llm/models");
 
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1/../../etc/passwd");
-            var response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("x-api-key", "token");
+            var result = controller.proxy(request, new MockHttpServletResponse(), new HttpHeaders(), jsonBody());
 
-            var result = controller.proxy("anthropic", request, response, headers, "{}".getBytes());
-
-            assertThat(result.getStatusCode().value()).isEqualTo(400);
+            assertThat(result.getStatusCode().value()).isEqualTo(404);
+            verifyNoInteractions(resolver);
         }
 
         @Test
-        void shouldRejectPercentEncodedDots() {
-            AgentJob job = createJobWithApiKey("sk-real-key");
-            setUpAuthentication(job);
+        void shouldRejectQueryBeforeCredentialResolution() {
+            authenticate(routing("openai-responses"));
+            var request = request("POST", "/internal/llm/responses");
+            request.setQueryString("api-version=unsafe");
 
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/%2e%2e/etc/passwd");
-            var response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("x-api-key", "token");
-
-            var result = controller.proxy("anthropic", request, response, headers, "{}".getBytes());
+            var result = controller.proxy(request, new MockHttpServletResponse(), new HttpHeaders(), jsonBody());
 
             assertThat(result.getStatusCode().value()).isEqualTo(400);
+            verifyNoInteractions(resolver);
         }
 
         @Test
-        void shouldRejectDoubleEncodedDots() {
-            AgentJob job = createJobWithApiKey("sk-real-key");
-            setUpAuthentication(job);
+        void shouldRejectProtocolPathMismatchBeforeCredentialResolution() {
+            authenticate(routing("openai-responses"));
+            var request = request("POST", "/internal/llm/chat/completions");
 
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/%252e%252e/etc/passwd");
-            var response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("x-api-key", "token");
+            var result = controller.proxy(request, new MockHttpServletResponse(), new HttpHeaders(), jsonBody());
 
-            var result = controller.proxy("anthropic", request, response, headers, "{}".getBytes());
-
-            assertThat(result.getStatusCode().value()).isEqualTo(400);
+            assertThat(result.getStatusCode().value()).isEqualTo(404);
+            verifyNoInteractions(resolver);
         }
 
         @Test
-        void shouldRejectBackslash() {
-            AgentJob job = createJobWithApiKey("sk-real-key");
-            setUpAuthentication(job);
+        void shouldAcceptChatCompletionsPath() {
+            var routing = routing("openai-completions");
+            authenticate(routing);
+            stubCredential(routing, credential("openai-completions", LlmAuthMode.BEARER));
+            doThrow(new IllegalArgumentException("blocked")).when(egressPolicy).validate("https://api.example.com/v1");
 
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1\\..\\etc\\passwd");
-            var response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("x-api-key", "token");
-
-            var result = controller.proxy("anthropic", request, response, headers, "{}".getBytes());
-
-            assertThat(result.getStatusCode().value()).isEqualTo(400);
-        }
-    }
-
-    @Nested
-    class NullApiKey {
-
-        @Test
-        void shouldReturn502ForNullApiKey() {
-            AgentJob job = createJobWithApiKey(null);
-            setUpAuthentication(job);
-
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1/messages");
-            var response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
-
-            var result = controller.proxy("anthropic", request, response, headers, "{}".getBytes());
+            var result = controller.proxy(
+                request("POST", "/internal/llm/chat/completions"),
+                new MockHttpServletResponse(),
+                new HttpHeaders(),
+                jsonBody()
+            );
 
             assertThat(result.getStatusCode().value()).isEqualTo(502);
         }
 
         @Test
-        void shouldReturn502ForBlankApiKey() {
-            AgentJob job = createJobWithApiKey("   ");
-            setUpAuthentication(job);
+        void shouldAcceptResponsesPath() {
+            var routing = routing("openai-responses");
+            authenticate(routing);
+            stubCredential(routing, credential("openai-responses", LlmAuthMode.API_KEY));
+            doThrow(new IllegalArgumentException("blocked")).when(egressPolicy).validate("https://api.example.com/v1");
 
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1/messages");
-            var response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
-
-            var result = controller.proxy("anthropic", request, response, headers, "{}".getBytes());
+            var result = controller.proxy(
+                request("POST", "/internal/llm/responses"),
+                new MockHttpServletResponse(),
+                new HttpHeaders(),
+                jsonBody()
+            );
 
             assertThat(result.getStatusCode().value()).isEqualTo(502);
         }
 
         @Test
-        void shouldIncrementErrorCounterForNullApiKey() {
-            AgentJob job = createJobWithApiKey(null);
-            setUpAuthentication(job);
+        void shouldRejectWhenLiveConnectionProtocolDiffersFromFrozenRouting() {
+            var routing = routing("openai-completions");
+            authenticate(routing);
+            stubCredential(routing, credential("openai-responses", LlmAuthMode.BEARER));
 
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1/messages");
-            var response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
-
-            controller.proxy("anthropic", request, response, headers, "{}".getBytes());
-
-            var errorCounter = meterRegistry.find("llm.proxy.errors").tag("provider", "ANTHROPIC").counter();
-            assertThat(errorCounter).isNotNull();
-            assertThat(errorCounter.count()).isEqualTo(1.0);
-        }
-    }
-
-    @Nested
-    class SsrfProtection {
-
-        @Test
-        void shouldBuildCorrectUrl() {
-            String url = LlmProxyController.buildUpstreamUrl(
-                "https://api.anthropic.com",
-                "/v1/messages",
-                "stream=true"
+            var result = controller.proxy(
+                request("POST", "/internal/llm/chat/completions"),
+                new MockHttpServletResponse(),
+                new HttpHeaders(),
+                jsonBody()
             );
-            assertThat(url).isEqualTo("https://api.anthropic.com/v1/messages?stream=true");
+
+            assertThat(result.getStatusCode().value()).isEqualTo(502);
+            verifyNoInteractions(egressPolicy);
         }
+    }
+
+    @Nested
+    class BodyLocking {
 
         @Test
-        void shouldPreserveHostAndSchemeFromBaseUrl() {
-            String url = LlmProxyController.buildUpstreamUrl("https://api.anthropic.com", "/v1/messages", null);
-            var uri = java.net.URI.create(url);
-            assertThat(uri.getHost()).isEqualTo("api.anthropic.com");
-            assertThat(uri.getScheme()).isEqualTo("https");
-        }
-
-        @Test
-        void shouldBuildUrlWithNoQuery() {
-            String url = LlmProxyController.buildUpstreamUrl("https://api.openai.com", "/v1/chat/completions", null);
-            assertThat(url).isEqualTo("https://api.openai.com/v1/chat/completions");
-            assertThat(url).doesNotContain("?");
-        }
-
-        @Test
-        void shouldBuildUrlWithEmptySubpath() {
-            String url = LlmProxyController.buildUpstreamUrl("https://api.anthropic.com", "", null);
-            assertThat(url).isEqualTo("https://api.anthropic.com");
-        }
-
-        @Test
-        void shouldNotMisinterpretAtInPathAsUserinfo() {
-            // An @ in the URL path (after the authority) is a harmless literal character,
-            // not a userinfo separator. Verify the constructed URI parses correctly.
-            String url = LlmProxyController.buildUpstreamUrl(
-                "https://api.anthropic.com",
-                "/user@evil.com/v1/messages",
-                null
+        void shouldForceAuthoritativeModel() {
+            byte[] input = "{\"model\":\"runner-controlled\",\"service_tier\":\"priority\",\"messages\":[]}".getBytes(
+                StandardCharsets.UTF_8
             );
-            var uri = java.net.URI.create(url);
-            assertThat(uri.getUserInfo()).as("@ in path must not create userinfo").isNull();
-            assertThat(uri.getHost()).isEqualTo("api.anthropic.com");
-            assertThat(uri.getScheme()).isEqualTo("https");
+
+            var prepared = controller.prepareBody(input, "catalog-model", false);
+
+            var tree = OBJECT_MAPPER.readTree(prepared.body());
+            assertThat(tree.path("model").asString()).isEqualTo("catalog-model");
+            assertThat(tree.has("service_tier")).isFalse();
         }
 
         @Test
-        @DisplayName("SSRF defense detects userinfo in authority (defense-in-depth)")
-        void shouldDetectUserInfoInAuthority() {
-            // The controller's SSRF check rejects URIs with userinfo.
-            // This verifies the defense works at the URI level — in production,
-            // buildUpstreamUrl cannot produce userinfo since the base URL is from config.
-            var uri = java.net.URI.create("https://attacker:pass@evil.com/v1/messages");
-            assertThat(uri.getUserInfo()).as("URI with @ in authority has userinfo").isNotNull();
-            assertThat(uri.getHost()).isNotEqualTo("api.anthropic.com");
+        void shouldRejectMalformedJson() {
+            assertThat(controller.prepareBody("not-json".getBytes(StandardCharsets.UTF_8), "model", false)).isNull();
         }
 
         @Test
-        void shouldRejectSsrfHostMismatchViaAtInjection() {
-            AgentJob job = createJobWithApiKey("sk-real-key");
-            setUpAuthentication(job);
-
-            // Craft path where stripping "/internal/llm/anthropic" leaves "@evil.com/v1/messages".
-            // buildUpstreamUrl produces: "https://api.anthropic.com@evil.com/v1/messages"
-            // URI.create parses this as: userInfo=api.anthropic.com, host=evil.com
-            // The SSRF check catches both userInfo != null AND host != expected host.
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic@evil.com/v1/messages");
-            var response = new MockHttpServletResponse();
-
-            var result = controller.proxy("anthropic", request, response, new HttpHeaders(), "{}".getBytes());
-
-            assertThat(result).isNotNull();
-            assertThat(result.getStatusCode().value()).isEqualTo(400);
-            assertThat(result.getBody()).isEqualTo("Invalid upstream target");
+        void shouldRejectJsonThatIsNotAnObject() {
+            assertThat(controller.prepareBody("[]".getBytes(StandardCharsets.UTF_8), "model", false)).isNull();
         }
 
         @Test
-        void shouldHandleMalformedUri() {
-            AgentJob job = createJobWithApiKey("sk-real-key");
-            setUpAuthentication(job);
+        void shouldAddStreamingUsageForChatCompletions() {
+            byte[] input = "{\"stream\":true,\"messages\":[]}".getBytes(StandardCharsets.UTF_8);
 
-            // Path with characters invalid for URI
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1/messages with spaces");
-            var response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
+            var prepared = controller.prepareBody(input, "catalog-model", true);
 
-            var result = controller.proxy("anthropic", request, response, headers, "{}".getBytes());
-
-            // Should return 400, not 500 (IllegalArgumentException caught)
-            assertThat(result).isNotNull();
-            assertThat(result.getStatusCode().value()).isEqualTo(400);
-        }
-    }
-
-    @Nested
-    class Metrics {
-
-        @Test
-        void shouldRecordTimerWithProviderTag() {
-            AgentJob job = createJobWithApiKey(null);
-            setUpAuthentication(job);
-
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1/messages");
-            var response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
-
-            controller.proxy("anthropic", request, response, headers, "{}".getBytes());
-
-            var timer = meterRegistry.find("llm.proxy.duration").tag("provider", "ANTHROPIC").timer();
-            assertThat(timer).isNotNull();
-            assertThat(timer.count()).isEqualTo(1);
+            var tree = OBJECT_MAPPER.readTree(prepared.body());
+            assertThat(tree.path("model").asString()).isEqualTo("catalog-model");
+            assertThat(tree.path("stream_options").path("include_usage").asBoolean()).isTrue();
+            // The un-augmented body is kept so a provider that rejects the flag can be retried on
+            // exactly what the caller sent.
+            assertThat(OBJECT_MAPPER.readTree(prepared.withoutUsageRequest()).has("stream_options")).isFalse();
         }
 
-        @Test
-        void shouldRecordTimerOnEarlyReturn() {
-            AgentJob job = createJobWithApiKey("   ");
-            setUpAuthentication(job);
-
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1/messages");
-            var response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
-
-            controller.proxy("anthropic", request, response, headers, "{}".getBytes());
-
-            var timer = meterRegistry.find("llm.proxy.duration").tag("provider", "ANTHROPIC").timer();
-            assertThat(timer).isNotNull();
-            assertThat(timer.count()).isEqualTo(1);
-            assertThat(timer.totalTime(TimeUnit.NANOSECONDS)).isGreaterThan(0);
+        static Stream<Arguments> requestedCapabilities() {
+            return Stream.of(
+                Arguments.of("{\"tools\":[{\"type\":\"function\"},{\"type\":\"custom\"}]}", true, "caller-run tools"),
+                Arguments.of("{\"tools\":[{\"type\":\"web_search_preview\"}]}", false, "a provider-hosted tool"),
+                Arguments.of("{\"web_search_options\":{}}", false, "hosted search asked for outside tools"),
+                Arguments.of("{\"modalities\":[\"text\",\"audio\"],\"audio\":{}}", false, "audio output"),
+                Arguments.of("{\"modalities\":[\"text\"]}", true, "an explicit text-only modality")
+            );
         }
 
-        @Test
-        void shouldIncrementErrorCounterMultipleTimes() {
-            AgentJob job = createJobWithApiKey(null);
-            setUpAuthentication(job);
+        @ParameterizedTest(name = "{2}")
+        @MethodSource("requestedCapabilities")
+        void locksTheRequestedCapabilitySurface(String body, boolean allowed, String what) {
+            var prepared = controller.prepareBody(body.getBytes(StandardCharsets.UTF_8), "model", false);
 
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1/messages");
-            var response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
-
-            controller.proxy("anthropic", request, response, headers, "{}".getBytes());
-            controller.proxy("anthropic", request, response, headers, "{}".getBytes());
-            controller.proxy("anthropic", request, response, headers, "{}".getBytes());
-
-            var errorCounter = meterRegistry.find("llm.proxy.errors").tag("provider", "ANTHROPIC").counter();
-            assertThat(errorCounter).isNotNull();
-            assertThat(errorCounter.count()).isEqualTo(3.0);
-        }
-
-        @Test
-        void shouldTrackErrorsPerProvider() {
-            AgentJob job = createJobWithApiKey(null);
-            setUpAuthentication(job);
-
-            var anthropicReq = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1/messages");
-            var openaiReq = new MockHttpServletRequest("POST", "/internal/llm/openai/v1/chat/completions");
-            var response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
-
-            controller.proxy("anthropic", anthropicReq, response, headers, "{}".getBytes());
-            controller.proxy("openai", openaiReq, response, headers, "{}".getBytes());
-            controller.proxy("openai", openaiReq, response, headers, "{}".getBytes());
-
-            var anthropicErrors = meterRegistry.find("llm.proxy.errors").tag("provider", "ANTHROPIC").counter();
-            var openaiErrors = meterRegistry.find("llm.proxy.errors").tag("provider", "OPENAI").counter();
-
-            assertThat(anthropicErrors).isNotNull();
-            assertThat(anthropicErrors.count()).isEqualTo(1.0);
-            assertThat(openaiErrors).isNotNull();
-            assertThat(openaiErrors.count()).isEqualTo(2.0);
+            if (allowed) {
+                assertThat(prepared).as(what).isNotNull();
+            } else {
+                assertThat(prepared).as(what).isNull();
+            }
         }
     }
 
+    /**
+     * These tests drive an actual HTTP stream because the failure they guard against is invisible to any
+     * mock: a controller that returns the instant it sees an SSE body serves a perfect response and
+     * reaches no accounting at all, so only the ledger tells the two apart.
+     */
     @Nested
-    class BodySizeValidation {
+    class Streaming {
 
-        @Test
-        void shouldRejectOversizedBody() {
-            AgentJob job = createJobWithApiKey("sk-real-key");
-            setUpAuthentication(job);
+        private MockWebServer upstream;
+        private LlmProxyController streamingController;
 
-            byte[] oversizedBody = new byte[4 * 1024 * 1024 + 1]; // 4MB + 1 byte
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1/messages");
-            var response = new MockHttpServletResponse();
-
-            var result = controller.proxy("anthropic", request, response, new HttpHeaders(), oversizedBody);
-
-            assertThat(result).isNotNull();
-            assertThat(result.getStatusCode().value()).isEqualTo(413);
-        }
-
-        @Test
-        void shouldAcceptBodyAtLimit() {
-            AgentJob job = createJobWithApiKey("sk-real-key");
-            setUpAuthentication(job);
-
-            byte[] maxBody = new byte[4 * 1024 * 1024]; // exactly 4MB
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1/messages");
-            var response = new MockHttpServletResponse();
-
-            var result = controller.proxy("anthropic", request, response, new HttpHeaders(), maxBody);
-
-            // Should pass body validation (may get 502 from WebClient, but not 413)
-            assertThat(result).isNotNull();
-            assertThat(result.getStatusCode().value()).isNotEqualTo(413);
-        }
-
-        @Test
-        void shouldAcceptNullBody() {
-            AgentJob job = createJobWithApiKey("sk-real-key");
-            setUpAuthentication(job);
-
-            var request = new MockHttpServletRequest("GET", "/internal/llm/anthropic/v1/models");
-            var response = new MockHttpServletResponse();
-
-            var result = controller.proxy("anthropic", request, response, new HttpHeaders(), null);
-
-            // Should not fail body validation
-            assertThat(result).isNotNull();
-            assertThat(result.getStatusCode().value()).isNotEqualTo(413);
-        }
-    }
-
-    @Nested
-    class UpstreamErrors {
-
-        @Test
-        void shouldReturn502OnWebClientRequestException() {
-            // Mock WebClient to throw WebClientRequestException (upstream unreachable)
-            @SuppressWarnings("unchecked")
-            WebClient.RequestBodyUriSpec bodyUriSpec = mock(WebClient.RequestBodyUriSpec.class);
-            @SuppressWarnings("unchecked")
-            WebClient.RequestBodySpec bodySpec = mock(WebClient.RequestBodySpec.class);
-            @SuppressWarnings("unchecked")
-            WebClient.RequestHeadersSpec<?> headersSpec = mock(WebClient.RequestHeadersSpec.class);
-            WebClient mockWebClient = mock(WebClient.class);
-
-            when(mockWebClient.method(any(HttpMethod.class))).thenReturn(bodyUriSpec);
-            when(bodyUriSpec.uri(any(URI.class))).thenReturn(bodySpec);
-            when(bodySpec.headers(any())).thenReturn(bodySpec);
-            doReturn(headersSpec).when(bodySpec).bodyValue(any());
-            when(headersSpec.exchangeToMono(any())).thenReturn(
-                Mono.error(
-                    new WebClientRequestException(
-                        new java.net.ConnectException("Connection refused"),
-                        HttpMethod.POST,
-                        URI.create("https://api.anthropic.com/v1/messages"),
-                        new HttpHeaders()
-                    )
+        @BeforeEach
+        void startUpstream() throws IOException {
+            upstream = new MockWebServer();
+            upstream.start();
+            streamingController = new LlmProxyController(
+                WebClient.builder().build(),
+                resolver,
+                egressPolicy,
+                OBJECT_MAPPER,
+                new ProxyAccounting(
+                    budgetGate,
+                    usageAccumulator,
+                    mentorTurnUsageAccumulator,
+                    new SimpleMeterRegistry(),
+                    OBJECT_MAPPER
                 )
             );
+        }
 
-            var mockedController = new LlmProxyController(mockWebClient, DEFAULT_PROPS, OBJECT_MAPPER, meterRegistry);
+        @AfterEach
+        void stopUpstream() throws IOException {
+            upstream.close();
+        }
 
-            AgentJob job = createJobWithApiKey("sk-real-key");
-            setUpAuthentication(job);
+        private ProxyRouting streamingRouting() {
+            return new ProxyRouting(
+                "job:stream",
+                "openai-completions",
+                upstream.url("/v1").toString(),
+                FundingSource.INSTANCE,
+                7L,
+                8L,
+                9L,
+                ATTEMPT
+            );
+        }
 
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1/messages");
-            var response = new MockHttpServletResponse();
+        private MockHttpServletResponse proxyStream(String... sseFrames) {
+            StringBuilder body = new StringBuilder();
+            for (String frame : sseFrames) {
+                body.append("data: ").append(frame).append("\n\n");
+            }
+            upstream.enqueue(
+                new MockResponse.Builder()
+                    .code(200)
+                    .addHeader("Content-Type", "text/event-stream")
+                    .body(body.toString())
+                    .build()
+            );
+            ProxyRouting routing = streamingRouting();
+            authenticate(routing);
+            when(
+                resolver.resolveProxyCredential(
+                    new LlmModelResolver.ConnectionRef(
+                        routing.connectionScope(),
+                        routing.connectionId(),
+                        routing.modelId(),
+                        routing.workspaceId()
+                    )
+                )
+            ).thenReturn(
+                new LlmModelResolver.ProxyCredential(
+                    upstream.url("/v1").toString(),
+                    "openai-completions",
+                    LlmAuthMode.BEARER,
+                    "catalog-model",
+                    "secret"
+                )
+            );
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            controllerProxy(response);
+            return response;
+        }
 
-            var result = mockedController.proxy("anthropic", request, response, new HttpHeaders(), "{}".getBytes());
-
-            assertThat(result).isNotNull();
-            assertThat(result.getStatusCode().value()).isEqualTo(502);
-            assertThat(result.getBody()).isEqualTo("Upstream provider unreachable");
-
-            var errorCounter = meterRegistry.find("llm.proxy.errors").tag("provider", "ANTHROPIC").counter();
-            assertThat(errorCounter).isNotNull();
-            assertThat(errorCounter.count()).isEqualTo(1.0);
+        private void controllerProxy(MockHttpServletResponse response) {
+            streamingController.proxy(
+                request("POST", "/internal/llm/chat/completions"),
+                response,
+                new HttpHeaders(),
+                "{\"stream\":true,\"messages\":[]}".getBytes(StandardCharsets.UTF_8)
+            );
         }
 
         @Test
-        void shouldReturn502OnGenericException() {
-            @SuppressWarnings("unchecked")
-            WebClient.RequestBodyUriSpec bodyUriSpec = mock(WebClient.RequestBodyUriSpec.class);
-            @SuppressWarnings("unchecked")
-            WebClient.RequestBodySpec bodySpec = mock(WebClient.RequestBodySpec.class);
-            @SuppressWarnings("unchecked")
-            WebClient.RequestHeadersSpec<?> headersSpec = mock(WebClient.RequestHeadersSpec.class);
-            WebClient mockWebClient = mock(WebClient.class);
-
-            when(mockWebClient.method(any(HttpMethod.class))).thenReturn(bodyUriSpec);
-            when(bodyUriSpec.uri(any(URI.class))).thenReturn(bodySpec);
-            when(bodySpec.headers(any())).thenReturn(bodySpec);
-            doReturn(headersSpec).when(bodySpec).bodyValue(any());
-            when(headersSpec.exchangeToMono(any())).thenReturn(
-                Mono.error(new RuntimeException("Unexpected upstream error"))
+        @DisplayName("a streamed call is billed for the usage its final frame reports")
+        void aStreamedCallIsBilled() throws Exception {
+            MockHttpServletResponse response = proxyStream(
+                "{\"choices\":[{\"delta\":{\"content\":\"hi\"}}],\"usage\":null}",
+                "{\"choices\":[],\"usage\":{\"prompt_tokens\":100,\"completion_tokens\":40," +
+                    "\"prompt_tokens_details\":{\"cached_tokens\":25}}}",
+                "[DONE]"
             );
 
-            var mockedController = new LlmProxyController(mockWebClient, DEFAULT_PROPS, OBJECT_MAPPER, meterRegistry);
+            assertThat(response.getContentAsString()).contains("\"content\":\"hi\"").contains("[DONE]");
+            ArgumentCaptor<ProxyTokenUsage> usage = ArgumentCaptor.forClass(ProxyTokenUsage.class);
+            verify(usageAccumulator).accumulate(eq(ATTEMPT), usage.capture());
+            assertThat(usage.getValue().billableInputTokens()).isEqualTo(75);
+            assertThat(usage.getValue().outputTokens()).isEqualTo(40);
+            assertThat(usage.getValue().cacheReadTokens()).isEqualTo(25);
+        }
 
-            AgentJob job = createJobWithApiKey("sk-real-key");
-            setUpAuthentication(job);
+        /**
+         * A stream that ends before its usage frame bills what it observed — which is nothing. Recording
+         * a zero-token call instead would put a fabricated event in the ledger.
+         */
+        @Test
+        @DisplayName("a stream that terminates before the usage frame records nothing")
+        void aTruncatedStreamRecordsNothing() throws Exception {
+            MockHttpServletResponse response = proxyStream(
+                "{\"choices\":[{\"delta\":{\"content\":\"cut off here\"}}],\"usage\":null}"
+            );
 
-            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1/messages");
-            var response = new MockHttpServletResponse();
+            assertThat(response.getContentAsString()).contains("cut off here");
+            verifyNoInteractions(usageAccumulator);
+        }
 
-            var result = mockedController.proxy("anthropic", request, response, new HttpHeaders(), "{}".getBytes());
+        /**
+         * The request-side half of the fix, proven on the wire: without the flag the provider sends no
+         * usage at all and there is nothing for the tap to read.
+         */
+        @Test
+        @DisplayName("the outgoing streaming request asks the provider to report usage")
+        void theOutgoingRequestAsksForUsage() throws Exception {
+            proxyStream("[DONE]");
 
-            assertThat(result).isNotNull();
-            assertThat(result.getStatusCode().value()).isEqualTo(502);
-            assertThat(result.getBody()).isEqualTo("Upstream request failed");
+            RecordedRequest sent = upstream.takeRequest(5, TimeUnit.SECONDS);
+            assertThat(sent).isNotNull();
+            assertThat(
+                OBJECT_MAPPER.readTree(sent.getBody().utf8()).path("stream_options").path("include_usage").asBoolean()
+            ).isTrue();
+        }
 
-            var errorCounter = meterRegistry.find("llm.proxy.errors").tag("provider", "ANTHROPIC").counter();
-            assertThat(errorCounter).isNotNull();
-            assertThat(errorCounter.count()).isEqualTo(1.0);
+        @Test
+        @DisplayName("a provider that rejects stream_options degrades to an unmetered call, not a failure")
+        void aProviderThatRejectsTheUsageRequestDegrades() throws Exception {
+            upstream.enqueue(
+                new MockResponse.Builder()
+                    .code(400)
+                    .addHeader("Content-Type", "application/json")
+                    .body("{\"error\":{\"message\":\"Unrecognized request argument: stream_options\"}}")
+                    .build()
+            );
+            upstream.enqueue(
+                new MockResponse.Builder()
+                    .code(200)
+                    .addHeader("Content-Type", "text/event-stream")
+                    .body("data: {\"choices\":[{\"delta\":{\"content\":\"served anyway\"}}]}\n\n")
+                    .build()
+            );
+            ProxyRouting routing = streamingRouting();
+            authenticate(routing);
+            stubCredential(
+                routing,
+                new LlmModelResolver.ProxyCredential(
+                    upstream.url("/v1").toString(),
+                    "openai-completions",
+                    LlmAuthMode.BEARER,
+                    "catalog-model",
+                    "secret"
+                )
+            );
+            MockHttpServletResponse response = new MockHttpServletResponse();
+
+            controllerProxy(response);
+
+            assertThat(response.getContentAsString()).contains("served anyway");
+            assertThat(upstream.takeRequest(5, TimeUnit.SECONDS).getBody().utf8()).contains("stream_options");
+            assertThat(upstream.takeRequest(5, TimeUnit.SECONDS).getBody().utf8()).doesNotContain("stream_options");
         }
     }
 
     @Nested
-    class AzureBodySanitization {
+    class HeaderAllowlist {
 
-        private static final LlmProxyProperties AZURE_PROPS = new LlmProxyProperties(
-            "https://api.anthropic.com",
-            "https://my-resource.openai.azure.com/openai/deployments/gpt-4",
-            "api-key",
-            false,
-            "",
-            "api-key",
-            false
+        @Test
+        void shouldInjectBearerAuthAndDropUnapprovedHeaders() {
+            var incoming = incomingHeaders();
+
+            HttpHeaders output = controller.buildUpstreamHeaders(
+                incoming,
+                credential("openai-completions", LlmAuthMode.BEARER)
+            );
+
+            assertThat(output.getFirst(HttpHeaders.AUTHORIZATION)).isEqualTo("Bearer secret");
+            assertThat(output.get("api-key")).isNull();
+            assertThat(output.get("x-api-key")).isNull();
+            assertThat(output.get("x-forward-me")).isNull();
+            assertThat(output.getFirst(HttpHeaders.CONTENT_TYPE)).isEqualTo("application/json");
+            assertThat(output.getFirst(HttpHeaders.ACCEPT)).isEqualTo("text/event-stream");
+            assertThat(output.getFirst(HttpHeaders.ACCEPT_ENCODING)).isEqualTo("identity");
+        }
+
+        @Test
+        void shouldInjectRawApiKeyAuth() {
+            HttpHeaders output = controller.buildUpstreamHeaders(
+                incomingHeaders(),
+                credential("openai-responses", LlmAuthMode.API_KEY)
+            );
+
+            assertThat(output.getFirst("api-key")).isEqualTo("secret");
+            assertThat(output.get(HttpHeaders.AUTHORIZATION)).isNull();
+        }
+
+        @Test
+        void shouldNotInjectAuthWhenKeyIsBlank() {
+            var credential = new LlmModelResolver.ProxyCredential(
+                "https://api.example.com/v1",
+                "openai-completions",
+                LlmAuthMode.BEARER,
+                "catalog-model",
+                " "
+            );
+
+            HttpHeaders output = controller.buildUpstreamHeaders(incomingHeaders(), credential);
+
+            assertThat(output.get(HttpHeaders.AUTHORIZATION)).isNull();
+            assertThat(output.get("api-key")).isNull();
+        }
+    }
+
+    @Test
+    void shouldBuildCanonicalProtocolUrls() {
+        assertThat(LlmProxyController.buildUpstreamUri("https://api.example.com/v1/", "openai-completions")).isEqualTo(
+            java.net.URI.create("https://api.example.com/v1/chat/completions")
         );
-
-        @Test
-        void shouldStripReasoningSummaryForAzure() throws Exception {
-            var azureController = new LlmProxyController(WebClient.create(), AZURE_PROPS, OBJECT_MAPPER, meterRegistry);
-            var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, AZURE_PROPS);
-
-            byte[] body = "{\"model\":\"gpt-4\",\"reasoningSummary\":\"auto\",\"messages\":[]}".getBytes(
-                StandardCharsets.UTF_8
-            );
-            byte[] sanitized = azureController.sanitizeBodyForAzure(LlmProvider.AZURE_OPENAI, config, body);
-
-            var tree = OBJECT_MAPPER.readTree(sanitized);
-            assertThat(tree.has("reasoningSummary")).isFalse();
-            assertThat(tree.has("model")).isTrue();
-            assertThat(tree.has("messages")).isTrue();
-        }
-
-        @Test
-        void shouldNotStripForStandardOpenAI() throws Exception {
-            var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, DEFAULT_PROPS);
-
-            byte[] body = "{\"model\":\"gpt-4\",\"reasoningSummary\":\"auto\",\"messages\":[]}".getBytes(
-                StandardCharsets.UTF_8
-            );
-            byte[] result = controller.sanitizeBodyForAzure(LlmProvider.OPENAI, config, body);
-
-            // Should return same reference (no modification)
-            assertThat(result).isSameAs(body);
-        }
-
-        @Test
-        void shouldPassThroughNullBody() {
-            var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, AZURE_PROPS);
-            assertThat(controller.sanitizeBodyForAzure(LlmProvider.OPENAI, config, null)).isNull();
-        }
-
-        @Test
-        void shouldPassThroughEmptyBody() {
-            var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, AZURE_PROPS);
-            byte[] empty = new byte[0];
-            assertThat(controller.sanitizeBodyForAzure(LlmProvider.OPENAI, config, empty)).isSameAs(empty);
-        }
-
-        @Test
-        void shouldPassThroughNonJsonBody() {
-            var azureController = new LlmProxyController(WebClient.create(), AZURE_PROPS, OBJECT_MAPPER, meterRegistry);
-            var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, AZURE_PROPS);
-
-            byte[] body = "not-json".getBytes(StandardCharsets.UTF_8);
-            byte[] result = azureController.sanitizeBodyForAzure(LlmProvider.AZURE_OPENAI, config, body);
-
-            assertThat(result).isSameAs(body);
-        }
-
-        @Test
-        void shouldRenameMaxTokensForAzure() throws Exception {
-            var azureController = new LlmProxyController(WebClient.create(), AZURE_PROPS, OBJECT_MAPPER, meterRegistry);
-            var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, AZURE_PROPS);
-
-            byte[] body = "{\"model\":\"gpt-4\",\"max_tokens\":1024,\"messages\":[]}".getBytes(StandardCharsets.UTF_8);
-            byte[] sanitized = azureController.sanitizeBodyForAzure(LlmProvider.AZURE_OPENAI, config, body);
-
-            var tree = OBJECT_MAPPER.readTree(sanitized);
-            assertThat(tree.has("max_tokens")).isFalse();
-            assertThat(tree.get("max_completion_tokens").asInt()).isEqualTo(1024);
-            assertThat(tree.has("model")).isTrue();
-        }
-
-        @Test
-        void shouldNotRenameMaxTokensForStandardOpenAI() throws Exception {
-            var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, DEFAULT_PROPS);
-
-            byte[] body = "{\"model\":\"gpt-4\",\"max_tokens\":1024,\"messages\":[]}".getBytes(StandardCharsets.UTF_8);
-            byte[] result = controller.sanitizeBodyForAzure(LlmProvider.OPENAI, config, body);
-
-            assertThat(result).isSameAs(body);
-        }
-
-        @Test
-        void shouldNotModifyCleanBody() throws Exception {
-            var azureController = new LlmProxyController(WebClient.create(), AZURE_PROPS, OBJECT_MAPPER, meterRegistry);
-            var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, AZURE_PROPS);
-
-            byte[] body = "{\"model\":\"gpt-4\",\"messages\":[]}".getBytes(StandardCharsets.UTF_8);
-            byte[] result = azureController.sanitizeBodyForAzure(LlmProvider.AZURE_OPENAI, config, body);
-
-            // Should return same reference (no modification needed)
-            assertThat(result).isSameAs(body);
-        }
+        assertThat(LlmProxyController.buildUpstreamUri("https://api.example.com/v1", "openai-responses")).isEqualTo(
+            java.net.URI.create("https://api.example.com/v1/responses")
+        );
     }
 
-    @Nested
-    class ProviderRouting {
+    private static byte[] jsonBody() {
+        return "{\"model\":\"anything\"}".getBytes(StandardCharsets.UTF_8);
+    }
 
-        @Test
-        void shouldUseAnthropicUpstream() {
-            // Verify buildUpstreamUrl produces correct Anthropic URL
-            String url = LlmProxyController.buildUpstreamUrl("https://api.anthropic.com", "/v1/messages", null);
-            assertThat(java.net.URI.create(url).getHost()).isEqualTo("api.anthropic.com");
-        }
+    private static MockHttpServletRequest request(String method, String path) {
+        return new MockHttpServletRequest(method, path);
+    }
 
-        @Test
-        void shouldUseOpenAIUpstream() {
-            String url = LlmProxyController.buildUpstreamUrl("https://api.openai.com", "/v1/chat/completions", null);
-            assertThat(java.net.URI.create(url).getHost()).isEqualTo("api.openai.com");
-        }
+    private static HttpHeaders incomingHeaders() {
+        var headers = new HttpHeaders();
+        headers.set(HttpHeaders.AUTHORIZATION, "Bearer sandbox-token");
+        headers.set("api-key", "sandbox-token");
+        headers.set("x-api-key", "sandbox-token");
+        headers.set("x-forward-me", "unsafe");
+        headers.set(HttpHeaders.CONTENT_TYPE, "application/json");
+        headers.set(HttpHeaders.ACCEPT, "text/event-stream");
+        return headers;
+    }
 
-        @Test
-        @DisplayName("should inject x-api-key for Anthropic, Bearer for OpenAI")
-        void shouldInjectCorrectAuthPerProvider() {
-            var anthropicConfig = ProviderProxyConfig.forProvider(LlmProvider.ANTHROPIC, DEFAULT_PROPS);
-            var openaiConfig = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, DEFAULT_PROPS);
-            HttpHeaders incoming = new HttpHeaders();
+    private static final ProxyRouting.BilledAttempt ATTEMPT = new ProxyRouting.BilledAttempt(
+        de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType.AGENT_JOB,
+        java.util.UUID.fromString("00000000-0000-0000-0000-0000000000aa"),
+        0,
+        java.math.BigDecimal.ZERO
+    );
 
-            HttpHeaders anthropicOut = controller.buildUpstreamHeaders(incoming, anthropicConfig, "sk-ant");
-            HttpHeaders openaiOut = controller.buildUpstreamHeaders(incoming, openaiConfig, "sk-oai");
+    private static ProxyRouting routing(String protocol) {
+        return new ProxyRouting(
+            "job:test",
+            protocol,
+            "https://frozen.example.com/v1",
+            FundingSource.INSTANCE,
+            7L,
+            8L,
+            9L,
+            ATTEMPT
+        );
+    }
 
-            assertThat(anthropicOut.getFirst("x-api-key")).isEqualTo("sk-ant");
-            assertThat(anthropicOut.get(HttpHeaders.AUTHORIZATION)).isNull();
+    private static ProxyRouting workspaceFundedRouting() {
+        return new ProxyRouting(
+            "job:test",
+            "openai-completions",
+            "https://frozen.example.com/v1",
+            FundingSource.WORKSPACE,
+            7L,
+            8L,
+            9L,
+            ATTEMPT
+        );
+    }
 
-            assertThat(openaiOut.getFirst(HttpHeaders.AUTHORIZATION)).isEqualTo("Bearer sk-oai");
-            assertThat(openaiOut.get("x-api-key")).isNull();
-        }
+    private static ProxyRouting unboundMentorSessionRouting() {
+        return new ProxyRouting(
+            "mentor-session",
+            "openai-completions",
+            "https://frozen.example.com/v1",
+            FundingSource.INSTANCE,
+            7L,
+            8L,
+            9L,
+            null
+        );
+    }
+
+    private static LlmModelResolver.ProxyCredential credential(String protocol, LlmAuthMode authMode) {
+        return new LlmModelResolver.ProxyCredential(
+            "https://api.example.com/v1",
+            protocol,
+            authMode,
+            "catalog-model",
+            "secret"
+        );
+    }
+
+    private void authenticate(ProxyRouting routing) {
+        SecurityContextHolder.getContext().setAuthentication(new JobTokenAuthentication(routing));
+    }
+
+    private void stubCredential(ProxyRouting routing, LlmModelResolver.ProxyCredential credential) {
+        when(
+            resolver.resolveProxyCredential(
+                eq(
+                    new LlmModelResolver.ConnectionRef(
+                        routing.connectionScope(),
+                        routing.connectionId(),
+                        routing.modelId(),
+                        routing.workspaceId()
+                    )
+                )
+            )
+        ).thenReturn(credential);
     }
 }

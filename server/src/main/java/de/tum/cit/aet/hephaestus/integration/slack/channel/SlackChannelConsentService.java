@@ -24,34 +24,31 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * The single authority for the per-channel Slack consent lifecycle — the write-side counterpart to the read-side
- * {@code SlackChannelConsentGate}. It owns the guarded state machine that makes {@code consent_state = ACTIVE}
- * reachable, posts the in-channel consent announcement on activation, stamps {@code consent_announced_at} (the
- * forward-only ingestion boundary), erases the channel's raw + derived data on revocation, and writes an immutable
- * audit row for every transition.
+ * Write-side authority for the per-channel Slack consent lifecycle (read side: {@code SlackChannelConsentGate}).
+ * Owns the guarded state machine, posts the in-channel consent announcement on activation, stamps
+ * {@code consent_announced_at} (the forward-only ingestion boundary), erases the channel's raw + derived data on
+ * revocation, and writes an immutable audit row for every transition.
  *
- * <p><strong>Mentoring-only, minimal state machine</strong> (no research gate, no forced wait window):
  * <pre>
  *   PENDING ──activate──▶ ACTIVE ⇄ PAUSED
  *      │                    │        │
  *      └────────── any → REVOKED (stop + ERASE; register again → PENDING) ──────────┘
  * </pre>
  * <ul>
- *   <li>{@code PENDING → ACTIVE}: post the announcement (what is read, why = practice feedback, and a one-click
- *       opt-out; see {@link SlackConsentBlocks}) and stamp {@code consent_announced_at = now()}. Ingestion is
- *       forward-only —
- *       {@code SlackIngestService} only stores messages whose {@code ts} is strictly after this stamp.</li>
+ *   <li>{@code PENDING → ACTIVE}: post the announcement ({@link SlackConsentBlocks}) and stamp
+ *       {@code consent_announced_at = now()} — {@code SlackIngestService} only stores messages whose {@code ts} is
+ *       strictly after this stamp.</li>
  *   <li>{@code ACTIVE ⇄ PAUSED}: stop / resume ingestion, keeping stored data. Resuming an already-announced
- *       channel does NOT re-announce or re-stamp (the original boundary stands).</li>
- *   <li>{@code * → REVOKED}: stops ingestion and erases the channel's {@code slack_message} rows, its
- *       {@code slack_thread} aggregates, and the derived {@code CONVERSATION_THREAD} observations/feedback (via the
- *       already-built {@link SlackIngestService#eraseChannel}). A later admin registration starts a fresh
- *       {@code PENDING} setup with a new announcement boundary.</li>
+ *       channel does NOT re-announce or re-stamp.</li>
+ *   <li>{@code * → REVOKED}: stops ingestion and erases raw messages, thread aggregates, and derived
+ *       {@code CONVERSATION_THREAD} observations/feedback ({@link SlackIngestService#eraseChannel}). A later
+ *       registration starts a fresh {@code PENDING} setup with a new announcement boundary.</li>
  * </ul>
  * A same-state PATCH is an idempotent no-op (no side effect, no audit row). Every other edge not drawn above is a
  * violation → {@link SlackChannelConsentViolationException} (409).
@@ -71,6 +68,14 @@ public class SlackChannelConsentService {
     private final UserRepository userRepository;
     private final SlackHephaestusUiLinks uiLinks;
     private final TransactionTemplate transactionTemplate;
+    private final ApplicationEventPublisher eventPublisher;
+
+    /**
+     * A channel just reached {@code ACTIVE}. Signals that its history sync may now run — every other
+     * integration kicks a sync when a resource is added, and without this Slack's would wait for the nightly
+     * cron. Delivered {@code AFTER_COMMIT} so the consumer reads the ACTIVE row rather than the old one.
+     */
+    public record SlackChannelActivatedEvent(long workspaceId, String slackChannelId) {}
 
     public SlackChannelConsentService(
         SlackMonitoredChannelRepository monitoredChannelRepository,
@@ -81,7 +86,8 @@ public class SlackChannelConsentService {
         ConnectionService connectionService,
         UserRepository userRepository,
         SlackHephaestusUiLinks uiLinks,
-        TransactionTemplate transactionTemplate
+        TransactionTemplate transactionTemplate,
+        ApplicationEventPublisher eventPublisher
     ) {
         this.monitoredChannelRepository = monitoredChannelRepository;
         this.consentEventRepository = consentEventRepository;
@@ -92,6 +98,7 @@ public class SlackChannelConsentService {
         this.userRepository = userRepository;
         this.uiLinks = uiLinks;
         this.transactionTemplate = transactionTemplate;
+        this.eventPublisher = eventPublisher;
     }
 
     /** All allow-listed channels for the workspace with their consent state + the workspace-wide opt-out count. */
@@ -204,12 +211,8 @@ public class SlackChannelConsentService {
     /**
      * Transition a channel to {@code target}, running the guarded state machine: validate the edge, perform the side
      * effect (announce on activate; erase on revoke), and append the immutable audit row. A same-state request is an
-     * idempotent no-op; an illegal edge throws {@link SlackChannelConsentViolationException}.
+     * idempotent no-op.
      *
-     * @param workspaceId    the acting workspace (tenant scope + isolation)
-     * @param slackChannelId the channel's Slack {@code C…}/{@code G…} id (the natural key / path var)
-     * @param target         the requested consent state
-     * @param reason         optional free-text reason recorded in the audit trail
      * @return the channel's DTO after the transition
      * @throws EntityNotFoundException            if the channel is not allow-listed in this workspace (404)
      * @throws SlackChannelConsentViolationException if the edge is not permitted (409)
@@ -225,7 +228,7 @@ public class SlackChannelConsentService {
             .orElseThrow(() -> new EntityNotFoundException("Slack channel", slackChannelId));
 
         if (preRead.getConsentState() == target) {
-            return toDTO(workspaceId, preRead); // idempotent no-op
+            return toDTO(workspaceId, preRead);
         }
         requireAllowed(preRead.getConsentState(), target, slackChannelId);
 
@@ -260,15 +263,17 @@ public class SlackChannelConsentService {
                     }
                     channel.setConsentState(ConsentState.ACTIVE);
                     monitoredChannelRepository.save(channel);
+                    // Published, not called: the kick's async pass must read the committed ACTIVE row, and
+                    // the admin's PATCH must not block on Slack round trips. Consumed after commit by
+                    // SlackDataSyncScheduler#onChannelConsentActivated.
+                    eventPublisher.publishEvent(new SlackChannelActivatedEvent(workspaceId, slackChannelId));
                 }
                 case PAUSED -> {
                     channel.setConsentState(ConsentState.PAUSED);
                     monitoredChannelRepository.save(channel);
                 }
                 case REVOKED -> {
-                    // Single erasure choke point: flips consent to REVOKED (bulk UPDATE) and hard-deletes the raw
-                    // messages, thread aggregates, and derived CONVERSATION_THREAD feedback. Reflect REVOKED on the
-                    // loaded entity for the returned DTO (the bulk update already persisted the row).
+                    // eraseChannel persists REVOKED via bulk UPDATE; reflect it on the loaded entity for the DTO.
                     ingestService.eraseChannel(workspaceId, slackChannelId);
                     channel.setConsentState(ConsentState.REVOKED);
                 }
@@ -329,7 +334,7 @@ public class SlackChannelConsentService {
         );
     }
 
-    /** The mentoring-only transition guard. {@code from != target} is already handled (idempotent no-op) by callers. */
+    /** Transition guard. The same-state case ({@code from == target}) is already handled as an idempotent no-op by callers. */
     private static void requireAllowed(ConsentState from, ConsentState target, String slackChannelId) {
         boolean allowed = switch (from) {
             case PENDING -> target == ConsentState.ACTIVE || target == ConsentState.REVOKED;
@@ -383,8 +388,7 @@ public class SlackChannelConsentService {
     /**
      * {@code channel_archive} / {@code channel_left} (and the {@code group_*} equivalents): stop ingestion but
      * keep stored data, exactly like {@code ACTIVE → PAUSED} via {@link #transition}. No-op unless the channel is
-     * currently {@code ACTIVE} — a channel that is {@code PENDING}, already {@code PAUSED}, or {@code REVOKED} has
-     * nothing to pause.
+     * currently {@code ACTIVE}.
      */
     public void pauseForPlatformEvent(long workspaceId, String slackChannelId, String reason) {
         runInTx(() -> {

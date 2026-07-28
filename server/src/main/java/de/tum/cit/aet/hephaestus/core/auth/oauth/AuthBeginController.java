@@ -3,6 +3,8 @@ package de.tum.cit.aet.hephaestus.core.auth.oauth;
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.CookieBearerTokenResolver;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.RevocationAwareJwtDecoder;
+import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
+import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderService;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
@@ -10,12 +12,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.oauth2.client.registration.ClientRegistration;
-import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
@@ -31,8 +32,7 @@ import org.springframework.web.servlet.view.RedirectView;
  * {@code /oauth2/authorization/{registrationId}} initiation endpoint.
  *
  * <p>This is the SPA's "Sign in with X" target. The intent cookie survives the round-trip
- * to the IdP and is read by the success handler (later commit) to decide where to land
- * the user post-login.
+ * to the IdP and is read by the success handler to decide where to land the user post-login.
  */
 @ConditionalOnServerRole
 @RestController
@@ -42,7 +42,7 @@ public class AuthBeginController {
     private static final Logger log = LoggerFactory.getLogger(AuthBeginController.class);
     private static final String OAUTH_INIT_PATH = "/oauth2/authorization/";
 
-    private final ClientRegistrationRepository clientRegistrationRepository;
+    private final LoginProviderService loginProviderService;
     private final AuthIntentCookie authIntentCookie;
     private final CookieBearerTokenResolver bearerTokenResolver;
     private final JwtDecoder jwtDecoder;
@@ -51,13 +51,13 @@ public class AuthBeginController {
     private final String apiBasePath;
 
     public AuthBeginController(
-        ClientRegistrationRepository clientRegistrationRepository,
+        LoginProviderService loginProviderService,
         AuthIntentCookie authIntentCookie,
         CookieBearerTokenResolver bearerTokenResolver,
         RevocationAwareJwtDecoder jwtDecoder,
         AuthProperties authProperties
     ) {
-        this.clientRegistrationRepository = clientRegistrationRepository;
+        this.loginProviderService = loginProviderService;
         this.authIntentCookie = authIntentCookie;
         this.bearerTokenResolver = bearerTokenResolver;
         this.jwtDecoder = jwtDecoder;
@@ -66,7 +66,7 @@ public class AuthBeginController {
 
     @GetMapping("/login")
     @PreAuthorize("permitAll()")
-    @Hidden // Behavior endpoint; OpenAPI catalogs the public-facing surface in commit 11.
+    @Hidden
     @Operation(summary = "Begin OAuth login flow against the given registrationId")
     public RedirectView begin(
         @RequestParam("provider") String registrationId,
@@ -76,14 +76,20 @@ public class AuthBeginController {
         HttpServletRequest request,
         HttpServletResponse response
     ) {
-        ClientRegistration registration = clientRegistrationRepository.findByRegistrationId(registrationId);
-        if (registration == null) {
+        // The enabled login_provider row is the authority: it backs the ClientRegistration Spring will
+        // resolve at the initiation endpoint, and its TYPE drives the link-only gate below.
+        Optional<LoginProvider> provider = loginProviderService.findEnabled(registrationId);
+        if (provider.isEmpty()) {
             log.warn("auth.begin: unknown provider={}", registrationId);
             return new RedirectView("/auth/error?code=unknown_provider", false);
         }
         String safeReturnTo = ReturnToValidator.safeOrFallback(returnTo);
         boolean linkMode = "link".equalsIgnoreCase(mode);
-        if (!linkMode && isSlackRegistration(registration)) {
+        // Link-only providers (Slack, Outline) can never begin a LOGIN — only the authenticated
+        // account-linking flow may reach them. Classified by the row's TYPE, not by URL: Outline is
+        // self-hosted, so there is no stable host to sniff. AccountProvisioningService re-checks this
+        // at the callback (defence in depth).
+        if (!linkMode && provider.get().getType().isLinkOnly()) {
             return new RedirectView("/auth/error?code=link_requires_auth", false);
         }
         AuthIntentCookie.Intent intent;
@@ -110,11 +116,6 @@ public class AuthBeginController {
         // not the SPA. (The /auth/error targets above are SPA routes at the origin root, so they keep none.)
         String urlEncodedRegistration = URLEncoder.encode(registrationId, StandardCharsets.UTF_8);
         return new RedirectView(apiBasePath + OAUTH_INIT_PATH + urlEncodedRegistration, false);
-    }
-
-    private static boolean isSlackRegistration(ClientRegistration registration) {
-        String authorizationUri = registration.getProviderDetails().getAuthorizationUri();
-        return authorizationUri != null && authorizationUri.startsWith("https://slack.com/");
     }
 
     /**

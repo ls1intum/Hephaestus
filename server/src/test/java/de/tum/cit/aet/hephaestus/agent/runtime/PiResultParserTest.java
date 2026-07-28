@@ -28,7 +28,6 @@ class PiResultParserTest extends BaseUnitTest {
     @DisplayName("emits agent.pi.result.parse.failure{stage=usage} when usage.json is invalid")
     void emitsParseFailureMetric() {
         var bad = "not-json".getBytes(StandardCharsets.UTF_8);
-        // Trigger via usage parse path.
         parser.parseUsage(bad);
         assertThat(meterRegistry.counter("agent.pi.result.parse.failure", "stage", "usage").count()).isEqualTo(1d);
     }
@@ -106,7 +105,32 @@ class PiResultParserTest extends BaseUnitTest {
         assertThat(result.usage().totalCalls()).isEqualTo(2);
         assertThat(result.usage().inputTokens()).isEqualTo(10);
         assertThat(result.usage().costUsd()).isEqualTo(0.12);
+        assertThat(result.usage().reasoningTokens()).isNull();
         assertThat(result.output()).containsKey("runnerDebug");
+    }
+
+    @Test
+    @DisplayName("reasoningTokens is populated from the responses-path shape when the runner reports it")
+    void populatesReasoningTokensWhenPresent() {
+        String usage =
+            "{\"model\":\"gpt-5.4\",\"inputTokens\":100,\"outputTokens\":50,\"reasoningTokens\":30," +
+            "\"totalCalls\":1}";
+        var result = parser.parseUsage(usage.getBytes(StandardCharsets.UTF_8));
+
+        assertThat(result).isNotNull();
+        assertThat(result.reasoningTokens()).isEqualTo(30);
+        assertThat(result.inputTokens()).isEqualTo(100);
+        assertThat(result.outputTokens()).isEqualTo(50);
+    }
+
+    @Test
+    @DisplayName("reasoningTokens stays null for a model that never reports it (chat/completions-only)")
+    void reasoningTokensNullWhenAbsent() {
+        String usage = "{\"model\":\"gpt-oss-120b\",\"inputTokens\":100,\"outputTokens\":50,\"totalCalls\":1}";
+        var result = parser.parseUsage(usage.getBytes(StandardCharsets.UTF_8));
+
+        assertThat(result).isNotNull();
+        assertThat(result.reasoningTokens()).isNull();
     }
 
     @Test

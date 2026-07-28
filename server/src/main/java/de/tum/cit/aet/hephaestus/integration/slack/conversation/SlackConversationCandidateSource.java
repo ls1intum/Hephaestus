@@ -9,19 +9,13 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
 /**
- * Slack-owned implementation of the agent {@link ConversationCandidateSource} SPI: the settled-thread candidate
- * scan, the non-tombstoned turn counts, and the review-watermark advance — all over Slack's own
- * {@code slack_thread}/{@code slack_message}/{@code slack_monitored_channel} tables.
+ * Slack-owned implementation of the agent {@link ConversationCandidateSource} SPI, over Slack's own
+ * {@code slack_thread}/{@code slack_message} tables. The agent {@code ConversationThreadTriggerScheduler} consumes
+ * it through the SPI to enqueue {@code CONVERSATION_REVIEW} jobs and never reaches into the Slack schema.
  *
- * <p><strong>Ownership.</strong> This lives in {@code integration.slack} because it reads/writes Slack's own
- * tables; the agent {@code ConversationThreadTriggerScheduler} consumes it through the SPI to enqueue
- * {@code CONVERSATION_REVIEW} jobs, and never reaches into the Slack schema.
- *
- * <p><strong>Persistence.</strong> Every read/write here rides the {@code integration.slack.domain} JPA
- * repositories — no raw {@code JdbcTemplate}. {@link #settledCandidates} delegates to
- * {@link SlackThreadRepository#findSettledCandidateRows}, an inherently cross-workspace sweep (each candidate
- * carries its own {@code workspace_id}, allowlisted in {@code SlackIntegrationArchitectureTest}); every other
- * method carries an explicit {@code workspace_id} predicate through its repository call.
+ * <p>{@link #settledCandidates} is an inherently cross-workspace sweep (each candidate carries its own
+ * {@code workspace_id}, allowlisted in {@code SlackIntegrationArchitectureTest}); every other method carries an
+ * explicit {@code workspace_id} predicate through its repository call.
  */
 @Service
 public class SlackConversationCandidateSource implements ConversationCandidateSource {

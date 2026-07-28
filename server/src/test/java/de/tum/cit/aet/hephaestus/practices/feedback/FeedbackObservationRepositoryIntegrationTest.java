@@ -11,7 +11,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderTyp
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.DeliveredObservationBody;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.ObservationAdviceBody;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
@@ -25,6 +25,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -129,28 +130,36 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @DisplayName(
-        "findDeliveredBodiesByObservationIds returns the DELIVERED body and excludes PREPARED/SUPPRESSED/null-body units"
+        "findAdviceBodiesByObservationIds returns DELIVERED and FAILED bodies (the dashboard's own channel) and " +
+            "excludes PREPARED/SUPPRESSED/null-body units"
     )
-    void findDeliveredBodiesExcludesNonDelivered() {
+    void findAdviceBodiesIncludesFailedExcludesPreparedSuppressed() {
         Observation delivered = saveObservation("obs-delivered");
+        Observation failed = saveObservation("obs-failed");
         Observation prepared = saveObservation("obs-prepared");
         Observation suppressed = saveObservation("obs-suppressed");
         Observation nullBody = saveObservation("obs-null-body");
 
         bind(saveFeedback(0, FeedbackDeliveryState.DELIVERED, "The advice the student saw"), delivered);
+        // A composed body that never reached the SCM surface still belongs on the dashboard (its own channel).
+        bind(saveFeedback(4000, FeedbackDeliveryState.FAILED, "The advice the direct post could not place"), failed);
         bind(saveFeedback(1, FeedbackDeliveryState.PREPARED, "Not yet delivered"), prepared);
         bind(saveFeedback(2, FeedbackDeliveryState.SUPPRESSED, "Withheld"), suppressed);
         bind(saveFeedback(3, FeedbackDeliveryState.DELIVERED, null), nullBody);
 
-        List<DeliveredObservationBody> bodies = feedbackObservationRepository.findDeliveredBodiesByObservationIds(
-            List.of(delivered.getId(), prepared.getId(), suppressed.getId(), nullBody.getId())
+        List<ObservationAdviceBody> bodies = feedbackObservationRepository.findAdviceBodiesByObservationIds(
+            List.of(delivered.getId(), failed.getId(), prepared.getId(), suppressed.getId(), nullBody.getId())
         );
 
-        assertThat(bodies).hasSize(1);
-        DeliveredObservationBody row = bodies.get(0);
-        assertThat(row.getObservationId()).isEqualTo(delivered.getId());
-        assertThat(row.getBody()).isEqualTo("The advice the student saw");
-        assertThat(row.getFeedbackCreatedAt()).isNotNull();
+        assertThat(bodies).hasSize(2);
+        Map<UUID, String> byObservation = bodies
+            .stream()
+            .collect(Collectors.toMap(ObservationAdviceBody::getObservationId, ObservationAdviceBody::getBody));
+        assertThat(byObservation)
+            .containsEntry(delivered.getId(), "The advice the student saw")
+            .containsEntry(failed.getId(), "The advice the direct post could not place")
+            .doesNotContainKeys(prepared.getId(), suppressed.getId(), nullBody.getId());
+        assertThat(bodies).allSatisfy(row -> assertThat(row.getFeedbackCreatedAt()).isNotNull());
     }
 
     @Test

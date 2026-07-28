@@ -83,7 +83,6 @@ class SessionRefreshLifecycleIntegrationTest {
             .expectStatus()
             .isOk()
             .expectBody()
-            // The whole point of the field: a real, future expiry the SPA schedules its renewal against.
             .jsonPath("$.accessTokenExpiresAt")
             .isNumber();
     }
@@ -97,15 +96,13 @@ class SessionRefreshLifecycleIntegrationTest {
         // Five consecutive refreshes: more wall-clock than a single 15-min token would survive, so a
         // session that rolls through all five is one that never auto-logs-out an active user.
         for (int cycle = 1; cycle <= 5; cycle++) {
-            // The current cookie still authenticates an ordinary app request.
             getUser(current).expectStatus().isOk();
 
             String rotated = refreshAndReadNewCookie(current, csrf);
 
             assertThat(rotated).as("cycle %d: refresh must mint a NEW token", cycle).isNotEqualTo(current);
-            // The rotated cookie authenticates app requests...
             getUser(rotated).expectStatus().isOk();
-            // ...and the token we just rotated away from is immediately dead (no parallel session).
+            // The token we just rotated away from is immediately dead (no parallel session).
             getUser(current).expectStatus().isUnauthorized();
 
             current = rotated;

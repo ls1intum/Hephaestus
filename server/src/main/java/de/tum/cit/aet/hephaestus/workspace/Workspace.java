@@ -23,6 +23,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
@@ -252,20 +253,22 @@ public class Workspace {
     // AI configuration
 
     /**
-     * The agent config that powers practice detection. When set, only this config is submitted
-     * for a review (no fan-out); when {@code null}, the "all enabled configs" fan-out applies.
-     * Scalar FK (not a {@code @ManyToOne AgentConfig}) on purpose — an association would close a
-     * {@code workspace → agent} Modulith cycle. {@code ON DELETE SET NULL} at the DB level.
+     * Monthly cap in USD on this workspace's INSTANCE-funded spend — the shared models the host pays
+     * for. {@code null} = uncapped; reaching it pauses work on shared models until the calendar month
+     * (UTC) rolls over. Set exclusively by instance admins, since it is the host's cost backstop.
      */
-    @Column(name = "practice_config_id")
-    private Long practiceConfigId;
+    @Column(name = "monthly_llm_budget_usd", precision = 10, scale = 2)
+    private BigDecimal monthlyLlmBudgetUsd;
 
     /**
-     * The agent config that powers the mentor. When {@code null} or disabled, the mentor falls
-     * back to the oldest enabled config. Scalar FK for the same cycle-avoidance reason.
+     * Monthly cap in USD on this workspace's OWN-provider (BYO) spend, set by the workspace's own
+     * admins. {@code null} = uncapped. The two caps are different people's money and are
+     * <b>never summed</b> — see {@code docs/contributor/llm-cost-vocabulary.md}, rule 2.
+     *
+     * <p>The API and the UI say "ownProvider"; the field keeps the released column's "byo" spelling.
      */
-    @Column(name = "mentor_config_id")
-    private Long mentorConfigId;
+    @Column(name = "monthly_byo_llm_budget_usd", precision = 10, scale = 2)
+    private BigDecimal monthlyByoLlmBudgetUsd;
 
     /**
      * Per-workspace practice-review trigger/delivery overrides; read via {@link #getReviewSettings()}.

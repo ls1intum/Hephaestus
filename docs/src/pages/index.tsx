@@ -19,8 +19,8 @@ const guideLinks = [
   },
   {
     title: 'Admin Guide',
-    description: 'Deploy Hephaestus securely and manage workspace configuration.',
-    to: '/admin/production-setup',
+    description: 'Install Hephaestus on your own server and operate it.',
+    to: '/admin/install',
   },
 ];
 

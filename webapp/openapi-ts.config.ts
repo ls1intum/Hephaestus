@@ -15,7 +15,7 @@ export default defineConfig({
 	],
 	// Exclude SSE endpoints - openapi-ts react-query plugin doesn't handle them correctly
 	// (tries to destructure 'data' from ServerSentEventsResult which has 'stream' instead).
-	// The mentor chat uses a custom transport in useMentorChat.ts.
+	// The mentor chat uses a custom transport in use-mentor-chat.ts.
 	parser: {
 		filters: {
 			operations: {

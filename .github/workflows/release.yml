@@ -1,8 +1,15 @@
 name: Release
 
-# Trunk-based continuous deployment
-# Every push to main with feat:/fix:/perf: triggers a release
-# Staging deploys immediately, Production requires approval
+# Cuts a release when a merge to main bumped the root package version — i.e.
+# when the Version PR (maintained by version-pr.yml) has been merged. Triggered
+# after CI/CD succeeds so the Docker images for the commit already exist.
+#
+# A release: tags vX.Y.Z at the version-bump commit, creates the GitHub Release
+# from that version's CHANGELOG.md section (flagging schema migrations), retags
+# the CI-built images (X.Y.Z, X.Y, latest), and starts the deploy chain
+# (staging automatically, production after environment approval).
+#
+# Versioning contract: docs/admin/compatibility-policy.mdx
 
 on:
   workflow_run:
@@ -10,47 +17,120 @@ on:
     types: [completed]
     branches: [main]
 
+# Key per commit so distinct releases queue independently — a global group would
+# let a newer run cancel an older release that is still pending.
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.event.workflow_run.head_sha }}
   cancel-in-progress: false
 
 permissions: {}
 
 jobs:
   release:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    # Only real pushes to our own main — a fork PR's CI/CD run reports
+    # head_branch of the fork; without these guards a fork branch named "main"
+    # could drive the privileged release job.
+    if: >-
+      ${{ github.event.workflow_run.conclusion == 'success'
+        && github.event.workflow_run.event == 'push'
+        && github.event.workflow_run.head_repository.full_name == github.repository }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      issues: write
-      pull-requests: write
     outputs:
-      new_version: ${{ steps.release.outputs.new_release_version }}
-      released: ${{ steps.release.outputs.new_release_published }}
+      released: ${{ steps.cut.outputs.released }}
+      version: ${{ steps.cut.outputs.version }}
+      major: ${{ steps.cut.outputs.major }}
+      minor: ${{ steps.cut.outputs.minor }}
+      tag_name: ${{ steps.cut.outputs.tag_name }}
+      sha: ${{ steps.cut.outputs.sha }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
+          # Pin to the exact commit CI/CD built — never main's tip, which may
+          # already carry a newer version bump (that would skip this release).
           ref: ${{ github.event.workflow_run.head_sha }}
-          token: ${{ secrets.GH_PAT }}
-          persist-credentials: false
           fetch-depth: 0
 
-      - name: Create Release
-        id: release
-        uses: cycjimmy/semantic-release-action@16ca923e6ccbb50770c415a0ccd43709a8c5f7a4 # v4.2.2
-        with:
-          extra_plugins: |
-            @semantic-release/commit-analyzer
-            @semantic-release/release-notes-generator
-            @semantic-release/github
-            conventional-changelog-conventionalcommits
+      - name: Cut release if this commit bumped the version
+        id: cut
+        # GITHUB_TOKEN suffices: the tag/Release it creates is not meant to
+        # trigger any workflow (deploys are wired via `needs`/dispatch below).
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+
+          VERSION=$(git show "$SHA:package.json" | jq -r .version)
+          PARENT_VERSION=$(git show "${SHA}^:package.json" | jq -r .version)
+          TAG="v$VERSION"
+
+          # Only the Version PR merge changes the root version. Feature merges add
+          # changesets, not version bumps, so they no-op here.
+          if [ "$VERSION" = "$PARENT_VERSION" ]; then
+            echo "Version unchanged at $VERSION — no release to cut."
+            echo "released=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Idempotent: if the Release already exists, this version is done. (A
+          # release whose downstream jobs half-failed is recovered by deleting the
+          # Release + its tag and re-running — not by silently re-releasing an old
+          # version, which would re-deploy it.)
+          if gh release view "$TAG" --repo "${{ github.repository }}" > /dev/null 2>&1; then
+            echo "Release $TAG already exists — nothing to cut."
+            echo "released=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Cutting $TAG at $SHA (was $PARENT_VERSION)"
+
+          PREV_TAG=$(git tag --list 'v*' --sort=-v:refname | head -1)
+
+          # Release notes = this version's CHANGELOG.md section (the assembled
+          # changeset entries), with a first-class migration warning when the
+          # release touches the Liquibase changelog.
+          NOTES=$(mktemp)
+          if [ -n "$PREV_TAG" ] && ! git diff --quiet "$PREV_TAG" "$SHA" -- server/src/main/resources/db/changelog/; then
+            {
+              echo "> [!WARNING]"
+              echo "> This release contains **schema migrations**. They run automatically on startup — back up your database before upgrading. See the [migration guide](https://github.com/ls1intum/Hephaestus/blob/main/MIGRATION.md)."
+              echo ""
+            } >> "$NOTES"
+          fi
+          # Slice the `## <version>` section: stop at the next release header or
+          # the footer's `---` fence. Exact-string header compare is regex-safe
+          # against the dots in the version. (A literal `---` inside a changeset
+          # body would truncate notes — our entries are short prose, so this is
+          # accepted over more fragile parsing.)
+          git show "$SHA:CHANGELOG.md" \
+            | awk -v ver="## $VERSION" '
+                $0 == ver { on=1; next }
+                on && (/^## / || /^---$/) { exit }
+                on { print }
+              ' >> "$NOTES"
+          echo "----- release notes -----"; cat "$NOTES"; echo "-------------------------"
+
+          # Creates the tag at $SHA and the Release atomically (no separate
+          # push, so there is no tag-without-Release window on a mid-step failure).
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes-file "$NOTES" \
+            --target "$SHA" \
+            --repo "${{ github.repository }}"
+
+          {
+            echo "released=true"
+            echo "version=$VERSION"
+            echo "major=${VERSION%%.*}"
+            MINOR="${VERSION#*.}"; echo "minor=${MINOR%%.*}"
+            echo "tag_name=$TAG"
+            echo "sha=$SHA"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Summary
-        if: steps.release.outputs.new_release_published == 'true'
+        if: steps.cut.outputs.released == 'true'
         run: |
-          echo "## 🚀 Released v${{ steps.release.outputs.new_release_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 Released ${{ steps.cut.outputs.tag_name }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Staging**: Deploying automatically" >> $GITHUB_STEP_SUMMARY
           echo "- **Production**: Waiting for approval" >> $GITHUB_STEP_SUMMARY
@@ -63,7 +143,7 @@ jobs:
       packages: write
       id-token: write
       attestations: write
-      contents: write
+      contents: write # gh release upload (release pin asset)
     outputs:
       agent-pi-digest: ${{ steps.retag.outputs.agent-pi-digest }}
       application-server-digest: ${{ steps.retag.outputs.application-server-digest }}
@@ -78,8 +158,9 @@ jobs:
       - name: Retag images and capture digests
         id: retag
         env:
-          VERSION: ${{ needs.release.outputs.new_version }}
-          SHA: ${{ github.event.workflow_run.head_sha }}
+          VERSION: ${{ needs.release.outputs.version }}
+          CHANNEL: ${{ needs.release.outputs.major }}.${{ needs.release.outputs.minor }}
+          SHA: ${{ needs.release.outputs.sha }}
         run: |
           set -euo pipefail
 
@@ -88,7 +169,7 @@ jobs:
             docker buildx imagetools inspect "$1" --format '{{json .Manifest}}' | jq -r '.digest'
           }
 
-          IMAGES=("webapp" "application-server" "agent-pi" "release-pin-fetcher")
+          IMAGES=("webapp" "application-server" "agent-pi" "release-pin-fetcher" "postgres")
 
           # Probe all images first; refuse to partial-publish if any is missing.
           for img in "${IMAGES[@]}"; do
@@ -112,17 +193,23 @@ jobs:
               echo "::error::$img source digest is malformed: ${SRC_DIGEST:-<empty>}"; exit 1; }
             echo "$img source digest: $SRC_DIGEST"
 
-            docker buildx imagetools create -t "$FULL_IMAGE:$VERSION" "$FULL_IMAGE:$SHA"
+            docker buildx imagetools create \
+              -t "$FULL_IMAGE:$VERSION" \
+              -t "$FULL_IMAGE:$CHANNEL" \
+              -t "$FULL_IMAGE:latest" \
+              "$FULL_IMAGE:$SHA"
 
-            DST_DIGEST=$(manifest_digest "$FULL_IMAGE:$VERSION")
-            if [[ "$SRC_DIGEST" != "$DST_DIGEST" ]]; then
-              echo "::error::Retag changed the digest for $img — refusing to publish."
-              exit 1
-            fi
+            for tag in "$VERSION" "$CHANNEL" "latest"; do
+              DST_DIGEST=$(manifest_digest "$FULL_IMAGE:$tag")
+              if [[ "$SRC_DIGEST" != "$DST_DIGEST" ]]; then
+                echo "::error::Retag changed the digest for $img:$tag — refusing to publish."
+                exit 1
+              fi
+            done
 
             case "$img" in
-              agent-pi)            echo "agent-pi-digest=$DST_DIGEST" >> "$GITHUB_OUTPUT" ;;
-              application-server)  echo "application-server-digest=$DST_DIGEST" >> "$GITHUB_OUTPUT" ;;
+              agent-pi)            echo "agent-pi-digest=$SRC_DIGEST" >> "$GITHUB_OUTPUT" ;;
+              application-server)  echo "application-server-digest=$SRC_DIGEST" >> "$GITHUB_OUTPUT" ;;
             esac
             echo "::endgroup::"
           done
@@ -138,7 +225,7 @@ jobs:
       - name: Write release pin asset
         id: pin
         env:
-          VERSION: ${{ needs.release.outputs.new_version }}
+          VERSION: ${{ needs.release.outputs.version }}
           AGENT_DIGEST: ${{ steps.retag.outputs.agent-pi-digest }}
         run: |
           set -euo pipefail
@@ -178,7 +265,7 @@ jobs:
           subject-checksums: subjects.sha256
           predicate-type: https://in-toto.io/attestation/release/v0.1
           predicate: |
-            { "purl": "pkg:github/ls1intum/hephaestus@v${{ needs.release.outputs.new_version }}" }
+            { "purl": "pkg:github/ls1intum/hephaestus@${{ needs.release.outputs.tag_name }}" }
 
       - name: Install cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
@@ -190,15 +277,31 @@ jobs:
           set -euo pipefail
           cosign sign-blob --yes --bundle "${ASSET}.sigstore.json" "$ASSET"
 
+      - name: Verify signature with the deploy-side identity (fail fast)
+        # Assert here, at build time, exactly what docker/compose.app.yaml's
+        # release-pin-fetcher asserts at deploy time. A mismatch (e.g. the OIDC
+        # ref drifts) fails the release loudly instead of silently hanging every
+        # production deploy on `cosign verify-blob`. Keep this identity in sync
+        # with docker/compose.app.yaml.
+        env:
+          ASSET: ${{ steps.pin.outputs.asset-path }}
+        run: |
+          set -euo pipefail
+          cosign verify-blob \
+            --bundle "${ASSET}.sigstore.json" \
+            --certificate-identity 'https://github.com/ls1intum/Hephaestus/.github/workflows/release.yml@refs/heads/main' \
+            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+            "$ASSET"
+
       - name: Upload release pin asset to GitHub Release
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}
-          VERSION: ${{ needs.release.outputs.new_version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ needs.release.outputs.tag_name }}
           ASSET: ${{ steps.pin.outputs.asset-path }}
         run: |
           set -euo pipefail
           # Release assets are immutable: no --clobber, fail loud on re-run.
-          gh release upload "v${VERSION}" \
+          gh release upload "$TAG_NAME" \
             "$ASSET" "${ASSET}.sigstore.json" \
             --repo "${{ github.repository }}"
 
@@ -206,8 +309,15 @@ jobs:
     needs: [release, tag-images]
     if: needs.release.outputs.released == 'true'
     uses: ./.github/workflows/deploy-staging.yml
+    # The called org workflow (ls1intum/.github deploy-docker-compose.yml@main)
+    # requires these. With the top-level `permissions: {}`, omitting them makes
+    # workflow COMPILATION fail ("requesting 'contents: read' but only allowed
+    # 'none'") — a startup_failure that killed every release since June 2026.
+    permissions:
+      contents: read
+      packages: read
     with:
-      image-tag: ${{ needs.release.outputs.new_version }}
+      image-tag: ${{ needs.release.outputs.version }}
       deploy-app: true
       deploy-core: false
       deploy-proxy: false
@@ -229,18 +339,18 @@ jobs:
               workflow_id: 'deploy-prod.yml',
               ref: 'main',
               inputs: {
-                'image-tag': '${{ needs.release.outputs.new_version }}',
+                'image-tag': '${{ needs.release.outputs.version }}',
                 'deploy-app': 'true',
                 'deploy-core': 'false',
                 'deploy-proxy': 'false'
               }
             });
-            console.log('✅ Production deployment triggered for v${{ needs.release.outputs.new_version }}');
+            console.log('✅ Production deployment triggered for ${{ needs.release.outputs.tag_name }}');
 
       - name: Summary
         run: |
           echo "## 🚀 Production Deployment Triggered" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Version **v${{ needs.release.outputs.new_version }}** deployment to production has been triggered." >> $GITHUB_STEP_SUMMARY
+          echo "Version **${{ needs.release.outputs.tag_name }}** deployment to production has been triggered." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "⏳ Waiting for approval in the [Deploy to Production](https://github.com/${{ github.repository }}/actions/workflows/deploy-prod.yml) workflow." >> $GITHUB_STEP_SUMMARY

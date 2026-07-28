@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, screen } from "storybook/test";
+import { expect, fn, screen, userEvent } from "storybook/test";
 import type { LoginProviderView } from "@/api/types.gen";
 import { LoginProviderFormDialog } from "./LoginProviderFormDialog";
 
@@ -29,6 +29,19 @@ const editingSlack: LoginProviderView = {
 	updatedAt: new Date("2026-05-02T00:00:00Z"),
 };
 
+const editingOutline: LoginProviderView = {
+	registrationId: "outline-acme",
+	type: "OUTLINE",
+	displayName: "ACME Outline",
+	baseUrl: "https://outline.acme.test",
+	scopes: "read",
+	enabled: true,
+	seededFromEnv: false,
+	redirectUri: "https://hephaestus.example.com/api/login/oauth2/code/outline-acme",
+	createdAt: new Date("2026-07-02T00:00:00Z"),
+	updatedAt: new Date("2026-07-02T00:00:00Z"),
+};
+
 const meta = {
 	component: LoginProviderFormDialog,
 	parameters: { layout: "centered" },
@@ -51,8 +64,22 @@ export const Create: Story = {
 		// Dialog renders in a portal → query the document.
 		await expect(await screen.findByText("Add login provider")).toBeInTheDocument();
 		await expect(screen.getByLabelText("Registration ID")).toBeEnabled();
-		// GitLab is the default type, so the GitLab-only instance base URL field is present.
+		// GitLab is the default type, so the instance base URL field is present.
 		await expect(screen.getByLabelText("Instance base URL")).toBeInTheDocument();
+	},
+};
+
+/** Every provider type the server accepts is offered — including OUTLINE, which is link-only. */
+export const CreateOutline: Story = {
+	play: async () => {
+		await userEvent.click(await screen.findByRole("combobox", { name: "Provider type" }));
+		await userEvent.click(await screen.findByRole("option", { name: /Outline/i }));
+
+		// Outline is self-hosted per instance, so (like GitLab) it carries a base URL...
+		await expect(screen.getByLabelText("Instance base URL")).toBeInTheDocument();
+		// ...and the admin is told it is link-only, plus which redirect URI to register in Outline.
+		await expect(screen.getByText(/nobody signs in to Hephaestus with it/i)).toBeInTheDocument();
+		await expect(screen.getByText(/Settings → Applications/)).toBeInTheDocument();
 	},
 };
 
@@ -64,6 +91,19 @@ export const EditSlack: Story = {
 		await expect(
 			screen.getByText(/Use the same Slack app client ID and secret/),
 		).toBeInTheDocument();
+	},
+};
+
+/** Edit an Outline provider: base URL kept, registration ID + type locked, redirect URI shown. */
+export const EditOutline: Story = {
+	args: { editing: editingOutline },
+	play: async () => {
+		await expect(await screen.findByText("Edit login provider")).toBeInTheDocument();
+		await expect(screen.getByLabelText("Registration ID")).toBeDisabled();
+		await expect(screen.getByLabelText("Instance base URL")).toHaveValue(
+			"https://outline.acme.test",
+		);
+		await expect(screen.getByText(editingOutline.redirectUri)).toBeInTheDocument();
 	},
 };
 

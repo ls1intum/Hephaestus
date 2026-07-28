@@ -136,6 +136,36 @@ query GetRepositoryPullRequests(
                     url
                 }
 
+                # Conversation (top-level) comments — the same IssueComment entity the
+                # issues connection returns, but repository.issues excludes PRs, so this
+                # is the only sync path that can see them. Without it a PR conversation
+                # comment reaches the mirror only via the non-redeliverable issue_comment
+                # webhook and reconciliation can never heal a dropped one.
+                # Embedded first 10 (matching the issue path); pagination handled by
+                # GetPullRequestComments for PRs with more.
+                comments(first: 10) {
+                    totalCount
+                    pageInfo {
+                        hasNextPage
+                        endCursor
+                    }
+                    nodes {
+                        id
+                        fullDatabaseId
+                        body
+                        url
+                        createdAt
+                        updatedAt
+
+                        # Author
+                        author {
+                            ...ActorFields
+                        }
+
+                        authorAssociation
+                    }
+                }
+
                 # Reviews (embedded to avoid N+1 queries)
                 # Most PRs have <5 reviews; follow-up pagination handles PRs with more
                 reviews(first: 5) {

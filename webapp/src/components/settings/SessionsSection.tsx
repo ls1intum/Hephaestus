@@ -22,11 +22,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { asDate } from "@/lib/dates";
 
 function formatTimestamp(value?: Date): string | undefined {
-	if (!value) return undefined;
-	const date = value instanceof Date ? value : new Date(value);
-	if (Number.isNaN(date.getTime())) return undefined;
+	const date = asDate(value);
+	if (!date) return undefined;
 	return date.toLocaleString(undefined, {
 		dateStyle: "medium",
 		timeStyle: "short",

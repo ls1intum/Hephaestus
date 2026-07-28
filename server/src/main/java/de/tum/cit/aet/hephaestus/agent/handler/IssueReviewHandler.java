@@ -6,6 +6,7 @@ import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requ
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
@@ -16,7 +17,9 @@ import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.Task;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -179,8 +182,9 @@ public class IssueReviewHandler implements JobTypeHandler {
             job.getWorkspace() == null
                 ? Set.of()
                 : practiceCatalogInjector.defectDetectorSlugs(job.getWorkspace().getId(), WorkArtifact.ISSUE);
-        List<PracticeDetectionResultParser.ValidatedFinding> coercedFindings =
-            PracticeDetectionResultParser.coerceCoherence(parsed.validFindings(), defectDetectorSlugs);
+        List<PracticeDetectionResultParser.ValidatedFinding> coercedFindings = new ArrayList<>(
+            PracticeDetectionResultParser.coerceCoherence(parsed.validFindings(), defectDetectorSlugs)
+        );
         PracticeDetectionDeliveryService.DeliveryResult result = deliveryService.deliver(job, coercedFindings);
         log.info(
             "Issue delivery complete: inserted={}, unknownSlug={}, duplicate={}, jobId={}",
@@ -189,6 +193,13 @@ public class IssueReviewHandler implements JobTypeHandler {
             result.discardedDuplicate(),
             job.getId()
         );
+
+        // Stamp the keys deliver() persisted (ADR 0021 C2, mirrors the PR handler) so the composer's withheld
+        // report and the ledger address the stored observation rather than recomputing a key downstream.
+        Map<PracticeDetectionResultParser.ValidatedFinding, ObservationKeys> keysByFinding = result.observationKeys();
+        for (int i = 0; i < coercedFindings.size(); i++) {
+            coercedFindings.set(i, coercedFindings.get(i).withKeys(keysByFinding.get(coercedFindings.get(i))));
+        }
 
         Map<String, String> whyBySlug =
             job.getWorkspace() == null
@@ -202,15 +213,17 @@ public class IssueReviewHandler implements JobTypeHandler {
         postIssueNote(job, delivery);
     }
 
+    @Override
+    public ExistingDeliveryLookup findExistingDelivery(AgentJob job) {
+        return commentPoster.findExistingSummaryComment(job);
+    }
+
     /**
-     * Posts the composed student-facing note as a comment on the issue (via the integration-resolved
-     * FeedbackChannel). Best-effort: a posting failure is logged, not thrown, so a transient delivery error
-     * never marks an otherwise-successful
-     * detection job FAILED (mirrors {@code FeedbackDeliveryService}'s soft-failure stance). Findings are
-     * already persisted above, so the formative loop is intact even if the comment does not land.
+     * Posts the composed student-facing note as an issue comment. Best-effort: a posting failure is logged,
+     * not thrown, so a transient delivery error never marks an otherwise-successful detection job FAILED.
+     * Findings are already persisted, so the formative loop is intact even if the comment does not land.
+     * Package-private for direct testing of the suppression + soft-failure contract.
      */
-    // Package-private for direct testing of the suppression + soft-failure contract (mirrors how
-    // FeedbackDeliveryService.deliverFeedback is tested), without driving the real result parser.
     void postIssueNote(AgentJob job, PracticeDetectionResultParser.@Nullable DeliveryContent delivery) {
         if (delivery == null || delivery.mrNote() == null) {
             return;
@@ -218,11 +231,14 @@ public class IssueReviewHandler implements JobTypeHandler {
         JsonNode metadata = job.getMetadata();
         if (metadata != null && "closed".equalsIgnoreCase(metadata.path("state").asString(""))) {
             log.info("Issue delivery suppressed: issue closed, jobId={}", job.getId());
+            recordGateSuppressed(job, delivery, FeedbackSuppressionReason.ARTIFACT_CLOSED);
             return;
         }
         String sanitized = PullRequestCommentPoster.sanitize(delivery.mrNote());
         if (sanitized.isBlank()) {
             log.debug("Issue note empty after sanitization, skipping post: jobId={}", job.getId());
+            // Issues have no inline lane, so a blank-sanitised body means NOTHING reached the developer.
+            recordGateSuppressed(job, delivery, FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE);
             return;
         }
         boolean posted = false;
@@ -234,24 +250,23 @@ public class IssueReviewHandler implements JobTypeHandler {
                 posted = true;
                 log.info("Issue feedback posted: jobId={}, commentId={}", job.getId(), commentId);
             } else {
-                // Best-effort issue post returned no comment id (vendor returned nothing without raising).
-                // Issue delivery is intentionally best-effort, so this is not fatal — but log it for diagnosis.
                 log.warn("Issue feedback post returned no comment id (best-effort): jobId={}", job.getId());
             }
         } catch (JobDeliveryException e) {
-            // A genuine delivery failure (the agent ran, but the student saw nothing) must NOT be reported
-            // as DELIVERED — re-throw so the job is recorded as failed, matching the PR path.
+            // A genuine delivery failure (the student saw nothing) must NOT be reported as DELIVERED — persist the
+            // composed body as FAILED (auditable), then re-throw so the job is recorded failed, matching the PR path.
+            recordUndelivered(job, delivery);
             throw e;
         } catch (RuntimeException e) {
             log.warn("Issue feedback delivery failed (non-fatal): jobId={}", job.getId(), e);
         }
 
-        // Record the delivered-feedback ledger (ADR 0021 C6) ONLY when the note actually landed. A null /
-        // swallowed post means the student saw nothing — recording a DELIVERED unit (and superseding the real
-        // prior) would corrupt the ledger exactly like the PR TRANSIENT no-op (A3). Best-effort, REQUIRES_NEW +
-        // try/catch so it can never affect the issue note the developer already received. Issues have no inline
-        // placements.
+        // Record the delivered-feedback ledger (ADR 0021 C6) ONLY when the note actually landed: recording a
+        // DELIVERED unit (and superseding the real prior) when the student saw nothing would corrupt the ledger.
+        // Best-effort, REQUIRES_NEW + try/catch so it can never affect the note the developer already received.
+        // Issues have no inline placements.
         if (!posted) {
+            recordUndelivered(job, delivery);
             return;
         }
         try {
@@ -259,6 +274,37 @@ public class IssueReviewHandler implements JobTypeHandler {
         } catch (RuntimeException e) {
             log.warn(
                 "Feedback ledger record failed (delivery unaffected): jobId={}, error={}",
+                job.getId(),
+                e.getMessage()
+            );
+        }
+    }
+
+    /** Best-effort SUPPRESSED-unit persist for a whole-review gate — see {@link FeedbackLedgerRecorder#recordSuppressedUnit}. */
+    private void recordGateSuppressed(
+        AgentJob job,
+        PracticeDetectionResultParser.DeliveryContent delivery,
+        FeedbackSuppressionReason reason
+    ) {
+        try {
+            feedbackLedgerRecorder.recordSuppressedUnit(job, delivery, reason);
+        } catch (RuntimeException e) {
+            log.warn(
+                "Gate-suppressed ledger record failed (delivery unaffected): jobId={}, reason={}, error={}",
+                job.getId(),
+                reason,
+                e.getMessage()
+            );
+        }
+    }
+
+    /** Best-effort FAILED-unit persist (two call sites). REQUIRES_NEW in the recorder + this catch mean a ledger failure never masks the delivery outcome. */
+    private void recordUndelivered(AgentJob job, PracticeDetectionResultParser.@Nullable DeliveryContent delivery) {
+        try {
+            feedbackLedgerRecorder.recordUndelivered(job, delivery);
+        } catch (RuntimeException e) {
+            log.warn(
+                "Undelivered-feedback ledger record failed (delivery unaffected): jobId={}, error={}",
                 job.getId(),
                 e.getMessage()
             );

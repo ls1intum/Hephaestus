@@ -9,6 +9,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.team.permission.TeamRepo
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.permission.TeamRepositoryPermissionRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceTeamScope;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceTeamScopeResolver;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamSettingsService;
 import java.util.List;
 import java.util.Map;
@@ -36,17 +38,20 @@ import org.springframework.transaction.annotation.Transactional;
 public class TeamService {
 
     private final TeamRepository teamRepository;
+    private final WorkspaceTeamScopeResolver workspaceTeamScopeResolver;
     private final TeamRepositoryPermissionRepository permissionRepository;
     private final WorkspaceTeamSettingsService workspaceTeamSettingsService;
     private final WorkspaceMembershipService workspaceMembershipService;
 
     public TeamService(
         TeamRepository teamRepository,
+        WorkspaceTeamScopeResolver workspaceTeamScopeResolver,
         TeamRepositoryPermissionRepository permissionRepository,
         WorkspaceTeamSettingsService workspaceTeamSettingsService,
         WorkspaceMembershipService workspaceMembershipService
     ) {
         this.teamRepository = teamRepository;
+        this.workspaceTeamScopeResolver = workspaceTeamScopeResolver;
         this.permissionRepository = permissionRepository;
         this.workspaceTeamSettingsService = workspaceTeamSettingsService;
         this.workspaceMembershipService = workspaceMembershipService;
@@ -60,7 +65,8 @@ public class TeamService {
      */
     @Transactional(readOnly = true)
     public List<TeamInfoDTO> getAllTeams(Workspace workspace) {
-        if (workspace.getAccountLogin() == null) {
+        WorkspaceTeamScope scope = workspaceTeamScopeResolver.resolve(workspace).orElse(null);
+        if (scope == null) {
             return List.of();
         }
 
@@ -69,7 +75,10 @@ public class TeamService {
         Set<Long> hiddenRepoIds = workspaceTeamSettingsService.getHiddenRepositoryIds(workspaceId);
         Set<Long> hiddenMemberIds = workspaceMembershipService.getHiddenMemberIds(workspaceId);
 
-        List<Team> teams = teamRepository.findWithCollectionsByOrganizationIgnoreCase(workspace.getAccountLogin());
+        List<Team> teams = teamRepository.findWithCollectionsByOrganizationIgnoreCaseAndProviderId(
+            scope.accountLogin(),
+            scope.providerId()
+        );
 
         // Batch fetch all label filters in ONE query instead of N queries (N+1 fix)
         Set<Long> teamIds = teams.stream().map(Team::getId).collect(Collectors.toSet());
@@ -161,10 +170,10 @@ public class TeamService {
     }
 
     private boolean belongsToWorkspace(Team team, Workspace workspace) {
-        if (team == null || workspace == null || workspace.getAccountLogin() == null) {
-            return false;
-        }
-        return workspace.getAccountLogin().equalsIgnoreCase(team.getOrganization());
+        return workspaceTeamScopeResolver
+            .resolve(workspace)
+            .map(scope -> scope.contains(team))
+            .orElse(false);
     }
 
     /**

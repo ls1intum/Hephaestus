@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.achievement;
 
+import de.tum.cit.aet.hephaestus.core.AuditExempt;
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
@@ -130,6 +131,7 @@ public class AchievementController {
     )
     @ApiResponse(responseCode = "202", description = "Recalculation task started successfully")
     @RequireAtLeastWorkspaceAdmin
+    @AuditExempt(reason = "recomputes a derived read model; stores no configuration")
     public ResponseEntity<Void> recalculateUserAchievements(
         WorkspaceContext workspaceContext,
         @PathVariable String login
@@ -154,6 +156,7 @@ public class AchievementController {
         description = "Hot reloads the achievements.yml configuration without requiring a restart. Admin only."
     )
     @RequireAtLeastWorkspaceAdmin
+    @AuditExempt(reason = "reloads code-declared definitions; stores no configuration")
     public ResponseEntity<Void> reloadAchievements(WorkspaceContext workspaceContext, @PathVariable String login) {
         log.info("Admin requested achievement configuration reload in workspace: {}", workspaceContext.slug());
         achievementRegistry.reload();

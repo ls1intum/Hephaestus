@@ -1,0 +1,27 @@
+# Newest-end scan of an issue's comments, for the summary-dedup lookup.
+# `last`/`before` walks the connection backwards from the newest comment; GetIssueComments
+# walks it forwards from the oldest for sync. Selects only what a marker match needs (id + body),
+# so this is a cheap scan and not a second sync path.
+
+query GetIssueCommentsNewest($owner: String!, $name: String!, $number: Int!, $last: Int!, $before: String) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
+    repository(owner: $owner, name: $name) {
+        issue(number: $number) {
+            comments(last: $last, before: $before) {
+                pageInfo {
+                    hasPreviousPage
+                    startCursor
+                }
+                nodes {
+                    id
+                    body
+                }
+            }
+        }
+    }
+}

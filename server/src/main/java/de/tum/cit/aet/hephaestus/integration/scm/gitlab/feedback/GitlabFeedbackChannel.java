@@ -6,9 +6,11 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabBackwardPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolver.MrCoordinates;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
@@ -87,7 +89,7 @@ public class GitlabFeedbackChannel implements FeedbackChannel {
         // generic createNote mutation — only the noteable gid resolution differs.
         String subject = target.subjectExternalId();
         String noteableGid;
-        if (subject != null && subject.lastIndexOf('#') > subject.lastIndexOf('!')) {
+        if (isIssueSubject(subject)) {
             MrCoordinates issue = GitlabMrResolver.parseIssueSubjectExternalId(subject);
             noteableGid = mrResolver.resolveIssueGid(scopeId, issue.projectPath(), issue.iid());
         } else {
@@ -211,6 +213,101 @@ public class GitlabFeedbackChannel implements FeedbackChannel {
         }
         log.info("Edited GitLab note in place: workspaceId={}, noteId={}", scopeId, noteId);
         return UpdateOutcome.edited(new SummaryHandle(noteId));
+    }
+
+    /** GitLab caps a connection page at 100. */
+    private static final int EXISTING_SUMMARY_SEARCH_PAGE_SIZE = 100;
+
+    /** Our cap, not GitLab's: an unscanned tail answers {@code UNKNOWN}, so recovery retries rather than reposts. */
+    private static final int EXISTING_SUMMARY_SEARCH_PAGE_BUDGET = 3;
+
+    /**
+     * Scans this MR/issue's notes for one whose body contains {@code marker}, walking the connection backwards
+     * from its newest end — the summary a crashed delivery already posted is the newest note.
+     *
+     * <p>Reads the noteable's <em>flat</em> {@code notes} connection rather than {@code discussions { notes }}:
+     * the nested form pages notes at a fixed {@code first: 100} inside each discussion with no cursor of its
+     * own, so an over-long thread would hide notes no cursor can reach.
+     */
+    @Override
+    public ExistingSummaryLookup findExistingSummary(FeedbackTarget target, String marker) {
+        if (marker == null || marker.isBlank()) {
+            return ExistingSummaryLookup.unknown();
+        }
+        long scopeId = target.ref().workspaceId();
+        if (gitLabProvider.isRateLimitCritical(scopeId)) {
+            return ExistingSummaryLookup.unknown();
+        }
+        String subject = target.subjectExternalId();
+        String documentName;
+        String notesPath;
+        MrCoordinates coordinates;
+        if (isIssueSubject(subject)) {
+            documentName = "GetIssueNotesNewest";
+            notesPath = "project.issue.notes";
+            coordinates = GitlabMrResolver.parseIssueSubjectExternalId(subject);
+        } else {
+            documentName = "GetMergeRequestNotesNewest";
+            notesPath = "project.mergeRequest.notes";
+            coordinates = GitlabMrResolver.parseSubjectExternalId(subject);
+        }
+
+        String cursor = null;
+        for (int page = 0; page < EXISTING_SUMMARY_SEARCH_PAGE_BUDGET; page++) {
+            try {
+                ClientGraphQlResponse response = gitLabProvider
+                    .forScope(scopeId)
+                    .documentName(documentName)
+                    .variable("fullPath", coordinates.projectPath())
+                    .variable("iid", String.valueOf(coordinates.iid()))
+                    .variable("last", EXISTING_SUMMARY_SEARCH_PAGE_SIZE)
+                    .variable("before", cursor)
+                    .execute()
+                    .block(GRAPHQL_TIMEOUT);
+                if (response == null || !response.getErrors().isEmpty()) {
+                    return ExistingSummaryLookup.unknown();
+                }
+
+                List<Map<String, Object>> notes = response.field(notesPath + ".nodes").getValue();
+                if (notes == null) {
+                    return ExistingSummaryLookup.unknown();
+                }
+                for (Map<String, Object> note : notes) {
+                    String noteId = (String) note.get("id");
+                    String body = (String) note.get("body");
+                    if (noteId != null && body != null && body.contains(marker)) {
+                        return ExistingSummaryLookup.found(new SummaryHandle(noteId));
+                    }
+                }
+
+                GitLabBackwardPageInfo pageInfo = response
+                    .field(notesPath + ".pageInfo")
+                    .toEntity(GitLabBackwardPageInfo.class);
+                if (pageInfo == null) {
+                    return ExistingSummaryLookup.unknown();
+                }
+                if (!pageInfo.hasPreviousPage()) {
+                    return ExistingSummaryLookup.absent();
+                }
+                cursor = pageInfo.startCursor();
+                if (cursor == null || cursor.isBlank()) {
+                    return ExistingSummaryLookup.unknown();
+                }
+            } catch (RuntimeException e) {
+                log.debug(
+                    "Existing-summary dedup lookup failed (treated as unknown, not absent): scopeId={}, error={}",
+                    scopeId,
+                    e.getMessage()
+                );
+                return ExistingSummaryLookup.unknown();
+            }
+        }
+        return ExistingSummaryLookup.unknown();
+    }
+
+    /** An issue subject is {@code "project/path#iid"}; a merge request is {@code "project/path!iid"}. */
+    private static boolean isIssueSubject(String subjectExternalId) {
+        return subjectExternalId != null && subjectExternalId.lastIndexOf('#') > subjectExternalId.lastIndexOf('!');
     }
 
     /** Conservative NOT_FOUND heuristic: GitLab signals a deleted note only via a free-text mutation error. */

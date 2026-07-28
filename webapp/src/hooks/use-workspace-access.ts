@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { getCurrentUserMembershipOptions } from "@/api/@tanstack/react-query.gen";
 import { useAuth } from "@/integrations/auth/AuthContext";
+import { workspaceMembershipQueryOptions } from "@/integrations/auth/guard";
+import { hasMinimumWorkspaceRole } from "@/lib/workspace-roles";
 import { useActiveWorkspaceSlug } from "./use-active-workspace";
 
 export function useWorkspaceAccess() {
@@ -13,29 +14,20 @@ export function useWorkspaceAccess() {
 	const { isAuthenticated, isLoading: authLoading } = useAuth();
 
 	const membershipQuery = useQuery({
-		...getCurrentUserMembershipOptions({
-			path: { workspaceSlug: workspaceSlug ?? "" },
-		}),
+		...workspaceMembershipQueryOptions(workspaceSlug ?? ""),
 		enabled: Boolean(workspaceSlug) && isAuthenticated && !authLoading,
 	});
 
 	const role = membershipQuery.data?.role;
-	const isMember = Boolean(role);
-	const isAdmin = role === "ADMIN" || role === "OWNER";
-	const isOwner = role === "OWNER";
 
 	return {
 		workspaceSlug,
 		workspaces,
 		selectWorkspace,
 		role,
-		isMember,
-		isAdmin,
-		isOwner,
-		// The account's SCM identity FOR THIS workspace's provider (ADR 0017): a linked account resolves
-		// to its GitHub user in a GitHub workspace, its GitLab user in a GitLab workspace. Backed by the
-		// server's workspace-scoped current-user resolution, so callers should prefer these over the
-		// global `username` for in-workspace identity (profile link, displayed name).
+		isAdmin: hasMinimumWorkspaceRole(role, "ADMIN"),
+		// The account's SCM identity for THIS workspace's provider — its GitHub user in a GitHub
+		// workspace, its GitLab user in a GitLab one. Prefer these over the global `username`.
 		userLogin: membershipQuery.data?.userLogin,
 		userName: membershipQuery.data?.userName,
 		isLoading: workspacesLoading || membershipQuery.isLoading,

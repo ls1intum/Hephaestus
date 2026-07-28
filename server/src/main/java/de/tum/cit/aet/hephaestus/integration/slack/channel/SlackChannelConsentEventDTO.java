@@ -6,7 +6,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import org.jspecify.annotations.NonNull;
 
-/** One immutable audit entry in a Slack channel's consent-transition history (who / when / from → to / why). */
 @Schema(description = "An immutable Slack channel consent-transition audit entry")
 public record SlackChannelConsentEventDTO(
     @NonNull @Schema(description = "Audit entry id") Long id,

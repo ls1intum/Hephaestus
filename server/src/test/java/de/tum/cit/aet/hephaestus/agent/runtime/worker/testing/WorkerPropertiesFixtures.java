@@ -15,8 +15,7 @@ public final class WorkerPropertiesFixtures {
             new WorkerProperties.Capacity(reviewMax, mentorMax),
             new WorkerProperties.Drain(Duration.ofMinutes(5)),
             new WorkerProperties.Heartbeat(Duration.ofSeconds(20)),
-            new WorkerProperties.Control(URI.create("ws://example"), "tok", Duration.ofSeconds(10)),
-            new WorkerProperties.Llm(null, null)
+            new WorkerProperties.Control(URI.create("ws://example"), "tok", Duration.ofSeconds(10))
         );
     }
 
@@ -26,8 +25,7 @@ public final class WorkerPropertiesFixtures {
             new WorkerProperties.Capacity("2", "1"),
             new WorkerProperties.Drain(drainTimeout),
             new WorkerProperties.Heartbeat(Duration.ofSeconds(20)),
-            new WorkerProperties.Control(URI.create("ws://example"), "tok", Duration.ofSeconds(10)),
-            new WorkerProperties.Llm(null, null)
+            new WorkerProperties.Control(URI.create("ws://example"), "tok", Duration.ofSeconds(10))
         );
     }
 }
