@@ -19,6 +19,5 @@ names may differ, but should not leak into product copy.
 | **Heph**            | The conversational assistant                                         | mentor                             |
 | **Hephaestus**      | The application that runs reviews and prepares feedback              | agent                              |
 
-Use **Practice feedback** for the workspace-admin interface, with **Review activity**, **Findings**,
-and **Delivery** for its three sections. Use provider-specific names such as **pull request** or
-**merge request** when the provider is known; otherwise write **pull or merge request**.
+Use provider-specific names such as **pull request** or **merge request** when the provider is known;
+otherwise write **pull or merge request**.

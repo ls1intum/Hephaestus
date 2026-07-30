@@ -17,6 +17,7 @@ import { FeedbackResults } from "./FeedbackResults";
 import { reviewArtifactScopeLabel } from "./ReviewArtifact";
 import { ReviewMoreFilters } from "./ReviewMoreFilters";
 import {
+	AVAILABLE_FEEDBACK_CHANNELS,
 	CHANNEL_LABELS,
 	DELIVERY_STATE_LABELS,
 	type FeedbackChannel,
@@ -31,7 +32,12 @@ const DELIVERY_OPTIONS: FacetOption<FeedbackDeliveryState>[] =
 	toFacetOptions(DELIVERY_STATE_LABELS);
 const REASON_OPTIONS: FacetOption<FeedbackSuppressionReason>[] =
 	toFacetOptions(SUPPRESSION_REASON_LABELS);
-const CHANNEL_OPTIONS: FacetOption<FeedbackChannel>[] = toFacetOptions(CHANNEL_LABELS);
+const CHANNEL_OPTIONS: FacetOption<FeedbackChannel>[] = AVAILABLE_FEEDBACK_CHANNELS.map(
+	(value) => ({
+		value,
+		label: CHANNEL_LABELS[value],
+	}),
+);
 
 export interface FeedbackListPageProps {
 	workspaceSlug: string;

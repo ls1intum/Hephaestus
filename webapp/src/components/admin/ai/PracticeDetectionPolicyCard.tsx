@@ -10,7 +10,7 @@ import type {
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
@@ -25,17 +25,17 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 export type PracticeReviewField = NonNullable<UpdatePracticeReviewSettingsRequest["reset"]>[number];
-export type PracticeReviewTriggerUpdate = Pick<
+export type PracticeReviewWorkspaceUpdate = Pick<
 	UpdateWorkspaceFeaturesRequest,
-	"practiceReviewAutoTriggerEnabled" | "practiceReviewManualTriggerEnabled"
+	"practicesEnabled" | "practiceReviewAutoTriggerEnabled" | "practiceReviewManualTriggerEnabled"
 >;
 
 const COVERAGE_ALL = "all";
 const COVERAGE_ROLE = "role";
 
 const COVERAGE_ITEMS = [
-	{ value: COVERAGE_ALL, label: "All contributors" },
-	{ value: COVERAGE_ROLE, label: "Contributors with the review role" },
+	{ value: COVERAGE_ALL, label: "All matching work" },
+	{ value: COVERAGE_ROLE, label: "Work assigned to review participants" },
 ];
 
 export interface PracticeDetectionPolicyCardProps {
@@ -43,15 +43,16 @@ export interface PracticeDetectionPolicyCardProps {
 	detectionBinding?: AgentBinding;
 	availableModels: AvailableLlmModel[];
 	workspaceSlug: string;
+	enabled: boolean;
 	autoTriggerEnabled: boolean;
 	manualTriggerEnabled: boolean;
 	isLoading: boolean;
 	isError?: boolean;
 	error?: unknown;
 	savingReviewSettings: boolean;
-	savingTriggers: boolean;
+	savingWorkspaceSettings: boolean;
 	onUpdateReviewSettings: (settings: UpdatePracticeReviewSettingsRequest) => void;
-	onUpdateTriggers: (triggers: PracticeReviewTriggerUpdate) => void;
+	onUpdateWorkspaceSettings: (settings: PracticeReviewWorkspaceUpdate) => void;
 	onResetReviewField: (field: PracticeReviewField) => void;
 	onRetry?: () => void;
 }
@@ -61,15 +62,16 @@ export function PracticeDetectionPolicyCard({
 	detectionBinding,
 	availableModels,
 	workspaceSlug,
+	enabled,
 	autoTriggerEnabled,
 	manualTriggerEnabled,
 	isLoading,
 	isError = false,
 	error,
 	savingReviewSettings,
-	savingTriggers,
+	savingWorkspaceSettings,
 	onUpdateReviewSettings,
-	onUpdateTriggers,
+	onUpdateWorkspaceSettings,
 	onResetReviewField,
 	onRetry,
 }: PracticeDetectionPolicyCardProps) {
@@ -118,6 +120,39 @@ export function PracticeDetectionPolicyCard({
 
 	return (
 		<div className="space-y-6">
+			<Card>
+				<CardHeader>
+					<CardTitle>Project review status</CardTitle>
+					<CardDescription>
+						Control whether connected project events and supported commands can start reviews.
+					</CardDescription>
+				</CardHeader>
+				<CardContent>
+					<Field orientation="horizontal">
+						<FieldContent>
+							<FieldLabel htmlFor="practice-reviews-enabled">Project reviews</FieldLabel>
+							<FieldDescription>
+								{enabled
+									? detectionRunnable
+										? "Connected project events and supported commands can start new reviews."
+										: "Reviews are on, but cannot run until the review model is ready."
+									: detectionRunnable
+										? "Connected project events and supported commands won't start new reviews."
+										: "Choose a runnable review model before starting reviews."}
+							</FieldDescription>
+						</FieldContent>
+						<Switch
+							id="practice-reviews-enabled"
+							checked={enabled}
+							disabled={savingWorkspaceSettings || (!enabled && !detectionRunnable)}
+							onCheckedChange={(checked) =>
+								onUpdateWorkspaceSettings({ practicesEnabled: checked })
+							}
+						/>
+					</Field>
+				</CardContent>
+			</Card>
+
 			<Card>
 				<CardHeader>
 					<CardTitle>Review model</CardTitle>
@@ -169,38 +204,36 @@ export function PracticeDetectionPolicyCard({
 
 			<Card>
 				<CardHeader>
-					<CardTitle>Triggers</CardTitle>
+					<CardTitle>When reviews run</CardTitle>
 				</CardHeader>
 				<CardContent className="space-y-4">
 					<Field orientation="horizontal">
 						<FieldContent>
 							<FieldLabel htmlFor="trigger-auto">Automatic reviews</FieldLabel>
 							<FieldDescription>
-								Run reviews when a practice's configured event occurs.
+								Run reviews when a configured GitHub or GitLab event occurs.
 							</FieldDescription>
 						</FieldContent>
 						<Switch
 							id="trigger-auto"
 							checked={autoTriggerEnabled}
-							disabled={savingTriggers || (!autoTriggerEnabled && !detectionRunnable)}
+							disabled={savingWorkspaceSettings || (!autoTriggerEnabled && !detectionRunnable)}
 							onCheckedChange={(checked) =>
-								onUpdateTriggers({ practiceReviewAutoTriggerEnabled: checked })
+								onUpdateWorkspaceSettings({ practiceReviewAutoTriggerEnabled: checked })
 							}
 						/>
 					</Field>
 					<Field orientation="horizontal">
 						<FieldContent>
 							<FieldLabel htmlFor="trigger-manual">Manual reviews</FieldLabel>
-							<FieldDescription>
-								Let contributors request a review with a bot command on a pull or merge request.
-							</FieldDescription>
+							<FieldDescription>Allow supported bot commands to request a review.</FieldDescription>
 						</FieldContent>
 						<Switch
 							id="trigger-manual"
 							checked={manualTriggerEnabled}
-							disabled={savingTriggers || (!manualTriggerEnabled && !detectionRunnable)}
+							disabled={savingWorkspaceSettings || (!manualTriggerEnabled && !detectionRunnable)}
 							onCheckedChange={(checked) =>
-								onUpdateTriggers({ practiceReviewManualTriggerEnabled: checked })
+								onUpdateWorkspaceSettings({ practiceReviewManualTriggerEnabled: checked })
 							}
 						/>
 					</Field>
@@ -209,7 +242,7 @@ export function PracticeDetectionPolicyCard({
 
 			<Card>
 				<CardHeader>
-					<CardTitle>Review policy</CardTitle>
+					<CardTitle>Review rules</CardTitle>
 				</CardHeader>
 				<CardContent className="space-y-4">
 					<Field orientation="horizontal">
@@ -274,7 +307,7 @@ export function PracticeDetectionPolicyCard({
 					</Field>
 
 					<Field>
-						<FieldLabel htmlFor="policy-coverage">Review coverage</FieldLabel>
+						<FieldLabel htmlFor="policy-coverage">Eligible work</FieldLabel>
 						<Select
 							items={COVERAGE_ITEMS}
 							value={settings.runForAllUsers ? COVERAGE_ALL : COVERAGE_ROLE}
@@ -297,13 +330,15 @@ export function PracticeDetectionPolicyCard({
 						</Select>
 						{!settings.runForAllUsers && (
 							<FieldDescription>
-								Only contributors already assigned the review role receive reviews.
+								A review starts only when at least one assignee has the review role.
 							</FieldDescription>
 						)}
 						{inheritHint(
 							settings.runForAllUsersOverride != null,
 							"RUN_FOR_ALL_USERS",
-							settings.runForAllUsers ? "All contributors" : "Contributors with the review role",
+							settings.runForAllUsers
+								? "All matching work"
+								: "Work assigned to review participants",
 						)}
 					</Field>
 				</CardContent>

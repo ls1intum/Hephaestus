@@ -121,7 +121,6 @@ export interface AgentBindingsPageProps {
 	onTurnOff: (purpose: Purpose) => void;
 }
 
-/** What each AI task runs on, one card per purpose. Presentational: the route owns every query. */
 export function AgentBindingsPage({
 	workspaceSlug,
 	bindings,
@@ -149,7 +148,6 @@ export function AgentBindingsPage({
 				<h1 className="text-3xl font-bold tracking-tight">AI models</h1>
 			</div>
 
-			{/* Each paused cap gets its own banner, the one the workspace can act on first. */}
 			{(usage?.ownProviderPaused || usage?.instancePaused) && (
 				<div className="mb-6 space-y-3">
 					{usage.ownProviderPaused && (
@@ -199,7 +197,6 @@ export function AgentBindingsPage({
 						))}
 					</section>
 
-					{/* The panel owns this section's heading, because it sits in a row with "Add provider". */}
 					{providerPanel && <section className="space-y-4">{providerPanel}</section>}
 				</div>
 			)}
@@ -235,7 +232,6 @@ function AgentPurposeCard({
 	);
 	const [allowInternet, setAllowInternet] = useState(binding?.allowInternet ?? false);
 	const [showAdvanced, setShowAdvanced] = useState(false);
-	// Withheld until the first submit, so nothing is marked invalid before anything was attempted.
 	const [showErrors, setShowErrors] = useState(false);
 
 	const noModels = availableModels.length === 0;
@@ -273,21 +269,7 @@ function AgentPurposeCard({
 		});
 	};
 
-	if (!featureEnabled) {
-		return (
-			<Card role="region" aria-labelledby={cardLabelId}>
-				<CardHeader>
-					<CardTitle id={cardLabelId}>{meta.title}</CardTitle>
-					<CardDescription>
-						Turned off for this workspace. Only your host can turn it on.
-					</CardDescription>
-				</CardHeader>
-			</Card>
-		);
-	}
-
 	return (
-		// A landmark: every card's Save, Turn off and model picker otherwise read identically.
 		<Card role="region" aria-labelledby={cardLabelId}>
 			<CardHeader>
 				<div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
@@ -295,12 +277,16 @@ function AgentPurposeCard({
 						<CardTitle id={cardLabelId}>{meta.title}</CardTitle>
 						<CardDescription>{meta.description}</CardDescription>
 					</div>
-					{binding &&
+					{!featureEnabled ? (
+						<Badge variant="secondary">Workspace off</Badge>
+					) : (
+						binding &&
 						(binding.ready ? (
 							<Badge variant="secondary">Ready</Badge>
 						) : (
 							<Badge variant="destructive">Not ready</Badge>
-						))}
+						))
+					)}
 				</div>
 			</CardHeader>
 			{/* noValidate: left to the browser, `min` blocks submit with a bubble `FieldError` can't explain. */}

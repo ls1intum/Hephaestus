@@ -13,9 +13,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { practiceCatalogStructureScope, upsertPractice } from "@/hooks/practice-catalog-cache";
 import { workspaceAdminHead } from "@/lib/page-title";
 
-export const Route = createFileRoute(
-	"/_authenticated/w/$workspaceSlug/admin/practices/_enabled/new",
-)({
+export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/new")({
 	head: workspaceAdminHead("New practice"),
 	component: CreatePracticeContainer,
 });

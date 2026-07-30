@@ -3,7 +3,6 @@ import { fn } from "storybook/test";
 import { AdminFeaturesSettings, type FeatureValues } from "./AdminFeaturesSettings";
 
 const allOff: FeatureValues = {
-	practicesEnabled: false,
 	mentorEnabled: false,
 	achievementsEnabled: false,
 	leaderboardEnabled: false,
@@ -31,7 +30,6 @@ export const AllEnabled: Story = {
 	args: {
 		values: {
 			...allOff,
-			practicesEnabled: true,
 			mentorEnabled: true,
 			achievementsEnabled: true,
 			leaderboardEnabled: true,
@@ -45,7 +43,6 @@ export const Saving: Story = {
 	args: {
 		values: {
 			...allOff,
-			practicesEnabled: true,
 			mentorEnabled: true,
 		},
 		isSaving: true,

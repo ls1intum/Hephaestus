@@ -20,7 +20,7 @@ import {
 import { workspaceAdminHead } from "@/lib/page-title";
 
 export const Route = createFileRoute(
-	"/_authenticated/w/$workspaceSlug/admin/practices/_enabled/$practiceSlug",
+	"/_authenticated/w/$workspaceSlug/admin/practices/$practiceSlug",
 )({
 	head: workspaceAdminHead("Edit practice"),
 	component: EditPracticeContainer,

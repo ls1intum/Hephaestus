@@ -15,7 +15,8 @@ describe("practice review search", () => {
 			to: "2026-02-31",
 		});
 
-		expect(feedback).toMatchObject({ deliveryState: ["DELIVERED"], channel: ["PROFILE"] });
+		expect(feedback).toMatchObject({ deliveryState: ["DELIVERED"] });
+		expect(feedback.channel).toBeUndefined();
 		expect(feedback.from).toBeUndefined();
 		expect(feedback.page).toBeUndefined();
 		expect(findings).toMatchObject({ assessment: ["GOOD"], severity: ["MAJOR"] });

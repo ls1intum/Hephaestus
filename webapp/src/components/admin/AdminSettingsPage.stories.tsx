@@ -6,7 +6,6 @@ import type { FeatureValues } from "./AdminFeaturesSettings";
 import { AdminSettingsPage } from "./AdminSettingsPage";
 
 const allOff: FeatureValues = {
-	practicesEnabled: false,
 	mentorEnabled: false,
 	achievementsEnabled: false,
 	leaderboardEnabled: false,
@@ -45,7 +44,9 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("heading", { name: /^features$/i })).toBeInTheDocument();
+		await expect(
+			canvas.getByRole("heading", { name: "Workspace capabilities" }),
+		).toBeInTheDocument();
 		await expect(canvas.queryByText(/reset and recalculate leagues/i)).not.toBeInTheDocument();
 		await canvas.findByRole("button", { name: /^delete workspace$/i });
 	},

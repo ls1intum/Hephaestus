@@ -27,6 +27,7 @@ import environment from "@/environment";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useMentorChat } from "@/hooks/use-mentor-chat";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
+import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
 import { FeatureFlagDevTools, useFeatureFlag } from "@/integrations/feature-flags";
 import { isPosthogEnabled } from "@/integrations/posthog/config";
@@ -156,6 +157,7 @@ function GlobalCopilot() {
 	const { isAuthenticated, isLoading } = useAuth();
 	const { enabled: hasMentorAccess } = useFeatureFlag("MENTOR_ACCESS");
 	const { workspaceSlug } = useActiveWorkspaceSlug();
+	const { mentorEnabled, isLoading: featuresLoading } = useWorkspaceFeatures(workspaceSlug);
 
 	const handleMessageSubmit = ({ text }: { text: string }) => {
 		if (!text.trim()) return;
@@ -179,7 +181,14 @@ function GlobalCopilot() {
 		});
 	};
 
-	if (isLoading || !isAuthenticated || !hasMentorAccess) {
+	if (
+		isLoading ||
+		featuresLoading ||
+		!isAuthenticated ||
+		!workspaceSlug ||
+		!hasMentorAccess ||
+		!mentorEnabled
+	) {
 		return null;
 	}
 

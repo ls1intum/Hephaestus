@@ -24,12 +24,6 @@ const meta = {
 	component: AppSidebar,
 	parameters: {
 		layout: "fullscreen",
-		docs: {
-			description: {
-				component:
-					"Complete application sidebar component that combines all navigation sections and provides access to the entire application.",
-			},
-		},
 	},
 	tags: ["autodocs"],
 	args: {
@@ -67,7 +61,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** A member never sees the workspace-admin nav — hidden, not shown disabled. */
 export const RegularUser: Story = {
 	args: {
 		username: "johndoe",
@@ -113,7 +106,6 @@ export const AdminUser: Story = {
 	},
 };
 
-/** The dedicated instance-admin shell: its own header and section nav, no workspace switcher. */
 export const AdminContext: Story = {
 	args: {
 		username: "admin",
@@ -123,7 +115,6 @@ export const AdminContext: Story = {
 	},
 };
 
-/** The day-one lockout guard: a freshly bootstrapped APP_ADMIN reaches /admin with no workspace. */
 export const AdminContextNoWorkspace: Story = {
 	args: {
 		username: "admin",
@@ -140,7 +131,6 @@ export const AdminContextNoWorkspace: Story = {
 	},
 };
 
-/** The server returns a flat list; `NavMentorThreads` buckets it locally by `createdAt`. */
 export const MentorContext: Story = {
 	args: {
 		username: "mentor",
@@ -210,11 +200,25 @@ export const LoadingWorkspaces: Story = {
 	},
 };
 
-/** User has the MENTOR_ACCESS feature flag but the workspace toggle is off — link hidden. */
 export const MentorRoleButFeatureDisabled: Story = {
 	args: {
 		hasMentorAccess: true,
 		activeWorkspace: { ...mockWorkspace, mentorEnabled: false },
 		workspaces: [{ ...mockWorkspace, mentorEnabled: false }],
+	},
+};
+
+export const WorkspaceAdminReviewsPaused: Story = {
+	args: {
+		isAdmin: true,
+		activeWorkspace: { ...mockWorkspace, practicesEnabled: false },
+		workspaces: [{ ...mockWorkspace, practicesEnabled: false }],
+	},
+	play: async ({ canvasElement, userEvent }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByRole("link", { name: "Practices" })).toBeInTheDocument();
+		await userEvent.click(canvas.getByRole("button", { name: "Toggle practices" }));
+		await expect(canvas.getByRole("link", { name: "Practice feedback" })).toBeInTheDocument();
+		await expect(canvas.getByRole("link", { name: "Review settings" })).toBeInTheDocument();
 	},
 };

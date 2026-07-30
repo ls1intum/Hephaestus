@@ -4,7 +4,6 @@ import type { FeatureValues } from "./AdminFeaturesSettings";
 import { AdminSettingsPage, type AdminSettingsPageProps } from "./AdminSettingsPage";
 
 const features: FeatureValues = {
-	practicesEnabled: false,
 	mentorEnabled: false,
 	achievementsEnabled: false,
 	leaderboardEnabled: false,

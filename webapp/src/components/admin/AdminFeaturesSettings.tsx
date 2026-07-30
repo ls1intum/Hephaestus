@@ -17,14 +17,9 @@ interface FeatureDefinition {
 
 const FEATURES = [
 	{
-		key: "practicesEnabled",
-		label: "Practice reviews",
-		description: "Run AI practice reviews for contributors.",
-	},
-	{
 		key: "mentorEnabled",
-		label: "Mentor chat",
-		description: "Give workspace members access to the AI mentor.",
+		label: "Chat with Heph",
+		description: "Let eligible workspace members chat with Heph in the web app.",
 	},
 	{
 		key: "achievementsEnabled",
@@ -62,9 +57,9 @@ export function AdminFeaturesSettings({ values, isSaving, onToggle }: AdminFeatu
 		<Card>
 			<CardHeader>
 				<CardTitle>
-					<h2>Features</h2>
+					<h2>Workspace capabilities</h2>
 				</CardTitle>
-				<CardDescription>Choose which capabilities are active in this workspace.</CardDescription>
+				<CardDescription>Choose which optional experiences members can use.</CardDescription>
 			</CardHeader>
 			<CardContent>
 				<FieldGroup>

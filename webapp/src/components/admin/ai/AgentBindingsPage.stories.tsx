@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, screen, userEvent, type within } from "storybook/test";
+import { expect, fn, screen, userEvent, within } from "storybook/test";
 import type { AgentBinding } from "@/api/types.gen";
 import { withStandardPage } from "@/stories/decorators";
 import { expectControlOnScreen, expectNoPageOverflow } from "@/test/reflow";
@@ -79,9 +79,12 @@ export const LoadForbidden: Story = {
 export const PurposeDisabledForWorkspace: Story = {
 	args: { mentorEnabled: false },
 	play: async ({ canvas }) => {
+		await expect(await canvas.findByText("Workspace off")).toBeInTheDocument();
 		await expect(
-			await canvas.findByText("Turned off for this workspace. Only your host can turn it on."),
-		).toBeInTheDocument();
+			within(canvas.getByRole("region", { name: "Mentor" })).getByRole("button", {
+				name: "Save",
+			}),
+		).toBeEnabled();
 	},
 };
 

@@ -17,7 +17,6 @@ import {
 
 export interface SettingsPageProps {
 	aiReviewProps: AiReviewSectionProps;
-	showAiReviewSection: boolean;
 	researchProps: ResearchParticipationSectionProps;
 	showResearchSection: boolean;
 	linkedAccountsProps: LinkedAccountsSectionProps;
@@ -31,7 +30,6 @@ export interface SettingsPageProps {
 
 export function SettingsPage({
 	aiReviewProps,
-	showAiReviewSection,
 	researchProps,
 	showResearchSection,
 	linkedAccountsProps,
@@ -60,33 +58,27 @@ export function SettingsPage({
 			</div>
 
 			{settingsError ? (
-				(showAiReviewSection || showResearchSection) && (
-					<>
-						<Separator />
-						<section className="space-y-2" aria-labelledby="settings-error-heading">
-							<h2 id="settings-error-heading" className="text-xl font-semibold">
-								Preferences
-							</h2>
-							<p className="text-sm text-destructive" role="alert">
-								We couldn't load your preferences, so your AI-review and research-participation
-								settings aren't shown — we won't display a guessed value for a privacy choice.
-							</p>
-							{onRetrySettings && (
-								<Button variant="outline" size="sm" onClick={onRetrySettings}>
-									Retry
-								</Button>
-							)}
-						</section>
-					</>
-				)
+				<>
+					<Separator />
+					<section className="space-y-2" aria-labelledby="settings-error-heading">
+						<h2 id="settings-error-heading" className="text-xl font-semibold">
+							Preferences
+						</h2>
+						<p className="text-sm text-destructive" role="alert">
+							We couldn't load your preferences, so your feedback and research settings aren't
+							shown.
+						</p>
+						{onRetrySettings && (
+							<Button variant="outline" size="sm" onClick={onRetrySettings}>
+								Retry
+							</Button>
+						)}
+					</section>
+				</>
 			) : (
 				<>
-					{showAiReviewSection && (
-						<>
-							<Separator />
-							<AiReviewSection {...aiReviewRest} isLoading={aiReviewPending} />
-						</>
-					)}
+					<Separator />
+					<AiReviewSection {...aiReviewRest} isLoading={aiReviewPending} />
 
 					{showResearchSection && (
 						<>

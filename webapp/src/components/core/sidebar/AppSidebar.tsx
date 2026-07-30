@@ -29,7 +29,6 @@ export type SidebarContext = "main" | "mentor" | "admin";
 export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 	username: string;
 	isAdmin: boolean;
-	/** Application-wide super-admin (APP_ADMIN). Gates the cross-workspace Admin nav group. */
 	isAppAdmin: boolean;
 	hasMentorAccess: boolean;
 	context: SidebarContext;
@@ -38,7 +37,6 @@ export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 	onWorkspaceChange?: (workspace: WorkspaceListItem) => void;
 	onAddWorkspace?: () => void;
 	workspacesLoading?: boolean;
-	// Optional mentor thread data - using API types directly
 	mentorThreads?: ChatThreadSummary[];
 	mentorThreadsLoading?: boolean;
 	mentorThreadsError?: string;
@@ -64,9 +62,6 @@ export function AppSidebar({
 	let sidebarContent: ReactNode = null;
 
 	if (context === "admin") {
-		// Dedicated instance-admin shell: its own back-to-app header + section nav, rendered
-		// independent of any workspace. This is what lets a freshly-bootstrapped APP_ADMIN with
-		// zero workspaces reach /admin (the entry point is the always-present footer, below).
 		sidebarContent = <NavSuperAdmin />;
 	} else if (workspacesLoading) {
 		sidebarContent = (
@@ -119,7 +114,6 @@ export function AppSidebar({
 					achievementsEnabled={activeWorkspace.achievementsEnabled}
 					leaderboardEnabled={activeWorkspace.leaderboardEnabled}
 				/>
-				{/* Mentor link requires BOTH the user-scoped account_feature flag and the per-workspace toggle. */}
 				{hasMentorAccess && activeWorkspace.mentorEnabled && (
 					<NavMentor workspaceSlug={activeWorkspace.workspaceSlug} />
 				)}
@@ -127,12 +121,9 @@ export function AppSidebar({
 					<NavAdmin
 						workspaceSlug={activeWorkspace.workspaceSlug}
 						achievementsEnabled={activeWorkspace.achievementsEnabled}
-						practicesEnabled={activeWorkspace.practicesEnabled}
 						scmProviderType={activeWorkspace.providerType === "GITLAB" ? "GITLAB" : "GITHUB"}
 					/>
 				)}
-				{/* Instance-admin lives in its own /admin shell (reached via the footer entry), never in
-				    the per-workspace nav. */}
 			</>
 		);
 	}
@@ -140,8 +131,6 @@ export function AppSidebar({
 	return (
 		<Sidebar collapsible={context === "main" ? "icon" : "offcanvas"} {...props}>
 			<SidebarHeader>
-				{/* The workspace switcher is workspace-scoped chrome; the instance-admin shell is not, so
-				    it gets its own back-to-app header (in NavSuperAdmin) instead. */}
 				{context !== "admin" && (
 					<WorkspaceSwitcher
 						isLoading={workspacesLoading}

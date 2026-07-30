@@ -11,7 +11,7 @@ import type {
 } from "./review-format";
 import {
 	ASSESSMENT_LABELS,
-	CHANNEL_LABELS,
+	AVAILABLE_FEEDBACK_CHANNELS,
 	DELIVERY_STATE_LABELS,
 	PRESENCE_LABELS,
 	SEVERITY_LABELS,
@@ -27,7 +27,6 @@ const ASSESSMENTS = Object.keys(ASSESSMENT_LABELS) as Assessment[];
 const SEVERITIES = Object.keys(SEVERITY_LABELS) as Severity[];
 const DELIVERY_STATES = Object.keys(DELIVERY_STATE_LABELS) as FeedbackDeliveryState[];
 const SUPPRESSION_REASONS = Object.keys(SUPPRESSION_REASON_LABELS) as FeedbackSuppressionReason[];
-const CHANNELS = Object.keys(CHANNEL_LABELS) as FeedbackChannel[];
 const enumValues = <T extends string>(allowed: readonly T[]) =>
 	multiValue.transform((values): T[] | undefined => narrowToEnum(values, allowed));
 
@@ -47,7 +46,7 @@ export const feedbackSearchSchema = z.object({
 	page,
 	deliveryState: enumValues(DELIVERY_STATES),
 	suppressionReason: enumValues(SUPPRESSION_REASONS),
-	channel: enumValues(CHANNELS),
+	channel: enumValues<FeedbackChannel>(AVAILABLE_FEEDBACK_CHANNELS),
 	recipientUserId: positiveId,
 });
 

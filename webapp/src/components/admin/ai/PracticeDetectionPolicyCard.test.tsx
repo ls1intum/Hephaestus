@@ -41,13 +41,14 @@ function renderCard(props: Partial<React.ComponentProps<typeof PracticeDetection
 				detectionBinding={readyBinding}
 				availableModels={[availableModel]}
 				workspaceSlug="acme"
+				enabled
 				autoTriggerEnabled
 				manualTriggerEnabled
 				isLoading={false}
 				savingReviewSettings={false}
-				savingTriggers={false}
+				savingWorkspaceSettings={false}
 				onUpdateReviewSettings={vi.fn()}
-				onUpdateTriggers={vi.fn()}
+				onUpdateWorkspaceSettings={vi.fn()}
 				onResetReviewField={vi.fn()}
 				{...props}
 			/>
@@ -109,12 +110,12 @@ describe("PracticeDetectionPolicyCard model binding", () => {
 	});
 
 	it("puts the triggers out of reach, not merely grey, while nothing can run", async () => {
-		const onUpdateTriggers = vi.fn();
+		const onUpdateWorkspaceSettings = vi.fn();
 		renderCard({
 			detectionBinding: undefined,
 			autoTriggerEnabled: false,
 			manualTriggerEnabled: false,
-			onUpdateTriggers,
+			onUpdateWorkspaceSettings,
 		});
 
 		const auto = await screen.findByRole("switch", { name: "Automatic reviews" });
@@ -125,6 +126,6 @@ describe("PracticeDetectionPolicyCard model binding", () => {
 
 		fireEvent.click(auto);
 		expect(auto.getAttribute("aria-checked")).toBe("false");
-		expect(onUpdateTriggers).not.toHaveBeenCalled();
+		expect(onUpdateWorkspaceSettings).not.toHaveBeenCalled();
 	});
 });

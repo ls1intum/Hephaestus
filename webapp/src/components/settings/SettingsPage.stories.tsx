@@ -68,7 +68,6 @@ export const Default: Story = {
 			aiReviewEnabled: true,
 			onToggleAiReview: fn(),
 		},
-		showAiReviewSection: true,
 		showResearchSection: true,
 		researchProps: {
 			participateInResearch: true,
@@ -87,7 +86,6 @@ export const AllTogglesDisabled: Story = {
 			aiReviewEnabled: false,
 			onToggleAiReview: fn(),
 		},
-		showAiReviewSection: true,
 		showResearchSection: true,
 		researchProps: {
 			participateInResearch: false,
@@ -106,7 +104,6 @@ export const Loading: Story = {
 			aiReviewEnabled: true,
 			onToggleAiReview: fn(),
 		},
-		showAiReviewSection: true,
 		showResearchSection: true,
 		researchProps: {
 			participateInResearch: true,
@@ -119,32 +116,12 @@ export const Loading: Story = {
 	},
 };
 
-export const AiReviewHidden: Story = {
-	args: {
-		aiReviewProps: {
-			aiReviewEnabled: true,
-			onToggleAiReview: fn(),
-		},
-		showAiReviewSection: false,
-		showResearchSection: true,
-		researchProps: {
-			participateInResearch: true,
-			onToggleResearch: fn(),
-		},
-		linkedAccountsProps: defaultLinkedAccountsProps,
-		slackPreferencesProps: defaultSlackPreferencesProps,
-		onAccountDeleted: fn(),
-		isLoading: false,
-	},
-};
-
 export const ResearchHidden: Story = {
 	args: {
 		aiReviewProps: {
 			aiReviewEnabled: true,
 			onToggleAiReview: fn(),
 		},
-		showAiReviewSection: true,
 		showResearchSection: false,
 		researchProps: {
 			participateInResearch: true,

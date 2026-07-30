@@ -80,7 +80,6 @@ function AdminSettings() {
 				resetLeagues.mutate({ path: { workspaceSlug } });
 			}}
 			features={{
-				practicesEnabled: workspaceData?.practicesEnabled ?? false,
 				mentorEnabled: workspaceData?.mentorEnabled ?? false,
 				achievementsEnabled: workspaceData?.achievementsEnabled ?? false,
 				leaderboardEnabled: workspaceData?.leaderboardEnabled ?? false,

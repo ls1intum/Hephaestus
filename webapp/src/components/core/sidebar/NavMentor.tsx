@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useMatchRoute } from "@tanstack/react-router";
 import { ChevronRight, Sparkles } from "lucide-react";
 import { MentorIcon } from "@/components/mentor/MentorIcon";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,9 @@ import {
 } from "@/components/ui/sidebar";
 
 export function NavMentor({ workspaceSlug }: { workspaceSlug: string }) {
+	const matchRoute = useMatchRoute();
+	const onMentor = Boolean(matchRoute({ to: "/w/$workspaceSlug/mentor", fuzzy: true }));
+
 	return (
 		<SidebarGroup>
 			<SidebarGroupLabel>Mentor</SidebarGroupLabel>
@@ -18,6 +21,7 @@ export function NavMentor({ workspaceSlug }: { workspaceSlug: string }) {
 				<SidebarMenuItem>
 					<SidebarMenuButton
 						tooltip="Heph - AI mentor"
+						isActive={onMentor}
 						render={
 							<Link
 								to="/w/$workspaceSlug/mentor"

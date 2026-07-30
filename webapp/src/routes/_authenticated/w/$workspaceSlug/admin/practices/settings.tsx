@@ -13,14 +13,12 @@ import type { PracticeReviewSettings, UpdatePracticeReviewSettingsRequest } from
 import {
 	PracticeDetectionPolicyCard,
 	type PracticeReviewField,
-	type PracticeReviewTriggerUpdate,
+	type PracticeReviewWorkspaceUpdate,
 } from "@/components/admin/ai/PracticeDetectionPolicyCard";
 import { useUpdateWorkspaceFeatures } from "@/hooks/use-update-workspace-features";
 import { workspaceAdminHead } from "@/lib/page-title";
 
-export const Route = createFileRoute(
-	"/_authenticated/w/$workspaceSlug/admin/practices/_enabled/settings",
-)({
+export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/settings")({
 	head: workspaceAdminHead("Practice review settings"),
 	component: ReviewSettingsContainer,
 });
@@ -91,8 +89,8 @@ function ReviewSettingsContainer() {
 	});
 
 	const updateFeatures = useUpdateWorkspaceFeatures(workspaceSlug, {
-		success: "Trigger settings updated",
-		error: "Failed to update trigger settings",
+		success: "Practice review settings updated",
+		error: "Failed to update practice review settings",
 	});
 
 	const handleUpdateReviewSettings = (settings: UpdatePracticeReviewSettingsRequest) => {
@@ -103,8 +101,8 @@ function ReviewSettingsContainer() {
 		updatePracticeReviewSettings.mutate({ path: { workspaceSlug }, body: { reset: [field] } });
 	};
 
-	const handleUpdateTriggers = (triggers: PracticeReviewTriggerUpdate) => {
-		updateFeatures.mutate({ path: { workspaceSlug }, body: triggers });
+	const handleUpdateWorkspaceSettings = (settings: PracticeReviewWorkspaceUpdate) => {
+		updateFeatures.mutate({ path: { workspaceSlug }, body: settings });
 	};
 
 	return (
@@ -112,7 +110,7 @@ function ReviewSettingsContainer() {
 			<header className="space-y-1">
 				<h1 className="text-3xl font-bold tracking-tight">Practice review settings</h1>
 				<p className="max-w-2xl text-muted-foreground">
-					Choose when practice reviews run and who receives them.
+					Configure how Hephaestus reviews connected project work.
 				</p>
 			</header>
 
@@ -123,6 +121,7 @@ function ReviewSettingsContainer() {
 				)}
 				workspaceSlug={workspaceSlug}
 				availableModels={availableModelsQuery.data ?? []}
+				enabled={workspaceQuery.data?.practicesEnabled ?? false}
 				autoTriggerEnabled={workspaceQuery.data?.practiceReviewAutoTriggerEnabled ?? true}
 				manualTriggerEnabled={workspaceQuery.data?.practiceReviewManualTriggerEnabled ?? true}
 				isLoading={
@@ -144,9 +143,9 @@ function ReviewSettingsContainer() {
 					workspaceQuery.error
 				}
 				savingReviewSettings={updatePracticeReviewSettings.isPending}
-				savingTriggers={updateFeatures.isPending}
+				savingWorkspaceSettings={updateFeatures.isPending}
 				onUpdateReviewSettings={handleUpdateReviewSettings}
-				onUpdateTriggers={handleUpdateTriggers}
+				onUpdateWorkspaceSettings={handleUpdateWorkspaceSettings}
 				onResetReviewField={handleResetReviewField}
 				onRetry={() => {
 					reviewSettingsQuery.refetch();

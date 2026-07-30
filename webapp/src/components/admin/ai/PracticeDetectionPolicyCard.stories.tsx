@@ -26,13 +26,14 @@ const meta = {
 		detectionBinding: readyBinding,
 		availableModels: mockAvailableModels,
 		workspaceSlug: "acme",
+		enabled: true,
 		autoTriggerEnabled: true,
 		manualTriggerEnabled: true,
 		isLoading: false,
 		savingReviewSettings: false,
-		savingTriggers: false,
+		savingWorkspaceSettings: false,
 		onUpdateReviewSettings: fn(),
-		onUpdateTriggers: fn(),
+		onUpdateWorkspaceSettings: fn(),
 		onResetReviewField: fn(),
 	},
 	decorators: [
@@ -58,7 +59,13 @@ export const Configured: Story = {
 };
 
 export const NoModelSelected: Story = {
-	args: { detectionBinding: undefined },
+	args: { detectionBinding: undefined, enabled: false },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("switch", { name: "Project reviews" })).toHaveAttribute(
+			"aria-disabled",
+			"true",
+		);
+	},
 };
 
 export const SelectedModelUnavailable: Story = {
@@ -87,6 +94,10 @@ export const TriggersOff: Story = {
 	args: { autoTriggerEnabled: false, manualTriggerEnabled: false },
 };
 
+export const ReviewsPaused: Story = {
+	args: { enabled: false },
+};
+
 export const SavingReviewPolicy: Story = {
 	args: { savingReviewSettings: true },
 	play: async ({ canvas }) => {
@@ -94,10 +105,7 @@ export const SavingReviewPolicy: Story = {
 			"aria-disabled",
 			"true",
 		);
-		await expect(canvas.getByRole("switch", { name: "Automatic reviews" })).not.toHaveAttribute(
-			"aria-disabled",
-			"true",
-		);
+		await expect(canvas.getByRole("switch", { name: "Automatic reviews" })).toBeEnabled();
 	},
 };
 
@@ -117,8 +125,13 @@ export const PermissionDenied: Story = {
 export const EditPolicy: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ args, canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("switch", { name: "Project reviews" }));
+		await expect(args.onUpdateWorkspaceSettings).toHaveBeenCalledWith({
+			practicesEnabled: false,
+		});
+
 		await userEvent.click(canvas.getByRole("switch", { name: "Automatic reviews" }));
-		await expect(args.onUpdateTriggers).toHaveBeenCalledWith({
+		await expect(args.onUpdateWorkspaceSettings).toHaveBeenCalledWith({
 			practiceReviewAutoTriggerEnabled: false,
 		});
 

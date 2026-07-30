@@ -20,7 +20,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { usePracticeCatalogMutations } from "@/hooks/use-practice-catalog-mutations";
 import { workspaceAdminHead } from "@/lib/page-title";
 
-export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/_enabled/")({
+export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/")({
 	head: workspaceAdminHead("Practice catalog"),
 	component: PracticeCatalogRoute,
 });
