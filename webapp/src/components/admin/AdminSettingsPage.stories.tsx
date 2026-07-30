@@ -12,8 +12,6 @@ const allOff: FeatureValues = {
 	leaderboardEnabled: false,
 	progressionEnabled: false,
 	leaguesEnabled: false,
-	practiceReviewAutoTriggerEnabled: true,
-	practiceReviewManualTriggerEnabled: true,
 };
 
 const membershipRead = [
@@ -55,17 +53,6 @@ export const Default: Story = {
 
 export const ResettingLeagues: Story = {
 	args: { isResettingLeagues: true, features: { ...allOff, leaguesEnabled: true } },
-};
-
-export const PracticeReviewWithSubToggles: Story = {
-	args: {
-		features: {
-			...allOff,
-			practicesEnabled: true,
-			practiceReviewAutoTriggerEnabled: true,
-			practiceReviewManualTriggerEnabled: false,
-		},
-	},
 };
 
 export const LeaguesEnabled: Story = {

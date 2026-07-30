@@ -25,6 +25,10 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 export type PracticeReviewField = NonNullable<UpdatePracticeReviewSettingsRequest["reset"]>[number];
+export type PracticeReviewTriggerUpdate = Pick<
+	UpdateWorkspaceFeaturesRequest,
+	"practiceReviewAutoTriggerEnabled" | "practiceReviewManualTriggerEnabled"
+>;
 
 const COVERAGE_ALL = "all";
 const COVERAGE_ROLE = "role";
@@ -47,7 +51,7 @@ export interface PracticeDetectionPolicyCardProps {
 	savingReviewSettings: boolean;
 	savingTriggers: boolean;
 	onUpdateReviewSettings: (settings: UpdatePracticeReviewSettingsRequest) => void;
-	onUpdateFeatures: (features: UpdateWorkspaceFeaturesRequest) => void;
+	onUpdateTriggers: (triggers: PracticeReviewTriggerUpdate) => void;
 	onResetReviewField: (field: PracticeReviewField) => void;
 	onRetry?: () => void;
 }
@@ -65,7 +69,7 @@ export function PracticeDetectionPolicyCard({
 	savingReviewSettings,
 	savingTriggers,
 	onUpdateReviewSettings,
-	onUpdateFeatures,
+	onUpdateTriggers,
 	onResetReviewField,
 	onRetry,
 }: PracticeDetectionPolicyCardProps) {
@@ -180,7 +184,7 @@ export function PracticeDetectionPolicyCard({
 							checked={autoTriggerEnabled}
 							disabled={savingTriggers || (!autoTriggerEnabled && !detectionRunnable)}
 							onCheckedChange={(checked) =>
-								onUpdateFeatures({ practiceReviewAutoTriggerEnabled: checked })
+								onUpdateTriggers({ practiceReviewAutoTriggerEnabled: checked })
 							}
 						/>
 					</Field>
@@ -196,7 +200,7 @@ export function PracticeDetectionPolicyCard({
 							checked={manualTriggerEnabled}
 							disabled={savingTriggers || (!manualTriggerEnabled && !detectionRunnable)}
 							onCheckedChange={(checked) =>
-								onUpdateFeatures({ practiceReviewManualTriggerEnabled: checked })
+								onUpdateTriggers({ practiceReviewManualTriggerEnabled: checked })
 							}
 						/>
 					</Field>

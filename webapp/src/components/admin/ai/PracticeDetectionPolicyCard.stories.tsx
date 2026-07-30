@@ -32,7 +32,7 @@ const meta = {
 		savingReviewSettings: false,
 		savingTriggers: false,
 		onUpdateReviewSettings: fn(),
-		onUpdateFeatures: fn(),
+		onUpdateTriggers: fn(),
 		onResetReviewField: fn(),
 	},
 	decorators: [
@@ -118,7 +118,7 @@ export const EditPolicy: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ args, canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("switch", { name: "Automatic reviews" }));
-		await expect(args.onUpdateFeatures).toHaveBeenCalledWith({
+		await expect(args.onUpdateTriggers).toHaveBeenCalledWith({
 			practiceReviewAutoTriggerEnabled: false,
 		});
 

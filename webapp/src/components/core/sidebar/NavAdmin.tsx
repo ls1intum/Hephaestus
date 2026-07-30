@@ -45,7 +45,10 @@ export function NavAdmin({
 }: NavAdminProps) {
 	const matchRoute = useMatchRoute();
 
-	const onSettings = Boolean(
+	const onWorkspaceSettings = Boolean(
+		matchRoute({ to: "/w/$workspaceSlug/admin/settings", fuzzy: false }),
+	);
+	const onReviewSettings = Boolean(
 		matchRoute({ to: "/w/$workspaceSlug/admin/practices/settings", fuzzy: true }),
 	);
 	const onReviews = Boolean(
@@ -82,6 +85,7 @@ export function NavAdmin({
 				<SidebarMenuItem>
 					<SidebarMenuButton
 						tooltip="Workspace settings"
+						isActive={onWorkspaceSettings}
 						render={<Link to="/w/$workspaceSlug/admin/settings" params={{ workspaceSlug }} />}
 					>
 						<Settings2 />
@@ -177,7 +181,7 @@ export function NavAdmin({
 							{practicesEnabled && (
 								<SidebarMenuSubItem>
 									<SidebarMenuSubButton
-										isActive={onSettings}
+										isActive={onReviewSettings}
 										render={
 											<Link
 												to="/w/$workspaceSlug/admin/practices/settings"

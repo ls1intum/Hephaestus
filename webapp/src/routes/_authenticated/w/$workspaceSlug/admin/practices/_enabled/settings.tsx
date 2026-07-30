@@ -9,14 +9,11 @@ import {
 	updatePracticeReviewSettingsMutation,
 	workspaceListAvailableLlmModelsOptions,
 } from "@/api/@tanstack/react-query.gen";
-import type {
-	PracticeReviewSettings,
-	UpdatePracticeReviewSettingsRequest,
-	UpdateWorkspaceFeaturesRequest,
-} from "@/api/types.gen";
+import type { PracticeReviewSettings, UpdatePracticeReviewSettingsRequest } from "@/api/types.gen";
 import {
 	PracticeDetectionPolicyCard,
 	type PracticeReviewField,
+	type PracticeReviewTriggerUpdate,
 } from "@/components/admin/ai/PracticeDetectionPolicyCard";
 import { useUpdateWorkspaceFeatures } from "@/hooks/use-update-workspace-features";
 import { workspaceAdminHead } from "@/lib/page-title";
@@ -24,7 +21,7 @@ import { workspaceAdminHead } from "@/lib/page-title";
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/admin/practices/_enabled/settings",
 )({
-	head: workspaceAdminHead("Review settings"),
+	head: workspaceAdminHead("Practice review settings"),
 	component: ReviewSettingsContainer,
 });
 
@@ -106,14 +103,14 @@ function ReviewSettingsContainer() {
 		updatePracticeReviewSettings.mutate({ path: { workspaceSlug }, body: { reset: [field] } });
 	};
 
-	const handleUpdateFeatures = (features: UpdateWorkspaceFeaturesRequest) => {
-		updateFeatures.mutate({ path: { workspaceSlug }, body: features });
+	const handleUpdateTriggers = (triggers: PracticeReviewTriggerUpdate) => {
+		updateFeatures.mutate({ path: { workspaceSlug }, body: triggers });
 	};
 
 	return (
 		<div className="mx-auto w-full max-w-3xl space-y-6">
 			<header className="space-y-1">
-				<h1 className="text-3xl font-bold tracking-tight">Review settings</h1>
+				<h1 className="text-3xl font-bold tracking-tight">Practice review settings</h1>
 				<p className="max-w-2xl text-muted-foreground">
 					Choose when practice reviews run and who receives them.
 				</p>
@@ -149,7 +146,7 @@ function ReviewSettingsContainer() {
 				savingReviewSettings={updatePracticeReviewSettings.isPending}
 				savingTriggers={updateFeatures.isPending}
 				onUpdateReviewSettings={handleUpdateReviewSettings}
-				onUpdateFeatures={handleUpdateFeatures}
+				onUpdateTriggers={handleUpdateTriggers}
 				onResetReviewField={handleResetReviewField}
 				onRetry={() => {
 					reviewSettingsQuery.refetch();

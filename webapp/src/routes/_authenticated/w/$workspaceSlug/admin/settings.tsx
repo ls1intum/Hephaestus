@@ -86,9 +86,6 @@ function AdminSettings() {
 				leaderboardEnabled: workspaceData?.leaderboardEnabled ?? false,
 				progressionEnabled: workspaceData?.progressionEnabled ?? false,
 				leaguesEnabled: workspaceData?.leaguesEnabled ?? false,
-				practiceReviewAutoTriggerEnabled: workspaceData?.practiceReviewAutoTriggerEnabled ?? true,
-				practiceReviewManualTriggerEnabled:
-					workspaceData?.practiceReviewManualTriggerEnabled ?? true,
 			}}
 			isSavingFeatures={updateFeatures.isPending}
 			onToggleFeature={handleToggleFeature}

@@ -10,8 +10,6 @@ const features: FeatureValues = {
 	leaderboardEnabled: false,
 	progressionEnabled: false,
 	leaguesEnabled: false,
-	practiceReviewAutoTriggerEnabled: true,
-	practiceReviewManualTriggerEnabled: true,
 };
 
 function setup(overrides: Partial<AdminSettingsPageProps> = {}) {
