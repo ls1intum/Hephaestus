@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { HttpResponse, http } from "msw";
-import { expect, fn, screen, within } from "storybook/test";
+import { expect, fn, screen, waitFor, within } from "storybook/test";
 import { withStandardPage, withWidePage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { FindingsListPage } from "./FindingsListPage";
@@ -85,9 +85,10 @@ export const MoreFiltersOpen: Story = {
 		const canvas = within(canvasElement);
 		await userEvent.click(canvas.getByRole("button", { name: /More filters/ }));
 		const dialog = await screen.findByRole("dialog");
-		await expect(
-			await within(dialog).findByRole("combobox", { name: "Practice status" }),
-		).toBeVisible();
+		const practiceStatus = await within(dialog).findByRole("combobox", {
+			name: "Practice status",
+		});
+		await waitFor(() => expect(practiceStatus).toBeVisible());
 	},
 };
 
