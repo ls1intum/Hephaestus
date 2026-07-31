@@ -171,6 +171,9 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
 
         ObjectNode metadata = OBJECT_MAPPER.createObjectNode();
         metadata.put("pull_request_id", prId);
+        metadata.put("repository_id", repo.getId());
+        metadata.put("repository_full_name", repo.getNameWithOwner());
+        metadata.put("pr_number", 42);
         agentJob.setMetadata(metadata);
         agentJob = agentJobRepository.save(agentJob);
     }

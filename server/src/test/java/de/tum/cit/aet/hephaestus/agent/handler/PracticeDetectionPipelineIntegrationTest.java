@@ -32,6 +32,7 @@ import de.tum.cit.aet.hephaestus.practices.observation.PracticeDetectionComplete
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
+import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
@@ -88,6 +89,9 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     private RepositoryRepository repositoryRepository;
 
     @Autowired
+    private RepositoryToMonitorRepository repositoryToMonitorRepository;
+
+    @Autowired
     private PullRequestRepository pullRequestRepository;
 
     @Autowired
@@ -108,7 +112,9 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     void setUp() {
         databaseTestUtils.cleanDatabase();
 
-        workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("pipeline-test"));
+        workspace = WorkspaceTestFixtures.activeWorkspace("pipeline-test");
+        workspace.getFeatures().setPracticesEnabled(true);
+        workspace = workspaceRepository.save(workspace);
 
         createPractice("pr-description-quality", "PR Description Quality");
         createPractice("error-handling", "Error Handling");
@@ -130,6 +136,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         repo.setHtmlUrl("https://github.com/org/pipeline-repo");
         repo.setDefaultBranch("main");
         repo = repositoryRepository.save(repo);
+        repositoryToMonitorRepository.save(WorkspaceTestFixtures.repositoryMonitor(workspace, repo.getNameWithOwner()));
 
         Instant now = Instant.now();
         pullRequestRepository.upsertCore(
@@ -191,6 +198,9 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         agentJob = agentJobRepository.save(agentJob);
 
         handler = handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW);
+        when(diffNotePoster.reconcileInlineNotes(any(), any())).thenReturn(
+            new DiffNotePoster.DiffNoteResult(0, 0, List.of())
+        );
     }
 
     private Practice createPractice(String slug, String name) {

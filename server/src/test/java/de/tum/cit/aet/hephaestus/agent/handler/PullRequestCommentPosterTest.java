@@ -17,7 +17,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,8 +45,6 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
         lenient().when(gitlabChannel.kind()).thenReturn(IntegrationKind.GITLAB);
         poster = new PullRequestCommentPoster(List.of(githubChannel, gitlabChannel));
     }
-
-    // Sanitization Tests
 
     @Nested
     class Sanitize {
@@ -156,7 +153,6 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
             assertThat(result).doesNotContain("‪").doesNotContain("‮");
             assertThat(result).contains("HelloWorld");
 
-            // Zero-width space (prevents @mention bypass)
             result = PullRequestCommentPoster.sanitize("@​username");
             assertThat(result).doesNotContain("​");
         }
@@ -294,73 +290,6 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
         }
     }
 
-    // Formatting Tests
-
-    @Nested
-    class FormatComment {
-
-        @Test
-        void shouldIncludeBotDisclaimer() {
-            AgentJob job = createTestJob(IntegrationKind.GITHUB);
-            String result = PullRequestCommentPoster.formatComment("Review body", "Summary", job);
-            assertThat(result).contains("Hephaestus Agent");
-        }
-
-        @Test
-        void shouldIncludeCollapsibleSection() {
-            AgentJob job = createTestJob(IntegrationKind.GITHUB);
-            String result = PullRequestCommentPoster.formatComment("Review body", "Summary", job);
-            assertThat(result).contains("<details>").contains("<summary>").contains("</details>");
-            assertThat(result).contains("Summary");
-        }
-
-        @Test
-        void shouldIncludeHtmlCommentMarker() {
-            AgentJob job = createTestJob(IntegrationKind.GITHUB);
-            String result = PullRequestCommentPoster.formatComment("Review body", null, job);
-            assertThat(result).contains("<!-- hephaestus:practice-review:" + job.getId() + " -->");
-        }
-
-        @Test
-        void shouldUseFallbackSummaryWhenNull() {
-            AgentJob job = createTestJob(IntegrationKind.GITHUB);
-            String result = PullRequestCommentPoster.formatComment("Review body", null, job);
-            assertThat(result).contains("Review details");
-        }
-
-        @Test
-        void shouldEscapeModelNameFromConfigSnapshot() {
-            AgentJob job = createTestJob(IntegrationKind.GITHUB);
-            ObjectNode configSnapshot = objectMapper.createObjectNode();
-            configSnapshot.put("model_name", "claude-opus-4-6");
-            job.setConfigSnapshot(configSnapshot);
-
-            String result = PullRequestCommentPoster.formatComment("Body", "Summary", job);
-            assertThat(result).contains("claude-opus-4-6");
-        }
-
-        @Test
-        void shouldIncludeDurationWhenAvailable() {
-            AgentJob job = createTestJob(IntegrationKind.GITHUB);
-            job.setStartedAt(Instant.parse("2025-01-01T00:00:00Z"));
-            job.setCompletedAt(Instant.parse("2025-01-01T00:02:30Z"));
-
-            String result = PullRequestCommentPoster.formatComment("Body", "Summary", job);
-            assertThat(result).contains("2m 30s");
-        }
-
-        @Test
-        void shouldTruncateLongSummary() {
-            AgentJob job = createTestJob(IntegrationKind.GITHUB);
-            String longSummary = "x".repeat(PullRequestCommentPoster.MAX_SUMMARY_LENGTH + 100);
-            String result = PullRequestCommentPoster.formatComment("Body", longSummary, job);
-            assertThat(result).contains("x".repeat(PullRequestCommentPoster.MAX_SUMMARY_LENGTH) + "…");
-            assertThat(result).doesNotContain("x".repeat(PullRequestCommentPoster.MAX_SUMMARY_LENGTH + 1));
-        }
-    }
-
-    // Posting Tests
-
     @Nested
     class PostComment {
 
@@ -371,7 +300,7 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
                 new FeedbackChannel.SummaryHandle("IC_comment456")
             );
 
-            String commentId = poster.postComment(job, "Review body", "Summary");
+            String commentId = poster.postFormattedBody(job, "Formatted review");
 
             assertThat(commentId).isEqualTo("IC_comment456");
             verify(githubChannel).postSummary(any(), any());
@@ -384,7 +313,7 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
                 new FeedbackChannel.SummaryHandle("gid://gitlab/Note/123")
             );
 
-            String noteId = poster.postComment(job, "Review body", "Summary");
+            String noteId = poster.postFormattedBody(job, "Formatted review");
 
             assertThat(noteId).isEqualTo("gid://gitlab/Note/123");
             verify(gitlabChannel).postSummary(any(), any());
@@ -394,7 +323,7 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
         void throwsWhenIntegrationKindMissing() {
             AgentJob job = createTestJob(null);
 
-            assertThatThrownBy(() -> poster.postComment(job, "Review body", "Summary"))
+            assertThatThrownBy(() -> poster.postFormattedBody(job, "Formatted review"))
                 .isInstanceOf(JobDeliveryException.class)
                 .hasMessageContaining("integrationKind is null");
         }
@@ -404,7 +333,7 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
             AgentJob job = createTestJob(IntegrationKind.GITLAB);
             PullRequestCommentPoster githubOnly = new PullRequestCommentPoster(List.of(githubChannel));
 
-            assertThatThrownBy(() -> githubOnly.postComment(job, "Review body", "Summary"))
+            assertThatThrownBy(() -> githubOnly.postFormattedBody(job, "Formatted review"))
                 .isInstanceOf(JobDeliveryException.class)
                 .hasMessageContaining("No FeedbackChannel wired for kind GITLAB");
         }
@@ -414,16 +343,9 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
             AgentJob job = createTestJob(IntegrationKind.GITHUB);
             job.setMetadata(objectMapper.createObjectNode());
 
-            assertThatThrownBy(() -> poster.postComment(job, "Review body", "Summary"))
+            assertThatThrownBy(() -> poster.postFormattedBody(job, "Formatted review"))
                 .isInstanceOf(JobDeliveryException.class)
                 .hasMessageContaining("Missing required metadata field");
-        }
-
-        @Test
-        void shouldReturnNullWhenSanitizedToEmpty() {
-            AgentJob job = createTestJob(IntegrationKind.GITHUB);
-            String commentId = poster.postComment(job, "LGTM", "Summary");
-            assertThat(commentId).isNull();
         }
 
         @Test
@@ -460,7 +382,7 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
                 new FeedbackDeliveryException("rate limit critical")
             );
 
-            assertThatThrownBy(() -> poster.postComment(job, "Review body", "Summary"))
+            assertThatThrownBy(() -> poster.postFormattedBody(job, "Formatted review"))
                 .isInstanceOf(JobDeliveryException.class)
                 .hasMessageContaining("rate limit critical");
         }
@@ -488,13 +410,11 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
                 new IllegalArgumentException("GitHub repoFullName must be 'owner/repo': repo-without-owner")
             );
 
-            assertThatThrownBy(() -> poster.postComment(job, "Review body", "Summary"))
+            assertThatThrownBy(() -> poster.postFormattedBody(job, "Formatted review"))
                 .isInstanceOf(JobDeliveryException.class)
                 .hasMessageContaining("'owner/repo'");
         }
     }
-
-    // Helpers
 
     private AgentJob createTestJob(IntegrationKind kind) {
         AgentJob job = new AgentJob();

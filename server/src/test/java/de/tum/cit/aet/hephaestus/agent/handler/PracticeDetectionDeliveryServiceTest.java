@@ -11,6 +11,7 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
@@ -18,6 +19,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
@@ -102,17 +104,25 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         testJob.setWorkspace(workspace);
         ObjectNode metadata = objectMapper.createObjectNode();
         metadata.put("pull_request_id", 456L);
+        metadata.put("repository_id", 123L);
+        metadata.put("repository_full_name", "owner/repo");
+        metadata.put("pr_number", 42);
         testJob.setMetadata(metadata);
 
         testAuthor = new User();
         ReflectionTestUtils.setField(testAuthor, "id", 789L);
         testAuthor.setLogin("developer");
         testPr = new PullRequest();
+        testPr.setNumber(42);
         testPr.setAuthor(testAuthor);
+        Repository repository = new Repository();
+        ReflectionTestUtils.setField(repository, "id", 123L);
+        repository.setNameWithOwner("owner/repo");
+        testPr.setRepository(repository);
 
         // Default stubs (lenient because not all tests exercise all code paths)
         lenient().when(practiceRepository.findByWorkspaceIdAndActiveTrue(1L)).thenReturn(List.of(testPractice));
-        lenient().when(pullRequestRepository.findByIdWithAuthor(456L)).thenReturn(Optional.of(testPr));
+        lenient().when(pullRequestRepository.findByIdWithAuthorAndRepository(456L)).thenReturn(Optional.of(testPr));
         lenient()
             .when(
                 observationRepository.insertIfAbsent(
@@ -350,7 +360,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         @Test
         @DisplayName("throws when pull request not found")
         void prNotFound() {
-            when(pullRequestRepository.findByIdWithAuthor(456L)).thenReturn(Optional.empty());
+            when(pullRequestRepository.findByIdWithAuthorAndRepository(456L)).thenReturn(Optional.empty());
             var findings = List.of(validFinding("pr-description-quality", Presence.PRESENT));
 
             assertThatThrownBy(() -> service.deliver(testJob, findings))
@@ -367,6 +377,17 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             assertThatThrownBy(() -> service.deliver(testJob, findings))
                 .isInstanceOf(JobDeliveryException.class)
                 .hasMessageContaining("no author");
+        }
+
+        @Test
+        void mismatchedArtifactMetadataIsRejectedBeforePersistence() {
+            ((ObjectNode) testJob.getMetadata()).put("repository_id", 999L);
+            var findings = List.of(validFinding("pr-description-quality", Presence.PRESENT));
+
+            assertThatThrownBy(() -> service.deliver(testJob, findings))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("does not match the live target");
+            verifyNoInteractions(observationRepository, eventPublisher);
         }
     }
 
@@ -629,11 +650,19 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             var issue = new de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue();
             ReflectionTestUtils.setField(issue, "id", 999L);
             issue.setAuthor(testAuthor);
-            when(issueRepository.findByIdWithAuthor(999L)).thenReturn(Optional.of(issue));
+            issue.setNumber(12);
+            Repository repository = new Repository();
+            ReflectionTestUtils.setField(repository, "id", 123L);
+            repository.setNameWithOwner("owner/repo");
+            issue.setRepository(repository);
+            when(issueRepository.findByIdWithAuthorAndRepository(999L)).thenReturn(Optional.of(issue));
 
             ObjectNode meta = new ObjectMapper().createObjectNode();
             meta.put("artifact_type", "ISSUE");
             meta.put("issue_id", 999L);
+            meta.put("repository_id", 123L);
+            meta.put("repository_full_name", "owner/repo");
+            meta.put("issue_number", 12);
             testJob.setMetadata(meta);
 
             var findings = List.of(validFinding("pr-description-quality", Presence.ABSENT));

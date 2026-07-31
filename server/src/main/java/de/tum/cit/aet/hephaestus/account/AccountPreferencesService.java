@@ -20,15 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
-/**
- * User preferences (notification / research / AI-review opt-ins) + GDPR analytics deletion.
- *
- * <p>The federated-identity operations (list / link / unlink / claim) live in the
- * {@code core.auth} module (Account + IdentityLink), not here. This
- * service keeps only the preference + PostHog-consent surface, which never depended on the
- * identity provider. Named {@code AccountPreferencesService} (not {@code AccountService}) to
- * avoid a bean-name clash with {@code core.auth.AccountService}.
- */
+/** Manages personal settings and research-consent cleanup. */
 @Service
 @WorkspaceAgnostic("User-scoped preferences + analytics consent — not workspace-specific")
 public class AccountPreferencesService {
@@ -79,8 +71,11 @@ public class AccountPreferencesService {
         log.info("Updating user settings: userLogin={}", user.getLogin());
         UserPreferences preferences = getOrCreatePreferences(user);
 
-        preferences.setAiReviewEnabled(
-            Objects.requireNonNull(userSettings.aiReviewEnabled(), "aiReviewEnabled must not be null")
+        preferences.setPracticeFeedbackDeliveryEnabled(
+            Objects.requireNonNull(
+                userSettings.practiceFeedbackDeliveryEnabled(),
+                "practiceFeedbackDeliveryEnabled must not be null"
+            )
         );
 
         boolean previousParticipation = preferences.isParticipateInResearch();
@@ -176,17 +171,6 @@ public class AccountPreferencesService {
         }
     }
 
-    @Transactional(readOnly = true)
-    public boolean isAiReviewEnabled(String userLogin) {
-        if (!StringUtils.hasText(userLogin)) {
-            throw new IllegalArgumentException("userLogin must not be blank");
-        }
-        return userPreferencesRepository
-            .findByUserLogin(userLogin)
-            .map(UserPreferences::isAiReviewEnabled)
-            .orElse(true);
-    }
-
     /** Delete analytics data for a user (GDPR). Called before account deletion. */
     public void deleteUserTrackingData(User user, String subjectId) {
         if (!deletePosthogIdentities(user, subjectId)) {
@@ -196,7 +180,10 @@ public class AccountPreferencesService {
     }
 
     private static UserSettingsDTO toDTO(UserPreferences preferences) {
-        return new UserSettingsDTO(preferences.isParticipateInResearch(), preferences.isAiReviewEnabled());
+        return new UserSettingsDTO(
+            preferences.isParticipateInResearch(),
+            preferences.isPracticeFeedbackDeliveryEnabled()
+        );
     }
 
     private boolean deletePosthogIdentities(User user, String primaryDistinctId) {

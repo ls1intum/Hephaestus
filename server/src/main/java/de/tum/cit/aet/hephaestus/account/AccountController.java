@@ -23,14 +23,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * User preferences (settings) under {@code /user/settings}.
- *
- * <p>Account identity, linked-identity management, and GDPR deletion moved to the
- * {@code core.auth} module ({@code AccountWebController}). This controller now owns only the
- * notification / research / AI-review preference surface, which is independent of the
- * identity provider.
- */
+/** Exposes personal settings under {@code /user/settings}. */
 @Validated
 @RestController
 @RequestMapping("/user")

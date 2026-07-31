@@ -102,7 +102,7 @@ class AccountControllerIntegrationTest {
             .expectStatus()
             .isOk()
             .expectBody()
-            .jsonPath("$.aiReviewEnabled")
+            .jsonPath("$.practiceFeedbackDeliveryEnabled")
             .isEqualTo(true)
             .jsonPath("$.participateInResearch")
             .isEqualTo(true);

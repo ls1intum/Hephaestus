@@ -113,7 +113,7 @@ class AccountExportServiceTest extends BaseUnitTest {
             });
         assertThat(bundle.featureFlags()).containsExactly("mentor_access");
         assertThat(bundle.preferences().participateInResearch()).isTrue();
-        assertThat(bundle.preferences().aiReviewEnabled()).isFalse();
+        assertThat(bundle.preferences().practiceFeedbackDeliveryEnabled()).isFalse();
         // The preferences could only carry these values if the bundle resolved the login "ada" from
         // this account's identity link and looked it up via preferencesForLogin("ada") — so the
         // returned-state assertions above already prove the Account → login bridge; no verify needed.

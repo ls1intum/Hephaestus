@@ -1,38 +1,38 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
-import { AiReviewSection } from "./AiReviewSection";
+import { PracticeFeedbackSection } from "./PracticeFeedbackSection";
 
 const meta = {
-	component: AiReviewSection,
+	component: PracticeFeedbackSection,
 	parameters: {
 		layout: "centered",
 	},
 	tags: ["autodocs"],
 	args: {
-		onToggleAiReview: fn(),
+		onTogglePracticeFeedback: fn(),
 	},
-} satisfies Meta<typeof AiReviewSection>;
+} satisfies Meta<typeof PracticeFeedbackSection>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Enabled: Story = {
 	args: {
-		aiReviewEnabled: true,
+		practiceFeedbackDeliveryEnabled: true,
 		isLoading: false,
 	},
 };
 
 export const Disabled: Story = {
 	args: {
-		aiReviewEnabled: false,
+		practiceFeedbackDeliveryEnabled: false,
 		isLoading: false,
 	},
 };
 
 export const Loading: Story = {
 	args: {
-		aiReviewEnabled: true,
+		practiceFeedbackDeliveryEnabled: true,
 		isLoading: true,
 	},
 };

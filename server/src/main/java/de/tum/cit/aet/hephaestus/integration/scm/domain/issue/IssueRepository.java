@@ -47,13 +47,11 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     @Query("SELECT i FROM Issue i LEFT JOIN FETCH i.repository WHERE TYPE(i) = Issue AND i.id = :id")
     Optional<Issue> findByIdWithRepository(@Param("id") long id);
 
-    /**
-     * Fetches an issue with its author eagerly — used by the practice-detection delivery path to resolve
-     * the about-user in the same query (mirrors {@code PullRequestRepository.findByIdWithAuthor}, avoiding
-     * a lazy-load round-trip on {@code issue.getAuthor()}). Restricted to {@code TYPE(i) = Issue}.
-     */
-    @Query("SELECT i FROM Issue i LEFT JOIN FETCH i.author WHERE TYPE(i) = Issue AND i.id = :id")
-    Optional<Issue> findByIdWithAuthor(@Param("id") long id);
+    @Query(
+        "SELECT i FROM Issue i LEFT JOIN FETCH i.author LEFT JOIN FETCH i.repository " +
+            "WHERE TYPE(i) = Issue AND i.id = :id"
+    )
+    Optional<Issue> findByIdWithAuthorAndRepository(@Param("id") long id);
 
     /**
      * Fetches an issue with the associations {@code PracticeReviewDetectionGate.evaluateIssue} needs:

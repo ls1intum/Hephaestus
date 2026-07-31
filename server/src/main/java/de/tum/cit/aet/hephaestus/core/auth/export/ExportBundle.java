@@ -50,7 +50,7 @@ public record ExportBundle(
 
     public record WorkspaceMembership(@Nullable String slug, @Nullable String name, @Nullable String role) {}
 
-    public record Preferences(boolean participateInResearch, boolean aiReviewEnabled) {}
+    public record Preferences(boolean participateInResearch, boolean practiceFeedbackDeliveryEnabled) {}
 
     public record AuthEvent(
         Instant occurredAt,

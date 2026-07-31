@@ -129,7 +129,7 @@ public class SlackAppHomeService {
     List<LayoutBlock> overviewBlocks(HomeOverviewState state) {
         String mentorState;
         if (!state.mentorReady()) {
-            mentorState = "Setup needed";
+            mentorState = "Unavailable";
         } else if (state.login().isEmpty()) {
             mentorState = "Link account";
         } else {
@@ -225,7 +225,7 @@ public class SlackAppHomeService {
     private static String leadText(boolean mentorReady, Optional<String> login) {
         if (!mentorReady) {
             return (
-                "*Mentor setup needed.* An admin needs to connect the mentor before Hephaestus can answer. " +
+                "*Mentor unavailable.* The mentor is disabled or not configured for this workspace. " +
                 "You can still manage privacy here."
             );
         }

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -20,6 +21,19 @@ import org.springframework.stereotype.Repository;
 @WorkspaceAgnostic("FeedbackPlacement is scoped through its parent Feedback's workspace_id, not its own")
 public interface FeedbackPlacementRepository extends JpaRepository<FeedbackPlacement, UUID> {
     List<FeedbackPlacement> findByFeedbackId(UUID feedbackId);
+
+    @Query(
+        """
+        SELECT p FROM FeedbackPlacement p
+        WHERE p.feedback.threadKey = :threadKey
+          AND p.feedback.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.DELIVERED
+          AND p.placementType = de.tum.cit.aet.hephaestus.practices.feedback.PlacementType.SUMMARY
+          AND p.postedCommentRef IS NOT NULL
+        ORDER BY p.feedback.createdAt DESC
+        LIMIT 1
+        """
+    )
+    Optional<FeedbackPlacement> findLatestDeliveredSummary(@Param("threadKey") String threadKey);
 
     @Query(
         value = """

@@ -1,18 +1,15 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
-import de.tum.cit.aet.hephaestus.account.UserPreferencesRepository;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.context.providers.GitDiffOperations;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationTrendService;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
@@ -67,30 +64,29 @@ public class JobTypeHandlerConfiguration {
     @Bean
     DiffNotePoster diffNotePoster(
         PullRequestCommentPoster commentPoster,
+        PracticeFeedbackCommentFormatter commentFormatter,
         List<InlineFindingChannel> inlineFindingChannels
     ) {
-        return new DiffNotePoster(commentPoster, inlineFindingChannels);
+        return new DiffNotePoster(commentPoster, commentFormatter, inlineFindingChannels);
     }
 
     @Bean
     FeedbackDeliveryService feedbackDeliveryService(
         PullRequestCommentPoster commentPoster,
         DiffNotePoster diffNotePoster,
-        UserPreferencesRepository userPreferencesRepository,
-        PullRequestRepository pullRequestRepository,
-        WorkspaceRepository workspaceRepository,
+        PracticeFeedbackDeliveryPolicy deliveryPolicy,
         FeedbackLedgerRecorder feedbackLedgerRecorder,
-        ObservationTrendService observationTrendService
+        ObservationTrendService observationTrendService,
+        PracticeFeedbackCommentFormatter commentFormatter
     ) {
         return new FeedbackDeliveryService(
             commentPoster,
             diffNotePoster,
-            userPreferencesRepository,
-            pullRequestRepository,
-            workspaceRepository,
+            deliveryPolicy,
             reviewProperties,
             feedbackLedgerRecorder,
-            observationTrendService
+            observationTrendService,
+            commentFormatter
         );
     }
 
@@ -134,7 +130,9 @@ public class JobTypeHandlerConfiguration {
         PracticeDetectionResultParser resultParser,
         PracticeDetectionDeliveryService deliveryService,
         PullRequestCommentPoster commentPoster,
-        FeedbackLedgerRecorder feedbackLedgerRecorder
+        FeedbackLedgerRecorder feedbackLedgerRecorder,
+        PracticeFeedbackDeliveryPolicy deliveryPolicy,
+        PracticeFeedbackCommentFormatter commentFormatter
     ) {
         return new IssueReviewHandler(
             objectMapper,
@@ -144,7 +142,9 @@ public class JobTypeHandlerConfiguration {
             resultParser,
             deliveryService,
             commentPoster,
-            feedbackLedgerRecorder
+            feedbackLedgerRecorder,
+            deliveryPolicy,
+            commentFormatter
         );
     }
 
