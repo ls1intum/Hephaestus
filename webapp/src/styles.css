@@ -71,7 +71,7 @@ code {
   --league-diamond: oklch(0.52 0.206 265.51);
   --league-master: oklch(0.73 0.1946 351.86);
 
-  --mentor: oklch(0.623 0.214 259.815);
+  --mentor: oklch(0.546 0.245 262.881);
   --mentor-foreground: oklch(0.97 0.014 254.604);
 
   /* Achievement skill tree node states (Light Mode) */
@@ -140,8 +140,8 @@ code {
   --league-diamond: oklch(0.52 0.206 265.51);
   --league-master: oklch(0.73 0.1946 351.86);
 
-  --mentor: oklch(0.546 0.245 262.881);
-  --mentor-foreground: oklch(0.379 0.146 265.522);
+  --mentor: oklch(0.707 0.165 254.624);
+  --mentor-foreground: oklch(0.21 0.006 285.885);
 
   /* Achievement skill tree node states (Dark Mode) */
   --node-locked: oklch(0.25 0.01 250);

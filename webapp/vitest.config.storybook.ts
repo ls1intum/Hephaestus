@@ -52,7 +52,9 @@ export default defineConfig({
 		browser: {
 			enabled: true,
 			headless: true,
-			provider: playwright(),
+			provider: playwright({
+				contextOptions: { reducedMotion: "reduce" }
+			}),
 			instances: [{ browser: "chromium" }]
 		},
 		setupFiles: [".storybook/vitest.setup.ts"],

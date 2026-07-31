@@ -30,7 +30,7 @@ function StageNumber({ number }: StageNumberProps) {
 
 	return (
 		<motion.span
-			className="relative flex size-8 shrink-0 items-center justify-center rounded-full bg-mentor text-xs font-bold text-white"
+			className="relative flex size-8 shrink-0 items-center justify-center rounded-full bg-mentor text-xs font-bold text-mentor-foreground"
 			animate={shouldReduceMotion ? undefined : { scale: [1, 1.08, 1] }}
 			transition={{
 				duration: 4.8,
