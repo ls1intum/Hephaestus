@@ -102,7 +102,7 @@ public class PracticeDetectionDeliveryService {
                 job.getId()
             );
             // With no active practices every slug is unknown, so the discards fold into discardedUnknownSlug.
-            return new DeliveryResult(0, validFindings.size(), 0, false);
+            return new DeliveryResult(0, validFindings.size(), 0, false, Map.of());
         }
 
         Target target = resolveTarget(job, metadata);
@@ -280,16 +280,15 @@ public class PracticeDetectionDeliveryService {
                 throw new JobDeliveryException("Missing issue_id in job metadata: jobId=" + job.getId());
             }
             Long issueId = issueIdNode.asLong();
-            // TYPE(i)=Issue finder: never resolve a PullRequest under an ISSUE artifact_type (shared table/id space).
-            // findByIdWithAuthor fetches the author in the same query so getAuthor() below is not a lazy round-trip.
             Issue issue = issueRepository
-                .findByIdWithAuthor(issueId)
+                .findByIdWithAuthorAndRepository(issueId)
                 .orElseThrow(() ->
                     new JobDeliveryException("Issue not found: issueId=" + issueId + ", jobId=" + job.getId())
                 );
             if (issue.getAuthor() == null) {
                 throw new JobDeliveryException("Issue has no author: issueId=" + issueId + ", jobId=" + job.getId());
             }
+            requireMatchingArtifact(issue, metadata, "issue_number", job);
             return new Target(WorkArtifact.ISSUE, issueId, issue.getAuthor().getId());
         }
         JsonNode pullRequestIdNode = metadata.get("pull_request_id");
@@ -298,7 +297,7 @@ public class PracticeDetectionDeliveryService {
         }
         Long pullRequestId = pullRequestIdNode.asLong();
         PullRequest pullRequest = pullRequestRepository
-            .findByIdWithAuthor(pullRequestId)
+            .findByIdWithAuthorAndRepository(pullRequestId)
             .orElseThrow(() ->
                 new JobDeliveryException(
                     "Pull request not found: pullRequestId=" + pullRequestId + ", jobId=" + job.getId()
@@ -309,7 +308,14 @@ public class PracticeDetectionDeliveryService {
                 "Pull request has no author: pullRequestId=" + pullRequestId + ", jobId=" + job.getId()
             );
         }
+        requireMatchingArtifact(pullRequest, metadata, "pr_number", job);
         return new Target(WorkArtifact.PULL_REQUEST, pullRequestId, pullRequest.getAuthor().getId());
+    }
+
+    private static void requireMatchingArtifact(Issue artifact, JsonNode metadata, String numberKey, AgentJob job) {
+        if (!PracticeFeedbackDeliveryPolicy.matchesArtifact(artifact, metadata, numberKey)) {
+            throw new JobDeliveryException("Artifact metadata does not match the live target: jobId=" + job.getId());
+        }
     }
 
     /**
@@ -345,10 +351,5 @@ public class PracticeDetectionDeliveryService {
         int discardedDuplicate,
         boolean hasNegative,
         Map<ValidatedFinding, ObservationKeys> observationKeys
-    ) {
-        /** Compatibility shape for call sites/tests that do not consume per-finding keys. */
-        public DeliveryResult(int inserted, int discardedUnknownSlug, int discardedDuplicate, boolean hasNegative) {
-            this(inserted, discardedUnknownSlug, discardedDuplicate, hasNegative, Map.of());
-        }
-    }
+    ) {}
 }

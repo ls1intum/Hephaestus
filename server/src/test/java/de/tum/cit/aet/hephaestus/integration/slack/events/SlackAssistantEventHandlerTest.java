@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.slack.api.model.assistant.SuggestedPrompt;
+import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorReadinessQuery;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
@@ -25,16 +26,20 @@ class SlackAssistantEventHandlerTest extends BaseUnitTest {
     @Mock
     private SlackMessageService messageService;
 
+    @Mock
+    private MentorReadinessQuery mentorReadinessQuery;
+
     private SlackAssistantEventHandler handler;
 
     @BeforeEach
     void setUp() {
-        handler = new SlackAssistantEventHandler(workspaceResolver, messageService);
+        handler = new SlackAssistantEventHandler(workspaceResolver, messageService, mentorReadinessQuery);
     }
 
     @Test
     void messagesTabSetsContextSafeSuggestedPrompts() throws Exception {
         when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(42L));
+        when(mentorReadinessQuery.isReady(42L)).thenReturn(true);
 
         handler.onMessagesOpened(
             "T1",
@@ -61,6 +66,24 @@ class SlackAssistantEventHandlerTest extends BaseUnitTest {
     @Test
     void missingChannelDoesNotSetPrompts() throws Exception {
         handler.onMessagesOpened("T1", JsonMapper.builder().build().readTree("{\"tab\":\"messages\"}"));
+
+        verify(messageService, never()).setSuggestedPrompts(
+            ArgumentMatchers.anyLong(),
+            ArgumentMatchers.anyString(),
+            ArgumentMatchers.anyString(),
+            ArgumentMatchers.anyList()
+        );
+    }
+
+    @Test
+    void unavailableMentorDoesNotInstallSuggestedPrompts() throws Exception {
+        when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(42L));
+        when(mentorReadinessQuery.isReady(42L)).thenReturn(false);
+
+        handler.onMessagesOpened(
+            "T1",
+            JsonMapper.builder().build().readTree("{\"tab\":\"messages\",\"channel\":\"D1\"}")
+        );
 
         verify(messageService, never()).setSuggestedPrompts(
             ArgumentMatchers.anyLong(),

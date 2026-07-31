@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.config;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import org.hibernate.validator.constraints.URL;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -30,25 +32,18 @@ public record ApplicationProperties(
     @URL(message = "Host URL must be a valid URL if provided")
     @DefaultValue("http://localhost:8080")
     String hostUrl,
-    Webapp webapp
+    @Valid Webapp webapp
 ) {
-    /**
-     * Compact constructor ensuring nested records are never null.
-     */
     public ApplicationProperties {
         if (webapp == null) {
             webapp = new Webapp("http://localhost:4200");
         }
     }
 
-    /**
-     * Webapp configuration.
-     *
-     * @param url the public URL of the webapp (used for links in emails)
-     */
     public record Webapp(
-        @Nullable @URL(message = "Webapp URL must be a valid URL if provided") @DefaultValue(
-            "http://localhost:4200"
-        ) String url
+        @NotBlank(message = "Webapp URL must not be blank") @URL(
+            regexp = "^https?://.*$",
+            message = "Webapp URL must be a valid HTTP(S) URL"
+        ) @DefaultValue("http://localhost:4200") String url
     ) {}
 }

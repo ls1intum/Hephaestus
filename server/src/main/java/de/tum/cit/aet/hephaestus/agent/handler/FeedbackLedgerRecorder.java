@@ -116,41 +116,24 @@ public class FeedbackLedgerRecorder {
         this.eventPublisher = eventPublisher;
     }
 
-    /**
-     * Record the in-context feedback ledger for a just-delivered review. Best-effort: callers must wrap
-     * this in try/catch — it runs REQUIRES_NEW so its own failure never poisons the delivery transaction.
-     *
-     * @param job the delivered job ({@code deliveryCommentId} holds the posted summary id)
-     * @param delivery the composed content that was posted (summary body + inline notes)
-     * @param artifact PR vs ISSUE (issues have no inline placements)
-     * @param inlineSignals the per-inline-note delivery outcomes (vendor note id, thread id, disposition)
-     *     emitted by the inline channel; empty for issues and for channels that cannot reconcile per-thread
-     */
+    /** Records a delivery whose summary landed. */
     public void record(
         AgentJob job,
         DeliveryContent delivery,
         WorkArtifact artifact,
         List<DeliveredSignal> inlineSignals
     ) {
-        record(job, delivery, artifact, inlineSignals, true);
+        record(job, delivery, artifact, inlineSignals, true, !inlineSignals.isEmpty());
     }
 
-    /**
-     * Record the ledger, gated on whether the summary actually landed this run.
-     *
-     * <p>When {@code summaryDelivered} is {@code false} — a TRANSIENT no-op kept the PRIOR run's summary live
-     * and posted nothing this run — the recorder writes NOTHING: no fresh DELIVERED unit and (critically) no
-     * supersession of the still-live prior unit. Recording a phantom DELIVERED row for words the student never
-     * saw, while flipping the real prior to SUPERSEDED, corrupts {@code findRecentDeliveredForRecipient} so the
-     * mentor would coach against feedback that was never delivered.
-     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void record(
         AgentJob job,
         DeliveryContent delivery,
         WorkArtifact artifact,
         List<DeliveredSignal> inlineSignals,
-        boolean summaryDelivered
+        boolean summaryDelivered,
+        boolean inlineDelivered
     ) {
         // Signal the conversational-delivery loop for EVERY cycle that reaches the ledger - before any early
         // return below - so comms-only cycles (zero IN_CONTEXT posts) and transient no-ops are not skipped. The
@@ -159,9 +142,7 @@ public class FeedbackLedgerRecorder {
         if (delivery == null) {
             return;
         }
-        if (!summaryDelivered) {
-            // Nothing landed this run: the prior summary (and its DELIVERED ledger unit) is still what the
-            // student sees. Do not write a phantom DELIVERED row or supersede the live prior.
+        if (!summaryDelivered && !inlineDelivered) {
             return;
         }
         List<Observation> findings = observationRepository.findByAgentJobId(job.getId());
@@ -178,16 +159,12 @@ public class FeedbackLedgerRecorder {
         Long artifactId = any.getArtifactId();
         String feedbackThreadKey = feedbackThreadKeyFor(any);
 
-        // Re-review supersession (ADR 0021 re-review UX): the prior live unit on this continuity line is the
-        // one whose SUMMARY comment the delivery just edited in place. Flip it to SUPERSEDED and point this
-        // new row's supersedes_id at it, preserving the temporal record of what the student saw each run.
-        UUID supersedesId = feedbackRepository
-            .findFirstByThreadKeyAndDeliveryStateOrderByCreatedAtDesc(
-                feedbackThreadKey,
-                FeedbackDeliveryState.DELIVERED
-            )
-            .map(Feedback::getId)
-            .orElse(null);
+        UUID supersedesId = summaryDelivered
+            ? feedbackPlacementRepository
+                  .findLatestDeliveredSummary(feedbackThreadKey)
+                  .map(FeedbackPlacement::getFeedbackId)
+                  .orElse(null)
+            : null;
 
         Instant now = Instant.now();
         Feedback feedback = feedbackRepository.save(
@@ -203,7 +180,7 @@ public class FeedbackLedgerRecorder {
                 .channel(FeedbackChannel.IN_CONTEXT)
                 .position(IN_CONTEXT_UNIT_ORDINAL)
                 .deliveryState(FeedbackDeliveryState.DELIVERED)
-                .body(delivery.mrNote())
+                .body(summaryDelivered ? delivery.mrNote() : null)
                 .source(FeedbackSource.AGENT)
                 .threadKey(feedbackThreadKey)
                 .replacesId(supersedesId)
@@ -212,9 +189,6 @@ public class FeedbackLedgerRecorder {
                 .build()
         );
 
-        // Flip the prior unit AFTER the new DELIVERED row lands, so there is never a window with zero live
-        // units on this line (a concurrent reader always sees exactly one). Native update — @Immutable forbids
-        // an ORM-level state mutation.
         if (supersedesId != null) {
             feedbackRepository.updateState(supersedesId, FeedbackDeliveryState.SUPERSEDED.name());
         }
@@ -269,10 +243,7 @@ public class FeedbackLedgerRecorder {
             feedbackObservationRepository.insertIfAbsent(feedback.getId(), f.getId(), role.name(), ordinal++);
         }
 
-        // SUMMARY placement — fully recoverable: external_ref is the posted summary comment id. Skipped
-        // entirely when no summary comment exists this run (e.g. the body sanitised to blank but inline
-        // notes landed) — a SUMMARY row with a null ref would claim a posting that never happened.
-        if (job.getDeliveryCommentId() != null) {
+        if (summaryDelivered && job.getDeliveryCommentId() != null) {
             feedbackPlacementRepository.save(
                 FeedbackPlacement.builder()
                     .feedback(feedback)
@@ -461,20 +432,10 @@ public class FeedbackLedgerRecorder {
             return Optional.empty();
         }
         String feedbackThreadKey = feedbackThreadKeyFor(findings.get(0));
-        return feedbackRepository
-            .findFirstByThreadKeyAndDeliveryStateOrderByCreatedAtDesc(
-                feedbackThreadKey,
-                FeedbackDeliveryState.DELIVERED
-            )
-            .flatMap(prior ->
-                feedbackPlacementRepository
-                    .findByFeedbackId(prior.getId())
-                    .stream()
-                    .filter(p -> p.getPlacementType() == PlacementType.SUMMARY)
-                    .map(FeedbackPlacement::getPostedCommentRef)
-                    .filter(ref -> ref != null && !ref.isBlank())
-                    .findFirst()
-            );
+        return feedbackPlacementRepository
+            .findLatestDeliveredSummary(feedbackThreadKey)
+            .map(FeedbackPlacement::getPostedCommentRef)
+            .filter(ref -> !ref.isBlank());
     }
 
     /**

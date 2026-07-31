@@ -253,12 +253,7 @@ services:
       PRACTICE_REVIEW_SKIP_DRAFTS: ${PRACTICE_REVIEW_SKIP_DRAFTS:-true}
       PRACTICE_REVIEW_DELIVER_TO_MERGED: ${PRACTICE_REVIEW_DELIVER_TO_MERGED:-false}
       PRACTICE_REVIEW_COOLDOWN_MINUTES: ${PRACTICE_REVIEW_COOLDOWN_MINUTES:-15}
-      PRACTICE_REVIEW_APP_BASE_URL: ${PRACTICE_REVIEW_APP_BASE_URL:-}
-      # Feature flags. These names are now the server's own — application.yml reads each flag from the
-      # variable of the same name — so they mean the same thing outside these compose files. They used
-      # to be compose-only aliases that fanned out to HEPHAESTUS_FEATURES_FLAGS_*, which made them dead
-      # letters in any deployment that did not use this file. That long form still works and still wins
-      # if you set it. PRACTICE_REVIEW_FOR_ALL also feeds the separate detection gate above.
+      # PRACTICE_REVIEW_FOR_ALL controls feature visibility and the separate review gate above.
       PRACTICE_REVIEW_FOR_ALL: ${PRACTICE_REVIEW_FOR_ALL:-false}
       GITLAB_WORKSPACE_CREATION: ${GITLAB_WORKSPACE_CREATION:-false}
       # LLM providers are registered at runtime (Instance admin → AI models), not via env vars —

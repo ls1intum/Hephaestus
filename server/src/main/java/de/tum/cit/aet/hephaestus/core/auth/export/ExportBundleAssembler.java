@@ -113,7 +113,7 @@ public class ExportBundleAssembler {
             .stream()
             .findFirst()
             .flatMap(preferencesQuery::preferencesForLogin)
-            .map(p -> new ExportBundle.Preferences(p.participateInResearch(), p.aiReviewEnabled()))
+            .map(p -> new ExportBundle.Preferences(p.participateInResearch(), p.practiceFeedbackDeliveryEnabled()))
             .orElse(null);
 
         // Real calendar months (not 30-day approximations) so this window matches the partition

@@ -24,7 +24,7 @@ public enum FeedbackSuppressionReason {
     ARTIFACT_MERGED,
     /** The target PR is a draft and draft-delivery is disabled for the workspace. */
     ARTIFACT_DRAFT,
-    /** The recipient opted out of AI review feedback. */
+    /** The recipient disabled practice-feedback delivery. */
     RECIPIENT_OPTED_OUT,
     /** The composed body sanitised to blank and no inline note was placed. */
     EMPTY_AFTER_SANITIZE,

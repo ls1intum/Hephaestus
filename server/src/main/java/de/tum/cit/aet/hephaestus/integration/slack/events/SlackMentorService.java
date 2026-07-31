@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.slack.events;
 
+import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorReadinessQuery;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorTurnRequest;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorTurnRunner;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
@@ -15,15 +16,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
-/**
- * Bridges an inbound Slack DM to the mentor: resolves the workspace (from the Slack team) and developer, finds or
- * creates the mentor {@code chat_thread} for that DM, then runs a turn through the {@link MentorTurnRunner} port,
- * streaming the reply natively via {@link SlackStreamingMentorChannel}.
- *
- * <p>Developer identity resolves through {@code identity_link} (SLACK provider) via
- * {@link SlackMentorIdentityResolver}: an unlinked Slack user (or one with no membership in the resolved
- * workspace) gets the friendly "not linked" reply.
- */
+/** Routes eligible Slack DMs into mentor turns. */
 @Service
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 public class SlackMentorService {
@@ -37,6 +30,7 @@ public class SlackMentorService {
     private final SlackMentorIdentityResolver identityResolver;
     private final SlackMentorInputGuard inputGuard;
     private final SlackOnboardingService onboardingService;
+    private final MentorReadinessQuery mentorReadinessQuery;
 
     public SlackMentorService(
         SlackWorkspaceResolver workspaceResolver,
@@ -45,7 +39,8 @@ public class SlackMentorService {
         SlackMessageService slackMessageService,
         SlackMentorIdentityResolver identityResolver,
         SlackMentorInputGuard inputGuard,
-        SlackOnboardingService onboardingService
+        SlackOnboardingService onboardingService,
+        MentorReadinessQuery mentorReadinessQuery
     ) {
         this.workspaceResolver = workspaceResolver;
         this.threadLinker = threadLinker;
@@ -54,6 +49,7 @@ public class SlackMentorService {
         this.identityResolver = identityResolver;
         this.inputGuard = inputGuard;
         this.onboardingService = onboardingService;
+        this.mentorReadinessQuery = mentorReadinessQuery;
     }
 
     private record Developer(String login) {}
@@ -79,6 +75,10 @@ public class SlackMentorService {
             return;
         }
         long workspaceId = workspaceOpt.get();
+        if (!mentorReadinessQuery.isEnabled(workspaceId)) {
+            log.debug("Slack mentor disabled for workspace={}, ignoring DM", workspaceId);
+            return;
+        }
         SlackMentorInputGuard.Verdict verdict = inputGuard.decide(text);
         if (!verdict.allowsMentorTurn()) {
             if (verdict.responseText() != null && !verdict.responseText().isBlank()) {
@@ -105,8 +105,7 @@ public class SlackMentorService {
             return;
         }
         Developer dev = devOpt.get();
-        // Find-or-create the Slack↔mentor thread mapping in its own atomic transaction (a real proxy hop), before
-        // any remote Slack streaming — handleDm itself stays outside any transaction.
+        // Link the thread transactionally before starting remote Slack I/O.
         UUID threadId = threadLinker.findOrCreateThread(
             workspaceId,
             teamId,
@@ -115,9 +114,7 @@ public class SlackMentorService {
             slackUserId,
             dev.login()
         );
-        // First feedback to the member on turn receipt, before any token streams (superseded by the first append).
         slackMessageService.setStatus(workspaceId, channelId, threadTs, "Reviewing recent feedback...");
-        // Stream the reply into the active Slack DM thread (event.thread_ts when present, else the user's message ts).
         SlackStreamingMentorChannel channel = new SlackStreamingMentorChannel(
             slackMessageService,
             workspaceId,

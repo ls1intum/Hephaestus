@@ -63,11 +63,9 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
     private FeedbackLedgerRecorder recorder() {
         when(feedbackRepository.existsByAgentJobIdAndPosition(any(), anyInt())).thenReturn(false);
         when(feedbackRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(feedbackRepository.findFirstByThreadKeyAndDeliveryStateOrderByCreatedAtDesc(any(), any())).thenReturn(
-            Optional.empty()
-        );
         when(feedbackObservationRepository.findObservationIdsSuppressedForJob(any())).thenReturn(List.of());
         when(feedbackPlacementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(feedbackPlacementRepository.findLatestDeliveredSummary(any())).thenReturn(Optional.empty());
         return new FeedbackLedgerRecorder(
             observationRepository,
             feedbackRepository,
@@ -300,11 +298,9 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(finding));
         var recorder = recorder();
         UUID priorId = UUID.randomUUID();
-        Feedback prior = mock(Feedback.class);
-        when(prior.getId()).thenReturn(priorId);
-        when(feedbackRepository.findFirstByThreadKeyAndDeliveryStateOrderByCreatedAtDesc(any(), any())).thenReturn(
-            Optional.of(prior)
-        );
+        FeedbackPlacement priorSummary = mock(FeedbackPlacement.class);
+        when(priorSummary.getFeedbackId()).thenReturn(priorId);
+        when(feedbackPlacementRepository.findLatestDeliveredSummary(any())).thenReturn(Optional.of(priorSummary));
 
         recorder.record(job(), new DeliveryContent("body", List.of(), List.of()), WorkArtifact.PULL_REQUEST, List.of());
 
@@ -363,19 +359,13 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         var finding = problem(0.9f);
         when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(finding));
         var recorder = recorder();
-        UUID priorId = UUID.randomUUID();
-        Feedback prior = mock(Feedback.class);
-        lenient().when(prior.getId()).thenReturn(priorId);
-        lenient()
-            .when(feedbackRepository.findFirstByThreadKeyAndDeliveryStateOrderByCreatedAtDesc(any(), any()))
-            .thenReturn(Optional.of(prior));
-
         recorder.record(
             job(),
             new DeliveryContent("body", List.of(), List.of()),
             WorkArtifact.PULL_REQUEST,
             List.of(),
-            /* summaryDelivered */ false
+            false,
+            false
         );
 
         verify(feedbackRepository, org.mockito.Mockito.never()).save(any());
@@ -386,6 +376,55 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
             any(),
             anyInt()
         );
+    }
+
+    @Test
+    void inlineOnlyDeliveryRecordsInlinePlacementWithoutSupersedingSummary() {
+        var finding = problem(0.9f);
+        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(finding));
+        var note = new DiffNote("src/Foo.java", 10, null, "Fix this", "ck-foo");
+        var signal = new InlineFindingChannel.DeliveredSignal(
+            "ck-foo",
+            new FindingAnchor.DiffAnchor("src/Foo.java", 10, null),
+            InlineFindingChannel.Disposition.POSTED,
+            "note-1",
+            "disc-1"
+        );
+
+        recorder().record(
+            job(),
+            new DeliveryContent(null, List.of(note), List.of()),
+            WorkArtifact.PULL_REQUEST,
+            List.of(signal),
+            false,
+            true
+        );
+
+        var savedFeedback = ArgumentCaptor.forClass(Feedback.class);
+        verify(feedbackRepository).save(savedFeedback.capture());
+        assertThat(savedFeedback.getValue().getBody()).isNull();
+        assertThat(savedFeedback.getValue().getReplacesId()).isNull();
+        verify(feedbackRepository, org.mockito.Mockito.never()).updateState(any(), any());
+
+        var savedPlacement = ArgumentCaptor.forClass(FeedbackPlacement.class);
+        verify(feedbackPlacementRepository).save(savedPlacement.capture());
+        assertThat(savedPlacement.getValue().getPlacementType()).isEqualTo(PlacementType.INLINE);
+        assertThat(savedPlacement.getValue().getPostedCommentRef()).isEqualTo("note-1");
+        verify(feedbackPlacementRepository, org.mockito.Mockito.never()).findLatestDeliveredSummary(any());
+    }
+
+    @Test
+    void priorLiveSummaryRefUsesLatestDeliveredSummaryPlacement() {
+        Observation finding = problem(0.9f);
+        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(finding));
+        FeedbackLedgerRecorder recorder = recorder();
+        FeedbackPlacement summary = mock(FeedbackPlacement.class);
+        when(summary.getPostedCommentRef()).thenReturn("summary-1");
+        when(feedbackPlacementRepository.findLatestDeliveredSummary(any())).thenReturn(Optional.of(summary));
+
+        Optional<String> result = recorder.priorLiveSummaryRef(job());
+
+        assertThat(result).contains("summary-1");
     }
 
     @Test

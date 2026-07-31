@@ -64,9 +64,9 @@ const defaultSlackPreferencesProps = {
 
 export const Default: Story = {
 	args: {
-		aiReviewProps: {
-			aiReviewEnabled: true,
-			onToggleAiReview: fn(),
+		practiceFeedbackProps: {
+			practiceFeedbackDeliveryEnabled: true,
+			onTogglePracticeFeedback: fn(),
 		},
 		showResearchSection: true,
 		researchProps: {
@@ -82,9 +82,9 @@ export const Default: Story = {
 
 export const AllTogglesDisabled: Story = {
 	args: {
-		aiReviewProps: {
-			aiReviewEnabled: false,
-			onToggleAiReview: fn(),
+		practiceFeedbackProps: {
+			practiceFeedbackDeliveryEnabled: false,
+			onTogglePracticeFeedback: fn(),
 		},
 		showResearchSection: true,
 		researchProps: {
@@ -100,9 +100,9 @@ export const AllTogglesDisabled: Story = {
 
 export const Loading: Story = {
 	args: {
-		aiReviewProps: {
-			aiReviewEnabled: true,
-			onToggleAiReview: fn(),
+		practiceFeedbackProps: {
+			practiceFeedbackDeliveryEnabled: true,
+			onTogglePracticeFeedback: fn(),
 		},
 		showResearchSection: true,
 		researchProps: {
@@ -118,9 +118,9 @@ export const Loading: Story = {
 
 export const ResearchHidden: Story = {
 	args: {
-		aiReviewProps: {
-			aiReviewEnabled: true,
-			onToggleAiReview: fn(),
+		practiceFeedbackProps: {
+			practiceFeedbackDeliveryEnabled: true,
+			onTogglePracticeFeedback: fn(),
 		},
 		showResearchSection: false,
 		researchProps: {

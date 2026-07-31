@@ -638,13 +638,13 @@ export type TeamSummary = {
  */
 export type UserSettings = {
     /**
-     * Whether the user wants to receive AI-generated practice review comments on pull requests
-     */
-    aiReviewEnabled: boolean;
-    /**
      * Whether the user consents to participate in research studies
      */
     participateInResearch: boolean;
+    /**
+     * Whether new practice-feedback comments may be delivered on issues, pull requests, and merge requests authored by the user, together with related Slack reminders
+     */
+    practiceFeedbackDeliveryEnabled: boolean;
 };
 
 /**

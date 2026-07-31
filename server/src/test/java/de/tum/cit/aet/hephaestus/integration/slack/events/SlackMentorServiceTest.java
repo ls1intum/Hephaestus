@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorReadinessQuery;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorTurnRequest;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorTurnRunner;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
@@ -51,7 +52,11 @@ class SlackMentorServiceTest extends BaseUnitTest {
     @Mock
     private SlackOnboardingService onboardingService;
 
+    @Mock
+    private MentorReadinessQuery mentorReadinessQuery;
+
     private SlackMentorService service() {
+        when(mentorReadinessQuery.isEnabled(WORKSPACE)).thenReturn(true);
         return new SlackMentorService(
             workspaceResolver,
             threadLinker,
@@ -59,12 +64,37 @@ class SlackMentorServiceTest extends BaseUnitTest {
             slackMessageService,
             identityResolver,
             new KeywordSlackMentorInputGuard(),
-            onboardingService
+            onboardingService,
+            mentorReadinessQuery
         );
     }
 
     @Test
-    void selfHarmMessage_postsSupportResponse_andNeverMentors() {
+    void disabledWorkspace_ignoresDmWithoutAnyMentorSideEffect() {
+        when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(WORKSPACE));
+        SlackMentorService service = service();
+        when(mentorReadinessQuery.isEnabled(WORKSPACE)).thenReturn(false);
+
+        service.handleDm(TEAM, CHANNEL, USER, "Can you review my work?", "100.1", "100.1");
+
+        verifyNoInteractions(identityResolver, threadLinker, mentorTurnRunner, slackMessageService, onboardingService);
+    }
+
+    @Test
+    void enabledWorkspace_acceptsDmWithoutConsultingOperationalReadiness() {
+        when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(WORKSPACE));
+        when(identityResolver.resolveDeveloperLogin(WORKSPACE, TEAM, USER)).thenReturn(Optional.of("alice"));
+        UUID threadId = UUID.randomUUID();
+        when(threadLinker.findOrCreateThread(WORKSPACE, TEAM, CHANNEL, "100.1", USER, "alice")).thenReturn(threadId);
+        SlackMentorService service = service();
+        service.handleDm(TEAM, CHANNEL, USER, "Can you review my work?", "100.1", "100.1");
+
+        verify(mentorTurnRunner).run(any(), any(), eq("alice"));
+        verify(mentorReadinessQuery, never()).isReady(WORKSPACE);
+    }
+
+    @Test
+    void selfHarmMessage_isDivertedBeforeIdentityResolution() {
         when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(WORKSPACE));
         SlackMentorService service = service();
 
@@ -78,7 +108,6 @@ class SlackMentorServiceTest extends BaseUnitTest {
             eq(KeywordSlackMentorInputGuard.SELF_HARM_RESPONSE)
         );
         verify(mentorTurnRunner, never()).run(any(), any(), any());
-        // Diverted before any identity resolution — the classifier applies even to an unlinked sender.
         verifyNoInteractions(identityResolver);
     }
 

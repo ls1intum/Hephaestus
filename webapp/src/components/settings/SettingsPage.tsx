@@ -4,10 +4,13 @@ import { PageLayout } from "@/components/core/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { optionalIntegrationsAvailable } from "@/integrations/consent";
-import { AiReviewSection, type AiReviewSectionProps } from "./AiReviewSection";
 import { CookiePreferencesSection } from "./CookiePreferencesSection";
 import { DangerZoneSection } from "./DangerZoneSection";
 import { LinkedAccountsSection, type LinkedAccountsSectionProps } from "./LinkedAccountsSection";
+import {
+	PracticeFeedbackSection,
+	type PracticeFeedbackSectionProps,
+} from "./PracticeFeedbackSection";
 import {
 	ResearchParticipationSection,
 	type ResearchParticipationSectionProps,
@@ -19,7 +22,7 @@ import {
 } from "./SlackPreferencesSection";
 
 export interface SettingsPageProps {
-	aiReviewProps: AiReviewSectionProps;
+	practiceFeedbackProps: PracticeFeedbackSectionProps;
 	researchProps: ResearchParticipationSectionProps;
 	showResearchSection: boolean;
 	linkedAccountsProps: LinkedAccountsSectionProps;
@@ -32,7 +35,7 @@ export interface SettingsPageProps {
 }
 
 export function SettingsPage({
-	aiReviewProps,
+	practiceFeedbackProps,
 	researchProps,
 	showResearchSection,
 	linkedAccountsProps,
@@ -43,12 +46,13 @@ export function SettingsPage({
 	settingsError = false,
 	onRetrySettings,
 }: SettingsPageProps) {
-	const { isLoading: aiReviewLoading = false, ...aiReviewRest } = aiReviewProps;
+	const { isLoading: practiceFeedbackLoading = false, ...practiceFeedbackRest } =
+		practiceFeedbackProps;
 	const { isLoading: researchLoading = false, ...researchRest } = researchProps;
 	const { isLoading: linkedLoading = false, ...linkedRest } = linkedAccountsProps;
 	const { isLoading: slackLoading = false, ...slackRest } = slackPreferencesProps;
 
-	const aiReviewPending = isLoading || aiReviewLoading;
+	const practiceFeedbackPending = isLoading || practiceFeedbackLoading;
 	const researchPending = isLoading || researchLoading;
 
 	return (
@@ -81,7 +85,10 @@ export function SettingsPage({
 				) : (
 					<>
 						<Separator />
-						<AiReviewSection {...aiReviewRest} isLoading={aiReviewPending} />
+						<PracticeFeedbackSection
+							{...practiceFeedbackRest}
+							isLoading={practiceFeedbackPending}
+						/>
 
 						{showResearchSection && (
 							<>

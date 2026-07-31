@@ -74,19 +74,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     )
     Optional<String> findHeadlineRecurrenceKey(@Param("feedbackId") UUID feedbackId);
 
-    /**
-     * The feedback a developer actually RECEIVED in a workspace — only units that reached a surface
-     * ({@code DELIVERED}), newest first. Powers the mentor's delivered-feedback content source so the coach
-     * references the exact words the student saw ({@link Feedback#getBody()}) instead of
-     * reconstructing from raw pre-delivery findings (which may have been suppressed, superseded, or never
-     * postable). Bounded by the caller's {@code Pageable}.
-     *
-     * <p>Filters and orders on {@code created_at} (not {@code delivered_at}) so the
-     * {@code idx_feedback_recipient_created (recipient_user_id, created_at DESC)} index serves both the
-     * {@code >= :since} range and the {@code ORDER BY}. This is behaviour-equivalent: a DELIVERED unit is
-     * written with {@code createdAt == deliveredAt} (same {@code Instant.now()} — see
-     * {@code FeedbackLedgerRecorder}), so the two timestamps coincide for every row this query can match.
-     */
+    /** Delivered summary and inline-only feedback for a recipient, newest first. */
     @Query(
         """
         SELECT f FROM Feedback f
@@ -105,34 +93,8 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     );
 
     /**
-     * The current (not-yet-superseded) delivery for a continuity line — the prior unit a re-review
-     * supersedes and whose comment it edits in place. There is at most one live row per key by
-     * construction (each new delivery flips the previous to {@code SUPERSEDED}).
-     */
-    Optional<Feedback> findFirstByThreadKeyAndDeliveryStateOrderByCreatedAtDesc(
-        String threadKey,
-        FeedbackDeliveryState state
-    );
-
-    /**
-     * Flip a delivered unit to {@code SUPERSEDED} when a newer delivery for the same continuity line lands.
-     * Native (not JPQL) because the {@code @Immutable} entity forbids ORM updates; the row's {@code state}
-     * is the one lifecycle column and is transitioned only through this explicit statement.
-     *
-     * <p>{@code state} is written verbatim into the {@code delivery_state varchar(16)} column. It IS guarded
-     * by the {@code chk_feedback_state} CHECK (PREPARED/DELIVERED/SUPERSEDED/SUPPRESSED/FAILED), so a typo
-     * fails fast at write time; callers still MUST pass a {@link FeedbackDeliveryState#name()} value.
-     *
-     * <p><strong>Concurrency invariant:</strong> the supersession is a guarded, idempotent
-     * transition — it flips a row to {@code :state} only while it is still {@code DELIVERED}. Two concurrent
-     * re-reviews of the same artifact can both read the same prior DELIVERED row and both attempt to flip it;
-     * the {@code AND delivery_state = 'DELIVERED'} predicate makes the second flip a no-op (affected rows = 0)
-     * instead of double-superseding, and the returned count lets a caller detect the lost race. The "at most
-     * one live (DELIVERED) row per continuity/thread key" invariant still relies on the orchestrator
-     * serializing recorder runs for a given thread key for the {@code INSERT}; this guard hardens the flip.
-     *
-     * @return the number of rows updated — {@code 1} on a clean supersession, {@code 0} if the row was no
-     *     longer {@code DELIVERED} (already superseded by a concurrent writer).
+     * Supersedes the prior delivered summary selected through its SUMMARY placement. Inline-only deliveries
+     * intentionally remain DELIVERED on the same thread. The state predicate makes concurrent retries idempotent.
      */
     @Modifying
     @Transactional

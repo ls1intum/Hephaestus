@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -15,20 +16,32 @@ import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.Del
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
+import de.tum.cit.aet.hephaestus.config.ApplicationProperties;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
+import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/** Unit tests for the issue-detection handler's pure submission logic. */
 class IssueReviewHandlerTest extends BaseUnitTest {
 
     private final JsonMapper objectMapper = JsonMapper.builder().build();
@@ -48,6 +61,21 @@ class IssueReviewHandlerTest extends BaseUnitTest {
     @Mock
     private FeedbackLedgerRecorder feedbackLedgerRecorder;
 
+    @Mock
+    private IssueRepository issueRepository;
+
+    @Mock
+    private RepositoryToMonitorRepository repositoryToMonitorRepository;
+
+    @Mock
+    private AccountPreferencesQuery accountPreferencesQuery;
+
+    @Mock
+    private PullRequestRepository pullRequestRepository;
+
+    @Mock
+    private WorkspaceRepository workspaceRepository;
+
     private IssueReviewHandler handler;
 
     @BeforeEach
@@ -60,8 +88,30 @@ class IssueReviewHandlerTest extends BaseUnitTest {
             new PracticeDetectionResultParser(objectMapper),
             deliveryService,
             commentPoster,
-            feedbackLedgerRecorder
+            feedbackLedgerRecorder,
+            new PracticeFeedbackDeliveryPolicy(
+                issueRepository,
+                pullRequestRepository,
+                repositoryToMonitorRepository,
+                workspaceRepository,
+                accountPreferencesQuery,
+                new PracticeReviewProperties(false, true, false, 15, false, false)
+            ),
+            new PracticeFeedbackCommentFormatter(
+                new ApplicationProperties(null, new ApplicationProperties.Webapp("https://hephaestus.example"))
+            )
         );
+        lenient()
+            .when(repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(1L, "owner/repo"))
+            .thenReturn(true);
+        lenient().when(workspaceRepository.findById(1L)).thenReturn(Optional.of(activePracticeWorkspace()));
+    }
+
+    private Workspace activePracticeWorkspace() {
+        var workspace = new Workspace();
+        workspace.setId(1L);
+        workspace.getFeatures().setPracticesEnabled(true);
+        return workspace;
     }
 
     private IssueReviewSubmissionRequest sampleRequest() {
@@ -108,9 +158,6 @@ class IssueReviewHandlerTest extends BaseUnitTest {
 
         @Test
         void idempotencyKeyHasDisposableFreshnessSegment() {
-            // Key ends in a trailing (updatedAt) freshness segment so extractCooldownKeyPrefix strips it and
-            // cooldown scopes per-issue, NOT per-repo. An edited issue (new updatedAt) re-reviews. The "manual"
-            // phase segment (no triggerEvent here) keeps an authoring pass distinct from an IssueClosed pass.
             JobSubmission submission = handler.createSubmission(sampleRequest());
             assertThat(submission.idempotencyKey()).isEqualTo("issue_review:owner/repo:12:manual:1700000000000");
         }
@@ -125,12 +172,6 @@ class IssueReviewHandlerTest extends BaseUnitTest {
 
     private record WrongRequest() implements de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest {}
 
-    /**
-     * The issue-delivery path mirrors the MR path's suppression + soft-failure contract (tested for PRs
-     * in {@code FeedbackDeliveryServiceTest}). These lock the issue-side equivalents so flipping the
-     * suppression sense (post to closed issues) or letting the swallow propagate (mark good jobs FAILED)
-     * cannot ship green.
-     */
     @Nested
     class DeliverIssueFeedback {
 
@@ -140,11 +181,28 @@ class IssueReviewHandlerTest extends BaseUnitTest {
             workspace.setId(1L);
             job.setWorkspace(workspace);
             ObjectNode metadata = objectMapper.createObjectNode();
+            metadata.put("repository_id", 123L);
             metadata.put("repository_full_name", "owner/repo");
+            metadata.put("issue_id", 777L);
             metadata.put("issue_number", 12);
             metadata.put("state", state);
             job.setMetadata(metadata);
             return job;
+        }
+
+        private Issue stubCurrentIssue(Issue.State state) {
+            Issue issue = new Issue();
+            issue.setNumber(12);
+            issue.setState(state);
+            Repository repository = new Repository();
+            repository.setId(123L);
+            repository.setNameWithOwner("owner/repo");
+            issue.setRepository(repository);
+            User author = new User();
+            author.setId(5L);
+            issue.setAuthor(author);
+            when(issueRepository.findByIdWithAuthorAndRepository(777L)).thenReturn(Optional.of(issue));
+            return issue;
         }
 
         private DeliveryContent note() {
@@ -152,8 +210,25 @@ class IssueReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        void closedIssue_isSuppressed_neverPosts() {
+        void disabledPracticeFeatureStopsDeliveryWithoutLedgerEgress() {
+            AgentJob job = issueJob("OPEN");
+            Workspace workspace = activePracticeWorkspace();
+            workspace.getFeatures().setPracticesEnabled(false);
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+
+            handler.postIssueNote(job, note());
+
+            verify(commentPoster, never()).postIssueFormattedBody(any(), any());
+            verify(feedbackLedgerRecorder, never()).recordSuppressedUnit(any(), any(), any());
+            verify(feedbackLedgerRecorder, never()).recordUndelivered(any(), any());
+            verify(issueRepository, never()).findByIdWithAuthorAndRepository(777L);
+            verify(accountPreferencesQuery, never()).preferencesForUserId(5L);
+        }
+
+        @Test
+        void closedSnapshotAfterReopen_isSuppressed() {
             AgentJob job = issueJob("CLOSED");
+            stubCurrentIssue(Issue.State.OPEN);
             DeliveryContent delivery = note();
 
             handler.postIssueNote(job, delivery);
@@ -167,9 +242,133 @@ class IssueReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        void blankAfterSanitize_isSuppressed_withEmptyAfterSanitizeReason() {
-            // Issues have no inline lane: a body that sanitises to blank means nothing reached the developer.
+        void currentIssueClosedAfterSubmission_isSuppressed() {
             AgentJob job = issueJob("OPEN");
+            stubCurrentIssue(Issue.State.CLOSED);
+
+            handler.postIssueNote(job, note());
+
+            verify(commentPoster, never()).postIssueFormattedBody(any(), any());
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                eq(job),
+                any(),
+                eq(FeedbackSuppressionReason.ARTIFACT_CLOSED)
+            );
+        }
+
+        @Test
+        void missingIssue_isSuppressedAsGone() {
+            AgentJob job = issueJob("OPEN");
+
+            handler.postIssueNote(job, note());
+
+            verify(commentPoster, never()).postIssueFormattedBody(any(), any());
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                eq(job),
+                any(),
+                eq(FeedbackSuppressionReason.ARTIFACT_GONE)
+            );
+        }
+
+        @Test
+        void authorlessIssue_isSuppressedAsGone() {
+            AgentJob job = issueJob("OPEN");
+            stubCurrentIssue(Issue.State.OPEN).setAuthor(null);
+
+            handler.postIssueNote(job, note());
+
+            verify(commentPoster, never()).postIssueFormattedBody(any(), any());
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                eq(job),
+                any(),
+                eq(FeedbackSuppressionReason.ARTIFACT_GONE)
+            );
+        }
+
+        @Test
+        void tombstonedIssue_isSuppressedAsGone() {
+            AgentJob job = issueJob("OPEN");
+            stubCurrentIssue(Issue.State.OPEN).setDeletedAt(Instant.now());
+
+            handler.postIssueNote(job, note());
+
+            verify(commentPoster, never()).postIssueFormattedBody(any(), any());
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                eq(job),
+                any(),
+                eq(FeedbackSuppressionReason.ARTIFACT_GONE)
+            );
+        }
+
+        @Test
+        void mismatchedTargetMetadata_isSuppressedAsGone() {
+            AgentJob job = issueJob("OPEN");
+            ((ObjectNode) job.getMetadata()).put("repository_id", 999L);
+            stubCurrentIssue(Issue.State.OPEN);
+
+            handler.postIssueNote(job, note());
+
+            verify(commentPoster, never()).postIssueFormattedBody(any(), any());
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                eq(job),
+                any(),
+                eq(FeedbackSuppressionReason.ARTIFACT_GONE)
+            );
+        }
+
+        @Test
+        void repositoryRemovedFromWorkspace_isSuppressedAsGone() {
+            AgentJob job = issueJob("OPEN");
+            stubCurrentIssue(Issue.State.OPEN);
+            when(repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(1L, "owner/repo")).thenReturn(false);
+
+            handler.postIssueNote(job, note());
+
+            verify(commentPoster, never()).postIssueFormattedBody(any(), any());
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                eq(job),
+                any(),
+                eq(FeedbackSuppressionReason.ARTIFACT_GONE)
+            );
+        }
+
+        @Test
+        void optedOutAuthor_isSuppressedWithoutConversationalEscalation() {
+            AgentJob job = issueJob("OPEN");
+            stubCurrentIssue(Issue.State.OPEN);
+            when(accountPreferencesQuery.preferencesForUserId(5L)).thenReturn(
+                Optional.of(new AccountPreferencesQuery.PreferencesView(false, false))
+            );
+
+            handler.postIssueNote(job, note());
+
+            verify(commentPoster, never()).postIssueFormattedBody(any(), any());
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                eq(job),
+                any(),
+                eq(FeedbackSuppressionReason.RECIPIENT_OPTED_OUT)
+            );
+            verify(feedbackLedgerRecorder, never()).recordUndelivered(any(), any());
+        }
+
+        @Test
+        void preferenceLookupFailure_failsClosedWithoutConversationalEscalation() {
+            AgentJob job = issueJob("OPEN");
+            stubCurrentIssue(Issue.State.OPEN);
+            when(accountPreferencesQuery.preferencesForUserId(5L)).thenThrow(
+                new IllegalStateException("database unavailable")
+            );
+
+            assertThatThrownBy(() -> handler.postIssueNote(job, note())).isInstanceOf(IllegalStateException.class);
+
+            verify(commentPoster, never()).postIssueFormattedBody(any(), any());
+            verify(feedbackLedgerRecorder, never()).recordUndelivered(any(), any());
+        }
+
+        @Test
+        void blankAfterSanitize_isSuppressed_withEmptyAfterSanitizeReason() {
+            AgentJob job = issueJob("OPEN");
+            stubCurrentIssue(Issue.State.OPEN);
             DeliveryContent delivery = new DeliveryContent("", List.of(), List.of());
 
             handler.postIssueNote(job, delivery);
@@ -183,42 +382,39 @@ class IssueReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        void openIssue_postsAndRecordsCommentId() {
+        void openIssueWithoutPreferences_postsLinkedCommentAndRecordsCommentId() {
             AgentJob job = issueJob("OPEN");
+            stubCurrentIssue(Issue.State.OPEN);
             when(commentPoster.postIssueFormattedBody(eq(job), any())).thenReturn("gid://gitlab/Note/9");
 
             handler.postIssueNote(job, note());
 
-            verify(commentPoster).postIssueFormattedBody(eq(job), any());
+            ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
+            verify(commentPoster).postIssueFormattedBody(eq(job), body.capture());
+            assertThat(body.getValue()).contains(
+                "[Manage comments and Slack reminders](https://hephaestus.example/settings#practice-feedback)"
+            );
             assertThat(job.getDeliveryCommentId()).isEqualTo("gid://gitlab/Note/9");
-            // C12: a confirmed post records the ledger.
             verify(feedbackLedgerRecorder).record(eq(job), any(), any(), any());
-            // A successful delivery must NOT also persist a FAILED/undelivered unit.
             verify(feedbackLedgerRecorder, never()).recordUndelivered(any(), any());
         }
 
         @Test
         void posterFailure_isSwallowed_doesNotPropagate() {
             AgentJob job = issueJob("OPEN");
+            stubCurrentIssue(Issue.State.OPEN);
             when(commentPoster.postIssueFormattedBody(eq(job), any())).thenThrow(new RuntimeException("gitlab down"));
 
             assertThatCode(() -> handler.postIssueNote(job, note())).doesNotThrowAnyException();
             assertThat(job.getDeliveryCommentId()).isNull();
-            // C12: a swallowed delivery failure means the student saw nothing — the ledger must NOT record a
-            // phantom DELIVERED unit (which would also supersede the real prior, corrupting it like A3).
             verify(feedbackLedgerRecorder, never()).record(any(), any(), any(), any());
-            // ...but the composed body must be persisted as a FAILED unit so it stays auditable.
             verify(feedbackLedgerRecorder).recordUndelivered(eq(job), any());
         }
 
         @Test
         void jobDeliveryException_propagates_andDoesNotRecord() {
-            // The deliberate firewall: a JobDeliveryException is a genuinely-undelivered review (the agent
-            // ran, but the student saw nothing). It MUST re-throw so the job is recorded FAILED — never
-            // swallowed like a transient RuntimeException — and the ledger must NOT record a phantom
-            // DELIVERED unit. A regression that broadened the swallow to also catch JobDeliveryException
-            // would otherwise ship green.
             AgentJob job = issueJob("OPEN");
+            stubCurrentIssue(Issue.State.OPEN);
             when(commentPoster.postIssueFormattedBody(eq(job), any())).thenThrow(
                 new de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException("delivery failed")
             );
@@ -228,15 +424,13 @@ class IssueReviewHandlerTest extends BaseUnitTest {
             );
             assertThat(job.getDeliveryCommentId()).isNull();
             verify(feedbackLedgerRecorder, never()).record(any(), any(), any(), any());
-            // The undelivered body is persisted (FAILED) BEFORE the exception re-throws, so it is not lost.
             verify(feedbackLedgerRecorder).recordUndelivered(eq(job), any());
         }
 
         @Test
         void nullCommentId_doesNotRecordPhantomDelivered() {
-            // C12: a best-effort post that returns no comment id (vendor returned nothing without raising) means
-            // nothing landed — the ledger must NOT record a DELIVERED unit for feedback the student never saw.
             AgentJob job = issueJob("OPEN");
+            stubCurrentIssue(Issue.State.OPEN);
             when(commentPoster.postIssueFormattedBody(eq(job), any())).thenReturn(null);
 
             handler.postIssueNote(job, note());
@@ -250,7 +444,6 @@ class IssueReviewHandlerTest extends BaseUnitTest {
         void noDeliveryContent_isNoop() {
             handler.postIssueNote(issueJob("OPEN"), null);
             verify(commentPoster, never()).postIssueFormattedBody(any(), any());
-            // Nothing was composed, so there is nothing to persist as undelivered either.
             verify(feedbackLedgerRecorder, never()).recordUndelivered(any(), any());
         }
     }

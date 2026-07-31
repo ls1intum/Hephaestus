@@ -98,7 +98,8 @@ function RouteComponent() {
 		});
 	};
 
-	const handleAiReviewToggle = (checked: boolean) => updateSetting({ aiReviewEnabled: checked });
+	const handlePracticeFeedbackToggle = (checked: boolean) =>
+		updateSetting({ practiceFeedbackDeliveryEnabled: checked });
 
 	const handleResearchToggle = (checked: boolean) =>
 		updateSetting({ participateInResearch: checked });
@@ -225,9 +226,9 @@ function RouteComponent() {
 			isLoading={isLoading}
 			settingsError={settingsError}
 			onRetrySettings={() => refetchSettings()}
-			aiReviewProps={{
-				aiReviewEnabled: settings?.aiReviewEnabled ?? true,
-				onToggleAiReview: handleAiReviewToggle,
+			practiceFeedbackProps={{
+				practiceFeedbackDeliveryEnabled: settings?.practiceFeedbackDeliveryEnabled ?? true,
+				onTogglePracticeFeedback: handlePracticeFeedbackToggle,
 				isLoading: updateSettingsMutation.isPending,
 			}}
 			showResearchSection={analyticsConfigured}

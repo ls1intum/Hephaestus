@@ -89,12 +89,12 @@ The exact practices depend on your workspace. Common areas include:
 
 Feedback can carry one of four severity labels:
 
-| Severity | Meaning |
-| --- | --- |
+| Severity     | Meaning                                                       |
+| ------------ | ------------------------------------------------------------- |
 | **CRITICAL** | A security vulnerability, data-loss risk, or production crash |
-| **MAJOR** | A functional problem or missing safety mechanism |
-| **MINOR** | A smaller maintainability, readability, or workflow concern |
-| **INFO** | An observation with no direct quality impact |
+| **MAJOR**    | A functional problem or missing safety mechanism              |
+| **MINOR**    | A smaller maintainability, readability, or workflow concern   |
+| **INFO**     | An observation with no direct quality impact                  |
 
 Severity helps order the feedback. It is not a grade or merge decision.
 
@@ -104,10 +104,10 @@ If your workspace connects an [Outline](https://www.getoutline.com/) team wiki, 
 
 Hephaestus only reads collections a workspace admin chose to mirror. It does not write to Outline. Connecting your own Outline account under **Settings → Connected accounts** lets Hephaestus attribute documents you wrote to you.
 
-## Stop receiving comments
+## Stop comments and reminders
 
-Open **Settings → Practice feedback** and turn off **Pull request comments** to stop Hephaestus from posting new practice-feedback comments on your pull requests or merge requests.
+Open **Settings → Practice feedback** and turn off **Comments and Slack reminders** to stop new practice-feedback comments on issues, pull requests, or merge requests you author and Slack reminders sent to you.
 
-This setting controls delivery only. Reviews can still run, and their findings are still stored and may be visible to workspace admins. It does not delete earlier comments or findings.
+This setting controls delivery only. Reviews can still run, their findings remain stored and may be visible to workspace admins, and earlier comments and findings are not deleted.
 
 Draft change requests are skipped when the workspace's **Skip drafts** setting is on. Marking a draft ready does not always start a review by itself; use `/hephaestus review` when manual review commands are enabled.
